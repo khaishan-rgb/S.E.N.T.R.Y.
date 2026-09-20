@@ -1,12 +1,14 @@
-# SG Transport Pulse V3.2 — Traffic Fixed
+# SG Transport Pulse V4 — Route = Traffic
 
-Traffic fix:
-- Uses the official `v3/TrafficSpeedBands` endpoint.
-- Traffic is fetched live on every corridor request (not cached as static data).
-- Paginates the full live feed.
-- Corridor matching widened to 800 m to account for approximate bus-route geometry.
-- Adds `/api/traffic-test` diagnostic endpoint.
-- UI now shows both raw LTA segment count and matched corridor segment count, so a zero result cannot silently masquerade as working traffic.
-- LTA bands 1–2 = red, 3–4 = yellow, 5–8 = green.
+## What changed
+- The bus route itself is now the traffic display.
+- Green = LTA bands 5–8 (40+ km/h)
+- Yellow = LTA bands 3–4 (20–39 km/h)
+- Red = LTA bands 1–2 (<20 km/h)
+- Cyan = no traffic-band match; never invents traffic.
+- Direction 1/2 remains isolated.
+- Every bus stop is tappable; tap **Monitor this stop** to query Bus Arrival and show approaching bus positions.
+- Traffic endpoint auto-detection tries the currently documented `v3/TrafficSpeedBands`, then legacy `TrafficSpeedBandsv2` and `TrafficSpeedBands` for compatibility.
+- `/api/traffic-test` reports the actual endpoint and segment count.
 
-Keep `LTA_ACCOUNT_KEY` only in Render environment variables.
+Keep `LTA_ACCOUNT_KEY` in Render only.

@@ -30,18 +30,43 @@ async def paged(path,key,max_pages=50,params=None):
     return rows
 
 
-async def paged_live(path,max_pages=60):
-    rows=[]
-    err=None
-    for skip in range(0,max_pages*500,500):
-        d=await get_lta(path,{"$skip":skip})
-        if d.get("_error"):
-            err=d.get("_error")
-            break
-        b=d.get("value",[])
-        rows += b
-        if len(b)<500: break
-    return rows,err
+async def traffic_speed_bands():
+    # LTA's current guide documents v3/TrafficSpeedBands. Some DataMall accounts/gateways
+    # have historically exposed legacy names, so probe safely and report which one works.
+    candidates=["v3/TrafficSpeedBands","TrafficSpeedBandsv2","TrafficSpeedBands"]
+    errors=[]
+    for path in candidates:
+        rows=[]
+        ok=False
+        for skip in range(0,30000,500):
+            d=await get_lta(path,{"$skip":skip})
+            if d.get("_error"):
+                errors.append(f"{path}: {d['_error']}")
+                rows=[]
+                break
+            b=d.get("value",[])
+            ok=True; rows+=b
+            if len(b)<500: break
+        if ok and rows:
+            norm=[]
+            for x in rows:
+                y=dict(x)
+                # Older feeds encode coordinates in Location.
+                if y.get("StartLat") is None and y.get("Location"):
+                    loc=y.get("Location")
+                    vals=[]
+                    if isinstance(loc,str):
+                        import re
+                        vals=[float(v) for v in re.findall(r"1\.\d+|10[34]\.\d+",loc)]
+                    elif isinstance(loc,(list,tuple)):
+                        vals=[float(v) for v in loc]
+                    if len(vals)>=4:
+                        # Common legacy order: start lat, start lon, end lat, end lon
+                        y["StartLat"],y["StartLon"],y["EndLat"],y["EndLon"]=vals[:4]
+                norm.append(y)
+            return norm,path,None
+    return [],None," | ".join(errors[-3:])
+
 
 def num(v):
     try:return float(v)
@@ -89,7 +114,7 @@ async def context(service:str="",stop:str="",direction:int=1):
         if lat is not None and (not pts or dist_to_route(lat,lon,pts)<1.2):relevant.append(x)
 
     # Traffic Speed Bands v3: current speeds, refreshed by LTA about every 5 min.
-    speed,speed_error=await paged_live("v3/TrafficSpeedBands",max_pages=60)
+    speed,traffic_endpoint,speed_error=await traffic_speed_bands()
     bands=[]
     for x in speed:
         a=(num(x.get("StartLat")),num(x.get("StartLon"))); b=(num(x.get("EndLat")),num(x.get("EndLon")))
@@ -98,17 +123,16 @@ async def context(service:str="",stop:str="",direction:int=1):
         if pts and dist_to_route(mid[0],mid[1],pts)>0.80:continue
         bands.append({"road":x.get("RoadName"),"band":x.get("SpeedBand"),"min":x.get("MinimumSpeed"),"max":x.get("MaximumSpeed"),"a":a,"b":b})
         if len(bands)>=1000:break
-    return {**base,"incidents":relevant[:80],"speedBands":bands,"trafficDebug":{"rawSegments":len(speed),"matchedSegments":len(bands),"error":speed_error}}
+    return {**base,"incidents":relevant[:80],"speedBands":bands,"trafficDebug":{"rawSegments":len(speed),"matchedSegments":len(bands),"error":speed_error,"endpoint":traffic_endpoint}}
 
 @app.get("/api/traffic-test")
 async def traffic_test():
-    rows,err=await paged_live("v3/TrafficSpeedBands",max_pages=60)
-    sample=rows[0] if rows else None
+    rows,endpoint,err=await traffic_speed_bands()
     counts={}
     for x in rows:
         k=str(x.get("SpeedBand"))
         counts[k]=counts.get(k,0)+1
-    return {"working":bool(rows),"segments":len(rows),"speedBandCounts":counts,"sample":sample,"error":err}
+    return {"working":bool(rows),"endpoint":endpoint,"segments":len(rows),"speedBandCounts":counts,"sample":rows[0] if rows else None,"error":err}
 
 @app.get("/api/stop-suggest")
 async def stop_suggest(q:str=Query("")):
