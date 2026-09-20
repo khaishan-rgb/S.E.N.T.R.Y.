@@ -29,6 +29,20 @@ async def paged(path,key,max_pages=50,params=None):
     CACHE[key]=rows
     return rows
 
+
+async def paged_live(path,max_pages=60):
+    rows=[]
+    err=None
+    for skip in range(0,max_pages*500,500):
+        d=await get_lta(path,{"$skip":skip})
+        if d.get("_error"):
+            err=d.get("_error")
+            break
+        b=d.get("value",[])
+        rows += b
+        if len(b)<500: break
+    return rows,err
+
 def num(v):
     try:return float(v)
     except:return None
@@ -75,16 +89,26 @@ async def context(service:str="",stop:str="",direction:int=1):
         if lat is not None and (not pts or dist_to_route(lat,lon,pts)<1.2):relevant.append(x)
 
     # Traffic Speed Bands v3: current speeds, refreshed by LTA about every 5 min.
-    speed=await paged("v3/TrafficSpeedBands","speedbands-live",max_pages=40)
+    speed,speed_error=await paged_live("v3/TrafficSpeedBands",max_pages=60)
     bands=[]
     for x in speed:
         a=(num(x.get("StartLat")),num(x.get("StartLon"))); b=(num(x.get("EndLat")),num(x.get("EndLon")))
         if None in a or None in b:continue
         mid=((a[0]+b[0])/2,(a[1]+b[1])/2)
-        if pts and dist_to_route(mid[0],mid[1],pts)>0.35:continue
+        if pts and dist_to_route(mid[0],mid[1],pts)>0.80:continue
         bands.append({"road":x.get("RoadName"),"band":x.get("SpeedBand"),"min":x.get("MinimumSpeed"),"max":x.get("MaximumSpeed"),"a":a,"b":b})
         if len(bands)>=1000:break
-    return {**base,"incidents":relevant[:80],"speedBands":bands}
+    return {**base,"incidents":relevant[:80],"speedBands":bands,"trafficDebug":{"rawSegments":len(speed),"matchedSegments":len(bands),"error":speed_error}}
+
+@app.get("/api/traffic-test")
+async def traffic_test():
+    rows,err=await paged_live("v3/TrafficSpeedBands",max_pages=60)
+    sample=rows[0] if rows else None
+    counts={}
+    for x in rows:
+        k=str(x.get("SpeedBand"))
+        counts[k]=counts.get(k,0)+1
+    return {"working":bool(rows),"segments":len(rows),"speedBandCounts":counts,"sample":sample,"error":err}
 
 @app.get("/api/stop-suggest")
 async def stop_suggest(q:str=Query("")):
