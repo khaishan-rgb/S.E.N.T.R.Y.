@@ -20,7 +20,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 
 import headway
 
-VERSION = "V5.5"
+VERSION = "V5.6"
 LTA = os.getenv("LTA_BASE", "https://datamall2.mytransport.sg/ltaodataservice").rstrip("/")
 KEY = os.getenv("LTA_ACCOUNT_KEY", "")
 OSRM = os.getenv("OSRM_URL", "https://router.project-osrm.org").rstrip("/")
@@ -992,8 +992,8 @@ BB_IDLE_SEC = 600                     # stop polling LTA when nobody has looked 
 BB_ALWAYS = os.getenv("BUNCHING_ALWAYS_ON", "").strip().lower() in ("1", "true", "yes")   # keep polling with nobody watching, so the event log keeps filling
 BB = {"params": dict(bunching.PARAMS), "master": [], "rows": {}, "watch": {}, "hist": deque(maxlen=900), "trk": {}, "open": {}, "seq": 0,
       "last_req": 0.0, "cycle": {"at": None, "took": None, "pairs": 0}, "loop_at": 0.0, "db_ok": True, "db_err": None}
-BB_INT_PARAMS = ("confirm_stops", "gap_stops", "refresh_sec", "horizon_min")
-PARAM_RANGES = {"bunch_min": (0.5, 10), "confirm_stops": (1, 60), "gap_add_min": (1, 60), "gap_stops": (1, 60), "horizon_min": (10, 60), "refresh_sec": (15, 600),
+BB_INT_PARAMS = ("confirm_stops", "gap_stops", "alert_step", "refresh_sec", "horizon_min")
+PARAM_RANGES = {"bunch_min": (0.5, 10), "confirm_stops": (1, 60), "gap_add_min": (1, 60), "gap_stops": (1, 60), "alert_step": (1, 30), "horizon_min": (10, 60), "refresh_sec": (15, 600),
                 "w_gap": (0, 100), "w_bunch": (0, 100), "w_persist": (0, 100), "w_deter": (0, 100), "w_time": (0, 100), "yellow_conv": (0.3, 1), "yellow_div": (1, 3)}
 
 
@@ -1019,10 +1019,12 @@ def bb_init():
            "max_level INTEGER, start_stop TEXT, end_stop TEXT, stops INTEGER, min_hw REAL)")
     bb_sql("CREATE TABLE IF NOT EXISTS gap_event(id INTEGER PRIMARY KEY AUTOINCREMENT, service TEXT, direction INTEGER, start_ts REAL, end_ts REAL, buses TEXT, "
            "max_hw REAL, max_ratio REAL, sched_hw REAL, location TEXT)")
-    have = {r["name"] for r in bb_sql("PRAGMA table_info(gap_event)", fetch=True)}             # older files: add the new gap_event columns
-    for col, typ in (("start_stop", "TEXT"), ("end_stop", "TEXT"), ("stops", "INTEGER")):
-        if col not in have:
-            bb_sql(f"ALTER TABLE gap_event ADD COLUMN {col} {typ}")
+    for tbl, cols in (("gap_event", (("start_stop", "TEXT"), ("end_stop", "TEXT"), ("stops", "INTEGER"), ("alerts", "INTEGER"))),   # older files: add the new columns
+                      ("bunching_event", (("alerts", "INTEGER"),))):
+        have = {r["name"] for r in bb_sql(f"PRAGMA table_info({tbl})", fetch=True)}
+        for col, typ in cols:
+            if col not in have:
+                bb_sql(f"ALTER TABLE {tbl} ADD COLUMN {col} {typ}")
     if not bb_sql("SELECT v FROM system_parameter WHERE k='rules_v'", fetch=True):              # rules changed (3 min / +10 min / 15 stops): drop old saved values once
         bb_sql("DELETE FROM system_parameter")
         bb_sql("INSERT OR REPLACE INTO system_parameter(k, v) VALUES ('rules_v', 2)")
@@ -1162,6 +1164,36 @@ def bb_ev_gate(e):
     return int(BB["params"]["confirm_stops" if e["kind"] == "bb" else "gap_stops"])
 
 
+# ---- alerts: 1st alert when the case has lasted the required stops (15), then one more every `alert_step` stops (20, 25, 30 ...) while it lasts
+def bb_alert_level(e):
+    n, gate, step = bb_ev_stops(e), bb_ev_gate(e), max(1, int(BB["params"]["alert_step"]))
+    return 0 if n < gate else 1 + (n - gate) // step
+
+
+def bb_alert_update(e, ts):
+    lvl, gate, step = bb_alert_level(e), bb_ev_gate(e), max(1, int(BB["params"]["alert_step"]))
+    while len(e["alerts"]) < lvl:                                                    # a missed refresh can cross more than one step: raise them all
+        k = len(e["alerts"]) + 1
+        e["alerts"].append({"n": k, "ts": ts, "at_stops": gate + step * (k - 1), "stops": bb_ev_stops(e), "stop": e.get("end_stop")})
+
+
+def bb_alert_public(e):
+    n, gate, step = len(e["alerts"]), bb_ev_gate(e), max(1, int(BB["params"]["alert_step"]))
+    lvl = e.get("max_level") or 2
+    return {"id": e["id"], "kind": e["kind"], "key": e["key"], "service": e["service"], "direction": e["direction"],
+            "label": ("BUNCHING " + ("4BB+" if lvl >= 4 else f"{lvl}BB")) if e["kind"] == "bb" else "LONG HEADWAY",
+            "level": lvl if e["kind"] == "bb" else None, "count": n, "stops": bb_ev_stops(e), "gate": gate, "step": step, "next_at": gate + step * n,
+            "start": e["start"], "last": e.get("last"), "start_stop": e.get("start_stop"), "end_stop": e.get("end_stop"), "buses": sorted(e["ids"]),
+            "min_hw": e.get("min_hw"), "max_hw": e.get("max_hw"), "sched": e.get("sched"), "alerts": e["alerts"],
+            "acked": e.get("acked_n", 0) >= n, "acked_ts": e.get("acked_ts"), "clearing": e.get("miss", 0) > 0}
+
+
+def bb_alerts(keys=None):
+    out = [bb_alert_public(e) for e in BB["open"].values() if e.get("alerts") and (keys is None or e["key"] in keys)]
+    out.sort(key=lambda a: (-a["count"], -a["stops"], a["service"], a["direction"]))
+    return out
+
+
 def bb_events(key, res, ts):
     ev, seen = BB["open"], set()
     svc, d = key.split(":")[0], int(key.split(":")[1])
@@ -1173,8 +1205,10 @@ def bb_events(key, res, ts):
         if e is None:
             BB["seq"] += 1
             e = ev[BB["seq"]] = {"id": BB["seq"], "kind": "bb", "key": key, "service": svc, "direction": d, "start": ts, "ids": set(), "max_level": 0,
-                                 "first_j": g["since_j"], "last_j": g["cur_j"], "start_stop": g["since_stop"], "end_stop": g["cur_stop"], "min_hw": g["min_hw"]}
+                                 "first_j": g["since_j"], "last_j": g["cur_j"], "start_stop": g["since_stop"], "end_stop": g["cur_stop"], "min_hw": g["min_hw"],
+                                 "alerts": [], "acked_n": 0, "acked_ts": None}
         e["ids"] |= ids
+        e["sched"] = res.get("sched_hw")
         e["max_level"] = max(e["max_level"], g["size"] + len(g["joining"]))
         e["min_hw"] = min(e["min_hw"], g["min_hw"])
         if g["since_j"] < e["first_j"]:
@@ -1182,6 +1216,7 @@ def bb_events(key, res, ts):
         if g["cur_j"] >= e["last_j"]:
             e["last_j"], e["end_stop"] = g["cur_j"], g["cur_stop"]
         e["last"], e["miss"] = ts, 0
+        bb_alert_update(e, ts)
         seen.add(e["id"])
     for gp in res.get("gaps", []):
         if not gp.get("active"):                                                     # only pairs whose headway is long right now
@@ -1192,7 +1227,8 @@ def bb_events(key, res, ts):
             BB["seq"] += 1
             e = ev[BB["seq"]] = {"id": BB["seq"], "kind": "gap", "key": key, "service": svc, "direction": d, "start": ts, "ids": set(), "max_hw": 0.0, "max_ratio": 0.0,
                                  "sched": res["sched_hw"], "location": gp["location"], "lead": gp["lead"], "foll": gp["foll"],
-                                 "first_j": gp["since_j"], "last_j": gp["cur_j"], "start_stop": gp["since_stop"], "end_stop": gp["cur_stop"]}
+                                 "first_j": gp["since_j"], "last_j": gp["cur_j"], "start_stop": gp["since_stop"], "end_stop": gp["cur_stop"],
+                                 "alerts": [], "acked_n": 0, "acked_ts": None}
         e["ids"] |= pair
         e["lead"], e["foll"] = gp["lead"], gp["foll"]
         if gp["max_hw"] >= e["max_hw"]:
@@ -1202,7 +1238,9 @@ def bb_events(key, res, ts):
             e["first_j"], e["start_stop"] = gp["since_j"], gp["since_stop"]
         if gp["cur_j"] >= e["last_j"]:
             e["last_j"], e["end_stop"] = gp["cur_j"], gp["cur_stop"]
+        e["sched"] = res.get("sched_hw", e.get("sched"))
         e["last"], e["miss"] = ts, 0
+        bb_alert_update(e, ts)
         seen.add(e["id"])
     for eid in [i for i, e in ev.items() if e["key"] == key and i not in seen]:
         e = ev[eid]
@@ -1217,12 +1255,12 @@ def bb_close_event(e):
     if n < bb_ev_gate(e):
         return False
     if e["kind"] == "bb":
-        bb_sql("INSERT INTO bunching_event(service,direction,start_ts,end_ts,bus_group,max_level,start_stop,end_stop,stops,min_hw) VALUES (?,?,?,?,?,?,?,?,?,?)",
-               (e["service"], e["direction"], e["start"], e.get("last"), ",".join(sorted(e["ids"])), e["max_level"], e["start_stop"], e.get("end_stop"), n, e["min_hw"]))
+        bb_sql("INSERT INTO bunching_event(service,direction,start_ts,end_ts,bus_group,max_level,start_stop,end_stop,stops,min_hw,alerts) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+               (e["service"], e["direction"], e["start"], e.get("last"), ",".join(sorted(e["ids"])), e["max_level"], e["start_stop"], e.get("end_stop"), n, e["min_hw"], len(e["alerts"])))
     else:
-        bb_sql("INSERT INTO gap_event(service,direction,start_ts,end_ts,buses,max_hw,max_ratio,sched_hw,location,start_stop,end_stop,stops) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+        bb_sql("INSERT INTO gap_event(service,direction,start_ts,end_ts,buses,max_hw,max_ratio,sched_hw,location,start_stop,end_stop,stops,alerts) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
                (e["service"], e["direction"], e["start"], e.get("last"), ",".join(sorted(e["ids"])), e["max_hw"], e["max_ratio"], e["sched"], e["location"],
-                e["start_stop"], e.get("end_stop"), n))
+                e["start_stop"], e.get("end_stop"), n, len(e["alerts"])))
     return True
 
 
@@ -1236,7 +1274,7 @@ def bb_event_public(e, open_=True):
     if open_:
         return {"kind": e["kind"], "service": e["service"], "direction": e["direction"], "start": e["start"], "end": None, "buses": sorted(e["ids"]),
                 "level": e.get("max_level"), "stops": bb_ev_stops(e), "min_hw": e.get("min_hw"), "max_hw": e.get("max_hw"), "location": e.get("location") or e.get("start_stop"),
-                "start_stop": e.get("start_stop"), "end_stop": e.get("end_stop"), "open": True}
+                "start_stop": e.get("start_stop"), "end_stop": e.get("end_stop"), "alerts": len(e.get("alerts", [])), "open": True}
     return e
 
 
@@ -1361,7 +1399,7 @@ async def api_bunching(services: str = "", direction: int = 0):
             "kpi": {**cur, "services": len({r["service"] for r in rows}), "prev": prev, "history_min": hist_min}, "trend": trend[::step],
             "params": P, "errors": errors, "collector": {**BB["cycle"], "alive": alive, "db_ok": BB["db_ok"], "db_err": BB["db_err"], "max_pairs": BB_MAX_PAIRS,
                                                          "truncated": len(svcs) * len(dirs) > BB_MAX_PAIRS},
-            "open_events": sum(1 for e in bb_open_public() if e["service"] + ":" + str(e["direction"]) in kk)}
+            "open_events": sum(1 for e in bb_open_public() if e["service"] + ":" + str(e["direction"]) in kk), "alerts": bb_alerts(set(kk))}
 
 
 @app.get("/api/bunching/detail")
@@ -1379,7 +1417,7 @@ async def api_bunching_detail(service: str = "", direction: int = 1):
     except Exception:
         inc = {"incidents": [], "error": "unavailable"}
     recent = bb_open_public(key)
-    recent += bb_sql("SELECT 'bb' AS kind, service, direction, start_ts AS start, end_ts AS end, bus_group AS buses, max_level AS level, stops, min_hw, start_stop, end_stop, start_stop AS location FROM bunching_event "
+    recent += bb_sql("SELECT 'bb' AS kind, service, direction, start_ts AS start, end_ts AS end, bus_group AS buses, max_level AS level, stops, min_hw, start_stop, end_stop, start_stop AS location, alerts FROM bunching_event "
                      "WHERE service=? AND direction=? ORDER BY id DESC LIMIT 5", (svc, direction), fetch=True)
     return {"row": row, "route": {"stops": route.get("stops", []), "runs": route.get("runs", []), "geometry": route.get("geometry")},
             "incidents": {"count": len(inc.get("incidents", [])), "items": inc.get("incidents", [])[:3], "error": inc.get("error")}, "events": recent}
@@ -1446,11 +1484,26 @@ async def api_bb_master_clear(request: Request):
     return {"ok": True}
 
 
+@app.post("/api/bunching/alerts/ack")
+async def api_bb_alert_ack(request: Request):
+    """ACT: the controller has seen / actioned this alert. It stays listed (marked) and turns un-acknowledged again if a further alert is raised."""
+    try:
+        body = json.loads((await request.body()).decode("utf-8") or "{}")
+        eid = int(body.get("id"))
+    except (ValueError, TypeError):
+        return JSONResponse({"error": "Body must be JSON with the alert id."}, status_code=400)
+    e = BB["open"].get(eid)
+    if not e or not e.get("alerts"):
+        return JSONResponse({"error": "That alert is no longer active."}, status_code=404)
+    e["acked_n"], e["acked_ts"] = len(e["alerts"]), time.time()
+    return {"ok": True, "alert": bb_alert_public(e)}
+
+
 @app.get("/api/bunching/events")
 async def api_bb_events(limit: int = 100):
     limit = max(1, min(500, limit))
-    closed = bb_sql("SELECT 'bb' AS kind, service, direction, start_ts AS start, end_ts AS end, bus_group AS buses, max_level AS level, stops, min_hw, NULL AS max_hw, start_stop, end_stop, start_stop AS location FROM bunching_event "
-                    "UNION ALL SELECT 'gap', service, direction, start_ts, end_ts, buses, NULL, stops, NULL, max_hw, start_stop, end_stop, location FROM gap_event ORDER BY start DESC LIMIT ?", (limit,), fetch=True)
+    closed = bb_sql("SELECT 'bb' AS kind, service, direction, start_ts AS start, end_ts AS end, bus_group AS buses, max_level AS level, stops, min_hw, NULL AS max_hw, start_stop, end_stop, start_stop AS location, alerts FROM bunching_event "
+                    "UNION ALL SELECT 'gap', service, direction, start_ts, end_ts, buses, NULL, stops, NULL, max_hw, start_stop, end_stop, location, alerts FROM gap_event ORDER BY start DESC LIMIT ?", (limit,), fetch=True)
     return {"events": bb_open_public() + closed, "db_ok": BB["db_ok"], "min_stops": {"bunching": int(BB["params"]["confirm_stops"]), "gap": int(BB["params"]["gap_stops"])}}
 
 

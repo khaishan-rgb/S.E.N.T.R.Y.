@@ -20,6 +20,7 @@ PARAMS = {
     "confirm_stops": 15,    # bunching must persist this many consecutive stops to be confirmed (and to be logged)
     "gap_add_min": 10.0,    # long headway:   HW >= scheduled HW + 10 min
     "gap_stops": 15,        # long headway must persist this many consecutive stops to be confirmed (and to be logged)
+    "alert_step": 5,        # alerts: 1st alert when confirmed (15 stops), then one more every 5 stops (20, 25, 30 ...) while it lasts
     "horizon_min": 30,      # prediction horizon
     "refresh_sec": 30,      # collector interval
     "w_gap": 30, "w_bunch": 25, "w_persist": 20, "w_deter": 15, "w_time": 10,      # risk-score weights (%)

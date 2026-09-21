@@ -25,6 +25,23 @@ button,input,select{font:inherit;color:inherit}:focus-visible{outline:2px solid 
 .live .dot{width:9px;height:9px;border-radius:50%;background:var(--mut)}.live.ok .dot{background:var(--green);box-shadow:0 0 8px var(--green)}.live.warn .dot{background:var(--amber)}.live.bad .dot{background:var(--red)}
 .tabs{display:flex;gap:6px;padding:10px 2px 0}.tabs button{padding:8px 16px;border-radius:10px 10px 0 0;border:1px solid var(--line2);border-bottom:0;background:var(--panel);cursor:pointer;font-weight:700;color:#a9c2da}
 .tabs button[aria-selected=true]{background:var(--blue);color:#fff;border-color:#4aa6ff}
+.tbadge[hidden]{display:none}.tbadge{display:inline-block;min-width:20px;padding:0 6px;margin-left:6px;border-radius:10px;background:#e0101f;color:#fff;font-size:12px;font-weight:800;line-height:20px;text-align:center}.tbadge.ok{background:#39536e;color:#cfe0f3}
+.al{background:linear-gradient(180deg,var(--panel),#08172a);border:1px solid var(--line2);border-left:5px solid var(--amber);border-radius:12px;margin-bottom:10px}
+.al.l2{border-color:#8a2632;border-left-color:var(--red)}.al.l3{border-color:#c0323e;border-left-color:#ff2a38;box-shadow:0 0 0 1px #ff4d5533,0 0 18px #ff4d5522}.al.acked{opacity:.72}
+.alrow{display:grid;grid-template-columns:minmax(170px,215px) minmax(110px,150px) minmax(0,1fr) minmax(96px,130px) auto;gap:10px 16px;align-items:center;padding:12px 14px}
+.albadge{display:inline-flex;align-items:center;gap:8px;padding:8px 12px;border-radius:9px;background:#3a0f16;border:1px solid #7a2530;color:#ffb0b6;font-weight:800;font-size:12.5px;letter-spacing:.3px;white-space:nowrap}.albadge i{width:9px;height:9px;border-radius:50%;background:var(--red)}
+.al.l1 .albadge{background:#3a2a06;border-color:#7a5a12;color:#ffe08a}.al.l1 .albadge i{background:var(--amber)}
+.alsvc b{font-size:20px;font-weight:800}.alsvc span{color:var(--mut);margin-left:6px}
+.alinfo{min-width:0}.alinfo b{font-weight:700}.alinfo small,.alcnt small{display:block;color:var(--mut);font-size:12px;font-weight:500}
+.alcnt{font-weight:800;text-align:center;font-size:15px}
+.albtns{display:flex;gap:8px;align-items:center;justify-content:flex-end}
+.albtn{height:38px;padding:0 16px;border-radius:9px;font-weight:800;cursor:pointer;border:1px solid var(--line2);background:#12253c;color:var(--text);white-space:nowrap}.albtn:hover{filter:brightness(1.15)}
+.albtn.act{background:#e0101f;border-color:#ff5560;color:#fff;min-width:74px}.albtn.act.done{background:#12331f;border-color:#2c7a47;color:#8ff0b3;cursor:default;filter:none}
+.alarrow{background:transparent;border:0;color:#9cb4cc;font-size:18px;cursor:pointer;width:32px;height:38px;transition:transform .15s}.al.open .alarrow{transform:rotate(90deg)}
+.almore{border-top:1px solid var(--line);padding:10px 16px 14px;display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:8px 24px;font-size:13.5px}
+.almore h4{margin:0 0 6px;font-size:12.5px;color:var(--mut);font-weight:600}.almore ol{margin:0;padding-left:20px;display:grid;gap:3px}.almore .m{font-size:12.5px}
+.alnote{color:var(--mut);font-size:12.5px;margin:2px 0 12px}
+@media(max-width:900px){.alrow{grid-template-columns:minmax(0,1fr) auto;gap:8px 12px;padding:12px}.alrow>*{min-width:0}.alrow .albadge{grid-column:1/3;justify-self:start}.alrow .alsvc{grid-column:1/2}.alrow .alcnt{grid-column:2/3;text-align:right}.alrow .alinfo{grid-column:1/3}.alrow .albtns{grid-column:1/3}.albtns .albtn:not(.alarrow){flex:1}.almore{grid-template-columns:1fr}}
 .filters{display:flex;flex-wrap:wrap;gap:12px 14px;align-items:flex-end;padding:12px 2px}
 .fld label{display:block;font-size:12.5px;color:var(--mut);margin:0 0 5px 2px}
 .chips{display:flex;flex-wrap:wrap;gap:6px;align-items:center;min-height:42px;background:var(--panel);border:1px solid var(--line2);border-radius:10px;padding:4px 8px;min-width:230px}
@@ -90,7 +107,7 @@ tbody tr{cursor:pointer}tbody tr:hover{background:#0d2440}tbody tr.sel{backgroun
     <nav class="nav" aria-label="Pages"><a href="/">Route Traffic</a><a href="/control">Headway Control</a><a class="on" href="/bunching" aria-current="page">Bunching &amp; Gap</a></nav>
     <div class="hdr-right"><div id="clock">&nbsp;</div><div class="live" id="live"><span class="dot"></span><span id="liveText">Connecting&hellip;</span></div></div>
   </header>
-  <div class="tabs" role="tablist"><button role="tab" id="tabDash" aria-selected="true">Dashboard</button><button role="tab" id="tabSet" aria-selected="false">Settings</button></div>
+  <div class="tabs" role="tablist"><button role="tab" id="tabDash" aria-selected="true">Dashboard</button><button role="tab" id="tabAlerts" aria-selected="false">Alerts<span class="tbadge" id="alBadge" hidden>0</span></button><button role="tab" id="tabSet" aria-selected="false">Settings</button></div>
 
   <main id="dash">
     <form class="filters" id="form" autocomplete="off">
@@ -134,6 +151,10 @@ tbody tr{cursor:pointer}tbody tr:hover{background:#0d2440}tbody tr.sel{backgroun
     </div>
   </main>
 
+  <main id="alerts" hidden>
+    <section class="card" style="margin-top:12px"><header><div><h2>Active alerts</h2><div class="sub" id="alSub">Alerts are raised when bunching or long headway lasts long enough.</div></div></header>
+      <div class="alnote" id="alRule"></div><div id="alList"></div></section>
+  </main>
   <main id="settings" hidden>
     <section class="card"><header><div><h2>System parameters</h2><div class="sub">Tune the rules without changing code. Saved on the server; applied on the next refresh.</div></div><div><button class="btn sm go" id="parSave" type="button">Save</button> <button class="btn sm" id="parReset" type="button">Reset to defaults</button></div></header><div class="set" id="params"></div></section>
     <section class="card" style="margin-top:12px"><header><div><h2>Service Headway Master</h2><div class="sub">Scheduled headway by service, direction, day type and time. Overrides LTA's frequency band when a row matches (narrowest time window wins).</div></div>
@@ -142,7 +163,7 @@ tbody tr{cursor:pointer}tbody tr:hover{background:#0d2440}tbody tr.sel{backgroun
     <section class="card" style="margin-top:12px"><header><div><h2>Event log</h2><div class="sub" id="evSub">Bunching and long-headway events, logged only when they last long enough.</div></div><button class="btn sm" id="evExport" type="button">Export CSV</button></header><div class="tw" id="events"></div></section>
   </main>
 
-  <footer class="foot"><span>Sources: LTA DataMall (Bus Arrival, Bus Routes/Stops/Services, Traffic Speed Bands, Incidents), OneMap &nbsp;|&nbsp; Decision support only, not for operational use</span><span>SG Transport Pulse V5.5</span></footer>
+  <footer class="foot"><span>Sources: LTA DataMall (Bus Arrival, Bus Routes/Stops/Services, Traffic Speed Bands, Incidents), OneMap &nbsp;|&nbsp; Decision support only, not for operational use</span><span>SG Transport Pulse V5.6</span></footer>
 </div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -155,7 +176,7 @@ const LS = {get(k, d){ try{ const v = localStorage.getItem(k); return v == null 
 const COL = {smooth:"#22d36a", moderate:"#ffc21a", slow:"#ff4d55", none:"#2f7dff"}, bandCls = b => b == null ? "none" : b >= 5 ? "smooth" : b >= 3 ? "moderate" : "slow";
 const RNK = {red:0, orange:1, yellow:2, green:3, nodata:4}, RNAME = {red:"Critical", orange:"Developing", yellow:"Early sign", green:"Normal", nodata:"No data"};
 const S = {services:LS.get("bb.services", []), dir:LS.get("bb.dir", 0), win:LS.get("bb.win", 30), view:"service", issue:"all", lv:{2:true, 3:true, 4:true}, sort:"risk", page:1, data:null, sel:null,
-           detail:{}, auto:LS.get("bb.auto", true), left:30, tok:0, busy:false, tab:"dash"};
+           detail:{}, auto:LS.get("bb.auto", true), left:30, tok:0, busy:false, tab:"dash", alOpen:{}};
 const sgt = o => new Intl.DateTimeFormat("en-GB", {timeZone:"Asia/Singapore", hour12:false, ...o});
 function tick(){ const p = Object.fromEntries(sgt({weekday:"short", day:"2-digit", month:"short", year:"numeric", hour:"2-digit", minute:"2-digit"}).formatToParts(new Date()).map(x => [x.type, x.value])); $("clock").textContent = `${p.weekday}, ${p.day} ${p.month} ${p.year}  ${p.hour}:${p.minute}`; }
 tick(); setInterval(tick, 15000);
@@ -170,7 +191,7 @@ async function post(url, body){
 }
 
 /* ------------------------------------------------------------------ helpers */
-const P = () => (S.data && S.data.params) || {bunch_min:3, confirm_stops:15, gap_add_min:10, gap_stops:15, horizon_min:30};
+const P = () => (S.data && S.data.params) || {bunch_min:3, confirm_stops:15, gap_add_min:10, gap_stops:15, alert_step:5, horizon_min:30};
 function hwCls(v, H){ if(v == null || !H) return ""; const p = P(); return v < p.bunch_min - 1e-6 || v >= H + p.gap_add_min - 1e-6 ? "c-red" : ""; }
 const tOcc = t => t == null ? "\u2013" : t <= 0 ? "Now" : Math.round(t) + " min";
 function spark(r){
@@ -265,7 +286,42 @@ function renderMsgs(){
   }
   $("msgs").innerHTML = m.join("");
 }
-function render(){ renderMsgs(); renderKpis(); renderTable(); renderDonut(); renderTrend(); renderInsight(); }
+function render(){ renderMsgs(); renderKpis(); renderTable(); renderDonut(); renderTrend(); renderInsight(); renderAlerts(); }
+
+/* ------------------------------------------------------------------ alerts: 1st alert at 15 stops, then one more every 5 stops while it lasts */
+const hm = ts => ts ? sgt({hour:"2-digit", minute:"2-digit"}).format(new Date(ts * 1000)) : "\u2013";
+function alertRow(a){
+  const cls = a.count >= 3 ? "l3" : a.count === 2 ? "l2" : "l1", open = S.alOpen[a.id], p = P();
+  const hwTxt = a.kind === "bb" ? `min headway ${f1(a.min_hw)} min (bunched: below ${p.bunch_min} min)` : `headway up to ${f1(a.max_hw)} min vs scheduled ${f1(a.sched)} min (long: ${f1((a.sched || 0) + p.gap_add_min)}+ min)`;
+  const act = a.acked ? `<button class="albtn act done" type="button" disabled title="Acknowledged ${hm(a.acked_ts)}">ACKED \u2713 ${hm(a.acked_ts)}</button>` : `<button class="albtn act" type="button" data-act="${a.id}" title="Acknowledge: I have seen / actioned this alert">ACT</button>`;
+  const tl = a.alerts.map(x => `<li><b>Alert ${x.n}</b> &bull; ${hm(x.ts)} &bull; at ${x.at_stops} stops${x.stop ? " &bull; " + esc(x.stop) : ""}</li>`).join("");
+  return `<div class="al ${cls}${a.acked ? " acked" : ""}${open ? " open" : ""}" data-id="${a.id}">
+    <div class="alrow"><span class="albadge"><i></i>${esc(a.label)}</span><span class="alsvc"><b>Svc ${esc(a.service)}</b><span>Dir ${a.direction}</span></span>
+      <div class="alinfo"><b>${a.stops} bus stops</b> &nbsp;${esc(a.start_stop || "")} &rarr; ${esc(a.end_stop || "")}<small>since ${hm(a.start)} &bull; ${hwTxt}${a.clearing ? " &bull; clearing?" : ""}</small></div>
+      <div class="alcnt">${a.count} alert${a.count === 1 ? "" : "s"}<small>next at ${a.next_at} stops</small></div>
+      <div class="albtns"><button class="albtn" type="button" data-map="${esc(a.key)}">Map</button>${act}<button class="alarrow" type="button" data-more="${a.id}" aria-label="Details" aria-expanded="${!!open}">&#9656;</button></div></div>
+    ${open ? `<div class="almore"><div><h4>Alert history</h4><ol>${tl}</ol><div class="m" style="margin-top:6px">Next alert at ${a.next_at} bus stops (every ${a.step} stops after the first at ${a.gate}).</div></div>
+      <div><h4>Buses</h4><div>${esc(a.buses.join(", "))}</div><div class="m" style="margin-top:6px">${a.kind === "bb" ? "Peak group size " + (a.level >= 4 ? "4BB+" : a.level + "BB") : "Scheduled headway " + f1(a.sched) + " min"}. Bus ids come from position tracking (LTA gives no registration number).</div></div></div>` : ""}</div>`;
+}
+function renderAlerts(){
+  const list = (S.data && S.data.alerts) || [], un = list.filter(a => !a.acked).length, p = P();
+  const b = $("alBadge"); b.hidden = !list.length; b.textContent = un || list.length; b.classList.toggle("ok", !un);
+  document.title = (un ? `(${un}) ` : "") + "SG Transport Pulse \u2013 Bunching & Gap";
+  $("alRule").textContent = `Alert 1 when bunching (headway below ${p.bunch_min} min) or long headway (scheduled + ${p.gap_add_min} min) has lasted ${p.confirm_stops} bus stops; then another alert every ${p.alert_step} more stops while it continues.`;
+  $("alSub").textContent = list.length ? `${list.length} active case${list.length === 1 ? "" : "s"}, ${un} not acknowledged` : "No active alerts";
+  $("alList").innerHTML = list.length ? list.map(alertRow).join("") : `<div class="empty">No active alerts. A case that has lasted ${p.confirm_stops} bus stops raises alert 1, then alert 2 at ${p.confirm_stops + p.alert_step}, alert 3 at ${p.confirm_stops + 2 * p.alert_step} stops, and so on. Cases that clear before ${p.confirm_stops} stops never raise an alert.</div>`;
+}
+$("alList").addEventListener("click", async e => {
+  const t = e.target.closest("button"); if(!t) return;
+  if(t.dataset.more){ S.alOpen[t.dataset.more] = !S.alOpen[t.dataset.more]; renderAlerts(); }
+  else if(t.dataset.map){ showTab("dash"); select(t.dataset.map, false); setTimeout(() => { const m = $("map"); if(m) m.scrollIntoView({behavior:"smooth", block:"center"}); if(map) map.invalidateSize(); }, 150); }
+  else if(t.dataset.act){
+    t.disabled = true; const j = await post("/api/bunching/alerts/ack", JSON.stringify({id:+t.dataset.act}));
+    if(j.error){ toast(j.error); t.disabled = false; load(true); return; }
+    if(S.data && S.data.alerts){ const i = S.data.alerts.findIndex(a => a.id === j.alert.id); if(i >= 0) S.data.alerts[i] = j.alert; }
+    toast("Alert acknowledged"); renderAlerts();
+  }
+});
 
 /* ------------------------------------------------------------------ drill-down */
 function selRow(){ return S.data && S.data.rows.find(r => r.key === S.sel); }
@@ -364,7 +420,7 @@ function addSvc(v){ v = (v || "").trim().toUpperCase(); if(!v) return; if(!/^[0-
 function syncSegs(){ document.querySelectorAll("#dirSeg button").forEach(b => b.setAttribute("aria-pressed", +b.dataset.d === S.dir)); document.querySelectorAll("#viewSeg button").forEach(b => b.setAttribute("aria-pressed", b.dataset.v === S.view)); document.querySelectorAll("#issueSeg button").forEach(b => b.setAttribute("aria-pressed", b.dataset.i === S.issue)); document.querySelectorAll(".sorts button[data-s]").forEach(b => b.setAttribute("aria-pressed", b.dataset.s === S.sort)); $("win").value = String(S.win); }
 
 /* ------------------------------------------------------------------ settings tab */
-const PLAB = {bunch_min:["Bunching: headway below", "min (absolute)"], confirm_stops:["Bunching: confirm and log after", "consecutive stops"], gap_add_min:["Long headway: scheduled HW plus", "min"], gap_stops:["Long headway: confirm and log after", "consecutive stops"], horizon_min:["Prediction horizon", "min"], refresh_sec:["Refresh interval", "sec"],
+const PLAB = {bunch_min:["Bunching: headway below", "min (absolute)"], confirm_stops:["Bunching: confirm and log after", "consecutive stops"], gap_add_min:["Long headway: scheduled HW plus", "min"], gap_stops:["Long headway: confirm and log after", "consecutive stops"], alert_step:["Alerts: repeat every", "more stops after the first alert"], horizon_min:["Prediction horizon", "min"], refresh_sec:["Refresh interval", "sec"],
   w_gap:["Risk weight: gap severity", "%"], w_bunch:["Risk weight: bunching level", "%"], w_persist:["Risk weight: persistence", "%"], w_deter:["Risk weight: deterioration", "%"], w_time:["Risk weight: time to occur", "%"], yellow_conv:["Yellow: converging below", "\u00d7 scheduled HW"], yellow_div:["Yellow: widening above", "\u00d7 scheduled HW"]};
 async function loadSettings(){
   const j = await getJSON("/api/bunching/settings", 20000); if(j.error){ $("params").innerHTML = `<div class="msg bad">${esc(j.error)}</div>`; return; }
@@ -374,8 +430,8 @@ async function loadSettings(){
   $("mNote").textContent = `Today is a ${j.dayType}. Columns: service, direction (1/2), day_type (Weekday/Saturday/Sunday/All), from, to (HH:MM), target_hw.${j.tokenRequired ? " Admin token required to change settings." : ""}`;
   const ev = await getJSON("/api/bunching/events?limit=100", 20000), fmt = ts => ts ? sgt({day:"2-digit", month:"short", hour:"2-digit", minute:"2-digit"}).format(new Date(ts * 1000)) : "\u2013"; S.events = ev.events || [];
   const pp = j.params, full = ts => ts ? sgt({day:"2-digit", month:"short", hour:"2-digit", minute:"2-digit", second:"2-digit"}).format(new Date(ts * 1000)) : "\u2013";
-  $("evSub").textContent = `Logged only if it lasts at least ${pp.confirm_stops} bus stops (bunching: headway below ${pp.bunch_min} min) or ${pp.gap_stops} bus stops (long headway: scheduled + ${pp.gap_add_min} min). Shorter cases are not logged. Kept in a small SQLite file on the server.`;
-  $("events").innerHTML = S.events.length ? `<table><thead><tr><th>Type</th><th>Service</th><th>Dir</th><th>Start time</th><th>End time</th><th>Start bus stop</th><th>End bus stop</th><th>No. of stops</th><th>Buses</th><th>Level</th><th>Min / max HW</th></tr></thead><tbody>${S.events.map(e => `<tr><td>${e.kind === "bb" ? "Bunching" : "Long headway"}${e.open ? " <span class='tag dev'>open</span>" : ""}</td><td class="svc">${esc(e.service)}</td><td>${e.direction}</td><td>${full(e.start)}</td><td>${e.open ? "still on" : full(e.end)}</td><td>${esc(e.start_stop || "")}</td><td>${esc(e.end_stop || "")}</td><td>${e.stops == null ? "" : e.stops}</td><td>${esc(Array.isArray(e.buses) ? e.buses.join(",") : e.buses)}</td><td>${e.level ? e.level + "BB" : ""}</td><td>${f1(e.min_hw != null ? e.min_hw : e.max_hw)}</td></tr>`).join("")}</tbody></table>` : `<div class="empty">No events yet. Bunching (headway below ${pp.bunch_min} min) is logged once it has lasted ${pp.confirm_stops} bus stops; long headway (scheduled + ${pp.gap_add_min} min) once it has lasted ${pp.gap_stops} bus stops. It is closed 2 refreshes after it clears.</div>`;
+  $("evSub").textContent = `Logged only if it lasts at least ${pp.confirm_stops} bus stops (bunching: headway below ${pp.bunch_min} min) or ${pp.gap_stops} bus stops (long headway: scheduled + ${pp.gap_add_min} min). Shorter cases are not logged. "Alerts" = how many alerts the case raised. Kept in a small SQLite file on the server.`;
+  $("events").innerHTML = S.events.length ? `<table><thead><tr><th>Type</th><th>Service</th><th>Dir</th><th>Start time</th><th>End time</th><th>Start bus stop</th><th>End bus stop</th><th>No. of stops</th><th>Alerts</th><th>Buses</th><th>Level</th><th>Min / max HW</th></tr></thead><tbody>${S.events.map(e => `<tr><td>${e.kind === "bb" ? "Bunching" : "Long headway"}${e.open ? " <span class='tag dev'>open</span>" : ""}</td><td class="svc">${esc(e.service)}</td><td>${e.direction}</td><td>${full(e.start)}</td><td>${e.open ? "still on" : full(e.end)}</td><td>${esc(e.start_stop || "")}</td><td>${esc(e.end_stop || "")}</td><td>${e.stops == null ? "" : e.stops}</td><td>${e.alerts == null ? "" : e.alerts}</td><td>${esc(Array.isArray(e.buses) ? e.buses.join(",") : e.buses)}</td><td>${e.level ? e.level + "BB" : ""}</td><td>${f1(e.min_hw != null ? e.min_hw : e.max_hw)}</td></tr>`).join("")}</tbody></table>` : `<div class="empty">No events yet. Bunching (headway below ${pp.bunch_min} min) is logged once it has lasted ${pp.confirm_stops} bus stops; long headway (scheduled + ${pp.gap_add_min} min) once it has lasted ${pp.gap_stops} bus stops. It is closed 2 refreshes after it clears.</div>`;
 }
 function csvDownload(name, rows){ const csv = rows.map(r => r.map(v => { v = v == null ? "" : String(v); return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; }).join(",")).join("\n"); const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([csv], {type:"text/csv"})); a.download = name; document.body.appendChild(a); a.click(); a.remove(); }
 
@@ -395,20 +451,20 @@ $("pager").addEventListener("click", e => { const b = e.target.closest("button[d
 $("seq").addEventListener("click", e => { const tr = e.target.closest("tr[data-o]"); const r = selRow(); if(!tr || !r || !map) return; const s = r.seq.find(x => String(x.order) === tr.dataset.o); if(s && s.lat != null) map.setView([s.lat, s.lon], Math.max(map.getZoom(), 15)); });
 $("mlay").addEventListener("change", mapLayers);
 $("autoCb").checked = S.auto; $("autoCb").addEventListener("change", () => { S.auto = $("autoCb").checked; LS.set("bb.auto", S.auto); });
-setInterval(() => { if(S.tab !== "dash" || document.hidden || !S.auto) { $("cd").textContent = S.auto ? "" : ""; return; } S.left--; $("cd").textContent = `(in ${Math.max(0, S.left)}s)`; if(S.left <= 0 && !S.busy) load(true); }, 1000);
+setInterval(() => { if((S.tab !== "dash" && S.tab !== "alerts") || document.hidden || !S.auto) { $("cd").textContent = S.auto ? "" : ""; return; } S.left--; $("cd").textContent = `(in ${Math.max(0, S.left)}s)`; if(S.left <= 0 && !S.busy) load(true); }, 1000);
 $("exportBtn").addEventListener("click", () => {
   const rows = visibleRows(); if(!rows.length){ toast("Nothing to export"); return; }
   csvDownload("bunching-gap-status.csv", [["Service", "Dir", "Risk", "Score", "HW now", "+10", "+20", "+30", "Scheduled HW", "Issue", "BB level", "BB status", "Consecutive stops", "Location", "Time to occur (min)", "Trend"], ...rows.map(r => [r.service, r.direction, RNAME[r.risk], r.score, r.hw["0"], r.hw["10"], r.hw["20"], r.hw["30"], r.sched_hw, r.issue, r.bb && r.bb.label, r.bb && r.bb.status, r.bb && r.bb.stops, r.location, r.t_occur, r.trend])]);
 });
-function showTab(t){ S.tab = t; $("dash").hidden = t !== "dash"; $("settings").hidden = t !== "set"; $("tabDash").setAttribute("aria-selected", t === "dash"); $("tabSet").setAttribute("aria-selected", t === "set"); if(t === "set") loadSettings(); else if(map) setTimeout(() => map.invalidateSize(), 100); }
-$("tabDash").onclick = () => showTab("dash"); $("tabSet").onclick = () => showTab("set");
+function showTab(t){ S.tab = t; $("dash").hidden = t !== "dash"; $("alerts").hidden = t !== "alerts"; $("settings").hidden = t !== "set"; $("tabDash").setAttribute("aria-selected", t === "dash"); $("tabAlerts").setAttribute("aria-selected", t === "alerts"); $("tabSet").setAttribute("aria-selected", t === "set"); if(t === "set") loadSettings(); else if(t === "alerts") renderAlerts(); else if(map) setTimeout(() => map.invalidateSize(), 100); }
+$("tabDash").onclick = () => showTab("dash"); $("tabAlerts").onclick = () => showTab("alerts"); $("tabSet").onclick = () => showTab("set");
 $("parSave").onclick = async () => { const params = {}; document.querySelectorAll("#params input").forEach(i => params[i.dataset.k] = i.value); const j = await post("/api/bunching/settings", JSON.stringify({params})); if(j.error){ toast(j.error); return; } toast("Parameters saved"); loadSettings(); };
 $("parReset").onclick = async () => { const j = await post("/api/bunching/settings", JSON.stringify({reset:true})); if(j.error){ toast(j.error); return; } toast("Parameters reset to defaults"); loadSettings(); };
 $("mUp").onclick = () => $("mFile").click();
 $("mFile").onchange = async e => { const f = e.target.files[0]; e.target.value = ""; if(!f) return; const j = await post("/api/bunching/master", await f.text()); if(j.error){ toast(j.error); return; } toast(`Loaded ${j.rows} rows${j.errors && j.errors.length ? " (" + j.errors.length + " skipped)" : ""}`); loadSettings(); };
 $("mClr").onclick = async () => { const j = await post("/api/bunching/master/clear", ""); if(j.error){ toast(j.error); return; } toast("Service Headway Master cleared"); loadSettings(); };
 $("mTpl").onclick = () => csvDownload("service_headway_master_template.csv", [["service", "direction", "day_type", "from", "to", "target_hw"], ["32", "1", "Weekday", "07:00", "09:00", "10"], ["32", "1", "Weekday", "09:00", "16:00", "12"], ["32", "2", "Weekday", "07:00", "09:00", "10"]]);
-$("evExport").onclick = () => { const ev = S.events || []; if(!ev.length){ toast("No events to export"); return; } const t = ts => ts ? sgt({year:"numeric", month:"2-digit", day:"2-digit", hour:"2-digit", minute:"2-digit", second:"2-digit"}).format(new Date(ts * 1000)) : ""; csvDownload("bunching-gap-events.csv", [["type", "service", "dir", "start_time_sgt", "end_time_sgt", "start_bus_stop", "end_bus_stop", "no_of_stops", "buses", "level", "min_hw", "max_hw"], ...ev.map(e => [e.kind === "bb" ? "bunching" : "long_headway", e.service, e.direction, t(e.start), e.open ? "open" : t(e.end), e.start_stop, e.end_stop, e.stops, Array.isArray(e.buses) ? e.buses.join(" ") : e.buses, e.level ? e.level + "BB" : "", e.kind === "bb" ? e.min_hw : "", e.max_hw])]); };
+$("evExport").onclick = () => { const ev = S.events || []; if(!ev.length){ toast("No events to export"); return; } const t = ts => ts ? sgt({year:"numeric", month:"2-digit", day:"2-digit", hour:"2-digit", minute:"2-digit", second:"2-digit"}).format(new Date(ts * 1000)) : ""; csvDownload("bunching-gap-events.csv", [["type", "service", "dir", "start_time_sgt", "end_time_sgt", "start_bus_stop", "end_bus_stop", "no_of_stops", "alerts", "buses", "level", "min_hw", "max_hw"], ...ev.map(e => [e.kind === "bb" ? "bunching" : "long_headway", e.service, e.direction, t(e.start), e.open ? "open" : t(e.end), e.start_stop, e.end_stop, e.stops, e.alerts, Array.isArray(e.buses) ? e.buses.join(" ") : e.buses, e.level ? e.level + "BB" : "", e.kind === "bb" ? e.min_hw : "", e.max_hw])]); };
 
 /* start */
 (async () => {

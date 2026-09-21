@@ -1,7 +1,35 @@
-# SG Transport Pulse V5.5 — Route Traffic + Departure Adjustment + Bunching & Gap
+# SG Transport Pulse V5.6 — Route Traffic + Departure Adjustment + Bunching, Gap & Alerts
 
 Live bus positions, live LTA traffic drawn directly on the bus route, and next arrivals per stop.
 FastAPI backend + a single-page Leaflet frontend (OneMap basemap, OpenStreetMap fallback).
+
+## V5.6 - Alerts (Bunching & Gap page -> **Alerts** tab)
+
+Each case that reaches the logging threshold raises alerts that **escalate while it lasts**:
+
+| Bus stops the case has lasted | Alerts raised |
+|---|---|
+| 15 | **1** |
+| 20 (next 5) | **2** |
+| 25 (next 5) | **3** |
+| 30, 35 ... (every 5 more) | 4, 5 ... |
+
+* Same rules as the event log: bunching = headway **< 3 min**, long headway = **scheduled + 10 min**, counted over **observed** bus stops (start stop ->
+  where the leading bus is now). A case that clears before 15 stops never raises an alert. The first threshold is `confirm_stops` (bunching) /
+  `gap_stops` (long headway); the step is the new `alert_step` setting (default 5). If a refresh is missed and the case jumps past several steps, all the
+  alerts are raised.
+* The tab lists one row per active case: badge (**BUNCHING 3BB** / **LONG HEADWAY**), service and direction, stops so far, start -> current bus stop,
+  **"N alerts"** with when the next one is due, **Map**, **ACT** and an arrow that opens the alert history (time and stop of each alert). Rows with
+  3+ alerts are styled as escalated. Most alerts first. The tab shows a badge with the number of cases not yet acknowledged, and the browser title shows
+  it too. The list follows the Services / Direction filter on the Dashboard tab.
+* **Map** opens the Dashboard with that service selected (live map, bus sequence, headway path). **ACT = acknowledge**: it marks the alert "ACKED" so
+  the team can see it has been seen; it **does not** send anything to buses or SCS and gives no intervention advice (that is the V2 layer in the spec).
+  An acknowledged alert becomes un-acknowledged again when a further alert is raised (the case got worse).
+* When a case clears (2 clean refreshes) its alerts leave the list; the **event log** keeps a case's start/end time, start/end bus stop, stops and the
+  **number of alerts** it raised.
+* Limits: alerts and acknowledgements live in the server's memory (a restart clears them; the event log is what persists). Acknowledging needs no admin
+  token, so anyone who can open the page can do it. There is no sound, SMS, e-mail or push notification: the page has to be open (Alerts tab or Dashboard).
+* API: `GET /api/bunching` now also returns `alerts`; `POST /api/bunching/alerts/ack` with `{"id": ...}`.
 
 ## V5.5 - Bus Bunching & Headway Gap page (`/bunching`): bunching < 3 min, long headway = scheduled + 10 min, 15 stops
 
