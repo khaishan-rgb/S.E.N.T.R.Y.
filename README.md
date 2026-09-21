@@ -1,58 +1,62 @@
-# SG Transport Pulse V7.0 — Route Traffic + Departure Adjustment + Bunching, Gap & Alerts + Halfway Deployment Simulator
+# SG Transport Pulse V8.0 — Route Traffic + Departure Adjustment + Bunching, Gap & Alerts + AI Halfway Optimiser
 
 Live bus positions, live LTA traffic drawn directly on the bus route, and next arrivals per stop.
 FastAPI backend + a single-page Leaflet frontend (OneMap basemap, OpenStreetMap fallback).
 
-## V7.0 - Halfway Deployment Simulator (its own page: **/halfway**, nav button *Halfway Optimiser*)
+## V8.0 - AI Halfway Optimiser (its own page: **/halfway**, nav button *Halfway Optimiser*)
 
-**What it answers:** *if one trip of the sequence is lost, how much headway does starting a replacement trip from a halfway stop recover, and where along the
-route?* It is a **scenario simulator, not a bus tracker**: LTA DataMall has no actual bus schedule or duty information, so matching a physical bus to a
-schedule is not reliable. **No bus is selected or identified, and no live bus data is used.** The scheduled timing at the **first bus stop** is the common
-reference, and the *same* 10-trip sequence is simulated under two conditions. It is decision support only: nothing is deployed.
+**What it answers:** *one trip of the sequence is lost or badly late - should we do nothing, regulate the headway, or start a replacement trip from a halfway
+stop, and if so where?* V8.0 keeps the V7.0 scenario model (the scheduled timing at the **first stop** is the common reference and the same 10-trip
+sequence is simulated) and **adds back the AI layer**: it simulates every option, scores them, regulates the headway of the neighbouring trips, and recommends
+the best one with the evidence underneath. **No bus is selected or identified and no live bus data is used** (LTA has no schedule/duty data, so matching a
+physical bus to a schedule is unreliable). It is decision support only: nothing is deployed.
 
-It is a separate module from *Bunching & Gap* (which detects live bunching and long headways); the only thing it reads from that page is the bunching limit
-(default 3 min) so both agree on what counts as bunched.
+**The 10-trip table (at the first stop)** - inputs: service, direction, first scheduled departure, scheduled headway (default from the Service Headway
+Master / LTA frequency band), layover, and each trip's arrival lateness; one trip is marked **Disrupted**. For every trip: Scheduled Arrival, Actual Arrival,
+Lateness, Next Trip Scheduled Departure, Next Trip Actual Departure and Departure Headway. *Actual departure = the later of the scheduled departure and the
+actual arrival + minimum layover.* New in V8.0: **AI plan: Dep / AI plan: HW** columns show the regulated departure of each trip (e.g. `08:24 (+4)` = hold
+4 min, `08:37 (-3)` = release 3 min early) and the resulting headway, so a long departure gap (e.g. 30 min) is visibly addressed.
 
-**The 10-trip table (at the first stop)** - inputs: service, direction, first scheduled departure (HH:MM), scheduled headway (default from the Service
-Headway Master / LTA frequency band, editable), scheduled layover, and each trip's **arrival lateness**. For every trip it shows:
-Scheduled Arrival, Actual/Simulated Arrival (= scheduled + lateness), Lateness, Next Trip Scheduled Departure, Next Trip Actual/Simulated Departure and
-Departure Headway. *Actual departure = the later of the scheduled departure and the actual arrival + the minimum layover (and never before the trip ahead).*
-The controller marks **one** trip as **Disrupted** (needs a trip before and after it): it does not depart, and the next headway grows (e.g. 08:20 -> 08:40 = 20).
-*Load example* fills the worked example (08:10 first departure, trip 3 arrives +22 and is Disrupted).
+**Options tested on the same trips** (A is the reference, the others are scored):
+* **A - No action:** the trip stays missing, nothing is regulated. Baseline only, never recommended.
+* **B - Regulate only:** the AI holds / releases the trips within `reg_window` (default 2) either side of the gap so the departure headways even out,
+  limited by *max hold* (5 min), *max early release* (3 min) and *minimum departure gap* (2 min). No bus leaves the service.
+* **C - Halfway at each approved stop:** a replacement trip starts at the disrupted trip's scheduled time at that stop (+ optional delay) and runs to the terminal.
+* **D - Halfway + regulation:** as C, and the AI also **re-times the replacement start** (within *start early / start late* limits, default -5 / +10 min)
+  and regulates the neighbouring trips. This is what fixes a late replacement that would otherwise arrive bunched behind the next trip.
 
-**Two scenarios, compared over the same stops**
-* **A - No halfway:** the trip stays missing; the remaining trips run down the route with the same running times (from the LTA speed-band traffic model), so
-  the gap propagates. An optional *headway propagation* setting lets a big gap grow and a short gap shrink downstream (0 = off, the default).
-* **B - Halfway:** a replacement trip starts at the chosen halfway stop at the disrupted trip's **scheduled time there** (+ an optional *replacement start
-  delay*) and runs to the terminal; headways are recalculated from that stop on. The first stops (before the halfway stop) stay without the trip in both scenarios.
+**Recommendation score** (0-100, "*Recommended - Highest Simulation Score*", not a % confidence): weighted sum of headway-regularity improvement (30), maximum-gap
+reduction (25), recovery-time improvement (20), holding / off-service time (10), mileage loss (10) and new-bunching risk (5). All weights are settings.
+An option that creates new bunching (any headway below the bunching limit) is rejected; so are options that leave less than the minimum remaining route,
+exceed the mileage limit, or improve the average affected headway by less than the minimum. The best option is the highest positive score among the viable ones.
+**Optimisation preference:** *Balanced* (default weights), *Faster headway recovery* (recovery + max-gap weights x1.6) or *Minimise mileage loss* (mileage weight x3).
+*Recovery time* = how long the headways stay outside +-20% of scheduled for 3 consecutive points (both configurable).
 
-**Output:** *Maximum headway* and *Average affected headway* (the headway(s) around the missing trip, from the halfway stop to the terminal) for A and B, and
-**Headway improvement = A - B (min and %)**, plus a simulated EWT (AWT - SWT, not LTA's). A map shows the missing section (red), the halfway start (star) and
-the downstream section where the bus resumes service (green). A **stop-by-stop table/heatmap** shows *No Halfway HW | With Halfway HW | HW Improvement* at 12 key
-stops (and every stop under *All stops*), so you can see where the improvement occurs and whether the intervention **creates new bunching downstream** (any
-headway below the bunching limit is red and the option is not recommended).
+**Output panels:** AI Recommendation card (action plan with hold / release / replacement start, *No action vs With this option*, score parts, simulated EWT);
+options table (score, holding, mileage, avg / max headway, recovery); map (red = section without the trip, green = section where the replacement resumes,
+star = halfway start); **Route Travel Time Comparison** (could the disrupted vehicle itself reach the halfway stop in time, or is a standby bus needed);
+**Traffic Condition** (LTA speed bands and incidents on the section that is resumed vs skipped); stop-by-stop **heatmap** and *All stops* table; Key Takeaways.
 
-**Halfway options:** every approved stop is tested on the same 10 trips and compared. The **best simulated option** is the largest improvement that creates no new
-bunching, leaves at least 20% of the route and improves the average affected headway by at least 10% (a tie goes to the earlier stop: more stops restored).
-Only *approved* stops are tested, plus one *what-if* stop code you can type (labelled "not approved"). Nothing is invented if none are configured.
+**Settings (on the halfway page):** 25 parameters (trips, layovers, regulation limits and window, start-time window, remaining-route / improvement / mileage
+thresholds, recovery tolerance, the six score weights, preference boosts, headway propagation, fallback speed); the **approved halfway stops** (CSV with
+`service, direction, stop_code, sequence, enabled`, or add / remove one); and an **audit log**: each press of *Run AI optimisation* stores the scenario, preference,
+recommended option, score, holding minutes, every option's metrics, parameters and model version `halfway-3.0`. Same admin token (if set) as the other settings pages.
 
-**Settings (on the halfway page):** number of trips, default layover, minimum layover, replacement start delay, minimum remaining route, minimum improvement,
-headway propagation, fallback running speed; the **approved halfway stops** (CSV upload with `service, direction, stop_code, sequence, enabled` - a header row
-is optional and extra columns are ignored - or add / remove one); and an **audit log**: each press of *Run simulation* stores the scenario (first departure,
-headway, lateness of every trip, disrupted trip, start delay), both scenarios' metrics, every option's result, the parameters and the model version
-`halfway-2.0` (live re-simulation while you edit is not stored). Same admin token (if set) as the other settings pages.
-
-**API:** `GET /api/halfway/setup?service=&direction=`, `GET /api/halfway/simulate?service=&direction=&ref=08:10&hw=&layover=&delay=&late=2,3,22,...&disrupted=3[&stop=&save=1]`,
+**API:** `GET /api/halfway/setup?service=&direction=`,
+`GET /api/halfway/simulate?service=&direction=&ref=08:10&hw=&layover=&delay=&late=2,3,22,...&disrupted=3&pref=balanced|recovery|mileage&reg=1|0[&stop=&save=1]`,
 `GET /api/halfway/runs`, `GET /api/halfway/runs/{id}`, `GET|POST /api/halfway/config`, `POST /api/halfway/points` (+ `/add`, `/delete`, `/clear`).
 
 **Read this before relying on it**
-* Everything is **simulated from the numbers you enter** plus the current LTA traffic running times: it shows the *operational effect* of losing a trip and
-  inserting a replacement, not what is happening on the road now. With the default identical running times a gap stays the same size down the route; real
-  headways also drift, which is what the propagation setting approximates (unvalidated - leave it at 0 unless you have calibrated it).
-* The replacement is assumed to start at the disrupted trip's *scheduled* time at the halfway stop (plus your delay). Whether a standby bus can actually be there
-  in time is an operational question the simulator does not answer; use the delay input to test a late start.
-* EWT is a simulated waiting-time penalty (`sum h^2 / 2 sum h` minus half the scheduled headway), not LTA's actual EWT. Weights and thresholds are starting points.
-* The route drawing and running times use LTA static data and the speed bands (cached); the simulation makes no bus-arrival or routing request.
+* Everything is **simulated from the numbers you enter** plus the current LTA traffic running times. It shows the operational effect of each option, not what is
+  happening on the road now.
+* **Regulation limits, score weights and thresholds are starting points**, not validated values - tune them with your operations team. The score ranks options
+  within one scenario; it is not a probability.
+* The replacement is assumed to be available at the halfway stop at the time shown. The travel-time panel indicates whether the disrupted vehicle could get there;
+  whether a standby bus and driver exist is an operational question the simulator does not answer.
+* EWT is a simulated waiting-time penalty (`sum h^2 / 2 sum h` minus the scheduled equivalent), not LTA's actual EWT.
+* Travel times are estimated from the LTA speed-band running times along the service route. The optional OSRM call only snaps the route drawing to roads;
+  there is no separate off-service road-routing calculation, so treat the travel-time panel as an estimate.
+
 
 ## V5.6 - Alerts (Bunching & Gap page -> **Alerts** tab)
 
