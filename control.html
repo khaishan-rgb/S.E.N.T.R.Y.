@@ -70,6 +70,22 @@ table.mini td.n{font-variant-numeric:tabular-nums}
 .auto input{width:16px;height:16px}
 
 /* messages */
+.chips.off{opacity:.45;pointer-events:none}
+.fld select{height:44px;background:var(--panel);border:1px solid var(--line2);border-radius:11px;padding:0 10px;color:var(--text);font-size:15px}
+.ttbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;background:var(--panel);border:1px solid var(--line2);border-radius:12px;padding:9px 12px;margin-bottom:12px;font-size:13px}
+.ttbar .tta{display:flex;gap:8px;flex-wrap:wrap}
+.pager{display:flex;gap:6px;justify-content:center;align-items:center;padding:12px 0 2px}
+.pager button{min-width:34px;height:34px;border-radius:8px;border:1px solid var(--line2);background:var(--panel);color:var(--text);cursor:pointer}
+.pager button.on{background:var(--cyan);color:#03203a;border-color:var(--cyan);font-weight:700}.pager button:disabled{opacity:.35;cursor:default}.pager .dots{color:var(--mut)}
+tr.callbc{background:#3a1f06!important;box-shadow:inset 4px 0 0 #ff8a1f}
+.cbadge{display:inline-block;background:#ff8a1f;color:#1a0d00;font-weight:800;font-size:11px;border-radius:5px;padding:1px 6px;margin-right:6px;white-space:nowrap}
+.cbtxt{color:#ffb060}
+.callbanner{background:#3a1f06;border:1px solid #b5651a;border-radius:12px;padding:10px 12px;margin-bottom:12px}
+.callbanner .cbh{display:flex;align-items:center;gap:8px;color:#ffc98a;font-size:15px;margin-bottom:4px}.callbanner .cbi{font-size:20px}
+.cbrow{display:block;width:100%;text-align:left;background:transparent;border:0;border-top:1px solid #6b3d12;color:#ffd9b0;padding:8px 2px;cursor:pointer;font-size:13.5px;line-height:1.35}
+.cbrow:hover{background:#4a2a0c}
+.callbox{background:#3a1f06;border:1px solid #b5651a;border-radius:10px;padding:9px 11px;margin:8px 0;color:#ffd9b0;font-size:13.5px}.callbox b{color:#ffc98a}
+.ptab td.e{color:#ffc95a;font-weight:700}
 .msgs{display:grid;gap:8px;margin-bottom:12px}
 .msg{border-radius:10px;padding:9px 12px;font-size:13px;border:1px solid}
 .msg.warn{background:#3a2a06;border-color:#7a5a12;color:#ffe08a}
@@ -180,6 +196,10 @@ details.rules summary{cursor:pointer;font-weight:700;font-size:16px}
   <form class="filters" id="form" autocomplete="off">
     <div class="fld"><label for="svcIn">Services <span class="m">(up to 8)</span></label>
       <div class="chips" id="chips"><input id="svcIn" placeholder="Add service, e.g. 32" maxlength="6" inputmode="text" autocapitalize="characters"></div></div>
+    <div class="fld"><label id="allL">Scope</label>
+      <div class="seg" role="group" aria-labelledby="allL" id="allSeg"><button type="button" data-a="0">Selected</button><button type="button" data-a="1">All services</button></div></div>
+    <div class="fld" id="scopeFld" hidden><label for="scope">Operator</label>
+      <select id="scope"><option value="">All operators</option><option value="SBST">SBS Transit</option><option value="SMRT">SMRT</option><option value="TTS">Tower Transit</option><option value="GAS">Go-Ahead</option></select></div>
     <div class="fld"><label id="dl">Direction</label>
       <div class="seg" role="group" aria-labelledby="dl" id="dirSeg"><button type="button" data-d="0">Both</button><button type="button" data-d="1">Dir 1</button><button type="button" data-d="2">Dir 2</button></div></div>
     <div class="fld"><label id="rl">Risk level</label>
@@ -194,6 +214,8 @@ details.rules summary{cursor:pointer;font-weight:700;font-size:16px}
   </form>
 
   <div class="msgs" id="msgs"></div>
+  <div id="callbc"></div>
+  <div class="ttbar" id="ttbar"></div>
 
   <section class="kpis" id="kpis" aria-label="Summary"></section>
 
@@ -207,6 +229,7 @@ details.rules summary{cursor:pointer;font-weight:700;font-size:16px}
       <th class="hide-m" title="Minutes lost to prolonged congestion ahead (average of affected buses). Terminal layover absorbs part of it.">Delay ahead</th><th class="hide-m" title="Predicted headway between terminal arrivals at +10 / +20 / +30 min">Predicted HW (min)<br><small>+10 / +20 / +30</small></th><th class="hide-m" title="Minutes until predicted HW leaves 0.5x-1.5x of scheduled">Time to critical</th><th class="hide-m">Likely cause</th><th>Suggested adjustment</th><th class="hide-m">Next dep.</th><th>Status</th><th>Action</th>
     </tr></thead><tbody id="tbody"></tbody></table></div>
     <div class="empty" id="tblEmpty" hidden></div>
+    <div class="pager" id="pager"></div>
   </section>
 
   <section id="detail" hidden>
@@ -223,7 +246,7 @@ details.rules summary{cursor:pointer;font-weight:700;font-size:16px}
 
   <section class="card"><details class="rules"><summary>Rules &amp; thresholds used (tap to view)</summary><div id="rules"></div></details></section>
 
-  <footer class="foot"><span>Sources: LTA DataMall (Bus Arrival, Bus Services, Traffic Speed Bands) &nbsp;|&nbsp; Decision support only, not for operational use</span><span>SG Transport Pulse V5.2 &nbsp;|&nbsp; Built for a smarter Singapore</span></footer>
+  <footer class="foot"><span>Sources: LTA DataMall (Bus Arrival, Bus Services, Traffic Speed Bands) &nbsp;|&nbsp; Decision support only, not for operational use</span><span>SG Transport Pulse V5.3 &nbsp;|&nbsp; Built for a smarter Singapore</span></footer>
 </div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
@@ -237,12 +260,12 @@ const LS = {get(k, d){ try{ const v = localStorage.getItem(k); return v == null 
 const COL = {smooth:"#22d36a", moderate:"#ffc21a", slow:"#ff4d55", none:"#3d7bd9"};
 const RISK = {critical:"Critical", developing:"Developing", stable:"Stable", nodata:"No data"};
 
-const S = {services:LS.get("hc.services", []), dir:LS.get("hc.dir", 0), risk:"all", q:"", data:null, sel:null, applied:LS.get("hc.applied", {}), ack:LS.get("hc.ack", {}),
+const S = {services:LS.get("hc.services", []), dir:LS.get("hc.dir", 0), risk:"all", q:"", all:LS.get("hc.all", false), scope:LS.get("hc.scope", ""), page:1, tt:null, progress:null, lapSec:null, allInfo:null, data:null, sel:null, applied:LS.get("hc.applied", {}), ack:LS.get("hc.ack", {}),
            plan:LS.get("hc.plan", {}), lay:LS.get("hc.lay", {}), hist:{}, auto:LS.get("hc.auto", true), left:60, tok:0, busy:false};
 const q = new URLSearchParams(location.search);
 if(q.get("svc")) S.services = q.get("svc").toUpperCase().split(/[,\s]+/).filter(x => /^[0-9A-Z]{1,6}$/.test(x)).slice(0, 8);
 if(q.get("dir") != null && ["0","1","2"].includes(q.get("dir"))) S.dir = +q.get("dir");
-const save = () => { LS.set("hc.services", S.services); LS.set("hc.dir", S.dir); LS.set("hc.applied", S.applied); LS.set("hc.ack", S.ack); LS.set("hc.plan", S.plan); LS.set("hc.lay", S.lay); LS.set("hc.auto", S.auto); };
+const save = () => { LS.set("hc.services", S.services); LS.set("hc.dir", S.dir); LS.set("hc.applied", S.applied); LS.set("hc.ack", S.ack); LS.set("hc.plan", S.plan); LS.set("hc.lay", S.lay); LS.set("hc.all", S.all); LS.set("hc.scope", S.scope); LS.set("hc.auto", S.auto); };
 
 /* header */
 function tick(){ const p = Object.fromEntries(sgt({weekday:"short", day:"2-digit", month:"short", year:"numeric", hour:"2-digit", minute:"2-digit"}).formatToParts(new Date()).map(x => [x.type, x.value])); $("clock").textContent = `${p.weekday}, ${p.day} ${p.month} ${p.year}  ${p.hour}:${p.minute}`; }
@@ -265,19 +288,65 @@ function addService(v){
 }
 $("chips").addEventListener("click", e => { const b = e.target.closest("button[data-s]"); if(b){ S.services = S.services.filter(x => x !== b.dataset.s); save(); renderChips(); load(); } else $("svcIn").focus(); });
 $("svcIn").addEventListener("keydown", e => { if(e.key === "," || e.key === " "){ e.preventDefault(); if(addService($("svcIn").value)) $("svcIn").value = ""; } else if(e.key === "Backspace" && !$("svcIn").value && S.services.length){ S.services.pop(); save(); renderChips(); } });
-function syncSegs(){ document.querySelectorAll("#dirSeg button").forEach(b => b.setAttribute("aria-pressed", +b.dataset.d === S.dir)); document.querySelectorAll("#riskSeg button").forEach(b => b.setAttribute("aria-pressed", b.dataset.r === S.risk)); $("autoCb").checked = S.auto; }
+function syncAll(){
+  document.querySelectorAll("#allSeg button").forEach(b => b.setAttribute("aria-pressed", (+b.dataset.a === 1) === S.all));
+  $("scopeFld").hidden = !S.all; $("scope").value = S.scope; $("svcIn").disabled = S.all; $("chips").classList.toggle("off", S.all);
+  $("svcIn").placeholder = S.all ? "All services" : (S.services.length ? "Add another" : "Add service, e.g. 32");
+}
+function syncSegs(){ syncAll(); document.querySelectorAll("#dirSeg button").forEach(b => b.setAttribute("aria-pressed", +b.dataset.d === S.dir)); document.querySelectorAll("#riskSeg button").forEach(b => b.setAttribute("aria-pressed", b.dataset.r === S.risk)); $("autoCb").checked = S.auto; }
 $("dirSeg").addEventListener("click", e => { const b = e.target.closest("button"); if(!b) return; S.dir = +b.dataset.d; save(); syncSegs(); load(); });
-$("riskSeg").addEventListener("click", e => { const b = e.target.closest("button"); if(!b) return; S.risk = b.dataset.r; syncSegs(); renderTable(); });
-$("form").addEventListener("submit", e => { e.preventDefault(); if(!addService($("svcIn").value)) return; $("svcIn").value = ""; load(); });
+$("riskSeg").addEventListener("click", e => { const b = e.target.closest("button"); if(!b) return; S.risk = b.dataset.r; S.page = 1; syncSegs(); renderTable(); });
+$("allSeg").addEventListener("click", e => { const b = e.target.closest("button"); if(!b) return; S.all = +b.dataset.a === 1; S.page = 1; S.data = null; S.sel = null; save(); syncSegs(); renderChips(); syncAll(); render(); load(); });
+$("scope").addEventListener("change", () => { S.scope = $("scope").value; S.page = 1; S.data = null; save(); render(); load(); });
+$("form").addEventListener("submit", e => { e.preventDefault(); if(!S.all){ if(!addService($("svcIn").value)) return; $("svcIn").value = ""; } load(); });
 $("autoCb").addEventListener("change", e => { S.auto = e.target.checked; save(); S.left = 60; cdText(); });
 function cdText(){ $("cd").textContent = S.auto ? `(in ${S.left}s)` : ""; }
-setInterval(() => { if(!S.auto || document.hidden || S.busy || !S.services.length) return; S.left--; if(S.left <= 0){ S.left = 60; load(true); } cdText(); }, 1000);
+setInterval(() => { if(!S.auto || document.hidden || S.busy || (!S.all && !S.services.length)) return; S.left--; if(S.left <= 0){ S.left = S.all ? 180 : 60; load(true); } cdText(); }, 1000);
 
 /* data */
 const adjParam = () => Object.entries(S.applied).map(([k, v]) => `${k}:${v}`).join(",");
 const planParam = () => Object.entries(S.plan).map(([k, v]) => `${k}:${v}`).join(",");
 const layParam = () => Object.entries(S.lay).map(([k, v]) => `${k}:${v}`).join(",");
+function summarize(list){
+  const s = {critical:0, developing:0, stable:0, nodata:0, total:list.length, buses:0}; let mon = 0;
+  list.forEach(i => { s[i.risk] = (s[i.risk] || 0) + 1; s.buses += i.n_buses; mon += i.monitored; });
+  s.coverage = s.buses ? Math.round(100 * mon / s.buses) : null; return s;
+}
+const RORD = {critical:0, developing:1, stable:2, nodata:3};
+const sortItems = list => list.sort((a, b) => (RORD[a.risk] ?? 9) - (RORD[b.risk] ?? 9) || (isNaN(a.service) - isNaN(b.service)) || (parseInt(a.service) || 0) - (parseInt(b.service) || 0) || a.service.localeCompare(b.service) || a.direction - b.direction);
+async function getJSON(u, ms){ const c = new AbortController(), t = setTimeout(() => c.abort(), ms || 90000); try{ const r = await fetch(u, {signal:c.signal}); const j = await r.json().catch(() => ({})); if(!r.ok && !j.error) j.error = "server error " + r.status; return j; } finally { clearTimeout(t); } }
+/* All-services mode: the server evaluates at most 16 service directions per request, so scan in batches and paint as they arrive.
+   Sequential on purpose (gentle on the LTA quota); repeats every 3 minutes while Auto refresh is on. */
+async function loadAll(quiet){
+  const tok = ++S.tok; S.busy = true; $("go").disabled = true; S.progress = null;
+  if(!quiet) $("tblSub").textContent = "Loading the service list...";
+  const t0 = Date.now(), items = {};
+  try{
+    const sv = await getJSON(`/api/control/services?scope=${encodeURIComponent(S.scope)}`, 30000);
+    if(tok !== S.tok) return;
+    if(sv.error || !sv.services || !sv.services.length){ S.data = null; S.allInfo = null; render(); $("msgs").innerHTML = `<div class="msg bad">${esc(sv.error || "No services found for this scope. LTA bus data may still be loading; try again in a minute.")}</div>`; return; }
+    S.allInfo = sv;
+    const per = S.dir === 0 ? 6 : 12, batches = [], errs = [];
+    for(let i = 0; i < sv.services.length; i += per) batches.push(sv.services.slice(i, i + per).map(x => x.service));
+    for(let i = 0; i < batches.length; i++){
+      S.progress = {done:i, of:batches.length}; if(i === 0) renderTable();
+      const j = await getJSON(`/api/control?services=${encodeURIComponent(batches[i].join(","))}&direction=${S.dir}&adj=${encodeURIComponent(adjParam())}&plan=${encodeURIComponent(planParam())}&lay=${encodeURIComponent(layParam())}`);
+      if(tok !== S.tok) return;
+      (j.items || []).forEach(it => { items[it.key] = it; const h = S.hist[it.key] = S.hist[it.key] || []; h.push({t:Date.now(), gap:it.avg_gap, hw:it.sched_hw}); if(h.length > 60) h.shift(); });
+      (j.errors || []).forEach(e => { if(errs.length < 5 && !errs.includes(e)) errs.push(e); });
+      if(j.error && errs.length < 5) errs.push(j.error);
+      const list = sortItems(Object.values(items));
+      S.data = {items:list, summary:summarize(list), cfg:j.cfg || (S.data && S.data.cfg) || {}, updated:j.updated, errors:errs, truncated:false, freqOk:j.freqOk !== false, freqError:j.freqError, timetable:j.timetable};
+      S.tt = j.timetable || S.tt; S.progress = {done:i + 1, of:batches.length};
+      if(!S.sel && list.length){ const f = list.find(x => x.risk === "critical" || x.risk === "developing") || list[0]; S.sel = f.key; }
+      render();
+    }
+    S.lapSec = Math.round((Date.now() - t0) / 1000);
+  }catch(e){ if(tok === S.tok){ setLive("bad", "Network error", String(e)); $("msgs").innerHTML = `<div class="msg bad">${e.name === "AbortError" ? "A batch timed out (LTA may be slow). It will retry on the next scan." : "Network error. Check your connection."}</div>`; } }
+  finally{ if(tok === S.tok){ S.busy = false; S.progress = null; $("go").disabled = false; S.left = 180; renderTable(); renderMsgs(); } }
+}
 async function load(quiet){
+  if(S.all) return loadAll(quiet);
   if(!S.services.length){ S.data = null; render(); return; }
   const tok = ++S.tok; S.busy = true; $("go").disabled = true;
   if(!quiet) $("tblSub").textContent = "Evaluating live buses and traffic...";
@@ -287,7 +356,7 @@ async function load(quiet){
     const r = await fetch(u, {signal:c.signal}); const j = await r.json().catch(() => ({}));
     if(tok !== S.tok) return;
     if(!r.ok || j.error){ setLive("bad", "Server error", j.error || r.status); $("msgs").innerHTML = `<div class="msg bad">Could not evaluate: ${esc(j.error || "server error " + r.status)}</div>`; return; }
-    S.data = j; S.left = 60;
+    S.data = j; S.left = 60; S.tt = j.timetable || S.tt;
     j.items.forEach(it => { const h = S.hist[it.key] = S.hist[it.key] || []; h.push({t:Date.now(), gap:it.avg_gap, hw:it.sched_hw}); if(h.length > 60) h.shift(); });
     if(!S.sel || !j.items.some(i => i.key === S.sel)) { const f = j.items.find(i => i.risk === "critical" || i.risk === "developing") || j.items[0]; S.sel = f ? f.key : null; }
     render();
@@ -317,12 +386,14 @@ function undo(key){ delete S.applied[key]; delete S.ack[key]; save(); load(true)
 async function copyMsg(text){ try{ await navigator.clipboard.writeText(text); }catch(e){ const t = document.createElement("textarea"); t.value = text; document.body.appendChild(t); t.select(); try{ document.execCommand("copy"); }catch(_){} t.remove(); } toast("Message copied"); }
 
 /* render */
-function render(){ renderMsgs(); renderKpis(); renderTable(); renderDetail(); renderRules(); }
+function render(){ renderMsgs(); renderCallBanner(); renderTT(); renderKpis(); renderTable(); renderDetail(); renderRules(); }
 function renderMsgs(){
   const d = S.data, m = [];
-  if(!S.services.length){ m.push(`<div class="msg info">Add one or more bus services above (e.g. <b>32</b>, <b>145</b>) and press <b>Evaluate</b>.</div>`); }
+  if(!S.all && !S.services.length){ m.push(`<div class="msg info">Add one or more bus services above (e.g. <b>32</b>, <b>145</b>) and press <b>Evaluate</b>.</div>`); }
   if(d){
     (d.errors || []).forEach(e => m.push(`<div class="msg bad">${esc(e)}</div>`));
+    if(S.all && S.allInfo && S.allInfo.truncated) m.push(`<div class="msg warn">Scanning the first ${S.allInfo.pairs} of ${S.allInfo.totalPairs} service directions (cap <code>CONTROL_ALL_CAP</code>, protects the LTA quota). Choose an operator to narrow the scope.</div>`);
+    if(S.all && !S.progress && d.items.length) m.push(`<div class="msg info">All-services mode scans in batches${S.lapSec != null ? ` (last full scan ${Math.max(1, S.lapSec)}s)` : ""} and repeats every 3 minutes while Auto refresh is on. Congestion must persist 10+ min before anything is recommended, so leave this page open.</div>`);
     if(d.truncated) m.push(`<div class="msg warn">Only the first 16 service/direction pairs were evaluated.</div>`);
     if(!d.freqOk) m.push(`<div class="msg warn"><b>Scheduled headway unavailable from LTA</b>${d.freqError ? " (" + esc(d.freqError) + ")" : ""}. Using the observed median gap where possible; some checks may show n/a.</div>`);
     if(d.items.some(i => !i.traffic_ok)) m.push(`<div class="msg warn"><b>Traffic feed unavailable</b> for some services: checks 2, 3 and 4 show n/a and no delay is guessed.</div>`);
@@ -358,12 +429,60 @@ function phCell(it){
   return `<span class="ph">${p.map(v => v == null ? `<span class="m">&ndash;</span>` : `<span class="${v >= H * 1.5 ? "c" : Math.abs(v - H) >= Math.max(2, .2 * H) ? "a" : ""}">${f1(v)}</span>`).join("")}</span>`;
 }
 function ttcCell(it){ const v = it.risk === "nodata" ? null : ttcOf(it); if(v == null) return `<span class="m">&ndash;</span>`; return `<span class="ttc ${v <= 10 ? "c" : v <= 20 ? "a" : ""}">${v === 0 ? "Now" : v + " min"}</span>`; }
-function causeCell(it){ if(it.risk === "nodata") return `<span class="m">&ndash;</span>`; const c = it.checks.find(c => c.state === "triggered"); if(c) return esc(CAUSE[c.id]); return it.watch ? `<span class="m">${esc(it.watch)}</span>` : "Stable"; }
+function causeCell(it){ const cb = it.buses.find(b => b.early_call); if(cb) return `<b class="cbtxt">Bus #${cb.id} early at ${cb.plan.early_pct}% of stops</b>`; if(it.risk === "nodata") return `<span class="m">&ndash;</span>`; const c = it.checks.find(c => c.state === "triggered"); if(c) return esc(CAUSE[c.id]); return it.watch ? `<span class="m">${esc(it.watch)}</span>` : "Stable"; }
 function turnTable(it){
   const t = it.turn; if(!t || !t.rows.length) return "";
   const rows = t.rows.map(r => `<tr><td>#${r.id}</td><td>${esc(r.arr_clock)} <small class="m">(${r.src === "LTA" ? "LTA ETA" : "modelled"})</small></td><td>Dir ${r.next_dir}${t.loop ? " <small class=\"m\">(loop)</small>" : ""}</td><td><b>${esc(r.dep_clock)}</b>${r.hold > 0 ? ` <small class="hold">hold +${f1(r.hold)}${r.capped ? " (max)" : ""}</small>` : ""}</td><td class="n">${f1(r.layover)} min</td></tr>`).join("");
   return `<div class="arr"><h4>Predicted arrival &amp; next departure</h4><div class="m">${t.heavy ? "Heavy-layover duty: delay is absorbed at the terminal, so every bus keeps its own layover. No holds suggested." : `Minimum layover ${f1(t.min_layover)} min. Departures are spaced ${f1(t.hw)} min apart; a bus is held only if it would otherwise leave closer than that to the one before. Holds are capped at ${f1(t.max_hold)} min; bunching bigger than that needs other action (e.g. regulate earlier).`} Suggestion only.</div>
     <table class="mini"><thead><tr><th>Bus</th><th>Arrives</th><th>Next trip</th><th>Depart</th><th>Layover</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+}
+const isCall = it => it.buses.some(b => b.early_call);
+function renderPager(pages){
+  const el = $("pager"); if(pages <= 1){ el.innerHTML = ""; return; }
+  const cur = S.page, nums = []; for(let p = 1; p <= pages; p++) if(p === 1 || p === pages || Math.abs(p - cur) <= 1) nums.push(p);
+  let h = `<button type="button" data-p="${cur - 1}" ${cur === 1 ? "disabled" : ""} aria-label="Previous page">&lsaquo;</button>`, last = 0;
+  nums.forEach(p => { if(p - last > 1) h += `<span class="dots">&hellip;</span>`; h += `<button type="button" data-p="${p}" ${p === cur ? 'aria-current="page" class="on"' : ""}>${p}</button>`; last = p; });
+  el.innerHTML = h + `<button type="button" data-p="${cur + 1}" ${cur === pages ? "disabled" : ""} aria-label="Next page">&rsaquo;</button>`;
+}
+$("pager").addEventListener("click", e => { const b = e.target.closest("button[data-p]"); if(!b || b.disabled) return; S.page = +b.dataset.p; renderTable(); });
+function renderCallBanner(){
+  const d = S.data, el = $("callbc"), calls = [];
+  if(d) d.items.forEach(it => it.buses.filter(b => b.early_call).forEach(b => calls.push({it, b})));
+  if(!calls.length){ el.innerHTML = ""; return; }
+  el.innerHTML = `<div class="callbanner" role="alert"><div class="cbh"><span class="cbi">&#9742;</span><b>Call the Bus Captain to slow down (${calls.length})</b></div>` + calls.map(({it, b}) => `<button type="button" class="cbrow" data-k="${esc(it.key)}"><b>Svc ${esc(it.service)} Dir ${it.direction} &middot; Bus #${b.id}</b> is early at ${b.plan.early_pct}% of its remaining stops (avg ${f1(b.plan.avg_dev)} min ahead of timetable) and ${f1(b.gap_behind)} min ahead of the next bus (scheduled ${f1(it.sched_hw)} min)</button>`).join("") + `</div>`;
+}
+$("callbc").addEventListener("click", e => { const r = e.target.closest("[data-k]"); if(!r) return; S.sel = r.dataset.k; renderTable(); renderDetail(); $("detail").scrollIntoView({behavior:"smooth", block:"start"}); });
+function callBox(it){ const cb = it.buses.find(b => b.early_call); if(!cb) return ""; return `<div class="callbox"><b>&#9742; Call the Bus Captain of Bus #${cb.id} &ndash; slow down.</b> Early at ${cb.plan.early_pct}% of remaining stops (avg ${f1(cb.plan.avg_dev)} min ahead of timetable, trip ${esc(cb.plan.trip)}); the bus behind is ${f1(cb.gap_behind)} min back (scheduled ${f1(it.sched_hw)}), for ${f1(S.data.cfg.HW_PROLONG_MIN)}+ min.</div>`; }
+function planTable(it){
+  const P = it.plan, cfg = S.data.cfg;
+  if(!P || !P.loaded) return `<div class="arr"><h4>Planned vs predicted</h4><div class="m">No planned timetable for this service. LTA publishes none, so upload yours (bar at the top of the page) to see how early or late each bus is at its remaining stops.</div></div>`;
+  const rows = it.buses.filter(b => b.plan);
+  if(!rows.length) return `<div class="arr"><h4>Planned vs predicted</h4><div class="m">${P.trips} planned trips are loaded around this time, but no live bus matched one (a bus must be within ~${f1(cfg.PLAN_MATCH_MAX)} min of a planned trip). The timetable may not cover the current time.</div></div>`;
+  const dv = v => v == null ? "&ndash;" : v >= 0.5 ? `${f1(v)} min early` : v <= -0.5 ? `${f1(-v)} min late` : "on time";
+  return `<div class="arr"><h4>Planned vs predicted</h4><div class="m">Predicted = LTA ETAs (scaled along the route by current traffic). A stop counts as early when the bus is ${f1(cfg.EARLY_STOP_MIN)}+ min ahead of plan; more than ${cfg.EARLY_STOP_PCT}% early stops with a long headway behind it means call the BC.</div>
+    <table class="mini ptab"><thead><tr><th>Bus</th><th>Planned trip</th><th>Early at</th><th>Average</th><th>At terminal</th><th></th></tr></thead><tbody>${rows.map(b => `<tr><td>#${b.id}</td><td>${esc(b.plan.trip)}</td><td class="${b.plan.early_pct > cfg.EARLY_STOP_PCT ? "e" : ""}">${b.plan.early_pct}% of ${b.plan.n} stops</td><td>${dv(b.plan.avg_dev)}</td><td>${dv(b.plan.term_dev)}</td><td>${b.early_call ? '<span class="cbadge">CALL BC</span>' : ""}</td></tr>`).join("")}</tbody></table></div>`;
+}
+function renderTT(){
+  const t = S.tt, el = $("ttbar"), on = t && t.loaded, sig = JSON.stringify(t || null);
+  if(el.dataset.sig === sig && el.innerHTML) return; el.dataset.sig = sig;      // do not rebuild (and drop an open file dialog) on every refresh
+  el.innerHTML = `<div class="ttl">${on ? `<b>Planned timetable loaded</b> &middot; ${t.services} service${t.services === 1 ? "" : "s"}, ${t.trips} trips${t.updated ? " &middot; " + esc(t.updated.slice(11, 16)) : ""}` : `<b>No planned timetable</b> <span class="m">&ndash; LTA publishes none. Upload yours to judge early running at each stop (call the BC to slow down).</span>`}</div>
+    <div class="tta"><button class="btn sm" id="ttUp" type="button">Upload timetable</button>${on ? `<button class="btn sm" id="ttClr" type="button">Clear</button>` : ""}<button class="btn sm" id="ttTpl" type="button">Template</button><input type="file" id="ttFile" accept=".csv,.tsv,.txt,text/csv,text/plain" hidden></div>`;
+  $("ttUp").onclick = () => $("ttFile").click();
+  $("ttFile").onchange = async e => { const f = e.target.files[0]; if(f) await ttUpload(f); e.target.value = ""; };
+  if($("ttClr")) $("ttClr").onclick = () => ttCall("/api/timetable/clear", "").then(j => { if(j) { toast("Timetable cleared"); load(true); } });
+  $("ttTpl").onclick = () => { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob(["# Planned timetable. Two formats are accepted (lines starting with # are ignored).\n# Format B (simple): service,direction,departure,run_min  - planned time at each stop is spread by distance over the running time\n# Format A (exact):  service,direction,trip,stop_code,time  - one row per trip per stop or timing point\nservice,direction,departure,run_min\n32,1,06:00,55\n32,1,06:10,55\n32,1,06:20,55\n32,2,06:05,52\n"], {type:"text/csv"})); a.download = "planned-timetable-template.csv"; document.body.appendChild(a); a.click(); a.remove(); };
+}
+async function ttCall(url, body){
+  const tok = sessionStorage.getItem("hc.tok") || ""; const hdr = tok ? {"x-admin-token":tok} : {};
+  let r = await fetch(url, {method:"POST", body, headers:hdr}); let j = await r.json().catch(() => ({}));
+  if(r.status === 401){ const t = prompt("This server needs an upload token (TIMETABLE_TOKEN):"); if(!t) return null; sessionStorage.setItem("hc.tok", t); r = await fetch(url, {method:"POST", body, headers:{"x-admin-token":t}}); j = await r.json().catch(() => ({})); }
+  if(!r.ok){ toast(j.error || "Upload failed (" + r.status + ")"); return null; }
+  return j;
+}
+async function ttUpload(file){
+  if(file.size > 8 * 1024 * 1024){ toast("File too large (max 8 MB)"); return; }
+  const j = await ttCall("/api/timetable", await file.text()); if(!j) return;
+  S.tt = j; renderTT(); toast(`Loaded ${j.trips} planned trips for ${j.services} service${j.services === 1 ? "" : "s"}${j.errors && j.errors.length ? ` (${j.errors.length} rows skipped: ${j.errors[0]})` : ""}`); load(true);
 }
 function triggeredNames(it){ return it.checks.filter(c => c.state === "triggered").map(c => `#${c.id} ${c.name}`).join(", ") || "&ndash;"; }
 function delayCell(it){
@@ -378,23 +497,27 @@ function devCell(it){
   return `<span class="${cls}">${d > 0 ? "+" : ""}${f1(d)} min</span>${it.plan_source && it.plan_source.startsWith("est") ? ` <small class="m">est.</small>` : ""}`;
 }
 function renderTable(){
-  const d = S.data, tb = $("tbody"); if(!d){ tb.innerHTML = ""; $("tblEmpty").hidden = true; return; }
+  const d = S.data, tb = $("tbody"); if(!d){ tb.innerHTML = ""; $("tblEmpty").hidden = true; $("pager").innerHTML = ""; return; }
   d.items.forEach(i => { i.cfgLate = d.cfg.LATE_MIN; i.cfgEarly = d.cfg.EARLY_MIN; });
-  const q = S.q.trim().toLowerCase(), rows = d.items.filter(i => (S.risk === "all" || i.risk === S.risk) && (!q || `${i.service} dir ${i.direction} ${i.rec.headline} ${i.cause || ""}`.toLowerCase().includes(q)));
-  $("tblSub").textContent = `Showing ${rows.length} of ${d.items.length} service directions \u2022 ${d.summary.critical} critical, ${d.summary.developing} developing`;
+  const q = S.q.trim().toLowerCase(), rowsAll = d.items.filter(i => (S.risk === "all" || i.risk === S.risk) && (!q || `${i.service} dir ${i.direction} ${i.rec.headline} ${i.cause || ""}`.toLowerCase().includes(q)));
+  const PAGE = 12, pages = Math.max(1, Math.ceil(rowsAll.length / PAGE)); S.page = Math.min(Math.max(1, S.page), pages);
+  const rows = rowsAll.slice((S.page - 1) * PAGE, S.page * PAGE), from = rowsAll.length ? (S.page - 1) * PAGE + 1 : 0;
+  const prog = S.progress ? ` \u2022 scanning batch ${Math.min(S.progress.done + 1, S.progress.of)} of ${S.progress.of}...` : "";
+  $("tblSub").textContent = `Showing ${from}\u2013${from ? from + rows.length - 1 : 0} of ${rowsAll.length} service directions \u2022 ${d.summary.critical} critical, ${d.summary.developing} developing${prog}`;
+  renderPager(pages);
   tb.innerHTML = rows.map((it, n) => {
     const [st, sc] = statusOf(it), r = it.rec, dep = it.origin_etas && it.origin_etas.length ? it.origin_etas[0] + " min" : "&ndash;";
     const extra = r.actions && r.actions.length ? ` <small>+${r.actions.length} more</small>` : "";
-    return `<tr data-k="${esc(it.key)}" class="${it.key === S.sel ? "sel" : ""}" tabindex="0">
+    return `<tr data-k="${esc(it.key)}" class="${it.key === S.sel ? "sel" : ""}${isCall(it) ? " callbc" : ""}" tabindex="0">
       <td><span class="rk ${it.risk}" title="${RISK[it.risk]}"></span></td><td class="svc">${esc(it.service)}<small class="m" style="display:block;font-weight:400;font-size:11.5px">${it.n_buses} bus${it.n_buses === 1 ? "" : "es"}${it.monitored < it.n_buses ? ` (${it.monitored} GPS)` : ""}</small></td><td>${it.direction}</td>
       <td class="hide-m">${it.sched_hw == null ? "&ndash;" : it.sched_hw + " min"}</td><td class="hide-m">${it.current_hw == null ? "&ndash;" : `<b>${it.current_hw} min</b>${it.adj_active ? ` <small class="m">adjusted</small>` : ""}`}</td>
       <td class="hide-m">${delayCell(it)}</td><td class="hide-m">${phCell(it)}</td><td class="hide-m">${ttcCell(it)}</td><td class="hide-m">${causeCell(it)}</td>
-      <td class="sugg" title="${esc(it.rec.confidence || "")} confidence${r.actions && r.actions.length ? " \u2022 also: " + esc(r.actions.map(a => a.headline).join("; ")) : ""}">${esc(r.headline)}${extra}</td>
+      <td class="sugg" title="${esc(it.rec.confidence || "")} confidence${r.actions && r.actions.length ? " \u2022 also: " + esc(r.actions.map(a => a.headline).join("; ")) : ""}">${isCall(it) ? '<span class="cbadge">CALL BC</span>' : ""}${esc(r.headline)}${extra}</td>
       <td class="hide-m">${dep}</td><td><span class="badge ${sc}">${st}</span></td><td><button class="vbtn" type="button" data-k="${esc(it.key)}">View</button></td></tr>`;
   }).join("");
-  const e = $("tblEmpty"); e.hidden = rows.length > 0; e.textContent = d.items.length ? "No service matches the current filters." : "No service could be evaluated. Check the messages above.";
+  const e = $("tblEmpty"); e.hidden = rowsAll.length > 0; e.textContent = d.items.length ? "No service matches the current filters." : "No service could be evaluated. Check the messages above.";
 }
-$("q").addEventListener("input", () => { S.q = $("q").value; renderTable(); });
+$("q").addEventListener("input", () => { S.q = $("q").value; S.page = 1; renderTable(); });
 $("tbody").addEventListener("click", e => { const r = e.target.closest("tr[data-k]"); if(!r) return; S.sel = r.dataset.k; renderTable(); renderDetail(); if(e.target.closest(".vbtn")) $("detail").scrollIntoView({behavior:"smooth", block:"start"}); });
 $("tbody").addEventListener("keydown", e => { if(e.key === "Enter"){ const r = e.target.closest("tr[data-k]"); if(r){ S.sel = r.dataset.k; renderTable(); renderDetail(); } } });
 
@@ -403,7 +526,7 @@ function stripSVG(it){
   const W = 1000, x0 = 34, x1 = 966, X = p => x0 + (x1 - x0) * p / 100, fin = it.strip.final_pct;
   const order = it.buses.map((b, i) => i).sort((a, b) => it.buses[a].pct - it.buses[b].pct), up = {}, dn = {}, lastU = [], lastD = [];
   const lane = (last, x, gap) => { let k = 0; while(last[k] != null && Math.abs(x - last[k]) < gap) k++; last[k] = x; return k; };
-  order.forEach(i => { const x = X(it.buses[i].pct); up[i] = lane(lastU, x, 46); dn[i] = lane(lastD, x, 44); });
+  order.forEach(i => { const x = X(it.buses[i].pct); up[i] = lane(lastU, x, 58); dn[i] = lane(lastD, x, 44); });
   const nu = Math.max(0, ...Object.values(up)) + 1, nd = Math.max(0, ...Object.values(dn)) + 1;
   const y = 36 + 27 * nu, H = y + 62 + 15 * nd;
   let s = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Route strip for service ${esc(it.service)} direction ${it.direction}: ${it.buses.length} buses">`;
@@ -419,13 +542,13 @@ function stripSVG(it){
     s += `<text x="${mx}" y="${y + 32}" text-anchor="middle" font-size="12" font-weight="700" fill="${bad ? "#ffa62b" : "#c6d8ea"}">${f1(g.gap)}${tr}</text>`;
   });
   it.buses.forEach((b, i) => {
-    const bx = X(b.pct), ly = y - 30 - 27 * up[i], stroke = b.affected ? "#ff4d55" : "#ffffff";
+    const bx = X(b.pct), ly = y - 30 - 27 * up[i], stroke = b.early_call ? "#ff8a1f" : b.affected ? "#ff4d55" : "#ffffff", w = b.early_call ? 52 : 40;
     s += `<line x1="${bx}" y1="${ly + 22}" x2="${bx}" y2="${y + 9}" stroke="${stroke}" stroke-width="1.4" opacity=".8"/>`;
-    s += `<rect x="${bx - 20}" y="${ly}" width="40" height="22" rx="6" fill="#1785ff" stroke="${stroke}" stroke-width="2"/><text x="${bx}" y="${ly + 16}" text-anchor="middle" font-size="13" font-weight="700" fill="#fff">#${b.id}</text>`;
+    s += `<rect x="${bx - w / 2}" y="${ly}" width="${w}" height="22" rx="6" fill="${b.early_call ? "#c8600a" : "#1785ff"}" stroke="${stroke}" stroke-width="2"/><text x="${bx}" y="${ly + 16}" text-anchor="middle" font-size="13" font-weight="700" fill="#fff">#${b.id}${b.early_call ? " BC" : ""}</text>`;
     s += `<circle cx="${bx}" cy="${y + 9}" r="5" fill="#fff" stroke="#04101f" stroke-width="2"/>`;
     if(b.term_clock) s += `<text x="${bx}" y="${y + 52 + 15 * dn[i]}" text-anchor="middle" font-size="11.5" fill="#b9d0e6">${b.term_clock}</text>`;
   });
-  return s + `</svg><div class="note">Bars = LTA speed bands (green &ge; 40, amber 20&ndash;39, red &lt; 20 km/h, blue = no reading). Numbers between buses = gap to the bus behind${it.sched_hw ? ` (scheduled ${it.sched_hw} min)` : ""}; &nearr; = growing. Red-outlined buses face prolonged congestion (slow stretch &ge; ${f1(S.data.cfg.PROLONG_KM)} km).</div>`;
+  return s + `</svg><div class="note">Bars = LTA speed bands (green &ge; 40, amber 20&ndash;39, red &lt; 20 km/h, blue = no reading). Numbers between buses = gap to the bus behind${it.sched_hw ? ` (scheduled ${it.sched_hw} min)` : ""}; &nearr; = growing. Orange = call the BC (early, timetable); red-outlined buses face prolonged congestion (slow stretch &ge; ${f1(S.data.cfg.PROLONG_KM)} km).</div>`;
 }
 function trendSVG(it){
   const h = (S.hist[it.key] || []).filter(p => p.gap != null);
@@ -449,7 +572,7 @@ function renderDetail(){
   $("dTitle").innerHTML = `Service ${esc(it.service)} &ndash; Dir ${it.direction} <span class="rk ${it.risk}" style="width:14px;height:14px;vertical-align:middle;margin-left:6px" title="${RISK[it.risk]}"></span>`;
   $("dSub").textContent = `${it.stops} stops \u2022 ${it.n_buses} live bus${it.n_buses === 1 ? "" : "es"} (${it.monitored} GPS-tracked) \u2022 ${it.hw_source || "scheduled headway unknown"}`;
   $("mapLink").href = `/?svc=${encodeURIComponent(it.service)}&dir=${it.direction}`;
-  $("strip").innerHTML = it.buses.length ? stripSVG(it) + turnTable(it) : `<div class="empty">No live bus positions found on this route right now.</div>`;
+  $("strip").innerHTML = it.buses.length ? stripSVG(it) + turnTable(it) + planTable(it) : `<div class="empty">No live bus positions found on this route right now.</div>`;
   const ic = {triggered:"!", watch:"~", clear:"\u2713", na:"?"};
   $("checks").innerHTML = it.checks.map(c => `<div class="chk"><div class="ci ${c.state}" title="${c.state}">${ic[c.state]}</div><div><b>${c.id}. ${esc(c.name)} <small class="m" style="font-weight:500">${c.state === "na" ? "not evaluable" : c.state}</small></b><span>${esc(c.detail)}</span></div></div>`).join("");
   const r = it.rec, [st] = statusOf(it), key = it.key, code = r.code;
@@ -460,7 +583,7 @@ function renderDetail(){
   const planTxt = it.plan_run_min == null ? "unavailable (no traffic feed)" : it.plan_source && it.plan_source.startsWith("est") ? `<span class="m">not set (optional; turns on the early-arrival check)</span>; predicted now <b>${f1(it.pred_run_min)} min</b>` : `<b>${f1(it.plan_run_min)} min</b> <span class="m">(your timetable)</span>; predicted now <b>${f1(it.pred_run_min)} min</b>`;
   const LY = it.layover, cfgL = S.data.cfg;
   $("sugCard").innerHTML = `<div class="sug-h"><span class="sp">&#10022;</span><b>Suggested action</b><span class="tag" title="Deterministic rules; no language model is used">Rule-based</span><span class="conf ${r.confidence}">${r.confidence} confidence</span></div>
-    <div class="sug-t">${esc(r.headline)}</div>${also}<div class="why">${esc(r.rationale)}</div>${dep}
+    ${callBox(it)}<div class="sug-t">${esc(r.headline)}</div>${also}<div class="why">${esc(r.rationale)}</div>${dep}
     <div class="plan">Terminal layover: <b>${f1(LY.min)} min</b> <span class="m">(${LY.src}${LY.heavy ? " &ndash; heavy-layover duty, never adjusted" : `; min ${f1(cfgL.MIN_LAYOVER)}, absorbs ${f1(LY.slack)} min`}). Enter this duty's scheduled layover (${f1(cfgL.HEAVY_LAYOVER)}+ = heavy).</span><br><input id="layIn" type="number" min="0" max="90" step="1" placeholder="min" value="${S.lay[key] || ""}" aria-label="Scheduled layover in minutes"><button class="btn sm" id="laySet" type="button">Set</button><button class="btn sm" id="layClr" type="button">Reset</button></div>
     <div class="plan">Timetable running time: ${planTxt}<br><span class="m">Have the timetable? </span><input id="planIn" type="number" min="5" max="300" step="1" placeholder="min" value="${S.plan[key] || ""}" aria-label="Timetable running time in minutes"><button class="btn sm" id="planSet" type="button">Set</button><button class="btn sm" id="planClr" type="button">Reset</button></div>
     <div class="acts"><button class="btn go sm" id="applyBtn" type="button" ${canApply ? "" : "disabled"}>${esc(label)}</button>
@@ -484,11 +607,11 @@ const CFG_TXT = {FINAL_PCT:["Final stretch", "% of route counted as the 'final' 
   NORMAL_GAP_PCT:["Normal gap tolerance", "% of sched HW (min "], NORMAL_GAP_MIN:["", "min)"], PLAN_SLACK:["Estimated plan slack", "x free-flow drive time"], DWELL_MIN:["Dwell per stop", "min"], BUS_MAX_KMH:["Bus speed cap", "km/h"]};
 Object.assign(CFG_TXT, {AFFECT_MIN:["Bus affected by congestion ahead", "min lost on slow stretches"], PROLONG_KM:["Prolonged = slow stretch of", "km or more"], CONG_KMH:["Slow means below", "km/h (LTA bands 1-2)"], FLOW_KMH:["Congestion cost measured vs", "km/h normal flow"],
   PERSIST_MIN:["Congestion must persist", "min before adjusting"], CLEAR_MIN:["Recovery must persist", "min before restoring HW"], C1_PERSIST_MIN:["Front-bus gap must persist", "min before contacting BC"],
-  MIN_LAYOVER:["Minimum layover (delayed bus)", "min"], MAX_HOLD:["Longest suggested hold at terminal", "min"], DEFAULT_LAYOVER:["Layover assumed if not entered", "min"], HEAVY_LAYOVER:["Heavy-layover duty (never adjusted)", "min or more"], LATE_MARGIN:["Delay must exceed layover slack by", "min"]});
+  MIN_LAYOVER:["Minimum layover (delayed bus)", "min"], EARLY_STOP_MIN:["Stop is early when ahead of plan by", "min or more"], EARLY_STOP_PCT:["Call BC when early at more than", "% of remaining stops"], HW_PROLONG_MIN:["Long headway must last", "min (prolonged)"], PLAN_MIN_STOPS:["Stops needed to judge a bus vs timetable", "stops"], PLAN_MATCH_MAX:["Bus matches a planned trip within", "min"], MAX_HOLD:["Longest suggested hold at terminal", "min"], DEFAULT_LAYOVER:["Layover assumed if not entered", "min"], HEAVY_LAYOVER:["Heavy-layover duty (never adjusted)", "min or more"], LATE_MARGIN:["Delay must exceed layover slack by", "min"]});
 function renderRules(){
   const cfg = S.data ? S.data.cfg : null;
   $("rules").innerHTML = `<table class="rt"><tr><th>#</th><th>Check</th><th>Fires when</th><th>Action</th></tr>
-   <tr><td>1</td><td>En-route</td><td>A leading bus is well ahead of the bus behind it <b>and</b> that gap is growing and still true 3 min later</td><td>Comm BC: regulate spacing</td></tr>
+   <tr><td>1</td><td>En-route</td><td>A leading bus is well ahead of the bus behind it <b>and</b> that gap is growing and still true 3 min later. <b>With your timetable:</b> the bus is early (2+ min ahead of plan) at <b>more than 50% of its remaining stops</b> <b>and</b> the long headway behind it has lasted 5+ min</td><td>Comm BC: regulate spacing</td></tr>
    <tr><td>2</td><td>Traffic</td><td><b>Prolonged</b> congestion ahead of 2+ buses (slow stretch &ge; 1.5 km costing &ge; 3 min) that has lasted 10+ min <b>and</b> the delay exceeds what terminal layover absorbs (layover &minus; 7 min minimum + 3 min margin). Heavy-layover duties (15+ min) are never adjusted</td><td>Temporarily longer departure HW (e.g. 10 &rarr; 11/12/13)</td></tr>
    <tr><td>3</td><td>Last 15% recovery</td><td>A longer-HW adjustment is active <b>and</b> affected buses are in the last 15% / clear and within layover slack, for 5+ min</td><td>Cancel, restore original HW (e.g. 13 &rarr; 10)</td></tr>
    <tr><td>4</td><td>Early arrival</td><td>2+ consecutive buses in the last 15% <b>and</b> predicted more than 5 min early vs <b>your timetable</b> (not judged without one)</td><td>Temporarily shorter HW (e.g. 10 &rarr; 9)</td></tr>
@@ -508,8 +631,9 @@ $("exportBtn").addEventListener("click", () => {
 });
 
 /* start */
-syncSegs(); renderChips(); cdText(); render();
-if(S.services.length) load();
+syncSegs(); renderChips(); syncAll(); cdText(); render();
+fetch("/api/timetable").then(r => r.json()).then(j => { S.tt = j; renderTT(); }).catch(() => {});
+if(S.all || S.services.length) load();
 </script>
 </body>
 </html>

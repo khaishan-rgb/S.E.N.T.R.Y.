@@ -1,9 +1,39 @@
-# SG Transport Pulse V5.2 — Route Traffic + Pre-emptive Departure Adjustment
+# SG Transport Pulse V5.3 — Route Traffic + Pre-emptive Departure Adjustment
 
 Live bus positions, live LTA traffic drawn directly on the bus route, and next arrivals per stop.
 FastAPI backend + a single-page Leaflet frontend (OneMap basemap, OpenStreetMap fallback).
 
-## Headway Control page (`/control`) - pre-emptive departure adjustment (V5.2: quieter, layover-aware)
+## V5.3 - All services, planned timetable, and "call the BC to slow down"
+
+**Are there planned and actual timetables in the data? Not from LTA.** DataMall publishes only dispatch-frequency bands, first/last bus
+times and live arrival *estimates* - no per-stop planned times and no per-stop actual times. So:
+* **Planned** = a timetable **you upload** (Headway Control page -> *Upload timetable*; *Template* downloads an example). Two CSV formats:
+  `service,direction,departure,run_min` (stops interpolated by distance) or `service,direction,trip,stop_code,time` (planned time per stop).
+* **Actual** = LTA's live estimated arrival at each stop still ahead of the bus (scaled along the route by current traffic). LTA does not
+  record what already happened, so past stops cannot be judged.
+
+**Call the BC rule** (needs an uploaded timetable): a bus is flagged when **all** are true
+1. it is predicted >= 2 min ahead of plan at **more than 50% of its remaining stops**;
+2. the headway behind it is long (>= scheduled HW + max(40%, 3 min)); and
+3. that long headway has **lasted 5+ min** (so a single noisy refresh never triggers it).
+
+It is then highlighted: an orange **"Call the Bus Captain to slow down"** banner at the top, the table row turns orange with a **CALL BC**
+badge, the bus is orange on the route strip, the *Planned vs predicted* table flags it, and *Copy BC message* drafts the call. Without a
+timetable, the older "gap growing" check (Comm BC / regulate spacing) still applies. Thresholds: `headway.CFG` (`EARLY_STOP_MIN`,
+`EARLY_STOP_PCT`, `HW_PROLONG_MIN`).
+
+**All services mode** (Scope -> *All services*): lists every service direction, stable ones included, with counts for Critical / Developing /
+Stable / Insufficient data, an operator filter and 12-row pages. The page scans in batches (about a minute to a few minutes per lap) and
+repeats every 3 minutes while Auto refresh is on. Keep the page open: the 10-minute "prolonged" confirmation needs repeat visits.
+* Default cap is **160 service directions** (`CONTROL_ALL_CAP`) to protect your LTA quota; the page says when it is capped. Use the operator
+  filter to cover more. Raising the cap makes laps longer, so confirmations get slower - raise it gradually.
+* Not verified against the live LTA network: full-network laps and their timing depend on LTA's response speed and any rate limiting.
+
+**Uploads are shared:** one timetable serves everyone using the site and is stored in `timetable.json` (git-ignored). Set `TIMETABLE_TOKEN`
+on Render so only people who know it can upload/clear. On Render's free tier the disk can reset on restart/redeploy: re-upload if the
+timetable bar says none is loaded.
+
+## Headway Control page (`/control`) - V5.2 rules - pre-emptive departure adjustment (V5.2: quieter, layover-aware)
 For each selected **Service + Direction** (up to 8 services, 16 pairs) it predicts every bus and its terminal arrival, then runs five
 checks and suggests a departure-headway (HW) change. **V5.2 is deliberately quiet: it only recommends an adjustment for prolonged
 congestion that terminal layover cannot absorb.**
@@ -86,6 +116,8 @@ Run locally: `pip install -r requirements.txt` then `LTA_ACCOUNT_KEY=... uvicorn
 | `LTA_SPEED_PATH` | Override speed-band endpoint path if LTA changes it |
 | `LTA_ARRIVAL_PATH` | Override bus-arrival endpoint path (default `v3/BusArrival`) |
 | `OSRM_URL` | Road-snapping server (default public demo `https://router.project-osrm.org`). If unreachable the route is drawn stop-to-stop and traffic matching is less precise |
+| `TIMETABLE_TOKEN` | If set, uploading/clearing the planned timetable requires this token (recommended) |
+| `CONTROL_ALL_CAP` | Max service directions scanned in All-services mode (default 160) |
 | `DATA_GOV_SG_KEY` | Optional, only raises data.gov.sg rate limits for the Rain layer |
 
 ## Known limits

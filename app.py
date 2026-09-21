@@ -9,18 +9,18 @@ LTA endpoint paths follow the DataMall API User Guide v6.9 (3 Aug 2026):
   v4/TrafficSpeedBands   (was probed as v3/... before, which now returns 404)
   v3/BusArrival          (was called BusArrivalv3, which is not a real path)
 """
-import os, re, math, time, asyncio
+import os, re, math, time, asyncio, json
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
 import httpx
-from fastapi import FastAPI, Query
+from fastapi import FastAPI, Query, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 
 import headway
 
-VERSION = "V5.2"
+VERSION = "V5.3"
 LTA = os.getenv("LTA_BASE", "https://datamall2.mytransport.sg/ltaodataservice").rstrip("/")
 KEY = os.getenv("LTA_ACCOUNT_KEY", "")
 OSRM = os.getenv("OSRM_URL", "https://router.project-osrm.org").rstrip("/")
@@ -514,10 +514,12 @@ def parse_services(data, now, only=None):
 
 
 async def arrivals_raw(stop, service=""):
+    """Bus Arrival for a stop. Always fetched for ALL services at the stop and cached per stop, so many selected services that share
+    stops (interchanges, trunk roads) cost one LTA call between them. Callers filter by service via parse_services(..., only=svc)."""
     async def factory():
-        d = await get_lta(EP_ARRIVAL, {"BusStopCode": stop, **({"ServiceNo": service} if service else {})})
+        d = await get_lta(EP_ARRIVAL, {"BusStopCode": stop})
         return d, TTL_ARRIVAL, not d.get("_error")
-    return await cached(f"arr:{stop}:{service}", factory)
+    return await cached(f"arr:{stop}", factory)
 
 
 def min_dist_km(lat, lon, line):
@@ -766,7 +768,7 @@ async def _load_freq():
         except (TypeError, ValueError):
             d = 1
         if svc:
-            fq[(svc, d)] = {k: r.get(k + "_Freq") for k in ("AM_Peak", "AM_Offpeak", "PM_Peak", "PM_Offpeak")}
+            fq[(svc, d)] = {**{k: r.get(k + "_Freq") for k in ("AM_Peak", "AM_Offpeak", "PM_Peak", "PM_Offpeak")}, "Operator": str(r.get("Operator") or "").strip().upper()}
     return {"freqs": fq, "error": err}, TTL_STATIC, bool(fq) and not err
 
 
@@ -788,7 +790,7 @@ def parse_triples(s, cast):
 
 
 HELD = {}        # "svc:dir" -> {condition: {"since": ts, "seen": ts}}   how long each condition has been continuously true
-HELD_GRACE = 180  # a condition that blips off for < 3 min keeps its clock (LTA ETAs jitter)
+HELD_GRACE = 420  # a condition that blips off (or is not re-evaluated) for < 7 min keeps its clock: covers ETA jitter and All-services laps
 
 
 def held_minutes(key, conds, ts):
@@ -807,6 +809,88 @@ def held_minutes(key, conds, ts):
                 del st[name]
             out[name] = 0.0
     return out
+
+
+# --------------------------------------------------------------------------- planned timetable (optional, uploaded by the operator)
+TT_FILE = HERE / "timetable.json"
+TT = {"trips": {}, "updated": None, "rows": 0}     # {(svc, dir): [trip, ...]}
+TT_TOKEN = os.getenv("TIMETABLE_TOKEN", "")         # if set, uploads/clears need header x-admin-token
+TT_MAX_BYTES = 8 * 1024 * 1024
+ALL_CAP = int(os.getenv("CONTROL_ALL_CAP", "160"))   # service+direction pairs scanned in All-services mode
+
+
+def tt_save():
+    try:
+        TT_FILE.write_text(json.dumps({"updated": TT["updated"], "rows": TT["rows"], "trips": {f"{k[0]}|{k[1]}": v for k, v in TT["trips"].items()}}), encoding="utf-8")
+    except OSError:
+        pass          # read-only or ephemeral disk: the timetable then lives in memory only
+
+
+def tt_load():
+    try:
+        j = json.loads(TT_FILE.read_text(encoding="utf-8"))
+        TT["trips"] = {(k.split("|")[0], int(k.split("|")[1])): v for k, v in j.get("trips", {}).items()}
+        TT["updated"], TT["rows"] = j.get("updated"), j.get("rows", 0)
+    except (OSError, ValueError, IndexError):
+        pass
+
+
+def tt_summary():
+    pairs = {f"{k[0]}:{k[1]}": len(v) for k, v in TT["trips"].items()}
+    return {"loaded": bool(pairs), "pairs": pairs, "services": len({k[0] for k in TT["trips"]}), "trips": sum(pairs.values()), "updated": TT["updated"], "tokenRequired": bool(TT_TOKEN)}
+
+
+tt_load()
+
+
+@app.get("/api/timetable")
+async def api_timetable():
+    return tt_summary()
+
+
+@app.post("/api/timetable")
+async def api_timetable_upload(request: Request):
+    """Body = CSV/TSV text (see headway.parse_timetable). Replaces the whole planned timetable."""
+    if TT_TOKEN and request.headers.get("x-admin-token", "") != TT_TOKEN:
+        return JSONResponse({"error": "Upload token missing or wrong."}, status_code=401)
+    raw = await request.body()
+    if len(raw) > TT_MAX_BYTES:
+        return JSONResponse({"error": "File too large (max 8 MB)."}, status_code=413)
+    trips, info = headway.parse_timetable(raw.decode("utf-8-sig", "replace"))
+    if not trips:
+        return JSONResponse({"error": "; ".join(info["errors"][:3]) or "No usable rows found.", **info}, status_code=400)
+    TT.update(trips=trips, updated=now_sgt().isoformat(timespec="seconds"), rows=info["rows"])
+    tt_save()
+    return {"ok": True, "rows": info["rows"], "errors": info["errors"], **tt_summary()}
+
+
+@app.post("/api/timetable/clear")
+async def api_timetable_clear(request: Request):
+    if TT_TOKEN and request.headers.get("x-admin-token", "") != TT_TOKEN:
+        return JSONResponse({"error": "Upload token missing or wrong."}, status_code=401)
+    TT.update(trips={}, updated=None, rows=0)
+    tt_save()
+    return {"ok": True, **tt_summary()}
+
+
+@app.get("/api/control/services")
+async def api_control_services(scope: str = ""):
+    """Services (with directions and operator) for All-services mode. scope = operator code (SBST, SMRT, TTS, GAS) or empty for all."""
+    st, fq = await static(), await freq_table()
+    scope = scope.strip().upper()
+    ops, out = {}, []
+    for svc, dirs in st["dirs"].items():
+        op = next((o for d in dirs for o in [(fq["freqs"].get((svc, d)) or {}).get("Operator")] if o), "")
+        ops[op or "?"] = ops.get(op or "?", 0) + 1
+        if scope in ("", "ALL") or op == scope:
+            out.append({"service": svc, "dirs": dirs, "operator": op})
+    out.sort(key=lambda x: ((not x["service"].isdigit()), int(x["service"]) if x["service"].isdigit() else 0, x["service"]))
+    total, kept, n = sum(len(x["dirs"]) for x in out), [], 0
+    for x in out:
+        if n + len(x["dirs"]) > ALL_CAP:
+            break
+        kept.append(x); n += len(x["dirs"])
+    return {"scope": scope or "ALL", "operators": ops, "services": kept, "pairs": n, "totalPairs": total, "cap": ALL_CAP, "truncated": n < total}
 
 
 @app.get("/control", response_class=HTMLResponse)
@@ -848,6 +932,16 @@ async def api_control(services: str = "", direction: int = 0, adj: str = "", pla
                "origin_etas": [o["eta"] for o in b.get("origin", [])],
                "sched": headway.sched_hw(fq["freqs"].get((svc, d)), now), "adj_hw": adj_m.get((svc, d)), "plan_override": plan_m.get((svc, d)),
                "layover": lay_m.get((svc, d)), "next_dir": (2 if d == 1 else 1) if len(st["dirs"].get(svc, [])) > 1 else d}
+        tt = TT["trips"].get((svc, d))
+        if tt:
+            nowm = now.hour * 60 + now.minute + now.second / 60
+            codes, arrs = [x["code"] for x in stops], []
+            for tr in tt:
+                t = headway.planned_times(tr, codes, prep["stop_s"], prep["km"])
+                ref = next((x for x in t if x is not None), None) if t else None
+                if ref is not None and abs(((ref - nowm + 720) % 1440) - 720) <= 240:      # only trips within +/-4 h of now
+                    arrs.append({"id": tr.get("id") or "", "t": t})
+            ctx["planned"] = {"trips": arrs, "now_min": nowm}
         # pass 1 finds which conditions are true right now; the tracker says how long each has held; pass 2 decides with that
         item0 = await asyncio.to_thread(headway.evaluate, ctx)
         ctx["held"] = held_minutes(f"{svc}:{d}", item0.get("conds"), now.timestamp())
@@ -873,7 +967,7 @@ async def api_control(services: str = "", direction: int = 0, adj: str = "", pla
     summary = {k: sum(1 for x in items if x["risk"] == k) for k in order}
     summary.update(total=len(items), buses=nb, coverage=round(100 * sum(x["monitored"] for x in items) / nb) if nb else None)
     return {"updated": now.isoformat(timespec="seconds"), "items": items, "summary": summary, "errors": errors, "cfg": headway.CFG,
-            "truncated": len(svcs) * len(dirs) > MAX_COMBOS, "freqOk": bool(fq["freqs"]), "freqError": fq.get("error")}
+            "truncated": len(svcs) * len(dirs) > MAX_COMBOS, "timetable": tt_summary(), "freqOk": bool(fq["freqs"]), "freqError": fq.get("error")}
 
 
 @app.get("/api/stop-suggest")

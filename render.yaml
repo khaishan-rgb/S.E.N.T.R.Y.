@@ -9,3 +9,5 @@ services:
     envVars:
       - key: LTA_ACCOUNT_KEY
         sync: false
+      - key: TIMETABLE_TOKEN      # optional but recommended: protects planned-timetable upload/clear
+        sync: false

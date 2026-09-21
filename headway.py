@@ -36,6 +36,11 @@ CFG = {
     "MIN_LAYOVER": 7.0,      # minimum layover a delayed bus still gets at the terminal
     "DEFAULT_LAYOVER": 10.0, # scheduled layover assumed when the controller has not entered one
     "HEAVY_LAYOVER": 15.0,   # duty with >= 15 min layover absorbs delay: never adjusted for traffic
+    "EARLY_STOP_MIN": 2.0,   # timetable: a stop is "early" when the bus is predicted >= 2 min ahead of its planned time
+    "EARLY_STOP_PCT": 50,    # ... and the bus is early at MORE than 50% of its remaining stops
+    "HW_PROLONG_MIN": 5.0,   # ... while a long headway behind it has lasted this long ("prolonged headway")
+    "PLAN_MIN_STOPS": 5,     # need >= 5 comparable stops to judge a bus against the timetable
+    "PLAN_MATCH_MAX": 6.0,   # a bus is matched to a planned trip only if it is within 6 min (mean over stops)
     "MAX_HOLD": 5.0,         # never suggest holding one bus at the terminal longer than this (bigger bunching needs other action)
     "LATE_MARGIN": 3.0,      # delay must exceed layover slack (layover - min layover) by this much
     "LATE_MIN": 3.0,         # (display only) route-vs-timetable colouring
@@ -222,6 +227,150 @@ class TimeModel:
         return self._span(0, self.total, True) * (1 + self.cfg["PLAN_SLACK"]) + self.dwell(0, self.total)
 
 
+# ----------------------------------------------------------------------------- planned timetable (optional, uploaded by the operator)
+def parse_hhmm(v):
+    """'08:05', '0805', '8:05:30', '24:10' (after midnight) -> minutes since midnight, else None."""
+    m = re.fullmatch(r"\s*(\d{1,2}):?(\d{2})(?::(\d{2}))?\s*", str(v if v is not None else ""))
+    if not m:
+        return None
+    h, mi, sec = int(m.group(1)), int(m.group(2)), int(m.group(3) or 0)
+    return None if (mi > 59 or sec > 59 or h > 47) else h * 60 + mi + sec / 60.0
+
+
+def parse_timetable(text, max_errors=20):
+    """CSV/TSV text -> ({(service, direction): [trip, ...]}, info).
+    Format A (planned time per stop):        service,direction,trip,stop_code,time
+    Format B (departure + running time):     service,direction,departure,run_min     (stops interpolated by distance)
+    A header row is optional; blank lines and lines starting with # are ignored."""
+    errors, rows_ok = [], 0
+    lines = [(i + 1, l.rstrip("\r")) for i, l in enumerate((text or "").split("\n")) if l.strip() and not l.strip().startswith("#")]
+    if not lines:
+        return {}, {"rows": 0, "trips": 0, "pairs": {}, "errors": ["The file is empty."]}
+    first = lines[0][1]
+    delim = "\t" if "\t" in first else (";" if first.count(";") > first.count(",") else ",")
+    split = lambda l: [c.strip().strip('"') for c in l.split(delim)]
+    cells0 = split(first)
+    low = [c.lower().replace(" ", "_") for c in cells0]
+    header = any(re.search(r"[a-z]{3,}", c) for c in low)
+    col = lambda *names: next((low.index(n) for n in names if n in low), None)
+    i_run = i_c = i_t = None
+    if header:
+        i_s, i_d = col("service", "svc", "serviceno", "service_no"), col("direction", "dir")
+        i_t = col("trip", "trip_id", "tripid")
+        i_c = col("stop", "stop_code", "stopcode", "busstopcode", "bus_stop_code")
+        i_time = col("time", "planned", "planned_time", "arrival", "departure", "dep", "planned_departure", "depart")
+        i_run = col("run", "run_min", "running", "running_time", "runtime", "run_time")
+        body = lines[1:]
+        if i_s is None or i_d is None or i_time is None or (i_c is None and i_run is None):
+            return {}, {"rows": 0, "trips": 0, "pairs": {}, "errors": ["Header must contain service, direction, time and either stop_code (format A) or run_min (format B)."]}
+    else:
+        body = lines
+        if len(cells0) >= 5:
+            i_s, i_d, i_t, i_c, i_time = 0, 1, 2, 3, 4
+        elif len(cells0) == 4:
+            i_s, i_d, i_time, i_run = 0, 1, 2, 3
+        else:
+            return {}, {"rows": 0, "trips": 0, "pairs": {}, "errors": ["Expected 5 columns (service,direction,trip,stop_code,time) or 4 (service,direction,departure,run_min)."]}
+    fmt_a = i_c is not None
+    out, grouped = {}, {}
+    for n, l in body:
+        c = split(l)
+        try:
+            svc, d = c[i_s].upper(), int(c[i_d])
+            t = parse_hhmm(c[i_time])
+            if not svc or d not in (1, 2) or t is None:
+                raise ValueError("bad service / direction / time")
+            if fmt_a:
+                code = c[i_c].strip()
+                if not code:
+                    raise ValueError("missing stop code")
+                tr = grouped.setdefault((svc, d, c[i_t] if i_t is not None else ""), {})
+                prev = list(tr.values())[-1] if tr else None
+                if prev is not None and t < prev - 720:      # passed midnight
+                    t += 1440
+                tr[code] = t
+            else:
+                run = float(c[i_run])
+                if not 5 <= run <= 300:
+                    raise ValueError("run_min must be 5-300")
+                out.setdefault((svc, d), []).append({"id": c[i_time], "dep": t, "run": run})
+            rows_ok += 1
+        except (ValueError, IndexError) as e:
+            if len(errors) < max_errors:
+                errors.append(f"line {n}: {e}")
+    for (svc, d, tid), stops in grouped.items():
+        if len(stops) >= 2:
+            out.setdefault((svc, d), []).append({"id": tid or f"trip{len(out.get((svc, d), [])) + 1}", "stops": stops})
+        elif len(errors) < max_errors:
+            errors.append(f"{svc} dir {d} trip '{tid}': needs at least 2 stops")
+    pairs = {f"{k[0]}:{k[1]}": len(v) for k, v in out.items()}
+    return out, {"rows": rows_ok, "trips": sum(pairs.values()), "pairs": pairs, "errors": errors}
+
+
+def planned_times(trip, stop_codes, stop_s, route_km):
+    """Planned minutes-since-midnight at every stop of the route (None where unknown). Timing-point timetables are interpolated by distance."""
+    n = len(stop_codes)
+    if "stops" in trip:
+        known = sorted((j, trip["stops"][c]) for j, c in enumerate(stop_codes) if c in trip["stops"])
+        if len(known) < 2:
+            return None
+        out = [None] * n
+        for (j0, t0), (j1, t1) in zip(known, known[1:]):
+            for j in range(j0, j1 + 1):
+                w = (stop_s[j] - stop_s[j0]) / (stop_s[j1] - stop_s[j0]) if stop_s[j1] > stop_s[j0] else 0.0
+                out[j] = t0 + (t1 - t0) * w
+        return out
+    return [trip["dep"] + trip["run"] * stop_s[j] / route_km for j in range(n)] if route_km > 0 else None
+
+
+def _pred_minutes(b, tm, stop_s, C):
+    """Predicted minutes from now at each stop the bus has not yet passed: LTA ETAs where known, otherwise the traffic model
+    scaled to the pace implied by those ETAs."""
+    s, etas = b["s_km"], b.get("etas") or {}
+    ks = [k for k in etas if stop_s[k] > s + 0.02]
+    pred = {}
+    if tm is not None:
+        ratios = [etas[k] / m for k in ks for m in [tm.t(s, stop_s[k])] if m > 1.0]
+        pace = min(1.8, max(0.6, _median(ratios))) if ratios else 1.0
+        for j, sj in enumerate(stop_s):
+            if sj > s + 0.02:
+                pred[j] = pace * tm.t(s, sj)
+    for k in ks:
+        pred[k] = float(etas[k])
+    return pred
+
+
+def _plan_buses(buses, tm, stop_s, planned, C):
+    """Match each bus to its planned trip (closest, each trip used once) and measure how early/late it is at its remaining stops."""
+    now_min, last = planned["now_min"], len(stop_s) - 1
+    trips = []
+    for tr in planned["trips"]:
+        ref = next((x for x in tr["t"] if x is not None), None)
+        if ref is not None:
+            trips.append((tr, round((now_min - ref) / 1440) * 1440))
+    cand = {}
+    for bi, b in enumerate(buses):
+        pred = _pred_minutes(b, tm, stop_s, C)
+        if len(pred) < C["PLAN_MIN_STOPS"]:
+            continue
+        for ti, (tr, shift) in enumerate(trips):
+            devs = {j: tr["t"][j] + shift - (now_min + pm) for j, pm in pred.items() if tr["t"][j] is not None}   # + = ahead of plan (early)
+            if len(devs) >= C["PLAN_MIN_STOPS"]:
+                cost = sum(abs(v) for v in devs.values()) / len(devs)
+                if cost <= C["PLAN_MATCH_MAX"]:
+                    cand[(bi, ti)] = (cost, devs)
+    used_b, used_t = set(), set()
+    for (bi, ti), (cost, devs) in sorted(cand.items(), key=lambda kv: kv[1][0]):
+        if bi in used_b or ti in used_t:
+            continue
+        used_b.add(bi); used_t.add(ti)
+        v = list(devs.values())
+        early = sum(1 for x in v if x >= C["EARLY_STOP_MIN"])
+        buses[bi]["plan"] = {"trip": trips[ti][0]["id"], "n": len(v), "early_pct": round(100 * early / len(v)), "avg_dev": round(sum(v) / len(v), 1),
+                             "term_dev": round(devs[last], 1) if last in devs else None}
+    return len(used_b)
+
+
 # ----------------------------------------------------------------------------- helpers
 def _median(v):
     v = sorted(v)
@@ -272,7 +421,9 @@ def evaluate(ctx, cfg=CFG):
                       "term_clock": (now + timedelta(minutes=et)).strftime("%H:%M") if et is not None else None,
                       "ahead_delay": _r(cost), "cong_km": _r(clong), "affected": cost is not None and cost >= C["AFFECT_MIN"] and clong >= C["PROLONG_KM"],
                       "monitored": bool(b.get("monitored")), "load": b.get("load") or "", "near": b.get("near") or "",
-                      "gap_behind": None, "gap_trend": None, "gap_src": None})
+                      "gap_behind": None, "gap_trend": None, "gap_src": None, "plan": None, "early_call": False})
+    planned = ctx.get("planned")
+    n_matched = _plan_buses(buses, tm, stop_s, planned, C) if (planned and planned.get("trips") and end) else 0
 
     # gaps between consecutive buses (leader = nearer the terminal)
     gaps = []
@@ -353,14 +504,28 @@ def evaluate(ctx, cfg=CFG):
     fmt = lambda x: f"{x:.0f}" if x is not None and abs(x - round(x)) < 0.05 else f"{x:.1f}"
 
     # ---- 1 EN-ROUTE: leading bus pulling away AND the gap behind it growing
-    c1 = None
+    c1, early_hit = None, []
     if H is None:
         chk1 = _chk(1, "En-route spacing", "na", "Scheduled headway unknown")
     else:
         thr = H + max(H * C["EARLY_GAP_PCT"] / 100, C["EARLY_GAP_MIN"])
         pulled = [g for g in gaps if g["gap"] is not None and g["gap"] >= thr]
         hit = [g for g in pulled if g["trend"] is not None and g["trend"] >= C["TREND_MIN"]]
-        if hit and hd("c1") >= C["C1_PERSIST_MIN"]:
+        if planned and planned.get("trips"):      # timetable available: "early" = ahead of plan at > 50% of remaining stops
+            for g in gaps:
+                lead = buses[g["lead"] - 1]; pl = lead.get("plan")
+                if g["gap"] is not None and g["gap"] >= thr and pl and pl["early_pct"] > C["EARLY_STOP_PCT"] and pl["avg_dev"] > 0:
+                    early_hit.append((g, lead))
+        if early_hit and hd("c1t") >= C["HW_PROLONG_MIN"]:
+            g, lead = max(early_hit, key=lambda x: x[0]["gap"]); pl = lead["plan"]
+            c1 = {**g, "timetable": True, "early_pct": pl["early_pct"], "avg_dev": pl["avg_dev"]}
+            chk1 = _chk(1, "En-route spacing", "triggered", f"Bus #{g['lead']} is early at {pl['early_pct']}% of its remaining stops (avg {fmt(pl['avg_dev'])} min "
+                        f"ahead of timetable) with a long headway behind it: {fmt(g['gap'])} min vs scheduled {H}, held {fmt(min(hd('c1t'), 99))} min. Call the BC to slow down.")
+        elif early_hit:
+            g, lead = max(early_hit, key=lambda x: x[0]["gap"]); pl = lead["plan"]
+            chk1 = _chk(1, "En-route spacing", "watch", f"Bus #{g['lead']} is early at {pl['early_pct']}% of stops and {fmt(g['gap'])} min ahead of the bus behind - "
+                        f"confirming the long headway lasts ({fmt(hd('c1t'))} of {fmt(C['HW_PROLONG_MIN'])} min) before calling the BC.")
+        elif hit and hd("c1") >= C["C1_PERSIST_MIN"]:
             c1 = max(hit, key=lambda g: g["gap"])
             chk1 = _chk(1, "En-route spacing", "triggered",
                         f"Bus #{c1['lead']} is {fmt(c1['gap'])} min ahead of the bus behind (scheduled {H}) and the gap "
@@ -472,7 +637,8 @@ def evaluate(ctx, cfg=CFG):
         else:
             actions.append(("SHORTEN", cur, to4, f"Shorten departure HW {cur} -> {to4} min", 4))
     if c1:
-        actions.append(("REGULATE", cur, cur, f"Comm BC: regulate spacing (Bus #{c1['lead']} ahead)", 1))
+        actions.append(("REGULATE", cur, cur, (f"Call BC - slow down Bus #{c1['lead']} (early at {c1['early_pct']}% of stops)" if c1.get("timetable")
+                                                else f"Comm BC: regulate spacing (Bus #{c1['lead']} ahead)"), 1))
     if c5:
         actions.append(("NORMALISE", adj, H, f"Restore scheduled HW {adj} -> {H} min", 5))
     if not actions and adj_active:
@@ -540,8 +706,15 @@ def evaluate(ctx, cfg=CFG):
                        "hold at the next control point before the gap becomes a service gap.",
            "HOLD": "The current adjustment is still appropriate; keep monitoring.",
            "NONE": "Headways are within the normal range and running time is close to plan."}[code]
+    if code == "REGULATE" and c1 and c1.get("timetable"):
+        why = (f"Bus #{c1['lead']} is ahead of its timetable at {c1['early_pct']}% of its remaining stops (on average {fmt(c1['avg_dev'])} min early) and the bus "
+               f"behind is {fmt(c1['gap'])} min back (scheduled HW {H}), which has persisted. Ask the Bus Captain to slow down / hold at the next timing point so the "
+               "following bus can close the gap.")
     bc = ""
-    if c1:
+    if c1 and c1.get("timetable"):
+        bc = (f"Svc {ctx['service']} Dir {ctx['direction']}: Bus #{c1['lead']} is running about {fmt(c1['avg_dev'])} min ahead of timetable (early at {c1['early_pct']}% of stops) "
+              f"and {fmt(c1['gap'])} min ahead of the following bus (scheduled HW {H}). Please slow down / hold at the next timing point.")
+    elif c1:
         bc = (f"Svc {ctx['service']} Dir {ctx['direction']}: Bus #{c1['lead']} is running {fmt(c1['gap'])} min ahead of the following bus "
               f"(scheduled HW {H}). Please regulate speed / hold at the next control point to maintain spacing.")
     elif code in ("EXTEND", "SHORTEN"):
@@ -555,6 +728,10 @@ def evaluate(ctx, cfg=CFG):
     conf -= (sched is None)
     conf -= (tm is None)
     conf -= (lay is None and bool(c2))
+    for b in buses:
+        b["early_call"] = bool(c1 and c1.get("timetable") and b["id"] == c1["lead"])
+    result["plan"] = {"loaded": bool(planned and planned.get("trips")), "trips": len(planned["trips"]) if planned else 0, "matched": n_matched}
+    result["conds"]["c1t"] = bool(early_hit)
     result.update(risk=risk, checks=checks, departures=dep,
                   rec={"code": code, "headline": headline, "from_hw": f_hw, "to_hw": t_hw, "actions": also,
                        "rationale": " ".join(facts) + " " + why, "bc_message": bc,
