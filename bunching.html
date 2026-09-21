@@ -1,0 +1,421 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#050d1a">
+<title>SG Transport Pulse – Bus Bunching &amp; Headway Gap</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+:root{--bg:#050d1a;--panel:#0a1a2e;--panel2:#0d2039;--line:#163250;--line2:#1f4468;--text:#eaf3ff;--mut:#8ba3bd;--blue:#1785ff;--cyan:#3cc8ff;
+  --green:#22d36a;--amber:#ff9f1c;--yellow:#ffd23f;--red:#ff4d55;--font:Inter,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif}
+*{box-sizing:border-box}html{-webkit-text-size-adjust:100%}
+body{margin:0;background:radial-gradient(1200px 500px at 20% -10%,#0b2140 0%,var(--bg) 60%);color:var(--text);font-family:var(--font);font-size:14px;line-height:1.35;min-height:100vh;
+  padding:env(safe-area-inset-top,0) env(safe-area-inset-right,0) env(safe-area-inset-bottom,0) env(safe-area-inset-left,0)}
+button,input,select{font:inherit;color:inherit}:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+.app{max-width:1500px;margin:0 auto;padding:0 14px 18px}
+.top{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;padding:12px 4px;border-bottom:1px solid var(--line)}
+.brand{display:flex;align-items:center;gap:12px}.logo{width:40px;height:40px;border-radius:11px;background:linear-gradient(160deg,#2a95ff,#0d63d6);display:grid;place-items:center;font-size:22px}
+.brand h1{margin:0;font-size:24px;font-weight:800;letter-spacing:-.4px;line-height:1.05}.brand p{margin:3px 0 0;color:var(--mut);font-size:13px}
+.nav{display:flex;gap:6px;flex-wrap:wrap}.nav a{padding:8px 14px;border:1px solid var(--line2);border-radius:10px;color:#cfe0f3;text-decoration:none;font-weight:600;font-size:13px;background:var(--panel)}
+.nav a.on{background:var(--blue);border-color:#4aa6ff;color:#fff}
+.hdr-right{text-align:right;font-size:13px;color:#cfe0f3}.live{display:flex;align-items:center;justify-content:flex-end;gap:7px;color:var(--mut);margin-top:3px}
+.live .dot{width:9px;height:9px;border-radius:50%;background:var(--mut)}.live.ok .dot{background:var(--green);box-shadow:0 0 8px var(--green)}.live.warn .dot{background:var(--amber)}.live.bad .dot{background:var(--red)}
+.tabs{display:flex;gap:6px;padding:10px 2px 0}.tabs button{padding:8px 16px;border-radius:10px 10px 0 0;border:1px solid var(--line2);border-bottom:0;background:var(--panel);cursor:pointer;font-weight:700;color:#a9c2da}
+.tabs button[aria-selected=true]{background:var(--blue);color:#fff;border-color:#4aa6ff}
+.filters{display:flex;flex-wrap:wrap;gap:12px 14px;align-items:flex-end;padding:12px 2px}
+.fld label{display:block;font-size:12.5px;color:var(--mut);margin:0 0 5px 2px}
+.chips{display:flex;flex-wrap:wrap;gap:6px;align-items:center;min-height:42px;background:var(--panel);border:1px solid var(--line2);border-radius:10px;padding:4px 8px;min-width:230px}
+.chip{display:inline-flex;align-items:center;gap:6px;background:#12365f;border:1px solid #2a6fbf;border-radius:8px;padding:3px 4px 3px 9px;font-weight:600}
+.chip button{background:transparent;border:0;cursor:pointer;color:#9cc4ff;font-size:15px;line-height:1;padding:0 4px}
+.chips input{flex:1;min-width:110px;background:transparent;border:0;outline:0;font-size:14px;padding:6px 4px}.chips input::placeholder{color:#5f7a96}
+.seg{display:flex;height:42px;background:var(--panel);border:1px solid var(--line2);border-radius:10px;padding:3px;gap:3px}
+.seg button{border:0;background:transparent;color:#a9c2da;padding:0 13px;border-radius:7px;cursor:pointer;font-weight:600;display:flex;align-items:center;gap:6px}
+.seg button[aria-pressed=true]{background:var(--cyan);color:#03203a}
+select,.sel{height:42px;background:var(--panel);border:1px solid var(--line2);border-radius:10px;padding:0 12px;color:var(--text);font-size:14px}
+.lvls{display:flex;gap:12px;height:42px;align-items:center;background:var(--panel);border:1px solid var(--line2);border-radius:10px;padding:0 12px}
+.lvls label{display:flex;align-items:center;gap:6px;cursor:pointer;margin:0;color:var(--text);font-size:14px;font-weight:600}
+.lvls input{accent-color:#1785ff;width:16px;height:16px}
+.btn{height:42px;border-radius:10px;border:1px solid var(--line2);background:var(--panel);cursor:pointer;font-weight:700;padding:0 16px}.btn:hover{filter:brightness(1.15)}
+.btn.go{background:linear-gradient(180deg,#1b8cff,#0c6be0);border-color:#4aa6ff;color:#fff}.btn.sm{height:32px;padding:0 12px;font-size:13px}
+.auto{display:flex;align-items:center;gap:7px;color:var(--mut);font-size:13px;height:42px}
+.msgs{display:grid;gap:8px;margin:2px 0 8px}.msg{border-radius:10px;padding:8px 12px;font-size:13px;border:1px solid var(--line2);background:#0c2440}
+.msg.bad{background:#3a0f16;border-color:#7a2530;color:#ffb0b6}.msg.warn{background:#3a2a06;border-color:#7a5a12;color:#ffe08a}
+.kpis{display:grid;grid-template-columns:1.25fr 1.25fr 1fr 1fr 1fr 1fr;gap:10px;margin:6px 0 12px}
+.kpi{display:flex;align-items:center;gap:12px;background:var(--panel);border:1px solid var(--line2);border-radius:13px;padding:12px 14px;min-width:0}
+.kpi .n{font-size:34px;font-weight:800;line-height:1}.kpi b{display:block;font-size:14px}.kpi span{color:var(--mut);font-size:12px;display:block}
+.kpi.gap{background:linear-gradient(120deg,#4a0f19,#2a0a12);border-color:#8a2632}.kpi.bb{background:linear-gradient(120deg,#4d2c05,#2c1a04);border-color:#8a5a12}
+.kpi .d{font-size:12px;font-weight:700;margin-top:2px}.d.up{color:#ff8a90}.d.dn{color:#7be7a5}.d.flat,.d.na{color:var(--mut);font-weight:500}
+.grid1{display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:12px}.grid2{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr) minmax(0,1fr);gap:12px;margin-top:12px}
+.card{background:linear-gradient(180deg,var(--panel),#08172a);border:1px solid var(--line2);border-radius:14px;padding:14px 16px;min-width:0}
+.card h2{margin:0;font-size:17px;font-weight:700}.card .sub{color:var(--mut);font-size:12.5px;margin-top:2px}
+.card>header{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;justify-content:space-between;margin-bottom:10px}
+.sorts{display:flex;gap:4px;align-items:center;color:var(--mut);font-size:12.5px;flex-wrap:wrap}.sorts button{padding:6px 11px;border-radius:7px;border:1px solid var(--line2);background:var(--panel);cursor:pointer;font-weight:600;color:#a9c2da}
+.sorts button[aria-pressed=true]{background:var(--cyan);color:#03203a;border-color:var(--cyan)}
+.tw{overflow-x:auto}table{width:100%;border-collapse:collapse}
+th{font-size:12px;color:#b9d0e6;text-align:left;font-weight:600;padding:8px 7px;border-bottom:1px solid var(--line2);vertical-align:bottom;white-space:normal;line-height:1.2}
+td{padding:7px;border-bottom:1px solid #12293f;white-space:nowrap}
+tbody tr{cursor:pointer}tbody tr:hover{background:#0d2440}tbody tr.sel{background:#10305a;outline:1px solid #2a6fbf;outline-offset:-1px}
+.rk{display:inline-block;width:14px;height:14px;border-radius:50%}.rk.red{background:var(--red)}.rk.orange{background:var(--amber)}.rk.yellow{background:var(--yellow)}.rk.green{background:var(--green)}.rk.nodata{background:#6b7f95}
+.svc{font-weight:800;font-size:16px}.c-red{color:#ff7a80;font-weight:700}.c-amb{color:#ffb25a;font-weight:700}.c-grn{color:#7be7a5}.m{color:var(--mut)}
+.bar4{display:inline-flex;gap:2px;align-items:flex-end;height:18px;vertical-align:middle}.bar4 i{display:block;width:5px;border-radius:1px;background:#3a5670}
+.vbtn{background:var(--blue);border:0;border-radius:7px;padding:5px 16px;font-weight:700;cursor:pointer;color:#fff}
+.tag{display:inline-block;padding:1px 7px;border-radius:6px;font-size:11px;font-weight:700;margin-left:5px}.tag.conf{background:#5a1219;color:#ffb0b6}.tag.dev{background:#4d3305;color:#ffd08a}.tag.early{background:#4a4205;color:#ffe98a}
+.pager{display:flex;gap:6px;justify-content:flex-end;align-items:center;margin-top:8px;color:var(--mut);font-size:12.5px}.pager button{padding:4px 10px;border-radius:7px;border:1px solid var(--line2);background:var(--panel);cursor:pointer}.pager button:disabled{opacity:.4;cursor:default}
+.empty{color:var(--mut);padding:16px 4px}.legend{display:grid;gap:8px;font-size:13.5px}.legend div{display:flex;align-items:center;gap:8px}.legend i{width:13px;height:13px;border-radius:50%}
+.insight{display:grid;grid-template-columns:1.1fr 1fr 1fr;gap:14px;margin-top:12px}.kv{display:grid;grid-template-columns:auto 1fr;gap:5px 14px;font-size:13.5px}.kv span:nth-child(odd){color:var(--mut)}
+.path{display:flex;gap:6px;margin:8px 0}.path div{flex:1;text-align:center;background:#0c2440;border:1px solid var(--line2);border-radius:9px;padding:6px 2px}.path b{display:block;font-size:17px}.path small{color:var(--mut)}
+#map{height:290px;border-radius:10px;overflow:hidden;background:#dfe6ea}.mapwrap{position:relative}
+.mlay{position:absolute;z-index:500;top:8px;right:8px;background:#0a1a2ee6;border:1px solid var(--line2);border-radius:10px;padding:7px 10px;display:grid;gap:4px;font-size:12.5px}
+.mlay label{display:flex;gap:6px;align-items:center;cursor:pointer;margin:0;color:var(--text)}
+.bmk{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;font-weight:800;font-size:12px;color:#03140a;border:2px solid #fff;box-shadow:0 1px 6px #0008}
+.bmk.n{background:var(--green)}.bmk.b{background:var(--red);color:#fff}.bmk.c{background:var(--yellow)}.bmk.g{background:#4aa6ff;border-color:var(--amber);color:#04203a}
+.stat3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:8px}.stat3>div{background:#0c2440;border:1px solid var(--line2);border-radius:9px;padding:8px;text-align:center}.stat3 b{display:block;font-size:22px}.stat3 small{color:var(--mut);font-size:11.5px}
+.set{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px 14px}.set label{display:block;font-size:12.5px;color:var(--mut);margin-bottom:4px}
+.set input{width:100%;height:38px;background:var(--panel);border:1px solid var(--line2);border-radius:9px;padding:0 10px;color:var(--text)}.set small{color:#6f88a3;font-size:11.5px}
+.toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:#12365f;border:1px solid #2a6fbf;padding:9px 16px;border-radius:10px;z-index:3000;opacity:0;pointer-events:none;transition:opacity .2s}.toast.show{opacity:1}
+.leaflet-popup-content-wrapper,.leaflet-popup-tip{background:#0a1a2e;color:#eaf3ff}
+.foot{display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px;color:#7f97b0;font-size:12.5px;padding:14px 4px 0}
+.sk{height:14px;border-radius:6px;background:linear-gradient(90deg,#0d2440,#163a63,#0d2440);background-size:200% 100%;animation:sk 1.2s linear infinite;margin:10px 0}@keyframes sk{to{background-position:-200% 0}}
+@media(max-width:1200px){.kpis{grid-template-columns:repeat(3,1fr)}.grid1,.grid2,.insight{grid-template-columns:1fr}}
+@media(max-width:760px){.kpis{grid-template-columns:repeat(2,1fr)}.hide-m{display:none}.chips{min-width:0;width:100%}.filters .fld{width:100%}.seg{width:100%}.seg button{flex:1;justify-content:center;padding:0 6px}.brand h1{font-size:20px}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <div class="brand"><div class="logo">&#128652;</div><div><h1>SG Transport Pulse</h1><p>Bus Bunching &amp; Headway Gap &bull; Detect earlier &bull; Prevent bunching &bull; Keep even headway</p></div></div>
+    <nav class="nav" aria-label="Pages"><a href="/">Route Traffic</a><a href="/control">Headway Control</a><a class="on" href="/bunching" aria-current="page">Bunching &amp; Gap</a></nav>
+    <div class="hdr-right"><div id="clock">&nbsp;</div><div class="live" id="live"><span class="dot"></span><span id="liveText">Connecting&hellip;</span></div></div>
+  </header>
+  <div class="tabs" role="tablist"><button role="tab" id="tabDash" aria-selected="true">Dashboard</button><button role="tab" id="tabSet" aria-selected="false">Settings</button></div>
+
+  <main id="dash">
+    <form class="filters" id="form" autocomplete="off">
+      <div class="fld"><label for="svcIn">Services</label><div class="chips" id="chips"><input id="svcIn" placeholder="All monitored (add e.g. 32)" maxlength="6" autocapitalize="characters"></div></div>
+      <div class="fld"><label id="dl">Direction</label><div class="seg" id="dirSeg" role="group" aria-labelledby="dl"><button type="button" data-d="0">Both</button><button type="button" data-d="1">Dir 1</button><button type="button" data-d="2">Dir 2</button></div></div>
+      <div class="fld"><label for="win">Time period</label><select id="win"><option value="0">Current</option><option value="10">Next 10 min</option><option value="20">Next 20 min</option><option value="30" selected>Next 30 min</option></select></div>
+      <div class="fld"><label id="vl">View by</label><div class="seg" id="viewSeg" role="group" aria-labelledby="vl"><button type="button" data-v="service">Service</button><button type="button" data-v="bus">Bus</button></div></div>
+      <div class="fld"><label id="il">Headway status</label><div class="seg" id="issueSeg" role="group" aria-labelledby="il"><button type="button" data-i="all">All</button><button type="button" data-i="gap">Gap</button><button type="button" data-i="bb">Bunching</button></div></div>
+      <div class="fld"><label>Bunching level</label><div class="lvls" id="lvls"><label><input type="checkbox" data-l="2" checked>2BB</label><label><input type="checkbox" data-l="3" checked>3BB</label><label><input type="checkbox" data-l="4" checked>4BB+</label></div></div>
+      <button class="btn go" type="submit" id="go">Refresh</button><button class="btn" type="button" id="reset">Reset</button>
+      <label class="auto"><input type="checkbox" id="autoCb" checked> Auto refresh <span id="cd"></span></label>
+    </form>
+    <div class="msgs" id="msgs"></div>
+    <section class="kpis" id="kpis" aria-label="Summary"></section>
+
+    <div class="grid1">
+      <section class="card" id="tableCard">
+        <header><div><h2 id="tblTitle">Service Headway &amp; Bunching Status</h2><div class="sub" id="tblSub">Loading&hellip;</div></div>
+          <div class="sorts">Sort by: <button data-s="risk" aria-pressed="true">Risk level</button><button data-s="time" aria-pressed="false">Time to occur</button><button data-s="svc" aria-pressed="false">Service no.</button><button data-s="gap" aria-pressed="false">Headway gap</button>
+          <button class="btn sm" id="exportBtn" type="button">Export</button></div></header>
+        <div class="tw"><table id="tbl"><thead id="thead"></thead><tbody id="tbody"></tbody></table></div>
+        <div class="empty" id="tblEmpty" hidden></div><div class="pager" id="pager"></div>
+      </section>
+      <div style="display:grid;gap:12px;align-content:start">
+        <section class="card"><h2>Bunching Cases by Level</h2><div id="donut" style="display:flex;align-items:center;gap:16px;margin-top:8px"></div></section>
+        <section class="card"><h2>Headway Gap vs Bunching Trend</h2><div id="trend"></div></section>
+      </div>
+    </div>
+
+    <section class="card insight" id="insight" hidden>
+      <div><h2 id="inTitle"></h2><div class="sub" id="inSub"></div><div class="kv" id="inKv" style="margin-top:10px"></div></div>
+      <div><h2>Headway path</h2><div class="sub">Predicted spacing of the focus pair vs scheduled</div><div class="path" id="inPath"></div><div id="inState" class="sub"></div></div>
+      <div><h2>Supporting information</h2><div class="sub">Context only - not presented as the cause</div><div id="inSupport" style="margin-top:8px;font-size:13.5px;display:grid;gap:6px"></div></div>
+    </section>
+
+    <div class="grid2">
+      <section class="card"><header><h2 id="mapTitle">Live Bus Positions</h2></header>
+        <div class="mapwrap"><div id="map"></div><div class="mlay" id="mlay"><label><input type="checkbox" data-m="bus" checked>Bus (on route)</label><label><input type="checkbox" data-m="stop" checked>Bus stop</label><label><input type="checkbox" data-m="group" checked>Bunched group</label><label><input type="checkbox" data-m="gap" checked>Headway gap</label></div></div></section>
+      <section class="card"><header><h2 id="seqTitle">Bus Sequence</h2></header><div class="tw" id="seq"><div class="empty">Select a service to see its bus formation.</div></div></section>
+      <section class="card"><header><h2 id="distTitle">Headway Distribution</h2></header><div id="dist"><div class="empty">Select a service.</div></div></section>
+    </div>
+  </main>
+
+  <main id="settings" hidden>
+    <section class="card"><header><div><h2>System parameters</h2><div class="sub">Tune the rules without changing code. Saved on the server; applied on the next refresh.</div></div><div><button class="btn sm go" id="parSave" type="button">Save</button> <button class="btn sm" id="parReset" type="button">Reset to defaults</button></div></header><div class="set" id="params"></div></section>
+    <section class="card" style="margin-top:12px"><header><div><h2>Service Headway Master</h2><div class="sub">Scheduled headway by service, direction, day type and time. Overrides LTA's frequency band when a row matches (narrowest time window wins).</div></div>
+      <div><button class="btn sm" id="mTpl" type="button">Template</button> <button class="btn sm go" id="mUp" type="button">Upload CSV</button> <button class="btn sm" id="mClr" type="button">Clear</button><input id="mFile" type="file" accept=".csv,.tsv,.txt" hidden></div></header>
+      <div class="tw" id="master"></div><div class="sub" id="mNote"></div></section>
+    <section class="card" style="margin-top:12px"><header><div><h2>Event log</h2><div class="sub">Confirmed bunching (bunching_event) and gaps (gap_event). Kept in a small SQLite file on the server.</div></div><button class="btn sm" id="evExport" type="button">Export CSV</button></header><div class="tw" id="events"></div></section>
+  </main>
+
+  <footer class="foot"><span>Sources: LTA DataMall (Bus Arrival, Bus Routes/Stops/Services, Traffic Speed Bands, Incidents), OneMap &nbsp;|&nbsp; Decision support only, not for operational use</span><span>SG Transport Pulse V5.4</span></footer>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const f1 = x => x == null ? "\u2013" : (Math.abs(x - Math.round(x)) < .05 ? String(Math.round(x)) : x.toFixed(1));
+const LS = {get(k, d){ try{ const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); }catch(e){ return d; } }, set(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }};
+const COL = {smooth:"#22d36a", moderate:"#ffc21a", slow:"#ff4d55", none:"#2f7dff"}, bandCls = b => b == null ? "none" : b >= 5 ? "smooth" : b >= 3 ? "moderate" : "slow";
+const RNK = {red:0, orange:1, yellow:2, green:3, nodata:4}, RNAME = {red:"Critical", orange:"Developing", yellow:"Early sign", green:"Normal", nodata:"No data"};
+const S = {services:LS.get("bb.services", []), dir:LS.get("bb.dir", 0), win:LS.get("bb.win", 30), view:"service", issue:"all", lv:{2:true, 3:true, 4:true}, sort:"risk", page:1, data:null, sel:null,
+           detail:{}, auto:LS.get("bb.auto", true), left:30, tok:0, busy:false, tab:"dash"};
+const sgt = o => new Intl.DateTimeFormat("en-GB", {timeZone:"Asia/Singapore", hour12:false, ...o});
+function tick(){ const p = Object.fromEntries(sgt({weekday:"short", day:"2-digit", month:"short", year:"numeric", hour:"2-digit", minute:"2-digit"}).formatToParts(new Date()).map(x => [x.type, x.value])); $("clock").textContent = `${p.weekday}, ${p.day} ${p.month} ${p.year}  ${p.hour}:${p.minute}`; }
+tick(); setInterval(tick, 15000);
+function setLive(state, text, title){ const e = $("live"); e.className = "live " + state; $("liveText").textContent = text; e.title = title || ""; }
+let toastT; function toast(m){ const t = $("toast"); t.textContent = m; t.classList.add("show"); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove("show"), 3800); }
+async function getJSON(u, ms){ const c = new AbortController(), t = setTimeout(() => c.abort(), ms || 60000); try{ const r = await fetch(u, {signal:c.signal}); const j = await r.json().catch(() => ({})); if(!r.ok && !j.error) j.error = "Server error " + r.status; return j; }catch(e){ return {error: e.name === "AbortError" ? "Timed out" : "Network error"}; } finally{ clearTimeout(t); } }
+async function post(url, body){
+  const send = tok => fetch(url, {method:"POST", headers:tok ? {"x-admin-token":tok} : {}, body});
+  let r = await send(sessionStorage.getItem("bb.tok") || "");
+  if(r.status === 401){ const t = prompt("This server needs an admin token (BUNCHING_ADMIN_TOKEN / TIMETABLE_TOKEN):"); if(!t) return {error:"Cancelled"}; sessionStorage.setItem("bb.tok", t); r = await send(t); }
+  const j = await r.json().catch(() => ({error:"Bad response"})); if(!r.ok && !j.error) j.error = "Error " + r.status; return j;
+}
+
+/* ------------------------------------------------------------------ helpers */
+const P = () => (S.data && S.data.params) || {gap_warn:1.5, gap_crit:2, bunch_thr:.5, confirm_stops:10, horizon_min:30};
+function hwCls(v, H){ if(v == null || !H) return ""; const p = P(); return v <= p.bunch_thr * H + 1e-6 || v >= p.gap_crit * H - 1e-6 ? "c-red" : v >= p.gap_warn * H - 1e-6 ? "c-amb" : ""; }
+const tOcc = t => t == null ? "\u2013" : t <= 0 ? "Now" : Math.round(t) + " min";
+function spark(r){
+  const H = r.sched_hw, v = ["0", "10", "20", "30"].map(k => r.hw && r.hw[k]); if(!H) return "";
+  return `<span class="bar4" title="HW now / +10 / +20 / +30: ${v.map(x => x == null ? "-" : f1(x)).join(" / ")}">${v.map(x => { const h = x == null ? 3 : Math.max(3, Math.min(18, Math.round(18 * x / (2 * H)))); const c = x == null ? "#3a5670" : x <= P().bunch_thr * H + 1e-6 ? "#ff4d55" : x >= P().gap_crit * H - 1e-6 ? "#ff4d55" : x >= P().gap_warn * H ? "#ff9f1c" : "#22d36a"; return `<i style="height:${h}px;background:${c}"></i>`; }).join("")}</span>`;
+}
+const TREND = {converging:"\u2198 converging", separating:"\u2197 separating", widening:"\u2197 widening", recovering:"\u2198 recovering", stable:"\u2192 stable"};
+function bbCell(r){
+  if(!r.bb) return `<span class="m">&ndash;</span>`;
+  const st = r.bb.status, t = st === "confirmed" ? `<span class="tag conf">confirmed</span>` : st === "developing" ? `<span class="tag dev">developing</span>` : `<span class="tag early">early warning</span>`;
+  return `<b>${esc(r.bb.label)}</b>${t}${r.bb.joining && r.bb.joining.length ? ` <small class="m">+${r.bb.joining.length} joining</small>` : ""}`;
+}
+function issueCell(r){ return r.issue === "Normal" ? `<span class="c-grn">Normal</span>` : r.risk === "nodata" ? `<span class="m">No data</span>` : `<span class="${r.risk === "red" ? "c-red" : "c-amb"}">${esc(r.issue)}</span>`; }
+function stopsCell(r){ return r.bb && r.bb.status !== "early" ? r.bb.stops : `<span class="m">&ndash;</span>`; }
+
+/* ------------------------------------------------------------------ filtering / sorting */
+function visibleRows(){
+  if(!S.data) return [];
+  const rows = S.data.rows.filter(r => {
+    if(S.issue === "gap" && !r.gap) return false;
+    if(S.issue === "bb" && !r.bb) return false;
+    if(r.bb && !r.gap && !S.lv[Math.min(4, r.bb.size)]) return false;
+    if(r.t_occur != null && r.risk !== "nodata" && r.risk !== "green" && r.risk !== "yellow" && r.t_occur > S.win) return false;
+    return true;
+  });
+  const key = {risk:r => [RNK[r.risk], -r.score], time:r => [r.t_occur == null ? 999 : r.t_occur, RNK[r.risk]], svc:r => [/^\d+$/.test(r.service) ? +r.service : 1e6, r.direction], gap:r => [-(r.gap ? r.gap.ratio : (r.hw && r.hw["0"] && r.sched_hw ? r.hw["0"] / r.sched_hw : 0)), RNK[r.risk]]}[S.sort];
+  return rows.sort((a, b) => { const x = key(a), y = key(b); for(let i = 0; i < x.length; i++) if(x[i] !== y[i]) return x[i] < y[i] ? -1 : 1; return 0; });
+}
+function busRows(rows){ const out = []; rows.forEach(r => (r.seq || []).forEach(s => out.push({r, s}))); const o = {Bunched:0, Leading:0, Joining:1, Converging:1, Gap:2, Normal:3}; return out.sort((a, b) => (RNK[a.r.risk] - RNK[b.r.risk]) || (o[a.s.status] - o[b.s.status])); }
+
+/* ------------------------------------------------------------------ rendering */
+function renderKpis(){
+  const k = S.data ? S.data.kpi : null, v = x => k ? x : "\u2013";
+  const dl = key => { if(!k) return ""; if(!k.prev) return `<div class="d na">vs 30 min: history builds (${f1(k.history_min)} min so far)</div>`; const d = k[key] - k.prev[key]; return `<div class="d ${d > 0 ? "up" : d < 0 ? "dn" : "flat"}">${d > 0 ? "\u2191" : d < 0 ? "\u2193" : "\u2192"} ${Math.abs(d)} vs 30 min ago</div>`; };
+  $("kpis").innerHTML = `
+   <div class="kpi gap"><div class="n">${v(k && k.gaps)}</div><div><b>Headway Gaps</b><span>&ge; ${P().gap_warn}&times; scheduled (developing) / ${P().gap_crit}&times; critical</span>${dl("gaps")}</div></div>
+   <div class="kpi bb"><div class="n">${v(k && k.bb)}</div><div><b>Bunching Cases</b><span>&ge; 2 buses${k && k.early ? ` &bull; +${k.early} early warning${k.early > 1 ? "s" : ""}` : ""}</span>${dl("bb")}</div></div>
+   <div class="kpi"><div class="n">${v(k && k.bb2)}</div><div><b>2BB cases</b>${dl("bb2")}</div></div>
+   <div class="kpi"><div class="n">${v(k && k.bb3)}</div><div><b>3BB cases</b>${dl("bb3")}</div></div>
+   <div class="kpi"><div class="n">${v(k && k.bb4)}</div><div><b>4BB+ cases</b>${dl("bb4")}</div></div>
+   <div class="kpi"><div class="n">${v(k && k.services)}</div><div><b>Services monitored</b><span>${S.data ? S.data.rows.length + (S.data.rows.length === 1 ? " direction" : " directions") : ""}</span></div></div>`;
+}
+function renderHead(){
+  $("thead").innerHTML = S.view === "service"
+    ? `<tr><th>#</th><th>Risk</th><th>Service</th><th>Dir</th><th class="hide-m">Current HW (min)</th><th class="hide-m">+10</th><th class="hide-m">+20</th><th class="hide-m">+30</th><th class="hide-m">Sch HW</th><th>Issue type</th><th>BB level</th><th class="hide-m">Consec. stops</th><th class="hide-m">Location (worst section)</th><th>Time to occur</th><th class="hide-m">Trend</th><th>Action</th></tr>`
+    : `<tr><th>#</th><th>Risk</th><th>Service</th><th>Dir</th><th>Order</th><th>Bus</th><th>Location</th><th>HW to next (min)</th><th>Status</th><th>Action</th></tr>`;
+}
+function renderTable(){
+  renderHead();
+  const d = S.data, tb = $("tbody"); $("tblTitle").textContent = `Service Headway & Bunching Status (${S.win ? "Next " + S.win + " min" : "Current"})`;
+  if(!d){ tb.innerHTML = `<tr><td colspan="16"><div class="sk"></div><div class="sk"></div><div class="sk"></div></td></tr>`; $("tblSub").textContent = "Loading live buses\u2026"; $("pager").innerHTML = ""; return; }
+  const rows = visibleRows(), items = S.view === "service" ? rows : busRows(rows), per = 10, pages = Math.max(1, Math.ceil(items.length / per));
+  S.page = Math.min(S.page, pages); const from = (S.page - 1) * per, slice = items.slice(from, from + per);
+  $("tblSub").textContent = items.length ? `Showing ${from + 1}\u2013${from + slice.length} of ${items.length} ${S.view === "service" ? "service directions" : "buses"}` : "Nothing matches the current filters";
+  if(S.view === "service"){
+    tb.innerHTML = slice.map((r, i) => { const H = r.sched_hw, h = r.hw || {};
+      return `<tr data-k="${esc(r.key)}" class="${r.key === S.sel ? "sel" : ""}" tabindex="0"><td>${from + i + 1}</td><td><span class="rk ${r.risk}" title="${RNAME[r.risk]} (score ${r.score})"></span></td><td class="svc">${esc(r.service)}</td><td>${r.direction}</td>
+        <td class="hide-m ${hwCls(h["0"], H)}">${f1(h["0"])}</td><td class="hide-m ${hwCls(h["10"], H)}">${f1(h["10"])}</td><td class="hide-m ${hwCls(h["20"], H)}">${f1(h["20"])}</td><td class="hide-m ${hwCls(h["30"], H)}">${f1(h["30"])}</td>
+        <td class="hide-m">${H == null ? "\u2013" : f1(H)}</td><td>${issueCell(r)}</td><td>${bbCell(r)}</td><td class="hide-m">${stopsCell(r)}</td><td class="hide-m">${esc(r.location || "\u2013")}</td>
+        <td class="${r.t_occur != null && r.t_occur <= 10 ? "c-amb" : ""}">${tOcc(r.t_occur)}</td><td class="hide-m">${spark(r)} <small class="m">${TREND[r.trend] || ""}</small></td><td><button class="vbtn" type="button" data-k="${esc(r.key)}">View</button></td></tr>`; }).join("");
+  }else{
+    tb.innerHTML = slice.map(({r, s}, i) => `<tr data-k="${esc(r.key)}" class="${r.key === S.sel ? "sel" : ""}" tabindex="0"><td>${from + i + 1}</td><td><span class="rk ${r.risk}"></span></td><td class="svc">${esc(r.service)}</td><td>${r.direction}</td><td>${s.order}</td><td>${esc(s.id)}</td><td>${esc(s.near)}</td><td>${f1(s.hw_next)}</td><td><b class="${s.status === "Normal" ? "c-grn" : s.status === "Gap" ? "c-amb" : "c-red"}">${s.status}</b></td><td><button class="vbtn" type="button" data-k="${esc(r.key)}">View</button></td></tr>`).join("");
+  }
+  const e = $("tblEmpty"); e.hidden = items.length > 0; e.textContent = d.rows.length ? "No service matches the current filters." : "No service could be evaluated. Check the messages above.";
+  $("pager").innerHTML = pages > 1 ? `<button data-p="${S.page - 1}" ${S.page <= 1 ? "disabled" : ""}>&lsaquo; Prev</button> Page ${S.page} of ${pages} <button data-p="${S.page + 1}" ${S.page >= pages ? "disabled" : ""}>Next &rsaquo;</button>` : "";
+}
+function renderDonut(){
+  const k = S.data && S.data.kpi, vals = [[4, k ? k.bb4 : 0, "#ff4d55", "4BB+"], [3, k ? k.bb3 : 0, "#ff9f1c", "3BB"], [2, k ? k.bb2 : 0, "#ffd23f", "2BB"]], tot = vals.reduce((a, x) => a + x[1], 0), R = 52, C = 2 * Math.PI * R; let off = 0;
+  const arcs = tot ? vals.filter(x => x[1]).map(x => { const len = C * x[1] / tot, a = `<circle r="${R}" cx="70" cy="70" fill="none" stroke="${x[2]}" stroke-width="20" stroke-dasharray="${len.toFixed(1)} ${(C - len).toFixed(1)}" stroke-dashoffset="${(-off).toFixed(1)}" transform="rotate(-90 70 70)"/>`; off += len; return a; }).join("") : `<circle r="${R}" cx="70" cy="70" fill="none" stroke="#163250" stroke-width="20"/>`;
+  $("donut").innerHTML = `<svg viewBox="0 0 140 140" width="140" height="140" role="img" aria-label="Bunching cases by level">${arcs}<text x="70" y="72" text-anchor="middle" font-size="26" font-weight="800" fill="#fff">${tot}</text><text x="70" y="90" text-anchor="middle" font-size="10" fill="#8ba3bd">Bunching cases</text></svg>
+    <div class="legend">${vals.map(x => `<div><i style="background:${x[2]}"></i><b>${x[3]}</b><span class="m">${x[1]}${tot ? ` (${Math.round(100 * x[1] / tot)}%)` : ""}</span></div>`).join("")}</div>`;
+}
+function renderTrend(){
+  const t = S.data ? S.data.trend : [];
+  if(t.length < 2){ $("trend").innerHTML = `<div class="empty">The trend fills in as the collector runs (${f1(S.data ? S.data.kpi.history_min : 0)} min of history so far).</div>`; return; }
+  const W = 360, H = 170, L = 30, R = 10, T = 12, B = 24, x0 = t[0][0], x1 = t[t.length - 1][0] || x0 + 1, ymax = Math.max(5, ...t.map(p => Math.max(p[1], p[2]))) , X = ts => L + (W - L - R) * (ts - x0) / Math.max(1, x1 - x0), Y = v => T + (H - T - B) * (1 - v / ymax);
+  const line = (i, c) => `<polyline fill="none" stroke="${c}" stroke-width="2" points="${t.map(p => X(p[0]).toFixed(1) + "," + Y(p[i]).toFixed(1)).join(" ")}"/>`;
+  const tf = ts => sgt({hour:"2-digit", minute:"2-digit"}).format(new Date(ts * 1000));
+  $("trend").innerHTML = `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Headway gaps and bunching cases over time"><line x1="${L}" x2="${W - R}" y1="${Y(0)}" y2="${Y(0)}" stroke="#163250"/><line x1="${L}" x2="${W - R}" y1="${Y(ymax)}" y2="${Y(ymax)}" stroke="#163250"/>
+    <text x="${L - 5}" y="${Y(0) + 4}" text-anchor="end" font-size="10" fill="#8ba3bd">0</text><text x="${L - 5}" y="${Y(ymax) + 4}" text-anchor="end" font-size="10" fill="#8ba3bd">${ymax}</text>${line(1, "#ff4d55")}${line(2, "#ff9f1c")}
+    <text x="${L}" y="${H - 6}" font-size="10" fill="#8ba3bd">${tf(x0)}</text><text x="${W - R}" y="${H - 6}" text-anchor="end" font-size="10" fill="#8ba3bd">${tf(x1)}</text></svg>
+    <div class="sub"><span style="color:#ff4d55">&#9632;</span> Headway gap &nbsp;<span style="color:#ff9f1c">&#9632;</span> Bunching &nbsp;(no. of cases)</div>`;
+}
+function renderMsgs(){
+  const d = S.data, m = [];
+  if(d){
+    (d.errors || []).forEach(e => m.push(`<div class="msg bad">${esc(e)}</div>`));
+    const c = d.collector || {};
+    if(c.truncated) m.push(`<div class="msg warn">Only the first ${c.max_pairs} service directions are monitored (BUNCHING_MAX_PAIRS, protects the LTA quota).</div>`);
+    if(c.db_ok === false) m.push(`<div class="msg warn">Event log / settings storage unavailable (${esc(c.db_err || "")}). The dashboard still works; events and edited parameters will not persist.</div>`);
+    if(d.rows.some(r => r.risk === "nodata" && /Headway Master/.test(r.note || ""))) m.push(`<div class="msg warn">Some services have no scheduled headway from LTA. Add them in <b>Settings &rarr; Service Headway Master</b>.</div>`);
+  }
+  $("msgs").innerHTML = m.join("");
+}
+function render(){ renderMsgs(); renderKpis(); renderTable(); renderDonut(); renderTrend(); renderInsight(); }
+
+/* ------------------------------------------------------------------ drill-down */
+function selRow(){ return S.data && S.data.rows.find(r => r.key === S.sel); }
+function renderInsight(){
+  const r = selRow(), box = $("insight"); box.hidden = !r; if(!r){ return; }
+  const H = r.sched_hw, det = S.detail[r.key];
+  $("inTitle").innerHTML = `Svc ${esc(r.service)} Dir ${r.direction} <span class="rk ${r.risk}" style="vertical-align:middle;margin-left:6px"></span>`;
+  $("inSub").textContent = `${r.n_buses} buses \u2022 scheduled HW ${f1(H)} min (${r.hw_src || "unknown"})`;
+  const kv = [["Issue", issueCell(r)], ["Risk", `${RNAME[r.risk]} (score ${r.score}/100)`]];
+  if(r.bb) kv.push(["Bunching", `${esc(r.bb.label)} \u2022 ${r.bb.status}${r.bb.status !== "early" ? ` \u2022 ${r.bb.stops} consecutive stops` : ""} \u2022 min HW ${f1(r.bb.min_hw)} min`], ["Where", esc(r.bb.location)]);
+  if(r.gap) kv.push(["Gap", `${f1(r.gap.now)} min now, up to ${f1(r.gap.max_hw)} min (${r.gap.ratio}\u00d7) \u2022 ${r.gap.state} \u2022 ${r.gap.trend}`], ["Where", esc(r.gap.location)]);
+  kv.push(["Time to occur", tOcc(r.t_occur)]); if(r.note) kv.push(["Note", esc(r.note)]);
+  $("inKv").innerHTML = kv.map(([a, b]) => `<span>${a}</span><span>${b}</span>`).join("");
+  const h = r.hw || {}; $("inPath").innerHTML = ["0", "10", "20", "30"].map(k => `<div><b class="${hwCls(h[k], H)}">${f1(h[k])}</b><small>${k === "0" ? "NOW" : "+" + k + " min"}</small></div>`).join("") + `<div><b>${f1(H)}</b><small>Scheduled</small></div>`;
+  const gp = r.gap && r.gap.trend, tr = TREND[r.trend] || "";
+  $("inState").innerHTML = r.gap ? `Gap <b>${esc(gp)}</b>${gp === "widening" ? " &mdash; <b class=\"c-amb\">HEADWAY WIDENING</b>" : ""}` : `Spacing ${esc(tr)}`;
+  const sup = []; if(r.traffic) sup.push(`&#128678; ${esc(r.traffic.text)}`);
+  if(det && det.incidents) sup.push(det.incidents.count ? `&#9888; ${det.incidents.count} traffic incident(s) within 1 km of the route: ${esc((det.incidents.items[0] || {}).message || "")}` : "No traffic incidents reported near this route.");
+  sup.push(`<span class="m">Road works: not available from DataMall with coordinates.</span>`);
+  if(det && det.events && det.events.length) sup.push(`Recent events: ${det.events.slice(0, 3).map(e => `${e.kind === "bb" ? (e.level || "?") + "BB" : "gap"} ${e.open ? "(open)" : ""}`).join(", ")}`);
+  $("inSupport").innerHTML = sup.map(x => `<div>${x}</div>`).join("");
+  renderSeq(r); renderDist(r); renderMap(r);
+}
+function renderSeq(r){
+  $("seqTitle").textContent = `Bus Sequence \u2013 Svc ${r.service} Dir ${r.direction} (${r.seq.length} buses)`;
+  $("seq").innerHTML = `<table><thead><tr><th>Order</th><th>Bus</th><th>Location</th><th>HW to next</th><th>Status</th></tr></thead><tbody>${r.seq.map(s => `<tr data-o="${s.order}"><td>${s.order}</td><td>${esc(s.id)}</td><td>${esc(s.near)}</td><td class="${hwCls(s.hw_next, r.sched_hw)}">${s.hw_next == null ? "\u2013" : f1(s.hw_next) + " min"}</td><td><b class="${s.status === "Normal" ? "c-grn" : s.status === "Gap" || s.status === "Converging" || s.status === "Joining" ? "c-amb" : "c-red"}">${s.status}</b></td></tr>`).join("")}</tbody></table><div class="sub">Bus ids are assigned by position tracking (LTA gives no registration number).</div>`;
+}
+function renderDist(r){
+  const H = r.sched_hw, edges = [0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20], bin = v => { for(let i = edges.length - 1; i >= 0; i--) if(v >= edges[i]) return i === edges.length - 1 ? edges.length - 1 : i; return 0; };
+  const now = (r.dist && r.dist.now) || [], pr = (r.dist && r.dist.pred) || [], cn = Array(11).fill(0), cp = Array(11).fill(0);
+  now.forEach(v => cn[bin(v)]++); pr.forEach(v => cp[bin(v)]++);
+  const mx = Math.max(1, ...cn, ...cp), W = 380, Hh = 190, L = 26, T = 10, B = 34, bw = (W - L - 6) / 11, X = i => L + i * bw, Y = v => T + (Hh - T - B) * (1 - v / mx);
+  let s = `<svg viewBox="0 0 ${W} ${Hh}" width="100%" role="img" aria-label="Headway distribution">`;
+  for(let i = 0; i < 11; i++){ s += `<rect x="${X(i) + 3}" y="${Y(cn[i])}" width="${bw / 2 - 3}" height="${Hh - B - Y(cn[i])}" fill="#3c8dff"/><rect x="${X(i) + bw / 2}" y="${Y(cp[i])}" width="${bw / 2 - 3}" height="${Hh - B - Y(cp[i])}" fill="#ff5c93"/><text x="${X(i) + bw / 2}" y="${Hh - 20}" text-anchor="middle" font-size="9" fill="#8ba3bd">${i === 10 ? ">20" : edges[i] + "-" + edges[i + 1]}</text>`; }
+  if(H) s += `<line x1="${X(Math.min(10, H / 2)) }" x2="${X(Math.min(10, H / 2))}" y1="${T}" y2="${Hh - B}" stroke="#c6d8ea" stroke-dasharray="4 3"/>`;
+  s += `<text x="${W / 2}" y="${Hh - 4}" text-anchor="middle" font-size="10" fill="#8ba3bd">Headway (min)</text></svg>`;
+  const pct = (a, f) => a.length ? Math.round(100 * a.filter(f).length / a.length) : null, avg = now.length ? now.reduce((a, b) => a + b, 0) / now.length : null;
+  $("dist").innerHTML = s + `<div class="sub"><span style="color:#3c8dff">&#9632;</span> Current &nbsp;<span style="color:#ff5c93">&#9632;</span> Predicted (next 30 min) &nbsp;&bull; dashed = scheduled ${f1(H)} min</div>
+   <div class="stat3"><div><b>${pct(now, v => v < H / 2) == null ? "\u2013" : pct(now, v => v < H / 2) + "%"}</b><small>Intervals &lt; &frac12; HW</small></div><div><b>${pct(now, v => v > 2 * H) == null ? "\u2013" : pct(now, v => v > 2 * H) + "%"}</b><small>Intervals &gt; 2&times; HW</small></div><div><b>${f1(avg)}</b><small>Avg headway (min)</small></div></div>`;
+}
+
+/* ------------------------------------------------------------------ map */
+let map = null, gRoute = null, gStop = null, gBus = null, gGrp = null, mapKey = null;
+function initMap(){
+  if(map || typeof L === "undefined") return;
+  map = L.map("map", {zoomControl:true, attributionControl:false, minZoom:11, maxZoom:19}).setView([1.3521, 103.8198], 11);
+  const AO = `<a href="https://www.onemap.gov.sg/" target="_blank" rel="noopener">OneMap</a> | \u00a9 ${new Date().getFullYear()} Singapore Land Authority`, AS = `Basemap \u00a9 OpenStreetMap contributors (OneMap unavailable)`;
+  const om = L.tileLayer("https://www.onemap.gov.sg/maps/tiles/Default/{z}/{x}/{y}.png", {minZoom:11, maxZoom:19, attribution:AO}).addTo(map); let ok = 0, bad = 0, sw = false;
+  om.on("tileload", () => { ok++; }); om.on("tileerror", () => { bad++; if(!sw && ok === 0 && bad >= 4){ sw = true; map.removeLayer(om); L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {minZoom:11, maxZoom:19, attribution:AS}).addTo(map); } });
+  L.control.attribution({position:"bottomleft", prefix:false}).addTo(map);
+  gRoute = L.layerGroup().addTo(map); gStop = L.layerGroup().addTo(map); gGrp = L.layerGroup().addTo(map); gBus = L.layerGroup().addTo(map);
+}
+function mapLayers(){ if(!map) return; const on = (g, v) => { if(v && !map.hasLayer(g)) map.addLayer(g); if(!v && map.hasLayer(g)) map.removeLayer(g); }; const c = k => document.querySelector(`#mlay input[data-m="${k}"]`).checked; on(gStop, c("stop")); on(gBus, c("bus")); on(gGrp, c("group")); }
+function renderMap(r){
+  initMap(); if(!map) return; $("mapTitle").textContent = `Live Bus Positions \u2013 Service ${r.service} Dir ${r.direction} (${r.issue})`;
+  const det = S.detail[r.key]; gBus.clearLayers(); gGrp.clearLayers();
+  if(det && det.route && mapKey !== r.key + "|" + (det.route.stops || []).length){
+    mapKey = r.key + "|" + (det.route.stops || []).length; gRoute.clearLayers(); gStop.clearLayers(); const all = [];
+    (det.route.runs || []).forEach(run => { all.push(...run.pts); L.polyline(run.pts, {color:"#04101f", weight:8, opacity:.5, interactive:false}).addTo(gRoute); L.polyline(run.pts, {color:COL[bandCls(run.b)], weight:5, opacity:.95, interactive:false}).addTo(gRoute); });
+    (det.route.stops || []).forEach(s => L.circleMarker([s.lat, s.lon], {radius:2.5, color:"#06111f", weight:1, fillColor:"#fff", fillOpacity:1}).bindPopup(`<b>${esc(s.code)}</b> ${esc(s.name)}`).addTo(gStop));
+    if(all.length) map.fitBounds(L.latLngBounds(all), {padding:[20, 20], maxZoom:15});
+  }
+  const cls = {Leading:"b", Bunched:"b", Joining:"b", Converging:"c", Gap:"g", Normal:"n"}, pos = {};
+  r.seq.forEach(s => { if(s.lat == null) return; pos[s.id] = [s.lat, s.lon];
+    L.marker([s.lat, s.lon], {icon:L.divIcon({className:"", iconSize:[26, 26], iconAnchor:[13, 13], html:`<div class="bmk ${cls[s.status] || "n"}">${s.order}</div>`}), keyboard:false})
+      .bindPopup(`<b>Bus ${esc(s.id)}</b> (order ${s.order})<br>${esc(s.near)}<br>HW to next: ${s.hw_next == null ? "\u2013" : f1(s.hw_next) + " min"}<br><b>${s.status}</b>`).addTo(gBus); });
+  (r.groups || []).filter(g => g.status !== "early").forEach(g => { const pts = g.ids.map(i => pos[i]).filter(Boolean); if(!pts.length) return;
+    const la = pts.reduce((a, p) => a + p[0], 0) / pts.length, lo = pts.reduce((a, p) => a + p[1], 0) / pts.length;
+    L.circle([la, lo], {radius:350, color:"#ff4d55", weight:1, fillColor:"#ff4d55", fillOpacity:.22, interactive:false}).addTo(gGrp); });
+  mapLayers();
+}
+async function loadDetail(key){
+  const [svc, dir] = key.split(":"); const j = await getJSON(`/api/bunching/detail?service=${encodeURIComponent(svc)}&direction=${dir}`, 45000);
+  if(j.error){ return; } S.detail[key] = j; if(S.sel === key) renderInsight();
+}
+function select(key, scroll){ S.sel = key; renderTable(); renderInsight(); loadDetail(key); if(scroll) $("insight").scrollIntoView({behavior:"smooth", block:"start"}); }
+
+/* ------------------------------------------------------------------ data */
+async function load(quiet){
+  const tok = ++S.tok; S.busy = true; $("go").disabled = true; if(!quiet && !S.data) renderTable();
+  const u = `/api/bunching?services=${encodeURIComponent(S.services.join(","))}&direction=${S.dir}`;
+  const j = await getJSON(u, 90000);
+  if(tok !== S.tok) return; S.busy = false; $("go").disabled = false;
+  if(j.error){ setLive("bad", "Server error", j.error); $("msgs").innerHTML = `<div class="msg bad">Could not load: ${esc(j.error)}</div>`; return; }
+  S.data = j; S.left = Math.max(20, (j.params && j.params.refresh_sec) || 30);
+  const c = j.collector || {}; setLive(c.db_ok === false ? "warn" : "ok", "Live Data (LTA)", c.alive ? `Collector cycle ${c.took}s over ${c.pairs} service directions` : "On-demand evaluation");
+  if(!S.sel || !j.rows.some(r => r.key === S.sel)){ const f = j.rows.find(r => r.risk === "red" || r.risk === "orange") || j.rows[0]; S.sel = f ? f.key : null; if(S.sel) loadDetail(S.sel); }
+  else if(!S.detail[S.sel] || quiet) loadDetail(S.sel);
+  render();
+}
+function renderChips(){
+  $("chips").innerHTML = S.services.map(s => `<span class="chip">${esc(s)}<button type="button" data-s="${esc(s)}" aria-label="Remove ${esc(s)}">&times;</button></span>`).join("") + `<input id="svcIn" placeholder="${S.services.length ? "Add another" : "All monitored (add e.g. 32)"}" maxlength="6" autocapitalize="characters">`;
+  $("svcIn").addEventListener("keydown", e => { if(e.key === "Enter" || e.key === ","){ e.preventDefault(); addSvc($("svcIn").value); } });
+}
+function addSvc(v){ v = (v || "").trim().toUpperCase(); if(!v) return; if(!/^[0-9A-Z]{1,6}$/.test(v)){ toast("Service numbers are 1-6 letters/digits"); return; } if(!S.services.includes(v)) S.services.push(v); LS.set("bb.services", S.services); renderChips(); S.page = 1; load(); }
+function syncSegs(){ document.querySelectorAll("#dirSeg button").forEach(b => b.setAttribute("aria-pressed", +b.dataset.d === S.dir)); document.querySelectorAll("#viewSeg button").forEach(b => b.setAttribute("aria-pressed", b.dataset.v === S.view)); document.querySelectorAll("#issueSeg button").forEach(b => b.setAttribute("aria-pressed", b.dataset.i === S.issue)); document.querySelectorAll(".sorts button[data-s]").forEach(b => b.setAttribute("aria-pressed", b.dataset.s === S.sort)); $("win").value = String(S.win); }
+
+/* ------------------------------------------------------------------ settings tab */
+const PLAB = {gap_warn:["Gap warning", "\u00d7 scheduled HW"], gap_crit:["Gap critical", "\u00d7 scheduled HW"], bunch_thr:["Bunching threshold", "\u00d7 scheduled HW (\u2264)"], confirm_stops:["Confirm bunching after", "consecutive stops"], horizon_min:["Prediction horizon", "min"], refresh_sec:["Refresh interval", "sec"],
+  w_gap:["Risk weight: gap severity", "%"], w_bunch:["Risk weight: bunching level", "%"], w_persist:["Risk weight: persistence", "%"], w_deter:["Risk weight: deterioration", "%"], w_time:["Risk weight: time to occur", "%"], yellow_conv:["Yellow: converging below", "\u00d7 scheduled HW"], yellow_div:["Yellow: widening above", "\u00d7 scheduled HW"]};
+async function loadSettings(){
+  const j = await getJSON("/api/bunching/settings", 20000); if(j.error){ $("params").innerHTML = `<div class="msg bad">${esc(j.error)}</div>`; return; }
+  S.settings = j;
+  $("params").innerHTML = Object.keys(PLAB).map(k => `<div><label for="p_${k}">${PLAB[k][0]}</label><input id="p_${k}" data-k="${k}" type="number" step="any" min="${j.ranges[k][0]}" max="${j.ranges[k][1]}" value="${j.params[k]}"><small>${PLAB[k][1]} &bull; default ${j.defaults[k]} &bull; range ${j.ranges[k][0]}&ndash;${j.ranges[k][1]}</small></div>`).join("");
+  const m = j.master; $("master").innerHTML = m.length ? `<table><thead><tr><th>Service</th><th>Dir</th><th>Day type</th><th>From</th><th>To</th><th>Target HW (min)</th></tr></thead><tbody>${m.map(r => `<tr><td class="svc">${esc(r.service)}</td><td>${r.direction}</td><td>${esc(r.day_type)}</td><td>${esc(r.from)}</td><td>${esc(r.to)}</td><td>${f1(r.hw)}</td></tr>`).join("")}</tbody></table>` : `<div class="empty">No rows. LTA's dispatch-frequency band is used (midpoint) for every service.</div>`;
+  $("mNote").textContent = `Today is a ${j.dayType}. Columns: service, direction (1/2), day_type (Weekday/Saturday/Sunday/All), from, to (HH:MM), target_hw.${j.tokenRequired ? " Admin token required to change settings." : ""}`;
+  const ev = await getJSON("/api/bunching/events?limit=100", 20000), fmt = ts => ts ? sgt({day:"2-digit", month:"short", hour:"2-digit", minute:"2-digit"}).format(new Date(ts * 1000)) : "\u2013"; S.events = ev.events || [];
+  $("events").innerHTML = S.events.length ? `<table><thead><tr><th>Type</th><th>Service</th><th>Dir</th><th>Start</th><th>End</th><th>Buses</th><th>Level / peak</th><th>Stops</th><th>Min / max HW</th><th>Location</th></tr></thead><tbody>${S.events.map(e => `<tr><td>${e.kind === "bb" ? "Bunching" : "Gap"}${e.open ? " <span class='tag dev'>open</span>" : ""}</td><td class="svc">${esc(e.service)}</td><td>${e.direction}</td><td>${fmt(e.start)}</td><td>${fmt(e.end)}</td><td>${esc(Array.isArray(e.buses) ? e.buses.join(",") : e.buses)}</td><td>${e.level ? e.level + "BB" : ""}</td><td>${e.stops == null ? "" : e.stops}</td><td>${f1(e.min_hw != null ? e.min_hw : e.max_hw)}</td><td>${esc(e.location || "")}</td></tr>`).join("")}</tbody></table>` : `<div class="empty">No events yet. A bunching event is logged once a group is confirmed (10+ stops) and closed 2 refreshes after it clears.</div>`;
+}
+function csvDownload(name, rows){ const csv = rows.map(r => r.map(v => { v = v == null ? "" : String(v); return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; }).join(",")).join("\n"); const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([csv], {type:"text/csv"})); a.download = name; document.body.appendChild(a); a.click(); a.remove(); }
+
+/* ------------------------------------------------------------------ wiring */
+$("form").addEventListener("submit", e => { e.preventDefault(); if($("svcIn").value.trim()) addSvc($("svcIn").value); else load(); });
+$("chips").addEventListener("click", e => { const b = e.target.closest("button[data-s]"); if(!b) return; S.services = S.services.filter(x => x !== b.dataset.s); LS.set("bb.services", S.services); renderChips(); load(); });
+$("dirSeg").addEventListener("click", e => { const b = e.target.closest("button"); if(!b) return; S.dir = +b.dataset.d; LS.set("bb.dir", S.dir); S.page = 1; syncSegs(); load(); });
+$("viewSeg").addEventListener("click", e => { const b = e.target.closest("button"); if(!b) return; S.view = b.dataset.v; S.page = 1; syncSegs(); renderTable(); });
+$("issueSeg").addEventListener("click", e => { const b = e.target.closest("button"); if(!b) return; S.issue = b.dataset.i; S.page = 1; syncSegs(); renderTable(); });
+$("win").addEventListener("change", () => { S.win = +$("win").value; LS.set("bb.win", S.win); S.page = 1; renderTable(); });
+$("lvls").addEventListener("change", e => { S.lv[e.target.dataset.l] = e.target.checked; S.page = 1; renderTable(); });
+document.querySelector(".sorts").addEventListener("click", e => { const b = e.target.closest("button[data-s]"); if(!b) return; S.sort = b.dataset.s; S.page = 1; syncSegs(); renderTable(); });
+$("reset").addEventListener("click", () => { S.services = []; S.dir = 0; S.win = 30; S.issue = "all"; S.view = "service"; S.lv = {2:true, 3:true, 4:true}; S.sort = "risk"; S.page = 1; LS.set("bb.services", []); LS.set("bb.dir", 0); document.querySelectorAll("#lvls input").forEach(i => i.checked = true); renderChips(); syncSegs(); load(); });
+$("tbody").addEventListener("click", e => { const r = e.target.closest("tr[data-k]"); if(r) select(r.dataset.k, !!e.target.closest(".vbtn")); });
+$("tbody").addEventListener("keydown", e => { if(e.key === "Enter"){ const r = e.target.closest("tr[data-k]"); if(r) select(r.dataset.k, false); } });
+$("pager").addEventListener("click", e => { const b = e.target.closest("button[data-p]"); if(!b || b.disabled) return; S.page = +b.dataset.p; renderTable(); });
+$("seq").addEventListener("click", e => { const tr = e.target.closest("tr[data-o]"); const r = selRow(); if(!tr || !r || !map) return; const s = r.seq.find(x => String(x.order) === tr.dataset.o); if(s && s.lat != null) map.setView([s.lat, s.lon], Math.max(map.getZoom(), 15)); });
+$("mlay").addEventListener("change", mapLayers);
+$("autoCb").checked = S.auto; $("autoCb").addEventListener("change", () => { S.auto = $("autoCb").checked; LS.set("bb.auto", S.auto); });
+setInterval(() => { if(S.tab !== "dash" || document.hidden || !S.auto) { $("cd").textContent = S.auto ? "" : ""; return; } S.left--; $("cd").textContent = `(in ${Math.max(0, S.left)}s)`; if(S.left <= 0 && !S.busy) load(true); }, 1000);
+$("exportBtn").addEventListener("click", () => {
+  const rows = visibleRows(); if(!rows.length){ toast("Nothing to export"); return; }
+  csvDownload("bunching-gap-status.csv", [["Service", "Dir", "Risk", "Score", "HW now", "+10", "+20", "+30", "Scheduled HW", "Issue", "BB level", "BB status", "Consecutive stops", "Location", "Time to occur (min)", "Trend"], ...rows.map(r => [r.service, r.direction, RNAME[r.risk], r.score, r.hw["0"], r.hw["10"], r.hw["20"], r.hw["30"], r.sched_hw, r.issue, r.bb && r.bb.label, r.bb && r.bb.status, r.bb && r.bb.stops, r.location, r.t_occur, r.trend])]);
+});
+function showTab(t){ S.tab = t; $("dash").hidden = t !== "dash"; $("settings").hidden = t !== "set"; $("tabDash").setAttribute("aria-selected", t === "dash"); $("tabSet").setAttribute("aria-selected", t === "set"); if(t === "set") loadSettings(); else if(map) setTimeout(() => map.invalidateSize(), 100); }
+$("tabDash").onclick = () => showTab("dash"); $("tabSet").onclick = () => showTab("set");
+$("parSave").onclick = async () => { const params = {}; document.querySelectorAll("#params input").forEach(i => params[i.dataset.k] = i.value); const j = await post("/api/bunching/settings", JSON.stringify({params})); if(j.error){ toast(j.error); return; } toast("Parameters saved"); loadSettings(); };
+$("parReset").onclick = async () => { const j = await post("/api/bunching/settings", JSON.stringify({reset:true})); if(j.error){ toast(j.error); return; } toast("Parameters reset to defaults"); loadSettings(); };
+$("mUp").onclick = () => $("mFile").click();
+$("mFile").onchange = async e => { const f = e.target.files[0]; e.target.value = ""; if(!f) return; const j = await post("/api/bunching/master", await f.text()); if(j.error){ toast(j.error); return; } toast(`Loaded ${j.rows} rows${j.errors && j.errors.length ? " (" + j.errors.length + " skipped)" : ""}`); loadSettings(); };
+$("mClr").onclick = async () => { const j = await post("/api/bunching/master/clear", ""); if(j.error){ toast(j.error); return; } toast("Service Headway Master cleared"); loadSettings(); };
+$("mTpl").onclick = () => csvDownload("service_headway_master_template.csv", [["service", "direction", "day_type", "from", "to", "target_hw"], ["32", "1", "Weekday", "07:00", "09:00", "10"], ["32", "1", "Weekday", "09:00", "16:00", "12"], ["32", "2", "Weekday", "07:00", "09:00", "10"]]);
+$("evExport").onclick = () => { const ev = S.events || []; if(!ev.length){ toast("No events to export"); return; } csvDownload("bunching-gap-events.csv", [["type", "service", "dir", "start", "end", "buses", "level", "stops", "min_hw", "max_hw", "location"], ...ev.map(e => [e.kind, e.service, e.direction, e.start && new Date(e.start * 1000).toISOString(), e.end && new Date(e.end * 1000).toISOString(), Array.isArray(e.buses) ? e.buses.join(" ") : e.buses, e.level, e.stops, e.kind === "bb" ? e.min_hw : "", e.max_hw, e.location])]); };
+
+/* start */
+(async () => {
+  const q = new URLSearchParams(location.search); if(q.get("svc")){ S.services = q.get("svc").toUpperCase().split(",").filter(x => /^[0-9A-Z]{1,6}$/.test(x)); } if(q.get("dir") === "1" || q.get("dir") === "2") S.dir = +q.get("dir");
+  renderChips(); syncSegs(); renderTable(); renderKpis(); renderDonut();
+  const h = await getJSON("/api/health", 15000); if(h.error) setLive("bad", "Server unreachable", h.error); else if(!h.lta) setLive("bad", "LTA key missing", "Set LTA_ACCOUNT_KEY on the server"); else setLive("ok", "Live Data (LTA)", "");
+  load();
+})();
+window.addEventListener("resize", () => { if(map) map.invalidateSize(); });
+</script>
+</body>
+</html>

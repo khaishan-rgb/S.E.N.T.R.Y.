@@ -20,7 +20,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 
 import headway
 
-VERSION = "V5.3"
+VERSION = "V5.4"
 LTA = os.getenv("LTA_BASE", "https://datamall2.mytransport.sg/ltaodataservice").rstrip("/")
 KEY = os.getenv("LTA_ACCOUNT_KEY", "")
 OSRM = os.getenv("OSRM_URL", "https://router.project-osrm.org").rstrip("/")
@@ -493,6 +493,7 @@ def parse_bus(b, now):
         lat = lon = None
     return {
         "eta": max(0, round((eta_dt - now).total_seconds() / 60)),
+        "etaf": max(0.0, (eta_dt - now).total_seconds() / 60),
         "lat": lat, "lon": lon,
         "load": b.get("Load") or "",
         "type": b.get("Type") or "",
@@ -535,9 +536,14 @@ async def lifespan(app):
             await asyncio.gather(static(), bands_state())
         except Exception:
             pass
+    task = None
     if KEY:
         asyncio.create_task(warm())
+        bb_init()
+        task = asyncio.create_task(bb_loop())
     yield
+    if task is not None:
+        task.cancel()
     if _client is not None:
         await _client.aclose()
 
@@ -652,16 +658,17 @@ async def api_buses(service: str = "", direction: int = 1):
             if c["src"] not in cl["srcs"] and hav_km(c["lat"], c["lon"], cl["lat"], cl["lon"]) < 0.25:
                 cl["srcs"].add(c["src"])
                 cl["etas"][c["src"]] = c["eta"]
+                cl["etasf"][c["src"]] = c["etaf"]
                 break
         else:
-            clusters.append({**c, "srcs": {c["src"]}, "etas": {c["src"]: c["eta"]}})
+            clusters.append({**c, "srcs": {c["src"]}, "etas": {c["src"]: c["eta"]}, "etasf": {c["src"]: c["etaf"]}})
     buses = []
     for cl in clusters:
         near_i = min(range(n), key=lambda k: hav_km(cl["lat"], cl["lon"], stops[k]["lat"], stops[k]["lon"]))
         near, to = stops[near_i], stops[cl["src"]]
         buses.append({"lat": cl["lat"], "lon": cl["lon"], "load": cl["load"], "type": cl["type"], "wab": cl["wab"], "monitored": cl["monitored"],
                       "eta": cl["eta"], "toStop": {"code": to["code"], "name": to["name"]},
-                      "near": {"code": near["code"], "name": near["name"], "road": near["road"]}, "progress": near_i, "etas": cl["etas"]})
+                      "near": {"code": near["code"], "name": near["name"], "road": near["road"]}, "progress": near_i, "etas": cl["etas"], "etasf": cl["etasf"]})
     buses.sort(key=lambda b: b["progress"])
     for k, b in enumerate(buses, 1):
         b["id"] = k
@@ -968,6 +975,433 @@ async def api_control(services: str = "", direction: int = 0, adj: str = "", pla
     summary.update(total=len(items), buses=nb, coverage=round(100 * sum(x["monitored"] for x in items) / nb) if nb else None)
     return {"updated": now.isoformat(timespec="seconds"), "items": items, "summary": summary, "errors": errors, "cfg": headway.CFG,
             "truncated": len(svcs) * len(dirs) > MAX_COMBOS, "timetable": tt_summary(), "freqOk": bool(fq["freqs"]), "freqError": fq.get("error")}
+
+
+# =============================================================================== Bus Bunching & Headway Gap (V1)
+import json
+import sqlite3
+import contextlib
+from collections import deque
+import bunching
+
+BB_DB = os.getenv("BUNCHING_DB", str(HERE / "bunching.db"))
+BB_DEFAULT = os.getenv("BUNCHING_SERVICES", "32,145,65,33,51,74,89,200,27,157")
+BB_MAX_PAIRS = int(os.getenv("BUNCHING_MAX_PAIRS", "40"))
+BB_ADMIN = os.getenv("BUNCHING_ADMIN_TOKEN", "") or TT_TOKEN
+BB_IDLE_SEC = 600                     # stop polling LTA when nobody has looked at the page for 10 min
+BB = {"params": dict(bunching.PARAMS), "master": [], "rows": {}, "watch": {}, "hist": deque(maxlen=900), "trk": {}, "open": {}, "seq": 0,
+      "last_req": 0.0, "cycle": {"at": None, "took": None, "pairs": 0}, "loop_at": 0.0, "db_ok": True, "db_err": None}
+PARAM_RANGES = {"gap_warn": (1.05, 5), "gap_crit": (1.1, 8), "bunch_thr": (0.1, 0.9), "confirm_stops": (1, 60), "horizon_min": (10, 60), "refresh_sec": (15, 600),
+                "w_gap": (0, 100), "w_bunch": (0, 100), "w_persist": (0, 100), "w_deter": (0, 100), "w_time": (0, 100), "yellow_conv": (0.3, 1), "yellow_div": (1, 3)}
+
+
+def bb_sql(sql, args=(), fetch=False):
+    """Tiny sqlite helper. A missing / read-only disk must never break the dashboard, so failures only set a flag."""
+    try:
+        with contextlib.closing(sqlite3.connect(BB_DB, timeout=10)) as c:
+            c.row_factory = sqlite3.Row
+            cur = c.execute(sql, args)
+            rows = [dict(r) for r in cur.fetchall()] if fetch else None
+            c.commit()
+            BB["db_ok"], BB["db_err"] = True, None
+            return rows
+    except Exception as e:
+        BB["db_ok"], BB["db_err"] = False, f"{type(e).__name__}: {e}"
+        return [] if fetch else None
+
+
+def bb_init():
+    bb_sql("CREATE TABLE IF NOT EXISTS system_parameter(k TEXT PRIMARY KEY, v REAL)")
+    bb_sql("CREATE TABLE IF NOT EXISTS service_headway_config(service TEXT, direction INTEGER, day_type TEXT, t_from TEXT, t_to TEXT, hw REAL)")
+    bb_sql("CREATE TABLE IF NOT EXISTS bunching_event(id INTEGER PRIMARY KEY AUTOINCREMENT, service TEXT, direction INTEGER, start_ts REAL, end_ts REAL, bus_group TEXT, "
+           "max_level INTEGER, start_stop TEXT, end_stop TEXT, stops INTEGER, min_hw REAL)")
+    bb_sql("CREATE TABLE IF NOT EXISTS gap_event(id INTEGER PRIMARY KEY AUTOINCREMENT, service TEXT, direction INTEGER, start_ts REAL, end_ts REAL, buses TEXT, "
+           "max_hw REAL, max_ratio REAL, sched_hw REAL, location TEXT)")
+    for r in bb_sql("SELECT k, v FROM system_parameter", fetch=True):
+        if r["k"] in BB["params"]:
+            BB["params"][r["k"]] = r["v"] if r["k"] not in ("confirm_stops", "refresh_sec", "horizon_min") else int(r["v"])
+    BB["master"] = [{"service": r["service"], "direction": r["direction"], "day_type": r["day_type"], "from": r["t_from"], "to": r["t_to"], "hw": r["hw"]}
+                    for r in bb_sql("SELECT * FROM service_headway_config ORDER BY service, direction, t_from", fetch=True)]
+
+
+def bb_validate_params(inp):
+    out, errs = {}, []
+    for k, v in (inp or {}).items():
+        if k not in PARAM_RANGES:
+            continue
+        try:
+            f = float(v)
+        except (TypeError, ValueError):
+            errs.append(f"{k}: not a number")
+            continue
+        lo, hi = PARAM_RANGES[k]
+        if not (lo <= f <= hi):
+            errs.append(f"{k}: must be between {lo} and {hi}")
+        else:
+            out[k] = int(round(f)) if k in ("confirm_stops", "refresh_sec", "horizon_min") else f
+    merged = {**BB["params"], **out}
+    if merged["gap_crit"] <= merged["gap_warn"]:
+        errs.append("gap_crit must be greater than gap_warn")
+    if sum(merged[w] for w in ("w_gap", "w_bunch", "w_persist", "w_deter", "w_time")) <= 0:
+        errs.append("at least one risk weight must be above 0")
+    return out, errs
+
+
+def _hhmm(s):
+    m = re.fullmatch(r"\s*(\d{1,2}):?(\d{2})\s*", str(s))
+    if not m:
+        return None
+    h, mi = int(m.group(1)), int(m.group(2))
+    return h * 60 + mi if (0 <= h <= 24 and 0 <= mi < 60) else None
+
+
+def parse_master(text):
+    """CSV/TSV -> (rows, errors). Columns: service, direction, day_type (Weekday|Saturday|Sunday|All), from, to, target_hw."""
+    rows, errs = [], []
+    lines = [l for l in (text or "").replace("\r", "").split("\n") if l.strip() and not l.strip().startswith("#")]
+    if not lines:
+        return [], ["The file is empty."]
+    delim = "\t" if "\t" in lines[0] else (";" if lines[0].count(";") > lines[0].count(",") else ",")
+    if re.search(r"[A-Za-z]{4,}", lines[0]) and not re.fullmatch(r"\s*\d+\s*", lines[0].split(delim)[0]):
+        lines = lines[1:]
+    for i, l in enumerate(lines, 1):
+        c = [x.strip().strip('"') for x in l.split(delim)]
+        if len(c) < 6:
+            errs.append(f"line {i}: needs 6 columns (service, direction, day_type, from, to, target_hw)")
+            continue
+        svc, dr, dt = c[0].upper(), c[1].lower().replace("dir", "").strip(), c[2].capitalize() if c[2] else "All"
+        f, t = _hhmm(c[3]), _hhmm(c[4])
+        try:
+            hw = float(c[5])
+        except ValueError:
+            hw = None
+        if not re.fullmatch(r"[0-9A-Z]{1,6}", svc) or dr not in ("1", "2") or dt not in ("Weekday", "Saturday", "Sunday", "All") or f is None or t is None or t <= f or not hw or not (1 <= hw <= 120):
+            errs.append(f"line {i}: invalid values ({l[:60]})")
+            continue
+        rows.append({"service": svc, "direction": int(dr), "day_type": dt, "from": f"{f // 60:02d}:{f % 60:02d}", "to": f"{t // 60:02d}:{t % 60:02d}", "hw": hw})
+    return rows, errs[:10]
+
+
+def bb_day_type(now):
+    return "Weekday" if now.weekday() < 5 else ("Saturday" if now.weekday() == 5 else "Sunday")
+
+
+def bb_resolve_hw(svc, d, now, fq):
+    """Scheduled headway: Service Headway Master first, else LTA BusServices frequency band, else unknown."""
+    m, dt, best = now.hour * 60 + now.minute, bb_day_type(now), None
+    for r in BB["master"]:
+        if r["service"] != svc or r["direction"] != d or r["day_type"] not in ("All", dt):
+            continue
+        f, t = _hhmm(r["from"]), _hhmm(r["to"])
+        if f is not None and t is not None and f <= m < t and (best is None or (t - f) < best[0]):
+            best = (t - f, r)
+    if best:
+        r = best[1]
+        return float(r["hw"]), f"Service Headway Master ({r['day_type']} {r['from']}-{r['to']})"
+    lta = headway.sched_hw(fq["freqs"].get((svc, d)), now)
+    if lta:
+        return float(lta["hw"]), "LTA BusServices frequency: " + lta["label"]
+    return None, None
+
+
+async def bb_route(svc, d):
+    async def factory():
+        r = await api_route(svc, d)
+        return r, 90, not r.get("error")
+    return await cached(f"bbroute:{svc}:{d}", factory)
+
+
+async def bb_eval(svc, d, now, st, fq):
+    key = f"{svc}:{d}"
+    route = await bb_route(svc, d)
+    if route.get("error"):
+        return {"service": svc, "direction": d, "key": key, "error": route["error"], "skip": bool(route.get("availableDirections"))}
+    stops = route_stops(st, svc, d)
+    line = cached_line(svc, d, stops)
+    gk = geom_key(svc, d, stops)
+    prep = PREP.get(gk)
+    if prep is None:
+        prep = PREP[gk] = await asyncio.to_thread(headway.prepare, line, stops)
+    b = await api_buses(svc, d)
+    bl = b.get("buses", [])
+    pos = await asyncio.to_thread(lambda: [headway.project(line, prep["cum"], x["lat"], x["lon"])[0] for x in bl])
+    tm = headway.TimeModel(route.get("runs", []), prep["stop_s"], headway.CFG) if route["traffic"]["ok"] else None
+    if tm is not None and not tm.ok:
+        tm = None
+    H, H_src = bb_resolve_hw(svc, d, now, fq)
+    buses = [{"s_km": s, "etas": x.get("etas", {}), "etasf": x.get("etasf"), "monitored": x["monitored"], "load": x["load"], "near": x["near"]["name"],
+              "lat": x["lat"], "lon": x["lon"]} for s, x in zip(pos, bl)]
+    trk = BB["trk"].setdefault(key, bunching.Tracker())
+    ts = now.timestamp()
+    trk.update(ts, buses, prep["km"])
+    res = bunching.evaluate({"service": svc, "direction": d, "stop_s": prep["stop_s"], "stop_names": [s["name"] for s in stops], "route_km": prep["km"], "buses": buses,
+                             "tm": tm, "H": H, "H_src": H_src, "prior": trk.prior()}, BB["params"])
+    trk.commit(res.pop("bunched_pairs", {}))
+    res.pop("score_parts", None)
+    res.update(key=key, stops=len(stops), route_km=round(prep["km"], 1), updated=now.isoformat(timespec="seconds"), at=ts, busError=b.get("error"), traffic_ok=tm is not None)
+    return res
+
+
+# ---- event log (bunching_event / gap_event): opened while an issue is confirmed, closed 2 cycles after it disappears
+def bb_events(key, res, ts):
+    ev, seen = BB["open"], set()
+    svc, d = key.split(":")[0], int(key.split(":")[1])
+    for g in res.get("groups", []):
+        if g["status"] != "confirmed":
+            continue
+        ids = set(g["ids"]) | set(g["joining"])
+        e = next((e for e in ev.values() if e["kind"] == "bb" and e["key"] == key and e["ids"] & ids), None)
+        if e is None:
+            BB["seq"] += 1
+            e = ev[BB["seq"]] = {"id": BB["seq"], "kind": "bb", "key": key, "service": svc, "direction": d, "start": ts, "ids": set(), "max_level": 0,
+                                 "start_stop": g["location"], "min_hw": g["min_hw"], "stops": 0}
+        e["ids"] |= ids
+        e["max_level"] = max(e["max_level"], g["size"] + len(g["joining"]))
+        e["min_hw"] = min(e["min_hw"], g["min_hw"])
+        e["stops"] = max(e["stops"], g["stops"])
+        e["end_stop"], e["last"], e["miss"] = g["location"], ts, 0
+        seen.add(e["id"])
+    gp = res.get("gap")
+    if gp:
+        e = next((e for e in ev.values() if e["kind"] == "gap" and e["key"] == key), None)
+        if e is None:
+            BB["seq"] += 1
+            e = ev[BB["seq"]] = {"id": BB["seq"], "kind": "gap", "key": key, "service": svc, "direction": d, "start": ts, "ids": set(), "max_hw": 0.0, "max_ratio": 0.0,
+                                 "sched": res["sched_hw"], "location": gp["location"]}
+        e["ids"] |= {gp["lead"], gp["foll"]}
+        if gp["max_hw"] >= e["max_hw"]:
+            e["max_hw"], e["location"] = gp["max_hw"], gp["location"]
+        e["max_ratio"] = max(e["max_ratio"], gp["ratio"])
+        e["last"], e["miss"] = ts, 0
+        seen.add(e["id"])
+    for eid in [i for i, e in ev.items() if e["key"] == key and i not in seen]:
+        e = ev[eid]
+        e["miss"] = e.get("miss", 0) + 1
+        if e["miss"] >= 2:
+            bb_close_event(ev.pop(eid))
+
+
+def bb_close_event(e):
+    if e["kind"] == "bb":
+        bb_sql("INSERT INTO bunching_event(service,direction,start_ts,end_ts,bus_group,max_level,start_stop,end_stop,stops,min_hw) VALUES (?,?,?,?,?,?,?,?,?,?)",
+               (e["service"], e["direction"], e["start"], e.get("last"), ",".join(sorted(e["ids"])), e["max_level"], e["start_stop"], e.get("end_stop"), e["stops"], e["min_hw"]))
+    else:
+        bb_sql("INSERT INTO gap_event(service,direction,start_ts,end_ts,buses,max_hw,max_ratio,sched_hw,location) VALUES (?,?,?,?,?,?,?,?,?)",
+               (e["service"], e["direction"], e["start"], e.get("last"), ",".join(sorted(e["ids"])), e["max_hw"], e["max_ratio"], e["sched"], e["location"]))
+
+
+def bb_event_public(e, open_=True):
+    if open_:
+        return {"kind": e["kind"], "service": e["service"], "direction": e["direction"], "start": e["start"], "end": None, "buses": sorted(e["ids"]),
+                "level": e.get("max_level"), "stops": e.get("stops"), "min_hw": e.get("min_hw"), "max_hw": e.get("max_hw"), "location": e.get("location") or e.get("start_stop"), "open": True}
+    return e
+
+
+# ---- collector
+async def bb_run(keys):
+    now = now_sgt()
+    st, fq = await static(), await freq_table()
+    sem = asyncio.Semaphore(3)
+
+    async def one(k):
+        svc, d = k
+        async with sem:
+            try:
+                r = await bb_eval(svc, d, now, st, fq)
+            except Exception as e:
+                r = {"service": svc, "direction": d, "key": f"{svc}:{d}", "error": f"{type(e).__name__}: {e}", "skip": False}
+            r.setdefault("at", now.timestamp())
+            BB["rows"][r["key"]] = r
+            if not r.get("error"):
+                bb_events(r["key"], r, now.timestamp())
+    await asyncio.gather(*[one(k) for k in keys])
+
+
+def bb_keys():
+    now = time.time()
+    keys = [(s, d) for s in [x for x in re.split(r"[,\s]+", BB_DEFAULT.upper()) if re.fullmatch(r"[0-9A-Z]{1,6}", x)] for d in (1, 2)]
+    keys += [k for k, t in BB["watch"].items() if now - t < 2700 and k not in keys]
+    return keys[:BB_MAX_PAIRS]
+
+
+async def bb_cycle(keys=None):
+    t0 = time.time()
+    keys = keys or bb_keys()
+    await bb_run(keys)
+    per = {}
+    for k in keys:
+        r = BB["rows"].get(f"{k[0]}:{k[1]}")
+        if r and not r.get("error"):
+            c = r["counts"]
+            per[r["key"]] = (c["gaps"], c["bb"], c["bb2"], c["bb3"], c["bb4"], c["early"])
+    BB["hist"].append({"ts": t0, "per": per})
+    BB["cycle"] = {"at": t0, "took": round(time.time() - t0, 1), "pairs": len(keys)}
+    BB["loop_at"] = time.time()
+
+
+async def bb_loop():
+    while True:
+        t0 = time.time()
+        try:
+            if t0 - BB["last_req"] < BB_IDLE_SEC:
+                await bb_cycle()
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            pass
+        await asyncio.sleep(max(5.0, BB["params"]["refresh_sec"] - (time.time() - t0)))
+
+
+def bb_auth(request):
+    return (not BB_ADMIN) or request.headers.get("x-admin-token", "") == BB_ADMIN
+
+
+def bb_sum(keys, which):
+    tot = [0, 0, 0, 0, 0, 0]
+    for k in keys:
+        v = which.get(k)
+        if v:
+            tot = [a + b for a, b in zip(tot, v)]
+    return {"gaps": tot[0], "bb": tot[1], "bb2": tot[2], "bb3": tot[3], "bb4": tot[4], "early": tot[5]}
+
+
+@app.get("/bunching", response_class=HTMLResponse)
+async def bunching_page():
+    return HTMLResponse((HERE / "bunching.html").read_text(encoding="utf-8"))
+
+
+@app.get("/api/bunching")
+async def api_bunching(services: str = "", direction: int = 0):
+    """Cached gap / bunching state for the selected services. Browsers never call DataMall; the collector does."""
+    BB["last_req"] = time.time()
+    svcs = []
+    for t in re.split(r"[,\s]+", (services or BB_DEFAULT).upper()):
+        if t and re.fullmatch(r"[0-9A-Z]{1,6}", t) and t not in svcs:
+            svcs.append(t)
+    dirs = [direction] if direction in (1, 2) else [1, 2]
+    keys = [(s, d) for s in svcs for d in dirs][:BB_MAX_PAIRS]
+    for k in keys:
+        BB["watch"][k] = time.time()
+    P, alive = BB["params"], time.time() - BB["loop_at"] < 3 * BB["params"]["refresh_sec"]
+    need = [k for k in keys if f"{k[0]}:{k[1]}" not in BB["rows"] or (not alive and time.time() - BB["rows"][f"{k[0]}:{k[1]}"].get("at", 0) > 2 * P["refresh_sec"])]
+    if need:
+        await bb_run(need)
+        if not alive:
+            per = {f"{k[0]}:{k[1]}": tuple(BB["rows"][f"{k[0]}:{k[1]}"]["counts"][c] for c in ("gaps", "bb", "bb2", "bb3", "bb4", "early"))
+                   for k in keys if f"{k[0]}:{k[1]}" in BB["rows"] and not BB["rows"][f"{k[0]}:{k[1]}"].get("error")}
+            BB["hist"].append({"ts": time.time(), "per": per})
+    kk = [f"{k[0]}:{k[1]}" for k in keys]
+    rows = [BB["rows"][k] for k in kk if k in BB["rows"] and not BB["rows"][k].get("error")]
+    errors = []
+    for k in kk:
+        r = BB["rows"].get(k)
+        if r and r.get("error") and not r.get("skip") and r["error"] not in errors:
+            errors.append(r["error"])
+    rows.sort(key=lambda r: (bunching.RISK_ORDER[r["risk"]], -r["score"], (not r["service"].isdigit()), int(r["service"]) if r["service"].isdigit() else 0, r["direction"]))
+    now = time.time()
+    cur = bb_sum(kk, {r["key"]: (r["counts"]["gaps"], r["counts"]["bb"], r["counts"]["bb2"], r["counts"]["bb3"], r["counts"]["bb4"], r["counts"]["early"]) for r in rows})
+    prev, hist_min = None, round((now - BB["hist"][0]["ts"]) / 60, 1) if BB["hist"] else 0
+    for h in reversed(BB["hist"]):
+        if now - h["ts"] >= 27 * 60:
+            prev = bb_sum(kk, h["per"])
+            break
+    trend = [[round(h["ts"]), bb_sum(kk, h["per"])["gaps"], bb_sum(kk, h["per"])["bb"]] for h in BB["hist"]]
+    step = max(1, len(trend) // 120)
+    return {"updated": now_sgt().isoformat(timespec="seconds"), "rows": [{k: v for k, v in r.items() if k not in ("groups_full",)} for r in rows],
+            "kpi": {**cur, "services": len({r["service"] for r in rows}), "prev": prev, "history_min": hist_min}, "trend": trend[::step],
+            "params": P, "errors": errors, "collector": {**BB["cycle"], "alive": alive, "db_ok": BB["db_ok"], "db_err": BB["db_err"], "max_pairs": BB_MAX_PAIRS,
+                                                         "truncated": len(svcs) * len(dirs) > BB_MAX_PAIRS},
+            "open_events": sum(1 for e in BB["open"].values() if e["key"] in kk)}
+
+
+@app.get("/api/bunching/detail")
+async def api_bunching_detail(service: str = "", direction: int = 1):
+    svc = service.strip().upper()
+    key = f"{svc}:{direction}"
+    if key not in BB["rows"] or BB["rows"][key].get("error"):
+        await bb_run([(svc, direction)])
+    row = BB["rows"].get(key)
+    if not row or row.get("error"):
+        return {"error": (row or {}).get("error", "Service not found")}
+    route = await bb_route(svc, direction)
+    try:
+        inc = await api_incidents(svc, direction)
+    except Exception:
+        inc = {"incidents": [], "error": "unavailable"}
+    recent = [bb_event_public(e) for e in BB["open"].values() if e["key"] == key]
+    recent += bb_sql("SELECT 'bb' AS kind, service, direction, start_ts AS start, end_ts AS end, bus_group AS buses, max_level AS level, stops, min_hw, start_stop AS location FROM bunching_event "
+                     "WHERE service=? AND direction=? ORDER BY id DESC LIMIT 5", (svc, direction), fetch=True)
+    return {"row": row, "route": {"stops": route.get("stops", []), "runs": route.get("runs", []), "geometry": route.get("geometry")},
+            "incidents": {"count": len(inc.get("incidents", [])), "items": inc.get("incidents", [])[:3], "error": inc.get("error")}, "events": recent}
+
+
+@app.get("/api/bunching/settings")
+async def api_bb_settings():
+    return {"params": BB["params"], "defaults": bunching.PARAMS, "ranges": PARAM_RANGES, "master": BB["master"], "tokenRequired": bool(BB_ADMIN), "db_ok": BB["db_ok"], "db_err": BB["db_err"],
+            "dayType": bb_day_type(now_sgt())}
+
+
+@app.post("/api/bunching/settings")
+async def api_bb_settings_save(request: Request):
+    if not bb_auth(request):
+        return JSONResponse({"error": "Admin token missing or wrong."}, status_code=401)
+    try:
+        body = json.loads((await request.body()).decode("utf-8") or "{}")
+    except ValueError:
+        return JSONResponse({"error": "Body must be JSON."}, status_code=400)
+    if body.get("reset"):
+        BB["params"] = dict(bunching.PARAMS)
+        bb_sql("DELETE FROM system_parameter")
+    else:
+        out, errs = bb_validate_params(body.get("params"))
+        if errs:
+            return JSONResponse({"error": "; ".join(errs)}, status_code=400)
+        BB["params"].update(out)
+        for k, v in out.items():
+            bb_sql("INSERT OR REPLACE INTO system_parameter(k, v) VALUES (?, ?)", (k, v))
+    BB["rows"].clear()          # cached results were computed with the old rules
+    return {"ok": True, "params": BB["params"]}
+
+
+@app.post("/api/bunching/master")
+async def api_bb_master_save(request: Request):
+    """Body: CSV/TSV text, or JSON {"rows": [...]}. Replaces the whole Service Headway Master."""
+    if not bb_auth(request):
+        return JSONResponse({"error": "Admin token missing or wrong."}, status_code=401)
+    raw = (await request.body()).decode("utf-8-sig", "replace")
+    if raw.lstrip().startswith("{"):
+        try:
+            rows, errs = parse_master("\n".join(",".join(str(r.get(k, "")) for k in ("service", "direction", "day_type", "from", "to", "hw")) for r in json.loads(raw).get("rows", [])))
+        except ValueError:
+            return JSONResponse({"error": "Invalid JSON."}, status_code=400)
+    else:
+        rows, errs = parse_master(raw)
+    if not rows:
+        return JSONResponse({"error": "; ".join(errs[:3]) or "No usable rows.", "errors": errs}, status_code=400)
+    bb_sql("DELETE FROM service_headway_config")
+    for r in rows:
+        bb_sql("INSERT INTO service_headway_config(service,direction,day_type,t_from,t_to,hw) VALUES (?,?,?,?,?,?)", (r["service"], r["direction"], r["day_type"], r["from"], r["to"], r["hw"]))
+    BB["master"] = rows
+    BB["rows"].clear()
+    return {"ok": True, "rows": len(rows), "errors": errs, "master": rows}
+
+
+@app.post("/api/bunching/master/clear")
+async def api_bb_master_clear(request: Request):
+    if not bb_auth(request):
+        return JSONResponse({"error": "Admin token missing or wrong."}, status_code=401)
+    bb_sql("DELETE FROM service_headway_config")
+    BB["master"] = []
+    BB["rows"].clear()
+    return {"ok": True}
+
+
+@app.get("/api/bunching/events")
+async def api_bb_events(limit: int = 100):
+    limit = max(1, min(500, limit))
+    closed = bb_sql("SELECT 'bb' AS kind, service, direction, start_ts AS start, end_ts AS end, bus_group AS buses, max_level AS level, stops, min_hw, start_stop AS location FROM bunching_event "
+                    "UNION ALL SELECT 'gap', service, direction, start_ts, end_ts, buses, NULL, NULL, max_hw, location FROM gap_event ORDER BY start DESC LIMIT ?", (limit,), fetch=True)
+    return {"events": [bb_event_public(e) for e in BB["open"].values()] + closed, "db_ok": BB["db_ok"]}
 
 
 @app.get("/api/stop-suggest")

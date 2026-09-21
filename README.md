@@ -1,7 +1,57 @@
-# SG Transport Pulse V5.3 — Route Traffic + Pre-emptive Departure Adjustment
+# SG Transport Pulse V5.4 — Route Traffic + Departure Adjustment + Bunching & Gap
 
 Live bus positions, live LTA traffic drawn directly on the bus route, and next arrivals per stop.
 FastAPI backend + a single-page Leaflet frontend (OneMap basemap, OpenStreetMap fallback).
+
+## V5.4 - Bus Bunching & Headway Gap page (`/bunching`)
+
+A third page, built to the V1 spec. It only **detects and predicts**; it does not recommend interventions (that is a later layer).
+Header buttons link all three pages.
+
+**Engine (`bunching.py`, no I/O):** tracks every consecutive bus (stable ids B1, B2... between polls) -> computes the ETA of each bus at
+every downstream stop -> headway between neighbours at each stop -> projects it to NOW / +10 / +20 / +30 min -> counts how many
+**consecutive stops** the spacing stays <= 0.5 x scheduled HW.
+
+| State | Rule (all values editable in **Settings**) |
+|---|---|
+| Developing gap (orange) | predicted HW >= 1.5 x scheduled |
+| Critical gap (red) | predicted HW >= 2.0 x scheduled |
+| Early warning / Developing bunching (yellow/orange) | spacing not yet bunched but predicted to fall <= 0.5 x scheduled |
+| Confirmed bunching (red) | spacing <= 0.5 x scheduled for **>= 10 consecutive stops** |
+| 2BB / 3BB / 4BB+ | buses travelling as **one group**. A-B and B-C both bunched is reported once as **3BB**, never as two 2BBs |
+| Recovering / closed | spacing widens again; the event closes after 2 clean cycles (no flapping) |
+
+**Risk ranking** (0-100) = gap severity 30% + bunching level 25% + persistence 20% + deterioration rate 15% + time-to-occur 10%
+(weights configurable). Red / Orange / Yellow / Green as in the spec section 17.
+
+**Scheduled headway:** the **Service Headway Master** (Settings -> upload CSV `service,direction,day_type,from,to,target_hw`) wins over
+LTA's BusServices dispatch-frequency band. The narrowest matching time window is used. No code change is needed to edit it.
+
+**Traffic and incidents are shown as context only** ("Possible contributing factor"), never as the cause (spec section 18).
+
+**What the data can and cannot say**
+* LTA gives **no registration numbers**, trip IDs or BC identity, so buses are labelled B1, B2... by position tracking (the mock's `SG7219L`
+  column cannot be filled from DataMall). Ids are stable while the server keeps running.
+* LTA only publishes estimates for buses approaching each stop; a bus far from any sampled stop may be missing, and +20/+30 min values show
+  "-" when there are too few downstream samples. Long horizons are less reliable than NOW.
+* The **"vs 30 min ago"** KPI deltas and the **trend chart** are built from the server's own history, so they start empty after every
+  restart and fill over the following 30+ minutes. The page says "history builds" rather than faking numbers.
+* The mock's **Area / Corridor** filter is not built: LTA does not tag services with a corridor.
+* Road works are not available from DataMall with coordinates; incidents are.
+
+**Collector and storage:** a background loop polls LTA every `refresh_sec` (default 30) for the watched services and **stops after 10
+minutes with nobody viewing** to save quota. Settings, the Service Headway Master and the bunching / gap **event log** (start, end, buses,
+max BB level, start/end stop, consecutive stops, minimum headway) live in SQLite (`bunching.db`, git-ignored). On Render's free tier the
+disk resets on restart or redeploy, so the log and settings return to defaults - attach a persistent disk (or point `BUNCHING_DB` at one)
+if you want history. If the database is unavailable the page still works and says so.
+
+**API:** `GET /bunching` (page) - `GET /api/bunching?services=32,145&direction=0` (0 = both) - `GET /api/bunching/detail?service=32&direction=1`
+(route geometry, buses, incidents) - `GET|POST /api/bunching/settings` - `POST /api/bunching/master` (CSV upload) and
+`POST /api/bunching/master/clear` - `GET /api/bunching/events?limit=100` (JSON; the page's Export button makes the CSV). Saving settings or the
+master needs `BUNCHING_ADMIN_TOKEN` (falls back to `TIMETABLE_TOKEN`) if one is set.
+
+**Phase-1 acceptance test (spec section 23)** is automated in `test_bunching.py`: Normal -> Developing -> Early warning -> Confirmed 2BB ->
+3BB upgrade -> Recovering -> event closed.
 
 ## V5.3 - All services, planned timetable, and "call the BC to slow down"
 
@@ -118,6 +168,10 @@ Run locally: `pip install -r requirements.txt` then `LTA_ACCOUNT_KEY=... uvicorn
 | `OSRM_URL` | Road-snapping server (default public demo `https://router.project-osrm.org`). If unreachable the route is drawn stop-to-stop and traffic matching is less precise |
 | `TIMETABLE_TOKEN` | If set, uploading/clearing the planned timetable requires this token (recommended) |
 | `CONTROL_ALL_CAP` | Max service directions scanned in All-services mode (default 160) |
+| `BUNCHING_SERVICES` | Default watch list for the Bunching page (default `32,145,65,33,51,74,89,200,27,157`) |
+| `BUNCHING_MAX_PAIRS` | Max bus pairs analysed per request (default 40) |
+| `BUNCHING_DB` | SQLite path for settings / headway master / event log (default `bunching.db`) |
+| `BUNCHING_ADMIN_TOKEN` | If set, saving Bunching settings / master requires it (falls back to `TIMETABLE_TOKEN`) |
 | `DATA_GOV_SG_KEY` | Optional, only raises data.gov.sg rate limits for the Rain layer |
 
 ## Known limits

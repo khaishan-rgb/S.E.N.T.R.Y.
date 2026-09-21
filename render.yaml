@@ -11,3 +11,7 @@ services:
         sync: false
       - key: TIMETABLE_TOKEN      # optional but recommended: protects planned-timetable upload/clear
         sync: false
+      - key: BUNCHING_ADMIN_TOKEN # optional: protects Bunching settings / Service Headway Master edits (falls back to TIMETABLE_TOKEN)
+        sync: false
+      - key: BUNCHING_SERVICES    # optional: default watch list, e.g. 32,145,65
+        sync: false
