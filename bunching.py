@@ -14,6 +14,7 @@ Consecutive stops = stops already travelled in that state since we first saw it 
 Not in the state yet but predicted to be = Early warning (bunching) / Developing (gap).
 """
 import bisect
+import math
 
 PARAMS = {
     "bunch_min": 3.0,       # bunched:        HW < 3 min (absolute)
@@ -33,13 +34,26 @@ RISK_ORDER = {"red": 0, "orange": 1, "yellow": 2, "green": 3, "nodata": 4}
 
 
 # ----------------------------------------------------------------------------- tracking
-class Tracker:
-    """Stable bus ids between polls and memory of how long a pair has been bunched."""
+def max_stops_moved(dt_sec):
+    """Most bus stops a bus can plausibly pass in dt seconds (generous: ~4 per minute + slack). A bigger jump is bad data or a different bus."""
+    return 4 + 4 * math.ceil(max(0.0, dt_sec) / 60.0)
 
-    def __init__(self):
+
+class Tracker:
+    """Stable bus ids between polls and memory of how long a pair has been bunched / long.
+
+    Nothing is trusted across a pause in polling (nobody had the page open, server asleep ...): after `gap_sec` without an update every track and
+    every pair memory is dropped, so buses that are on the road now can never inherit the ids and 'first seen' stops of buses seen an hour ago."""
+
+    def __init__(self, gap_sec=150):
         self.tracks, self.n, self.first, self.firstg = [], 0, {}, {}
+        self.last, self.lastg, self.ts_last, self.gap_sec = {}, {}, None, gap_sec
 
     def update(self, ts, buses, total_km):
+        if self.ts_last is not None and ts - self.ts_last > self.gap_sec:            # polling paused: start again from scratch
+            self.tracks, self.first, self.firstg, self.last, self.lastg = [], {}, {}, {}, {}
+        self.ts_last = ts
+        self.tracks = [t for t in self.tracks if ts - t["ts"] <= 300]                # expire BEFORE matching: a stale track must never claim a bus
         used = set()
         for b in sorted(buses, key=lambda x: -x["s_km"]):
             best, bd = None, 1e9
@@ -65,20 +79,33 @@ class Tracker:
     def prior_gap(self):
         return dict(self.firstg)
 
-    def commit(self, pairs_now, long_now=None):
+    def prior_last(self):
+        return dict(self.last)
+
+    def prior_last_gap(self):
+        return dict(self.lastg)
+
+    @staticmethod
+    def _commit(first, last, now, ts):
+        for k, j in now.items():
+            lp = last.get(k)
+            if lp is not None and ts is not None and j - lp[0] > max_stops_moved(ts - lp[1]):
+                first[k] = j                                                         # the leader 'jumped': not the same run any more, count again from here
+            else:
+                first.setdefault(k, j)
+            if ts is not None:
+                last[k] = (j, ts)
+        for k in list(first):
+            if k not in now:
+                del first[k]
+                last.pop(k, None)
+
+    def commit(self, pairs_now, long_now=None, ts=None):
         """pairs_now: {(leader_id, follower_id): leader's next-stop index} for pairs bunched right now.
-        long_now: same for pairs whose headway is long right now (None = leave the long-headway memory alone)."""
-        for k, j in pairs_now.items():
-            self.first.setdefault(k, j)
-        for k in list(self.first):
-            if k not in pairs_now:
-                del self.first[k]
+        long_now: same for pairs whose headway is long right now (None = leave the long-headway memory alone). ts: time of this poll (enables the jump check)."""
+        self._commit(self.first, self.last, pairs_now, ts)
         if long_now is not None:
-            for k, j in long_now.items():
-                self.firstg.setdefault(k, j)
-            for k in list(self.firstg):
-                if k not in long_now:
-                    del self.firstg[k]
+            self._commit(self.firstg, self.lastg, long_now, ts)
 
 
 # ----------------------------------------------------------------------------- ETA at every stop
@@ -287,8 +314,18 @@ def evaluate(ctx, P=None):
         prev = vec
         vecs.append({"id": b.get("id") or f"B{i + 1}", "order": i + 1, "s_km": b["s_km"], "vec": vec, "j0": j0, "near": b.get("near", ""),
                      "lat": b.get("lat"), "lon": b.get("lon"), "monitored": b.get("monitored", True), "load": b.get("load", "")})
-    prior = ctx.get("prior") or {}
-    prior_gap = ctx.get("prior_gap") or {}
+    j0_of, now_ts = {v["id"]: v["j0"] for v in vecs}, ctx.get("now_ts")
+
+    def continuous(mem, last):
+        """Drop remembered 'first seen' stops whose leader has moved further than a bus physically can since the last poll (bad position / different bus)."""
+        out = {}
+        for k, j in (mem or {}).items():
+            lp = (last or {}).get(k)
+            if lp is not None and now_ts is not None and k[0] in j0_of and j0_of[k[0]] - lp[0] > max_stops_moved(now_ts - lp[1]):
+                continue
+            out[k] = j
+        return out
+    prior, prior_gap = continuous(ctx.get("prior"), ctx.get("prior_last")), continuous(ctx.get("prior_gap"), ctx.get("prior_last_gap"))
     pairs = [analyse_pair(vecs[i], vecs[i + 1], pair_series(vecs[i], vecs[i + 1], n_st), H, P, prior, prior_gap) for i in range(len(vecs) - 1)]
     if not any(p["ok"] for p in pairs):
         return _empty(ctx, H, "No arrival estimates overlap between consecutive buses yet.", len(bs))

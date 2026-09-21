@@ -1,4 +1,4 @@
-# SG Transport Pulse V5.6 — Route Traffic + Departure Adjustment + Bunching, Gap & Alerts
+# SG Transport Pulse V5.6.1 — Route Traffic + Departure Adjustment + Bunching, Gap & Alerts
 
 Live bus positions, live LTA traffic drawn directly on the bus route, and next arrivals per stop.
 FastAPI backend + a single-page Leaflet frontend (OneMap basemap, OpenStreetMap fallback).
@@ -29,6 +29,13 @@ Each case that reaches the logging threshold raises alerts that **escalate while
   **number of alerts** it raised.
 * Limits: alerts and acknowledgements live in the server's memory (a restart clears them; the event log is what persists). Acknowledging needs no admin
   token, so anyone who can open the page can do it. There is no sound, SMS, e-mail or push notification: the page has to be open (Alerts tab or Dashboard).
+* **Fix (V5.6.1): "9 alerts at once, all at the same time and stop".** After nobody had the page open for a while, the server still remembered the buses
+  and the "first seen" stops from before, so buses now on the road inherited old ids and the case was counted as already 55 stops long. Now: bus tracks
+  are expired **before** matching; after a pause in polling (no update for 150 s, or 3x the refresh interval) all bus ids and pair history are dropped; a
+  case can never move along the route faster than buses do (a jump is treated as a different case); a group only continues an event if it overlaps who is in
+  the case **now**; and every alert records the stop where its own threshold was crossed (the 15th, 20th, 25th stop...), not just where the bus is now.
+  **After a pause, counting starts again from when a case is next seen**, so a case that was already under way when the page was reopened needs a further
+  15 observed stops before it is logged or raises alert 1.
 * API: `GET /api/bunching` now also returns `alerts`; `POST /api/bunching/alerts/ack` with `{"id": ...}`.
 
 ## V5.5 - Bus Bunching & Headway Gap page (`/bunching`): bunching < 3 min, long headway = scheduled + 10 min, 15 stops

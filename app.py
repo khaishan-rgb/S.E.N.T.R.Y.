@@ -20,7 +20,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 
 import headway
 
-VERSION = "V5.6"
+VERSION = "V5.6.1"
 LTA = os.getenv("LTA_BASE", "https://datamall2.mytransport.sg/ltaodataservice").rstrip("/")
 KEY = os.getenv("LTA_ACCOUNT_KEY", "")
 OSRM = os.getenv("OSRM_URL", "https://router.project-osrm.org").rstrip("/")
@@ -990,7 +990,7 @@ BB_MAX_PAIRS = int(os.getenv("BUNCHING_MAX_PAIRS", "40"))
 BB_ADMIN = os.getenv("BUNCHING_ADMIN_TOKEN", "") or TT_TOKEN
 BB_IDLE_SEC = 600                     # stop polling LTA when nobody has looked at the page for 10 min
 BB_ALWAYS = os.getenv("BUNCHING_ALWAYS_ON", "").strip().lower() in ("1", "true", "yes")   # keep polling with nobody watching, so the event log keeps filling
-BB = {"params": dict(bunching.PARAMS), "master": [], "rows": {}, "watch": {}, "hist": deque(maxlen=900), "trk": {}, "open": {}, "seq": 0,
+BB = {"params": dict(bunching.PARAMS), "labels": {}, "master": [], "rows": {}, "watch": {}, "hist": deque(maxlen=900), "trk": {}, "open": {}, "seq": 0,
       "last_req": 0.0, "cycle": {"at": None, "took": None, "pairs": 0}, "loop_at": 0.0, "db_ok": True, "db_err": None}
 BB_INT_PARAMS = ("confirm_stops", "gap_stops", "alert_step", "refresh_sec", "horizon_min")
 PARAM_RANGES = {"bunch_min": (0.5, 10), "confirm_stops": (1, 60), "gap_add_min": (1, 60), "gap_stops": (1, 60), "alert_step": (1, 30), "horizon_min": (10, 60), "refresh_sec": (15, 600),
@@ -1141,12 +1141,15 @@ async def bb_eval(svc, d, now, st, fq):
     buses = [{"s_km": s, "etas": x.get("etas", {}), "etasf": x.get("etasf"), "monitored": x["monitored"], "load": x["load"], "near": x["near"]["name"],
               "lat": x["lat"], "lon": x["lon"]} for s, x in zip(pos, bl)]
     trk = BB["trk"].setdefault(key, bunching.Tracker())
+    trk.gap_sec = max(150, 3 * int(BB["params"]["refresh_sec"]))                     # no update for this long = polling was paused: forget everything
     ts = now.timestamp()
     trk.update(ts, buses, prep["km"])
     res = bunching.evaluate({"service": svc, "direction": d, "stop_s": prep["stop_s"], "stop_names": [s["name"] for s in stops], "route_km": prep["km"], "buses": buses,
                              "stop_labels": [f"{s['name']} ({s['code']})" if s.get("code") else s["name"] for s in stops],
-                             "tm": tm, "H": H, "H_src": H_src, "prior": trk.prior(), "prior_gap": trk.prior_gap()}, BB["params"])
-    trk.commit(res.pop("bunched_pairs", {}), res.pop("long_pairs", {}))
+                             "tm": tm, "H": H, "H_src": H_src, "prior": trk.prior(), "prior_gap": trk.prior_gap(),
+                             "prior_last": trk.prior_last(), "prior_last_gap": trk.prior_last_gap(), "now_ts": ts}, BB["params"])
+    BB["labels"][key] = [f"{s['name']} ({s['code']})" if s.get("code") else s["name"] for s in stops]
+    trk.commit(res.pop("bunched_pairs", {}), res.pop("long_pairs", {}), ts)
     res.pop("score_parts", None)
     res.update(key=key, stops=len(stops), route_km=round(prep["km"], 1), updated=now.isoformat(timespec="seconds"), at=ts, busError=b.get("error"), traffic_ok=tm is not None)
     return res
@@ -1174,7 +1177,9 @@ def bb_alert_update(e, ts):
     lvl, gate, step = bb_alert_level(e), bb_ev_gate(e), max(1, int(BB["params"]["alert_step"]))
     while len(e["alerts"]) < lvl:                                                    # a missed refresh can cross more than one step: raise them all
         k = len(e["alerts"]) + 1
-        e["alerts"].append({"n": k, "ts": ts, "at_stops": gate + step * (k - 1), "stops": bb_ev_stops(e), "stop": e.get("end_stop")})
+        at = gate + step * (k - 1)
+        labels, idx = BB["labels"].get(e["key"]) or [], min(e["first_j"] + at - 1, e["last_j"])          # the stop where the count reached `at`, not just where the bus is now
+        e["alerts"].append({"n": k, "ts": ts, "at_stops": at, "stops": bb_ev_stops(e), "stop": labels[idx] if 0 <= idx < len(labels) else e.get("end_stop")})
 
 
 def bb_alert_public(e):
@@ -1194,6 +1199,11 @@ def bb_alerts(keys=None):
     return out
 
 
+def bb_plausible(e, cur_j, ts):
+    """A case cannot move along the route faster than buses do. A bigger jump is a different case (or bad data), not a continuation."""
+    return cur_j - e["last_j"] <= bunching.max_stops_moved(ts - e.get("last", ts))
+
+
 def bb_events(key, res, ts):
     ev, seen = BB["open"], set()
     svc, d = key.split(":")[0], int(key.split(":")[1])
@@ -1201,18 +1211,17 @@ def bb_events(key, res, ts):
         if g["status"] not in ("confirmed", "developing"):                          # only groups that are bunched right now
             continue
         ids = set(g["ids"]) | set(g["joining"])
-        e = next((e for e in ev.values() if e["kind"] == "bb" and e["key"] == key and e["ids"] & ids), None)
+        e = next((e for e in ev.values() if e["kind"] == "bb" and e["key"] == key and e["id"] not in seen and e.get("cur_ids", e["ids"]) & ids and bb_plausible(e, g["cur_j"], ts)), None)
         if e is None:
             BB["seq"] += 1
             e = ev[BB["seq"]] = {"id": BB["seq"], "kind": "bb", "key": key, "service": svc, "direction": d, "start": ts, "ids": set(), "max_level": 0,
                                  "first_j": g["since_j"], "last_j": g["cur_j"], "start_stop": g["since_stop"], "end_stop": g["cur_stop"], "min_hw": g["min_hw"],
                                  "alerts": [], "acked_n": 0, "acked_ts": None}
         e["ids"] |= ids
+        e["cur_ids"] = ids                                                            # who is in the group NOW (matching uses this, not everyone ever seen)
         e["sched"] = res.get("sched_hw")
         e["max_level"] = max(e["max_level"], g["size"] + len(g["joining"]))
         e["min_hw"] = min(e["min_hw"], g["min_hw"])
-        if g["since_j"] < e["first_j"]:
-            e["first_j"], e["start_stop"] = g["since_j"], g["since_stop"]
         if g["cur_j"] >= e["last_j"]:
             e["last_j"], e["end_stop"] = g["cur_j"], g["cur_stop"]
         e["last"], e["miss"] = ts, 0
@@ -1222,7 +1231,8 @@ def bb_events(key, res, ts):
         if not gp.get("active"):                                                     # only pairs whose headway is long right now
             continue
         pair = {gp["lead"], gp["foll"]}
-        e = next((e for e in ev.values() if e["kind"] == "gap" and e["key"] == key and (e["lead"] == gp["lead"] or e["foll"] == gp["foll"])), None)
+        e = next((e for e in ev.values() if e["kind"] == "gap" and e["key"] == key and e["id"] not in seen and (e["lead"] == gp["lead"] or e["foll"] == gp["foll"])
+                  and bb_plausible(e, gp["cur_j"], ts)), None)
         if e is None:
             BB["seq"] += 1
             e = ev[BB["seq"]] = {"id": BB["seq"], "kind": "gap", "key": key, "service": svc, "direction": d, "start": ts, "ids": set(), "max_hw": 0.0, "max_ratio": 0.0,
@@ -1234,8 +1244,6 @@ def bb_events(key, res, ts):
         if gp["max_hw"] >= e["max_hw"]:
             e["max_hw"], e["location"] = gp["max_hw"], gp["location"]
         e["max_ratio"] = max(e["max_ratio"], gp["ratio"])
-        if gp["since_j"] < e["first_j"]:
-            e["first_j"], e["start_stop"] = gp["since_j"], gp["since_stop"]
         if gp["cur_j"] >= e["last_j"]:
             e["last_j"], e["end_stop"] = gp["cur_j"], gp["cur_stop"]
         e["sched"] = res.get("sched_hw", e.get("sched"))
