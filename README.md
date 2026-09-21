@@ -1,28 +1,42 @@
-# SG Transport Pulse V5.4 — Route Traffic + Departure Adjustment + Bunching & Gap
+# SG Transport Pulse V5.5 — Route Traffic + Departure Adjustment + Bunching & Gap
 
 Live bus positions, live LTA traffic drawn directly on the bus route, and next arrivals per stop.
 FastAPI backend + a single-page Leaflet frontend (OneMap basemap, OpenStreetMap fallback).
 
-## V5.4 - Bus Bunching & Headway Gap page (`/bunching`)
+## V5.5 - Bus Bunching & Headway Gap page (`/bunching`): bunching < 3 min, long headway = scheduled + 10 min, 15 stops
 
 A third page, built to the V1 spec. It only **detects and predicts**; it does not recommend interventions (that is a later layer).
 Header buttons link all three pages.
 
-**Engine (`bunching.py`, no I/O):** tracks every consecutive bus (stable ids B1, B2... between polls) -> computes the ETA of each bus at
-every downstream stop -> headway between neighbours at each stop -> projects it to NOW / +10 / +20 / +30 min -> counts how many
-**consecutive stops** the spacing stays <= 0.5 x scheduled HW.
+**Rules (all editable in Settings, no code change):**
 
-| State | Rule (all values editable in **Settings**) |
+| State | Rule |
 |---|---|
-| Developing gap (orange) | predicted HW >= 1.5 x scheduled |
-| Critical gap (red) | predicted HW >= 2.0 x scheduled |
-| Early warning / Developing bunching (yellow/orange) | spacing not yet bunched but predicted to fall <= 0.5 x scheduled |
-| Confirmed bunching (red) | spacing <= 0.5 x scheduled for **>= 10 consecutive stops** |
+| **Bunching** | headway between two consecutive buses **< 3 min** (absolute, not a fraction of scheduled headway; exactly 3.0 is not bunching) |
+| **Long headway (gap)** | headway **>= scheduled headway + 10 min** |
+| **Confirmed** | the state holds for **15 consecutive bus stops** (bunching and long headway each have their own stop count) |
+| Developing | in the state now but for fewer than 15 stops, or **predicted** to get into it within the horizon (early warning) |
 | 2BB / 3BB / 4BB+ | buses travelling as **one group**. A-B and B-C both bunched is reported once as **3BB**, never as two 2BBs |
-| Recovering / closed | spacing widens again; the event closes after 2 clean cycles (no flapping) |
+| Closed | the state ends; the event closes after 2 clean refreshes (no flapping) |
+
+**How it works (`bunching.py`, no I/O):** tracks every consecutive bus (stable ids B1, B2... between polls), estimates each bus's ETA at
+every downstream stop, takes the headway between neighbours at each stop, projects it to NOW / +10 / +20 / +30 min and counts the
+**consecutive stops** it stays in the state (stops already travelled since first seen + predicted stops ahead).
 
 **Risk ranking** (0-100) = gap severity 30% + bunching level 25% + persistence 20% + deterioration rate 15% + time-to-occur 10%
-(weights configurable). Red / Orange / Yellow / Green as in the spec section 17.
+(weights configurable). Gap severity is the minutes above scheduled headway, full at scheduled + 10 min. Red = confirmed bunching / confirmed
+long headway / a developing 3BB+; Orange = developing; Yellow = early drift; Green = normal.
+
+**Event log (Settings tab):** one row per event with **start time, end time, start bus stop, end bus stop, number of stops**, buses, peak
+level and min/max headway. **An event is logged only if it lasted at least 15 bus stops** (`confirm_stops` for bunching, `gap_stops` for long
+headway). Stops are counted from where the leading bus was when the state was **first seen** to where it was when it was **last seen**
+(predicted stops do not count), so a case that clears sooner is dropped and never appears in the log. Start and end time are the first and last
+refresh at which the state was seen. Open cases appear in the log (as "still on") only once they have reached 15 stops.
+* The start is where **this server first saw** the state. If the server restarted, or was asleep, while a bunch was already under way, counting
+  starts from when it woke - so that event can be logged with fewer stops than it really had, or not at all.
+* The collector only polls while someone has the page open (and for 10 min after). For an unattended log set `BUNCHING_ALWAYS_ON=1`
+  (uses more LTA quota; Render's free tier still sleeps when idle, so it needs a paid always-on instance to be truly unattended).
+  When the collector goes idle, open events are closed at the time they were last seen, so nothing is lost.
 
 **Scheduled headway:** the **Service Headway Master** (Settings -> upload CSV `service,direction,day_type,from,to,target_hw`) wins over
 LTA's BusServices dispatch-frequency band. The narrowest matching time window is used. No code change is needed to edit it.
@@ -50,8 +64,8 @@ if you want history. If the database is unavailable the page still works and say
 `POST /api/bunching/master/clear` - `GET /api/bunching/events?limit=100` (JSON; the page's Export button makes the CSV). Saving settings or the
 master needs `BUNCHING_ADMIN_TOKEN` (falls back to `TIMETABLE_TOKEN`) if one is set.
 
-**Phase-1 acceptance test (spec section 23)** is automated in `test_bunching.py`: Normal -> Developing -> Early warning -> Confirmed 2BB ->
-3BB upgrade -> Recovering -> event closed.
+**Phase-1 acceptance test (spec section 23)** is automated in `test_bunching.py` with the new numbers: Normal -> Early warning (predicted < 3 min) ->
+Developing -> Confirmed 2BB at 15 stops -> 3BB upgrade -> Recovering -> event closed and logged only if it reached 15 stops.
 
 ## V5.3 - All services, planned timetable, and "call the BC to slow down"
 
@@ -171,6 +185,7 @@ Run locally: `pip install -r requirements.txt` then `LTA_ACCOUNT_KEY=... uvicorn
 | `BUNCHING_SERVICES` | Default watch list for the Bunching page (default `32,145,65,33,51,74,89,200,27,157`) |
 | `BUNCHING_MAX_PAIRS` | Max bus pairs analysed per request (default 40) |
 | `BUNCHING_DB` | SQLite path for settings / headway master / event log (default `bunching.db`) |
+| `BUNCHING_ALWAYS_ON` | `1` = keep collecting when nobody has the Bunching page open (default: stop after 10 idle minutes) |
 | `BUNCHING_ADMIN_TOKEN` | If set, saving Bunching settings / master requires it (falls back to `TIMETABLE_TOKEN`) |
 | `DATA_GOV_SG_KEY` | Optional, only raises data.gov.sg rate limits for the Rain layer |
 

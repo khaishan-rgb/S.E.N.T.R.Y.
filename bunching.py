@@ -7,17 +7,19 @@ Data limits (LTA DataMall only): there is no bus registration, trip id, SCS reco
 position tracking (B1, B2 ...). Arrival estimates exist only at the sampled stops, so the ETA at every other stop is
 interpolated between them (and extrapolated past the last one with the traffic model). All of this is labelled in the UI.
 
-Headway at a stop = ETA(follower) - ETA(leader).      Bunched = headway <= bunch_thr x scheduled HW.
-Confirmed bunching = bunched now AND it stays bunched for >= confirm_stops consecutive stops (stops already travelled together
-since we first saw the pair + predicted stops ahead). Fewer stops = Developing. Not bunched yet but predicted to be = Early warning.
+Headway at a stop = ETA(follower) - ETA(leader).
+  Bunched      = headway  <  bunch_min minutes (default 3, absolute)           -> Confirmed after confirm_stops (15) consecutive stops
+  Long headway = headway  >= scheduled HW + gap_add_min (default +10 min)     -> Confirmed after gap_stops (15) consecutive stops
+Consecutive stops = stops already travelled in that state since we first saw it + predicted stops ahead. Fewer stops = Developing.
+Not in the state yet but predicted to be = Early warning (bunching) / Developing (gap).
 """
 import bisect
 
 PARAMS = {
-    "gap_warn": 1.5,        # developing gap: predicted HW >= 1.5 x scheduled
-    "gap_crit": 2.0,        # critical gap:   predicted HW >= 2.0 x scheduled
-    "bunch_thr": 0.5,       # bunched:        HW <= 0.5 x scheduled
-    "confirm_stops": 10,    # bunching must persist this many consecutive stops to be confirmed
+    "bunch_min": 3.0,       # bunched:        HW < 3 min (absolute)
+    "confirm_stops": 15,    # bunching must persist this many consecutive stops to be confirmed (and to be logged)
+    "gap_add_min": 10.0,    # long headway:   HW >= scheduled HW + 10 min
+    "gap_stops": 15,        # long headway must persist this many consecutive stops to be confirmed (and to be logged)
     "horizon_min": 30,      # prediction horizon
     "refresh_sec": 30,      # collector interval
     "w_gap": 30, "w_bunch": 25, "w_persist": 20, "w_deter": 15, "w_time": 10,      # risk-score weights (%)
@@ -34,7 +36,7 @@ class Tracker:
     """Stable bus ids between polls and memory of how long a pair has been bunched."""
 
     def __init__(self):
-        self.tracks, self.n, self.first = [], 0, {}
+        self.tracks, self.n, self.first, self.firstg = [], 0, {}, {}
 
     def update(self, ts, buses, total_km):
         used = set()
@@ -59,13 +61,23 @@ class Tracker:
     def prior(self):
         return dict(self.first)
 
-    def commit(self, pairs_now):
-        """pairs_now: {(leader_id, follower_id): leader's next-stop index} for pairs bunched right now."""
+    def prior_gap(self):
+        return dict(self.firstg)
+
+    def commit(self, pairs_now, long_now=None):
+        """pairs_now: {(leader_id, follower_id): leader's next-stop index} for pairs bunched right now.
+        long_now: same for pairs whose headway is long right now (None = leave the long-headway memory alone)."""
         for k, j in pairs_now.items():
             self.first.setdefault(k, j)
         for k in list(self.first):
             if k not in pairs_now:
                 del self.first[k]
+        if long_now is not None:
+            for k, j in long_now.items():
+                self.firstg.setdefault(k, j)
+            for k in list(self.firstg):
+                if k not in long_now:
+                    del self.firstg[k]
 
 
 # ----------------------------------------------------------------------------- ETA at every stop
@@ -135,40 +147,53 @@ def _r(x, n=1):
 
 
 # ----------------------------------------------------------------------------- one pair of consecutive buses
-def analyse_pair(lead, foll, ser, H, P, prior):
-    thr, warn, crit, hz = P["bunch_thr"] * H + EPS, P["gap_warn"] * H - EPS, P["gap_crit"] * H - EPS, P["horizon_min"]
+def analyse_pair(lead, foll, ser, H, P, prior, prior_gap=None):
+    thr, long_thr, hz = P["bunch_min"] - EPS, H + P["gap_add_min"] - EPS, P["horizon_min"]      # bunched: hw <= thr (i.e. < 3 min); long: hw >= long_thr
+    prior_gap = prior_gap or {}
     a = {"lead": lead["id"], "foll": foll["id"], "ok": bool(ser)}
     if not ser:
         return a
     hws = {h: _hw_at(ser, h) for h in HORIZONS if h <= hz}
     within = [x for x in ser if x[2] <= hz] or ser[:1]
     now = ser[0][1]
-    bunched_now = now <= thr
-    k0 = 0 if bunched_now else next((k for k, (j, hw, e) in enumerate(ser) if hw <= thr and e <= hz), None)
-    run = 0
-    if k0 is not None:
-        for j, hw, e in ser[k0:]:
-            if hw > thr:
-                break
-            run += 1
     key = (lead["id"], foll["id"])
+
+    def run_from(pred):
+        """(now?, first-index, consecutive stops from there) for hw satisfying pred, starting now or at the first predicted stop within the horizon."""
+        now_ok = pred(now)
+        k0 = 0 if now_ok else next((k for k, (j, hw, e) in enumerate(ser) if pred(hw) and e <= hz), None)
+        run = 0
+        if k0 is not None:
+            for j, hw, e in ser[k0:]:
+                if not pred(hw):
+                    break
+                run += 1
+        return now_ok, k0, run
+
+    bunched_now, k0, run = run_from(lambda v: v <= thr)
     travelled = max(0, lead["j0"] - prior[key]) if (bunched_now and key in prior) else 0
+    long_now, kg, run_g = run_from(lambda v: v >= long_thr)
+    travelled_g = max(0, lead["j0"] - prior_gap[key]) if (long_now and key in prior_gap) else 0
     mx = max(x[1] for x in within)
     vals = [v for v in hws.values() if v is not None]
     delta = vals[-1] - vals[0] if len(vals) > 1 else 0.0
+    if kg is None:
+        gap_state = None
+    else:
+        gap_state = "confirmed" if (long_now and run_g + travelled_g >= int(P["gap_stops"])) else "developing"
     a.update(now=now, hws=hws, bunched_now=bunched_now, run=run, travelled=travelled,
              start_j=ser[k0][0] if k0 is not None else None,
              t_bunch=0.0 if bunched_now else (ser[k0][2] if k0 is not None else None),
              min_hw=min(x[1] for x in within), max_hw=mx, max_ratio=mx / H, max_at=next(x[0] for x in within if x[1] == mx),
-             delta=delta, gap_state="critical" if mx >= crit else ("developing" if mx >= warn else None),
-             t_gap=0.0 if now >= warn else next((e for j, hw, e in within if hw >= warn), None),
-             smap={j: hw for j, hw, e in ser}, pct_gap=sum(1 for x in within if x[1] >= warn) / len(within))
+             delta=delta, gap_state=gap_state, long_now=long_now, gap_run=run_g, gap_travelled=travelled_g,
+             t_gap=0.0 if long_now else (ser[kg][2] if kg is not None else None),
+             smap={j: hw for j, hw, e in ser})
     return a
 
 
 # ----------------------------------------------------------------------------- groups (2BB / 3BB / 4BB+)
 def build_groups(vecs, pairs, P, H, names):
-    n, thr, N = len(vecs), P["bunch_thr"] * H + EPS, int(P["confirm_stops"])
+    n, thr, N = len(vecs), P["bunch_min"] - EPS, int(P["confirm_stops"])
     used = [False] * n
     groups = []
 
@@ -185,7 +210,9 @@ def build_groups(vecs, pairs, P, H, names):
     def mk(a, b, status, stops, t_occur, start_j=None):
         size = b - a + 1
         j = start_j if start_j is not None else vecs[a]["j0"]
-        return {"a": a, "b": b, "ids": [vecs[k]["id"] for k in range(a, b + 1)], "size": size, "label": f"{size}BB",
+        cur = vecs[a]["j0"]
+        first = max(0, cur - (0 if status == "early" else trav(a, b)))           # stop where this group was first seen bunched
+        return {"a": a, "b": b, "cur_j": cur, "since_j": first, "ids": [vecs[k]["id"] for k in range(a, b + 1)], "size": size, "label": f"{size}BB",
                 "bucket": "2BB" if size == 2 else "3BB" if size == 3 else "4BB+", "status": status, "stops": stops,
                 "min_hw": _r(min(pairs[i]["min_hw"] for i in range(a, b))), "hw_now": _r(min(pairs[i]["now"] for i in range(a, b))),
                 "t_occur": _r(t_occur), "joining": [], "near": vecs[a]["near"],
@@ -239,7 +266,7 @@ def _empty(ctx, H, note, n):
     return {"service": ctx["service"], "direction": ctx["direction"], "risk": "nodata", "score": 0, "n_buses": n, "sched_hw": H,
             "hw_src": ctx.get("H_src"), "issue": "No data", "note": note, "groups": [], "gaps": [], "seq": [], "bb": None, "gap": None,
             "hw": {}, "trend": None, "location": None, "t_occur": None, "traffic": None, "dist": {"now": [], "pred": []},
-            "counts": {"gaps": 0, "bb": 0, "bb2": 0, "bb3": 0, "bb4": 0, "early": 0}, "bunched_pairs": {}}
+            "counts": {"gaps": 0, "bb": 0, "bb2": 0, "bb3": 0, "bb4": 0, "early": 0}, "bunched_pairs": {}, "long_pairs": {}}
 
 
 def evaluate(ctx, P=None):
@@ -260,27 +287,38 @@ def evaluate(ctx, P=None):
         vecs.append({"id": b.get("id") or f"B{i + 1}", "order": i + 1, "s_km": b["s_km"], "vec": vec, "j0": j0, "near": b.get("near", ""),
                      "lat": b.get("lat"), "lon": b.get("lon"), "monitored": b.get("monitored", True), "load": b.get("load", "")})
     prior = ctx.get("prior") or {}
-    pairs = [analyse_pair(vecs[i], vecs[i + 1], pair_series(vecs[i], vecs[i + 1], n_st), H, P, prior) for i in range(len(vecs) - 1)]
+    prior_gap = ctx.get("prior_gap") or {}
+    pairs = [analyse_pair(vecs[i], vecs[i + 1], pair_series(vecs[i], vecs[i + 1], n_st), H, P, prior, prior_gap) for i in range(len(vecs) - 1)]
     if not any(p["ok"] for p in pairs):
         return _empty(ctx, H, "No arrival estimates overlap between consecutive buses yet.", len(bs))
     for p in pairs:
         if not p["ok"]:
-            p.update(now=None, hws={}, bunched_now=False, run=0, travelled=0, t_bunch=None, min_hw=0.0, smap={}, delta=0.0, gap_state=None)
+            p.update(now=None, hws={}, bunched_now=False, run=0, travelled=0, t_bunch=None, min_hw=0.0, smap={}, delta=0.0, gap_state=None, long_now=False, gap_run=0, gap_travelled=0)
     groups = build_groups(vecs, pairs, P, H, names)
+    labels = ctx.get("stop_labels") or names                                         # "Name (code)" for the event log, when known
+
+    def lab(j):
+        return labels[j] if 0 <= j < len(labels) else None
+    for g in groups:
+        g["since_stop"], g["cur_stop"] = lab(g["since_j"]), lab(g["cur_j"])
     trend_thr = max(1.0, 0.1 * H)
 
     gaps = []
     for i, p in enumerate(pairs):
         if p.get("gap_state"):
             tr = "widening" if p["delta"] >= trend_thr else "recovering" if p["delta"] <= -trend_thr else "stable"
+            cur = vecs[i]["j0"]
+            since = max(0, cur - p["gap_travelled"])
             gaps.append({"lead": p["lead"], "foll": p["foll"], "order": i + 1, "now": _r(p["now"]), "max_hw": _r(p["max_hw"]), "ratio": round(p["max_ratio"], 2),
                          "state": p["gap_state"], "t_occur": _r(p["t_gap"]), "trend": tr, "hws": {str(k): _r(v) for k, v in p["hws"].items()},
+                         "stops": p["gap_run"] + p["gap_travelled"] if p["long_now"] else 0, "active": bool(p["long_now"]), "cur_j": cur, "since_j": since,
+                         "since_stop": lab(since), "cur_stop": lab(cur),
                          "location": names[p["max_at"]] if 0 <= p["max_at"] < len(names) else vecs[i]["near"], "i": i})
 
     conf = [g for g in groups if g["status"] == "confirmed"]
     devn = [g for g in groups if g["status"] == "developing"]
     early = [g for g in groups if g["status"] == "early"]
-    crit_gap = [g for g in gaps if g["state"] == "critical"]
+    crit_gap = [g for g in gaps if g["state"] == "confirmed"]
     dev_gap = [g for g in gaps if g["state"] == "developing"]
     yellow = any(p["ok"] and ((min([v for v in p["hws"].values() if v is not None] or [H]) <= P["yellow_conv"] * H and p["delta"] < 0) or
                               (max([v for v in p["hws"].values() if v is not None] or [H]) >= P["yellow_div"] * H and p["delta"] > 0)) for p in pairs)
@@ -318,15 +356,15 @@ def evaluate(ctx, P=None):
     t_occur = min(ts) if ts else None
 
     # risk score 0-100 (weights configurable)
-    r_gap = max([g["ratio"] for g in gaps] or [max(p["max_ratio"] for p in pairs if p["ok"])])
-    c_gap = max(0.0, min(1.0, (r_gap - 1) / max(0.01, P["gap_crit"] - 1)))
+    x_gap = max([g["max_hw"] - H for g in gaps] or [max(p["max_hw"] - H for p in pairs if p["ok"])])       # minutes above scheduled HW
+    c_gap = max(0.0, min(1.0, x_gap / max(0.01, P["gap_add_min"])))                                          # 1.0 at scheduled + gap_add_min
     sev = {"confirmed": 1.0, "developing": 0.6, "early": 0.4}
     c_bunch = max([min(1.0, (g["size"] - 1) / 3) * sev[g["status"]] for g in groups] or [0.0])
-    c_pers = max([min(1.0, g["stops"] / max(1, P["confirm_stops"])) for g in groups if g["status"] != "early"] + [max(p.get("pct_gap", 0) for p in pairs if p["ok"]) if gaps else 0.0])
+    c_pers = max([min(1.0, g["stops"] / max(1, P["confirm_stops"])) for g in groups if g["status"] != "early"] + [min(1.0, g["stops"] / max(1, P["gap_stops"])) for g in gaps] + [0.0])
     c_det = 0.0
     for p in pairs:
         if p["ok"]:
-            c_det = max(c_det, min(1.0, max(-p["delta"] if p["min_hw"] <= P["bunch_thr"] * H * 1.6 else 0, p["delta"] if p["max_hw"] >= H else 0) / H))
+            c_det = max(c_det, min(1.0, max(-p["delta"] if p["min_hw"] <= P["bunch_min"] * 1.6 else 0, p["delta"] if p["max_hw"] >= H else 0) / H))
     c_time = 1 - min(t_occur, P["horizon_min"]) / P["horizon_min"] if t_occur is not None else 0.0
     W = [P["w_gap"], P["w_bunch"], P["w_persist"], P["w_deter"], P["w_time"]]
     score = round(100 * sum(w * c for w, c in zip(W, [c_gap, c_bunch, c_pers, c_det, c_time])) / max(1e-9, sum(W)))
@@ -385,4 +423,5 @@ def evaluate(ctx, P=None):
             "hw": fhw, "focus": {"lead": fp["lead"], "foll": fp["foll"]}, "trend": trend, "location": location, "t_occur": _r(t_occur),
             "traffic": traffic, "dist": {"now": dnow, "pred": dpred}, "counts": cnt,
             "bunched_pairs": {(p["lead"], p["foll"]): vecs[i]["j0"] for i, p in enumerate(pairs) if p.get("bunched_now")},
+            "long_pairs": {(p["lead"], p["foll"]): vecs[i]["j0"] for i, p in enumerate(pairs) if p.get("long_now")},
             "score_parts": {"gap": round(c_gap, 2), "bunch": round(c_bunch, 2), "persist": round(c_pers, 2), "deter": round(c_det, 2), "time": round(c_time, 2)}}

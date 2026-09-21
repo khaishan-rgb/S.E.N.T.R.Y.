@@ -139,10 +139,10 @@ tbody tr{cursor:pointer}tbody tr:hover{background:#0d2440}tbody tr.sel{backgroun
     <section class="card" style="margin-top:12px"><header><div><h2>Service Headway Master</h2><div class="sub">Scheduled headway by service, direction, day type and time. Overrides LTA's frequency band when a row matches (narrowest time window wins).</div></div>
       <div><button class="btn sm" id="mTpl" type="button">Template</button> <button class="btn sm go" id="mUp" type="button">Upload CSV</button> <button class="btn sm" id="mClr" type="button">Clear</button><input id="mFile" type="file" accept=".csv,.tsv,.txt" hidden></div></header>
       <div class="tw" id="master"></div><div class="sub" id="mNote"></div></section>
-    <section class="card" style="margin-top:12px"><header><div><h2>Event log</h2><div class="sub">Confirmed bunching (bunching_event) and gaps (gap_event). Kept in a small SQLite file on the server.</div></div><button class="btn sm" id="evExport" type="button">Export CSV</button></header><div class="tw" id="events"></div></section>
+    <section class="card" style="margin-top:12px"><header><div><h2>Event log</h2><div class="sub" id="evSub">Bunching and long-headway events, logged only when they last long enough.</div></div><button class="btn sm" id="evExport" type="button">Export CSV</button></header><div class="tw" id="events"></div></section>
   </main>
 
-  <footer class="foot"><span>Sources: LTA DataMall (Bus Arrival, Bus Routes/Stops/Services, Traffic Speed Bands, Incidents), OneMap &nbsp;|&nbsp; Decision support only, not for operational use</span><span>SG Transport Pulse V5.4</span></footer>
+  <footer class="foot"><span>Sources: LTA DataMall (Bus Arrival, Bus Routes/Stops/Services, Traffic Speed Bands, Incidents), OneMap &nbsp;|&nbsp; Decision support only, not for operational use</span><span>SG Transport Pulse V5.5</span></footer>
 </div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -170,12 +170,12 @@ async function post(url, body){
 }
 
 /* ------------------------------------------------------------------ helpers */
-const P = () => (S.data && S.data.params) || {gap_warn:1.5, gap_crit:2, bunch_thr:.5, confirm_stops:10, horizon_min:30};
-function hwCls(v, H){ if(v == null || !H) return ""; const p = P(); return v <= p.bunch_thr * H + 1e-6 || v >= p.gap_crit * H - 1e-6 ? "c-red" : v >= p.gap_warn * H - 1e-6 ? "c-amb" : ""; }
+const P = () => (S.data && S.data.params) || {bunch_min:3, confirm_stops:15, gap_add_min:10, gap_stops:15, horizon_min:30};
+function hwCls(v, H){ if(v == null || !H) return ""; const p = P(); return v < p.bunch_min - 1e-6 || v >= H + p.gap_add_min - 1e-6 ? "c-red" : ""; }
 const tOcc = t => t == null ? "\u2013" : t <= 0 ? "Now" : Math.round(t) + " min";
 function spark(r){
   const H = r.sched_hw, v = ["0", "10", "20", "30"].map(k => r.hw && r.hw[k]); if(!H) return "";
-  return `<span class="bar4" title="HW now / +10 / +20 / +30: ${v.map(x => x == null ? "-" : f1(x)).join(" / ")}">${v.map(x => { const h = x == null ? 3 : Math.max(3, Math.min(18, Math.round(18 * x / (2 * H)))); const c = x == null ? "#3a5670" : x <= P().bunch_thr * H + 1e-6 ? "#ff4d55" : x >= P().gap_crit * H - 1e-6 ? "#ff4d55" : x >= P().gap_warn * H ? "#ff9f1c" : "#22d36a"; return `<i style="height:${h}px;background:${c}"></i>`; }).join("")}</span>`;
+  return `<span class="bar4" title="HW now / +10 / +20 / +30: ${v.map(x => x == null ? "-" : f1(x)).join(" / ")}">${v.map(x => { const h = x == null ? 3 : Math.max(3, Math.min(18, Math.round(18 * x / (2 * H)))); const c = x == null ? "#3a5670" : x < P().bunch_min - 1e-6 || x >= H + P().gap_add_min - 1e-6 ? "#ff4d55" : "#22d36a"; return `<i style="height:${h}px;background:${c}"></i>`; }).join("")}</span>`;
 }
 const TREND = {converging:"\u2198 converging", separating:"\u2197 separating", widening:"\u2197 widening", recovering:"\u2198 recovering", stable:"\u2192 stable"};
 function bbCell(r){
@@ -196,7 +196,7 @@ function visibleRows(){
     if(r.t_occur != null && r.risk !== "nodata" && r.risk !== "green" && r.risk !== "yellow" && r.t_occur > S.win) return false;
     return true;
   });
-  const key = {risk:r => [RNK[r.risk], -r.score], time:r => [r.t_occur == null ? 999 : r.t_occur, RNK[r.risk]], svc:r => [/^\d+$/.test(r.service) ? +r.service : 1e6, r.direction], gap:r => [-(r.gap ? r.gap.ratio : (r.hw && r.hw["0"] && r.sched_hw ? r.hw["0"] / r.sched_hw : 0)), RNK[r.risk]]}[S.sort];
+  const key = {risk:r => [RNK[r.risk], -r.score], time:r => [r.t_occur == null ? 999 : r.t_occur, RNK[r.risk]], svc:r => [/^\d+$/.test(r.service) ? +r.service : 1e6, r.direction], gap:r => [-(r.gap ? r.gap.max_hw - r.sched_hw : (r.hw && r.hw["0"] && r.sched_hw ? r.hw["0"] - r.sched_hw : -99)), RNK[r.risk]]}[S.sort];
   return rows.sort((a, b) => { const x = key(a), y = key(b); for(let i = 0; i < x.length; i++) if(x[i] !== y[i]) return x[i] < y[i] ? -1 : 1; return 0; });
 }
 function busRows(rows){ const out = []; rows.forEach(r => (r.seq || []).forEach(s => out.push({r, s}))); const o = {Bunched:0, Leading:0, Joining:1, Converging:1, Gap:2, Normal:3}; return out.sort((a, b) => (RNK[a.r.risk] - RNK[b.r.risk]) || (o[a.s.status] - o[b.s.status])); }
@@ -206,7 +206,7 @@ function renderKpis(){
   const k = S.data ? S.data.kpi : null, v = x => k ? x : "\u2013";
   const dl = key => { if(!k) return ""; if(!k.prev) return `<div class="d na">vs 30 min: history builds (${f1(k.history_min)} min so far)</div>`; const d = k[key] - k.prev[key]; return `<div class="d ${d > 0 ? "up" : d < 0 ? "dn" : "flat"}">${d > 0 ? "\u2191" : d < 0 ? "\u2193" : "\u2192"} ${Math.abs(d)} vs 30 min ago</div>`; };
   $("kpis").innerHTML = `
-   <div class="kpi gap"><div class="n">${v(k && k.gaps)}</div><div><b>Headway Gaps</b><span>&ge; ${P().gap_warn}&times; scheduled (developing) / ${P().gap_crit}&times; critical</span>${dl("gaps")}</div></div>
+   <div class="kpi gap"><div class="n">${v(k && k.gaps)}</div><div><b>Headway Gaps</b><span>long headway: scheduled + ${P().gap_add_min} min for ${P().gap_stops} stops</span>${dl("gaps")}</div></div>
    <div class="kpi bb"><div class="n">${v(k && k.bb)}</div><div><b>Bunching Cases</b><span>&ge; 2 buses${k && k.early ? ` &bull; +${k.early} early warning${k.early > 1 ? "s" : ""}` : ""}</span>${dl("bb")}</div></div>
    <div class="kpi"><div class="n">${v(k && k.bb2)}</div><div><b>2BB cases</b>${dl("bb2")}</div></div>
    <div class="kpi"><div class="n">${v(k && k.bb3)}</div><div><b>3BB cases</b>${dl("bb3")}</div></div>
@@ -276,7 +276,7 @@ function renderInsight(){
   $("inSub").textContent = `${r.n_buses} buses \u2022 scheduled HW ${f1(H)} min (${r.hw_src || "unknown"})`;
   const kv = [["Issue", issueCell(r)], ["Risk", `${RNAME[r.risk]} (score ${r.score}/100)`]];
   if(r.bb) kv.push(["Bunching", `${esc(r.bb.label)} \u2022 ${r.bb.status}${r.bb.status !== "early" ? ` \u2022 ${r.bb.stops} consecutive stops` : ""} \u2022 min HW ${f1(r.bb.min_hw)} min`], ["Where", esc(r.bb.location)]);
-  if(r.gap) kv.push(["Gap", `${f1(r.gap.now)} min now, up to ${f1(r.gap.max_hw)} min (${r.gap.ratio}\u00d7) \u2022 ${r.gap.state} \u2022 ${r.gap.trend}`], ["Where", esc(r.gap.location)]);
+  if(r.gap) kv.push(["Gap", `${f1(r.gap.now)} min now, up to ${f1(r.gap.max_hw)} min (${r.gap.max_hw >= H ? "+" : "\u2212"}${f1(Math.abs(r.gap.max_hw - H))} vs scheduled) \u2022 ${r.gap.state}${r.gap.stops ? ` \u2022 ${r.gap.stops} consecutive stops` : ""} \u2022 ${r.gap.trend}`], ["Where", esc(r.gap.location)]);
   kv.push(["Time to occur", tOcc(r.t_occur)]); if(r.note) kv.push(["Note", esc(r.note)]);
   $("inKv").innerHTML = kv.map(([a, b]) => `<span>${a}</span><span>${b}</span>`).join("");
   const h = r.hw || {}; $("inPath").innerHTML = ["0", "10", "20", "30"].map(k => `<div><b class="${hwCls(h[k], H)}">${f1(h[k])}</b><small>${k === "0" ? "NOW" : "+" + k + " min"}</small></div>`).join("") + `<div><b>${f1(H)}</b><small>Scheduled</small></div>`;
@@ -304,7 +304,7 @@ function renderDist(r){
   s += `<text x="${W / 2}" y="${Hh - 4}" text-anchor="middle" font-size="10" fill="#8ba3bd">Headway (min)</text></svg>`;
   const pct = (a, f) => a.length ? Math.round(100 * a.filter(f).length / a.length) : null, avg = now.length ? now.reduce((a, b) => a + b, 0) / now.length : null;
   $("dist").innerHTML = s + `<div class="sub"><span style="color:#3c8dff">&#9632;</span> Current &nbsp;<span style="color:#ff5c93">&#9632;</span> Predicted (next 30 min) &nbsp;&bull; dashed = scheduled ${f1(H)} min</div>
-   <div class="stat3"><div><b>${pct(now, v => v < H / 2) == null ? "\u2013" : pct(now, v => v < H / 2) + "%"}</b><small>Intervals &lt; &frac12; HW</small></div><div><b>${pct(now, v => v > 2 * H) == null ? "\u2013" : pct(now, v => v > 2 * H) + "%"}</b><small>Intervals &gt; 2&times; HW</small></div><div><b>${f1(avg)}</b><small>Avg headway (min)</small></div></div>`;
+   <div class="stat3"><div><b>${pct(now, v => v < P().bunch_min - 1e-6) == null ? "\u2013" : pct(now, v => v < P().bunch_min - 1e-6) + "%"}</b><small>Intervals &lt; ${P().bunch_min} min (bunched)</small></div><div><b>${pct(now, v => v >= H + P().gap_add_min - 1e-6) == null ? "\u2013" : pct(now, v => v >= H + P().gap_add_min - 1e-6) + "%"}</b><small>Intervals &ge; scheduled + ${P().gap_add_min} min</small></div><div><b>${f1(avg)}</b><small>Avg headway (min)</small></div></div>`;
 }
 
 /* ------------------------------------------------------------------ map */
@@ -364,7 +364,7 @@ function addSvc(v){ v = (v || "").trim().toUpperCase(); if(!v) return; if(!/^[0-
 function syncSegs(){ document.querySelectorAll("#dirSeg button").forEach(b => b.setAttribute("aria-pressed", +b.dataset.d === S.dir)); document.querySelectorAll("#viewSeg button").forEach(b => b.setAttribute("aria-pressed", b.dataset.v === S.view)); document.querySelectorAll("#issueSeg button").forEach(b => b.setAttribute("aria-pressed", b.dataset.i === S.issue)); document.querySelectorAll(".sorts button[data-s]").forEach(b => b.setAttribute("aria-pressed", b.dataset.s === S.sort)); $("win").value = String(S.win); }
 
 /* ------------------------------------------------------------------ settings tab */
-const PLAB = {gap_warn:["Gap warning", "\u00d7 scheduled HW"], gap_crit:["Gap critical", "\u00d7 scheduled HW"], bunch_thr:["Bunching threshold", "\u00d7 scheduled HW (\u2264)"], confirm_stops:["Confirm bunching after", "consecutive stops"], horizon_min:["Prediction horizon", "min"], refresh_sec:["Refresh interval", "sec"],
+const PLAB = {bunch_min:["Bunching: headway below", "min (absolute)"], confirm_stops:["Bunching: confirm and log after", "consecutive stops"], gap_add_min:["Long headway: scheduled HW plus", "min"], gap_stops:["Long headway: confirm and log after", "consecutive stops"], horizon_min:["Prediction horizon", "min"], refresh_sec:["Refresh interval", "sec"],
   w_gap:["Risk weight: gap severity", "%"], w_bunch:["Risk weight: bunching level", "%"], w_persist:["Risk weight: persistence", "%"], w_deter:["Risk weight: deterioration", "%"], w_time:["Risk weight: time to occur", "%"], yellow_conv:["Yellow: converging below", "\u00d7 scheduled HW"], yellow_div:["Yellow: widening above", "\u00d7 scheduled HW"]};
 async function loadSettings(){
   const j = await getJSON("/api/bunching/settings", 20000); if(j.error){ $("params").innerHTML = `<div class="msg bad">${esc(j.error)}</div>`; return; }
@@ -373,7 +373,9 @@ async function loadSettings(){
   const m = j.master; $("master").innerHTML = m.length ? `<table><thead><tr><th>Service</th><th>Dir</th><th>Day type</th><th>From</th><th>To</th><th>Target HW (min)</th></tr></thead><tbody>${m.map(r => `<tr><td class="svc">${esc(r.service)}</td><td>${r.direction}</td><td>${esc(r.day_type)}</td><td>${esc(r.from)}</td><td>${esc(r.to)}</td><td>${f1(r.hw)}</td></tr>`).join("")}</tbody></table>` : `<div class="empty">No rows. LTA's dispatch-frequency band is used (midpoint) for every service.</div>`;
   $("mNote").textContent = `Today is a ${j.dayType}. Columns: service, direction (1/2), day_type (Weekday/Saturday/Sunday/All), from, to (HH:MM), target_hw.${j.tokenRequired ? " Admin token required to change settings." : ""}`;
   const ev = await getJSON("/api/bunching/events?limit=100", 20000), fmt = ts => ts ? sgt({day:"2-digit", month:"short", hour:"2-digit", minute:"2-digit"}).format(new Date(ts * 1000)) : "\u2013"; S.events = ev.events || [];
-  $("events").innerHTML = S.events.length ? `<table><thead><tr><th>Type</th><th>Service</th><th>Dir</th><th>Start</th><th>End</th><th>Buses</th><th>Level / peak</th><th>Stops</th><th>Min / max HW</th><th>Location</th></tr></thead><tbody>${S.events.map(e => `<tr><td>${e.kind === "bb" ? "Bunching" : "Gap"}${e.open ? " <span class='tag dev'>open</span>" : ""}</td><td class="svc">${esc(e.service)}</td><td>${e.direction}</td><td>${fmt(e.start)}</td><td>${fmt(e.end)}</td><td>${esc(Array.isArray(e.buses) ? e.buses.join(",") : e.buses)}</td><td>${e.level ? e.level + "BB" : ""}</td><td>${e.stops == null ? "" : e.stops}</td><td>${f1(e.min_hw != null ? e.min_hw : e.max_hw)}</td><td>${esc(e.location || "")}</td></tr>`).join("")}</tbody></table>` : `<div class="empty">No events yet. A bunching event is logged once a group is confirmed (10+ stops) and closed 2 refreshes after it clears.</div>`;
+  const pp = j.params, full = ts => ts ? sgt({day:"2-digit", month:"short", hour:"2-digit", minute:"2-digit", second:"2-digit"}).format(new Date(ts * 1000)) : "\u2013";
+  $("evSub").textContent = `Logged only if it lasts at least ${pp.confirm_stops} bus stops (bunching: headway below ${pp.bunch_min} min) or ${pp.gap_stops} bus stops (long headway: scheduled + ${pp.gap_add_min} min). Shorter cases are not logged. Kept in a small SQLite file on the server.`;
+  $("events").innerHTML = S.events.length ? `<table><thead><tr><th>Type</th><th>Service</th><th>Dir</th><th>Start time</th><th>End time</th><th>Start bus stop</th><th>End bus stop</th><th>No. of stops</th><th>Buses</th><th>Level</th><th>Min / max HW</th></tr></thead><tbody>${S.events.map(e => `<tr><td>${e.kind === "bb" ? "Bunching" : "Long headway"}${e.open ? " <span class='tag dev'>open</span>" : ""}</td><td class="svc">${esc(e.service)}</td><td>${e.direction}</td><td>${full(e.start)}</td><td>${e.open ? "still on" : full(e.end)}</td><td>${esc(e.start_stop || "")}</td><td>${esc(e.end_stop || "")}</td><td>${e.stops == null ? "" : e.stops}</td><td>${esc(Array.isArray(e.buses) ? e.buses.join(",") : e.buses)}</td><td>${e.level ? e.level + "BB" : ""}</td><td>${f1(e.min_hw != null ? e.min_hw : e.max_hw)}</td></tr>`).join("")}</tbody></table>` : `<div class="empty">No events yet. Bunching (headway below ${pp.bunch_min} min) is logged once it has lasted ${pp.confirm_stops} bus stops; long headway (scheduled + ${pp.gap_add_min} min) once it has lasted ${pp.gap_stops} bus stops. It is closed 2 refreshes after it clears.</div>`;
 }
 function csvDownload(name, rows){ const csv = rows.map(r => r.map(v => { v = v == null ? "" : String(v); return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; }).join(",")).join("\n"); const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([csv], {type:"text/csv"})); a.download = name; document.body.appendChild(a); a.click(); a.remove(); }
 
@@ -406,7 +408,7 @@ $("mUp").onclick = () => $("mFile").click();
 $("mFile").onchange = async e => { const f = e.target.files[0]; e.target.value = ""; if(!f) return; const j = await post("/api/bunching/master", await f.text()); if(j.error){ toast(j.error); return; } toast(`Loaded ${j.rows} rows${j.errors && j.errors.length ? " (" + j.errors.length + " skipped)" : ""}`); loadSettings(); };
 $("mClr").onclick = async () => { const j = await post("/api/bunching/master/clear", ""); if(j.error){ toast(j.error); return; } toast("Service Headway Master cleared"); loadSettings(); };
 $("mTpl").onclick = () => csvDownload("service_headway_master_template.csv", [["service", "direction", "day_type", "from", "to", "target_hw"], ["32", "1", "Weekday", "07:00", "09:00", "10"], ["32", "1", "Weekday", "09:00", "16:00", "12"], ["32", "2", "Weekday", "07:00", "09:00", "10"]]);
-$("evExport").onclick = () => { const ev = S.events || []; if(!ev.length){ toast("No events to export"); return; } csvDownload("bunching-gap-events.csv", [["type", "service", "dir", "start", "end", "buses", "level", "stops", "min_hw", "max_hw", "location"], ...ev.map(e => [e.kind, e.service, e.direction, e.start && new Date(e.start * 1000).toISOString(), e.end && new Date(e.end * 1000).toISOString(), Array.isArray(e.buses) ? e.buses.join(" ") : e.buses, e.level, e.stops, e.kind === "bb" ? e.min_hw : "", e.max_hw, e.location])]); };
+$("evExport").onclick = () => { const ev = S.events || []; if(!ev.length){ toast("No events to export"); return; } const t = ts => ts ? sgt({year:"numeric", month:"2-digit", day:"2-digit", hour:"2-digit", minute:"2-digit", second:"2-digit"}).format(new Date(ts * 1000)) : ""; csvDownload("bunching-gap-events.csv", [["type", "service", "dir", "start_time_sgt", "end_time_sgt", "start_bus_stop", "end_bus_stop", "no_of_stops", "buses", "level", "min_hw", "max_hw"], ...ev.map(e => [e.kind === "bb" ? "bunching" : "long_headway", e.service, e.direction, t(e.start), e.open ? "open" : t(e.end), e.start_stop, e.end_stop, e.stops, Array.isArray(e.buses) ? e.buses.join(" ") : e.buses, e.level ? e.level + "BB" : "", e.kind === "bb" ? e.min_hw : "", e.max_hw])]); };
 
 /* start */
 (async () => {

@@ -15,3 +15,5 @@ services:
         sync: false
       - key: BUNCHING_SERVICES    # optional: default watch list, e.g. 32,145,65
         sync: false
+      - key: BUNCHING_ALWAYS_ON   # optional: 1 = keep collecting when nobody has the page open (needed for an unattended event log; uses more LTA quota)
+        sync: false
