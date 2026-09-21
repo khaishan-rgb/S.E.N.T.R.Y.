@@ -17,13 +17,14 @@ Score (spec section 16) = regularity benefit + max-gap reduction + recovery-time
 configurable weights; "Balanced", "Faster recovery" and "Minimise mileage" re-weight it. A halfway stop that would create bunching (a headway below the
 bunching limit that the baseline does not have) is rejected: the target is even spacing, not just another bus in the gap.
 
-"Affected headways" = the consecutive headways among the trips in the window (`reg_window` trips either side of the disrupted one, plus the replacement).
+"Affected headways" = the consecutive headways among the trips in the window (`reg_window` trips either side of the disrupted one, plus the replacement). The AVERAGE
+(and EWT) is taken over the 2 trips either side only, so a wide window does not dilute it; max / min / RMS / counts use the whole window so the side effects of a wide ramp show.
 Recovery time = how long the irregular headways last (from the start of the first to the end of the last headway outside +/- tol of scheduled), measured at
 the halfway stop (at stop 2 for "regulate only"). If the simulated trips end on an irregular headway it is "not recovered". EWT is a simulated penalty, not LTA's.
 """
 import math
 
-MODEL_VERSION = "halfway-3.0"
+MODEL_VERSION = "halfway-4.0"
 EPS = 1e-6
 
 PARAMS = {
@@ -34,7 +35,8 @@ PARAMS = {
     # ---- regulation (options B and D)
     "reg_hold_max": 5.0,         # a trip may be held at most this many min beyond its scheduled departure
     "reg_early_max": 3.0,        # ... or released at most this many min before it (never before arrival + minimum layover)
-    "reg_window": 2,             # trips either side of the disrupted trip that may be regulated (and that count as "affected")
+    "reg_window": 5,             # trips either side of the disrupted trip that may be regulated (and that count as "affected"). 5 or more lets the AI ramp the
+                                 # correction over many trips (each held / released by a little) instead of shocking the two nearest ones
     "min_dep_gap": 2.0,          # minimum gap between two consecutive departures at the first stop
     "start_early_max": 5.0,      # option D: the replacement may start this many min earlier than the disrupted trip's scheduled time ...
     "start_late_max": 10.0,      # ... or this many min later (the AI picks the start that evens the headways)
@@ -194,14 +196,21 @@ def propagate(deps, tau, H, beta, join=None):
     return T
 
 
+def _tsd(T):
+    """{trip id: [time at each stop or None]} rounded to 0.1 min (JSON-friendly: keys are strings)."""
+    return {str(k): [None if x is None else round(x, 1) for x in v] for k, v in T.items()}
+
+
 def _gaps(times):
     ts = sorted(times)
     return [ts[i + 1] - ts[i] for i in range(len(ts) - 1)]
 
 
-def _stop_rec(T, j, aff_ids):
+def _stop_rec(T, j, aff_ids, core_ids=None):
+    """(headways among the regulated window, headways among all active trips, headways among the core trips next to the gap)."""
     active = [T[t][j] for t in T if T[t][j] is not None]
-    return _gaps([T[t][j] for t in aff_ids if t in T and T[t][j] is not None]), _gaps(active)
+    core = aff_ids if core_ids is None else core_ids
+    return (_gaps([T[t][j] for t in aff_ids if t in T and T[t][j] is not None]), _gaps(active), _gaps([T[t][j] for t in core if t in T and T[t][j] is not None]))
 
 
 def _ewt(gaps, H):
@@ -217,10 +226,14 @@ def _metrics(recs, H, bm):
     """recs: [(affected gaps, all gaps)] per stop of the comparison section."""
     aff = [r[0] for r in recs]
     pooled = [g for a in aff for g in a]
+    core = [r[2] for r in recs]
+    cpool = [g for a in core for g in a]
     worst = [max(a) for a in aff]
     allmin = [min(r[1]) for r in recs if r[1]]
-    return {"avg": _r(_mean(pooled), 2), "max": _r(max(pooled), 2), "min": _r(min(pooled), 2),
-            "rms": _r(math.sqrt(_mean([(g - H) ** 2 for g in pooled])), 3), "ewt": _r(_mean([_ewt(a, H) for a in aff]), 3),
+    # avg / EWT: the headways around the gap (2 trips either side + the replacement), so a wide regulation window does not dilute them with normal headways;
+    # max / min / rms / % counts / bunching: every headway inside the regulated window, so the side effects of a wide ramp are counted
+    return {"avg": _r(_mean(cpool), 2), "max": _r(max(pooled), 2), "min": _r(min(pooled), 2),
+            "rms": _r(math.sqrt(_mean([(g - H) ** 2 for g in pooled])), 3), "ewt": _r(_mean([_ewt(a, H) for a in core]), 3),
             "pct_ge_1_5": _r(100.0 * sum(1 for w in worst if w >= 1.5 * H - EPS) / len(worst), 1),
             "pct_ge_2": _r(100.0 * sum(1 for w in worst if w >= 2.0 * H - EPS) / len(worst), 1),
             "pct_le_half": _r(100.0 * sum(1 for g in pooled if g <= 0.5 * H + EPS) / len(pooled), 1),
@@ -271,7 +284,8 @@ def simulate(ctx):
         join = None if j is None else {"id": "R", "j": j, "t": rv + tau[j]}
         T = propagate(list(deps.items()), tau, H, beta, join)
         aff_ids = win + (["R"] if j is not None else [])
-        return T, [_stop_rec(T, jj, aff_ids) for jj in range(n_st)]
+        core_ids = [i for i in win if abs(i - d) <= 2] + (["R"] if j is not None else [])
+        return T, [_stop_rec(T, jj, aff_ids, core_ids) for jj in range(n_st)]
 
     TA, recA = run(u)
     dev2A = [_dev2(r[0], H) for r in recA]
@@ -288,7 +302,8 @@ def simulate(ctx):
         sect = range(start, n_st)
         ma, mb = _metrics([recA[jj] for jj in sect], H, bm), _metrics([recs[jj] for jj in sect], H, bm)
         rec_a, rec_b = _recovery(TA, start, H, P), _recovery(T, start, H, P)
-        opt = {"kind": kind, "label": label, "j": j, "code": cand.get("code") if cand else None, "name": cand.get("name") if cand else None, "seq": cand.get("seq") if cand else None,
+        opt = {"kind": kind, "label": label, "tsd": _tsd(T), "reg_trips": sum(1 for i in deps if abs(deps[i] - u[i]) >= 0.5) + (1 if (rv is not None and abs(rv - sd_d - P["start_delay_min"]) >= 0.5) else 0),
+               "j": j, "code": cand.get("code") if cand else None, "name": cand.get("name") if cand else None, "seq": cand.get("seq") if cand else None,
                "approved": cand.get("approved", True) if cand else True, "regulated": kind in ("regulate", "halfway_reg"), "violations": [], "warnings": [],
                "hold_min": _r(hold, 1), "metrics_a": ma, "metrics": mb, "recovery_a": _r(rec_a, 1), "recovery": _r(rec_b, 1),
                "deps": [{"n": i, "dep": deps[i], "shift": _r(deps[i] - u[i], 1)} for i in sorted(deps)], "r_shift": None, "start_time": None, "sch_time": None}
@@ -329,7 +344,7 @@ def simulate(ctx):
             "regularity": _clip(reg_gain, -1, 1),
             "maxgap": _clip((ma["max"] - mb["max"]) / max(maxA_total, EPS), -1, 1),
             "recovery": _clip((ra - rb) / ra, -1, 1) if ra > EPS else 0.0,
-            "holding": _clip(hold / (max(P["reg_hold_max"], 1.0) * max(1, len(win))), 0, 1) if kind in ("regulate", "halfway_reg") else 0.0,
+            "holding": _clip(hold / (max(P["reg_hold_max"], 1.0) * 4.0), 0, 1) if kind in ("regulate", "halfway_reg") else 0.0,
             "mileage": _clip(opt["skipped_km"] / max(P["max_mileage_km"], EPS), 0, 1),
             "bunching": _clip((frac(mb) - frac(ma)) / 0.25, 0, 1),
         }
@@ -373,6 +388,9 @@ def simulate(ctx):
     monitor = [{"j": j, "name": names[j] if j < len(names) else "", "seq": seqs[j] if j < len(seqs) else j + 1, "terminal": j == n_st - 1} for j in mon]
     out.update(options=options, recommended=(options.index(best) if best is not None else None), message=msg, monitor=monitor, baseline=baseline,
                gap_min=_r(u[d + 1] - u[d - 1], 1), window=win)
+    baseline["tsd"] = _tsd(TA)
+    baseline["dis_path"] = [round(sd_d + t, 1) for t in tau]            # where the lost trip WOULD have been (its scheduled first-stop time + running times)
+    baseline["u"] = {str(i): round(u[i], 1) for i in u}
     return out
 
 
