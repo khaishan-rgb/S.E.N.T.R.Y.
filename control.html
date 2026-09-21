@@ -32,10 +32,10 @@ a{color:var(--cyan);text-decoration:none}
 .brand h1{margin:0;font-size:26px;font-weight:800;letter-spacing:-.4px;line-height:1.05}
 .brand p{margin:3px 0 0;color:var(--mut);font-size:14px}
 .brand p i{display:inline-block;width:4px;height:4px;border-radius:50%;background:var(--mut);margin:0 9px;vertical-align:middle}
-.nav{display:flex;gap:6px}
+.nav{display:flex;gap:6px;flex-wrap:wrap}
 .nav a{padding:8px 14px;border-radius:9px;border:1px solid var(--line2);color:#b9d0e6;font-weight:600}
 .nav a.on{background:var(--blue);border-color:#4aa6ff;color:#fff}
-.hdr-right{display:flex;align-items:center;gap:18px;text-align:right}
+.hdr-right{display:flex;align-items:center;gap:18px;text-align:right;margin-left:auto}
 .clock{font-size:13px;color:#cfe0f3;font-variant-numeric:tabular-nums}
 .live{display:flex;align-items:center;justify-content:flex-end;gap:7px;color:var(--mut);margin-top:3px}
 .live .dot{width:9px;height:9px;border-radius:50%;background:var(--mut)}
@@ -187,7 +187,7 @@ details.rules summary{cursor:pointer;font-weight:700;font-size:16px}
         <p>Pre-emptive Departure Adjustment<i></i>Detect Earlier<i></i>Act Faster</p>
       </div>
     </div>
-    <nav class="nav" aria-label="Pages"><a href="/">Route Traffic</a><a class="on" href="/control" aria-current="page">Headway Control</a><a href="/bunching">Bunching &amp; Gap</a></nav>
+    <nav class="nav" aria-label="Pages"><a href="/">Route Traffic</a><a class="on" href="/control" aria-current="page">Headway Control</a><a href="/bunching">Bunching &amp; Gap</a><a href="/halfway">Halfway Optimiser</a></nav>
     <div class="hdr-right">
       <div><div class="clock" id="clock">&nbsp;</div><div class="live" id="live"><span class="dot"></span><span id="liveText">Connecting&hellip;</span></div></div>
     </div>
@@ -246,7 +246,7 @@ details.rules summary{cursor:pointer;font-weight:700;font-size:16px}
 
   <section class="card"><details class="rules"><summary>Rules &amp; thresholds used (tap to view)</summary><div id="rules"></div></details></section>
 
-  <footer class="foot"><span>Sources: LTA DataMall (Bus Arrival, Bus Services, Traffic Speed Bands) &nbsp;|&nbsp; Decision support only, not for operational use</span><span>SG Transport Pulse V6.0 &nbsp;|&nbsp; Built for a smarter Singapore</span></footer>
+  <footer class="foot"><span>Sources: LTA DataMall (Bus Arrival, Bus Services, Traffic Speed Bands) &nbsp;|&nbsp; Decision support only, not for operational use</span><span>SG Transport Pulse V7.0 &nbsp;|&nbsp; Built for a smarter Singapore</span></footer>
 </div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 

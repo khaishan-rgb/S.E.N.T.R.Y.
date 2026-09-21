@@ -20,7 +20,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 
 import headway
 
-VERSION = "V6.0"
+VERSION = "V7.0"
 LTA = os.getenv("LTA_BASE", "https://datamall2.mytransport.sg/ltaodataservice").rstrip("/")
 KEY = os.getenv("LTA_ACCOUNT_KEY", "")
 OSRM = os.getenv("OSRM_URL", "https://router.project-osrm.org").rstrip("/")
@@ -1375,6 +1375,11 @@ async def bunching_page():
     return HTMLResponse((HERE / "bunching.html").read_text(encoding="utf-8"))
 
 
+@app.get("/halfway", response_class=HTMLResponse)
+async def halfway_page():
+    return HTMLResponse((HERE / "halfway.html").read_text(encoding="utf-8"))
+
+
 @app.get("/api/bunching")
 async def api_bunching(services: str = "", direction: int = 0):
     """Cached gap / bunching state for the selected services. Browsers never call DataMall; the collector does."""
@@ -1539,27 +1544,25 @@ async def api_bb_events(limit: int = 100):
     return {"events": bb_open_public() + closed, "db_ok": BB["db_ok"], "min_stops": {"bunching": int(BB["params"]["confirm_stops"]), "gap": int(BB["params"]["gap_stops"])}}
 
 
-# =========================================================================== AI Halfway Optimiser
-# Simulate "continue the trip" against every APPROVED halfway point for a delayed bus (engine: halfway.py). Decision support only: nothing is deployed.
+# =========================================================================== Halfway Deployment Simulator
+# Simulate losing ONE trip of a scheduled 10-trip sequence (timed at the first bus stop) and replacing it from an approved halfway stop. It does not
+# identify a physical bus (LTA has no schedule / duty data). Engine: halfway.py. Decision support only: nothing is deployed.
 import halfway
 import bisect
 
-HO = {"params": dict(halfway.PARAMS), "points": [], "osrm_down_until": 0.0, "routes": {}}
-HO_INT = ("recover_points", "monitor_points")
-HO_RANGES = {"min_late": (0, 120), "min_remaining_pct": (0, 90), "max_offservice_min": (1, 120), "max_mileage_km": (0.5, 100), "min_improve_pct": (0, 100),
-             "poor_recovery_min": (0, 600), "prep_buffer_min": (0, 30), "extra_layover_min": (0, 60), "recover_tol_pct": (5, 100), "recover_points": (1, 12),
-             "monitor_points": (4, 30), "fallback_kmh": (5, 60), "w_regularity": (0, 100), "w_maxgap": (0, 100), "w_recovery": (0, 100), "w_offservice": (0, 100),
-             "w_mileage": (0, 100), "w_bunching": (0, 100), "pref_recovery_boost": (1, 5), "pref_mileage_boost": (1, 10)}
+HO = {"params": dict(halfway.PARAMS), "points": []}
+HO_INT = ("n_trips",)
+HO_RANGES = {"n_trips": (5, 20), "layover_min": (0, 60), "min_layover_min": (0, 30), "start_delay_min": (-30, 60), "min_remaining_pct": (0, 90), "min_improve_pct": (0, 100),
+             "load_sens": (0, 0.3), "fallback_kmh": (5, 60)}
 HO_MAX_CANDIDATES = 12
-HO_OFF_KMH, HO_DETOUR = 30.0, 1.35          # off-service speed / road-factor used ONLY when no routing service answers (clearly labelled "estimate")
 
 
 def ho_init():
     bb_sql("CREATE TABLE IF NOT EXISTS halfway_parameter(k TEXT PRIMARY KEY, v REAL)")
     bb_sql("CREATE TABLE IF NOT EXISTS halfway_point_master(id INTEGER PRIMARY KEY AUTOINCREMENT, service TEXT, direction INTEGER, stop_code TEXT, seq INTEGER, enabled INTEGER, "
            "min_late REAL, min_remaining_pct REAL, max_offservice_min REAL, max_mileage_km REAL)")
-    bb_sql("CREATE TABLE IF NOT EXISTS simulation_run(id INTEGER PRIMARY KEY AUTOINCREMENT, ts REAL, input_ts REAL, service TEXT, direction INTEGER, bus TEXT, delay_min REAL, pref TEXT, "
-           "mode TEXT, recommended TEXT, recommended_score REAL, no_halfway TEXT, best TEXT, scenarios TEXT, params TEXT, model_version TEXT)")
+    bb_sql("CREATE TABLE IF NOT EXISTS halfway_sim(id INTEGER PRIMARY KEY AUTOINCREMENT, ts REAL, service TEXT, direction INTEGER, ref_time TEXT, sched_hw REAL, disrupted INTEGER, "
+           "lateness TEXT, start_delay REAL, recommended TEXT, improvement_pct REAL, no_halfway TEXT, best TEXT, scenarios TEXT, params TEXT, model_version TEXT)")
     for r in bb_sql("SELECT k, v FROM halfway_parameter", fetch=True):
         if r["k"] in HO["params"]:
             HO["params"][r["k"]] = int(r["v"]) if r["k"] in HO_INT else r["v"]
@@ -1585,9 +1588,6 @@ def ho_validate_params(inp):
             errs.append(f"{k}: must be between {lo} and {hi}")
         else:
             out[k] = int(round(f)) if k in HO_INT else f
-    merged = {**HO["params"], **out}
-    if sum(merged[w] for w in ("w_regularity", "w_maxgap", "w_recovery", "w_offservice", "w_mileage", "w_bunching")) <= 0:
-        errs.append("at least one score weight must be above 0")
     return out, errs
 
 
@@ -1596,16 +1596,13 @@ def _hnorm(s):
 
 
 HO_COLS = {"service": "service", "direction": "direction", "dir": "direction", "stopcode": "stop_code", "approvedhalfwaystop": "stop_code", "halfwaystop": "stop_code", "stop": "stop_code",
-           "sequence": "seq", "stopsequence": "seq", "seq": "seq", "enabled": "enabled", "halfwayenabled": "enabled", "minlate": "min_late", "minimumlatethreshold": "min_late",
-           "minimumlate": "min_late", "minremainingpct": "min_remaining_pct", "minimumremainingtrip": "min_remaining_pct", "minremaining": "min_remaining_pct",
-           "maxoffservice": "max_offservice_min", "maximumoffservicetime": "max_offservice_min", "maxoffservicemin": "max_offservice_min", "maxmileage": "max_mileage_km",
-           "maximummileageloss": "max_mileage_km", "maxmileagekm": "max_mileage_km"}
-HO_DEFAULT_ORDER = ["service", "direction", "stop_code", "seq", "enabled", "min_late", "min_remaining_pct", "max_offservice_min", "max_mileage_km"]
+           "sequence": "seq", "stopsequence": "seq", "seq": "seq", "enabled": "enabled", "halfwayenabled": "enabled"}
+HO_DEFAULT_ORDER = ["service", "direction", "stop_code", "seq", "enabled"]
 
 
 def parse_points(text):
-    """CSV/TSV of approved halfway points -> (rows, errors). Columns: service, direction, stop_code, sequence, enabled, min_late, min_remaining_pct, max_offservice_min, max_mileage_km.
-    A header row (any of the spec's column names) is optional; stop_code or sequence must be given; the last four are optional per-point limits."""
+    """CSV/TSV of approved halfway stops -> (rows, errors). Columns: service, direction, stop_code, sequence, enabled. A header row is optional; extra columns
+    (e.g. older per-point limits) are ignored. stop_code or sequence must be given."""
     rows, errs = [], []
     lines = [l for l in (text or "").replace("\r", "").split("\n") if l.strip() and not l.strip().startswith("#")]
     if not lines:
@@ -1622,8 +1619,7 @@ def parse_points(text):
         c = [x.strip().strip('"') for x in l.split(delim)]
         rec = {k: (c[j] if j < len(c) else "") for j, k in enumerate(order) if k}
         svc, dr = rec.get("service", "").upper(), rec.get("direction", "").lower().replace("dir", "").strip()
-        code, seq = rec.get("stop_code", "").strip(), rec.get("seq", "").strip()
-        en = rec.get("enabled", "").strip().lower()
+        code, seq, en = rec.get("stop_code", "").strip(), rec.get("seq", "").strip(), rec.get("enabled", "").strip().lower()
         bad = None
         if not re.fullmatch(r"[0-9A-Z]{1,6}", svc) or dr not in ("1", "2"):
             bad = "service / direction"
@@ -1635,26 +1631,10 @@ def parse_points(text):
             bad = "sequence must be a number"
         elif en not in ("", "yes", "y", "true", "1", "no", "n", "false", "0"):
             bad = "enabled must be yes/no"
-        lim = {}
-        if not bad:
-            for k, (lo, hi) in (("min_late", HO_RANGES["min_late"]), ("min_remaining_pct", HO_RANGES["min_remaining_pct"]), ("max_offservice_min", HO_RANGES["max_offservice_min"]),
-                                ("max_mileage_km", HO_RANGES["max_mileage_km"])):
-                v = rec.get(k, "").strip()
-                if v:
-                    try:
-                        f = float(v)
-                    except ValueError:
-                        bad = f"{k} is not a number"
-                        break
-                    if not (lo <= f <= hi):
-                        bad = f"{k} must be between {lo} and {hi}"
-                        break
-                    lim[k] = f
         if bad:
             errs.append(f"line {i}: {bad} ({l[:50]})")
             continue
-        rows.append({"service": svc, "direction": int(dr), "stop_code": code or None, "seq": int(seq) if seq else None, "enabled": 0 if en in ("no", "n", "false", "0") else 1,
-                     "min_late": lim.get("min_late"), "min_remaining_pct": lim.get("min_remaining_pct"), "max_offservice_min": lim.get("max_offservice_min"), "max_mileage_km": lim.get("max_mileage_km")})
+        rows.append({"service": svc, "direction": int(dr), "stop_code": code or None, "seq": int(seq) if seq else None, "enabled": 0 if en in ("no", "n", "false", "0") else 1})
     return rows, errs[:10]
 
 
@@ -1662,8 +1642,7 @@ def ho_save_points(rows, replace=True):
     if replace:
         bb_sql("DELETE FROM halfway_point_master")
     for r in rows:
-        bb_sql("INSERT INTO halfway_point_master(service,direction,stop_code,seq,enabled,min_late,min_remaining_pct,max_offservice_min,max_mileage_km) VALUES (?,?,?,?,?,?,?,?,?)",
-               (r["service"], r["direction"], r["stop_code"], r["seq"], r["enabled"], r["min_late"], r["min_remaining_pct"], r["max_offservice_min"], r["max_mileage_km"]))
+        bb_sql("INSERT INTO halfway_point_master(service,direction,stop_code,seq,enabled) VALUES (?,?,?,?,?)", (r["service"], r["direction"], r["stop_code"], r["seq"], r["enabled"]))
     ho_load_points()
 
 
@@ -1692,76 +1671,8 @@ def ho_cut(line, cum, a, b):
     return [ho_point_at(line, cum, a)] + [line[i] for i in range(len(line)) if a < cum[i] < b] + [ho_point_at(line, cum, b)]
 
 
-# ---- off-service routing (OSRM driving route + LTA speed bands = traffic-adjusted time)
-async def ho_osrm(a, b):
-    """[(lat, lon)] alternatives from OSRM, [] if it has no route, None if the service cannot be reached (then a labelled estimate is used)."""
-    if time.time() < HO["osrm_down_until"]:
-        return None
-    try:
-        r = await client().get(f"{OSRM}/route/v1/driving/{a[1]:.6f},{a[0]:.6f};{b[1]:.6f},{b[0]:.6f}",
-                               params={"overview": "full", "geometries": "geojson", "alternatives": "true", "steps": "false"}, timeout=8)
-        r.raise_for_status()
-        j = r.json()
-        if j.get("code") != "Ok":
-            return []
-        return [{"km": rt["distance"] / 1000.0, "free_min": rt["duration"] / 60.0, "line": [(c[1], c[0]) for c in rt["geometry"]["coordinates"]]} for rt in j["routes"][:3]]
-    except Exception:
-        HO["osrm_down_until"] = time.time() + 60
-        return None
-
-
-def ho_speed_label(kmh):
-    return "Smooth" if kmh >= 35 else ("Moderate" if kmh >= 22 else "Congested")
-
-
-async def ho_offservice(a, stop, idx):
-    """Bus position a -> halfway stop by road. Chooses the route with the SHORTEST TRAVEL TIME under current traffic (not the fewest km)."""
-    key = (round(a[0], 4), round(a[1], 4), stop["code"])
-    hit = HO["routes"].get(key)
-    if hit and time.time() - hit[0] < 60:
-        return hit[1]
-    alts = await ho_osrm(a, (stop["lat"], stop["lon"]))
-    if not alts:
-        km = hav_km(a[0], a[1], stop["lat"], stop["lon"]) * HO_DETOUR
-        mins = km / HO_OFF_KMH * 60.0
-        res = {"source": "estimate", "km": km, "min": mins, "free_min": mins, "traffic": "none", "line": [a, (stop["lat"], stop["lon"])], "alternatives": [], "roads": [],
-               "avg_kmh": HO_OFF_KMH, "pct": None, "note": "No routing service answered: straight-line distance x %.2f at %d km/h (estimate)" % (HO_DETOUR, HO_OFF_KMH)}
-    else:
-        ev = []
-        for alt in alts:
-            runs, stats = await asyncio.to_thread(color_route, alt["line"], idx)
-            known = bool(stats and stats["known"])
-            ev.append({**alt, "min": stats["driveMin"] if known else alt["free_min"], "traffic": "adjusted" if known else "free-flow", "runs": runs, "stats": stats})
-        best = min(ev, key=lambda e: e["min"])
-        short, fast = min(ev, key=lambda e: e["km"]), min(ev, key=lambda e: e["free_min"])
-        roads = {}
-        for r in best["runs"] or []:
-            if r.get("road"):
-                roads[r["road"]] = roads.get(r["road"], 0.0) + r["km"]
-        km = best["stats"]["km"] if best["stats"] else None
-        tot = sum(km.values()) if km else 0
-        res = {"source": "osrm", "km": best["km"], "min": best["min"], "free_min": best["free_min"], "traffic": best["traffic"], "line": best["line"],
-               "avg_kmh": best["km"] / (best["min"] / 60.0) if best["min"] > 0 else None,
-               "roads": [k for k, _ in sorted(roads.items(), key=lambda kv: -kv[1])[:3]],
-               "pct": pct_split([km["smooth"], km["moderate"], km["slow"], km["none"]]) if tot > 0 else None,
-               "alternatives": [{"km": round(e["km"], 2), "min": round(e["min"], 1), "free_min": round(e["free_min"], 1), "chosen": e is best, "shortest_km": e is short, "fastest_free": e is fast} for e in ev]}
-    HO["routes"][key] = (time.time(), res)
-    if len(HO["routes"]) > 400:
-        HO["routes"].clear()
-    return res
-
-
-async def ho_incidents_near(line, km=0.3):
-    try:
-        inc = await api_incidents("", 1)
-    except Exception:
-        return []
-    return [{"type": x["type"], "message": x["message"][:120]} for x in inc.get("incidents", []) if line and min_dist_km(x["lat"], x["lon"], line) <= km][:5]
-
-
-# ---- live data for one service direction
-async def ho_gather(svc, d):
-    now = now_sgt()
+# ---- route facts for one service direction (no live buses are used)
+async def ho_route(svc, d):
     st, fq = await static(), await freq_table()
     route = await bb_route(svc, d)
     if route.get("error"):
@@ -1772,187 +1683,169 @@ async def ho_gather(svc, d):
     prep = PREP.get(gk)
     if prep is None:
         prep = PREP[gk] = await asyncio.to_thread(headway.prepare, line, stops)
-    b = await api_buses(svc, d)
-    bl = b.get("buses", [])
-    if b.get("error") and not bl:
-        return {"error": b["error"]}
-    pos = await asyncio.to_thread(lambda: [headway.project(line, prep["cum"], x["lat"], x["lon"])[0] for x in bl])
     tm = headway.TimeModel(route.get("runs", []), prep["stop_s"], headway.CFG) if route["traffic"]["ok"] else None
     if tm is not None and not tm.ok:
         tm = None
-    H, H_src = bb_resolve_hw(svc, d, now, fq)
-    buses = [{"s_km": s, "etas": x.get("etas", {}), "etasf": x.get("etasf"), "monitored": x["monitored"], "load": x["load"], "near": x["near"]["name"], "near_code": x["near"]["code"],
-              "lat": x["lat"], "lon": x["lon"]} for s, x in zip(pos, bl)]
-    key = f"{svc}:{d}"
-    trk = BB["trk"].setdefault(key, bunching.Tracker())
-    trk.gap_sec = max(150, 3 * int(BB["params"]["refresh_sec"]))
-    ts = now.timestamp()
-    trk.update(ts, buses, prep["km"])                                              # same ids (B1, B2 ...) as the Bunching tab
-    out, prev = [], None
-    for x in sorted(buses, key=lambda z: -z["s_km"]):
-        vec, j0 = bunching.eta_vector(x, prep["stop_s"], tm, prev)
-        prev = vec
-        if any(v is not None for v in vec):
-            out.append({**x, "vec": vec, "j0": j0})
-    return {"svc": svc, "d": d, "now": now, "ts": ts, "stops": stops, "line": line, "prep": prep, "tm": tm, "H": H, "H_src": H_src, "buses": out, "route": route, "traffic_ok": tm is not None,
-            "bus_error": b.get("error")}
-
-
-def ho_ctx(g, pref="balanced", cands=None, x=None, manual=None):
     P = {**halfway.PARAMS, **HO["params"]}
-    return {"H": g["H"], "stop_s": g["prep"]["stop_s"], "route_km": g["prep"]["km"], "stop_names": [s["name"] for s in g["stops"]], "stop_seq": [s["seq"] for s in g["stops"]],
-            "buses": g["buses"], "tm": g["tm"], "params": HO["params"], "P": P, "pref": pref, "bunch_min": BB["params"]["bunch_min"], "candidates": cands or [], "x": x, "manual": manual}
+    ss = prep["stop_s"]
+    tau = [(tm.t(ss[0], s) if tm is not None else max(0.0, s - ss[0]) / P["fallback_kmh"] * 60.0) for s in ss]      # running minutes from the first stop
+    now = now_sgt()
+    H, H_src = bb_resolve_hw(svc, d, now, fq)
+    return {"stops": stops, "line": line, "prep": prep, "tm": tm, "tau": tau, "H": H, "H_src": H_src, "now": now, "traffic_ok": tm is not None}
 
 
-def ho_candidates(svc, d, stops, x_j0):
+def ho_candidates(svc, d, stops, extra=""):
+    """Approved halfway stops resolved to route stop indices (+ one what-if stop the controller typed)."""
     out, unresolved, seen = [], [], set()
+
+    def add(j, approved):
+        if j in seen:
+            return
+        seen.add(j)
+        s = stops[j]
+        out.append({"j": j, "code": s["code"], "name": s["name"], "seq": s["seq"], "lat": s["lat"], "lon": s["lon"], "approved": approved})
     for row in HO["points"]:
         if row["service"] != svc or row["direction"] != d or not row["enabled"]:
             continue
         j = None
         if row["stop_code"]:
-            idxs = [i for i, s in enumerate(stops) if s["code"] == row["stop_code"]]
-            j = next((i for i in idxs if i >= x_j0), idxs[-1] if idxs else None)
+            j = next((i for i, s in enumerate(stops) if s["code"] == row["stop_code"] and i > 0), None)
         if j is None and row["seq"]:
             j = next((i for i, s in enumerate(stops) if s["seq"] == row["seq"]), None)
         if j is None:
             unresolved.append(row["stop_code"] or f"seq {row['seq']}")
-            continue
-        if j in seen:
-            continue
-        seen.add(j)
-        s = stops[j]
-        out.append({"j": j, "code": s["code"], "name": s["name"], "seq": s["seq"], "lat": s["lat"], "lon": s["lon"], "min_late": row["min_late"], "min_remaining_pct": row["min_remaining_pct"],
-                    "max_offservice_min": row["max_offservice_min"], "max_mileage_km": row["max_mileage_km"]})
+        else:
+            add(j, True)
+    if extra:
+        j = next((i for i, s in enumerate(stops) if s["code"] == extra and i > 0), None)
+        if j is None:
+            unresolved.append(extra)
+        else:
+            add(j, False)
     out.sort(key=lambda c: c["j"])
     return out[:HO_MAX_CANDIDATES], unresolved
 
 
-def ho_bus_public(g, ctx, i):
-    b, stops = g["buses"][i], g["stops"]
-    late = halfway.lateness(ctx, i)
-    nj = b["j0"] if b["j0"] < len(stops) else len(stops) - 1
-    return {"id": b.get("id"), "order": i + 1, "near": b["near"], "near_code": b.get("near_code"), "lat": b["lat"], "lon": b["lon"], "s_km": round(b["s_km"], 2), "load": b.get("load"),
-            "next_stop": {"name": stops[nj]["name"], "code": stops[nj]["code"], "eta": halfway._r(b["vec"][nj], 1)},
-            "front_hw": halfway._r(late["front_hw"], 1) if late else None, "late": halfway._r(late["late"], 1) if late else None}
+def ho_hhmm(m):
+    m = int(round(m)) % 1440
+    return f"{m // 60:02d}:{m % 60:02d}"
 
 
-@app.get("/api/halfway/buses")
-async def api_ho_buses(service: str = "", direction: int = 1):
+def ho_parse_hhmm(s):
+    mm = re.fullmatch(r"\s*(\d{1,2}):(\d{2})\s*", s or "")
+    if not mm or int(mm.group(1)) > 23 or int(mm.group(2)) > 59:
+        return None
+    return int(mm.group(1)) * 60 + int(mm.group(2))
+
+
+@app.get("/api/halfway/setup")
+async def api_ho_setup(service: str = "", direction: int = 1):
     svc = service.strip().upper()
     if not svc:
         return {"error": "Enter a service number."}
-    g = await ho_gather(svc, direction)
+    g = await ho_route(svc, direction)
     if g.get("error"):
         return {"error": g["error"]}
     P = {**halfway.PARAMS, **HO["params"]}
-    ctx = ho_ctx(g)
-    cands, unresolved = ho_candidates(svc, direction, g["stops"], 0)
-    buses = [ho_bus_public(g, ctx, i) for i in range(len(g["buses"]))] if g["H"] else []
-    lates = [b for b in buses if b["late"] is not None]
-    pick = max(lates, key=lambda b: b["late"]) if lates else None
-    return {"service": svc, "direction": direction, "buses": buses, "auto": pick["id"] if pick else None, "sched_hw": g["H"], "hw_src": g["H_src"], "min_late": P["min_late"],
-            "points": [{"code": c["code"], "name": c["name"], "seq": c["seq"]} for c in cands], "unresolved": unresolved, "traffic_ok": g["traffic_ok"], "bus_error": g["bus_error"],
-            "note": None if g["H"] else "Scheduled headway unknown for this service - add it in Settings -> Service Headway Master.", "updated": g["now"].isoformat(timespec="seconds")}
+    now = g["now"]
+    ref = ((now.hour * 60 + now.minute) // 5 + 1) * 5                    # next 5-minute mark: the first simulated departure
+    cands, unresolved = ho_candidates(svc, direction, g["stops"])
+    return {"service": svc, "direction": direction, "sched_hw": g["H"], "hw_src": g["H_src"], "ref": ho_hhmm(ref), "params": P, "n_stops": len(g["stops"]),
+            "first": g["stops"][0]["name"], "last": g["stops"][-1]["name"], "route_km": round(g["prep"]["km"], 1), "run_min": round(g["tau"][-1], 1), "traffic_ok": g["traffic_ok"],
+            "stops": [[s["code"], s["name"]] for s in g["stops"]], "points": [{"code": c["code"], "name": c["name"], "seq": c["seq"]} for c in cands], "unresolved": unresolved,
+            "updated": now.isoformat(timespec="seconds")}
 
 
-def ho_audit(res, g, mode, delay):
-    best = res["candidates"][res["recommended"]] if res.get("recommended") is not None else None
-    scen = [{"code": c["code"], "name": c["name"], "score": c["score"], "off_min": c["off_min"], "lost_km": c["lost_km"], "viable": c["viable"],
-             "avg": c["metrics"]["avg"] if c.get("metrics") else None, "max": c["metrics"]["max"] if c.get("metrics") else None,
-             "recovery": c["full"]["recovery"] if c.get("full") else None, "violations": c["violations"]} for c in res["candidates"]]
-    bb_sql("INSERT INTO simulation_run(ts,input_ts,service,direction,bus,delay_min,pref,mode,recommended,recommended_score,no_halfway,best,scenarios,params,model_version) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-           (time.time(), g["ts"], g["svc"], g["d"], res["bus"]["id"], delay, res["pref"], mode, best["code"] if best else None, best["score"] if best else None,
-            json.dumps(res["baseline"]["metrics"]), json.dumps(best["metrics"]) if best else None, json.dumps(scen), json.dumps({**HO["params"], "bunch_min": BB["params"]["bunch_min"]}), halfway.MODEL_VERSION))
-    row = bb_sql("SELECT MAX(id) AS id FROM simulation_run", fetch=True)
-    return row[0]["id"] if row else None
-
-
-@app.get("/api/halfway/run")
-async def api_ho_run(service: str = "", direction: int = 1, bus: str = "", pref: str = "balanced", stop: str = "", start: str = ""):
+@app.get("/api/halfway/simulate")
+async def api_ho_simulate(service: str = "", direction: int = 1, ref: str = "", hw: str = "", layover: str = "", delay: str = "", late: str = "", disrupted: str = "", stop: str = "", save: str = ""):
     svc = service.strip().upper()
-    g = await ho_gather(svc, direction)
+    g = await ho_route(svc, direction)
     if g.get("error"):
         return {"ok": False, "error": g["error"]}
-    if not g["H"]:
-        return {"ok": False, "error": "Scheduled headway unknown for this service - add it in Settings -> Service Headway Master."}
-    xi = next((i for i, b in enumerate(g["buses"]) if str(b.get("id")) == bus.strip()), None)
-    if xi is None:
-        return {"ok": False, "error": f"Bus {bus or '?'} is not being tracked right now - refresh the bus list and choose again."}
-    cands, unresolved = ho_candidates(svc, direction, g["stops"], g["buses"][xi]["j0"])
-    x = g["buses"][xi]
-    # ---- off-service routing for every approved point, in parallel
-    bands = await bands_state()
-    sem_ = asyncio.Semaphore(4)
+    P = {**halfway.PARAMS, **HO["params"]}
+    now = g["now"]
 
-    async def one(c):
-        async with sem_:
-            return await ho_offservice((x["lat"], x["lon"]), c, bands["idx"])
-    routes = await asyncio.gather(*[one(c) for c in cands if c["j"] >= x["j0"]])
-    rmap = {c["j"]: r for c, r in zip([c for c in cands if c["j"] >= x["j0"]], routes)}
-    for c in cands:
-        r = rmap.get(c["j"])
-        c.update(off_min=r["min"] if r else 0.0, off_km=r["km"] if r else 0.0, off_source=(r["source"] + ("/" + r["traffic"] if r["source"] == "osrm" else "")) if r else "n/a")
-    manual = None
-    if stop.strip():
-        mc = next((c for c in cands if c["code"] == stop.strip()), None)
-        if mc is None:
-            return {"ok": False, "error": f"Stop {stop} is not an approved halfway point for Svc {svc} Dir {direction}."}
+    def num_(v, lo, hi, name, default):
+        if not str(v).strip():
+            return default, None
         try:
-            ready = float(start) if start.strip() else None
+            f = float(v)
         except ValueError:
-            return {"ok": False, "error": "Manual start time must be a number of minutes from now."}
-        manual = {"j": mc["j"], "ready": ready}
-    ectx = ho_ctx(g, pref, [c for c in cands], xi, manual)
-    res = halfway.optimise(ectx)
+            return None, f"{name} must be a number."
+        if not (lo <= f <= hi):
+            return None, f"{name} must be between {lo:g} and {hi:g}."
+        return f, None
+    t0 = ho_parse_hhmm(ref) if ref.strip() else ((now.hour * 60 + now.minute) // 5 + 1) * 5
+    if t0 is None:
+        return {"ok": False, "error": "First scheduled departure must be a time like 08:10."}
+    H, e1 = num_(hw, 1, 120, "Scheduled headway", g["H"])
+    lay, e2 = num_(layover, 0, 60, "Scheduled layover", P["layover_min"])
+    dly, e3 = num_(delay, -30, 60, "Replacement start delay", P["start_delay_min"])
+    if e1 or e2 or e3:
+        return {"ok": False, "error": e1 or e2 or e3}
+    n = int(P["n_trips"])
+    lates = []
+    for i, x in enumerate([v for v in late.split(",")] if late.strip() else []):
+        f, e = num_(x, -60, 300, f"Lateness of trip {i + 1}", 0.0)
+        if e:
+            return {"ok": False, "error": e}
+        lates.append(f)
+    lates = (lates + [0.0] * n)[:n]
+    dis = None
+    if disrupted.strip():
+        try:
+            dis = int(disrupted)
+        except ValueError:
+            return {"ok": False, "error": "Disrupted trip must be a trip number."}
+    stops = g["stops"]
+    cands, unresolved = ho_candidates(svc, direction, stops, stop.strip())
+    ctx = {"H": H, "t0": t0, "late": lates, "disrupted": dis, "tau": g["tau"], "stop_s": g["prep"]["stop_s"], "route_km": g["prep"]["km"], "stop_names": [s["name"] for s in stops],
+           "stop_seq": [s["seq"] for s in stops], "params": {**HO["params"], "layover_min": lay, "start_delay_min": dly}, "bunch_min": BB["params"]["bunch_min"], "candidates": cands}
+    res = halfway.simulate(ctx)
     if not res["ok"]:
         return res
-    P = {**halfway.PARAMS, **HO["params"]}
-    xb = ho_bus_public(g, ectx, xi)
-    ab = ho_bus_public(g, ectx, xi - 1)
-    stops = g["stops"]
-    # ---- per-candidate extras: route, traffic and incidents on both alternatives
+    cum, line, ss = g["prep"]["cum"], g["line"], g["prep"]["stop_s"]
     for c in res["candidates"]:
-        r = rmap.get(c["j"])
-        c["lat"], c["lon"] = stops[c["j"]]["lat"], stops[c["j"]]["lon"]
-        tx = x["vec"][c["j"]] if c["j"] < len(x["vec"]) else None
-        c["on_route_min"] = halfway._r(tx, 1)
-        seg_km = max(0.0, g["prep"]["stop_s"][c["j"]] - x["s_km"])
-        c["service_kmh"] = halfway._r(seg_km / (g["tm"].t(x["s_km"], g["prep"]["stop_s"][c["j"]]) / 60.0), 1) if (g["tm"] is not None and seg_km > 0.2) else None
-        if r:
-            c["route"] = {"source": r["source"], "km": halfway._r(r["km"], 2), "min": halfway._r(r["min"], 1), "free_min": halfway._r(r["free_min"], 1), "traffic": r["traffic"], "avg_kmh": halfway._r(r["avg_kmh"], 1),
-                          "label": ho_speed_label(r["avg_kmh"]) if r["avg_kmh"] else None, "roads": r["roads"], "pct": r["pct"], "alternatives": r["alternatives"], "note": r.get("note"),
-                          "line": ho_simplify(r["line"], 160)}
-            c["route"]["incidents"] = await ho_incidents_near(r["line"]) if r["source"] == "osrm" else []
-        else:
-            c["route"] = None
-        sec = ho_cut(g["line"], g["prep"]["cum"], x["s_km"], g["prep"]["stop_s"][c["j"]])
-        c["service_incidents"] = await ho_incidents_near(sec)
-    sel_code = manual and next((c["code"] for c in res["candidates"] if c["j"] == manual["j"]), None)
-    res.update(ok=True, service=svc, direction=direction, bus=xb, bus_ahead=ab, sched_hw=g["H"], hw_src=g["H_src"], pref=res["pref"], selected=sel_code, mode="manual" if manual else "auto",
-               params={k: P[k] for k in halfway.PARAMS}, unresolved=unresolved, points_configured=len(cands), traffic_ok=g["traffic_ok"], updated=g["now"].isoformat(timespec="seconds"), input_ts=g["ts"],
-               model=halfway.MODEL_VERSION, routing="osrm" if any(r["source"] == "osrm" for r in routes) else ("estimate" if routes else None),
-               map={"line": ho_simplify(g["line"], 500), "gap": ho_simplify(ho_cut(g["line"], g["prep"]["cum"], ab["s_km"], x["s_km"]), 120),
-                    "buses": [{"id": b.get("id"), "lat": b["lat"], "lon": b["lon"], "x": i == xi} for i, b in enumerate(g["buses"])]},
-               stop_labels=[{"j": m["j"], "name": m["name"], "seq": m["seq"]} for m in res["monitor"]])
-    res["run_id"] = ho_audit(res, g, res["mode"], xb["late"])
+        j = c["j"]
+        c["lat"], c["lon"] = stops[j]["lat"], stops[j]["lon"]
+        c["line_missing"] = ho_simplify(ho_cut(line, cum, 0.0, ss[j]), 150)               # the section this trip does not serve
+        c["line_resumed"] = ho_simplify(ho_cut(line, cum, ss[j], cum[-1]), 150)            # where the replacement resumes service
+    res.update(service=svc, direction=direction, ref=ho_hhmm(t0), hw_src=g["H_src"] if not hw.strip() else "entered by you", layover=lay, start_delay=dly, unresolved=unresolved,
+               selected=stop.strip() or None, traffic_ok=g["traffic_ok"], route={"km": round(g["prep"]["km"], 1), "run_min": round(g["tau"][-1], 1), "first": stops[0]["name"], "last": stops[-1]["name"]},
+               map={"line": ho_simplify(line, 500), "first": [stops[0]["lat"], stops[0]["lon"]], "last": [stops[-1]["lat"], stops[-1]["lon"]]},
+               updated=now.isoformat(timespec="seconds"))
+    if save.strip() and dis is not None:
+        res["run_id"] = ho_audit(res, lates)
     return res
+
+
+def ho_audit(res, lates):
+    best = res["candidates"][res["recommended"]] if res.get("recommended") is not None else None
+    scen = [{"code": c["code"], "name": c["name"], "viable": c.get("viable"), "avg_a": (c.get("metrics_a") or {}).get("avg"), "avg_b": (c.get("metrics_b") or {}).get("avg"),
+             "max_a": (c.get("metrics_a") or {}).get("max"), "max_b": (c.get("metrics_b") or {}).get("max"), "improvement_pct": (c.get("improvement") or {}).get("avg_pct"), "violations": c["violations"]}
+            for c in res["candidates"]]
+    bb_sql("INSERT INTO halfway_sim(ts,service,direction,ref_time,sched_hw,disrupted,lateness,start_delay,recommended,improvement_pct,no_halfway,best,scenarios,params,model_version) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+           (time.time(), res["service"], res["direction"], res["ref"], res["sched_hw"], res["disrupted"], json.dumps(lates), res["start_delay"], best["code"] if best else None,
+            best["improvement"]["avg_pct"] if best else None, json.dumps(best["metrics_a"]) if best else None, json.dumps(best["metrics_b"]) if best else None, json.dumps(scen),
+            json.dumps({**res["params"], "bunch_min": BB["params"]["bunch_min"]}), halfway.MODEL_VERSION))
+    row = bb_sql("SELECT MAX(id) AS id FROM halfway_sim", fetch=True)
+    return row[0]["id"] if row else None
 
 
 @app.get("/api/halfway/runs")
 async def api_ho_runs(limit: int = 30):
     limit = max(1, min(200, limit))
-    rows = bb_sql("SELECT id, ts, service, direction, bus, delay_min, pref, mode, recommended, recommended_score, model_version FROM simulation_run ORDER BY id DESC LIMIT ?", (limit,), fetch=True)
+    rows = bb_sql("SELECT id, ts, service, direction, ref_time, sched_hw, disrupted, start_delay, recommended, improvement_pct, model_version FROM halfway_sim ORDER BY id DESC LIMIT ?", (limit,), fetch=True)
     return {"runs": rows, "db_ok": BB["db_ok"]}
 
 
 @app.get("/api/halfway/runs/{run_id}")
 async def api_ho_run_detail(run_id: int):
-    rows = bb_sql("SELECT * FROM simulation_run WHERE id=?", (run_id,), fetch=True)
+    rows = bb_sql("SELECT * FROM halfway_sim WHERE id=?", (run_id,), fetch=True)
     if not rows:
         return JSONResponse({"error": "No such simulation run."}, status_code=404)
     r = rows[0]
-    for k in ("no_halfway", "best", "scenarios", "params"):
+    for k in ("lateness", "no_halfway", "best", "scenarios", "params"):
         try:
             r[k] = json.loads(r[k]) if r[k] else None
         except ValueError:
@@ -1960,18 +1853,17 @@ async def api_ho_run_detail(run_id: int):
     return r
 
 
-# ---- configuration (approved points + parameters)
+# ---- configuration (approved stops + parameters)
 async def ho_points_public():
     st = await static()
     out = []
     for r in HO["points"]:
-        name = None
+        name, code = None, r["stop_code"]
         if st.get("stops"):
-            code = r["stop_code"]
             if not code and r["seq"]:
                 code = next((x["code"] for x in st["routes"].get((r["service"], r["direction"]), []) if x["seq"] == r["seq"]), None)
             name = (st["stops"].get(code) or {}).get("name") if code else None
-        out.append({**r, "name": name})
+        out.append({"id": r["id"], "service": r["service"], "direction": r["direction"], "stop_code": r["stop_code"], "seq": r["seq"], "enabled": r["enabled"], "name": name})
     return out
 
 
@@ -2004,7 +1896,7 @@ async def api_ho_config_save(request: Request):
 
 @app.post("/api/halfway/points")
 async def api_ho_points_save(request: Request):
-    """Replace ALL approved halfway points with the uploaded CSV."""
+    """Replace ALL approved halfway stops with the uploaded CSV."""
     if not bb_auth(request):
         return JSONResponse({"error": "Admin token missing or wrong."}, status_code=401)
     rows, errs = parse_points((await request.body()).decode("utf-8-sig", "replace"))

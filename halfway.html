@@ -1,0 +1,435 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#050d1a">
+<title>SG Transport Pulse – Halfway Deployment Simulator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+:root{--bg:#050d1a;--panel:#0a1a2e;--panel2:#0d2039;--line:#163250;--line2:#1f4468;--text:#eaf3ff;--mut:#8ba3bd;--blue:#1785ff;--cyan:#3cc8ff;
+  --green:#22d36a;--amber:#ff9f1c;--yellow:#ffd23f;--red:#ff4d55;--font:Inter,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif}
+*{box-sizing:border-box}html{-webkit-text-size-adjust:100%}
+body{margin:0;background:radial-gradient(1200px 500px at 20% -10%,#0b2140 0%,var(--bg) 60%);color:var(--text);font-family:var(--font);font-size:14px;line-height:1.35;min-height:100vh;
+  padding:env(safe-area-inset-top,0) env(safe-area-inset-right,0) env(safe-area-inset-bottom,0) env(safe-area-inset-left,0)}
+button,input,select{font:inherit;color:inherit}:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+.app{max-width:1500px;margin:0 auto;padding:0 14px 18px}
+.top{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;padding:12px 4px;border-bottom:1px solid var(--line)}
+.brand{display:flex;align-items:center;gap:12px}.logo{width:40px;height:40px;border-radius:11px;background:linear-gradient(160deg,#2a95ff,#0d63d6);display:grid;place-items:center;font-size:22px}
+.brand h1{margin:0;font-size:24px;font-weight:800;letter-spacing:-.4px;line-height:1.05}.brand p{margin:3px 0 0;color:var(--mut);font-size:13px}
+.nav{display:flex;gap:6px;flex-wrap:wrap}.nav a{padding:8px 14px;border:1px solid var(--line2);border-radius:10px;color:#cfe0f3;text-decoration:none;font-weight:600;font-size:13px;background:var(--panel)}
+.nav a.on{background:var(--blue);border-color:#4aa6ff;color:#fff}
+.hdr-right{text-align:right;font-size:13px;color:#cfe0f3;margin-left:auto}.live{display:flex;align-items:center;justify-content:flex-end;gap:7px;color:var(--mut);margin-top:3px}
+.live .dot{width:9px;height:9px;border-radius:50%;background:var(--mut)}.live.ok .dot{background:var(--green);box-shadow:0 0 8px var(--green)}.live.warn .dot{background:var(--amber)}.live.bad .dot{background:var(--red)}
+.tabs{display:flex;gap:6px;padding:10px 2px 0}.tabs button{padding:8px 16px;border-radius:10px 10px 0 0;border:1px solid var(--line2);border-bottom:0;background:var(--panel);cursor:pointer;font-weight:700;color:#a9c2da}
+.tabs button[aria-selected=true]{background:var(--blue);color:#fff;border-color:#4aa6ff}
+.tbadge[hidden]{display:none}.tbadge{display:inline-block;min-width:20px;padding:0 6px;margin-left:6px;border-radius:10px;background:#e0101f;color:#fff;font-size:12px;font-weight:800;line-height:20px;text-align:center}.tbadge.ok{background:#39536e;color:#cfe0f3}
+.al{background:linear-gradient(180deg,var(--panel),#08172a);border:1px solid var(--line2);border-left:5px solid var(--amber);border-radius:12px;margin-bottom:10px}
+.al.l2{border-color:#8a2632;border-left-color:var(--red)}.al.l3{border-color:#c0323e;border-left-color:#ff2a38;box-shadow:0 0 0 1px #ff4d5533,0 0 18px #ff4d5522}.al.acked{opacity:.72}
+.alrow{display:grid;grid-template-columns:minmax(170px,215px) minmax(110px,150px) minmax(0,1fr) minmax(96px,130px) auto;gap:10px 16px;align-items:center;padding:12px 14px}
+.albadge{display:inline-flex;align-items:center;gap:8px;padding:8px 12px;border-radius:9px;background:#3a0f16;border:1px solid #7a2530;color:#ffb0b6;font-weight:800;font-size:12.5px;letter-spacing:.3px;white-space:nowrap}.albadge i{width:9px;height:9px;border-radius:50%;background:var(--red)}
+.al.l1 .albadge{background:#3a2a06;border-color:#7a5a12;color:#ffe08a}.al.l1 .albadge i{background:var(--amber)}
+.alsvc b{font-size:20px;font-weight:800}.alsvc span{color:var(--mut);margin-left:6px}
+.alinfo{min-width:0}.alinfo b{font-weight:700}.alinfo small,.alcnt small{display:block;color:var(--mut);font-size:12px;font-weight:500}
+.alcnt{font-weight:800;text-align:center;font-size:15px}
+.albtns{display:flex;gap:8px;align-items:center;justify-content:flex-end}
+.albtn{height:38px;padding:0 16px;border-radius:9px;font-weight:800;cursor:pointer;border:1px solid var(--line2);background:#12253c;color:var(--text);white-space:nowrap}.albtn:hover{filter:brightness(1.15)}
+.albtn.act{background:#e0101f;border-color:#ff5560;color:#fff;min-width:74px}.albtn.act.done{background:#12331f;border-color:#2c7a47;color:#8ff0b3;cursor:default;filter:none}
+.alarrow{background:transparent;border:0;color:#9cb4cc;font-size:18px;cursor:pointer;width:32px;height:38px;transition:transform .15s}.al.open .alarrow{transform:rotate(90deg)}
+.almore{border-top:1px solid var(--line);padding:10px 16px 14px;display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:8px 24px;font-size:13.5px}
+.almore h4{margin:0 0 6px;font-size:12.5px;color:var(--mut);font-weight:600}.almore ol{margin:0;padding-left:20px;display:grid;gap:3px}.almore .m{font-size:12.5px}
+.alnote{color:var(--mut);font-size:12.5px;margin:2px 0 12px}
+@media(max-width:900px){.alrow{grid-template-columns:minmax(0,1fr) auto;gap:8px 12px;padding:12px}.alrow>*{min-width:0}.alrow .albadge{grid-column:1/3;justify-self:start}.alrow .alsvc{grid-column:1/2}.alrow .alcnt{grid-column:2/3;text-align:right}.alrow .alinfo{grid-column:1/3}.alrow .albtns{grid-column:1/3}.albtns .albtn:not(.alarrow){flex:1}.almore{grid-template-columns:1fr}}
+.filters{display:flex;flex-wrap:wrap;gap:12px 14px;align-items:flex-end;padding:12px 2px}
+.fld label{display:block;font-size:12.5px;color:var(--mut);margin:0 0 5px 2px}
+.chips{display:flex;flex-wrap:wrap;gap:6px;align-items:center;min-height:42px;background:var(--panel);border:1px solid var(--line2);border-radius:10px;padding:4px 8px;min-width:230px}
+.chip{display:inline-flex;align-items:center;gap:6px;background:#12365f;border:1px solid #2a6fbf;border-radius:8px;padding:3px 4px 3px 9px;font-weight:600}
+.chip button{background:transparent;border:0;cursor:pointer;color:#9cc4ff;font-size:15px;line-height:1;padding:0 4px}
+.chips input{flex:1;min-width:110px;background:transparent;border:0;outline:0;font-size:14px;padding:6px 4px}.chips input::placeholder{color:#5f7a96}
+.seg{display:flex;height:42px;background:var(--panel);border:1px solid var(--line2);border-radius:10px;padding:3px;gap:3px}
+.seg button{border:0;background:transparent;color:#a9c2da;padding:0 13px;border-radius:7px;cursor:pointer;font-weight:600;display:flex;align-items:center;gap:6px}
+.seg button[aria-pressed=true]{background:var(--cyan);color:#03203a}
+select,.sel{height:42px;background:var(--panel);border:1px solid var(--line2);border-radius:10px;padding:0 12px;color:var(--text);font-size:14px}
+.lvls{display:flex;gap:12px;height:42px;align-items:center;background:var(--panel);border:1px solid var(--line2);border-radius:10px;padding:0 12px}
+.lvls label{display:flex;align-items:center;gap:6px;cursor:pointer;margin:0;color:var(--text);font-size:14px;font-weight:600}
+.lvls input{accent-color:#1785ff;width:16px;height:16px}
+.btn{height:42px;border-radius:10px;border:1px solid var(--line2);background:var(--panel);cursor:pointer;font-weight:700;padding:0 16px}.btn:hover{filter:brightness(1.15)}
+.btn.go{background:linear-gradient(180deg,#1b8cff,#0c6be0);border-color:#4aa6ff;color:#fff}.btn.sm{height:32px;padding:0 12px;font-size:13px}
+.auto{display:flex;align-items:center;gap:7px;color:var(--mut);font-size:13px;height:42px}
+.msgs{display:grid;gap:8px;margin:2px 0 8px}.msg{border-radius:10px;padding:8px 12px;font-size:13px;border:1px solid var(--line2);background:#0c2440}
+.msg.bad{background:#3a0f16;border-color:#7a2530;color:#ffb0b6}.msg.warn{background:#3a2a06;border-color:#7a5a12;color:#ffe08a}
+.kpis{display:grid;grid-template-columns:1.25fr 1.25fr 1fr 1fr 1fr 1fr;gap:10px;margin:6px 0 12px}
+.kpi{display:flex;align-items:center;gap:12px;background:var(--panel);border:1px solid var(--line2);border-radius:13px;padding:12px 14px;min-width:0}
+.kpi .n{font-size:34px;font-weight:800;line-height:1}.kpi b{display:block;font-size:14px}.kpi span{color:var(--mut);font-size:12px;display:block}
+.kpi.gap{background:linear-gradient(120deg,#4a0f19,#2a0a12);border-color:#8a2632}.kpi.bb{background:linear-gradient(120deg,#4d2c05,#2c1a04);border-color:#8a5a12}
+.kpi .d{font-size:12px;font-weight:700;margin-top:2px}.d.up{color:#ff8a90}.d.dn{color:#7be7a5}.d.flat,.d.na{color:var(--mut);font-weight:500}
+.grid1{display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:12px}.grid2{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr) minmax(0,1fr);gap:12px;margin-top:12px}
+.card{background:linear-gradient(180deg,var(--panel),#08172a);border:1px solid var(--line2);border-radius:14px;padding:14px 16px;min-width:0}
+.card h2{margin:0;font-size:17px;font-weight:700}.card .sub{color:var(--mut);font-size:12.5px;margin-top:2px}
+.card>header{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;justify-content:space-between;margin-bottom:10px}
+.sorts{display:flex;gap:4px;align-items:center;color:var(--mut);font-size:12.5px;flex-wrap:wrap}.sorts button{padding:6px 11px;border-radius:7px;border:1px solid var(--line2);background:var(--panel);cursor:pointer;font-weight:600;color:#a9c2da}
+.sorts button[aria-pressed=true]{background:var(--cyan);color:#03203a;border-color:var(--cyan)}
+.tw{overflow-x:auto}table{width:100%;border-collapse:collapse}
+th{font-size:12px;color:#b9d0e6;text-align:left;font-weight:600;padding:8px 7px;border-bottom:1px solid var(--line2);vertical-align:bottom;white-space:normal;line-height:1.2}
+td{padding:7px;border-bottom:1px solid #12293f;white-space:nowrap}
+tbody tr{cursor:pointer}tbody tr:hover{background:#0d2440}tbody tr.sel{background:#10305a;outline:1px solid #2a6fbf;outline-offset:-1px}
+.rk{display:inline-block;width:14px;height:14px;border-radius:50%}.rk.red{background:var(--red)}.rk.orange{background:var(--amber)}.rk.yellow{background:var(--yellow)}.rk.green{background:var(--green)}.rk.nodata{background:#6b7f95}
+.svc{font-weight:800;font-size:16px}.c-red{color:#ff7a80;font-weight:700}.c-amb{color:#ffb25a;font-weight:700}.c-grn{color:#7be7a5}.m{color:var(--mut)}
+.bar4{display:inline-flex;gap:2px;align-items:flex-end;height:18px;vertical-align:middle}.bar4 i{display:block;width:5px;border-radius:1px;background:#3a5670}
+.vbtn{background:var(--blue);border:0;border-radius:7px;padding:5px 16px;font-weight:700;cursor:pointer;color:#fff}
+.tag{display:inline-block;padding:1px 7px;border-radius:6px;font-size:11px;font-weight:700;margin-left:5px}.tag.conf{background:#5a1219;color:#ffb0b6}.tag.dev{background:#4d3305;color:#ffd08a}.tag.early{background:#4a4205;color:#ffe98a}
+.pager{display:flex;gap:6px;justify-content:flex-end;align-items:center;margin-top:8px;color:var(--mut);font-size:12.5px}.pager button{padding:4px 10px;border-radius:7px;border:1px solid var(--line2);background:var(--panel);cursor:pointer}.pager button:disabled{opacity:.4;cursor:default}
+.empty{color:var(--mut);padding:16px 4px}.legend{display:grid;gap:8px;font-size:13.5px}.legend div{display:flex;align-items:center;gap:8px}.legend i{width:13px;height:13px;border-radius:50%}
+.insight{display:grid;grid-template-columns:1.1fr 1fr 1fr;gap:14px;margin-top:12px}.kv{display:grid;grid-template-columns:auto 1fr;gap:5px 14px;font-size:13.5px}.kv span:nth-child(odd){color:var(--mut)}
+.path{display:flex;gap:6px;margin:8px 0}.path div{flex:1;text-align:center;background:#0c2440;border:1px solid var(--line2);border-radius:9px;padding:6px 2px}.path b{display:block;font-size:17px}.path small{color:var(--mut)}
+#map{height:290px;border-radius:10px;overflow:hidden;background:#dfe6ea}.mapwrap{position:relative}
+.mlay{position:absolute;z-index:500;top:8px;right:8px;background:#0a1a2ee6;border:1px solid var(--line2);border-radius:10px;padding:7px 10px;display:grid;gap:4px;font-size:12.5px}
+.mlay label{display:flex;gap:6px;align-items:center;cursor:pointer;margin:0;color:var(--text)}
+.bmk{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;font-weight:800;font-size:12px;color:#03140a;border:2px solid #fff;box-shadow:0 1px 6px #0008}
+.bmk.n{background:var(--green)}.bmk.b{background:var(--red);color:#fff}.bmk.c{background:var(--yellow)}.bmk.g{background:#4aa6ff;border-color:var(--amber);color:#04203a}
+.stat3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:8px}.stat3>div{background:#0c2440;border:1px solid var(--line2);border-radius:9px;padding:8px;text-align:center}.stat3 b{display:block;font-size:22px}.stat3 small{color:var(--mut);font-size:11.5px}
+.set{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px 14px}.set label{display:block;font-size:12.5px;color:var(--mut);margin-bottom:4px}
+.set input{width:100%;height:38px;background:var(--panel);border:1px solid var(--line2);border-radius:9px;padding:0 10px;color:var(--text)}.set small{color:#6f88a3;font-size:11.5px}
+.toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:#12365f;border:1px solid #2a6fbf;padding:9px 16px;border-radius:10px;z-index:3000;opacity:0;pointer-events:none;transition:opacity .2s}.toast.show{opacity:1}
+.leaflet-popup-content-wrapper,.leaflet-popup-tip{background:#0a1a2e;color:#eaf3ff}
+.foot{display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px;color:#7f97b0;font-size:12.5px;padding:14px 4px 0}
+.sk{height:14px;border-radius:6px;background:linear-gradient(90deg,#0d2440,#163a63,#0d2440);background-size:200% 100%;animation:sk 1.2s linear infinite;margin:10px 0}@keyframes sk{to{background-position:-200% 0}}
+@media(max-width:1200px){.kpis{grid-template-columns:repeat(3,1fr)}.grid1,.grid2,.insight{grid-template-columns:1fr}}
+@media(max-width:760px){.kpis{grid-template-columns:repeat(2,1fr)}.hide-m{display:none}.chips{min-width:0;width:100%}.filters .fld{width:100%}.seg{width:100%}.seg button{flex:1;justify-content:center;padding:0 6px}.brand h1{font-size:20px}}
+
+.tabs{flex-wrap:wrap}
+.hx-top{display:grid;grid-template-columns:320px minmax(0,1fr);gap:12px;margin-top:12px}.hx-mid{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:12px;margin-top:12px}
+.hx-bot{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);gap:12px;margin-top:12px}
+.hx-sc h2{font-size:16px;margin:0 0 8px}.hx-sc .fld{margin-bottom:10px}.hx-f2{display:grid;grid-template-columns:1fr 1fr;gap:10px}.hx-sc input.sel,.hx-sc select{width:100%}
+.hx-sc .btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}.hx-sc .btns .btn{flex:1}.hx-note,.ho-note{font-size:12px;color:var(--mut);margin-top:8px;line-height:1.45}
+.hx-info{background:var(--panel2);border:1px solid var(--line2);border-radius:10px;padding:9px 11px;font-size:12.5px;color:#cfe0f3;margin:6px 0 10px;line-height:1.5}
+.hx-err{color:#ff9aa0}
+#hoTrips{width:100%}#hoTrips th{white-space:normal;font-size:12px;vertical-align:bottom}#hoTrips td{white-space:nowrap}
+#hoTrips input.late{width:64px;height:34px;background:var(--panel);border:1px solid var(--line2);border-radius:8px;color:var(--text);text-align:center;font-size:14px}
+#hoTrips input[type=radio]{accent-color:#ff4d55;width:18px;height:18px}
+#hoTrips tr.dis td{background:#3a0f16;color:#ffb3b8}#hoTrips tr.dis td b{color:#ff7b82}#hoTrips td.wl{color:#ffd166;font-weight:700}#hoTrips td.wr{color:#ff7b82;font-weight:700}
+#hoMap{position:relative;height:440px;border-radius:10px;overflow:hidden;background:#dfe6ea}
+.holeg{display:flex;flex-wrap:wrap;gap:6px 14px;color:var(--mut);font-size:12px;margin-bottom:8px;align-items:center}.holeg i{display:inline-block;width:22px;height:0;border-top:5px solid;vertical-align:middle;margin-right:5px}
+.hostar{font-size:34px;line-height:30px;color:#ff4d55;text-shadow:0 0 3px #fff,0 0 3px #fff,0 0 6px #fff;text-align:center;width:30px}
+.hoend{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;font-weight:800;font-size:12px;color:#03140a;background:#fff;border:2px solid #0a1a2e;box-shadow:0 1px 5px #0008}
+.ho-msg{padding:14px 4px;color:var(--mut)}
+.hsel{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:2px 0 10px}.hsel select{min-width:220px;flex:1}
+.pill{display:inline-block;padding:4px 12px;border-radius:8px;font-weight:700;font-size:12.5px;border:1px solid}.pill.g{background:#0f3a24;border-color:#2c7a47;color:#8ff0b3}.pill.a{background:#3a2a06;border-color:#7a5a12;color:#ffe08a}.pill.n{background:#12253c;border-color:var(--line2);color:#cfe0f3}
+.hocmp{display:grid;grid-template-columns:1fr 1fr;gap:8px}.hocmp>div{border-radius:10px;padding:9px 12px;border:1px solid var(--line2)}.hocmp .no{background:#1a2740}.hocmp .yes{background:#0b3320;border-color:#2c7a47}.hocmp h4{margin:0 0 6px;font-size:14px}
+.hocmp .k{color:var(--mut);font-size:12px}.hocmp .v{font-size:19px;font-weight:800;margin-bottom:4px}.hocmp .yes .v{color:#7be7a5}
+.hoimp{display:grid;grid-template-columns:1.2fr 1fr;gap:8px;margin-top:8px;background:#0f3a24;border:1px solid #2c7a47;border-radius:10px;padding:10px 12px}.hoimp.w{background:#3a2a06;border-color:#7a5a12}.hoimp b{font-size:20px}.hoimp small{display:block;color:#a9c2da;font-size:11.5px}
+.hosum{margin:10px 0 0;padding:10px 12px;border-radius:10px;background:var(--panel2);border:1px solid var(--line2);font-size:13px;line-height:1.7}.hosum b{color:#fff}
+.horw{list-style:none;margin:8px 0 0;padding:0;display:grid;gap:5px;font-size:13px}.horw li:before{content:"\26A0";color:var(--amber);margin-right:8px}.horw li.g:before{content:"\2714";color:#22d36a}
+#hoOpts tr.rec td{background:#0f3a24}#hoOpts tr.sel td{background:#10305a}#hoOpts tr.rec.sel td{background:#14523a}#hoOpts tr.bad td{color:#9fb4ca}#hoOpts td.rm{white-space:normal;min-width:140px;font-size:12.5px}#hoOpts small{display:block;color:var(--mut)}#hoOpts th,#hoOpts td{padding:8px 6px}
+.hoheat{border-collapse:separate;border-spacing:2px}.hoheat td,.hoheat th{text-align:center;padding:7px 2px;border:0;border-radius:4px;font-weight:700;min-width:30px}.hoheat th{background:transparent;color:#b9d0e6;font-weight:600;font-size:12px}.hoheat td.l{text-align:left;background:transparent;color:#cfe0f3;white-space:nowrap;padding-left:2px}
+.hc-r{background:#c2313c;color:#fff}.hc-o{background:#ee8a2a;color:#1a1000}.hc-y{background:#f4d23c;color:#221a00}.hc-g{background:#22b567;color:#03140a}.hc-n{background:#22303f;color:#8ba3bd}
+.hokey{display:flex;flex-wrap:wrap;gap:6px 14px;color:var(--mut);font-size:12px;margin-bottom:8px}.hokey i{display:inline-block;width:13px;height:13px;border-radius:3px;vertical-align:middle;margin-right:5px}
+.hotake{list-style:none;margin:0;padding:0;display:grid;gap:9px;font-size:13.5px}.hotake li{display:flex;gap:9px}.hotake li:before{content:"\2714";color:#22d36a}.hotake li.w:before{content:"\26A0";color:var(--amber)}
+details.hall{margin-top:10px}details.hall summary{cursor:pointer;color:#9cc4ff;font-weight:600;font-size:13px}
+@media(max-width:1180px){.hx-top,.hx-mid,.hx-bot{grid-template-columns:minmax(0,1fr)}.hx-mid>#hoRes{order:-1}}
+@media(max-width:560px){.hocmp{grid-template-columns:1fr}.hoimp{grid-template-columns:1fr}.hx-f2{grid-template-columns:1fr 1fr}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <div class="brand"><div class="logo">&#128652;</div><div><h1>SG Transport Pulse</h1><p>Halfway Deployment Simulator &bull; Lose one trip, insert a replacement halfway &bull; See the headway recovered</p></div></div>
+    <nav class="nav" aria-label="Pages"><a href="/">Route Traffic</a><a href="/control">Headway Control</a><a href="/bunching">Bunching &amp; Gap</a><a class="on" href="/halfway" aria-current="page">Halfway Optimiser</a></nav>
+    <div class="hdr-right"><div id="clock">&nbsp;</div><div class="live" id="live"><span class="dot"></span><span id="liveText">Connecting&hellip;</span></div></div>
+  </header>
+  <div class="tabs" role="tablist"><button role="tab" id="tabOpt" aria-selected="true">Simulator</button><button role="tab" id="tabSet" aria-selected="false">Settings</button></div>
+
+  <main id="opt">
+    <div class="hx-top">
+      <section class="card hx-sc">
+        <h2>1. Scenario</h2>
+        <div class="hx-f2"><div class="fld"><label for="hoSvc">Service</label><input id="hoSvc" class="sel" maxlength="6" autocapitalize="characters" placeholder="e.g. 32"></div>
+          <div class="fld"><label>Direction</label><div class="seg" id="hoDir"><button type="button" data-d="1" aria-pressed="true">Dir 1</button><button type="button" data-d="2" aria-pressed="false">Dir 2</button></div></div></div>
+        <div class="hx-f2"><div class="fld"><label for="hoRef">First departure</label><input id="hoRef" class="sel" type="text" maxlength="5" inputmode="numeric" placeholder="08:10" aria-label="Scheduled departure of trip 1 at the first stop (HH:MM)"></div>
+          <div class="fld"><label for="hoHw">Headway, min</label><input id="hoHw" class="sel" type="number" min="1" max="120" step="0.5" inputmode="decimal"></div></div>
+        <div class="hx-f2"><div class="fld"><label for="hoLay">Layover, min</label><input id="hoLay" class="sel" type="number" min="0" max="60" step="1" inputmode="decimal"></div>
+          <div class="fld"><label for="hoDelay">Replacement delay, min</label><input id="hoDelay" class="sel" type="number" min="-30" max="60" step="1" inputmode="decimal"></div></div>
+        <div class="fld"><label for="hoExtra">Also test another stop <small>(what-if, code)</small></label><input id="hoExtra" class="sel" list="hoStopsList" maxlength="5" inputmode="numeric" placeholder="optional 5-digit stop code"><datalist id="hoStopsList"></datalist></div>
+        <div class="hx-info" id="hoInfo">Enter a service to load its route.</div>
+        <div class="btns"><button class="btn go" id="hoRun" type="button">Run simulation</button><button class="btn" id="hoEx" type="button">Load example</button></div>
+        <div class="hx-note" id="hoMsg"></div>
+      </section>
+      <section class="card">
+        <header><div><h2>2. Trip sequence at the first stop</h2><div class="sub" id="hoTripSub">Type each trip's arrival lateness and mark ONE trip as Disrupted. No bus is picked: the schedule at the first stop is the common reference.</div></div></header>
+        <div class="tw"><table id="hoTrips"><thead><tr><th>Trip</th><th>Sch Arr</th><th>Act Arr</th><th>Lateness (min)</th><th>Next trip Sch Dep</th><th>Next trip Act Dep</th><th>Dep HW</th><th>Disrupted</th></tr></thead><tbody></tbody></table></div>
+        <div class="hx-note">Actual departure = the later of the scheduled departure and the actual arrival + the minimum layover. A Disrupted trip does not depart (the trip is lost). Dep HW = gap to the previous actual departure.</div>
+      </section>
+    </div>
+    <div class="hx-mid">
+      <section class="card"><header><div><h2>Route: missing trip, halfway start, resumed section</h2></div></header>
+        <div class="holeg"><span><i style="border-color:#1785ff"></i>Route</span><span><i style="border-color:#ff4d55"></i>Trip missing (not served)</span><span><i style="border-color:#22d36a"></i>Replacement resumes service</span><span style="color:#ff4d55">&#9733; Halfway start</span></div>
+        <div class="mapwrap"><div id="hoMap"></div></div></section>
+      <section class="card" id="hoRes"><div class="ho-msg">Mark a trip as Disrupted to compare <b>No halfway</b> with <b>Halfway</b>.</div></section>
+    </div>
+    <div class="hx-mid">
+      <section class="card"><header><div><h2>Halfway options compared</h2><div class="sub">Every approved stop, same 10 trips. Click a row to view it.</div></div></header><div class="tw"><table id="hoOpts"></table></div><div class="ho-note" id="hoOptsNote"></div></section>
+      <section class="card"><header><div><h2>Headway along the route</h2><div class="sub">Largest headway around the missing trip, stop by stop</div></div></header><div id="hoProf"></div></section>
+    </div>
+    <div class="hx-bot">
+      <section class="card" id="hoHeatCard"><header><div><h2>Stop-by-stop headway</h2><div class="sub">No Halfway vs With Halfway at key stops (min). Green = within &plusmn;20% of scheduled.</div></div></header><div class="hokey" id="hoKey"></div><div class="tw" id="hoHeat"></div>
+        <details class="hall"><summary>All stops</summary><div class="tw"><table id="hoAll"></table></div></details></section>
+      <section class="card"><header><div><h2>Key takeaways</h2></div></header><ul class="hotake" id="hoTake"></ul></section>
+    </div>
+  </main>
+
+  <main id="settings" hidden>
+    <section class="card"><header><div><h2>Simulator parameters</h2><div class="sub">Defaults for the scenario. The page can override headway, layover and replacement delay for a single run.</div></div><div><button class="btn sm go" id="hoParSave" type="button">Save</button> <button class="btn sm" id="hoParReset" type="button">Reset to defaults</button></div></header><div class="set" id="hoParams"></div><div class="sub" id="hoParNote"></div></section>
+    <section class="card" style="margin-top:12px"><header><div><h2>Approved halfway stops</h2><div class="sub">Only these stops are tested (plus one what-if stop typed on the Simulator page). One row per service, direction and stop.</div></div>
+      <div><button class="btn sm" id="hoPTpl" type="button">Template</button> <button class="btn sm go" id="hoPUp" type="button">Upload CSV</button> <button class="btn sm" id="hoPClr" type="button">Clear all</button><input type="file" id="hoPFile" accept=".csv,.txt,.tsv" hidden></div></header>
+      <div class="tw" id="hoPts"></div>
+      <div class="set" style="margin-top:12px;align-items:end"><div><label for="hoAS">Service</label><input id="hoAS" maxlength="6" placeholder="32"></div><div><label for="hoAD">Direction</label><select id="hoAD" style="width:100%"><option>1</option><option>2</option></select></div><div><label for="hoAC">Stop code (5 digits)</label><input id="hoAC" maxlength="5" placeholder="18011"></div><div><label for="hoAQ">or stop sequence</label><input id="hoAQ" maxlength="3" placeholder="18"></div><div><label><input type="checkbox" id="hoAE" checked style="width:auto;height:auto"> Enabled</label><button class="btn sm go" id="hoPAdd" type="button" style="margin-top:6px">Add stop</button></div></div>
+      <div class="sub" style="margin-top:8px">CSV columns: service, direction, stop_code, sequence, enabled (a header row is optional; stop_code or sequence is required).</div></section>
+    <section class="card" style="margin-top:12px"><header><div><h2>Simulation audit log</h2><div class="sub">Each time you press <b>Run simulation</b> the scenario and both outcomes are stored (live re-simulation while you edit is not).</div></div></header><div class="tw" id="hoRuns"></div></section>
+  </main>
+
+  <footer class="foot"><span>Sources: LTA DataMall (Bus Routes/Stops/Services, Traffic Speed Bands) &nbsp;|&nbsp; A scenario simulation from the schedule at the first stop, not live bus data. Decision support only, not for operational use</span><span>SG Transport Pulse V7.0</span></footer>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const f1 = x => x == null ? "\u2013" : (Math.abs(x - Math.round(x)) < .05 ? String(Math.round(x)) : x.toFixed(1));
+const LS = {get(k, d){ try{ const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); }catch(e){ return d; } }, set(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }};
+const sgt = o => new Intl.DateTimeFormat("en-GB", {timeZone:"Asia/Singapore", hour12:false, ...o});
+function tick(){ const p = Object.fromEntries(sgt({weekday:"short", day:"2-digit", month:"short", year:"numeric", hour:"2-digit", minute:"2-digit"}).formatToParts(new Date()).map(x => [x.type, x.value])); $("clock").textContent = `${p.weekday}, ${p.day} ${p.month} ${p.year}  ${p.hour}:${p.minute}`; }
+tick(); setInterval(tick, 15000);
+function setLive(state, text, title){ const e = $("live"); e.className = "live " + state; $("liveText").textContent = text; e.title = title || ""; }
+let toastT; function toast(m){ const t = $("toast"); t.textContent = m; t.classList.add("show"); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove("show"), 3800); }
+async function getJSON(u, ms){ const c = new AbortController(), t = setTimeout(() => c.abort(), ms || 60000); try{ const r = await fetch(u, {signal:c.signal}); const j = await r.json().catch(() => ({})); if(!r.ok && !j.error) j.error = "Server error " + r.status; return j; }catch(e){ return {error: e.name === "AbortError" ? "Timed out" : "Network error"}; } finally{ clearTimeout(t); } }
+async function post(url, body){
+  const send = tok => fetch(url, {method:"POST", headers:tok ? {"x-admin-token":tok} : {}, body});
+  let r = await send(sessionStorage.getItem("bb.tok") || "");
+  if(r.status === 401){ const t = prompt("This server needs an admin token (BUNCHING_ADMIN_TOKEN / TIMETABLE_TOKEN):"); if(!t) return {error:"Cancelled"}; sessionStorage.setItem("bb.tok", t); r = await send(t); }
+  const j = await r.json().catch(() => ({error:"Bad response"})); if(!r.ok && !j.error) j.error = "Error " + r.status; return j;
+}
+
+function csvDownload(name, rows){ const csv = rows.map(r => r.map(v => { v = v == null ? "" : String(v); return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; }).join(",")).join("\n"); const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([csv], {type:"text/csv"})); a.download = name; document.body.appendChild(a); a.click(); a.remove(); }
+/* ===================== Halfway Deployment Simulator (a scenario from the schedule at the first stop; never identifies a bus, never deploys) ===================== */
+const S = {tab:"opt", hoCfg:null};
+const HO = {svc:LS.get("ho.svc", ""), dir:LS.get("ho.dir", 1), setup:null, res:null, sel:null, selCode:null, map:null, g:null, late:[], dis:3, tok:0, timer:null, n:10};
+const hm = m => { m = ((Math.round(m) % 1440) + 1440) % 1440; return String(Math.floor(m / 60)).padStart(2, "0") + ":" + String(m % 60).padStart(2, "0"); };
+const hoF = x => x == null ? "\u2013" : f1(x);
+const hoPct = x => x == null ? "\u2013" : f1(x) + "%";
+function hoCls(h, H, bm){ if(h == null) return "hc-n"; if(h < bm || h >= 2 * H - 1e-9) return "hc-r"; if(h >= 1.5 * H - 1e-9) return "hc-o"; if(Math.abs(h - H) <= .2 * H + 1e-9) return "hc-g"; return "hc-y"; }
+function hoSelC(){ const r = HO.res; return r && r.ok && HO.sel != null ? r.candidates[HO.sel] : null; }
+function hoMsg(t, err){ const e = $("hoMsg"); e.textContent = t || ""; e.classList.toggle("hx-err", !!err); }
+function hoInitMap(){
+  if(HO.map || typeof L === "undefined") return;
+  HO.map = L.map("hoMap", {zoomControl:true, attributionControl:false, minZoom:11, maxZoom:19}).setView([1.3521, 103.8198], 11);
+  const AO = `<a href="https://www.onemap.gov.sg/" target="_blank" rel="noopener">OneMap</a> | \u00a9 ${new Date().getFullYear()} Singapore Land Authority`, AS = `Basemap \u00a9 OpenStreetMap contributors (OneMap unavailable)`, m = HO.map;
+  const om = L.tileLayer("https://www.onemap.gov.sg/maps/tiles/Default/{z}/{x}/{y}.png", {minZoom:11, maxZoom:19, attribution:AO}).addTo(m); let ok = 0, bad = 0, sw = false;
+  om.on("tileload", () => { ok++; }); om.on("tileerror", () => { bad++; if(!sw && ok === 0 && bad >= 4){ sw = true; m.removeLayer(om); L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {minZoom:11, maxZoom:19, attribution:AS}).addTo(m); } });
+  L.control.attribution({position:"bottomleft", prefix:false}).addTo(m);
+  HO.g = {route:L.layerGroup().addTo(m), stops:L.layerGroup().addTo(m)};
+}
+/* ---- route + defaults for the chosen service */
+async function hoLoad(){
+  const svc = $("hoSvc").value.trim().toUpperCase(); HO.svc = svc; LS.set("ho.svc", svc); HO.res = null; HO.sel = null; HO.selCode = null; HO.setup = null;
+  if(!svc){ $("hoInfo").textContent = "Enter a service to load its route."; hoMsg(""); hoRender(); return; }
+  hoMsg("Loading route\u2026");
+  const j = await getJSON(`/api/halfway/setup?service=${encodeURIComponent(svc)}&direction=${HO.dir}`, 60000);
+  if(svc !== HO.svc) return;
+  HO.setup = j;
+  if(j.error){ $("hoInfo").innerHTML = `<span class="hx-err">${esc(j.error)}</span>`; hoMsg(""); hoRender(); return; }
+  if(!$("hoRef").value) $("hoRef").value = j.ref;
+  $("hoHw").value = j.sched_hw != null ? j.sched_hw : ""; $("hoHw").placeholder = j.sched_hw != null ? "" : "enter it";
+  $("hoLay").value = j.params.layover_min; $("hoDelay").value = j.params.start_delay_min;
+  HO.n = j.params.n_trips; hoBuildTrips();
+  $("hoStopsList").innerHTML = j.stops.map(s => `<option value="${esc(s[0])}">${esc(s[1])}</option>`).join("");
+  $("hoInfo").innerHTML = `<b>Svc ${esc(j.service)} Dir ${HO.dir}</b>: ${esc(j.first)} \u2192 ${esc(j.last)}<br>${j.n_stops} stops \u00b7 ${f1(j.route_km)} km \u00b7 ${Math.round(j.run_min)} min running ${j.traffic_ok ? "(current traffic)" : "(fallback speed: no traffic data)"}<br>` +
+    (j.sched_hw != null ? `Scheduled headway ${f1(j.sched_hw)} min (${esc(j.hw_src)})` : `<span class="hx-err">Scheduled headway unknown - enter it in the Headway box.</span>`) +
+    `<br>${j.points.length ? j.points.length + " approved halfway stop" + (j.points.length > 1 ? "s" : "") : "<b>No approved halfway stops</b> - add them in Settings, or type a stop code to test."}` + (j.unresolved.length ? `<br><span class="hx-err">Not on this route: ${esc(j.unresolved.join(", "))}</span>` : "");
+  hoMsg(""); hoSim(false);
+}
+/* ---- the editable trip table (built once so typing is never interrupted) */
+function hoBuildTrips(){
+  const n = HO.n; while(HO.late.length < n) HO.late.push(0); HO.late.length = n; if(!(HO.dis >= 2 && HO.dis <= n - 1)) HO.dis = Math.min(3, n - 1);
+  $("hoTrips").querySelector("tbody").innerHTML = Array.from({length:n}, (_, k) => { const i = k + 1, edge = i === 1 || i === n;
+    return `<tr data-i="${i}"><td class="svc">${i}</td><td class="sa"></td><td class="aa"></td><td><input class="late" type="number" step="1" min="-60" max="300" inputmode="decimal" value="${HO.late[k]}" data-i="${i}" aria-label="Lateness of trip ${i} in minutes"></td><td class="sd"></td><td class="ad"></td><td class="dh"></td><td><input type="radio" name="hodis" value="${i}" ${HO.dis === i ? "checked" : ""} ${edge ? "disabled title='A disrupted trip needs a trip before and after it'" : ""} aria-label="Mark trip ${i} as disrupted"></td></tr>`; }).join("");
+  document.querySelectorAll("#hoTrips input.late").forEach(x => x.oninput = () => { HO.late[+x.dataset.i - 1] = x.value === "" ? 0 : +x.value; hoSchedule(); });
+  document.querySelectorAll("#hoTrips input[name=hodis]").forEach(x => x.onchange = () => { HO.dis = +x.value; hoSchedule(); });
+}
+function hoRenderTrips(){
+  const r = HO.res; if(!r || !r.ok) return; const H = r.sched_hw;
+  r.trips.forEach(t => { const tr = document.querySelector(`#hoTrips tr[data-i="${t.n}"]`); if(!tr) return; tr.className = t.disrupted ? "dis" : "";
+    tr.querySelector(".sa").textContent = hm(t.sch_arr); tr.querySelector(".aa").textContent = hm(t.act_arr); tr.querySelector(".sd").textContent = hm(t.sch_dep);
+    tr.querySelector(".ad").innerHTML = t.disrupted ? "<b>Disrupted</b>" : hm(t.act_dep) + (t.dep_late >= .5 ? ` <small>(+${f1(t.dep_late)})</small>` : "");
+    const dh = tr.querySelector(".dh"); dh.textContent = t.dep_hw == null ? "\u2014" : f1(t.dep_hw); dh.className = "dh" + (t.dep_hw != null && t.dep_hw >= 2 * H - 1e-9 ? " wr" : t.dep_hw != null && t.dep_hw >= 1.5 * H - 1e-9 ? " wl" : ""); });
+  $("hoTripSub").textContent = `Trips at ${r.route ? r.route.first : "the first stop"}, scheduled every ${f1(H)} min from ${r.ref}. Type each trip's arrival lateness and mark ONE trip as Disrupted. No bus is picked: the first-stop schedule is the common reference.`;
+}
+/* ---- simulate */
+function hoSchedule(){ clearTimeout(HO.timer); HO.timer = setTimeout(() => hoSim(false), 350); }
+function hoUrl(save){
+  const hw = $("hoHw").value.trim(), std = HO.setup && HO.setup.sched_hw != null && Math.abs(+hw - HO.setup.sched_hw) < 1e-9;
+  return "/api/halfway/simulate?" + new URLSearchParams({service:HO.svc, direction:HO.dir, ref:$("hoRef").value.trim(), hw:std ? "" : hw, layover:$("hoLay").value.trim(), delay:$("hoDelay").value.trim(), late:HO.late.join(","), disrupted:HO.dis || "", stop:$("hoExtra").value.trim(), save:save ? "1" : ""});
+}
+async function hoSim(save){
+  if(!HO.svc || !HO.setup || HO.setup.error) return;
+  const tok = ++HO.tok; if(save){ $("hoRun").disabled = true; hoMsg("Simulating\u2026"); }
+  const j = await getJSON(hoUrl(save), 60000);
+  if(tok !== HO.tok) return;
+  $("hoRun").disabled = false; HO.res = j; hoPickSel(); hoMsg(j.ok ? "" : j.error, !j.ok); hoRender();
+  if(save && j.ok) toast(j.run_id ? `Simulation stored (run #${j.run_id})` : "Mark one trip as Disrupted, then run the simulation");
+}
+function hoPickSel(){
+  const r = HO.res; if(!r || !r.ok || !r.candidates.length){ HO.sel = null; return; }
+  let i = HO.selCode ? r.candidates.findIndex(c => c.code === HO.selCode) : -1;
+  if(i < 0 && r.recommended != null) i = r.recommended;
+  if(i < 0){ const ranked = r.candidates.map((c, k) => [c, k]).filter(x => x[0].improvement).sort((a, b) => b[0].improvement.avg_pct - a[0].improvement.avg_pct); i = ranked.length ? ranked[0][1] : -1; }
+  HO.sel = i >= 0 ? i : null; HO.selCode = HO.sel != null ? r.candidates[HO.sel].code : null;
+}
+function hoRender(){ hoRenderTrips(); hoRenderRes(); hoRenderOpts(); hoRenderProf(); hoRenderHeat(); hoRenderTake(); hoRenderMap(); }
+/* ---- result card: Scenario A vs Scenario B */
+function hoRenderRes(){
+  const r = HO.res, el = $("hoRes");
+  if(!r){ el.innerHTML = `<div class="ho-msg">Enter a service to load its route.</div>`; return; }
+  if(!r.ok){ el.innerHTML = `<div class="ho-msg hx-err">${esc(r.error)}</div>`; return; }
+  if(r.disrupted == null){ el.innerHTML = `<div class="ho-msg">${esc(r.message)} Then choose a halfway stop to compare <b>No halfway</b> with <b>Halfway</b>.</div>`; return; }
+  if(!r.candidates.length){ el.innerHTML = `<header><h2>Halfway result</h2></header><div class="ho-msg">${esc(r.message)} Add approved stops in <b>Settings</b>, or type a stop code under "Also test another stop".</div>`; return; }
+  const c = hoSelC(), best = r.recommended === HO.sel, ma = c.metrics_a, mb = c.metrics_b, imp = c.improvement, ew = x => (x >= 0 ? "+" : "") + f1(Math.round(x * 100) / 100);
+  const pill = best ? `<span class="pill g">Best simulated option</span>` : r.recommended == null ? `<span class="pill a">No stop recommended</span>` : `<span class="pill n">Selected option (not the best)</span>`;
+  const bunch = mb.bunched_stops > ma.bunched_stops ? `<li>New bunching downstream: ${mb.bunched_stops} stop${mb.bunched_stops > 1 ? "s" : ""}, shortest headway ${f1(mb.min_gap)} min</li>` : `<li class="g">No new bunching downstream (shortest headway ${f1(mb.min_gap)} min)</li>`;
+  el.innerHTML = `<header style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:0"><h2>Halfway result</h2>${pill}</header>
+    <div class="hsel"><label for="hoStopSel" class="m">Halfway stop</label><select id="hoStopSel">${r.candidates.map((k, i) => `<option value="${i}" ${i === HO.sel ? "selected" : ""}>${k.seq}. ${esc(k.name)}${r.recommended === i ? " \u2605 best" : ""}${k.approved ? "" : " (what-if)"}</option>`).join("")}</select></div>
+    <div class="hocmp"><div class="no"><h4>Scenario A \u2013 No halfway</h4><div class="k">Maximum headway</div><div class="v">${hoF(ma.max)} min</div><div class="k">Average affected headway</div><div class="v">${hoF(ma.avg)} min</div><div class="k">Simulated EWT</div><div class="v">${ew(ma.ewt)} min</div></div>
+      <div class="yes"><h4>Scenario B \u2013 Halfway</h4><div class="k">Maximum headway</div><div class="v">${hoF(mb.max)} min</div><div class="k">Average affected headway</div><div class="v">${hoF(mb.avg)} min</div><div class="k">Simulated EWT</div><div class="v">${ew(mb.ewt)} min</div></div></div>
+    <div class="hoimp ${imp.avg_min > 0 ? "" : "w"}"><div><small>Headway improvement</small><b>${imp.avg_min > 0 ? "\u25BC " : ""}${f1(imp.avg_min)} min (${f1(imp.avg_pct)}%)</b></div><div><small>Section restored</small><b>${c.restored_stops} stops</b><small>${f1(c.restored_km)} km \u00b7 from ${hm(c.start_time)} at ${esc(c.name)}</small></div></div>
+    <div class="hosum"><b>Without Halfway:</b> Maximum headway = ${hoF(ma.max)} min; Average affected headway = ${hoF(ma.avg)} min<br><b>With Halfway:</b> Maximum headway = ${hoF(mb.max)} min; Average affected headway = ${hoF(mb.avg)} min<br><b>Headway improvement</b> = ${hoF(imp.avg_min)} min (${f1(imp.avg_pct)}%)</div>
+    <ul class="horw">${bunch}${c.violations.map(v => `<li>${esc(v)}</li>`).join("")}${c.warnings.map(v => `<li>${esc(v)}</li>`).join("")}</ul>
+    <div class="ho-note">Simulated from the entered scenario and current LTA traffic running times. Average affected headway = the headway(s) around the missing trip, over the stops from the halfway stop to the terminal. EWT is a simulated waiting-time penalty, not LTA's. Decision support only.</div>`;
+  $("hoStopSel").onchange = e => { HO.sel = +e.target.value; HO.selCode = r.candidates[HO.sel].code; hoRender(); };
+}
+/* ---- options table */
+function hoRenderOpts(){
+  const r = HO.res, t = $("hoOpts");
+  if(!r || !r.ok || r.disrupted == null || !r.candidates.length){ t.innerHTML = ""; $("hoOptsNote").textContent = ""; return; }
+  let h = `<thead><tr><th>Halfway stop</th><th>Replacement at stop</th><th>Stops restored</th><th>Max HW no \u2192 with</th><th>Avg affected HW no \u2192 with</th><th>Improvement</th><th>New bunching</th><th>Remarks</th></tr></thead><tbody>`;
+  r.candidates.forEach((c, i) => { const rec = r.recommended === i, ma = c.metrics_a, mb = c.metrics_b, imp = c.improvement;
+    const rm = c.violations.length ? c.violations[0] : rec ? "Best simulated option" : c.warnings.some(w => /what-if/.test(w)) ? "What-if (not approved)" : "Viable";
+    h += `<tr data-i="${i}" tabindex="0" class="${rec ? "rec " : ""}${HO.sel === i ? "sel " : ""}${c.viable ? "" : "bad"}"><td class="svc">${rec ? "\u2605 " : ""}${c.seq}. ${esc(c.name)}<small>${esc(c.code)}${c.approved ? "" : " \u00b7 what-if"}</small></td>`;
+    h += ma ? `<td>${hm(c.start_time)}</td><td>${c.restored_stops}<small>${f1(c.restored_km)} km</small></td><td>${hoF(ma.max)} \u2192 <b>${hoF(mb.max)}</b></td><td>${hoF(ma.avg)} \u2192 <b>${hoF(mb.avg)}</b></td><td>${f1(imp.avg_min)} min<small>${f1(imp.avg_pct)}%</small></td><td>${mb.bunched_stops > ma.bunched_stops ? "<b style='color:#ff7b82'>Yes</b>" : "No"}</td>` : `<td>\u2013</td><td>\u2013</td><td>\u2013</td><td>\u2013</td><td>\u2013</td><td>\u2013</td>`;
+    h += `<td class="rm">${esc(rm)}</td></tr>`; });
+  t.innerHTML = h + "</tbody>";
+  t.querySelectorAll("tbody tr[data-i]").forEach(tr => { const go = () => { HO.sel = +tr.dataset.i; HO.selCode = r.candidates[HO.sel].code; hoRender(); }; tr.onclick = go; tr.onkeydown = e => { if(e.key === "Enter" || e.key === " "){ e.preventDefault(); go(); } }; });
+  $("hoOptsNote").textContent = `Same ${r.n_trips} trips in every row. Average affected headway is measured from each halfway stop to the terminal. Recommended = the largest improvement that creates no new bunching (earlier stop wins a tie: more stops restored). Bunching = a headway below ${r.bunch_min} min.`;
+}
+/* ---- headway along the route */
+function hoRenderProf(){
+  const r = HO.res, c = hoSelC(), el = $("hoProf");
+  if(!c || !r.baseline){ el.innerHTML = `<div class="ho-msg">${r && r.ok && r.disrupted != null ? "Choose a halfway stop." : "Run a simulation to see the headway profile."}</div>`; return; }
+  const bj = {}, cj = {}; r.baseline.series.forEach(s => bj[s.j] = s); c.series.forEach(s => cj[s.j] = s);
+  const pts = r.monitor.map(m => ({m, a:bj[m.j] ? bj[m.j].wa : null, b:cj[m.j] ? cj[m.j].wb : null})), H = r.sched_hw;
+  const vals = pts.flatMap(p => [p.a, p.b]).filter(v => v != null).concat([H * 1.5]), ymax = Math.ceil(Math.max(...vals) * 1.15 / 5) * 5 || 10;
+  const W = 560, Ht = 270, pl = 40, pr = 14, pt = 22, pb = 68, x = i => pl + (pts.length < 2 ? 0 : i * (W - pl - pr) / (pts.length - 1)), y = v => pt + (Ht - pt - pb) * (1 - v / ymax);
+  let s = `<svg viewBox="0 0 ${W} ${Ht}" role="img" aria-label="Largest headway around the missing trip at key stops, with and without halfway" style="width:100%;height:auto">`;
+  for(let g = 0; g <= ymax; g += ymax / 5) s += `<line x1="${pl}" x2="${W - pr}" y1="${y(g)}" y2="${y(g)}" stroke="#163250"/><text x="${pl - 6}" y="${y(g) + 4}" text-anchor="end" font-size="11" fill="#8ba3bd">${Math.round(g)}</text>`;
+  s += `<line x1="${pl}" x2="${W - pr}" y1="${y(H)}" y2="${y(H)}" stroke="#8ba3bd" stroke-dasharray="4 4"/><text x="${W - pr}" y="${y(H) - 4}" text-anchor="end" font-size="10" fill="#8ba3bd">scheduled ${f1(H)}</text>`;
+  const line = (k, col, dy) => { const seg = pts.map((p, i) => p[k] == null ? null : `${x(i).toFixed(1)},${y(p[k]).toFixed(1)}`).filter(Boolean); return seg.length ? `<polyline points="${seg.join(" ")}" fill="none" stroke="${col}" stroke-width="2.5"/>` + pts.map((p, i) => p[k] == null ? "" : `<circle cx="${x(i)}" cy="${y(p[k])}" r="3.5" fill="${col}"/><text x="${x(i)}" y="${y(p[k]) + dy}" text-anchor="middle" font-size="10" fill="${col}">${Math.round(p[k])}</text>`).join("") : ""; };
+  const fi = pts.findIndex(p => p.m.j >= c.j); if(fi >= 0){ const fx = fi === 0 ? x(0) : x(fi - 1) + (x(fi) - x(fi - 1)) * ((c.j - pts[fi - 1].m.j) / Math.max(1, pts[fi].m.j - pts[fi - 1].m.j)); s += `<line x1="${fx}" x2="${fx}" y1="${pt}" y2="${Ht - pb}" stroke="#b06bff" stroke-dasharray="3 5"/><text x="${fx + 4}" y="${pt + 10}" font-size="10" fill="#c9a2ff">halfway start</text>`; }
+  s += line("a", "#ff5a5f", -8) + line("b", "#22d36a", 15);
+  pts.forEach((p, i) => { const lb = p.m.terminal ? "Terminal" : (p.m.name || "").slice(0, 12); s += `<text transform="translate(${x(i)},${Ht - pb + 12}) rotate(-38)" text-anchor="end" font-size="10" fill="#b9d0e6">${esc(lb)}</text>`; });
+  s += `<text x="12" y="${(pt + Ht - pb) / 2}" transform="rotate(-90 12 ${(pt + Ht - pb) / 2})" text-anchor="middle" font-size="11" fill="#8ba3bd">Headway (min)</text></svg>`;
+  el.innerHTML = `<div class="hokey"><span><i style="background:#ff5a5f"></i>No halfway (trip stays missing)</span><span><i style="background:#22d36a"></i>With halfway (${esc(c.name)})</span></div>` + s;
+}
+/* ---- stop-by-stop: No Halfway HW | With Halfway HW | HW Improvement */
+function hoRenderHeat(){
+  const r = HO.res, c = hoSelC(), el = $("hoHeat"), key = $("hoKey"), all = $("hoAll");
+  if(!c || !r.baseline){ el.innerHTML = `<div class="ho-msg">${r && r.ok && r.disrupted != null ? "Choose a halfway stop." : "Run a simulation to see the stop-by-stop comparison."}</div>`; key.innerHTML = ""; all.innerHTML = ""; return; }
+  const H = r.sched_hw, bm = r.bunch_min, bj = {}, cj = {}; r.baseline.series.forEach(s => bj[s.j] = s); c.series.forEach(s => cj[s.j] = s);
+  key.innerHTML = `<span><i class="hc-r"></i>\u2265 2\u00d7 scheduled, or bunched (&lt;${f1(bm)} min)</span><span><i class="hc-o"></i>1.5\u20132\u00d7</span><span><i class="hc-y"></i>other</span><span><i class="hc-g"></i>within \u00b120% of ${f1(H)} min</span>`;
+  const wb = s => s ? `<td class="${s.min_b != null && s.min_b < bm - 1e-9 ? "hc-r" : hoCls(s.wb, H, bm)}" title="${s.b && s.b.length ? "affected headways: " + s.b.map(f1).join(" / ") + " min" : ""}${s.min_b != null && s.min_b < bm ? " (bunched: " + f1(s.min_b) + " min)" : ""}">${s.wb == null ? "\u2013" : Math.round(s.wb)}</td>` : `<td class="hc-n">\u2013</td>`;
+  const im = s => { const v = s ? s.imp : null; return v == null ? `<td class="hc-n">\u2013</td>` : `<td class="${v > 0.05 ? "hc-g" : v < -0.05 ? "hc-r" : "hc-n"}">${v > 0.05 ? "+" : ""}${Math.round(v * 10) / 10 === Math.round(v) ? Math.round(v) : f1(v)}</td>`; };
+  let h = `<table class="hoheat"><thead><tr><th>Stop</th>${r.monitor.map(m => `<th title="${esc(m.name)}">${m.terminal ? "End" : m.seq}</th>`).join("")}</tr></thead><tbody>`;
+  h += `<tr><td class="l">No Halfway HW</td>${r.monitor.map(m => `<td class="${hoCls(bj[m.j] ? bj[m.j].wa : null, H, bm)}">${bj[m.j] && bj[m.j].wa != null ? Math.round(bj[m.j].wa) : "\u2013"}</td>`).join("")}</tr>`;
+  h += `<tr><td class="l">With Halfway HW</td>${r.monitor.map(m => wb(cj[m.j])).join("")}</tr>`;
+  h += `<tr><td class="l">HW Improvement</td>${r.monitor.map(m => im(cj[m.j])).join("")}</tr></tbody></table><div class="ho-note">No change before the halfway stop (${esc(c.name)}, stop ${c.seq}): the trip is missing there in both scenarios. A red cell in the With row means a headway shorter than ${f1(bm)} min: new bunching.</div>`;
+  el.innerHTML = h;
+  all.innerHTML = `<thead><tr><th>Stop</th><th>Name</th><th>No Halfway HW</th><th>With Halfway HW</th><th>HW Improvement</th><th>Shortest headway (with)</th></tr></thead><tbody>${r.stop_names_all ? "" : ""}${c.series.map(s => { const nm = HO.setup && HO.setup.stops[s.j] ? HO.setup.stops[s.j][1] : ""; const b0 = bj[s.j];
+    return `<tr><td>${s.j + 1}</td><td>${esc(nm)}</td><td>${hoF(b0 ? b0.wa : null)}</td><td>${hoF(s.wb)}</td><td>${s.imp == null ? "\u2013" : (s.imp > 0.05 ? "+" : "") + f1(s.imp)}</td><td>${hoF(s.min_b)}</td></tr>`; }).join("")}</tbody>`;
+}
+/* ---- takeaways */
+function hoRenderTake(){
+  const r = HO.res, c = hoSelC(), el = $("hoTake");
+  if(!r || !r.ok){ el.innerHTML = `<li style="color:var(--mut)">Run a simulation to see the takeaways.</li>`; return; }
+  if(r.disrupted == null){ el.innerHTML = `<li style="color:var(--mut)">${esc(r.message)}</li>`; return; }
+  const gap = r.trips[r.disrupted].act_dep != null && r.trips[r.disrupted - 2].act_dep != null ? r.trips[r.disrupted].act_dep - r.trips[r.disrupted - 2].act_dep : null;
+  const out = [[`Losing trip ${r.disrupted} leaves a ${hoF(gap)} min headway (scheduled ${f1(r.sched_hw)}) between trips ${r.disrupted - 1} and ${r.disrupted + 1} at the first stop${r.params.load_sens > 0 ? ", and it changes as it propagates (headway propagation is on)" : ", and it stays that size down the route (identical running times)"}.`]];
+  if(!c){ out.push([r.message, "w"]); el.innerHTML = out.map(o => `<li class="${o[1] || ""}">${esc(o[0])}</li>`).join(""); return; }
+  const ma = c.metrics_a, mb = c.metrics_b, imp = c.improvement;
+  out.push([`Halfway at ${c.name} (stop ${c.seq}): the replacement passes it at ${hm(c.start_time)} (${c.start_time - c.sch_time >= 0.05 || c.start_time - c.sch_time <= -0.05 ? f1(c.start_time - c.sch_time) + " min against the disrupted trip's scheduled " + hm(c.sch_time) : "the disrupted trip's scheduled time"}) and serves the last ${c.restored_stops} stops (${f1(c.restored_km)} km). The first ${c.skipped_stops} stops stay without the trip in both scenarios.`]);
+  out.push(imp.avg_min > 0 ? [`Average affected headway ${hoF(ma.avg)} \u2192 ${hoF(mb.avg)} min: an improvement of ${f1(imp.avg_min)} min (${f1(imp.avg_pct)}%).`] : [`No improvement in average affected headway (${hoF(ma.avg)} \u2192 ${hoF(mb.avg)} min).`, "w"]);
+  out.push(imp.max_min > 0 ? [`Maximum headway falls from ${hoF(ma.max)} to ${hoF(mb.max)} min.`] : [`Maximum headway does not fall (${hoF(ma.max)} \u2192 ${hoF(mb.max)} min).`, "w"]);
+  out.push([`Simulated EWT ${ma.ewt >= 0 ? "+" : ""}${f1(Math.round(ma.ewt * 100) / 100)} \u2192 ${mb.ewt >= 0 ? "+" : ""}${f1(Math.round(mb.ewt * 100) / 100)} min (estimated, not LTA's EWT).`]);
+  out.push(mb.bunched_stops > ma.bunched_stops ? [`Warning: the intervention creates new bunching on ${mb.bunched_stops} stop${mb.bunched_stops > 1 ? "s" : ""} downstream (shortest headway ${f1(mb.min_gap)} min).`, "w"] : [`No new bunching downstream (shortest headway ${f1(mb.min_gap)} min).`]);
+  const heat = c.series.filter(s => s.imp != null && s.imp > 0.05).length; if(heat) out.push([`The improvement appears on ${heat} stops, from stop ${c.seq} to the terminal.`]);
+  (c.violations || []).forEach(v => out.push([v, "w"]));
+  el.innerHTML = out.map(o => `<li class="${o[1] || ""}">${esc(o[0])}</li>`).join("");
+}
+/* ---- map: missing trip / halfway start / resumed section */
+function hoRenderMap(){
+  const r = HO.res; hoInitMap(); if(!HO.map || !HO.g) return; Object.values(HO.g).forEach(g => g.clearLayers());
+  if(!r || !r.ok || !r.map) return;
+  const mp = r.map, c = hoSelC(), pts = mp.line.slice();
+  L.polyline(mp.line, {color:"#1785ff", weight:4, opacity:.9, interactive:false, pane:"route"}).addTo(HO.g.route);
+  if(r.disrupted != null){
+    if(c){ L.polyline(c.line_missing, {color:"#ff4d55", weight:7, opacity:.95, interactive:false, pane:"route"}).addTo(HO.g.route); L.polyline(c.line_resumed, {color:"#22d36a", weight:7, opacity:.95, interactive:false, pane:"route"}).addTo(HO.g.route); }
+    else L.polyline(mp.line, {color:"#ff4d55", weight:7, opacity:.9, interactive:false, pane:"route"}).addTo(HO.g.route);
+    r.candidates.forEach((k, i) => { if(i === HO.sel) return; const m = L.circleMarker([k.lat, k.lon], {radius:7, color:"#cfe0f3", weight:2, fillColor:"#0a1a2e", fillOpacity:1, pane:"stops"}); m.on("click", () => { HO.sel = i; HO.selCode = k.code; hoRender(); }); m.addTo(HO.g.stops); });
+    if(c) L.marker([c.lat, c.lon], {icon:L.divIcon({className:"", iconSize:[30, 30], iconAnchor:[15, 15], html:`<div class="hostar">\u2605</div>`}), keyboard:false}).addTo(HO.g.stops);
+  }
+  L.marker(mp.first, {icon:L.divIcon({className:"", iconSize:[26, 26], iconAnchor:[13, 13], html:`<div class="hoend">S</div>`}), keyboard:false}).addTo(HO.g.stops);
+  L.marker(mp.last, {icon:L.divIcon({className:"", iconSize:[26, 26], iconAnchor:[13, 13], html:`<div class="hoend">E</div>`}), keyboard:false}).addTo(HO.g.stops);
+  if(pts.length) HO.map.fitBounds(L.latLngBounds(pts), {padding:[24, 24], maxZoom:15});
+}
+/* ---- wiring */
+$("hoSvc").value = HO.svc || "";
+document.querySelectorAll("#hoDir button").forEach(b => { b.setAttribute("aria-pressed", String(+b.dataset.d === HO.dir)); b.onclick = () => { HO.dir = +b.dataset.d; LS.set("ho.dir", HO.dir); document.querySelectorAll("#hoDir button").forEach(x => x.setAttribute("aria-pressed", String(x === b))); hoLoad(); }; });
+$("hoSvc").onchange = () => hoLoad(); $("hoSvc").onkeydown = e => { if(e.key === "Enter"){ e.preventDefault(); hoLoad(); } };
+["hoRef", "hoHw", "hoLay", "hoDelay"].forEach(id => $(id).oninput = () => hoSchedule());
+$("hoExtra").oninput = () => { const v = $("hoExtra").value.trim(); if(/^\d{5}$/.test(v)) HO.selCode = v; hoSchedule(); };
+$("hoRun").onclick = () => hoSim(true);
+$("hoEx").onclick = () => { $("hoRef").value = "08:10"; $("hoLay").value = 10; HO.late = [2, 3, 22, 5, 4, 3, 2, 4, 3, 2]; HO.dis = 3; hoBuildTrips(); hoSim(false); toast("Example loaded: 08:10 first departure, trip 3 arrives +22 min and is Disrupted"); };
+/* ---- Settings */
+const HLAB = {n_trips:["Trips simulated", "trips at the first stop"], layover_min:["Scheduled layover at the first stop", "min (default; editable per run)"], min_layover_min:["Minimum layover", "min: a trip leaves no earlier than its arrival + this"],
+  start_delay_min:["Replacement start delay", "min after the disrupted trip's scheduled time at the halfway stop (negative = early)"], min_remaining_pct:["Minimum remaining route to recommend", "% of the route left after the halfway stop"],
+  min_improve_pct:["Minimum improvement to recommend", "% better average affected headway"], load_sens:["Headway propagation (advanced)", "0 = every trip runs the same; higher = a big gap grows and a short gap shrinks downstream"], fallback_kmh:["Fallback running speed", "km/h when no traffic model is available"]};
+async function loadHoSettings(){
+  const j = await getJSON("/api/halfway/config", 20000); if(j.error){ $("hoParams").innerHTML = `<div class="msg bad">${esc(j.error)}</div>`; return; }
+  S.hoCfg = j;
+  $("hoParams").innerHTML = Object.keys(HLAB).map(k => `<div><label for="hp_${k}">${HLAB[k][0]}</label><input id="hp_${k}" data-k="${k}" type="number" step="any" min="${j.ranges[k][0]}" max="${j.ranges[k][1]}" value="${j.params[k]}"><small>${HLAB[k][1]} &bull; default ${j.defaults[k]} &bull; range ${j.ranges[k][0]}\u2013${j.ranges[k][1]}</small></div>`).join("");
+  $("hoParNote").textContent = `Model ${j.model}. The bunching limit (${j.bunch_min} min) comes from Bunching & Gap \u2192 Settings.${j.tokenRequired ? " Admin token required to change settings." : ""}`;
+  const p = j.points; $("hoPts").innerHTML = p.length ? `<table><thead><tr><th>Service</th><th>Dir</th><th>Stop code</th><th>Stop name</th><th>Seq</th><th>Enabled</th><th></th></tr></thead><tbody>${p.map(x => `<tr><td class="svc">${esc(x.service)}</td><td>${x.direction}</td><td>${esc(x.stop_code || "\u2013")}</td><td>${esc(x.name || "\u2013")}</td><td>${x.seq == null ? "\u2013" : x.seq}</td><td>${x.enabled ? "Yes" : "No"}</td><td><button class="btn sm" data-del="${x.id}" type="button">Remove</button></td></tr>`).join("")}</tbody></table>` : `<div class="empty">No approved halfway stops yet. Upload a CSV or add one below.</div>`;
+  $("hoPts").querySelectorAll("[data-del]").forEach(b => b.onclick = async () => { const r = await post("/api/halfway/points/delete", JSON.stringify({id:+b.dataset.del})); if(r.error){ toast(r.error); return; } loadHoSettings(); });
+  const rn = await getJSON("/api/halfway/runs?limit=20", 20000), full = ts => ts ? sgt({day:"2-digit", month:"short", hour:"2-digit", minute:"2-digit", second:"2-digit"}).format(new Date(ts * 1000)) : "\u2013", runs = rn.runs || [];
+  $("hoRuns").innerHTML = runs.length ? `<table><thead><tr><th>Run</th><th>Time</th><th>Service</th><th>Dir</th><th>First dep.</th><th>Headway</th><th>Disrupted trip</th><th>Start delay</th><th>Recommended stop</th><th>Improvement</th><th>Model</th></tr></thead><tbody>${runs.map(r => `<tr><td>#${r.id}</td><td>${full(r.ts)}</td><td class="svc">${esc(r.service)}</td><td>${r.direction}</td><td>${esc(r.ref_time)}</td><td>${f1(r.sched_hw)} min</td><td>${r.disrupted}</td><td>${f1(r.start_delay)} min</td><td>${esc(r.recommended || "none")}</td><td>${r.improvement_pct == null ? "\u2013" : f1(r.improvement_pct) + "%"}</td><td>${esc(r.model_version)}</td></tr>`).join("")}</tbody></table>` : `<div class="empty">No simulations stored yet. Press <b>Run simulation</b> on the Simulator page.</div>`;
+}
+$("hoParSave").onclick = async () => { const params = {}; document.querySelectorAll("#hoParams input").forEach(i => params[i.dataset.k] = i.value); const j = await post("/api/halfway/config", JSON.stringify({params})); if(j.error){ toast(j.error); return; } toast("Parameters saved"); loadHoSettings(); };
+$("hoParReset").onclick = async () => { const j = await post("/api/halfway/config", JSON.stringify({reset:true})); if(j.error){ toast(j.error); return; } toast("Parameters reset to defaults"); loadHoSettings(); };
+$("hoPUp").onclick = () => $("hoPFile").click();
+$("hoPFile").onchange = async e => { const f = e.target.files[0]; e.target.value = ""; if(!f) return; const j = await post("/api/halfway/points", await f.text()); if(j.error){ toast(j.error); return; } toast(`Loaded ${j.rows} approved stops${j.errors && j.errors.length ? " (" + j.errors.length + " skipped)" : ""}`); loadHoSettings(); };
+$("hoPClr").onclick = async () => { const j = await post("/api/halfway/points/clear", ""); if(j.error){ toast(j.error); return; } toast("Approved halfway stops cleared"); loadHoSettings(); };
+$("hoPTpl").onclick = () => csvDownload("halfway_stops_template.csv", [["service", "direction", "stop_code", "sequence", "enabled"], ["32", "1", "12031", "12", "yes"], ["32", "1", "", "18", "yes"], ["32", "2", "12345", "", "yes"]]);
+$("hoPAdd").onclick = async () => { const b = {service:$("hoAS").value.trim(), direction:$("hoAD").value, stop_code:$("hoAC").value.trim(), seq:$("hoAQ").value.trim(), enabled:$("hoAE").checked ? "yes" : "no"}; const j = await post("/api/halfway/points/add", JSON.stringify(b)); if(j.error){ toast(j.error); return; } toast("Approved stop added"); $("hoAC").value = ""; $("hoAQ").value = ""; loadHoSettings(); };
+/* ---- tabs + start-up */
+function showTab(t){ S.tab = t; $("opt").hidden = t !== "opt"; $("settings").hidden = t !== "set"; $("tabOpt").setAttribute("aria-selected", t === "opt"); $("tabSet").setAttribute("aria-selected", t === "set");
+  if(t === "set") loadHoSettings(); else setTimeout(() => { hoInitMap(); if(HO.map){ HO.map.invalidateSize(); hoRenderMap(); } }, 120); }
+$("tabOpt").onclick = () => showTab("opt"); $("tabSet").onclick = () => showTab("set");
+(async () => {
+  const q = new URLSearchParams(location.search); if(/^[0-9A-Za-z]{1,6}$/.test(q.get("svc") || "")) $("hoSvc").value = q.get("svc").toUpperCase(); if(q.get("dir") === "1" || q.get("dir") === "2"){ HO.dir = +q.get("dir"); document.querySelectorAll("#hoDir button").forEach(x => x.setAttribute("aria-pressed", String(+x.dataset.d === HO.dir))); }
+  hoBuildTrips(); hoInitMap(); hoRender();
+  const h = await getJSON("/api/health", 15000); if(h.error) setLive("bad", "Server unreachable", h.error); else if(!h.lta) setLive("bad", "LTA key missing", "Set LTA_ACCOUNT_KEY on the server"); else setLive("ok", "Live Data (LTA)", "");
+  if($("hoSvc").value.trim()) hoLoad();
+  if(location.hash === "#settings") showTab("set");
+})();
+window.addEventListener("resize", () => { if(HO.map) HO.map.invalidateSize(); });
+</script>
+</body>
+</html>
