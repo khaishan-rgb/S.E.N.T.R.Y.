@@ -166,6 +166,9 @@ details.hall{margin-top:10px}details.hall summary{cursor:pointer;color:#9cc4ff;f
 .howhy{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);gap:12px;margin-top:10px;background:#10294a;border:1px solid #1f4c85;border-radius:12px;padding:12px 14px}.howhy h3{margin:0 0 4px;font-size:16px}.howhy ul{margin:0;padding-left:18px;display:grid;gap:4px;font-size:13.2px;line-height:1.4}
 .hobanner{display:flex;align-items:center;background:#1c5a9a;border-radius:10px;padding:10px 14px;font-weight:800;font-size:15px;line-height:1.3}
 @media(max-width:760px){.horesult,.howhy{grid-template-columns:1fr}}
+
+.hodisbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 0 8px;font-size:12.8px;color:var(--mut)}.hodisbar b{color:#fff}
+.hogain{margin:8px 0;padding:8px 12px;border-radius:10px;background:#211a3d;border:1px solid #5b3fa3;font-size:13px;line-height:1.5;color:#e5d9ff}.hogain b{color:#fff}.hogain .btn{margin-left:6px}
 </style>
 </head>
 <body>
@@ -190,7 +193,7 @@ details.hall{margin-top:10px}details.hall summary{cursor:pointer;color:#9cc4ff;f
         <div class="fld"><label for="hoExtra">Also test another stop <small>(what-if, code)</small></label><input id="hoExtra" class="sel" list="hoStopsList" maxlength="5" inputmode="numeric" placeholder="optional 5-digit stop code"><datalist id="hoStopsList"></datalist></div>
         <div class="hx-info" id="hoInfo">Enter a service to load its route.</div>
         <h2>2. Optimisation Preference</h2>
-        <div class="hopref" id="hoPref"><label><input type="radio" name="hopref" value="balanced" checked> Balanced (recommended)</label><label><input type="radio" name="hopref" value="recovery"> Faster headway recovery</label><label><input type="radio" name="hopref" value="mileage"> Minimise mileage loss</label></div>
+        <div class="hopref" id="hoPref"><label><input type="radio" name="hopref" value="balanced" checked> Balanced (recommended)</label><label><input type="radio" name="hopref" value="recovery"> Faster headway recovery</label><label><input type="radio" name="hopref" value="mileage"> Minimise mileage loss</label><label><input type="radio" name="hopref" value="gain"> Maximum headway gain</label></div>
         <label class="hx-chk"><input type="checkbox" id="hoReg" checked> AI regulates headway <small>(hold / release trips, re-time the replacement)</small></label>
         <h2>3. Halfway deployment</h2>
         <div class="hopref" id="hoScope"><label><input type="radio" name="hoscope" value="all" checked> AI tests every stop (timing &amp; headway)</label><label><input type="radio" name="hoscope" value="approved"> Approved stops list only</label></div>
@@ -212,7 +215,8 @@ details.hall{margin-top:10px}details.hall summary{cursor:pointer;color:#9cc4ff;f
       <section class="card horec" id="hoRec"><div class="ho-msg">Enter a service to load its route.</div></section>
     </div>
     <section class="card hx-row">
-      <header><div><h2>Trip sequence at the first stop</h2><div class="sub" id="hoTripSub">Type each trip's arrival lateness and mark ONE trip as Disrupted. No bus is picked: the schedule at the first stop is the common reference.</div></div></header>
+      <header><div><h2>Trip sequence at the first stop</h2><div class="sub" id="hoTripSub">Type each trip's arrival lateness and mark the trips that are Disrupted (1 to ${(r.params && r.params.max_disrupted) || 4}). No bus is picked: the schedule at the first stop is the common reference.</div></div></header>
+      <div class="hodisbar"><button class="btn sm go" id="hoSuggest" type="button">Suggest from lateness</button><button class="btn sm" id="hoClearDis" type="button">Clear</button><span id="hoDisMsg"></span></div>
       <div class="tw"><table id="hoTrips"><thead><tr><th>Trip</th><th>Sch Arr</th><th>Act Arr</th><th>Lateness (min)</th><th>Next trip Sch Dep</th><th>Next trip Act Dep</th><th>Dep HW</th><th class="ai">AI plan: Dep</th><th class="ai">AI plan: HW</th><th>Disrupted</th></tr></thead><tbody></tbody></table></div>
       <div class="hx-note">Actual departure = the later of the scheduled departure and the actual arrival + the minimum layover. A Disrupted trip does not depart (the trip is lost). <b>AI plan</b> = the departures the selected option would use after holding / releasing trips (green), and where the replacement starts.</div>
     </section>
@@ -242,7 +246,7 @@ details.hall{margin-top:10px}details.hall summary{cursor:pointer;color:#9cc4ff;f
     <section class="card" style="margin-top:12px"><header><div><h2>Simulation audit log</h2><div class="sub">Each time you press <b>Run AI Optimisation</b> the scenario, every option's result, the recommendation, the weights and the model version are stored (live re-simulation while you edit is not).</div></div></header><div class="tw" id="hoRuns"></div></section>
   </main>
 
-  <footer class="foot"><span>Sources: LTA DataMall (Bus Routes/Stops/Services, Traffic Speed Bands, Traffic Incidents) &nbsp;|&nbsp; A scenario simulation from the schedule at the first stop, not live bus data. Decision support only, not for operational use</span><span>SG Transport Pulse V9.1</span></footer>
+  <footer class="foot"><span>Sources: LTA DataMall (Bus Routes/Stops/Services, Traffic Speed Bands, Traffic Incidents) &nbsp;|&nbsp; A scenario simulation from the schedule at the first stop, not live bus data. Decision support only, not for operational use</span><span>SG Transport Pulse V10.0</span></footer>
 </div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -267,12 +271,15 @@ async function post(url, body){
 function csvDownload(name, rows){ const csv = rows.map(r => r.map(v => { v = v == null ? "" : String(v); return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; }).join(",")).join("\n"); const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([csv], {type:"text/csv"})); a.download = name; document.body.appendChild(a); a.click(); a.remove(); }
 /* ===================== AI Halfway Optimiser (a scenario from the schedule at the first stop; never identifies a bus, never deploys) ===================== */
 const S = {tab:"opt", hoCfg:null};
-const HO = {svc:LS.get("ho.svc", ""), dir:LS.get("ho.dir", 1), setup:null, res:null, sel:null, selKey:null, map:null, g:null, late:[], dis:3, tok:0, timer:null, n:10, pb:{t:null, min:0, max:100, play:false, timer:null, res:null, key:null, ghost:false}, geo:null, tsdg:null, barsAt:null, view:LS.get("ho.view", "simple"), scope:LS.get("ho.scope", "all"), veh:LS.get("ho.veh", "own"), pick:"", showAll:false};
+const HO = {svc:LS.get("ho.svc", ""), dir:LS.get("ho.dir", 1), setup:null, res:null, sel:null, selKey:null, map:null, g:null, late:[], dis:[3], tok:0, timer:null, n:10, pb:{t:null, min:0, max:100, play:false, timer:null, res:null, key:null, ghost:false}, geo:null, tsdg:null, barsAt:null, view:LS.get("ho.view", "simple"), scope:LS.get("ho.scope", "all"), veh:LS.get("ho.veh", "own"), pick:"", showAll:false};
 const hm = m => { m = ((Math.round(m) % 1440) + 1440) % 1440; return String(Math.floor(m / 60)).padStart(2, "0") + ":" + String(m % 60).padStart(2, "0"); };
 const hoF = x => x == null ? "\u2013" : f1(x);
 const hoPct = x => x == null ? "\u2013" : f1(x) + "%";
 const sg = x => (x > 0 ? "+" : "") + f1(x);
 const okey = o => o.kind + ":" + (o.code || "");
+const isR = id => typeof id === "string" && id[0] === "R";                    // the halfway (replacement) buses: R, or R5 / R6 when several trips are disrupted
+const dis_ = r => (r && r.disrupted_all && r.disrupted_all.length ? r.disrupted_all : (r && r.disrupted != null ? [r.disrupted] : []));
+const disTxt = r => { const D = dis_(r); return D.length > 1 ? `trips ${D.join(", ")}` : `trip ${D[0]}`; };
 function hoCls(h, H, bm){ if(h == null) return "hc-n"; if(h < bm || h >= 2 * H - 1e-9) return "hc-r"; if(h >= 1.5 * H - 1e-9) return "hc-o"; if(Math.abs(h - H) <= .2 * H + 1e-9) return "hc-g"; return "hc-y"; }
 function hoSelC(){ const r = HO.res; const o = r && r.ok && HO.sel != null ? r.options[HO.sel] : null; return o && o.detail !== false ? o : null; }
 function hoMsg(t, err){ const e = $("hoMsg"); e.textContent = t || ""; e.classList.toggle("hx-err", !!err); }
@@ -307,11 +314,15 @@ async function hoLoad(){
 }
 /* ---- the editable trip table (built once so typing is never interrupted) */
 function hoBuildTrips(){
-  const n = HO.n; while(HO.late.length < n) HO.late.push(0); HO.late.length = n; if(!(HO.dis >= 2 && HO.dis <= n - 1)) HO.dis = Math.min(3, n - 1);
+  const n = HO.n; while(HO.late.length < n) HO.late.push(0); HO.late.length = n; HO.dis = (Array.isArray(HO.dis) ? HO.dis : [HO.dis]).map(Number).filter((x, k, a) => x >= 2 && x <= n - 1 && a.indexOf(x) === k).sort((a, b) => a - b);
   $("hoTrips").querySelector("tbody").innerHTML = Array.from({length:n}, (_, k) => { const i = k + 1, edge = i === 1 || i === n;
-    return `<tr data-i="${i}"><td class="svc">${i}</td><td class="sa"></td><td class="aa"></td><td><input class="late" type="number" step="1" min="-60" max="300" inputmode="decimal" value="${HO.late[k]}" data-i="${i}" aria-label="Lateness of trip ${i} in minutes"></td><td class="sd"></td><td class="ad"></td><td class="dh"></td><td class="ai rd"></td><td class="ai rh"></td><td><input type="radio" name="hodis" value="${i}" ${HO.dis === i ? "checked" : ""} ${edge ? "disabled title='A disrupted trip needs a trip before and after it'" : ""} aria-label="Mark trip ${i} as disrupted"></td></tr>`; }).join("");
+    return `<tr data-i="${i}"><td class="svc">${i}</td><td class="sa"></td><td class="aa"></td><td><input class="late" type="number" step="1" min="-60" max="300" inputmode="decimal" value="${HO.late[k]}" data-i="${i}" aria-label="Lateness of trip ${i} in minutes"></td><td class="sd"></td><td class="ad"></td><td class="dh"></td><td class="ai rd"></td><td class="ai rh"></td><td><input type="checkbox" name="hodis" value="${i}" ${HO.dis.includes(i) ? "checked" : ""} ${edge ? "disabled title='A disrupted trip needs a trip before and after it'" : ""} aria-label="Mark trip ${i} as disrupted"></td></tr>`; }).join("");
   document.querySelectorAll("#hoTrips input.late").forEach(x => x.oninput = () => { HO.late[+x.dataset.i - 1] = x.value === "" ? 0 : +x.value; hoTouch(); });
-  document.querySelectorAll("#hoTrips input[name=hodis]").forEach(x => x.onchange = () => { HO.dis = +x.value; hoTouch(); });
+  document.querySelectorAll("#hoTrips input[name=hodis]").forEach(x => x.onchange = () => {
+    const mx = (HO.setup && HO.setup.params && HO.setup.params.max_disrupted) || 4, sel = Array.from(document.querySelectorAll("#hoTrips input[name=hodis]:checked")).map(e => +e.value);
+    if(sel.length > mx){ x.checked = false; toast(`At most ${mx} trips can be disrupted at once (Settings: Most trips disrupted at once)`); return; }
+    HO.dis = sel; hoTouch();
+  });
 }
 function hoRenderTrips(){
   const r = HO.res; if(!r || !r.ok) return; const H = r.sched_hw, o = hoSelC(), dep = {};
@@ -322,11 +333,13 @@ function hoRenderTrips(){
     tr.querySelector(".ad").innerHTML = t.disrupted ? "<b>Disrupted</b>" : hm(t.act_dep) + (t.dep_late >= .5 ? ` <small>(+${f1(t.dep_late)})</small>` : "");
     const dh = tr.querySelector(".dh"); dh.textContent = t.dep_hw == null ? "\u2014" : f1(t.dep_hw); dh.className = "dh" + (t.dep_hw != null && t.dep_hw >= 2 * H - 1e-9 ? " wr" : t.dep_hw != null && t.dep_hw >= 1.5 * H - 1e-9 ? " wl" : "");
     const rd = tr.querySelector(".rd"), rh = tr.querySelector(".rh");
-    if(t.disrupted){ rd.innerHTML = o && o.j != null ? `<b>Starts at ${esc(o.name)} ${hm(o.start_time)}</b>${o.r_shift ? ` <small>(${sg(o.r_shift)})</small>` : ""}` : "\u2014"; rh.textContent = "\u2014"; return; }
+    if(t.disrupted){ const rp = o && o.j != null ? (o.repl || []).find(x => x.trip === t.n) : null; rd.innerHTML = rp ? `<b>Starts at ${esc(o.name)} ${hm(rp.start_time)}</b>${Math.abs(rp.late_start) >= .5 ? ` <small>(${sg(rp.late_start)})</small>` : ""}` : (o && o.j != null ? "no halfway bus" : "\u2014"); rh.textContent = "\u2014"; return; }
     const x = dep[t.n];
     if(!o || !o.regulated || !x){ rd.textContent = "\u2014"; rh.textContent = "\u2014"; prev = o && x ? x.dep : t.act_dep; return; }
     rd.innerHTML = hm(x.dep) + (Math.abs(x.shift) >= .5 ? ` <small>(${sg(x.shift)})</small>` : "");
     rh.textContent = prev == null ? "\u2014" : f1(x.dep - prev); prev = x.dep; });
+  const lt = HO.late.map((v, k) => [k + 1, +v]).filter(x => x[0] >= 2 && x[0] <= HO.n - 1 && x[1] >= hoThr() - 1e-9).map(x => x[0]), nd = (r.disrupted_all || []).length;
+  $("hoDisMsg").innerHTML = `${nd ? `<b>${nd}</b> disrupted (${r.disrupted_all.join(", ")})` : "None marked"} \u00b7 ${lt.length ? `trip${lt.length > 1 ? "s" : ""} <b>${lt.join(", ")}</b> arrive${lt.length > 1 ? "" : "s"} \u2265 ${f1(hoThr())} min late` : `no trip is \u2265 ${f1(hoThr())} min late`}`;
   $("hoTripSub").textContent = `Trips at ${r.route ? r.route.first : "the first stop"}, scheduled every ${f1(H)} min from ${r.ref}. Type each trip's arrival lateness and mark ONE trip as Disrupted. No bus is picked: the first-stop schedule is the common reference.`;
 }
 /* ---- simulate */
@@ -334,7 +347,7 @@ function hoSchedule(){ clearTimeout(HO.timer); HO.timer = setTimeout(() => hoSim
 function hoTouch(){ HO.selKey = null; HO.pick = ""; hoSchedule(); }              // an edited scenario shows its new recommendation (a pick only survives while browsing options)
 function hoUrl(save){
   const hw = $("hoHw").value.trim(), std = HO.setup && HO.setup.sched_hw != null && Math.abs(+hw - HO.setup.sched_hw) < 1e-9, pref = (document.querySelector("input[name=hopref]:checked") || {}).value || "balanced";
-  return "/api/halfway/simulate?" + new URLSearchParams({service:HO.svc, direction:HO.dir, ref:$("hoRef").value.trim(), hw:std ? "" : hw, layover:$("hoLay").value.trim(), delay:$("hoDelay").value.trim(), late:HO.late.join(","), disrupted:HO.dis || "", stop:$("hoExtra").value.trim(), save:save ? "1" : "", pref, reg:$("hoReg").checked ? "1" : "0", scope:HO.scope, veh:HO.veh, ready:$("hoReady").value.trim(), pick:HO.pick || ""});
+  return "/api/halfway/simulate?" + new URLSearchParams({service:HO.svc, direction:HO.dir, ref:$("hoRef").value.trim(), hw:std ? "" : hw, layover:$("hoLay").value.trim(), delay:$("hoDelay").value.trim(), late:HO.late.join(","), disrupted:(HO.dis || []).join(","), stop:$("hoExtra").value.trim(), save:save ? "1" : "", pref, reg:$("hoReg").checked ? "1" : "0", scope:HO.scope, veh:HO.veh, ready:$("hoReady").value.trim(), pick:HO.pick || ""});
 }
 async function hoSim(save){
   if(!HO.svc || !HO.setup || HO.setup.error) return;
@@ -367,19 +380,22 @@ function hoPlan(o){
   return out;
 }
 function hoSteps(r, o){                             // the deployment plan as timed steps, in the order they happen
-  const st = [], d = r.trips[r.disrupted - 1], first = r.route.first;
-  if(o.j != null){
+  const st = [], first = r.route.first, D = r.disrupted_all || [r.disrupted], many = D.length > 1;
+  if(o.j != null) (o.repl || []).forEach(x => {
+    const d = r.trips[x.trip - 1], tag = many ? ` (trip ${x.trip})` : "";
     if(o.veh === "own"){
-      st.push([o.leave_first, `Send ${r.ready_in ? "the halfway bus" : `trip ${r.disrupted}'s bus (arrived ${hm(d.act_arr)}, ${sg(d.late)} min)`} off-service from ${esc(first)}`]);
-      st.push([o.own_arrive, `It reaches ${esc(o.name)} (stop ${o.seq}, ${esc(o.code)}) after ~${f1(o.off_min)} min / ${f1(o.skipped_km)} km off-service`]);
-    } else st.push([o.start_time - .01, `Have a spare bus at ${esc(o.name)} (stop ${o.seq}, ${esc(o.code)})`]);
-    st.push([o.start_time, `<b>Start the trip at ${esc(o.name)}</b> and run to the terminal` + (o.wait_min > .4 ? ` (waits ${f1(o.wait_min)} min for its slot)` : "") + (Math.abs(o.late_start) >= .5 ? ` \u2013 ${sg(o.late_start)} min against the lost trip's slot` : " \u2013 on the lost trip's slot")]);
-  }
+      st.push([x.leave_first, `Send ${r.ready_in ? "the halfway bus" : `trip ${x.trip}'s bus (arrived ${hm(d.act_arr)}, ${sg(d.late)} min)`} off-service from ${esc(first)}`]);
+      st.push([x.own_arrive, `It reaches ${esc(o.name)} (stop ${o.seq}, ${esc(o.code)}) after ~${f1(x.off_min)} min / ${f1(o.skipped_km)} km off-service${tag}`]);
+    } else st.push([x.start_time - .01, `Have a spare bus at ${esc(o.name)} (stop ${o.seq}, ${esc(o.code)})${tag}`]);
+    st.push([x.start_time, `<b>Start the trip at ${esc(o.name)}</b>${tag} and run to the terminal` + (x.wait_min > .4 ? ` (waits ${f1(x.wait_min)} min for its slot)` : "") + (Math.abs(x.late_start) >= .5 ? ` \u2013 ${sg(x.late_start)} min against the lost trip's slot` : " \u2013 on the lost trip's slot")]);
+  });
   if(o.regulated) (o.deps || []).filter(x => Math.abs(x.shift) >= .5).forEach(x => st.push([x.dep, x.shift > 0 ? `Hold trip ${x.n} ${f1(x.shift)} min at ${esc(first)}` : `Release trip ${x.n} ${f1(-x.shift)} min early from ${esc(first)}`]));
+  if(o.regulated && r.span){ const last = Math.max(...D) + r.span.dn, ld = (o.deps || []).find(x => x.n === last); if(ld) st.push([ld.dep, `Trip ${last} leaves on its own time (${hm(ld.dep)}): the correction ends here`]); }
   return st.sort((a, b) => a[0] - b[0]);
 }
 function hoWhy(r, o){
   const ma = o.metrics_a, mb = o.metrics, imp = o.improvement, out = [];
+  (o.skipped_trips || []).forEach(t => out.push([`Trip ${t}'s bus cannot reach ${o.name} in time: its slot gets no halfway bus and is shared by the regulated trips`, "w"]));
   if(o.j != null) out.push([`Replacement restores ${o.restored_stops} stops (${f1(o.restored_km)} km) from ${hm(o.start_time)}; the first ${o.skipped_stops} stop${o.skipped_stops === 1 ? "" : "s"} stay without the trip`]);
   out.push(imp.max_min > 0 ? [`Largest headway ${hoF(ma.max)} \u2192 ${hoF(mb.max)} min`] : [`Largest headway does not fall (${hoF(ma.max)} \u2192 ${hoF(mb.max)} min)`, "w"]);
   if(imp.avg_min > 0.05) out.push([`Average affected headway ${hoF(ma.avg)} \u2192 ${hoF(mb.avg)} min (${f1(imp.avg_pct)}% better)`]);
@@ -390,6 +406,8 @@ function hoWhy(r, o){
     const sh = (o.deps || []).filter(x => Math.abs(x.shift) >= .5), before = sh.filter(x => x.shift > 0).length, after = sh.filter(x => x.shift < 0).length;
     out.push([`Regulation spreads the correction over ${o.reg_trips} trips${o.reg_trips >= 5 ? " (a gradual ramp, no single trip takes the whole gap)" : ""}${before || after ? `: ${before} held, ${after} released early` : ""} \u2013 ${f1(o.hold_min)} min of holding / release in total`, "a"]);
     const d = r.disrupted, up = sh.filter(x => x.n < d).length, dn = sh.filter(x => x.n > d).length, sp = r.span || {};
+    if(r.share) out.push([`Even share at the interchange: ${r.share.slots} slots \u00d7 ${f1(r.sched_hw)} min \u00f7 ${r.share.trips} trips = ${f1(r.share.hw)} min between the regulated trips (the lost trip's slot is shared, the last trip settles on its own time)`, "a"]);
+    if(o.kind === "regulate" && r.reg_enough) out.push([`Regulating alone keeps every headway within \u00b1${Math.round(r.params.recover_tol_pct)}% of ${f1(r.sched_hw)} min, so a halfway bus is not needed for this gap`, ""]);
     out.push([`Interchange (${r.route.first}) departures adjusted: ${up} trip${up === 1 ? "" : "s"} before the gap + ${dn} after it${sp.min_side ? ` (minimum ${sp.min_side} + ${sp.min_side} regulated)` : ""}`, "a"]);
     if(sp.short_up) out.push([`Only ${sp.up} trip${sp.up === 1 ? "" : "s"} run above the gap, so ${sp.dn} future trips are adjusted instead and may leave up to ${f1(r.params.reg_early_future)} min early to close it. Raise "Trips simulated" or mark a later trip to give the top more room.`, "w"]);
   }
@@ -403,20 +421,22 @@ function hoRenderRec(){
   if(r.disrupted == null){ el.innerHTML = `<header><h2>AI Recommendation</h2></header><div class="ho-msg">${esc(r.message)} Then press <b>Run AI Optimisation</b>.</div>`; return; }
   if(!o){ el.innerHTML = `<header><h2>AI Recommendation</h2></header><div class="ho-msg">${esc(r.message)} Try a bus-ready time under <b>3. Halfway deployment</b>, switch to <b>Spare bus already at the stop</b>, or turn on <b>AI regulates headway</b>.</div>`; return; }
   const best = r.recommended === HO.sel, ma = o.metrics_a, mb = o.metrics, imp = o.improvement, ew = x => (x >= 0 ? "+" : "") + f1(Math.round(x * 100) / 100);
-  const pill = best ? `<span class="pill g">Recommended \u2013 Highest Simulation Score</span>` : r.recommended == null ? `<span class="pill a">No option recommended</span>` : `<span class="pill n">Selected option (not the top score)</span>`;
+  const pill = best ? `<span class="pill g">Recommended \u2013 ${r.pref === "gain" ? "Most Headway Gain" : "Highest Simulation Score"}</span>` : o.ref_only ? `<span class="pill a">Reference \u2013 leaves the interchange gap</span>` : r.recommended == null ? `<span class="pill a">No option recommended</span>` : `<span class="pill n">Selected option (not the top score)</span>`;
   const title = o.kind === "regulate" ? "Regulate the headway (no halfway)" : `${best ? "Start Halfway at " : "Halfway at "}${esc(o.name)}${o.regulated ? " + regulation" : ""}`;
   const steps = hoSteps(r, o);
   el.innerHTML = `<header style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:0"><h2>AI Recommendation</h2>${pill}</header>
     ${r.recommended == null ? `<div class="hoverdict w">${esc(r.message)}</div>` : ""}
     <div class="ttl"><span class="star">${best ? "\u2605" : "\u25C6"}</span><div><h3>${title}</h3><div class="sub2">${o.j != null ? `Stop ${esc(o.code)} \u00b7 replacement starts at ${hm(o.start_time)}` : `Trips ${(r.window || []).join(", ")} may be held / released`} \u00b7 score ${hoF(o.score)}</div></div></div>
+    ${r.best_gain != null ? (() => { const bg = r.options[r.best_gain]; return `<div class="hogain">Most headway gain: <b>${esc(bg.label)}</b> \u2013 the largest headway falls by <b>${f1(bg.gain.min)} min</b> on average over every stop (${f1(bg.gain.pct)}%)${r.best_gain === HO.sel ? " \u2013 this is the option shown" : ` <button class="btn sm" type="button" id="hoGainBtn">View</button>`}</div>`; })() : ""}
     ${steps.length ? `<div class="hoplan"><b>${o.j != null ? "AI Halfway Deployment Plan" : "AI Headway Regulation Plan"}</b><ol class="hosteps">${steps.map(x => `<li><time>${hm(x[0])}</time><span>${x[1]}</span></li>`).join("")}</ol>${o.start_window ? `<div class="hosw">Start window at this stop: <b>${hm(o.start_window.from)}\u2013${hm(o.start_window.to)}</b> (the lost trip's slot is ${hm(o.start_window.sched)}). Outside it the gap is not filled or a bunch is created.</div>` : ""}${r.ready_note && o.j != null ? `<div class="hosw">${esc(r.ready_note)}</div>` : ""}</div>` : ""}
-    <ul>${hoWhy(r, o).map(w => `<li class="${w[1] || ""}">${esc(w[0])}</li>`).join("")}</ul>
+    <ul>${hoWhy(r, o).map(w => `<li class="${w[1] || ""}">${/^Even share/.test(w[0]) ? esc(w[0]).replace(/=\s*(\S+ min)/, "= <b>$1</b>") : esc(w[0])}</li>`).join("")}</ul>
     <div class="hocmp"><div class="no"><h4>No action</h4><div class="k">Avg affected headway</div><div class="v">${hoF(ma.avg)} min</div><div class="k">Max headway</div><div class="v">${hoF(ma.max)} min</div><div class="k">Irregular for</div><div class="v">${o.recovery_a == null ? "not before end" : Math.round(o.recovery_a) + " min"}</div></div>
       <div class="yes"><h4>With this option</h4><div class="k">Avg affected headway</div><div class="v">${hoF(mb.avg)} min</div><div class="k">Max headway</div><div class="v">${hoF(mb.max)} min</div><div class="k">Irregular for</div><div class="v">${o.recovery == null ? "not before end" : Math.round(o.recovery) + " min"}</div></div></div>
     <div class="hoimp ${imp.max_min > 0 || imp.avg_min > 0.05 ? "" : "w"}"><div><small>Headway improvement</small><b>${imp.avg_min > 0.05 ? "\u25BC " + f1(imp.avg_min) + " min (" + f1(imp.avg_pct) + "%)" : "\u25BC " + f1(imp.max_min) + " min on the largest headway"}</b>${imp.avg_min > 0.05 ? `<small>largest headway \u25BC ${f1(imp.max_min)} min</small>` : ""}</div><div><small>${o.j != null ? "Mileage loss" : "Holding"}</small><b>${o.j != null ? f1(o.skipped_km) + " km" : f1(o.hold_min) + " min"}</b><small>${o.j != null ? f1(o.mileage_pct) + "% of the trip" + (o.regulated ? " \u00b7 " + f1(o.hold_min) + " min holding" : "") : "in total, at the first stop"}</small></div></div>
-    <div class="btns"><button class="btn sm go" type="button" id="hoView">View simulation</button><button class="btn sm" type="button" id="hoCmp">Compare other options</button></div>
+    <div class="btns"><button class="btn sm go" type="button" id="hoViewSim">View simulation</button><button class="btn sm" type="button" id="hoCmp">Compare other options</button></div>
     <div class="ho-note">Score parts: ${Object.keys(o.parts).map(k => k + " " + f1(o.parts[k])).join(" \u00b7 ")}. Simulated EWT ${ew(ma.ewt)} \u2192 ${ew(mb.ewt)} min (not LTA's). Decision support only \u2013 nothing is deployed.</div>`;
-  $("hoView").onclick = () => $("hoHeatCard").scrollIntoView({behavior:"smooth", block:"start"});
+  if($("hoGainBtn")) $("hoGainBtn").onclick = () => hoSelect(r.best_gain);
+  $("hoViewSim").onclick = () => $("hoHeatCard").scrollIntoView({behavior:"smooth", block:"start"});
   $("hoCmp").onclick = () => $("hoOpts").scrollIntoView({behavior:"smooth", block:"center"});
 }
 /* ---- options table */
@@ -430,7 +450,7 @@ function hoRenderOpts(){
   let h = `<thead><tr><th>Scenario</th><th>Hold (min)</th><th>Skipped km</th><th>Avg HW no \u2192 with</th><th>Max HW no \u2192 with</th><th>Irregular for</th><th>\u2265 2\u00d7 HW</th><th>Score</th><th>Remarks</th></tr></thead><tbody>`;
   h += `<tr class="base"><td class="svc">${many ? "" : "A. "}No action</td><td>\u2013</td><td>0</td><td>${hoF(b.avg)}</td><td>${hoF(b.max)}</td><td>${r.baseline.recovery == null ? "no" : Math.round(r.baseline.recovery) + " min"}</td><td>${hoPct(b.pct_ge_2)}</td><td>\u2013</td><td class="rm">Trip stays missing</td></tr>`;
   top.forEach(i => { const o = r.options[i], rec = r.recommended === i, ma = o.metrics_a, mb = o.metrics;
-    const rm = o.violations.length ? o.violations[0] : rec ? "Highest simulation score" : o.warnings.some(w => /what-if/.test(w)) ? "What-if (not approved)" : "Viable";
+    const rm = o.violations.length ? o.violations[0] : rec ? "Highest simulation score" : o.ref_only ? "Reference: no interchange regulation" : i === r.best_gain ? "Most headway gain" : o.warnings.some(w => /what-if/.test(w)) ? "What-if (not approved)" : "Viable";
     const lab = many ? (o.rank ? o.rank + ". " : "") : (L_[i + 1] || i + 2) + ". ";
     const tag = o.j == null ? "" : o.approved ? `<span class="hotag a">approved</span>` : "";
     h += `<tr data-i="${i}" tabindex="0" class="${rec ? "rec " : ""}${HO.sel === i ? "sel " : ""}${o.viable ? "" : "bad"}"><td class="svc">${rec ? "\u2605 " : ""}${lab}${o.kind === "regulate" ? "Regulate only" : esc(o.name) + (o.regulated ? " + regulation" : "")}${tag}<small>${o.j != null ? "stop " + o.seq + " \u00b7 " + esc(o.code) + (o.start_time != null ? " \u00b7 starts " + hm(o.start_time) : "") + (o.approved || o.auto ? "" : " \u00b7 what-if") : "no halfway"}</small></td>`;
@@ -492,7 +512,7 @@ function hoRenderTake(){
   const r = HO.res, o = hoSelC(), el = $("hoTake");
   if(!r || !r.ok){ el.innerHTML = `<li style="color:var(--mut)">Run a simulation to see the takeaways.</li>`; return; }
   if(r.disrupted == null){ el.innerHTML = `<li style="color:var(--mut)">${esc(r.message)}</li>`; return; }
-  const out = [[`Losing trip ${r.disrupted} leaves a ${hoF(r.gap_min)} min headway (scheduled ${f1(r.sched_hw)}) between trips ${r.disrupted - 1} and ${r.disrupted + 1} at the first stop${r.params.load_sens > 0 ? ", and it changes as it propagates (headway propagation is on)" : ", and it stays that size down the route (identical running times)"}.`]];
+  const D_ = dis_(r), out = [[`Losing ${disTxt(r)} leaves a ${hoF(r.gap_min)} min headway (scheduled ${f1(r.sched_hw)}) between trips ${D_[0] - 1} and ${D_[D_.length - 1] + 1} at the first stop${r.params.load_sens > 0 ? ", and it changes as it propagates (headway propagation is on)" : ", and it stays that size down the route (identical running times)"}.`]];
   if(!o){ out.push([r.message, "w"]); el.innerHTML = out.map(x => `<li class="${x[1] || ""}">${esc(x[0])}</li>`).join(""); return; }
   const ma = o.metrics_a, mb = o.metrics, imp = o.improvement, best = r.recommended === HO.sel;
   out.push([best ? `Best simulated option: ${o.label} (score ${hoF(o.score)}, ${r.pref} preference).` : `Selected: ${o.label} (score ${hoF(o.score)}); the top score is ${hoF(r.options[r.recommended] ? r.options[r.recommended].score : null)}.`, best ? "" : "w"]);
@@ -574,7 +594,7 @@ function hoDrawBuses(){
   const put = (st, cls, label) => L.marker(G.at(st.f), {icon:L.divIcon({className:"", iconSize:[22, 22], iconAnchor:[11, 11], html:`<div class="hobus ${cls}">${label}</div>`}), pane:"buses", interactive:false, keyboard:false}).addTo(HO.g.buses);
   if(pb.ghost && r.baseline && r.baseline.tsd) hoBusStates(r.baseline.tsd, pb.t).forEach(st => put(st, "ghost", st.id));
   const now = hoBusStates(o.tsd, pb.t);
-  now.forEach(st => { const s = sh[st.id]; put(st, st.id === "R" ? "rep" : s >= .5 ? "hold" : s <= -.5 ? "rel" : "", st.id === "R" ? "\u2605" : st.id); });
+  now.forEach(st => { const s = sh[st.id]; put(st, isR(st.id) ? "rep" : s >= .5 ? "hold" : s <= -.5 ? "rel" : "", isR(st.id) ? "\u2605" : st.id); });
   $("hoBusCount").textContent = `${now.length} trip${now.length === 1 ? "" : "s"} on the route at ${hm(pb.t)}`;
 }
 function hoPickOpt(k){                              // click a halfway stop on the map: keep the current kind (with / without regulation)
@@ -588,7 +608,12 @@ function hoRenderDep(){
   if(!r) { el.textContent = "Enter a service to load its route."; return; }
   if(!r.ok){ el.textContent = r.error || ""; return; }
   if(r.disrupted == null || !o){ el.textContent = r.message || "Mark one trip as Disrupted."; return; }
-  const d = r.trips[r.disrupted - 1];
+  const d = r.trips[r.disrupted - 1], rl = o.repl || [];
+  if(o.j != null && rl.length > 1){
+    el.innerHTML = `<b>Deployment:</b> ${rl.length} halfway buses start at <b>${esc(o.name)}</b> (stop ${o.seq}): ` + rl.map(x => `trip ${x.trip}'s bus leaves ${esc(r.route.first)} at ${hm(x.leave_first)} and starts at <b>${hm(x.start_time)}</b>${Math.abs(x.late_start) < .5 ? "" : " (" + sg(x.late_start) + " vs slot)"}`).join("; ") + "."
+      + ((o.skipped_trips || []).length ? ` <span class="no">Trip ${o.skipped_trips.join(", ")}: no bus can reach the stop in time.</span>` : "") + (o.regulated ? ` The AI also regulates <b>${o.reg_trips}</b> trips.` : "");
+    return;
+  }
   if(o.j == null){ el.innerHTML = `<b>Regulate only:</b> no trip leaves the service and nothing is deployed. The AI holds / releases <b>${o.reg_trips}</b> trips at the first stop (${esc(r.route.first)}) so the gap is shared across them. Press play to watch the trips.`; return; }
   const tv = o.travel, late = tv.own_behind_start, w = o.start_window;
   if(o.veh === "own"){
@@ -632,7 +657,7 @@ function hoRenderMap(){
       L.marker(B, {icon:L.divIcon({className:"", iconSize:[0, 0], iconAnchor:[0, 0], html:`<div class="hocall rep" style="transform:${(o.lon <= midLon) ? 'translate(-16px,60%)' : 'translate(calc(-100% + 16px),60%)'}">Replacement starts ${hm(o.start_time)}<br>${esc(o.name)} \u00b7 stop ${o.seq}</div>`}), interactive:false, keyboard:false}).addTo(HO.g.stops);
     }
     const d = r.trips[r.disrupted - 1];
-    L.marker(mp.first, {icon:L.divIcon({className:"", iconSize:[0, 0], iconAnchor:[0, 0], html:`<div class="hocall dis" style="transform:${alignS}">\u2716 Trip ${r.disrupted} disrupted<br>at ${esc(r.route.first)} ${hm(d.act_arr)} (${sg(d.late)} min)</div>`}), interactive:false, keyboard:false}).addTo(HO.g.stops);
+    L.marker(mp.first, {icon:L.divIcon({className:"", iconSize:[0, 0], iconAnchor:[0, 0], html:`<div class="hocall dis" style="transform:${alignS}">\u2716 ${dis_(r).length > 1 ? "Trips " + dis_(r).join(", ") : "Trip " + r.disrupted} disrupted<br>at ${esc(r.route.first)} ${hm(d.act_arr)} (${sg(d.late)} min)</div>`}), interactive:false, keyboard:false}).addTo(HO.g.stops);
   }
   L.marker(mp.first, {icon:L.divIcon({className:"", iconSize:[26, 26], iconAnchor:[13, 13], html:`<div class="hoend">S</div>`}), keyboard:false}).addTo(HO.g.stops);
   L.marker(mp.last, {icon:L.divIcon({className:"", iconSize:[26, 26], iconAnchor:[13, 13], html:`<div class="hoend">E</div>`}), keyboard:false}).addTo(HO.g.stops);
@@ -670,14 +695,15 @@ function hoRenderSimple(){
   if(!r.ok){ el.innerHTML = `<div class="ho-msg hx-err">${esc(r.error)}</div>`; return; }
   const o = hoSelC();
   if(r.disrupted == null || !o || !o.tsd || !r.baseline || !r.baseline.tsd || !r.span){ el.innerHTML = `<div class="ho-msg">${esc(r.message || "Mark one trip as Disrupted, then press Run AI Optimisation.")}</div>`; return; }
-  const d = r.disrupted, H = r.sched_hw, bm = r.bunch_min, j = o.j != null ? o.j : 0, sp = r.span, refName = j === 0 ? r.route.first : r.map.stops[j][3];
-  const ids = []; for(let i = d - sp.show_up; i < d; i++) if(i >= 1) ids.push(String(i)); for(let i = d + 1; i <= d + sp.show_dn; i++) if(i <= r.n_trips) ids.push(String(i));
+  const D = dis_(r), d = D[0], dl = D[D.length - 1], H = r.sched_hw, bm = r.bunch_min, j = o.j != null ? o.j : 0, sp = r.span, refName = j === 0 ? r.route.first : r.map.stops[j][3];
+  const ids = []; for(let i = d - sp.show_up; i <= dl + sp.show_dn; i++) if(i >= 1 && i <= r.n_trips && !D.includes(i)) ids.push(String(i));
   const shift = {}; (o.deps || []).forEach(x => shift[x.n] = x.shift);
   const A = [], B = [];
   ids.forEach(id => { const ta = r.baseline.tsd[id] && r.baseline.tsd[id][j], tb = o.tsd[id] && o.tsd[id][j]; if(ta != null) A.push({id, t:ta, label:"Trip " + id, col:"#1e6fd9"});
     if(tb != null){ const sv = shift[id] || 0; B.push({id, t:tb, label:"Trip " + id, col:sv >= .5 ? "#e0a21a" : sv <= -.5 ? "#39b7e6" : "#1e6fd9", sub:sv >= .5 ? "held +" + f1(sv) : sv <= -.5 ? "early " + f1(sv) : "", subCol:sv >= .5 ? "#ffd166" : "#7fdcff"}); } });
-  const dp = r.baseline.dis_path && r.baseline.dis_path[j]; if(dp != null) A.push({id:"L", t:dp, label:"Trip " + d + " lost", col:"#000", ghost:true});
-  const rt = o.tsd.R && o.tsd.R[j]; if(rt != null) B.push({id:"R", t:rt, label:"Halfway bus", col:"#2fa84f", star:true, sub:o.start_time != null && o.late_start != null && Math.abs(o.late_start) >= .5 ? sg(o.late_start) + " vs slot" : "", subCol:"#8ff0b3"});
+  const dps = r.baseline.dis_paths || {[String(d)]: r.baseline.dis_path};
+  D.forEach(i => { const dp = dps[String(i)] && dps[String(i)][j]; if(dp != null) A.push({id:"L" + i, t:dp, label:"Trip " + i + " lost", col:"#000", ghost:true}); });
+  Object.keys(o.tsd).filter(isR).sort().forEach(k => { const rt = o.tsd[k][j]; if(rt == null) return; const rp = (o.repl || []).find(x => x.id === k); B.push({id:k, t:rt, label:D.length > 1 ? "Halfway " + k.slice(1) : "Halfway bus", col:"#2fa84f", star:true, sub:rp && Math.abs(rp.late_start) >= .5 ? sg(rp.late_start) + " vs slot" : "", subCol:"#8ff0b3"}); });
   const all = A.concat(B).map(x => x.t), tmin = Math.min(...all) - 2.5, tmax = Math.max(...all) + 2.5;
   const gaps = L => { const t = L.filter(x => !x.ghost).map(x => x.t).sort((a, b) => a - b); return t.slice(1).map((x, i) => x - t[i]); };
   const ga = gaps(A), gb = gaps(B), mxA = Math.max(...ga), mxB = Math.max(...gb), bunA = ga.filter(g => g < bm - 1e-9).length, bunB = gb.filter(g => g < bm - 1e-9).length;
@@ -690,10 +716,11 @@ function hoRenderSimple(){
   const why = [];
   if(o.j != null) why.push(`A bus started at ${esc(o.name)} fills the ${f1(mxA)} min gap, balancing the spacing between buses.`);
   if(o.regulated && (nh || nr)) why.push(`At the interchange (${esc(r.route.first)}) ${nh ? nh + " trip" + (nh > 1 ? "s are" : " is") + " held" : ""}${nh && nr ? " and " : ""}${nr ? nr + " released early" : ""}, so the gap is shared across ${o.reg_trips} trips instead of one.`);
+  if(o.regulated && r.share) why.push(`The lost trip's slot is shared: ${r.share.slots} slots \u00d7 ${f1(H)} min \u00f7 ${r.share.trips} trips = ${f1(r.share.hw)} min between the regulated trips.`);
   why.push(`More even headways cut passenger waiting time (simulated EWT ${ew(ma.ewt)} \u2192 ${ew(mb.ewt)} min) and improve reliability.`);
   why.push("This can be done with a spare bus, a short-turning bus, or by adjusting dispatching at the interchange in real time.");
   const title = o.kind === "regulate" ? "Regulating the interchange departures" : "Halfway insertion";
-  const cap = `Each bus is placed by the time it passes <b>${esc(refName)}</b>; the number between two buses is the gap in minutes. Showing ${sp.show_up} trip${sp.show_up === 1 ? "" : "s"} before and ${sp.show_dn} after the gap${sp.short_up ? ` (only ${sp.show_up} run above it, so more future trips are adjusted)` : ""}.`;
+  const nlost = D.length, cap = `${nlost > 1 ? `<b>${nlost} disrupted trips (${D.join(", ")})</b>. ` : ""}Each bus is placed by the time it passes <b>${esc(refName)}</b>; the number between two buses is the gap in minutes. Showing ${sp.show_up} trip${sp.show_up === 1 ? "" : "s"} before and ${sp.show_dn} after the gap${sp.short_up ? ` (only ${sp.show_up} run above it, so more future trips are adjusted)` : ""}.`;
   el.innerHTML = `<div class="ho-note" style="margin:0 0 8px">${cap}</div>
     <div class="hopanel"><div class="hotitle red">Before \u2013 no action ${bunA || mxA >= 1.5 * H ? "(bunched / long gap)" : ""}</div><div class="tw">${hoSimplePanel(A, tmin, tmax, H, bm)}</div></div>
     <div class="hoarr">\u25BC</div>
@@ -722,20 +749,21 @@ function hoRenderTsd(){
   const rows = [[0, "First: " + r.map.stops[0][3]]]; if(o.j != null) rows.push([o.j, "\u2605 " + r.map.stops[o.j][3]]); rows.push([NS_ - 1, "End: " + r.map.stops[NS_ - 1][3]]);
   rows.forEach(([j, n]) => { s += `<line x1="${L0}" x2="${W - R0}" y1="${Y(j).toFixed(1)}" y2="${Y(j).toFixed(1)}" stroke="${j === o.j ? "#b46bff" : "#2a6fbf"}" stroke-dasharray="${j === 0 || j === NS_ - 1 ? "0" : "5 4"}" stroke-width="1" opacity=".7"/><text x="${L0 - 6}" y="${(Y(j) + 4).toFixed(1)}" fill="#cfe0f3" font-size="11" text-anchor="end">${esc(n.length > 20 ? n.slice(0, 19) + "\u2026" : n)}</text>`; });
   const pl = (T, ids) => ids.map(id => T[id]).map((a, k) => a.map((x, j) => x == null ? null : `${X(x).toFixed(1)},${Y(j).toFixed(1)}`).filter(Boolean).join(" "));
-  const A = r.baseline.tsd, B = o.tsd, d = r.disrupted;
-  if(A[String(d - 1)] && A[String(d + 1)]){                          // the hole: the area between the two trips either side of the lost one (no action)
-    const p1 = A[String(d - 1)].map((x, j) => x == null ? null : `${X(x).toFixed(1)},${Y(j).toFixed(1)}`).filter(Boolean), p2 = A[String(d + 1)].map((x, j) => x == null ? null : `${X(x).toFixed(1)},${Y(j).toFixed(1)}`).filter(Boolean).reverse();
+  const A = r.baseline.tsd, B = o.tsd, D = dis_(r), d = D[0], dl = D[D.length - 1];
+  if(A[String(d - 1)] && A[String(dl + 1)]){                          // the hole: the area between the two trips either side of the lost one (no action)
+    const p1 = A[String(d - 1)].map((x, j) => x == null ? null : `${X(x).toFixed(1)},${Y(j).toFixed(1)}`).filter(Boolean), p2 = A[String(dl + 1)].map((x, j) => x == null ? null : `${X(x).toFixed(1)},${Y(j).toFixed(1)}`).filter(Boolean).reverse();
     s += `<polygon points="${p1.concat(p2).join(" ")}" fill="#ff4d55" opacity=".10"/>`;
   }
   Object.keys(A).forEach(id => { const p = A[id].map((x, j) => x == null ? null : `${X(x).toFixed(1)},${Y(j).toFixed(1)}`).filter(Boolean).join(" "); s += `<polyline points="${p}" fill="none" stroke="#8aa0b8" stroke-width="1.3" stroke-dasharray="4 4" opacity=".75"/>`; });
-  s += `<polyline points="${r.baseline.dis_path.map((x, j) => `${X(x).toFixed(1)},${Y(j).toFixed(1)}`).join(" ")}" fill="none" stroke="#ff4d55" stroke-width="1.8" stroke-dasharray="1.5 4" stroke-linecap="round"/><text x="${(X(r.baseline.dis_path[0]) + 5).toFixed(1)}" y="${T0 - 6}" fill="#ff8a90" font-size="11" font-weight="700">\u2716 ${d}</text>`;
+  const dps = r.baseline.dis_paths || {[String(d)]: r.baseline.dis_path};
+  D.forEach(i => { const dp_ = dps[String(i)]; if(!dp_) return; s += `<polyline points="${dp_.map((x, j) => `${X(x).toFixed(1)},${Y(j).toFixed(1)}`).join(" ")}" fill="none" stroke="#ff4d55" stroke-width="1.8" stroke-dasharray="1.5 4" stroke-linecap="round"/><text x="${(X(dp_[0]) + 5).toFixed(1)}" y="${T0 - 6}" fill="#ff8a90" font-size="11" font-weight="700">\u2716 ${i}</text>`; });
   const sh = {}; (o.deps || []).forEach(x => sh[x.n] = x.shift);
   Object.keys(B).forEach(id => {
-    const isR = id === "R", sv = sh[id] || 0, col = isR ? "#b46bff" : sv >= .5 ? "#ffc94d" : sv <= -.5 ? "#5fd0ff" : "#3b9dff";
+    const isRb = isR(id), sv = sh[id] || 0, col = isRb ? "#b46bff" : sv >= .5 ? "#ffc94d" : sv <= -.5 ? "#5fd0ff" : "#3b9dff";
     const p = B[id].map((x, j) => x == null ? null : `${X(x).toFixed(1)},${Y(j).toFixed(1)}`).filter(Boolean);
-    s += `<polyline points="${p.join(" ")}" fill="none" stroke="${col}" stroke-width="${isR ? 3.6 : 2.2}" stroke-linejoin="round"/>`;
+    s += `<polyline points="${p.join(" ")}" fill="none" stroke="${col}" stroke-width="${isRb ? 3.6 : 2.2}" stroke-linejoin="round"/>`;
     const fj = B[id].findIndex(x => x != null), fx = X(B[id][fj]), fy = Y(fj);
-    s += isR ? `<text x="${(fx - 8).toFixed(1)}" y="${(fy + 4).toFixed(1)}" fill="#d9b8ff" font-size="12" font-weight="800" text-anchor="end">\u2605 R</text>` : `<text x="${fx.toFixed(1)}" y="${(fy - 6).toFixed(1)}" fill="${col}" font-size="11" font-weight="700" text-anchor="middle">${id}${sv >= .5 ? " +" + f1(sv) : sv <= -.5 ? " " + f1(sv) : ""}</text>`;
+    s += isRb ? `<text x="${(fx - 8).toFixed(1)}" y="${(fy + 4).toFixed(1)}" fill="#d9b8ff" font-size="12" font-weight="800" text-anchor="end">\u2605 ${id}</text>` : `<text x="${fx.toFixed(1)}" y="${(fy - 6).toFixed(1)}" fill="${col}" font-size="11" font-weight="700" text-anchor="middle">${id}${sv >= .5 ? " +" + f1(sv) : sv <= -.5 ? " " + f1(sv) : ""}</text>`;
   });
   const ann = (T, j, dy, faint) => { const ids = Object.keys(T).filter(id => T[id][j] != null).sort((a, b) => T[a][j] - T[b][j]); for(let i = 1; i < ids.length; i++){ const a = T[ids[i - 1]][j], b = T[ids[i]][j], v = b - a, c = faint ? "#8aa0b8" : HCOL[hoCls(v, H, bm)]; s += `<text x="${((X(a) + X(b)) / 2).toFixed(1)}" y="${(Y(j) + dy).toFixed(1)}" fill="${c}" font-size="11" font-weight="${faint ? 500 : 800}" text-anchor="middle">${f1(v)}</text>`; } };
   ann(B, NS_ - 1, -6, false); ann(A, NS_ - 1, 13, true);
@@ -748,7 +776,7 @@ function hoTsdCursor(){
   const c = $("hoTsdCur"), g = HO.tsdg, r = HO.res, o = hoSelC(); if(!c || !g || !o || !o.tsd) return;
   const x = g.X(HO.pb.t).toFixed(1); c.setAttribute("x1", x); c.setAttribute("x2", x); const t = $("hoTsdCurT"); t.setAttribute("x", x); t.textContent = hm(HO.pb.t);
   const sh = {}; (o.deps || []).forEach(q => sh[q.n] = q.shift);
-  $("hoTsdDots").innerHTML = hoBusStates(o.tsd, HO.pb.t).map(st => `<circle cx="${x}" cy="${g.Y(st.f).toFixed(1)}" r="${st.id === "R" ? 6 : 4.5}" fill="${st.id === "R" ? "#b46bff" : sh[st.id] >= .5 ? "#ffc94d" : sh[st.id] <= -.5 ? "#5fd0ff" : "#3b9dff"}" stroke="#fff" stroke-width="1.5"/>`).join("");
+  $("hoTsdDots").innerHTML = hoBusStates(o.tsd, HO.pb.t).map(st => `<circle cx="${x}" cy="${g.Y(st.f).toFixed(1)}" r="${isR(st.id) ? 6 : 4.5}" fill="${isR(st.id) ? "#b46bff" : sh[st.id] >= .5 ? "#ffc94d" : sh[st.id] <= -.5 ? "#5fd0ff" : "#3b9dff"}" stroke="#fff" stroke-width="1.5"/>`).join("");
 }
 function hoBarChart(T, j, H, bm, title){
   const ids = Object.keys(T).filter(id => T[id][j] != null).sort((a, b) => T[a][j] - T[b][j]), g = [];
@@ -766,6 +794,15 @@ function hoRenderBars(){
   $("hoBars").innerHTML = `<h4>No action \u2013 headway (min) between consecutive trips at ${esc(where)}</h4>${hoBarChart(r.baseline.tsd, j, r.sched_hw, r.bunch_min, "No action headways")}<h4>${esc(o.label)}</h4>${hoBarChart(o.tsd, j, r.sched_hw, r.bunch_min, "Headways with the selected option")}<div class="ho-note">Green band = scheduled ${f1(r.sched_hw)} min \u00b1${Math.round(r.params.recover_tol_pct)}%. Red = a bunched or double-length headway. "R" = the replacement trip.</div>`;
 }
 /* ---- wiring */
+function hoThr(){ return (HO.setup && HO.setup.params && HO.setup.params.late_disrupt_min) || 15; }
+function hoMaxDis(){ return (HO.setup && HO.setup.params && HO.setup.params.max_disrupted) || 4; }
+function hoSuggest(){                               // trips whose arrival is at least late_disrupt_min late (never the first / last trip), the latest first, up to the maximum
+  const n = HO.n, c = HO.late.map((v, k) => [k + 1, +v]).filter(x => x[0] >= 2 && x[0] <= n - 1 && x[1] >= hoThr() - 1e-9).sort((a, b) => b[1] - a[1]).slice(0, hoMaxDis()).map(x => x[0]).sort((a, b) => a - b);
+  if(!c.length){ toast(`No trip arrives ${f1(hoThr())} min or more late: mark the disrupted trips yourself`); return; }
+  HO.dis = c; HO.selKey = null; HO.pick = ""; hoBuildTrips(); hoSim(false); toast(`Marked as disrupted from lateness (\u2265 ${f1(hoThr())} min): trip${c.length > 1 ? "s" : ""} ${c.join(", ")}`);
+}
+$("hoSuggest").onclick = hoSuggest;
+$("hoClearDis").onclick = () => { HO.dis = []; HO.selKey = null; HO.pick = ""; hoBuildTrips(); hoSim(false); };
 document.querySelectorAll("#hoView button").forEach(b => b.onclick = () => hoSetView(b.dataset.v));
 hoSetView(HO.view);
 document.querySelectorAll("input[name=hoscope]").forEach(x => { x.checked = x.value === HO.scope; x.onchange = () => { HO.scope = x.value; LS.set("ho.scope", HO.scope); HO.selKey = null; HO.pick = ""; if(HO.setup) hoLoad(); }; });
@@ -783,7 +820,7 @@ $("hoSvc").onchange = () => hoLoad(); $("hoSvc").onkeydown = e => { if(e.key ===
 $("hoExtra").oninput = () => { const v = $("hoExtra").value.trim(); if(/^\d{5}$/.test(v)) HO.selKey = "halfway:" + v; hoSchedule(); };
 document.querySelectorAll("input[name=hopref]").forEach(x => x.onchange = () => { HO.selKey = null; hoSim(false); }); $("hoReg").onchange = () => { HO.selKey = null; hoSim(false); };
 $("hoRun").onclick = () => hoSim(true);
-$("hoEx").onclick = () => { $("hoRef").value = "08:10"; $("hoLay").value = 10; HO.late = [2, 3, 22, 5, 4, 3, 2, 4, 3, 2]; HO.dis = 3; hoBuildTrips(); hoSim(false); toast("Example loaded: 08:10 first departure, trip 3 arrives +22 min and is Disrupted"); };
+$("hoEx").onclick = () => { $("hoRef").value = "08:10"; $("hoLay").value = 10; HO.late = [2, 3, 22, 5, 4, 3, 2, 4, 3, 2]; HO.dis = [3]; hoBuildTrips(); hoSim(false); toast("Example loaded: 08:10 first departure, trip 3 arrives +22 min and is Disrupted"); };
 /* ---- Settings */
 const HLAB = {n_trips:["Trips simulated", "trips at the first stop"], layover_min:["Scheduled layover at the first stop", "min (default; editable per run)"], min_layover_min:["Minimum layover", "min: a trip leaves no earlier than its arrival + this"],
   start_delay_min:["Replacement start delay", "min after the disrupted trip's scheduled time at the halfway stop (plain halfway option)"], reg_hold_max:["Regulation: max hold", "min a trip may be held beyond its scheduled departure"],
@@ -793,7 +830,9 @@ const HLAB = {n_trips:["Trips simulated", "trips at the first stop"], layover_mi
   recover_tol_pct:["Recovered = within \u00b1", "% of scheduled headway"], recover_points:["Consecutive headways to confirm", "kept for the specification; the simulated trips end the check"],
   w_regularity:["Weight: headway regularity", "% (Balanced)"], w_maxgap:["Weight: maximum-gap reduction", "% (Balanced)"], w_recovery:["Weight: recovery time", "% (Balanced)"], w_holding:["Weight: holding cost", "% (Balanced)"], w_mileage:["Weight: mileage loss", "% (Balanced)"], w_bunching:["Weight: new bunching risk", "% (Balanced)"],
   pref_recovery_boost:["'Faster recovery' boosts recovery + max-gap by", "\u00d7"], pref_mileage_boost:["'Minimise mileage' boosts the mileage weight by", "\u00d7"], load_sens:["Headway propagation (advanced)", "0 = every trip runs the same; higher = a big gap grows downstream"], fallback_kmh:["Fallback running speed", "km/h when no traffic model is available"],
+  reg_even_share:["Share the lost slot evenly at the interchange", "1 = the regulated trips get equal headways (7 slots x headway / 6 trips) and the halfway bus is placed on top; 0 = the older joint calculation"],
   reg_min_side:["Regulate at least this many trips each side", "trips before AND after the gap regulated at the interchange (3 + 3 = 6). With fewer trips above the gap, more future trips are used (0 = off)"], reg_early_future:["Future trips may leave early by up to", "min, when the trips above the gap are too few (never before arrival + minimum layover)"],
+  late_disrupt_min:["Suggest as disrupted from", "min late: 'Suggest from lateness' marks the trips whose arrival is at least this late"], max_disrupted:["Most trips disrupted at once", "trips (1 to 6)"],
   offsvc_factor:["Off-service run time factor", "the halfway bus runs to the halfway stop in this fraction of the in-service running time (no dwell, no stopping). Unvalidated: 1 = same as in service"]};
 async function loadHoSettings(){
   const j = await getJSON("/api/halfway/config", 20000); if(j.error){ $("hoParams").innerHTML = `<div class="msg bad">${esc(j.error)}</div>`; return; }

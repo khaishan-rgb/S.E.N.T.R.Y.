@@ -20,7 +20,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 
 import headway
 
-VERSION = "V9.1"
+VERSION = "V10.0"
 LTA = os.getenv("LTA_BASE", "https://datamall2.mytransport.sg/ltaodataservice").rstrip("/")
 KEY = os.getenv("LTA_ACCOUNT_KEY", "")
 OSRM = os.getenv("OSRM_URL", "https://router.project-osrm.org").rstrip("/")
@@ -1552,8 +1552,8 @@ import halfway
 import bisect
 
 HO = {"params": dict(halfway.PARAMS), "points": []}
-HO_INT = ("n_trips", "reg_window", "recover_points", "reg_min_side")
-HO_RANGES = {"n_trips": (5, 20), "layover_min": (0, 60), "min_layover_min": (0, 30), "start_delay_min": (-30, 60), "reg_hold_max": (0, 30), "reg_early_max": (0, 30), "reg_window": (1, 9), "reg_min_side": (0, 5), "reg_early_future": (0, 30),
+HO_INT = ("n_trips", "reg_window", "recover_points", "reg_min_side", "reg_even_share", "max_disrupted")
+HO_RANGES = {"n_trips": (5, 20), "layover_min": (0, 60), "min_layover_min": (0, 30), "start_delay_min": (-30, 60), "reg_hold_max": (0, 30), "reg_early_max": (0, 30), "reg_window": (1, 9), "reg_min_side": (0, 5), "reg_even_share": (0, 1), "late_disrupt_min": (0, 120), "max_disrupted": (1, 6), "reg_early_future": (0, 30),
              "min_dep_gap": (0, 10), "start_early_max": (0, 30), "start_late_max": (0, 60), "min_remaining_pct": (0, 90), "min_improve_pct": (0, 100), "max_mileage_km": (0.5, 100),
              "recover_tol_pct": (5, 100), "recover_points": (1, 8), "w_regularity": (0, 100), "w_maxgap": (0, 100), "w_recovery": (0, 100), "w_holding": (0, 100), "w_mileage": (0, 100),
              "w_bunching": (0, 100), "pref_recovery_boost": (1, 5), "pref_mileage_boost": (1, 10), "load_sens": (0, 0.3), "fallback_kmh": (5, 60), "offsvc_factor": (0.3, 1.0)}
@@ -1574,6 +1574,10 @@ def ho_init():
     if not bb_sql("SELECT 1 FROM halfway_parameter WHERE k='mig_v81'", fetch=True):          # V8.1: the regulation window default went from 2 to 5 trips; an old stored 2 is the old default
         bb_sql("DELETE FROM halfway_parameter WHERE k='reg_window' AND v=2")
         bb_sql("INSERT OR REPLACE INTO halfway_parameter(k, v) VALUES ('mig_v81', 1)")
+    if not bb_sql("SELECT 1 FROM halfway_parameter WHERE k='mig_v92'", fetch=True):          # V9.2: new defaults (window 3 = 3 up + 3 down, hold 6, early 5); an old stored default is dropped once
+        for k_, v_ in (("reg_window", 5), ("reg_window", 2), ("reg_hold_max", 5), ("reg_early_max", 3), ("reg_early_future", 5)):
+            bb_sql("DELETE FROM halfway_parameter WHERE k=? AND v=?", (k_, v_))
+        bb_sql("INSERT OR REPLACE INTO halfway_parameter(k, v) VALUES ('mig_v92', 1)")
     for r in bb_sql("SELECT k, v FROM halfway_parameter", fetch=True):
         if r["k"] in HO["params"]:
             HO["params"][r["k"]] = int(r["v"]) if r["k"] in HO_INT else r["v"]
@@ -1851,9 +1855,10 @@ async def api_ho_simulate(service: str = "", direction: int = 1, ref: str = "", 
     dis = None
     if disrupted.strip():
         try:
-            dis = int(disrupted)
+            dis = sorted({int(x) for x in re.split(r"[,\s]+", disrupted.strip()) if x})          # one trip or several: "3" or "3,4,7"
         except ValueError:
-            return {"ok": False, "error": "Disrupted trip must be a trip number."}
+            return {"ok": False, "error": "Disrupted trip must be a trip number (or a list like 3,4)."}
+        dis = dis or None
     stops = g["stops"]
     scope = scope if scope in ("auto", "all", "approved") else "auto"
     veh = veh if veh in ("own", "standby") else "own"
@@ -1878,7 +1883,7 @@ async def api_ho_simulate(service: str = "", direction: int = 1, ref: str = "", 
         mins = tm.t(ss[a_], ss[b_]) if tm is not None else km / P["fallback_kmh"] * 60.0
         kmh = km / (mins / 60.0) if mins > 0 else None
         return {"km": round(km, 2), "min": round(mins, 1), "kmh": round(kmh, 1) if kmh else None, "label": ho_speed_label(kmh) if kmh else None}
-    dis_trip = res["trips"][dis - 1] if dis is not None else None
+    dis_trip = res["trips"][res["disrupted"] - 1] if res.get("disrupted") else None
     for o in res["options"]:
         j = o.get("j")
         if j is None or not o.get("series"):
@@ -1906,7 +1911,7 @@ def ho_audit(res, lates):
              "max_a": (o.get("metrics_a") or {}).get("max"), "max_b": (o.get("metrics") or {}).get("max"), "avg_a": (o.get("metrics_a") or {}).get("avg"), "avg_b": (o.get("metrics") or {}).get("avg"),
              "recovery": o.get("recovery"), "violations": o["violations"]} for o in res["options"]]
     bb_sql("INSERT INTO halfway_sim(ts,service,direction,ref_time,sched_hw,disrupted,lateness,start_delay,recommended,improvement_pct,no_halfway,best,scenarios,params,model_version,pref,rec_label,score,hold_min) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-           (time.time(), res["service"], res["direction"], res["ref"], res["sched_hw"], res["disrupted"], json.dumps(lates), res["start_delay"], (best.get("code") or best["kind"]) if best else None,
+           (time.time(), res["service"], res["direction"], res["ref"], res["sched_hw"], (res["disrupted"] if res.get("n_lost", 1) == 1 else ",".join(map(str, res["disrupted_all"]))), json.dumps(lates), res["start_delay"], (best.get("code") or best["kind"]) if best else None,
             best["improvement"]["avg_pct"] if best else None, json.dumps(best["metrics_a"]) if best else None, json.dumps(best["metrics"]) if best else None, json.dumps(scen),
             json.dumps({**res["params"], "bunch_min": BB["params"]["bunch_min"], "weights": res["weights"]}), halfway.MODEL_VERSION, res["pref"], best["label"] if best else None,
             best["score"] if best else None, best["hold_min"] if best else None))

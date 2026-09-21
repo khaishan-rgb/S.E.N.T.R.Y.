@@ -1,7 +1,48 @@
-# SG Transport Pulse V9.1 — Route Traffic + Departure Adjustment + Bunching, Gap & Alerts + AI Halfway Optimiser
+# SG Transport Pulse V10.0 — Route Traffic + Departure Adjustment + Bunching, Gap & Alerts + AI Halfway Optimiser
 
 Live bus positions, live LTA traffic drawn directly on the bus route, and next arrivals per stop.
 FastAPI backend + a single-page Leaflet frontend (OneMap basemap, OpenStreetMap fallback).
+
+## V10.0 - Several disrupted trips, chosen from lateness, and the halfway plan with the most headway gain
+
+* **The number of disrupted trips is flexible.** The *Disrupted* column of the trip table is now a set of checkboxes: mark **1 to `max_disrupted` trips** (default 4, setting range 1-6; never the first or
+  last trip, which need a trip before and after). API: `disrupted=3` or `disrupted=3,5,6`; the result has `disrupted_all`, `n_lost` and `disrupted` (the first one, for single-trip readers).
+* **Suggest from lateness.** Trips whose **arrival is at least `late_disrupt_min` late** (default 15 min, the specification's *MinimumLateForHalfway*) are offered: with nothing marked the card says
+  *trips 3, 8 arrive >= 15 min late* and the **Suggest from lateness** button marks them (the latest first, up to the maximum) and simulates. The list is in the result as `late_trips`. Clear removes every mark.
+* **One halfway bus per lost trip, each timed by its own lateness.** Each disrupted trip's bus leaves the first stop at its arrival + minimum layover, runs off-service (`offsvc_factor`) and joins at its slot at
+  the halfway stop. A bus that cannot get there within *AI replacement start: latest* of its slot is **left out** (*Trip N's bus cannot reach the stop in time; its slot gets no halfway bus and is shared by the
+  regulated trips*), so the number of halfway buses follows the lateness. The AI tests every eligible stop and every plan (regulate only / halfway / halfway + regulation) for the whole set.
+* **Even share for several lost trips.** The interchange departures share **all** the lost slots: (trips + lost trips) x headway / trips, e.g. two lost trips, 6 regulated trips, 12 min:
+  8 slots x 12 / 6 = **16 min** (outside the +-20% band, so a halfway bus is then usually needed). The window covers the 3 trips before the first lost trip and 3 after the last; trips between
+  non-adjacent lost trips are regulated too. Bunching / the picture / the plan / the timeline / the map callouts / the trip table show every lost trip and every halfway bus (`R5`, `R6` in the data).
+* **Most headway gain.** The AI marks the plan with the **largest fall in average headway** (`best_gain`, `option.gain`): the card shows *Most headway gain: <plan> - the largest headway falls by X min on
+  average over every stop (Y%)* with a **View** button, even when the score recommends another plan. A new preference **Maximum headway gain** re-weights the score (regularity 40, largest gap 40,
+  recovery 15, cost about 1) and the card then reads *Recommended - Most Headway Gain*.
+* **Fixes.** *View simulation* on the recommendation card did nothing (its id clashed with the Simple / Street toggle); it now scrolls to the heatmap.
+* **API / model.** Model `halfway-8.0`; options have `repl` (one entry per halfway bus: trip, id, start, lateness of that bus, off-service minutes), `skipped_trips` and `gain`; the audit log stores
+  the disrupted trips as a comma list (a single trip stays a number). New settings: `late_disrupt_min`, `max_disrupted`.
+
+**Limits:** the halfway buses of several lost trips all start at the same stop (the AI picks it); running two buses to different stops is not modelled. Lateness is the arrival lateness you type; nothing is
+read from live buses. Decision support only: nothing is deployed.
+
+## V9.2 - The interchange departures always share the lost trip's slot (7 slots x 12 min / 6 trips = 14 min)
+
+* **Fix: "AI plan HW 24, never regulates".** Before, the halfway bus was treated as one more trip *inside* the interchange regulation, so the trips around the gap were arranged around it
+  and the interchange kept its long gap (24 min; even later departures for the trips after it). Now the interchange departures are regulated **first and on their own**: the trips
+  before the gap (3 up) and after it (3 down) are held / released so the headways between them are **equal** - *(trips + 1) slots x scheduled headway / trips*, e.g. 7 x 12 / 6 = **14 min**
+  (within +-20% of 12). The trip before the window and the **last** trip of the window stay on their own times, so the correction starts and ends on schedule. The halfway bus is
+  placed afterwards, in the middle of the regulated gap (as far as its start window and the bus's arrival allow). Setting `reg_even_share` = 0 restores the older joint calculation.
+* **Limits that make it possible.** Defaults are now hold up to **6** min, early release up to **5** min (**6** for future trips when the trips above the gap are too few) and a
+  window of **3 + 3** trips (was 5). A 12-min headway needs about 6 min of hold on the last trip before the gap and 4-5 min of early release after it. All are editable; with tighter
+  limits the gap cannot be shared fully and the AI says so (`reg_enough` = false) and can prefer halfway + regulation.
+* **Scoring.** The *largest-gap* part of the score is now averaged over **every stop** of the route (a halfway bus cannot fix the stops before it starts), like the regularity part.
+  With **AI regulation on**, a plain halfway bus that leaves the interchange gap alone is listed as **Reference: no interchange regulation** and is never the recommendation; the choice is
+  between *Regulate only* and *Halfway + regulation* (which regulates the interchange exactly as regulate-only does and adds the halfway bus). If regulation alone keeps every headway
+  within tolerance the card says so (*a halfway bus is not needed for this gap*); a halfway bus is recommended when regulation cannot close the gap (large headways, tight limits, larger
+  delays). Switch **AI regulates headway** off to see the plain halfway plan.
+* **Screen.** The card shows *Even share at the interchange: 7 slots x 12 min / 6 trips = 14 min* and the plan ends with *Trip N leaves on its own time: the correction ends here*; the
+  **AI plan: HW** column shows the regulated headways; the simple picture shows the 14-min headways with the held / early buses. Model version `halfway-7.0`; the result has `share`
+  {slots, trips, hw} and `reg_enough`, options have `ref_only`. Saved old defaults of the regulation limits are moved to the new ones once (migration `mig_v92`).
 
 ## V9.1 - Simple before / after picture, and headway regulation of at least 3 + 3 trips at the interchange
 
