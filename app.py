@@ -20,7 +20,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 
 import headway
 
-VERSION = "V8.1"
+VERSION = "V9.0"
 LTA = os.getenv("LTA_BASE", "https://datamall2.mytransport.sg/ltaodataservice").rstrip("/")
 KEY = os.getenv("LTA_ACCOUNT_KEY", "")
 OSRM = os.getenv("OSRM_URL", "https://router.project-osrm.org").rstrip("/")
@@ -1556,8 +1556,9 @@ HO_INT = ("n_trips", "reg_window", "recover_points")
 HO_RANGES = {"n_trips": (5, 20), "layover_min": (0, 60), "min_layover_min": (0, 30), "start_delay_min": (-30, 60), "reg_hold_max": (0, 30), "reg_early_max": (0, 30), "reg_window": (1, 9),
              "min_dep_gap": (0, 10), "start_early_max": (0, 30), "start_late_max": (0, 60), "min_remaining_pct": (0, 90), "min_improve_pct": (0, 100), "max_mileage_km": (0.5, 100),
              "recover_tol_pct": (5, 100), "recover_points": (1, 8), "w_regularity": (0, 100), "w_maxgap": (0, 100), "w_recovery": (0, 100), "w_holding": (0, 100), "w_mileage": (0, 100),
-             "w_bunching": (0, 100), "pref_recovery_boost": (1, 5), "pref_mileage_boost": (1, 10), "load_sens": (0, 0.3), "fallback_kmh": (5, 60)}
+             "w_bunching": (0, 100), "pref_recovery_boost": (1, 5), "pref_mileage_boost": (1, 10), "load_sens": (0, 0.3), "fallback_kmh": (5, 60), "offsvc_factor": (0.3, 1.0)}
 HO_MAX_CANDIDATES = 12
+HO_MAX_SCAN = 60                                                             # stops the AI tests when it searches the whole route (a stride is used on longer routes)
 
 
 def ho_init():
@@ -1721,16 +1722,18 @@ async def ho_route(svc, d):
     return {"stops": stops, "line": line, "prep": prep, "tm": tm, "tau": tau, "H": H, "H_src": H_src, "now": now, "traffic_ok": tm is not None}
 
 
-def ho_candidates(svc, d, stops, extra=""):
-    """Approved halfway stops resolved to route stop indices (+ one what-if stop the controller typed)."""
-    out, unresolved, seen = [], [], set()
+def ho_candidates(svc, d, stops, extra="", scope="auto", prep=None, P=None):
+    """Halfway stops to test. scope: "approved" = the approved list only; "all" = the AI searches every eligible stop (approved ones are flagged); "auto" = the approved list
+    if the service has one, otherwise every eligible stop. Returns (candidates, unresolved, info)."""
+    out, unresolved, seen, info = [], [], set(), {"scope": scope, "approved": 0, "scanned": False, "skipped_end": 0, "skipped_km": 0}
 
-    def add(j, approved):
+    def add(j, approved, auto=False):
         if j in seen:
             return
         seen.add(j)
         s = stops[j]
-        out.append({"j": j, "code": s["code"], "name": s["name"], "seq": s["seq"], "lat": s["lat"], "lon": s["lon"], "approved": approved})
+        out.append({"j": j, "code": s["code"], "name": s["name"], "seq": s["seq"], "lat": s["lat"], "lon": s["lon"], "approved": approved, "auto": auto})
+    appr = set()
     for row in HO["points"]:
         if row["service"] != svc or row["direction"] != d or not row["enabled"]:
             continue
@@ -1742,6 +1745,32 @@ def ho_candidates(svc, d, stops, extra=""):
         if j is None:
             unresolved.append(row["stop_code"] or f"seq {row['seq']}")
         else:
+            appr.add(j)
+    info["approved"] = len(appr)
+    if scope == "auto":
+        scope = "all" if not appr else "approved"
+    info["scope_used"] = scope
+    if scope == "all" and prep is not None and P is not None:
+        info["scanned"] = True
+        ss, km, n = prep["stop_s"], prep["km"], len(stops)
+        elig = []
+        for j in range(1, n - 1):
+            if km and 100.0 * (km - ss[j]) / km < P["min_remaining_pct"] - 1e-9:
+                info["skipped_end"] += 1
+            elif ss[j] > P["max_mileage_km"] + 1e-9:
+                info["skipped_km"] += 1
+            else:
+                elig.append(j)
+        if len(elig) > HO_MAX_SCAN:
+            stride = math.ceil(len(elig) / HO_MAX_SCAN)
+            elig = elig[::stride]
+        for j in elig:
+            add(j, j in appr, auto=j not in appr)
+        for j in sorted(appr):
+            if j not in seen:
+                add(j, True)
+    else:
+        for j in sorted(appr):
             add(j, True)
     if extra:
         j = next((i for i, s in enumerate(stops) if s["code"] == extra and i > 0), None)
@@ -1750,7 +1779,7 @@ def ho_candidates(svc, d, stops, extra=""):
         else:
             add(j, False)
     out.sort(key=lambda c: c["j"])
-    return out[:HO_MAX_CANDIDATES], unresolved
+    return (out if info["scanned"] else out[:HO_MAX_CANDIDATES]), unresolved, info
 
 
 def ho_hhmm(m):
@@ -1776,16 +1805,16 @@ async def api_ho_setup(service: str = "", direction: int = 1):
     P = {**halfway.PARAMS, **HO["params"]}
     now = g["now"]
     ref = ((now.hour * 60 + now.minute) // 5 + 1) * 5                    # next 5-minute mark: the first simulated departure
-    cands, unresolved = ho_candidates(svc, direction, g["stops"])
+    cands, unresolved, cinfo = ho_candidates(svc, direction, g["stops"], "", "auto", g["prep"], P)
     return {"service": svc, "direction": direction, "sched_hw": g["H"], "hw_src": g["H_src"], "ref": ho_hhmm(ref), "params": P, "n_stops": len(g["stops"]),
             "first": g["stops"][0]["name"], "last": g["stops"][-1]["name"], "route_km": round(g["prep"]["km"], 1), "run_min": round(g["tau"][-1], 1), "traffic_ok": g["traffic_ok"],
-            "stops": [[s["code"], s["name"]] for s in g["stops"]], "points": [{"code": c["code"], "name": c["name"], "seq": c["seq"]} for c in cands], "unresolved": unresolved,
+            "stops": [[s["code"], s["name"]] for s in g["stops"]], "points": [{"code": c["code"], "name": c["name"], "seq": c["seq"]} for c in cands if c.get("approved")], "n_approved": cinfo["approved"], "n_scan": len(cands) if cinfo["scanned"] else 0, "unresolved": unresolved,
             "updated": now.isoformat(timespec="seconds")}
 
 
 @app.get("/api/halfway/simulate")
 async def api_ho_simulate(service: str = "", direction: int = 1, ref: str = "", hw: str = "", layover: str = "", delay: str = "", late: str = "", disrupted: str = "", stop: str = "", save: str = "",
-                          pref: str = "balanced", reg: str = "1"):
+                          pref: str = "balanced", reg: str = "1", scope: str = "auto", veh: str = "own", ready: str = "", pick: str = ""):
     svc = service.strip().upper()
     g = await ho_route(svc, direction)
     if g.get("error"):
@@ -1826,10 +1855,18 @@ async def api_ho_simulate(service: str = "", direction: int = 1, ref: str = "", 
         except ValueError:
             return {"ok": False, "error": "Disrupted trip must be a trip number."}
     stops = g["stops"]
-    cands, unresolved = ho_candidates(svc, direction, stops, stop.strip())
+    scope = scope if scope in ("auto", "all", "approved") else "auto"
+    veh = veh if veh in ("own", "standby") else "own"
+    rdy = None
+    if ready.strip():
+        rdy = ho_parse_hhmm(ready)
+        if rdy is None:
+            return {"ok": False, "error": "Bus ready time must be a time like 08:54."}
+    cands, unresolved, cinfo = ho_candidates(svc, direction, stops, stop.strip(), scope, g["prep"], {**P, **HO["params"]})
     ctx = {"H": H, "t0": t0, "late": lates, "disrupted": dis, "tau": g["tau"], "stop_s": g["prep"]["stop_s"], "route_km": g["prep"]["km"], "stop_names": [s["name"] for s in stops],
            "stop_seq": [s["seq"] for s in stops], "params": {**HO["params"], "layover_min": lay, "start_delay_min": dly}, "bunch_min": BB["params"]["bunch_min"], "candidates": cands,
-           "pref": pref, "regulate": reg.strip() not in ("0", "false", "no", "off")}
+           "pref": pref, "regulate": reg.strip() not in ("0", "false", "no", "off"), "veh": veh, "ready": rdy,
+           "keep": [c for c in pick.split(",") if re.fullmatch(r"\d{5}", c.strip())][:6]}
     res = halfway.simulate(ctx)
     if not res["ok"]:
         return res
@@ -1851,11 +1888,11 @@ async def api_ho_simulate(service: str = "", direction: int = 1, ref: str = "", 
         o["line_resumed"] = ho_simplify(ho_cut(line, cum, ss[j], cum[-1]), 150)            # where the replacement resumes service
         o["traffic"] = {"resumed": section(j, len(ss) - 1), "skipped": section(0, j), "incidents": await ho_incidents_near(ho_cut(line, cum, ss[j], cum[-1])),
                         "skipped_incidents": await ho_incidents_near(ho_cut(line, cum, 0.0, ss[j]))}
-        own = dis_trip["act_arr"] + HO["params"]["min_layover_min"] + g["tau"][j]          # the late vehicle itself, running from the first stop
+        own = o.get("own_arrive") if o.get("own_arrive") is not None else dis_trip["act_arr"] + HO["params"]["min_layover_min"] + g["tau"][j]       # when the halfway bus can be at the stop
         o["travel"] = {"first_to_stop": round(g["tau"][j], 1), "stop_to_end": round(g["tau"][-1] - g["tau"][j], 1), "vehicle_late": round(dis_trip["late"], 1),
                        "own_ready": own, "own_behind_start": round(own - o["start_time"], 1)}
     res.update(service=svc, direction=direction, ref=ho_hhmm(t0), hw_src=g["H_src"] if not hw.strip() else "entered by you", layover=lay, start_delay=dly, unresolved=unresolved,
-               selected=stop.strip() or None, traffic_ok=g["traffic_ok"], route={"km": round(g["prep"]["km"], 1), "run_min": round(g["tau"][-1], 1), "first": stops[0]["name"], "last": stops[-1]["name"]},
+               selected=stop.strip() or None, candidates=cinfo, scope=scope, ready_in=ready.strip() or None, traffic_ok=g["traffic_ok"], route={"km": round(g["prep"]["km"], 1), "run_min": round(g["tau"][-1], 1), "first": stops[0]["name"], "last": stops[-1]["name"]},
                map={"line": ho_simplify(line, 500), "first": [stops[0]["lat"], stops[0]["lon"]], "last": [stops[-1]["lat"], stops[-1]["lon"]],
                     "stops": [[round(s_["lat"], 5), round(s_["lon"], 5), s_["seq"], s_["name"], s_["code"]] for s_ in stops]}, updated=now.isoformat(timespec="seconds"))
     if save.strip() and dis is not None:

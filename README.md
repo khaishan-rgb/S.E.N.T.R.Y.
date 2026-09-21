@@ -1,7 +1,31 @@
-# SG Transport Pulse V8.1 — Route Traffic + Departure Adjustment + Bunching, Gap & Alerts + AI Halfway Optimiser
+# SG Transport Pulse V9.0 — Route Traffic + Departure Adjustment + Bunching, Gap & Alerts + AI Halfway Optimiser
 
 Live bus positions, live LTA traffic drawn directly on the bus route, and next arrivals per stop.
 FastAPI backend + a single-page Leaflet frontend (OneMap basemap, OpenStreetMap fallback).
+
+## V9.0 - AI halfway deployment plan: no approved list needed, the AI picks the stop from timing and headway
+
+* **No approved stops required.** By default (*AI tests every stop*) the optimiser scans every eligible stop of the route (from the 2nd stop, keeping at least *minimum remaining route*
+  = 20% of the route and within the *mileage loss limit*; up to 60 stops, with a stride on longer routes) and picks the best by the simulation score. The approved-stops list in
+  Settings is now **optional**: *Approved stops list only* restricts the AI to it; API `scope=auto` (default) uses the list if the service has one and scans everything otherwise;
+  `scope=all` scans everything and flags the approved stops; `scope=approved` never scans.
+* **Timing decides where the bus can join.** The halfway bus (by default the **delayed bus itself**: it can leave the first stop at its arrival + the minimum layover, or at a
+  **ready time you type**) runs **off-service** to the halfway stop in `offsvc_factor` x the in-service running time (default **0.7**: no dwell, no stopping - an *unvalidated
+  assumption*, editable in Settings; 1 = same as in service). It reaches stop *j* at `ready + factor x running time`; the lost trip's slot there is `scheduled + running time`, so a
+  later stop lets the bus catch up. A stop where the bus would be more than *AI replacement start: latest* (10 min) behind the slot is rejected with the reason. The AI weighs how
+  much headway a start there recovers against the mileage lost, so the recommended stop moves with the delay, the headway and the running times. If no stop works it says so
+  (and suggests a spare bus) instead of inventing one. *Spare bus already at the stop* (`veh=standby`) restores the V8 assumption (starts on the slot).
+* **AI Halfway Deployment Plan** (recommendation card): timed steps in order - *send the bus off-service from the first stop at hh:mm*, *it reaches the halfway stop at hh:mm after ~N min /
+  km*, *start the trip at hh:mm (waits N min / +N min against the lost trip's slot)*, then each *hold / release* of the neighbouring trips - plus the **start window** at that stop (the
+  start times for which the option keeps the headways: outside it the gap is not filled or a bunch appears). If the bus is ready before the slot the plan notes it could simply run the
+  whole trip. The map's deployment line and off-service arrow use the same numbers.
+* **Full scans stay light.** Every option gets its score and metrics, but the heavy detail (stop-by-stop series, per-trip times) is sent for the best 10 options + regulate-only only; the
+  options table shows the best first with *Show all N tested options*; clicking a lower-ranked row fetches its detail (`pick=<stop code>`).
+* **API** `/api/halfway/simulate` new parameters: `scope=auto|all|approved`, `veh=own|standby` (default own), `ready=HH:MM`, `pick=<codes>`; new result fields `scan`, `candidates`,
+  `ready_note`, and per option `veh, leave_first, off_min, own_arrive, late_start, wait_min, start_window, detail, auto`. Model version `halfway-5.0`; new setting `offsvc_factor` (0.3 - 1.0).
+
+**Limits:** the off-service factor is an assumption, not routing: the run time is not computed from a road route (OSRM/OneMap) and the bus's real position is not used - the delayed bus is
+assumed to be at the first stop from its arrival + layover (or your ready time). Change the factor or the ready time to test what-ifs. Decision support only: nothing is deployed.
 
 ## V8.1 - Halfway Optimiser: deployment map, timeline, wider headway regulation
 

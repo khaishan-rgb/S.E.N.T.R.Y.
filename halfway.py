@@ -24,7 +24,7 @@ the halfway stop (at stop 2 for "regulate only"). If the simulated trips end on 
 """
 import math
 
-MODEL_VERSION = "halfway-4.0"
+MODEL_VERSION = "halfway-5.0"
 EPS = 1e-6
 
 PARAMS = {
@@ -53,6 +53,7 @@ PARAMS = {
     # ---- propagation
     "load_sens": 0.0,            # 0 = identical running times; e.g. 0.05 = 5% slower per headway-of-slack ahead
     "fallback_kmh": 20.0,        # running speed if no traffic model is available
+    "offsvc_factor": 0.7,        # the halfway bus runs the section to the halfway stop OFF-SERVICE (no dwell, no stopping) in this fraction of the in-service running time. UNVALIDATED assumption
 }
 PREFS = ("balanced", "recovery", "mileage")
 
@@ -128,7 +129,7 @@ def _chain(nodes, g, iters=600):
     return xs
 
 
-def regulate(P, H, trips, d, with_r, delay):
+def regulate(P, H, trips, d, with_r, delay, rv_min=None):
     """Return ({trip: departure}, r_virtual or None, hold_min). Trips within the window of the disrupted trip may be held / released; the trips just outside
     the window are anchors. With a replacement (`with_r`) it is one more node between the trips either side of the gap, free within its start window."""
     n, w, g = len(trips), int(P["reg_window"]), P["min_dep_gap"]
@@ -138,7 +139,8 @@ def regulate(P, H, trips, d, with_r, delay):
     for i in range(max(1, d - w - 1), min(n, d + w + 1) + 1):
         if i == d:
             if with_r:
-                nodes.append({"x": sd_d + delay, "lo": sd_d - P["start_early_max"], "hi": sd_d + P["start_late_max"], "free": True})
+                lo_r = sd_d - P["start_early_max"] if rv_min is None else max(sd_d - P["start_early_max"], rv_min)      # the delayed bus cannot start before it is there
+                nodes.append({"x": max(sd_d + delay, lo_r), "lo": lo_r, "hi": max(sd_d + P["start_late_max"], lo_r), "free": True})
                 ids.append("R")
             continue
         t = trips[i - 1]
@@ -267,12 +269,15 @@ def simulate(ctx):
     beta = P["load_sens"]
     trips = build_trips(P, H, ctx["t0"], ctx.get("late") or [], d)
     out = {"ok": True, "model": MODEL_VERSION, "sched_hw": H, "trips": trips, "disrupted": d, "n_trips": n, "bunch_min": bm, "params": P, "pref": pref,
-           "weights": {k: _r(v, 3) for k, v in weights(P, pref).items()}, "regulate": do_reg}
+           "weights": {k: _r(v, 3) for k, v in weights(P, pref).items()}, "regulate": do_reg, "veh": ctx.get("veh") if ctx.get("veh") in ("own", "standby") else "standby"}
     if d is None:
         out.update(options=[], recommended=None, message="Mark one trip as Disrupted to simulate losing it.", baseline=None, monitor=[])
         return out
     if not (2 <= d <= n - 1):
         return {"ok": False, "error": f"The disrupted trip must have a trip before and after it: choose a trip between 2 and {n - 1}."}
+    veh = ctx.get("veh") if ctx.get("veh") in ("own", "standby") else "standby"          # own = the delayed bus runs off-service to the halfway stop; standby = a spare bus is at the stop at the slot time
+    F = _clip(P["offsvc_factor"], 0.2, 1.0)
+    own_ready = float(ctx["ready"]) if ctx.get("ready") is not None else trips[d - 1]["act_arr"] + P["min_layover_min"]     # the earliest the halfway bus can leave the first stop (default: the delayed bus itself)
     w = int(P["reg_window"])
     win = [i for i in range(max(1, d - w), min(n, d + w) + 1) if i != d]
     u = {t["n"]: t["act_dep"] for t in trips if not t["disrupted"]}
@@ -295,14 +300,14 @@ def simulate(ctx):
     baseline = {"series": [{"j": jj, "wa": _r(max(recA[jj][0]), 1), "a": [_r(x, 1) for x in recA[jj][0]], "min_all": _r(min(recA[jj][1]), 1) if recA[jj][1] else None} for jj in range(n_st)],
                 "metrics": _metrics(recA[1:], H, bm), "recovery": _r(_recovery(TA, 1, H, P), 1), "gap": _r(max(recA[0][0]), 1)}
 
-    def build(kind, cand, deps, rv, hold, label):
+    def build(kind, cand, deps, rv, hold, label, light=False):
         j = cand["j"] if cand else None
         start = j if j is not None else 1
         T, recs = run(deps, j, rv)
         sect = range(start, n_st)
         ma, mb = _metrics([recA[jj] for jj in sect], H, bm), _metrics([recs[jj] for jj in sect], H, bm)
         rec_a, rec_b = _recovery(TA, start, H, P), _recovery(T, start, H, P)
-        opt = {"kind": kind, "label": label, "tsd": _tsd(T), "reg_trips": sum(1 for i in deps if abs(deps[i] - u[i]) >= 0.5) + (1 if (rv is not None and abs(rv - sd_d - P["start_delay_min"]) >= 0.5) else 0),
+        opt = {"kind": kind, "label": label, "tsd": None if light else _tsd(T), "reg_trips": sum(1 for i in deps if abs(deps[i] - u[i]) >= 0.5) + (1 if (rv is not None and abs(rv - sd_d - P["start_delay_min"]) >= 0.5) else 0),
                "j": j, "code": cand.get("code") if cand else None, "name": cand.get("name") if cand else None, "seq": cand.get("seq") if cand else None,
                "approved": cand.get("approved", True) if cand else True, "regulated": kind in ("regulate", "halfway_reg"), "violations": [], "warnings": [],
                "hold_min": _r(hold, 1), "metrics_a": ma, "metrics": mb, "recovery_a": _r(rec_a, 1), "recovery": _r(rec_b, 1),
@@ -313,6 +318,9 @@ def simulate(ctx):
             remain = 100.0 * (ctx["route_km"] - ctx["stop_s"][j]) / ctx["route_km"] if ctx.get("route_km") else 0.0
             opt["remain_pct"] = _r(remain, 1)
             opt["mileage_pct"] = _r(100.0 * ctx["stop_s"][j] / ctx["route_km"], 1) if ctx.get("route_km") else None
+            arrive = own_ready + F * tau[j]                                   # when the delayed bus could be at this stop, running off-service from the first stop
+            opt.update(veh=veh, leave_first=own_ready, off_min=_r(F * tau[j], 1), own_arrive=arrive, late_start=_r(rv - sd_d, 1), wait_min=_r(max(0.0, rv + tau[j] - arrive), 1) if veh == "own" else None,
+                       auto=bool(cand.get("auto")))
         else:
             opt.update(skipped_stops=0, skipped_km=0.0, restored_stops=n_st - 1, restored_km=_r(ctx["route_km"], 2), remain_pct=100.0, mileage_pct=0.0)
         # ---- rules
@@ -323,16 +331,18 @@ def simulate(ctx):
                 opt["violations"].append(f"Only {opt['remain_pct']:.0f}% of the route remains after this stop (minimum {P['min_remaining_pct']:.0f}%)")
             if opt["skipped_km"] > P["max_mileage_km"] + EPS:
                 opt["violations"].append(f"Mileage loss {opt['skipped_km']:.1f} km is over the {P['max_mileage_km']:.1f} km limit")
+        if j is not None and veh == "own" and rv - sd_d > P["start_late_max"] + EPS:
+            opt["violations"].append(f"The delayed bus cannot fill the gap from here: it reaches this stop {rv - sd_d:.0f} min after the lost trip's slot (limit {P['start_late_max']:.0f} min) - use a standby bus or a later stop")
         frac = lambda m: m["bunched_stops"] / max(1, len(sect))
         if mb["bunched_stops"] > ma["bunched_stops"]:
             opt["violations"].append(f"Creates new bunching ({mb['min_gap']:.1f} min headway, below {bm:g} min) on {mb['bunched_stops']} stops")
         imp_rms = 100.0 * (ma["rms"] - mb["rms"]) / ma["rms"] if ma["rms"] else 0.0
         if imp_rms < P["min_improve_pct"] - EPS:
             opt["violations"].append(f"Headway regularity improves only {imp_rms:.0f}% (minimum {P['min_improve_pct']:.0f}%)")
-        if j is not None and not opt["approved"]:
+        if j is not None and not opt["approved"] and not cand.get("auto"):
             opt["warnings"].append("Not on the approved halfway list: what-if only")
         if j is not None and j > 0:
-            opt["warnings"].append(f"The first {j} stops ({ctx['stop_s'][j]:.1f} km) stay without this trip in every option")
+            opt["warnings"].append(f"The first {j} stop{'' if j == 1 else 's'} ({ctx['stop_s'][j]:.1f} km) stay without this trip in every option")
         if j is not None and kind == "halfway" and P["start_delay_min"]:
             opt["warnings"].append(f"Replacement assumed {P['start_delay_min']:+.0f} min against the disrupted trip's scheduled time at this stop")
         # ---- score (0 = same as doing nothing)
@@ -355,7 +365,7 @@ def simulate(ctx):
                    improvement={"avg_min": _r(imp, 2), "avg_pct": _r(100.0 * imp / ma["avg"], 1) if ma["avg"] else 0.0, "max_min": _r(ma["max"] - mb["max"], 2),
                                 "rms_pct": _r(imp_rms, 1), "ewt": _r(ma["ewt"] - mb["ewt"], 3),
                                 "recovery_saved": _r(rec_a - rec_b, 1) if (rec_a is not None and rec_b is not None) else None},
-                   series=[{"j": jj, "wa": _r(max(recA[jj][0]), 1), "wb": _r(max(recs[jj][0]), 1), "a": [_r(x, 1) for x in recA[jj][0]], "b": [_r(x, 1) for x in recs[jj][0]],
+                   series=None if light else [{"j": jj, "wa": _r(max(recA[jj][0]), 1), "wb": _r(max(recs[jj][0]), 1), "a": [_r(x, 1) for x in recA[jj][0]], "b": [_r(x, 1) for x in recs[jj][0]],
                             "imp": _r(max(recA[jj][0]) - max(recs[jj][0]), 1), "min_b": _r(min(recs[jj][1]), 1) if recs[jj][1] else None} for jj in range(n_st)])
         return opt
 
@@ -370,24 +380,69 @@ def simulate(ctx):
                             "regulated": False, "violations": ["A halfway stop must be after the first stop and before the terminal"], "warnings": [], "viable": False, "metrics": None, "metrics_a": None,
                             "series": [], "improvement": None, "score": None, "parts": None, "deps": [], "hold_min": 0})
             continue
-        options.append(build("halfway", c, dict(u), sd_d + P["start_delay_min"], 0.0, f"Halfway at {c.get('name')}"))
+        rvm = (own_ready + F * tau[j] - tau[j]) if veh == "own" else None            # earliest start (as a first-stop-equivalent time) the delayed bus allows
+        options.append(build("halfway", c, dict(u), max(sd_d + P["start_delay_min"], rvm) if rvm is not None else sd_d + P["start_delay_min"], 0.0, f"Halfway at {c.get('name')}"))
         if do_reg:
-            deps, rv, hold = regulate(P, H, trips, d, True, P["start_delay_min"])
+            deps, rv, hold = regulate(P, H, trips, d, True, P["start_delay_min"], rvm)
             options.append(build("halfway_reg", c, deps, rv, hold, f"Halfway at {c.get('name')} + regulation"))
     okc = [o for o in options if o.get("viable") and o["score"] is not None and o["score"] > 0]
     best = max(okc, key=lambda o: (o["score"], -(o["j"] or 0))) if okc else None
     for k, o in enumerate(sorted([o for o in options if o.get("score") is not None], key=lambda o: (-o["score"], o["j"] or 0)), 1):
         o["rank"] = k
+    hw_opts = [o for o in options if o["kind"] in ("halfway", "halfway_reg") and o.get("metrics")]
     if best is not None:
         msg = "Recommended - highest simulation score"
     elif not options:
-        msg = "No approved halfway points are configured for this service and direction."
+        msg = "No halfway stop could be tested for this service and direction (none eligible, or none approved)."
+    elif veh == "own" and hw_opts and all(any("cannot fill the gap" in v for v in o["violations"]) for o in hw_opts if o["kind"] == "halfway"):
+        msg = (f"The delayed bus cannot reach any tested stop in time to fill the gap (it would be more than {P['start_late_max']:.0f} min after the lost trip's slot at every stop). "
+               "Choose 'Standby bus' if a spare bus is available, or rely on regulation.")
     else:
         msg = "No option beats doing nothing without creating a problem."
+    # ---- start-time tolerance for the plain halfway options we keep in detail, and a lighter payload for the rest (a full-route scan tests dozens of stops)
+    keep_codes = set(ctx.get("keep") or [])
+    scored = sorted([o for o in options if o.get("score") is not None], key=lambda o: (-o["score"], o["j"] or 0))
+    if len(options) > 24:
+        keep = {id(o) for o in scored[:10]} | {id(o) for o in options if o["kind"] == "regulate" or o.get("code") in keep_codes}
+        if best is not None:
+            keep.add(id(best))
+    else:
+        keep = {id(o) for o in options}
+    wcache = {}
+
+    def start_window(c):
+        j = c["j"]
+        if j in wcache:
+            return wcache[j]
+        lo_rv = sd_d - P["start_early_max"]
+        if veh == "own":
+            lo_rv = max(lo_rv, own_ready + F * tau[j] - tau[j])
+        ok = []
+        hi_rv = sd_d + P["start_late_max"]
+        for k in [lo_rv] + [float(x) for x in range(math.floor(lo_rv) + 1, math.floor(hi_rv + 1e-9) + 1)]:       # the earliest possible start, then whole minutes
+            o2 = build("halfway", c, dict(u), k, 0.0, "", light=True)
+            if o2["viable"] and o2["score"] is not None and o2["score"] > 0:
+                ok.append(k)
+        wcache[j] = {"from": _r(min(ok) + tau[j], 1), "to": _r(max(ok) + tau[j], 1), "sched": _r(sd_d + tau[j], 1)} if ok else None
+        return wcache[j]
+    cmap = {c["j"]: c for c in (ctx.get("candidates") or [])}
+    for o in options:
+        if id(o) in keep:
+            o["detail"] = True
+            if o["kind"] in ("halfway", "halfway_reg") and o.get("metrics") and o["j"] in cmap:
+                o["start_window"] = start_window(cmap[o["j"]])
+        else:
+            o["detail"] = False
+            o["series"] = None
+            o["tsd"] = None
     mon = _monitor(n_st, 12)
     monitor = [{"j": j, "name": names[j] if j < len(names) else "", "seq": seqs[j] if j < len(seqs) else j + 1, "terminal": j == n_st - 1} for j in mon]
     out.update(options=options, recommended=(options.index(best) if best is not None else None), message=msg, monitor=monitor, baseline=baseline,
-               gap_min=_r(u[d + 1] - u[d - 1], 1), window=win)
+               gap_min=_r(u[d + 1] - u[d - 1], 1), window=win,
+               ready_note=("The bus is ready at the first stop before the lost trip's slot, so it can simply run the whole trip: a halfway start is only worth it if that bus cannot be at the first stop in time."
+                           if veh == "own" and own_ready <= sd_d + P["start_delay_min"] + EPS else None),
+               scan={"stops_tested": len({o["j"] for o in options if o["kind"] == "halfway"}), "stops_viable": len({o["j"] for o in options if o["kind"] in ("halfway", "halfway_reg") and o.get("viable") and (o.get("score") or 0) > 0}),
+                     "veh": veh, "offsvc_factor": F, "own_ready": _r(own_ready, 1), "detail_kept": sum(1 for o in options if o.get("detail"))})
     baseline["tsd"] = _tsd(TA)
     baseline["dis_path"] = [round(sd_d + t, 1) for t in tau]            # where the lost trip WOULD have been (its scheduled first-stop time + running times)
     baseline["u"] = {str(i): round(u[i], 1) for i in u}
