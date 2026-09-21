@@ -24,7 +24,7 @@ the halfway stop (at stop 2 for "regulate only"). If the simulated trips end on 
 """
 import math
 
-MODEL_VERSION = "halfway-10.1"
+MODEL_VERSION = "halfway-10.3"
 EPS = 1e-6
 
 PARAMS = {
@@ -33,15 +33,15 @@ PARAMS = {
     "min_layover_min": 7.0,      # mandatory break: every trip cannot depart earlier than actual arrival + 7 min
     "start_delay_min": 0.0,      # option C: replacement passes the halfway stop this many min after the disrupted trip's scheduled time there
     # ---- regulation (options B and D)
-    "reg_hold_max": 10.0,         # a trip may be held at most this many min beyond its scheduled departure
-    "reg_early_max": 8.0,        # ... or released at most this many min before it (never before arrival + minimum layover)
-    "reg_window": 4,             # trips either side of the disrupted trip that may be regulated (and that count as "affected"): 3 up + 3 down = 6, the lost trip's slot is shared
+    "reg_hold_max": 20.0,         # a trip may be held at most this many min beyond its scheduled departure
+    "reg_early_max": 15.0,        # ... or released at most this many min before it (never before arrival + minimum layover)
+    "reg_window": 5,             # trips either side of the disrupted trip that may be regulated (and that count as "affected"): 3 up + 3 down = 6, the lost trip's slot is shared
                                  # by those 6 trips (7 slots x headway / 6 trips). A wider window ramps the correction over more trips
     "reg_even_share": 1,         # 1 = the interchange departures share the lost trip's slot evenly (the halfway bus is NOT part of that calculation; it is placed on top);
                                  # the last trip of the window settles on its own time. 0 = the older joint calculation (kept for comparison)
     "reg_min_side": 4,           # the AI regulates at least this many trips BEFORE and AFTER the gap at the interchange (3 up + 3 down = 6). If the sequence has fewer trips before
                                  # the disrupted one, more trips AFTER it are regulated instead (0 = off: use reg_window only)
-    "reg_early_future": 8.0,     # ... and then those future trips may depart up to this many min early (never before arrival + minimum layover) to close the gap
+    "reg_early_future": 15.0,     # ... and then those future trips may depart up to this many min early (never before arrival + minimum layover) to close the gap
     "min_dep_gap": 2.0,          # minimum gap between two consecutive departures at the first stop
     "start_early_max": 5.0,      # option D: the replacement may start this many min earlier than the disrupted trip's scheduled time ...
     "start_late_max": 10.0,      # ... or this many min later (the AI picks the start that evens the headways)
@@ -57,7 +57,7 @@ PARAMS = {
     "pref_mileage_boost": 3.0,   # "Minimise mileage loss" multiplies the mileage weight by this
     # ---- propagation
     "load_sens": 0.0,            # 0 = identical running times; e.g. 0.05 = 5% slower per headway-of-slack ahead
-    "late_disrupt_min": 15.0,    # a trip whose arrival is at least this late is suggested as Disrupted ("Suggest from lateness"; the specification's MinimumLateForHalfway)
+    "auto_late_min": 1.0,        # the AI (Run AI Optimisation) considers a trip for disruption / halfway when it would leave at least this many min late; the others just run and are adjusted
     "max_disrupted": 4,          # how many trips may be disrupted (lost) at once
     "fallback_kmh": 20.0,        # running speed if no traffic model is available
     "offsvc_factor": 0.7,        # the halfway bus runs the section to the halfway stop OFF-SERVICE (no dwell, no stopping) in this fraction of the in-service running time. UNVALIDATED assumption
@@ -218,13 +218,13 @@ def _regulate_joint(P, H, trips, d, with_r, delay, rv_min=None):
     return deps, rv, hold
 
 
-def _regulate_share(P, H, trips, D, Rset, delay, rvmin):
+def _regulate_share(P, H, trips, D, Rset, delay, rvmin, full=()):
     """The interchange departures share the lost trips' slots evenly: the trips before the first gap (wu) and after the last one (wd) - and any trips between lost ones - are held / released so
     the headways between them are equal: (k + m) slots x H spread over k trips (m = lost trips), e.g. 7 x 12 min / 6 trips = 14 min for one lost trip. The trip before the span and the LAST trip
     of the span stay on their own times. Halfway buses (Rset = the lost trips that get one) are placed afterwards, evenly inside the regulated gap they belong to, as close as their start window
     and the bus's arrival allow. Returns ({trip: departure}, {lost trip: start as a first-stop-equivalent time}, hold_min)."""
     n, g = len(trips), P["min_dep_gap"]
-    d, dl, Dset = D[0], D[-1], set(D)
+    d, dl, Dset = D[0], D[-1], set(D) - set(full)              # the block (first .. last marked trip); a marked trip that still runs (`full`) is a normal, regulated trip
     wu, wd = _span(P, n, d, dl)
     short_up = int(P.get("reg_min_side", 0) or 0) > 0 and wu < int(P["reg_min_side"])
     u = {t["n"]: t["act_dep"] for t in trips if not t["disrupted"]}
@@ -281,11 +281,11 @@ def _regulate_share(P, H, trips, D, Rset, delay, rvmin):
     return deps, rvs, hold
 
 
-def regulate(P, H, trips, D, Rset, delay, rvmin=None):
+def regulate(P, H, trips, D, Rset, delay, rvmin=None, full=()):
     """D = the lost trips, Rset = the lost trips that get a halfway bus. Returns ({trip: departure}, {lost trip: start}, hold_min)."""
     D, Rset = _norm_dis(D), list(Rset or [])
-    if int(P.get("reg_even_share", 1)) or len(D) > 1:
-        return _regulate_share(P, H, trips, D, Rset, delay, rvmin or {})
+    if int(P.get("reg_even_share", 1)) or len(D) > 1 or full:
+        return _regulate_share(P, H, trips, D, Rset, delay, rvmin or {}, full)
     d = D[0]
     deps, rv, hold = _regulate_joint(P, H, trips, d, bool(Rset), delay, (rvmin or {}).get(d))
     return deps, ({d: rv} if rv is not None else {}), hold
@@ -394,13 +394,17 @@ def simulate(ctx):
     beta = P["load_sens"]
     trips = build_trips(P, H, ctx["t0"], ctx.get("late") or [], D)
     veh = ctx.get("veh") if ctx.get("veh") in ("own", "standby") else "standby"          # own = the delayed bus runs off-service to the halfway stop; standby = a spare bus is at the stop at the slot time
-    late_trips = [t["n"] for t in trips if 2 <= t["n"] <= n - 1 and t["late"] >= P["late_disrupt_min"] - EPS]      # suggested as Disrupted: at least the specification's MinimumLateForHalfway late
-    out = {"ok": True, "model": MODEL_VERSION, "sched_hw": H, "trips": trips, "disrupted": D[0] if D else None, "disrupted_all": D, "n_lost": len(D), "late_trips": late_trips, "n_trips": n,
+    out = {"ok": True, "model": MODEL_VERSION, "sched_hw": H, "trips": trips, "disrupted": D[0] if D else None, "disrupted_all": D, "n_lost": len(D), "n_trips": n, "mode": "disrupt" if D else "continue",
            "bunch_min": bm, "params": P, "pref": pref, "weights": {k: _r(v, 3) for k, v in weights(P, pref).items()}, "regulate": do_reg, "veh": veh}
-    if not D:
-        out.update(options=[], recommended=None, best_gain=None, message="Mark one or more trips as Disrupted to simulate losing them" + (f" (trip{'s' if len(late_trips) > 1 else ''} {', '.join(map(str, late_trips))} arrive{'' if len(late_trips) > 1 else 's'} at least {P['late_disrupt_min']:g} min late: press Suggest from lateness)." if late_trips else "."), baseline=None, monitor=[])
+    block = _norm_dis(ctx.get("block"))
+    if not D and not block:
+        out.update(options=[], recommended=None, best_gain=None, baseline=None, monitor=[],
+                   message="Enter the lateness of the late trips, then press Run AI Optimisation: the AI decides whether to disrupt a trip (halfway) or just adjust and continue service.")
         return out
-    m, d, dl, Dset = len(D), D[0], D[-1], set(D)
+    cont = not D                                   # continue service: nothing is lost, the AI only holds / releases the trips around the late ones
+    Bk = D if D else block
+    do_reg = True if cont else do_reg
+    m, d, dl, Dset = len(D), Bk[0], Bk[-1], set(D)
     if d < 2 or dl > n - 1:
         return {"ok": False, "error": ("The disrupted trip must have a trip before and after it: choose a trip" if m == 1 else "The disrupted trips must have a trip before and after them: choose trips") + f" between 2 and {n - 1}."}
     if m > int(P["max_disrupted"]):
@@ -412,7 +416,7 @@ def simulate(ctx):
     rid = (lambda i: "R") if m == 1 else (lambda i: f"R{i}")
     wu, wd = _span(P, n, d, dl)
     win = [i for i in range(d - wu, dl + wd + 1) if i not in Dset]
-    core = [i for i in win if min(abs(i - x) for x in D) <= 2]
+    core = [i for i in win if min(abs(i - x) for x in Bk) <= 2]
     ms = int(P.get("reg_min_side", 0) or 0)
     show_up = min(d - 1, ms or 3); show_dn = min(n - dl, max(ms or 3, 2 * (ms or 3) - show_up))          # the trips drawn in the simple before / after picture (3 up + 3 down, more down if the top is short)
     u = {t["n"]: t["act_dep"] for t in trips if not t["disrupted"]}
@@ -518,9 +522,9 @@ def simulate(ctx):
 
     options = []
     if do_reg:
-        deps, _, hold = regulate(P, H, trips, D, [], 0.0)
-        options.append(build("regulate", None, deps, None, hold, "Regulate headway only (no halfway)"))
-    for c in ctx.get("candidates") or []:
+        deps, _, hold = regulate(P, H, trips, Bk, [], 0.0, None, full=(Bk if cont else ()))
+        options.append(build("regulate", None, deps, None, hold, "Adjust the trips and continue service (no disruption, no halfway)" if cont else "Regulate headway only (no halfway)"))
+    for c in ([] if cont else (ctx.get("candidates") or [])):
         j = c["j"]
         if j < 1 or j >= n_st - 1:
             options.append({"kind": "halfway", "label": f"Halfway at {c.get('name')}", "j": j, "code": c.get("code"), "name": c.get("name"), "seq": c.get("seq"), "approved": c.get("approved", True),
@@ -603,7 +607,7 @@ def simulate(ctx):
     mon = _monitor(n_st, 12)
     monitor = [{"j": j, "name": names[j] if j < len(names) else "", "seq": seqs[j] if j < len(seqs) else j + 1, "terminal": j == n_st - 1} for j in mon]
     gaps = []
-    for x in D:
+    for x in D:                                                       # (nothing to do in continue mode)
         p_, q_ = x - 1, x + 1
         while p_ in Dset:
             p_ -= 1
@@ -613,18 +617,133 @@ def simulate(ctx):
     kk = (dl - d + 1 - m) + wu + wd                                   # regulated trips: those before / between / after the lost ones
     early_ready = [i for i in D if veh == "own" and own_ready[i] <= sd[i] + delay + EPS]
     out.update(options=options, recommended=(options.index(best) if best is not None else None), best_gain=(options.index(bgain) if bgain is not None else None), message=msg, monitor=monitor, baseline=baseline,
-               gap_min=_r(max(gaps), 1), window=win, share=({"slots": kk + m, "trips": kk, "hw": _r(H * (kk + m) / kk, 1), "lost": m} if kk else None),
+               gap_min=_r(max(gaps), 1) if gaps else baseline["gap"], block=Bk, window=win, share=({"slots": kk + m, "trips": kk, "hw": _r(H * (kk + m) / kk, 1), "lost": m} if kk else None),
                span={"up": wu, "dn": wd, "min_side": ms, "short_up": bool(ms and wu < ms), "show_up": show_up, "show_dn": show_dn, "lost": m},
                reg_enough=reg_enough,
                ready_note=("The bus is ready at the first stop before the lost trip's slot, so it can simply run the whole trip: a halfway start is only worth it if that bus cannot be at the first stop in time."
                            if early_ready else None),
                scan={"stops_tested": len({o["j"] for o in options if o["kind"] == "halfway"}), "stops_viable": len({o["j"] for o in options if o["kind"] in ("halfway", "halfway_reg") and o.get("viable") and (o.get("score") or 0) > 0}),
-                     "veh": veh, "offsvc_factor": F, "own_ready": _r(own_ready[d], 1), "detail_kept": sum(1 for o in options if o.get("detail"))})
+                     "veh": veh, "offsvc_factor": F, "own_ready": _r(own_ready[d], 1) if d in own_ready else None, "detail_kept": sum(1 for o in options if o.get("detail"))})
     baseline["tsd"] = _tsd(TA)
-    baseline["dis_path"] = [round(sd[d] + t, 1) for t in tau]            # where the (first) lost trip WOULD have been (its scheduled first-stop time + running times)
+    baseline["dis_path"] = [round(sd[d] + t, 1) for t in tau] if d in sd else None            # where the (first) lost trip WOULD have been (its scheduled first-stop time + running times)
     baseline["dis_paths"] = {str(i): [round(sd[i] + t, 1) for t in tau] for i in D}
     baseline["u"] = {str(i): round(u[i], 1) for i in u}
     return out
+
+
+# ----------------------------------------------------------------------------- the AI decision (Run AI Optimisation): disrupt + halfway + adjust, or adjust and continue service
+def _quality(P, H, bm, W, opt_tsd, hold, mileage_km, buses, cand, n, n_st):
+    """How good the resulting service is, on a scale that does not depend on which trips were disrupted (so different decisions can be compared): the headways among the trips around the
+    late ones (plus any halfway bus) at every stop - regularity (RMS around the scheduled headway), the largest headway, the share of stops that are within tolerance, bunching - minus
+    the cost of holding and of the mileage a halfway bus skips. Same weights as the score (so 'Faster recovery' and 'Minimise mileage' apply)."""
+    if not opt_tsd:
+        return None
+    lo_t, hi_t = max(1, cand[0] - 4), min(n, cand[-1] + 4)
+    ids = [k for k in opt_tsd if (k.isdigit() and lo_t <= int(k) <= hi_t) or k.startswith("R")]
+    tol = P["recover_tol_pct"] / 100.0
+    sq = cnt = stops = bun = ok = 0
+    mx = 0.0
+    for jj in range(1, n_st):
+        ts = sorted(opt_tsd[k][jj] for k in ids if opt_tsd[k][jj] is not None)
+        if len(ts) < 2:
+            continue
+        g = [ts[i + 1] - ts[i] for i in range(len(ts) - 1)]
+        stops += 1
+        sq += sum((x - H) ** 2 for x in g)
+        cnt += len(g)
+        mx = max(mx, max(g))
+        bun += 1 if min(g) < bm - EPS else 0
+        ok += 1 if all(abs(x - H) <= tol * H + EPS for x in g) else 0
+    if not stops:
+        return None
+    rms = math.sqrt(sq / cnt)
+    parts = {"regularity": _clip(1.0 - rms / H, 0, 1), "maxgap": _clip(1.0 - max(0.0, mx - H) / H, 0, 1), "recovery": ok / stops,
+             "holding": _clip(hold / (max(P["reg_hold_max"], 1.0) * 4.0), 0, 1), "mileage": _clip(mileage_km * buses / max(P["max_mileage_km"], EPS), 0, 1), "bunching": _clip(bun / stops / 0.25, 0, 1)}
+    q = 100.0 * (W["regularity"] * parts["regularity"] + W["maxgap"] * parts["maxgap"] + W["recovery"] * parts["recovery"]
+                 - W["holding"] * parts["holding"] - W["mileage"] * parts["mileage"] - W["bunching"] * parts["bunching"])
+    return {"q": _r(q, 1), "rms": _r(rms, 2), "max": _r(mx, 1), "ok_stops_pct": _r(100.0 * ok / stops, 0), "bunched_stops": bun}
+
+
+def decide(ctx):
+    """What to do about the late trips (Run AI Optimisation). The AI looks at the trips that would leave late and compares, on one common measure of the resulting headways:
+      * continue service - nobody is disrupted, the trips around the late ones are held / released (adjusted), or left as they are;
+      * disrupt ONE late trip and deploy a halfway bus for it (the other late trips still run their full route and are adjusted around it), at the best stop.
+    Two trips together are not disrupted (too heavy). The preference decides what counts: 'Faster headway recovery' = the largest headway, 'Minimise mileage loss' = the km a halfway bus skips.
+    Returns the normal simulate() result for the chosen decision plus `ai` {decision, suggest (the trips to tick as Disrupted), candidates, alternatives}."""
+    P = {**PARAMS, **(ctx.get("params") or {})}
+    probe = simulate({**ctx, "disrupted": [], "block": []})
+    if not probe.get("ok"):
+        return probe
+    H, tau, n_st, bm, n = float(ctx["H"]), ctx["tau"], len(ctx["tau"]), ctx.get("bunch_min", 3.0), int(P["n_trips"])
+    pref = ctx.get("pref") if ctx.get("pref") in PREFS else "balanced"
+    W = weights(P, pref)
+    trips0 = build_trips(P, H, ctx["t0"], ctx.get("late") or [], [])
+    own_late = lambda t: max(0.0, t["act_arr"] + P["min_layover_min"] - t["sch_dep"])                # how late THIS bus would leave on its own (not because a bus ahead of it is late)
+    cand = sorted(sorted([t["n"] for t in trips0 if 2 <= t["n"] <= n - 1 and own_late(t) >= P["auto_late_min"] - EPS], key=lambda i: -own_late(trips0[i - 1]))[:int(P["max_disrupted"])])
+    if not cand:
+        probe["ai"] = {"mode": "auto", "decision": "none", "suggest": [], "candidates": [], "alternatives": []}
+        probe["message"] = "No trip would leave late: nothing to disrupt or adjust."
+        return probe
+    sc = ctx.get("search_candidates") or ctx.get("candidates") or []
+    entries = []
+
+    def rate(res, o, S):
+        km = o.get("skipped_km") or 0.0
+        return _quality(P, H, bm, W, o.get("tsd"), o.get("hold_min") or 0.0, km, len(o.get("repl") or []), cand, n, n_st)
+    for S in [()] + [(c,) for c in cand]:
+        r = simulate({**ctx, "disrupted": list(S), "block": cand, "candidates": sc, "keep": [], "pref": pref})
+        if not r.get("ok"):
+            continue
+        for o in r["options"]:
+            if not o.get("detail") or not o.get("metrics") or not o.get("viable") or o.get("ref_only") or not o.get("tsd"):
+                continue
+            if S and o["kind"] not in ("halfway", "halfway_reg"):          # a disrupted trip must be deployed halfway: cancelling it is not one of the AI's decisions
+                continue
+            qq = rate(r, o, S)
+            if qq:
+                entries.append({"S": S, "kind": o["kind"], "label": o["label"], "j": o.get("j"), "name": o.get("name"), "skipped_km": o.get("skipped_km") or 0.0, "hold": o.get("hold_min") or 0.0, **qq})
+        if not S and r.get("baseline") and r["baseline"].get("tsd"):
+            qq = _quality(P, H, bm, W, r["baseline"]["tsd"], 0.0, 0.0, 0, cand, n, n_st)
+            if qq:
+                entries.append({"S": (), "kind": "none", "label": "Continue service as it is (no change)", "j": None, "name": None, "skipped_km": 0.0, "hold": 0.0, **qq})
+    if not entries:
+        probe["ai"] = {"mode": "auto", "decision": "none", "suggest": [], "candidates": cand, "alternatives": []}
+        probe["message"] = "No plan improves the headways without creating a problem: continue service as it is."
+        return probe
+    top = max(entries, key=lambda e: (round(e["q"], 1), -len(e["S"]), -e["skipped_km"], -e["hold"]))         # a tie goes to the simpler decision (fewer disrupted trips, less mileage, less holding)
+    S = top["S"]
+    final = simulate({**ctx, "disrupted": list(S), "block": cand, "pref": pref})
+    if not final.get("ok"):
+        return final
+    best_i, best_q = None, None
+    for k, o in enumerate(final["options"]):
+        if not o.get("detail") or not o.get("metrics") or not o.get("viable") or o.get("ref_only") or not o.get("tsd"):
+            continue
+        if S and o["kind"] not in ("halfway", "halfway_reg"):
+            continue
+        qq = rate(final, o, S)
+        if not qq:
+            continue
+        o["q"] = qq
+        if best_q is None or (round(qq["q"], 1), -(o.get("skipped_km") or 0.0)) > best_q:
+            best_i, best_q = k, (round(qq["q"], 1), -(o.get("skipped_km") or 0.0))
+    if top["kind"] == "none" and final.get("baseline") and final["baseline"].get("tsd"):
+        q0 = _quality(P, H, bm, W, final["baseline"]["tsd"], 0.0, 0.0, 0, cand, n, n_st)
+        if q0 and (best_q is None or q0["q"] >= best_q[0]):
+            best_i = None                                                   # nothing beats leaving the service as it is
+    final["recommended"] = best_i
+    by_S = {}
+    for e in entries:
+        cur = by_S.get(e["S"])
+        if cur is None or e["q"] > cur["q"]:
+            by_S[e["S"]] = e
+    alts = [{"suggest": list(e["S"]), "kind": e["kind"], "label": e["label"], "stop": e["name"], "q": e["q"], "max_hw": e["max"], "rms": e["rms"], "ok_stops_pct": e["ok_stops_pct"], "skipped_km": _r(e["skipped_km"], 1),
+             "hold_min": _r(e["hold"], 1), "chosen": e["S"] == S and e["kind"] == top["kind"]} for e in sorted(by_S.values(), key=lambda e: -e["q"])]
+    decision = "halfway" if S else ("adjust" if best_i is not None else "none")
+    final["ai"] = {"mode": "auto", "decision": decision, "suggest": list(S), "candidates": cand, "alternatives": alts, "pref": pref}
+    final["message"] = ("Recommended - the AI ticks trip %d as Disrupted (halfway) and adjusts the trips around it" % S[0] if S else
+                        ("Recommended - adjust the trips and continue service (no disruption)" if best_i is not None else "Recommended - continue service as it is: no plan beats it"))
+    return final
 
 
 def _monitor(n, k):

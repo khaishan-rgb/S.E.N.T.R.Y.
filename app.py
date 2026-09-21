@@ -20,7 +20,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 
 import headway
 
-VERSION = "V10.0"
+VERSION = "V10.3"
 LTA = os.getenv("LTA_BASE", "https://datamall2.mytransport.sg/ltaodataservice").rstrip("/")
 KEY = os.getenv("LTA_ACCOUNT_KEY", "")
 OSRM = os.getenv("OSRM_URL", "https://router.project-osrm.org").rstrip("/")
@@ -1553,7 +1553,7 @@ import bisect
 
 HO = {"params": dict(halfway.PARAMS), "points": []}
 HO_INT = ("n_trips", "reg_window", "recover_points", "reg_min_side", "reg_even_share", "max_disrupted")
-HO_RANGES = {"n_trips": (5, 20), "layover_min": (0, 60), "min_layover_min": (0, 30), "start_delay_min": (-30, 60), "reg_hold_max": (0, 30), "reg_early_max": (0, 30), "reg_window": (1, 9), "reg_min_side": (0, 5), "reg_even_share": (0, 1), "late_disrupt_min": (0, 120), "max_disrupted": (1, 6), "reg_early_future": (0, 30),
+HO_RANGES = {"n_trips": (5, 20), "layover_min": (0, 60), "min_layover_min": (0, 30), "start_delay_min": (-30, 60), "reg_hold_max": (0, 30), "reg_early_max": (0, 30), "reg_window": (1, 9), "reg_min_side": (0, 5), "auto_late_min": (0, 120), "reg_even_share": (0, 1), "max_disrupted": (1, 6), "reg_early_future": (0, 30),
              "min_dep_gap": (0, 10), "start_early_max": (0, 30), "start_late_max": (0, 60), "min_remaining_pct": (0, 90), "min_improve_pct": (0, 100), "max_mileage_km": (0.5, 100),
              "recover_tol_pct": (5, 100), "recover_points": (1, 8), "w_regularity": (0, 100), "w_maxgap": (0, 100), "w_recovery": (0, 100), "w_holding": (0, 100), "w_mileage": (0, 100),
              "w_bunching": (0, 100), "pref_recovery_boost": (1, 5), "pref_mileage_boost": (1, 10), "load_sens": (0, 0.3), "fallback_kmh": (5, 60), "offsvc_factor": (0.3, 1.0)}
@@ -1824,7 +1824,7 @@ async def api_ho_setup(service: str = "", direction: int = 1):
 
 @app.get("/api/halfway/simulate")
 async def api_ho_simulate(service: str = "", direction: int = 1, ref: str = "", hw: str = "", layover: str = "", delay: str = "", late: str = "", disrupted: str = "", stop: str = "", save: str = "",
-                          pref: str = "balanced", reg: str = "1", scope: str = "auto", veh: str = "own", ready: str = "", pick: str = ""):
+                          pref: str = "balanced", reg: str = "1", scope: str = "auto", veh: str = "own", ready: str = "", pick: str = "", preview: str = ""):
     svc = service.strip().upper()
     g = await ho_route(svc, direction)
     if g.get("error"):
@@ -1859,7 +1859,8 @@ async def api_ho_simulate(service: str = "", direction: int = 1, ref: str = "", 
         lates.append(f)
     lates = (lates + [0.0] * n)[:n]
     dis = None
-    if disrupted.strip():
+    auto = disrupted.strip().lower() == "auto"                # "auto": the AI decides which trips to disrupt (Run AI Optimisation), or to just adjust and continue service
+    if disrupted.strip() and not auto:
         try:
             dis = sorted({int(x) for x in re.split(r"[,\s]+", disrupted.strip()) if x})          # one trip or several: "3" or "3,4,7"
         except ValueError:
@@ -1874,11 +1875,14 @@ async def api_ho_simulate(service: str = "", direction: int = 1, ref: str = "", 
         if rdy is None:
             return {"ok": False, "error": "Bus ready time must be a time like 08:54."}
     cands, unresolved, cinfo = ho_candidates(svc, direction, stops, stop.strip(), scope, g["prep"], {**P, **HO["params"]})
+    if preview.strip():                                       # only the trip table (schedule, lateness, departures): no search, nothing stored
+        cands, reg, save = [], "0", ""
     ctx = {"H": H, "t0": t0, "late": lates, "disrupted": dis, "tau": g["tau"], "stop_s": g["prep"]["stop_s"], "route_km": g["prep"]["km"], "stop_names": [s["name"] for s in stops],
            "stop_seq": [s["seq"] for s in stops], "params": {**HO["params"], "layover_min": lay, "start_delay_min": dly}, "bunch_min": BB["params"]["bunch_min"], "candidates": cands,
            "pref": pref, "regulate": reg.strip() not in ("0", "false", "no", "off"), "veh": veh, "ready": rdy,
+           "search_candidates": (cands[::math.ceil(len(cands) / 10)] if len(cands) > 10 else cands),           # the AI's search compares its decisions on a coarser set of stops; the chosen one is then simulated on every stop
            "keep": [c for c in pick.split(",") if re.fullmatch(r"\d{5}", c.strip())][:6]}
-    res = halfway.simulate(ctx)
+    res = halfway.decide(ctx) if auto else halfway.simulate(ctx)
     if not res["ok"]:
         return res
     cum, line, ss = g["prep"]["cum"], g["line"], g["prep"]["stop_s"]
@@ -1906,7 +1910,7 @@ async def api_ho_simulate(service: str = "", direction: int = 1, ref: str = "", 
                selected=stop.strip() or None, candidates=cinfo, scope=scope, ready_in=ready.strip() or None, traffic_ok=g["traffic_ok"], route={"km": round(g["prep"]["km"], 1), "run_min": round(g["tau"][-1], 1), "first": stops[0]["name"], "last": stops[-1]["name"]},
                map={"line": ho_simplify(line, 500), "first": [stops[0]["lat"], stops[0]["lon"]], "last": [stops[-1]["lat"], stops[-1]["lon"]],
                     "stops": [[round(s_["lat"], 5), round(s_["lon"], 5), s_["seq"], s_["name"], s_["code"]] for s_ in stops]}, updated=now.isoformat(timespec="seconds"))
-    if save.strip() and dis is not None:
+    if save.strip() and (dis is not None or auto) and res.get("options"):
         res["run_id"] = ho_audit(res, lates)
     return res
 

@@ -1,7 +1,27 @@
-# SG Transport Pulse V10.0 — Route Traffic + Departure Adjustment + Bunching, Gap & Alerts + AI Halfway Optimiser
+# SG Transport Pulse V10.3 — Route Traffic + Departure Adjustment + Bunching, Gap & Alerts + AI Halfway Optimiser
 
 Live bus positions, live LTA traffic drawn directly on the bus route, and next arrivals per stop.
 FastAPI backend + a single-page Leaflet frontend (OneMap basemap, OpenStreetMap fallback).
+
+## V10.3 - Run AI Optimisation decides: tick a disrupted trip + halfway + adjust, or adjust and continue service
+
+* **Only Run AI Optimisation changes the plan.** Editing the headway, the first departure, the layover or any trip's lateness runs nothing: the plan on the screen stays as it was, the message says
+  *Inputs changed - press Run AI Optimisation to update the plan* and the Run button pulses. (The trip table's own columns - scheduled / actual arrival and departure - still refresh while you type.)
+* **The AI suggests and ticks.** With **AI decides which trips to disrupt** on (the default) you only type the lateness. On Run the AI looks at every trip that would leave late on its own
+  (`auto_late_min`, default 1 min; Settings) and compares, on one common measure of the resulting headways at every stop:
+  1. **continue service as it is** (nothing changes),
+  2. **adjust the trips and continue service** - no trip is disrupted, no halfway bus; the trips around the late ones are held / released at the interchange,
+  3. **tick ONE late trip as Disrupted and deploy a halfway bus for it**, at the best stop, and adjust the trips around it (the other late trips keep running their full route).
+  Two trips are never disrupted together (too heavy: the gap doubles). The card says which: *Tick trip N as Disrupted -> deploy halfway at X -> adjust the trips around it*, or *No disruption: adjust
+  the trips and continue service*, or *Continue service as it is*; the disrupted checkbox is ticked for you, and a small table shows **what the AI compared** (largest headway, spread, skipped km,
+  quality) with its choice marked. **Faster headway recovery** = the largest headway counts most; **Minimise mileage loss** = the km a halfway bus skips count most; Balanced = the score weights.
+  API: `disrupted=auto` (the result has `ai` {decision: halfway | adjust | none, suggest, candidates, alternatives}); `disrupted=3` or `3,5` still simulates exactly those trips.
+* **Manual mode** (untick *AI decides*, or tick a trip yourself): Run simulates exactly the ticked trips (up to `max_disrupted`, default 4) and the AI adjusts around them. *Clear ticks* unticks all.
+* **Removed:** the *Suggest from lateness* button (the AI now decides) and the *Maximum headway gain* preference (it was the same as *Faster headway recovery*).
+* **Continue-service screens.** With nothing disrupted the page shows the adjusted plan (holds / releases, the AI plan columns, the simple and street views) without a lost-trip ghost or halfway bus.
+  Fixed a page error when the AI chose to continue service (the street map tried to read a lost-trip path that does not exist).
+* **Settings you may notice** (defaults in `halfway.py`): minimum layover 7 min (the mandatory break: no trip leaves earlier than its actual arrival + 7), hold up to 20 min, regulation window 5 trips
+  (at least 4 each side), `auto_late_min` 1 min. All editable. The comparison table on the card now fits the card. Model `halfway-10.3`.
 
 ## V10.0 - Several disrupted trips, chosen from lateness, and the halfway plan with the most headway gain
 
