@@ -22,12 +22,23 @@ from datetime import timedelta
 
 CFG = {
     "FINAL_PCT": 15,         # "final 15%" of the route
-    "EARLY_GAP_PCT": 25,     # leading bus counts as "early" when the gap behind exceeds sched HW by max(25%, 2 min)
-    "EARLY_GAP_MIN": 2.0,
-    "TREND_MIN": 1.0,        # gap "increasing" = grows by >= 1 min between nearer and farther stops
+    "EARLY_GAP_PCT": 40,     # leading bus counts as "early" when the gap behind exceeds sched HW by max(40%, 3 min)
+    "EARLY_GAP_MIN": 3.0,
+    "TREND_MIN": 2.0,        # gap "increasing" = grows by >= 2 min between nearer and farther stops
+    "C1_PERSIST_MIN": 3.0,   # ... and must still be true after 3 min (filters ETA noise)
     "MULTI": 2,              # "multiple buses"
-    "AFFECT_MIN": 1.0,       # a bus is traffic-affected if congestion ahead costs it >= 1 min vs free flow
-    "LATE_MIN": 3.0,         # terminal arrivals predicted late by >= 3 min vs plan
+    "AFFECT_MIN": 3.0,       # a bus is traffic-affected only if congestion ahead costs it >= 3 min ...
+    "PROLONG_KM": 1.5,       # ... over a continuous slow stretch of >= 1.5 km  (= PROLONGED, not a spot delay)
+    "CONG_KMH": 20.0,        # "slow" = below 20 km/h (LTA speed bands 1-2)
+    "FLOW_KMH": 30.0,        # congestion cost = time lost below this normal-flow speed
+    "PERSIST_MIN": 10.0,     # congestion must persist >= 10 min (two LTA 5-min speed-band updates) before we act
+    "CLEAR_MIN": 5.0,        # recovery / normalisation must persist >= 5 min before restoring HW (no flip-flop)
+    "MIN_LAYOVER": 7.0,      # minimum layover a delayed bus still gets at the terminal
+    "DEFAULT_LAYOVER": 10.0, # scheduled layover assumed when the controller has not entered one
+    "HEAVY_LAYOVER": 15.0,   # duty with >= 15 min layover absorbs delay: never adjusted for traffic
+    "MAX_HOLD": 5.0,         # never suggest holding one bus at the terminal longer than this (bigger bunching needs other action)
+    "LATE_MARGIN": 3.0,      # delay must exceed layover slack (layover - min layover) by this much
+    "LATE_MIN": 3.0,         # (display only) route-vs-timetable colouring
     "EARLY_MIN": 5.0,        # terminal arrivals predicted early by > 5 min vs plan
     "NEAR_ONTIME": 1.5,      # within 1.5 min of plan = near on-time
     "MAX_EXTEND": 3,         # extend departure HW by at most +3 min
@@ -162,6 +173,7 @@ class TimeModel:
         self.ok = bool(raw) and kk > 0
         avg = kk / kh if kh > 0 else DEFAULT_FREE
         self.segs = [(a, b, v or avg, f) for a, b, v, f in raw]      # unmatched stretches borrow the route average
+        self.cseg = [(a, b, v) for a, b, v, f in raw]                # v is None where LTA has no reading (never counted as slow)
         self.known_pct = round(100 * kk / e) if e else 0
 
     def _span(self, a, b, free=False):
@@ -174,6 +186,28 @@ class TimeModel:
             if hi > lo:
                 t += (hi - lo) / (f if free else v) * 60.0
         return t
+
+    def cong(self, a, b):
+        """Congestion ahead between km a and b -> (minutes lost below FLOW_KMH on slow stretches, slow km, longest slow stretch km).
+        Slow stretches separated by <= 0.3 km (junction noise) count as one; no-reading stretches are never slow."""
+        a, b = max(0.0, min(a, self.total)), max(0.0, min(b, self.total))
+        cost, slow, best, cur, gap = 0.0, 0.0, 0.0, 0.0, 0.0
+        for e0, e1, v in self.cseg:
+            lo, hi = max(a, e0), min(b, e1)
+            if hi <= lo:
+                continue
+            d = hi - lo
+            if v is not None and v < self.cfg["CONG_KMH"]:
+                cost += d * (1 / v - 1 / self.cfg["FLOW_KMH"]) * 60.0
+                slow += d
+                cur += d + (gap if cur > 0 else 0.0)
+                gap = 0.0
+                best = max(best, cur)
+            else:
+                gap += d
+                if gap > 0.3:
+                    cur, gap = 0.0, 0.0
+        return cost, slow, best
 
     def dwell(self, a, b):
         return self.cfg["DWELL_MIN"] * sum(1 for s in self.stop_s if a < s <= b)
@@ -232,11 +266,11 @@ def evaluate(ctx, cfg=CFG):
             et, src = tm.t(s, end), "traffic model"
         else:
             et, src = None, None
-        ahead = max(0.0, tm.t(s, end) - tm.t_free(s, end)) if tm else None
+        cost, cslow, clong = tm.cong(s, end) if tm else (None, None, None)
         buses.append({"id": i + 1, "s_km": round(s, 2), "pct": round(100 * s / end, 1) if end else 0.0, "etas": etas,
                       "eta_term": _r(et), "term_src": src,
                       "term_clock": (now + timedelta(minutes=et)).strftime("%H:%M") if et is not None else None,
-                      "ahead_delay": _r(ahead), "affected": ahead is not None and ahead >= C["AFFECT_MIN"],
+                      "ahead_delay": _r(cost), "cong_km": _r(clong), "affected": cost is not None and cost >= C["AFFECT_MIN"] and clong >= C["PROLONG_KM"],
                       "monitored": bool(b.get("monitored")), "load": b.get("load") or "", "near": b.get("near") or "",
                       "gap_behind": None, "gap_trend": None, "gap_src": None})
 
@@ -275,6 +309,19 @@ def evaluate(ctx, cfg=CFG):
         plan_run, plan_src = (po, "timetable (user)") if po else (tm.plan_estimate(), "estimated (no timetable)")
         route_dev = pred_run - plan_run
 
+    lay = ctx.get("layover")
+    L = float(lay) if lay else C["DEFAULT_LAYOVER"]
+    heavy, slack = L >= C["HEAVY_LAYOVER"], max(0.0, L - C["MIN_LAYOVER"])
+    trigger = slack + C["LATE_MARGIN"]
+    held = ctx.get("held")                      # minutes each condition has been continuously true; None = no persistence gating
+    hd = lambda k: 1e9 if held is None else held.get(k, 0.0)
+    aff = [b for b in buses if b["affected"]]
+    n_aff = len(aff)
+    mean_cost = sum(b["ahead_delay"] for b in aff) / n_aff if aff else 0.0
+    delay2 = route_dev if (tm and ctx.get("plan_override")) else mean_cost   # a real timetable beats the estimate
+    ok_delay = delay2 <= max(C["NEAR_ONTIME"], slack)
+    layinfo = {"min": L, "src": "set by you" if lay else "assumed", "heavy": heavy, "slack": round(slack, 1), "trigger": round(trigger, 1)}
+
     result = {"service": ctx["service"], "direction": ctx["direction"], "n_buses": len(buses),
               "monitored": sum(1 for b in buses if b["monitored"]), "sched": sched, "sched_hw": H, "hw_source": H_src,
               "current_hw": cur, "adj_active": adj_active, "pred_run_min": _r(pred_run), "plan_run_min": _r(plan_run),
@@ -282,7 +329,8 @@ def evaluate(ctx, cfg=CFG):
               "traffic_known_pct": tm.known_pct if tm else None, "buses": buses, "gaps": gaps,
               "avg_gap": _r(sum(known) / len(known)) if known else None,
               "origin_etas": sorted(ctx.get("origin_etas") or [])[:3], "route_km": round(end, 2),
-              "strip": {"final_pct": 100 - C["FINAL_PCT"], "runs": []}}
+              "strip": {"final_pct": 100 - C["FINAL_PCT"], "runs": []},
+              "layover": layinfo, "delay_ahead": _r(delay2), "conds": {}, "held": held or {}, "watch": None, "turn": None}
     if tm and end:
         e = 0.0
         for r in ctx.get("runs") or []:
@@ -312,11 +360,15 @@ def evaluate(ctx, cfg=CFG):
         thr = H + max(H * C["EARLY_GAP_PCT"] / 100, C["EARLY_GAP_MIN"])
         pulled = [g for g in gaps if g["gap"] is not None and g["gap"] >= thr]
         hit = [g for g in pulled if g["trend"] is not None and g["trend"] >= C["TREND_MIN"]]
-        if hit:
+        if hit and hd("c1") >= C["C1_PERSIST_MIN"]:
             c1 = max(hit, key=lambda g: g["gap"])
             chk1 = _chk(1, "En-route spacing", "triggered",
                         f"Bus #{c1['lead']} is {fmt(c1['gap'])} min ahead of the bus behind (scheduled {H}) and the gap "
-                        f"grows +{fmt(c1['trend'])} min downstream.")
+                        f"grows +{fmt(c1['trend'])} min downstream (held {fmt(min(hd('c1'), 99))} min).")
+        elif hit:
+            g = max(hit, key=lambda g: g["gap"])
+            chk1 = _chk(1, "En-route spacing", "watch", f"Bus #{g['lead']} is {fmt(g['gap'])} min ahead and the gap is growing - "
+                        f"confirming ({fmt(hd('c1'))} of {fmt(C['C1_PERSIST_MIN'])} min) before contacting the BC.")
         elif pulled:
             g = max(pulled, key=lambda g: g["gap"])
             chk1 = _chk(1, "En-route spacing", "watch", f"Bus #{g['lead']} is {fmt(g['gap'])} min ahead of the bus behind "
@@ -324,41 +376,47 @@ def evaluate(ctx, cfg=CFG):
         else:
             chk1 = _chk(1, "En-route spacing", "clear", f"No bus is pulling away (threshold {fmt(thr)} min vs scheduled {H}).")
 
-    # ---- 2 TRAFFIC: congestion ahead of several buses AND terminal arrivals predicted late
-    n_aff = sum(1 for b in buses if b["affected"])
-    c2 = None
-    to2 = None
+    # ---- 2 TRAFFIC: PROLONGED congestion ahead of several buses AND delay the terminal layover cannot absorb
+    c2, to2, cond2 = None, None, False
     if tm is None:
         chk2 = _chk(2, "Traffic", "na", "LTA traffic feed unavailable")
+    elif n_aff < C["MULTI"]:
+        chk2 = _chk(2, "Traffic", "clear", f"{n_aff} bus(es) face prolonged congestion (needs {C['MULTI']}+ buses, a slow stretch of "
+                    f">= {fmt(C['PROLONG_KM'])} km costing >= {fmt(C['AFFECT_MIN'])} min). Brief slow spots are ignored.")
+    elif heavy:
+        chk2 = _chk(2, "Traffic", "clear", f"Heavy-layover duty ({fmt(L)} min layover): ~{fmt(delay2)} min of delay is absorbed "
+                    "at the terminal. No adjustment.")
+    elif delay2 < trigger:
+        chk2 = _chk(2, "Traffic", "clear", f"Congestion ahead costs ~{fmt(delay2)} min, but layover ({fmt(L)} min, minimum {fmt(C['MIN_LAYOVER'])}) "
+                    f"absorbs {fmt(slack)} min (+{fmt(C['LATE_MARGIN'])} margin). No adjustment.")
     else:
-        late = route_dev >= C["LATE_MIN"]
-        if n_aff >= C["MULTI"] and late and H:
-            k = min(C["MAX_EXTEND"], 1 if route_dev < 5 else 2 if route_dev < 8 else 3)
-            to2 = (H + k) if H else None
-            c2 = {"k": k}
-            chk2 = _chk(2, "Traffic", "triggered", f"{n_aff} buses have congestion ahead; running time is "
-                        f"{fmt(route_dev)} min over plan ({fmt(pred_run)} vs {fmt(plan_run)} min, plan {plan_src}).")
-        elif n_aff >= C["MULTI"] or late:
-            chk2 = _chk(2, "Traffic", "watch", f"{n_aff} bus(es) with congestion ahead; running time {route_dev:+.1f} min vs plan. "
-                        "Both conditions are needed to act.")
+        cond2 = True
+        if hd("c2") >= C["PERSIST_MIN"] and H:
+            excess = delay2 - slack
+            k = min(C["MAX_EXTEND"], 1 if excess < 5 else 2 if excess < 8 else 3)
+            to2, c2 = H + k, {"k": k}
+            chk2 = _chk(2, "Traffic", "triggered", f"{n_aff} buses face prolonged congestion (held {fmt(min(hd('c2'), 99))} min); "
+                        f"~{fmt(delay2)} min delay exceeds the layover slack of {fmt(slack)} min ({fmt(L)} min layover, minimum "
+                        f"{fmt(C['MIN_LAYOVER'])}).")
         else:
-            chk2 = _chk(2, "Traffic", "clear", f"Running time {route_dev:+.1f} min vs plan; {n_aff} bus(es) with congestion ahead.")
+            chk2 = _chk(2, "Traffic", "watch", f"{n_aff} buses face prolonged congestion (~{fmt(delay2)} min delay > {fmt(slack)} min slack). "
+                        f"Confirming it persists ({fmt(hd('c2'))} of {fmt(C['PERSIST_MIN'])} min) - no adjustment yet.")
 
-    # ---- 3 LAST-15% RECOVERY: traffic adjustment active AND affected buses now near on-time
+    # ---- 3 LAST-15% RECOVERY: traffic adjustment active AND affected buses now near on-time (held, so it does not flip-flop)
     c3 = False
+    clear_now = tm is not None and not cond2 and ok_delay and (n_aff < C["MULTI"] or all(b["pct"] >= final_from for b in aff))
     if not (adj and H and adj > H):
         chk3 = _chk(3, "Last 15% recovery", "clear", "No traffic (longer-HW) adjustment is active.")
     elif tm is None:
         chk3 = _chk(3, "Last 15% recovery", "na", "Cannot confirm recovery without the traffic feed.")
+    elif clear_now and hd("clear") >= C["CLEAR_MIN"]:
+        c3 = True
+        chk3 = _chk(3, "Last 15% recovery", "triggered", f"Affected buses are in the last {C['FINAL_PCT']}% or clear, and remaining delay "
+                    f"(~{fmt(delay2)} min) is within layover slack. Held {fmt(min(hd('clear'), 99))} min.")
+    elif clear_now:
+        chk3 = _chk(3, "Last 15% recovery", "watch", f"Recovering - confirming ({fmt(hd('clear'))} of {fmt(C['CLEAR_MIN'])} min) before restoring HW.")
     else:
-        aff = [b for b in buses if b["affected"]]
-        if (len(aff) < C["MULTI"] or all(b["pct"] >= final_from for b in aff)) and route_dev <= C["NEAR_ONTIME"]:
-            c3 = True
-            chk3 = _chk(3, "Last 15% recovery", "triggered", f"Affected buses are now in the last {C['FINAL_PCT']}% or clear "
-                        f"and running time is {route_dev:+.1f} min vs plan (near on-time).")
-        else:
-            chk3 = _chk(3, "Last 15% recovery", "watch", f"Adjustment {H}->{adj} still needed: {len(aff)} bus(es) with congestion "
-                        f"ahead, running time {route_dev:+.1f} min vs plan.")
+        chk3 = _chk(3, "Last 15% recovery", "watch", f"Adjustment {H}->{adj} still needed: {n_aff} bus(es) with prolonged congestion, ~{fmt(delay2)} min delay.")
 
     # ---- 4 EARLY ARRIVAL: several consecutive buses in the final 15% AND early by > 5 min
     c4, to4, nf = False, None, 0
@@ -367,9 +425,14 @@ def evaluate(ctx, cfg=CFG):
             nf += 1
         else:
             break
+    cond4 = bool(tm and ctx.get("plan_override") and H and nf >= C["MULTI"] and route_dev <= -C["EARLY_MIN"] and not (adj and adj > H))
     if tm is None:
         chk4 = _chk(4, "Early arrival", "na", "LTA traffic feed unavailable")
-    elif H and nf >= C["MULTI"] and route_dev <= -C["EARLY_MIN"] and not (adj and adj > H):
+    elif not ctx.get("plan_override"):
+        chk4 = _chk(4, "Early arrival", "na", "Needs your timetable running time (LTA publishes none), so early arrival is not judged.")
+    elif cond4 and hd("c4") < C["CLEAR_MIN"]:
+        chk4 = _chk(4, "Early arrival", "watch", f"{nf} buses look early; confirming ({fmt(hd('c4'))} of {fmt(C['CLEAR_MIN'])} min).")
+    elif cond4:
         c4, to4 = True, max(1, H - C["MAX_SHORTEN"])
         chk4 = _chk(4, "Early arrival", "triggered", f"{nf} consecutive buses are in the last {C['FINAL_PCT']}% and the route is "
                     f"running {abs(route_dev):.1f} min faster than plan (plan {plan_src}).")
@@ -383,11 +446,13 @@ def evaluate(ctx, cfg=CFG):
         chk5 = _chk(5, "Normalisation", "clear", "Scheduled headway is in effect.")
     else:
         tol = max(C["NORMAL_GAP_MIN"], (H or 0) * C["NORMAL_GAP_PCT"] / 100)
-        normal = bool(known) and all(abs(g - H) <= tol for g in known) and (route_dev is None or abs(route_dev) <= C["NEAR_ONTIME"] + C["LATE_MIN"] / 2)
-        if normal and not (c1 or c2 or c3 or c4):
+        normal = bool(known) and all(abs(g - H) <= tol for g in known) and clear_now
+        if normal and not (c1 or c2 or c3 or c4) and hd("clear") >= C["CLEAR_MIN"]:
             c5 = True
-            chk5 = _chk(5, "Normalisation", "triggered", f"Gaps are within +/-{fmt(tol)} min of scheduled {H} and the route is "
+            chk5 = _chk(5, "Normalisation", "triggered", f"Gaps are within +/-{fmt(tol)} min of scheduled {H} and traffic is "
                         "back to normal.")
+        elif normal and not (c1 or c2 or c3 or c4):
+            chk5 = _chk(5, "Normalisation", "watch", f"Looks normal - confirming ({fmt(hd('clear'))} of {fmt(C['CLEAR_MIN'])} min).")
         else:
             chk5 = _chk(5, "Normalisation", "watch", "Adjustment is active; service has not fully normalised yet.")
     checks = [chk1, chk2, chk3, chk4, chk5]
@@ -417,8 +482,15 @@ def evaluate(ctx, cfg=CFG):
     code, f_hw, t_hw, headline, _ = actions[0]
     also = [{"code": a[0], "headline": a[3], "check": a[4]} for a in actions[1:] if a[0] != code]
 
-    crit = (c2 and route_dev >= 2 * C["LATE_MIN"]) or (c1 and c1["gap"] >= 1.5 * (H or 1e9))
-    risk = "critical" if crit else ("developing" if (c1 or c2 or c3 or c4 or c5 or adj_active) else "stable")
+    crit = (c2 and delay2 >= trigger + 4) or (c1 and c1["gap"] >= 1.5 * (H or 1e9))
+    risk = "critical" if crit else ("developing" if (c1 or c2 or c3 or c4 or c5) else "stable")
+    watch = next((c["detail"] for c in checks if c["state"] == "watch" and c["id"] in (1, 2)), None)
+    if chk2["state"] == "watch" and cond2:
+        watch = f"Congestion ahead - confirming {fmt(min(hd('c2'), C['PERSIST_MIN']))}/{fmt(C['PERSIST_MIN'])} min"
+    elif chk1["state"] == "watch":
+        watch = "Gap growing - confirming"
+    elif adj_active and not (c1 or c2 or c3 or c4 or c5):
+        watch = "Adjustment in effect"
 
     # departure ladder: next departures from the origin, spaced at the new HW
     orig = result["origin_etas"]
@@ -429,12 +501,33 @@ def evaluate(ctx, cfg=CFG):
             adjd.append(adjd[-1] + t_hw)
         dep = {"orig": orig, "adjusted": adjd}
 
+    # predicted arrival + next trip / departure timing at the terminal (min layover applies; heavy-layover duties are left alone)
+    T = t_hw if (code in ("EXTEND", "SHORTEN", "RESTORE", "NORMALISE") and t_hw) else cur
+    nd = ctx.get("next_dir") or ctx["direction"]
+    clock = lambda m: (now + timedelta(minutes=m)).strftime("%H:%M")
+    turn, prev = [], None
+    for b in sorted([b for b in buses if b["eta_term"] is not None], key=lambda b: b["eta_term"]):
+        arr = b["eta_term"]
+        earliest = arr + C["MIN_LAYOVER"]
+        want = 0.0 if (heavy or prev is None or not T) else max(0.0, prev + T - earliest)     # hold needed for full spacing
+        hold = 0.0 if heavy else min(C["MAX_HOLD"], want)
+        rel = arr + L if heavy else earliest + hold
+        capped = (not heavy) and want > C["MAX_HOLD"] + 0.05
+        prev = rel
+        turn.append({"id": b["id"], "arr": _r(arr), "arr_clock": clock(arr), "src": b["term_src"], "next_dir": nd, "capped": capped,
+                     "earliest_clock": clock(earliest), "dep_clock": clock(rel), "layover": _r(rel - arr), "hold": _r(hold if hold >= 1 else 0.0)})
+    result["turn"] = {"rows": turn, "hw": T, "min_layover": C["MIN_LAYOVER"], "heavy": heavy, "loop": nd == ctx["direction"], "max_hold": C["MAX_HOLD"]}
+    result["conds"] = {"c1": bool(hit) if H else False, "c2": cond2, "c4": cond4, "clear": bool(clear_now)}
+    result["watch"] = watch
+
     # rationale + BC message
     facts = []
     if H:
         facts.append(f"Scheduled headway {H} min ({H_src}).")
-    if route_dev is not None:
-        facts.append(f"Predicted running time {fmt(pred_run)} min vs plan {fmt(plan_run)} min ({plan_src}): {route_dev:+.1f} min.")
+    if route_dev is not None and ctx.get("plan_override"):
+        facts.append(f"Predicted running time {fmt(pred_run)} min vs your timetable {fmt(plan_run)} min: {route_dev:+.1f} min.")
+    if tm is not None:
+        facts.append(f"Delay from prolonged congestion ahead ~{fmt(delay2)} min; layover {fmt(L)} min ({layinfo['src']}) absorbs {fmt(slack)} min.")
     facts.append(f"{len(buses)} live buses; gaps behind: " + (", ".join(f"#{g['lead']} {fmt(g['gap'])} min" for g in gaps if g["gap"] is not None) or "n/a") + ".")
     why = {"EXTEND": f"Congestion is affecting {n_aff} buses and terminal arrivals are predicted late. A temporarily longer departure headway "
                      f"({f_hw} -> {t_hw} min) spreads departures to match the slower running time. Cancel once affected buses recover.",
@@ -461,7 +554,7 @@ def evaluate(ctx, cfg=CFG):
     conf -= (len(buses) < 3) + (len(buses) < 2)
     conf -= (sched is None)
     conf -= (tm is None)
-    conf -= (plan_src == "estimated (no timetable)" and bool(c2 or c4))
+    conf -= (lay is None and bool(c2))
     result.update(risk=risk, checks=checks, departures=dep,
                   rec={"code": code, "headline": headline, "from_hw": f_hw, "to_hw": t_hw, "actions": also,
                        "rationale": " ".join(facts) + " " + why, "bc_message": bc,

@@ -20,7 +20,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 
 import headway
 
-VERSION = "V5.1"
+VERSION = "V5.2"
 LTA = os.getenv("LTA_BASE", "https://datamall2.mytransport.sg/ltaodataservice").rstrip("/")
 KEY = os.getenv("LTA_ACCOUNT_KEY", "")
 OSRM = os.getenv("OSRM_URL", "https://router.project-osrm.org").rstrip("/")
@@ -787,13 +787,35 @@ def parse_triples(s, cast):
     return out
 
 
+HELD = {}        # "svc:dir" -> {condition: {"since": ts, "seen": ts}}   how long each condition has been continuously true
+HELD_GRACE = 180  # a condition that blips off for < 3 min keeps its clock (LTA ETAs jitter)
+
+
+def held_minutes(key, conds, ts):
+    """Minutes each check condition has been continuously true. In memory only: it restarts if the server restarts or sleeps."""
+    st = HELD.setdefault(key, {})
+    out = {}
+    for name, on in (conds or {}).items():
+        e = st.get(name)
+        if on:
+            if e is None or ts - e["seen"] > HELD_GRACE:
+                e = st[name] = {"since": ts, "seen": ts}
+            e["seen"] = ts
+            out[name] = round((ts - e["since"]) / 60, 2)
+        else:
+            if e is not None and ts - e["seen"] > HELD_GRACE:
+                del st[name]
+            out[name] = 0.0
+    return out
+
+
 @app.get("/control", response_class=HTMLResponse)
 async def control_page():
     return HTMLResponse((HERE / "control.html").read_text(encoding="utf-8"))
 
 
 @app.get("/api/control")
-async def api_control(services: str = "", direction: int = 0, adj: str = "", plan: str = ""):
+async def api_control(services: str = "", direction: int = 0, adj: str = "", plan: str = "", lay: str = ""):
     """Evaluate the five pre-emptive departure checks for each selected service + direction.
     adj  = HW the controller has already applied, e.g. '32:1:13'   plan = timetable running time (min), e.g. '32:1:45'"""
     svcs = []
@@ -802,7 +824,7 @@ async def api_control(services: str = "", direction: int = 0, adj: str = "", pla
             svcs.append(t)
     dirs = [direction] if direction in (1, 2) else [1, 2]
     combos = [(s, d) for s in svcs for d in dirs][:MAX_COMBOS]
-    adj_m, plan_m = parse_triples(adj, int), parse_triples(plan, float)
+    adj_m, plan_m, lay_m = parse_triples(adj, int), parse_triples(plan, float), parse_triples(lay, float)
     now = now_sgt()
     st = await static()
     fq = await freq_table()
@@ -824,7 +846,11 @@ async def api_control(services: str = "", direction: int = 0, adj: str = "", pla
                "runs": route.get("runs", []), "traffic_ok": route["traffic"]["ok"],
                "buses": [{"s_km": s, "etas": x.get("etas", {}), "monitored": x["monitored"], "load": x["load"], "near": x["near"]["name"]} for s, x in zip(pos, bl)],
                "origin_etas": [o["eta"] for o in b.get("origin", [])],
-               "sched": headway.sched_hw(fq["freqs"].get((svc, d)), now), "adj_hw": adj_m.get((svc, d)), "plan_override": plan_m.get((svc, d))}
+               "sched": headway.sched_hw(fq["freqs"].get((svc, d)), now), "adj_hw": adj_m.get((svc, d)), "plan_override": plan_m.get((svc, d)),
+               "layover": lay_m.get((svc, d)), "next_dir": (2 if d == 1 else 1) if len(st["dirs"].get(svc, [])) > 1 else d}
+        # pass 1 finds which conditions are true right now; the tracker says how long each has held; pass 2 decides with that
+        item0 = await asyncio.to_thread(headway.evaluate, ctx)
+        ctx["held"] = held_minutes(f"{svc}:{d}", item0.get("conds"), now.timestamp())
         item = await asyncio.to_thread(headway.evaluate, ctx)
         for x in item["buses"]:
             x.pop("etas", None)

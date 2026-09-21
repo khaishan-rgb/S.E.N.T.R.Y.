@@ -56,6 +56,7 @@ a{color:var(--cyan);text-decoration:none}
 .ph{white-space:nowrap;font-variant-numeric:tabular-nums}.ph span{display:inline-block;min-width:26px;text-align:right;padding:0 3px}
 .ph .c,.ttc.c{color:#ff7a80;font-weight:700}.ph .a,.ttc.a{color:#ffc95a;font-weight:600}.ttc{white-space:nowrap;font-variant-numeric:tabular-nums}
 table.mini td.n{font-variant-numeric:tabular-nums}
+.hold{color:#ffc95a;font-weight:600}
 .arr h4{margin:14px 0 2px;font-size:14px}.arr .m{font-size:12px}
 .seg{display:flex;height:44px;background:var(--panel);border:1px solid var(--line2);border-radius:11px;padding:3px;gap:3px}
 .seg button{border:0;background:transparent;color:#a9c2da;padding:0 16px;border-radius:8px;cursor:pointer;font-weight:600;display:flex;align-items:center;gap:7px}
@@ -98,7 +99,7 @@ table.tbl{width:100%;border-collapse:collapse;min-width:980px}
 .tbl th{font-weight:600;color:#bcd0e4;font-size:12.5px;text-align:left;padding:9px 10px;border-bottom:1px solid var(--line2);white-space:nowrap}
 .tbl td{padding:9px 10px;border-bottom:1px solid #12293f;vertical-align:middle}
 .tbl tbody tr{cursor:pointer}
-.tbl th,.tbl td{padding-left:7px;padding-right:7px}
+.tbl th,.tbl td{padding:7px}
 .tbl th{white-space:normal;line-height:1.2;vertical-align:bottom}.tbl td.sugg{min-width:150px;max-width:230px}
 .tbl tbody tr:hover{background:#0d2440}
 .tbl tbody tr.sel{background:#10305a;outline:1px solid #2a6fbf;outline-offset:-1px}
@@ -203,7 +204,7 @@ details.rules summary{cursor:pointer;font-weight:700;font-size:16px}
     </header>
     <div class="tw"><table class="tbl" id="tbl"><thead><tr>
       <th>Risk</th><th>Service</th><th>Dir</th><th class="hide-m">Sched. HW</th><th class="hide-m">Dep. HW now</th>
-      <th class="hide-m">Route vs plan</th><th class="hide-m" title="Predicted headway between terminal arrivals at +10 / +20 / +30 min">Predicted HW (min)<br><small>+10 / +20 / +30</small></th><th class="hide-m" title="Minutes until predicted HW leaves 0.5x-1.5x of scheduled">Time to critical</th><th class="hide-m">Likely cause</th><th>Suggested adjustment</th><th class="hide-m">Next dep.</th><th>Status</th><th>Action</th>
+      <th class="hide-m" title="Minutes lost to prolonged congestion ahead (average of affected buses). Terminal layover absorbs part of it.">Delay ahead</th><th class="hide-m" title="Predicted headway between terminal arrivals at +10 / +20 / +30 min">Predicted HW (min)<br><small>+10 / +20 / +30</small></th><th class="hide-m" title="Minutes until predicted HW leaves 0.5x-1.5x of scheduled">Time to critical</th><th class="hide-m">Likely cause</th><th>Suggested adjustment</th><th class="hide-m">Next dep.</th><th>Status</th><th>Action</th>
     </tr></thead><tbody id="tbody"></tbody></table></div>
     <div class="empty" id="tblEmpty" hidden></div>
   </section>
@@ -222,7 +223,7 @@ details.rules summary{cursor:pointer;font-weight:700;font-size:16px}
 
   <section class="card"><details class="rules"><summary>Rules &amp; thresholds used (tap to view)</summary><div id="rules"></div></details></section>
 
-  <footer class="foot"><span>Sources: LTA DataMall (Bus Arrival, Bus Services, Traffic Speed Bands) &nbsp;|&nbsp; Decision support only, not for operational use</span><span>SG Transport Pulse V5.1 &nbsp;|&nbsp; Built for a smarter Singapore</span></footer>
+  <footer class="foot"><span>Sources: LTA DataMall (Bus Arrival, Bus Services, Traffic Speed Bands) &nbsp;|&nbsp; Decision support only, not for operational use</span><span>SG Transport Pulse V5.2 &nbsp;|&nbsp; Built for a smarter Singapore</span></footer>
 </div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
@@ -237,11 +238,11 @@ const COL = {smooth:"#22d36a", moderate:"#ffc21a", slow:"#ff4d55", none:"#3d7bd9
 const RISK = {critical:"Critical", developing:"Developing", stable:"Stable", nodata:"No data"};
 
 const S = {services:LS.get("hc.services", []), dir:LS.get("hc.dir", 0), risk:"all", q:"", data:null, sel:null, applied:LS.get("hc.applied", {}), ack:LS.get("hc.ack", {}),
-           plan:LS.get("hc.plan", {}), hist:{}, auto:LS.get("hc.auto", true), left:60, tok:0, busy:false};
+           plan:LS.get("hc.plan", {}), lay:LS.get("hc.lay", {}), hist:{}, auto:LS.get("hc.auto", true), left:60, tok:0, busy:false};
 const q = new URLSearchParams(location.search);
 if(q.get("svc")) S.services = q.get("svc").toUpperCase().split(/[,\s]+/).filter(x => /^[0-9A-Z]{1,6}$/.test(x)).slice(0, 8);
 if(q.get("dir") != null && ["0","1","2"].includes(q.get("dir"))) S.dir = +q.get("dir");
-const save = () => { LS.set("hc.services", S.services); LS.set("hc.dir", S.dir); LS.set("hc.applied", S.applied); LS.set("hc.ack", S.ack); LS.set("hc.plan", S.plan); LS.set("hc.auto", S.auto); };
+const save = () => { LS.set("hc.services", S.services); LS.set("hc.dir", S.dir); LS.set("hc.applied", S.applied); LS.set("hc.ack", S.ack); LS.set("hc.plan", S.plan); LS.set("hc.lay", S.lay); LS.set("hc.auto", S.auto); };
 
 /* header */
 function tick(){ const p = Object.fromEntries(sgt({weekday:"short", day:"2-digit", month:"short", year:"numeric", hour:"2-digit", minute:"2-digit"}).formatToParts(new Date()).map(x => [x.type, x.value])); $("clock").textContent = `${p.weekday}, ${p.day} ${p.month} ${p.year}  ${p.hour}:${p.minute}`; }
@@ -275,13 +276,14 @@ setInterval(() => { if(!S.auto || document.hidden || S.busy || !S.services.lengt
 /* data */
 const adjParam = () => Object.entries(S.applied).map(([k, v]) => `${k}:${v}`).join(",");
 const planParam = () => Object.entries(S.plan).map(([k, v]) => `${k}:${v}`).join(",");
+const layParam = () => Object.entries(S.lay).map(([k, v]) => `${k}:${v}`).join(",");
 async function load(quiet){
   if(!S.services.length){ S.data = null; render(); return; }
   const tok = ++S.tok; S.busy = true; $("go").disabled = true;
   if(!quiet) $("tblSub").textContent = "Evaluating live buses and traffic...";
   const c = new AbortController(), t = setTimeout(() => c.abort(), 90000);
   try{
-    const u = `/api/control?services=${encodeURIComponent(S.services.join(","))}&direction=${S.dir}&adj=${encodeURIComponent(adjParam())}&plan=${encodeURIComponent(planParam())}`;
+    const u = `/api/control?services=${encodeURIComponent(S.services.join(","))}&direction=${S.dir}&adj=${encodeURIComponent(adjParam())}&plan=${encodeURIComponent(planParam())}&lay=${encodeURIComponent(layParam())}`;
     const r = await fetch(u, {signal:c.signal}); const j = await r.json().catch(() => ({}));
     if(tok !== S.tok) return;
     if(!r.ok || j.error){ setLive("bad", "Server error", j.error || r.status); $("msgs").innerHTML = `<div class="msg bad">Could not evaluate: ${esc(j.error || "server error " + r.status)}</div>`; return; }
@@ -300,6 +302,7 @@ function statusOf(it){
   if(c === "RESTORE" || c === "NORMALISE") return ["Restore due", "pend"];
   if(c === "HOLD") return ["In progress", "prog"];
   if(c === "EXTEND" || c === "SHORTEN") return ["Pending", "pend"];
+  if(c === "NONE" && it.watch && /confirming/i.test(it.watch)) return ["Confirming", "mon"];
   if(c === "REGULATE") return (S.ack[k] && Date.now() - S.ack[k] < 15 * 60000) ? ["Monitoring", "mon"] : ["Pending", "pend"];
   return ["Stable", "ok"];
 }
@@ -323,7 +326,7 @@ function renderMsgs(){
     if(d.truncated) m.push(`<div class="msg warn">Only the first 16 service/direction pairs were evaluated.</div>`);
     if(!d.freqOk) m.push(`<div class="msg warn"><b>Scheduled headway unavailable from LTA</b>${d.freqError ? " (" + esc(d.freqError) + ")" : ""}. Using the observed median gap where possible; some checks may show n/a.</div>`);
     if(d.items.some(i => !i.traffic_ok)) m.push(`<div class="msg warn"><b>Traffic feed unavailable</b> for some services: checks 2, 3 and 4 show n/a and no delay is guessed.</div>`);
-    if(d.items.some(i => i.plan_source && i.plan_source.startsWith("estimated"))) m.push(`<div class="msg info">Early/late is measured against an <b>estimated</b> planned running time (LTA publishes no timetable). Enter your timetable running time for a service (in its detail panel) to replace the estimate.</div>`);
+    if(d.items.some(i => i.plan_source && i.plan_source.startsWith("estimated"))) m.push(`<div class="msg info">Adjustments are suggested only for <b>prolonged</b> congestion (2+ buses, slow stretch &ge; 1.5 km, lasting 10+ min) that terminal layover cannot absorb. Set each service&rsquo;s layover in its detail panel; 15+ min = heavy layover, never adjusted.`);
     const live = d.items.length ? (d.errors.length || !d.freqOk || d.items.some(i => !i.traffic_ok) ? "warn" : "ok") : "warn";
     setLive(live, live === "ok" ? "Live Data (LTA)" : "Live, with warnings", "");
   } else if(S.services.length) setLive("warn", "Ready", "");
@@ -346,25 +349,29 @@ function hwAt(t, h){ if(t.length < 2) return null; if(h <= t[0]) return +(t[1] -
 function predHW(it){ const t = arrTimes(it); return [0, 10, 20, 30].map(h => hwAt(t, h)); }
 function ttcOf(it){
   const H = it.sched_hw; if(!H) return null; const p = predHW(it), pts = [0, 10, 20, 30].map((h, i) => [h, p[i]]).filter(x => x[1] != null); if(!pts.length) return null;
-  const hi = H * 1.5, lo = H * 0.5; if(pts[0][1] >= hi || pts[0][1] <= lo) return 0;
-  for(let i = 0; i < pts.length - 1; i++){ const [t0, v0] = pts[i], [t1, v1] = pts[i + 1];
-    for(const [c, up] of [[hi, true], [lo, false]]) if((up && v1 >= c && c > v0) || (!up && v1 <= c && c < v0)) return Math.round(t0 + (c - v0) / (v1 - v0) * (t1 - t0)); }
+  const hi = H * 1.5; if(pts[0][1] >= hi) return 0;
+  for(let i = 0; i < pts.length - 1; i++){ const [t0, v0] = pts[i], [t1, v1] = pts[i + 1]; if(v1 >= hi && hi > v0) return Math.round(t0 + (hi - v0) / (v1 - v0) * (t1 - t0)); }
   return null;
 }
 function phCell(it){
   const p = predHW(it).slice(1), H = it.sched_hw; if(it.risk === "nodata" || !H) return `<span class="m">&ndash;</span>`;
-  return `<span class="ph">${p.map(v => v == null ? `<span class="m">&ndash;</span>` : `<span class="${v >= H * 1.5 || v <= H * 0.5 ? "c" : Math.abs(v - H) >= Math.max(2, .2 * H) ? "a" : ""}">${f1(v)}</span>`).join("")}</span>`;
+  return `<span class="ph">${p.map(v => v == null ? `<span class="m">&ndash;</span>` : `<span class="${v >= H * 1.5 ? "c" : Math.abs(v - H) >= Math.max(2, .2 * H) ? "a" : ""}">${f1(v)}</span>`).join("")}</span>`;
 }
 function ttcCell(it){ const v = it.risk === "nodata" ? null : ttcOf(it); if(v == null) return `<span class="m">&ndash;</span>`; return `<span class="ttc ${v <= 10 ? "c" : v <= 20 ? "a" : ""}">${v === 0 ? "Now" : v + " min"}</span>`; }
-function causeCell(it){ if(it.risk === "nodata") return `<span class="m">&ndash;</span>`; const c = it.checks.find(c => c.state === "triggered"); return esc(c ? CAUSE[c.id] : it.risk === "stable" ? "Stable" : "Normal variation"); }
-function arrivalsTable(it){
-  const H = it.sched_hw, bs = it.buses.filter(b => b.eta_term != null).sort((a, b) => a.eta_term - b.eta_term); if(!bs.length || !H) return "";
-  const rows = bs.map((b, k) => { const g = k === 0 ? null : +(b.eta_term - bs[k - 1].eta_term).toFixed(1), hold = g == null ? 0 : Math.max(-3, Math.min(5, Math.round(H - g)));
-    return `<tr><td>#${b.id}</td><td>${esc(b.term_clock || "")} <small class="m">(${b.term_src === "LTA" ? "LTA ETA" : "modelled"})</small></td><td class="n">${g == null ? "&ndash;" : f1(g) + " min"}</td><td class="n"><b>${hold > 0 ? "+" + hold : hold} min</b></td></tr>`; }).join("");
-  return `<div class="arr"><h4>Next arrivals at terminal</h4><div class="m">Predicted gap to the previous arrival and a suggested hold (+) / advance (&minus;) of that bus's next departure to pull the gap towards the scheduled ${f1(H)} min. Suggestion only.</div>
-    <table class="mini"><thead><tr><th>Bus</th><th>Terminal arrival</th><th>Predicted HW</th><th>Suggested hold</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+function causeCell(it){ if(it.risk === "nodata") return `<span class="m">&ndash;</span>`; const c = it.checks.find(c => c.state === "triggered"); if(c) return esc(CAUSE[c.id]); return it.watch ? `<span class="m">${esc(it.watch)}</span>` : "Stable"; }
+function turnTable(it){
+  const t = it.turn; if(!t || !t.rows.length) return "";
+  const rows = t.rows.map(r => `<tr><td>#${r.id}</td><td>${esc(r.arr_clock)} <small class="m">(${r.src === "LTA" ? "LTA ETA" : "modelled"})</small></td><td>Dir ${r.next_dir}${t.loop ? " <small class=\"m\">(loop)</small>" : ""}</td><td><b>${esc(r.dep_clock)}</b>${r.hold > 0 ? ` <small class="hold">hold +${f1(r.hold)}${r.capped ? " (max)" : ""}</small>` : ""}</td><td class="n">${f1(r.layover)} min</td></tr>`).join("");
+  return `<div class="arr"><h4>Predicted arrival &amp; next departure</h4><div class="m">${t.heavy ? "Heavy-layover duty: delay is absorbed at the terminal, so every bus keeps its own layover. No holds suggested." : `Minimum layover ${f1(t.min_layover)} min. Departures are spaced ${f1(t.hw)} min apart; a bus is held only if it would otherwise leave closer than that to the one before. Holds are capped at ${f1(t.max_hold)} min; bunching bigger than that needs other action (e.g. regulate earlier).`} Suggestion only.</div>
+    <table class="mini"><thead><tr><th>Bus</th><th>Arrives</th><th>Next trip</th><th>Depart</th><th>Layover</th></tr></thead><tbody>${rows}</tbody></table></div>`;
 }
 function triggeredNames(it){ return it.checks.filter(c => c.state === "triggered").map(c => `#${c.id} ${c.name}`).join(", ") || "&ndash;"; }
+function delayCell(it){
+  const L = it.layover, d = it.delay_ahead, aff = it.buses.filter(b => b.affected).length;
+  if(it.risk === "nodata" || d == null || !L || !aff) return `<span class="m">&ndash;</span>`;
+  const cls = d >= L.trigger ? "c" : d > L.slack ? "a" : "";
+  return `<span class="ttc ${cls}" title="${aff} bus(es) face prolonged congestion. Layover ${L.min} min absorbs ${L.slack} min${L.heavy ? " (heavy-layover duty: not adjusted)" : ""}.">${f1(d)} min</span>${L.heavy ? ` <small class="m">heavy lay.</small>` : d <= L.slack ? ` <small class="m">absorbed</small>` : ""}`;
+}
 function devCell(it){
   if(it.route_dev_min == null || it.risk === "nodata") return `<span class="m">${it.risk === "nodata" ? "&ndash;" : "n/a"}</span>`;
   const d = it.route_dev_min, cls = d >= it.cfgLate ? "dev-late" : d <= -it.cfgEarly ? "dev-early" : "dev-ok";
@@ -381,8 +388,8 @@ function renderTable(){
     return `<tr data-k="${esc(it.key)}" class="${it.key === S.sel ? "sel" : ""}" tabindex="0">
       <td><span class="rk ${it.risk}" title="${RISK[it.risk]}"></span></td><td class="svc">${esc(it.service)}<small class="m" style="display:block;font-weight:400;font-size:11.5px">${it.n_buses} bus${it.n_buses === 1 ? "" : "es"}${it.monitored < it.n_buses ? ` (${it.monitored} GPS)` : ""}</small></td><td>${it.direction}</td>
       <td class="hide-m">${it.sched_hw == null ? "&ndash;" : it.sched_hw + " min"}</td><td class="hide-m">${it.current_hw == null ? "&ndash;" : `<b>${it.current_hw} min</b>${it.adj_active ? ` <small class="m">adjusted</small>` : ""}`}</td>
-      <td class="hide-m">${devCell(it)}</td><td class="hide-m">${phCell(it)}</td><td class="hide-m">${ttcCell(it)}</td><td class="hide-m">${causeCell(it)}${triggeredNames(it) !== "&ndash;" ? `<small class="m" style="display:block;font-size:11.5px">${triggeredNames(it)}</small>` : ""}</td>
-      <td class="sugg">${esc(r.headline)}${extra}${it.rec.confidence && it.risk !== "nodata" ? `<small>${it.rec.confidence} confidence</small>` : ""}</td>
+      <td class="hide-m">${delayCell(it)}</td><td class="hide-m">${phCell(it)}</td><td class="hide-m">${ttcCell(it)}</td><td class="hide-m">${causeCell(it)}</td>
+      <td class="sugg" title="${esc(it.rec.confidence || "")} confidence${r.actions && r.actions.length ? " \u2022 also: " + esc(r.actions.map(a => a.headline).join("; ")) : ""}">${esc(r.headline)}${extra}</td>
       <td class="hide-m">${dep}</td><td><span class="badge ${sc}">${st}</span></td><td><button class="vbtn" type="button" data-k="${esc(it.key)}">View</button></td></tr>`;
   }).join("");
   const e = $("tblEmpty"); e.hidden = rows.length > 0; e.textContent = d.items.length ? "No service matches the current filters." : "No service could be evaluated. Check the messages above.";
@@ -393,33 +400,37 @@ $("tbody").addEventListener("keydown", e => { if(e.key === "Enter"){ const r = e
 
 /* route strip */
 function stripSVG(it){
-  const W = 1000, H = 215, x0 = 34, x1 = 966, y = 96, X = p => x0 + (x1 - x0) * p / 100, fin = it.strip.final_pct;
-  const late = S.data.cfg.LATE_MIN;
+  const W = 1000, x0 = 34, x1 = 966, X = p => x0 + (x1 - x0) * p / 100, fin = it.strip.final_pct;
+  const order = it.buses.map((b, i) => i).sort((a, b) => it.buses[a].pct - it.buses[b].pct), up = {}, dn = {}, lastU = [], lastD = [];
+  const lane = (last, x, gap) => { let k = 0; while(last[k] != null && Math.abs(x - last[k]) < gap) k++; last[k] = x; return k; };
+  order.forEach(i => { const x = X(it.buses[i].pct); up[i] = lane(lastU, x, 46); dn[i] = lane(lastD, x, 44); });
+  const nu = Math.max(0, ...Object.values(up)) + 1, nd = Math.max(0, ...Object.values(dn)) + 1;
+  const y = 36 + 27 * nu, H = y + 62 + 15 * nd;
   let s = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Route strip for service ${esc(it.service)} direction ${it.direction}: ${it.buses.length} buses">`;
   s += `<rect x="${x0 - 4}" y="${y}" width="${x1 - x0 + 8}" height="18" rx="9" fill="#0a1a2e" stroke="#1f4468"/>`;
   if(it.strip.runs.length) it.strip.runs.forEach(([a, b, c]) => { s += `<rect x="${X(a).toFixed(1)}" y="${y + 3}" width="${Math.max(1, X(b) - X(a)).toFixed(1)}" height="12" fill="${COL[c]}"/>`; });
   else s += `<rect x="${x0}" y="${y + 3}" width="${x1 - x0}" height="12" fill="${COL.none}" opacity=".5"/>`;
-  s += `<rect x="${X(fin)}" y="${y - 14}" width="${X(100) - X(fin)}" height="46" rx="6" fill="#3d7bd91a" stroke="#6ea8ff" stroke-dasharray="4 3"/><text x="${(X(fin) + X(100)) / 2}" y="${y - 20}" text-anchor="middle" font-size="12" fill="#9cc4ff">Final ${100 - fin}%</text>`;
-  s += `<text x="${x0}" y="${y + 54}" font-size="12" fill="#8ba3bd">Origin</text><text x="${x1}" y="${y + 54}" font-size="12" fill="#8ba3bd" text-anchor="end">Terminal (${f1(it.route_km)} km)</text>`;
-  it.buses.forEach((b, i) => {
-    const bx = X(b.pct), up = i % 2 ? 0 : 30, stroke = b.affected ? "#ff4d55" : "#ffffff";
-    s += `<line x1="${bx}" y1="${y - 26 - up + 22}" x2="${bx}" y2="${y + 9}" stroke="${stroke}" stroke-width="1.5"/>`;
-    s += `<rect x="${bx - 21}" y="${y - 26 - up}" width="42" height="22" rx="6" fill="#1785ff" stroke="${stroke}" stroke-width="2"/><text x="${bx}" y="${y - 10 - up}" text-anchor="middle" font-size="13" font-weight="700" fill="#fff">#${b.id}</text>`;
-    s += `<circle cx="${bx}" cy="${y + 9}" r="5" fill="#fff" stroke="#04101f" stroke-width="2"/>`;
-    if(b.term_clock) s += `<text x="${bx}" y="${y + 68}" text-anchor="middle" font-size="11.5" fill="#b9d0e6">${b.term_clock}</text><text x="${bx}" y="${y + 82}" text-anchor="middle" font-size="10" fill="#7f97b0">arr. terminal</text>`;
-  });
+  s += `<rect x="${X(fin)}" y="${y - 12}" width="${X(100) - X(fin)}" height="42" rx="6" fill="#3d7bd91a" stroke="#6ea8ff" stroke-dasharray="4 3"/>`;
+  s += `<text x="${x0}" y="${H - 6}" font-size="12" fill="#8ba3bd">Origin</text><text x="${x1}" y="${H - 6}" font-size="12" fill="#8ba3bd" text-anchor="end">Terminal (${f1(it.route_km)} km) &middot; Final ${100 - fin}% dashed &middot; times = predicted arrival</text>`;
   it.gaps.forEach(g => {
-    const a = it.buses[g.lead - 1], b = it.buses[g.follow - 1]; if(!a || !b || g.gap == null) return;
-    const mx = (X(a.pct) + X(b.pct)) / 2, hw = it.sched_hw, bad = hw && g.gap >= hw + Math.max(hw * S.data.cfg.EARLY_GAP_PCT / 100, S.data.cfg.EARLY_GAP_MIN), low = hw && g.gap < hw - Math.max(2, hw * .4);
-    const c = bad ? "#ffa62b" : low ? "#7fd9ff" : "#c6d8ea", tr = g.trend == null ? "" : g.trend >= 1 ? " \u2197" : g.trend <= -1 ? " \u2198" : "";
-    s += `<text x="${mx}" y="${y + 34}" text-anchor="middle" font-size="12.5" font-weight="700" fill="${c}">${f1(g.gap)} min${tr}</text>`;
+    const a = it.buses[g.lead - 1], b = it.buses[g.follow - 1]; if(!a || !b || g.gap == null || Math.abs(X(a.pct) - X(b.pct)) < 62) return;
+    const mx = (X(a.pct) + X(b.pct)) / 2, hw = it.sched_hw, bad = hw && g.gap >= hw + Math.max(hw * S.data.cfg.EARLY_GAP_PCT / 100, S.data.cfg.EARLY_GAP_MIN);
+    const tr = g.trend == null ? "" : g.trend >= 1 ? " \u2197" : g.trend <= -1 ? " \u2198" : "";
+    s += `<text x="${mx}" y="${y + 32}" text-anchor="middle" font-size="12" font-weight="700" fill="${bad ? "#ffa62b" : "#c6d8ea"}">${f1(g.gap)}${tr}</text>`;
   });
-  return s + `</svg><div class="note">Bars show LTA speed bands along the route (green &ge; 40, amber 20&ndash;39, red &lt; 20 km/h, blue = no reading). Numbers between buses = gap to the bus behind${it.sched_hw ? ` (scheduled ${it.sched_hw} min)` : ""}; &nearr; = gap growing. Red-outlined buses have congestion ahead.</div>`;
+  it.buses.forEach((b, i) => {
+    const bx = X(b.pct), ly = y - 30 - 27 * up[i], stroke = b.affected ? "#ff4d55" : "#ffffff";
+    s += `<line x1="${bx}" y1="${ly + 22}" x2="${bx}" y2="${y + 9}" stroke="${stroke}" stroke-width="1.4" opacity=".8"/>`;
+    s += `<rect x="${bx - 20}" y="${ly}" width="40" height="22" rx="6" fill="#1785ff" stroke="${stroke}" stroke-width="2"/><text x="${bx}" y="${ly + 16}" text-anchor="middle" font-size="13" font-weight="700" fill="#fff">#${b.id}</text>`;
+    s += `<circle cx="${bx}" cy="${y + 9}" r="5" fill="#fff" stroke="#04101f" stroke-width="2"/>`;
+    if(b.term_clock) s += `<text x="${bx}" y="${y + 52 + 15 * dn[i]}" text-anchor="middle" font-size="11.5" fill="#b9d0e6">${b.term_clock}</text>`;
+  });
+  return s + `</svg><div class="note">Bars = LTA speed bands (green &ge; 40, amber 20&ndash;39, red &lt; 20 km/h, blue = no reading). Numbers between buses = gap to the bus behind${it.sched_hw ? ` (scheduled ${it.sched_hw} min)` : ""}; &nearr; = growing. Red-outlined buses face prolonged congestion (slow stretch &ge; ${f1(S.data.cfg.PROLONG_KM)} km).</div>`;
 }
 function trendSVG(it){
   const h = (S.hist[it.key] || []).filter(p => p.gap != null);
   if(h.length < 2) return `<div class="empty">Collecting data&hellip; the chart fills in as the page refreshes (${h.length} point so far).</div>`;
-  const W = 520, Hh = 210, L = 40, R = 12, T = 12, B = 30, hw = it.sched_hw || 0;
+  const W = 520, Hh = 210, L = 40, R = 12, T = 24, B = 30, hw = it.sched_hw || 0;
   const ymax = Math.ceil(Math.max(...h.map(p => p.gap), hw * 1.6, 12) / 5) * 5, X = i => L + (W - L - R) * i / (h.length - 1), Y = v => T + (Hh - T - B) * (1 - v / ymax);
   let s = `<svg viewBox="0 0 ${W} ${Hh}" role="img" aria-label="Average gap between buses over this session" style="width:100%;height:auto">`;
   for(let v = 0; v <= ymax; v += 5) s += `<line x1="${L}" x2="${W - R}" y1="${Y(v)}" y2="${Y(v)}" stroke="#163250"/><text x="${L - 6}" y="${Y(v) + 4}" text-anchor="end" font-size="11" fill="#8ba3bd">${v}</text>`;
@@ -427,7 +438,7 @@ function trendSVG(it){
   if(hw) s += `<line x1="${L}" x2="${W - R}" y1="${Y(hw)}" y2="${Y(hw)}" stroke="#c6d8ea" stroke-dasharray="5 4"/>`;
   s += `<polyline fill="none" stroke="#3cc8ff" stroke-width="2.5" points="${h.map((p, i) => X(i).toFixed(1) + "," + Y(p.gap).toFixed(1)).join(" ")}"/>` + h.map((p, i) => `<circle cx="${X(i).toFixed(1)}" cy="${Y(p.gap).toFixed(1)}" r="3.2" fill="#3cc8ff"/>`).join("");
   const tf = t => sgt({hour:"2-digit", minute:"2-digit"}).format(new Date(t));
-  s += `<text x="${L}" y="${Hh - 8}" font-size="11" fill="#8ba3bd">${tf(h[0].t)}</text><text x="${W - R}" y="${Hh - 8}" font-size="11" text-anchor="end" fill="#8ba3bd">${tf(h[h.length - 1].t)}</text><text x="8" y="${T + 4}" font-size="11" fill="#8ba3bd">min</text></svg>`;
+  s += `<text x="${L}" y="${Hh - 8}" font-size="11" fill="#8ba3bd">${tf(h[0].t)}</text><text x="${W - R}" y="${Hh - 8}" font-size="11" text-anchor="end" fill="#8ba3bd">${tf(h[h.length - 1].t)}</text><text x="${L}" y="${T - 10}" font-size="11" fill="#8ba3bd">min</text></svg>`;
   return s + `<div class="note"><span style="color:#3cc8ff">&#9632;</span> average gap between buses &nbsp; <span style="color:#c6d8ea">- - -</span> scheduled HW${it.sched && it.sched.lo != null ? " (shaded = LTA frequency range)" : ""}. Built from this page's refreshes only.</div>`;
 }
 
@@ -438,7 +449,7 @@ function renderDetail(){
   $("dTitle").innerHTML = `Service ${esc(it.service)} &ndash; Dir ${it.direction} <span class="rk ${it.risk}" style="width:14px;height:14px;vertical-align:middle;margin-left:6px" title="${RISK[it.risk]}"></span>`;
   $("dSub").textContent = `${it.stops} stops \u2022 ${it.n_buses} live bus${it.n_buses === 1 ? "" : "es"} (${it.monitored} GPS-tracked) \u2022 ${it.hw_source || "scheduled headway unknown"}`;
   $("mapLink").href = `/?svc=${encodeURIComponent(it.service)}&dir=${it.direction}`;
-  $("strip").innerHTML = it.buses.length ? stripSVG(it) + arrivalsTable(it) : `<div class="empty">No live bus positions found on this route right now.</div>`;
+  $("strip").innerHTML = it.buses.length ? stripSVG(it) + turnTable(it) : `<div class="empty">No live bus positions found on this route right now.</div>`;
   const ic = {triggered:"!", watch:"~", clear:"\u2713", na:"?"};
   $("checks").innerHTML = it.checks.map(c => `<div class="chk"><div class="ci ${c.state}" title="${c.state}">${ic[c.state]}</div><div><b>${c.id}. ${esc(c.name)} <small class="m" style="font-weight:500">${c.state === "na" ? "not evaluable" : c.state}</small></b><span>${esc(c.detail)}</span></div></div>`).join("");
   const r = it.rec, [st] = statusOf(it), key = it.key, code = r.code;
@@ -446,10 +457,12 @@ function renderDetail(){
   const label = code === "REGULATE" ? "Mark BC contacted" : code === "EXTEND" || code === "SHORTEN" ? `Apply HW ${r.to_hw} min` : (code === "RESTORE" || code === "NORMALISE") ? `Restore HW ${r.to_hw} min` : "No action needed";
   const dep = it.departures ? `<table class="mini"><thead><tr><th>Next departure</th><th>LTA est. now</th><th>Suggested</th></tr></thead><tbody>${it.departures.orig.map((o, i) => `<tr><td>${i + 1}</td><td>in ${o} min</td><td><b>in ${it.departures.adjusted[i]} min</b>${it.departures.adjusted[i] !== o ? ` <small class="m">(${it.departures.adjusted[i] - o > 0 ? "+" : ""}${it.departures.adjusted[i] - o})</small>` : ""}</td></tr>`).join("")}</tbody></table>` : "";
   const also = r.actions && r.actions.length ? `<div class="also">Also: ${r.actions.map(a => esc(a.headline)).join(" \u2022 ")}</div>` : "";
-  const planTxt = it.plan_run_min == null ? "unavailable (no traffic feed)" : `<b>${f1(it.plan_run_min)} min</b> <span class="m">(${esc(it.plan_source)})</span>; predicted now <b>${f1(it.pred_run_min)} min</b>`;
+  const planTxt = it.plan_run_min == null ? "unavailable (no traffic feed)" : it.plan_source && it.plan_source.startsWith("est") ? `<span class="m">not set (optional; turns on the early-arrival check)</span>; predicted now <b>${f1(it.pred_run_min)} min</b>` : `<b>${f1(it.plan_run_min)} min</b> <span class="m">(your timetable)</span>; predicted now <b>${f1(it.pred_run_min)} min</b>`;
+  const LY = it.layover, cfgL = S.data.cfg;
   $("sugCard").innerHTML = `<div class="sug-h"><span class="sp">&#10022;</span><b>Suggested action</b><span class="tag" title="Deterministic rules; no language model is used">Rule-based</span><span class="conf ${r.confidence}">${r.confidence} confidence</span></div>
     <div class="sug-t">${esc(r.headline)}</div>${also}<div class="why">${esc(r.rationale)}</div>${dep}
-    <div class="plan">Planned running time: ${planTxt}<br><span class="m">Have the timetable? </span><input id="planIn" type="number" min="5" max="300" step="1" placeholder="min" value="${S.plan[key] || ""}" aria-label="Timetable running time in minutes"><button class="btn sm" id="planSet" type="button">Set</button><button class="btn sm" id="planClr" type="button">Reset</button></div>
+    <div class="plan">Terminal layover: <b>${f1(LY.min)} min</b> <span class="m">(${LY.src}${LY.heavy ? " &ndash; heavy-layover duty, never adjusted" : `; min ${f1(cfgL.MIN_LAYOVER)}, absorbs ${f1(LY.slack)} min`}). Enter this duty's scheduled layover (${f1(cfgL.HEAVY_LAYOVER)}+ = heavy).</span><br><input id="layIn" type="number" min="0" max="90" step="1" placeholder="min" value="${S.lay[key] || ""}" aria-label="Scheduled layover in minutes"><button class="btn sm" id="laySet" type="button">Set</button><button class="btn sm" id="layClr" type="button">Reset</button></div>
+    <div class="plan">Timetable running time: ${planTxt}<br><span class="m">Have the timetable? </span><input id="planIn" type="number" min="5" max="300" step="1" placeholder="min" value="${S.plan[key] || ""}" aria-label="Timetable running time in minutes"><button class="btn sm" id="planSet" type="button">Set</button><button class="btn sm" id="planClr" type="button">Reset</button></div>
     <div class="acts"><button class="btn go sm" id="applyBtn" type="button" ${canApply ? "" : "disabled"}>${esc(label)}</button>
       ${S.applied[key] || S.ack[key] ? `<button class="btn sm" id="undoBtn" type="button">Undo</button>` : ""}
       <button class="btn sm" id="copyBtn" type="button" ${r.bc_message ? "" : "disabled"}>Copy BC message</button></div>
@@ -457,6 +470,8 @@ function renderDetail(){
   $("applyBtn").onclick = () => applyRec(key);
   if($("undoBtn")) $("undoBtn").onclick = () => undo(key);
   $("copyBtn").onclick = () => copyMsg(r.bc_message);
+  $("laySet").onclick = () => { const v = parseFloat($("layIn").value); if(!(v >= 0 && v <= 90)){ toast("Enter a layover between 0 and 90 minutes"); return; } S.lay[key] = v; save(); load(true); };
+  $("layClr").onclick = () => { delete S.lay[key]; save(); load(true); };
   $("planSet").onclick = () => { const v = parseFloat($("planIn").value); if(!(v >= 5 && v <= 300)){ toast("Enter a running time between 5 and 300 minutes"); return; } S.plan[key] = v; save(); load(true); };
   $("planClr").onclick = () => { delete S.plan[key]; save(); load(true); };
   $("trend").innerHTML = trendSVG(it);
@@ -467,13 +482,16 @@ const CFG_TXT = {FINAL_PCT:["Final stretch", "% of route counted as the 'final' 
   MULTI:["'Multiple' buses", "count"], AFFECT_MIN:["Bus affected by congestion ahead", "min lost vs free-flow"], LATE_MIN:["Terminal arrival late", "min over plan"], EARLY_MIN:["Terminal arrival early", "min under plan"],
   NEAR_ONTIME:["Near on-time", "min either side of plan"], MAX_EXTEND:["Max temporary extension", "min added to HW"], MAX_SHORTEN:["Max temporary shortening", "min removed from HW"],
   NORMAL_GAP_PCT:["Normal gap tolerance", "% of sched HW (min "], NORMAL_GAP_MIN:["", "min)"], PLAN_SLACK:["Estimated plan slack", "x free-flow drive time"], DWELL_MIN:["Dwell per stop", "min"], BUS_MAX_KMH:["Bus speed cap", "km/h"]};
+Object.assign(CFG_TXT, {AFFECT_MIN:["Bus affected by congestion ahead", "min lost on slow stretches"], PROLONG_KM:["Prolonged = slow stretch of", "km or more"], CONG_KMH:["Slow means below", "km/h (LTA bands 1-2)"], FLOW_KMH:["Congestion cost measured vs", "km/h normal flow"],
+  PERSIST_MIN:["Congestion must persist", "min before adjusting"], CLEAR_MIN:["Recovery must persist", "min before restoring HW"], C1_PERSIST_MIN:["Front-bus gap must persist", "min before contacting BC"],
+  MIN_LAYOVER:["Minimum layover (delayed bus)", "min"], MAX_HOLD:["Longest suggested hold at terminal", "min"], DEFAULT_LAYOVER:["Layover assumed if not entered", "min"], HEAVY_LAYOVER:["Heavy-layover duty (never adjusted)", "min or more"], LATE_MARGIN:["Delay must exceed layover slack by", "min"]});
 function renderRules(){
   const cfg = S.data ? S.data.cfg : null;
   $("rules").innerHTML = `<table class="rt"><tr><th>#</th><th>Check</th><th>Fires when</th><th>Action</th></tr>
-   <tr><td>1</td><td>En-route</td><td>A leading bus is well ahead of the bus behind it <b>and</b> that gap is growing</td><td>Comm BC: regulate spacing</td></tr>
-   <tr><td>2</td><td>Traffic</td><td>Congestion ahead of 2+ buses <b>and</b> terminal arrivals predicted late</td><td>Temporarily longer departure HW (e.g. 10 &rarr; 11/12/13)</td></tr>
-   <tr><td>3</td><td>Last 15% recovery</td><td>A longer-HW adjustment is active <b>and</b> affected buses are in the last 15% / clear and near on-time</td><td>Cancel, restore original HW (e.g. 13 &rarr; 10)</td></tr>
-   <tr><td>4</td><td>Early arrival</td><td>2+ consecutive buses in the last 15% <b>and</b> predicted more than 5 min early</td><td>Temporarily shorter HW (e.g. 10 &rarr; 9)</td></tr>
+   <tr><td>1</td><td>En-route</td><td>A leading bus is well ahead of the bus behind it <b>and</b> that gap is growing and still true 3 min later</td><td>Comm BC: regulate spacing</td></tr>
+   <tr><td>2</td><td>Traffic</td><td><b>Prolonged</b> congestion ahead of 2+ buses (slow stretch &ge; 1.5 km costing &ge; 3 min) that has lasted 10+ min <b>and</b> the delay exceeds what terminal layover absorbs (layover &minus; 7 min minimum + 3 min margin). Heavy-layover duties (15+ min) are never adjusted</td><td>Temporarily longer departure HW (e.g. 10 &rarr; 11/12/13)</td></tr>
+   <tr><td>3</td><td>Last 15% recovery</td><td>A longer-HW adjustment is active <b>and</b> affected buses are in the last 15% / clear and within layover slack, for 5+ min</td><td>Cancel, restore original HW (e.g. 13 &rarr; 10)</td></tr>
+   <tr><td>4</td><td>Early arrival</td><td>2+ consecutive buses in the last 15% <b>and</b> predicted more than 5 min early vs <b>your timetable</b> (not judged without one)</td><td>Temporarily shorter HW (e.g. 10 &rarr; 9)</td></tr>
    <tr><td>5</td><td>Normalisation</td><td>An adjustment is active but gaps and running time are back to normal</td><td>Restore scheduled HW</td></tr></table>
    ${cfg ? `<p class="m" style="margin:14px 0 4px">Thresholds in use (server-side, returned with every evaluation):</p><table class="rt">${Object.entries(cfg).filter(([k]) => CFG_TXT[k] && CFG_TXT[k][0]).map(([k, v]) => `<tr><td>${CFG_TXT[k][0]}</td><td><code>${k} = ${v}</code></td><td class="m">${CFG_TXT[k][1]}</td></tr>`).join("")}</table>` : ""}
    <p class="m" style="margin:14px 0 4px"><b>How to read the numbers</b></p>
@@ -483,8 +501,8 @@ function renderRules(){
 /* export */
 $("exportBtn").addEventListener("click", () => {
   if(!S.data || !S.data.items.length){ toast("Nothing to export yet"); return; }
-  const cols = ["Service","Dir","Risk","Live buses","Scheduled HW","Departure HW now","Route vs plan (min)","Plan source","Triggered checks","Suggested adjustment","Confidence","Next departure (min)","Updated"];
-  const rows = S.data.items.map(i => [i.service, i.direction, RISK[i.risk], i.n_buses, i.sched_hw, i.current_hw, i.route_dev_min, i.plan_source, i.checks.filter(c => c.state === "triggered").map(c => c.id + " " + c.name).join("; "), i.rec.headline, i.rec.confidence, i.origin_etas && i.origin_etas[0], S.data.updated]);
+  const cols = ["Service","Dir","Risk","Live buses","Scheduled HW","Departure HW now","Delay ahead (min)","Layover (min)","Triggered checks","Suggested adjustment","Confidence","Next departure (min)","Updated"];
+  const rows = S.data.items.map(i => [i.service, i.direction, RISK[i.risk], i.n_buses, i.sched_hw, i.current_hw, i.delay_ahead, i.layover && i.layover.min, i.checks.filter(c => c.state === "triggered").map(c => c.id + " " + c.name).join("; "), i.rec.headline, i.rec.confidence, i.origin_etas && i.origin_etas[0], S.data.updated]);
   const csv = [cols, ...rows].map(r => r.map(v => { v = v == null ? "" : String(v); return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; }).join(",")).join("\n");
   const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([csv], {type:"text/csv"})); a.download = "departure-adjustments.csv"; document.body.appendChild(a); a.click(); a.remove();
 });
