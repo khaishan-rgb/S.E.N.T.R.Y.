@@ -24,24 +24,24 @@ the halfway stop (at stop 2 for "regulate only"). If the simulated trips end on 
 """
 import math
 
-MODEL_VERSION = "halfway-8.0"
+MODEL_VERSION = "halfway-10.1"
 EPS = 1e-6
 
 PARAMS = {
     "n_trips": 10,               # trips in the simulated sequence
     "layover_min": 10.0,         # scheduled layover at the first stop (scheduled arrival = scheduled departure - this)
-    "min_layover_min": 2.0,      # a trip cannot depart earlier than its actual arrival + this
+    "min_layover_min": 7.0,      # mandatory break: every trip cannot depart earlier than actual arrival + 7 min
     "start_delay_min": 0.0,      # option C: replacement passes the halfway stop this many min after the disrupted trip's scheduled time there
     # ---- regulation (options B and D)
-    "reg_hold_max": 6.0,         # a trip may be held at most this many min beyond its scheduled departure
-    "reg_early_max": 5.0,        # ... or released at most this many min before it (never before arrival + minimum layover)
-    "reg_window": 3,             # trips either side of the disrupted trip that may be regulated (and that count as "affected"): 3 up + 3 down = 6, the lost trip's slot is shared
+    "reg_hold_max": 10.0,         # a trip may be held at most this many min beyond its scheduled departure
+    "reg_early_max": 8.0,        # ... or released at most this many min before it (never before arrival + minimum layover)
+    "reg_window": 4,             # trips either side of the disrupted trip that may be regulated (and that count as "affected"): 3 up + 3 down = 6, the lost trip's slot is shared
                                  # by those 6 trips (7 slots x headway / 6 trips). A wider window ramps the correction over more trips
     "reg_even_share": 1,         # 1 = the interchange departures share the lost trip's slot evenly (the halfway bus is NOT part of that calculation; it is placed on top);
                                  # the last trip of the window settles on its own time. 0 = the older joint calculation (kept for comparison)
-    "reg_min_side": 3,           # the AI regulates at least this many trips BEFORE and AFTER the gap at the interchange (3 up + 3 down = 6). If the sequence has fewer trips before
+    "reg_min_side": 4,           # the AI regulates at least this many trips BEFORE and AFTER the gap at the interchange (3 up + 3 down = 6). If the sequence has fewer trips before
                                  # the disrupted one, more trips AFTER it are regulated instead (0 = off: use reg_window only)
-    "reg_early_future": 6.0,     # ... and then those future trips may depart up to this many min early (never before arrival + minimum layover) to close the gap
+    "reg_early_future": 8.0,     # ... and then those future trips may depart up to this many min early (never before arrival + minimum layover) to close the gap
     "min_dep_gap": 2.0,          # minimum gap between two consecutive departures at the first stop
     "start_early_max": 5.0,      # option D: the replacement may start this many min earlier than the disrupted trip's scheduled time ...
     "start_late_max": 10.0,      # ... or this many min later (the AI picks the start that evens the headways)
@@ -52,7 +52,7 @@ PARAMS = {
     "recover_tol_pct": 20.0,     # recovered = every headway within +/- this % of scheduled
     "recover_points": 3,         # ... for at least this many consecutive headways after the last irregular one
     # ---- score weights (Balanced), %
-    "w_regularity": 30.0, "w_maxgap": 25.0, "w_recovery": 20.0, "w_holding": 10.0, "w_mileage": 10.0, "w_bunching": 5.0,
+    "w_regularity": 35.0, "w_maxgap": 35.0, "w_recovery": 15.0, "w_holding": 5.0, "w_mileage": 7.0, "w_bunching": 3.0,
     "pref_recovery_boost": 1.6,  # "Faster headway recovery" multiplies the recovery and max-gap weights by this
     "pref_mileage_boost": 3.0,   # "Minimise mileage loss" multiplies the mileage weight by this
     # ---- propagation
@@ -62,7 +62,7 @@ PARAMS = {
     "fallback_kmh": 20.0,        # running speed if no traffic model is available
     "offsvc_factor": 0.7,        # the halfway bus runs the section to the halfway stop OFF-SERVICE (no dwell, no stopping) in this fraction of the in-service running time. UNVALIDATED assumption
 }
-PREFS = ("balanced", "recovery", "mileage", "gain")
+PREFS = ("balanced", "recovery", "mileage")
 
 
 def _r(x, n=1):
@@ -80,9 +80,7 @@ def _clip(x, lo, hi):
 def weights(P, pref):
     """Score weights (fractions summing to 1) for the chosen optimisation preference."""
     w = {"regularity": P["w_regularity"], "maxgap": P["w_maxgap"], "recovery": P["w_recovery"], "holding": P["w_holding"], "mileage": P["w_mileage"], "bunching": P["w_bunching"]}
-    if pref == "gain":                                    # "Maximum headway gain": headway regularity and the largest gap decide, cost is a tie-break
-        w = {"regularity": 40.0, "maxgap": 40.0, "recovery": 15.0, "holding": 1.0, "mileage": 1.0, "bunching": 3.0}
-    elif pref == "recovery":
+    if pref == "recovery":
         w["recovery"] *= P["pref_recovery_boost"]
         w["maxgap"] *= P["pref_recovery_boost"]
     elif pref == "mileage":
@@ -555,7 +553,7 @@ def simulate(ctx):
     reg_o = next((o for o in options if o["kind"] == "regulate" and o.get("metrics")), None)
     reg_enough = bool(reg_o and reg_o["metrics"]["max"] <= H * (1 + P["recover_tol_pct"] / 100.0) + EPS and reg_o["metrics"]["min"] >= H * (1 - P["recover_tol_pct"] / 100.0) - EPS)
     if best is not None:
-        msg = "Recommended - highest simulation score" if pref != "gain" else "Recommended - most headway gain"
+        msg = "Recommended - lowest regulated headway spread"
     elif not options:
         msg = "No halfway stop could be tested for this service and direction (none eligible, or none approved)."
     elif veh == "own" and hw_opts and all(any("cannot fill the gap" in v for v in o["violations"]) for o in hw_opts if o["kind"] == "halfway"):

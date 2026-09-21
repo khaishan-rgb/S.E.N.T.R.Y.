@@ -193,13 +193,13 @@ details.hall{margin-top:10px}details.hall summary{cursor:pointer;color:#9cc4ff;f
         <div class="fld"><label for="hoExtra">Also test another stop <small>(what-if, code)</small></label><input id="hoExtra" class="sel" list="hoStopsList" maxlength="5" inputmode="numeric" placeholder="optional 5-digit stop code"><datalist id="hoStopsList"></datalist></div>
         <div class="hx-info" id="hoInfo">Enter a service to load its route.</div>
         <h2>2. Optimisation Preference</h2>
-        <div class="hopref" id="hoPref"><label><input type="radio" name="hopref" value="balanced" checked> Balanced (recommended)</label><label><input type="radio" name="hopref" value="recovery"> Faster headway recovery</label><label><input type="radio" name="hopref" value="mileage"> Minimise mileage loss</label><label><input type="radio" name="hopref" value="gain"> Maximum headway gain</label></div>
+        <div class="hopref" id="hoPref"><label><input type="radio" name="hopref" value="balanced" checked> Balanced (recommended)</label><label><input type="radio" name="hopref" value="recovery"> Faster headway recovery</label><label><input type="radio" name="hopref" value="mileage"> Minimise mileage loss</label></div>
         <label class="hx-chk"><input type="checkbox" id="hoReg" checked> AI regulates headway <small>(hold / release trips, re-time the replacement)</small></label>
         <h2>3. Halfway deployment</h2>
         <div class="hopref" id="hoScope"><label><input type="radio" name="hoscope" value="all" checked> AI tests every stop (timing &amp; headway)</label><label><input type="radio" name="hoscope" value="approved"> Approved stops list only</label></div>
         <div class="hopref" id="hoVeh"><label><input type="radio" name="hoveh" value="own" checked> Bus runs off-service to the stop (timing decides)</label><label><input type="radio" name="hoveh" value="standby"> Spare bus already at the stop (starts on the slot)</label></div>
         <div class="fld"><label for="hoReady">Halfway bus ready at the first stop <small>(HH:MM, optional)</small></label><input id="hoReady" class="sel" type="text" maxlength="5" inputmode="numeric" placeholder="auto: the delayed bus itself"></div>
-        <div class="hx-note" style="margin:0 0 6px">The halfway bus runs off-service from the first stop (in <b>Settings</b>: a fraction of the in-service running time). The AI picks the stop where it can join the gap in time.</div>
+        <div class="hx-note" style="margin:0 0 6px">The halfway bus runs off-service from the first stop (in <b>Settings</b>: a fraction of the in-service running time). The AI tests the eligible halfway starts and regulates surrounding full trips to minimise the largest headway and overall headway spread. Every trip must receive at least the minimum break before departure.</div>
         <div class="btns"><button class="btn go" id="hoRun" type="button">Run AI Optimisation</button><button class="btn" id="hoEx" type="button">Load example</button></div>
         <div class="hx-note" id="hoMsg"></div>
       </section>
@@ -215,8 +215,8 @@ details.hall{margin-top:10px}details.hall summary{cursor:pointer;color:#9cc4ff;f
       <section class="card horec" id="hoRec"><div class="ho-msg">Enter a service to load its route.</div></section>
     </div>
     <section class="card hx-row">
-      <header><div><h2>Trip sequence at the first stop</h2><div class="sub" id="hoTripSub">Type each trip's arrival lateness and mark the trips that are Disrupted (1 to ${(r.params && r.params.max_disrupted) || 4}). No bus is picked: the schedule at the first stop is the common reference.</div></div></header>
-      <div class="hodisbar"><button class="btn sm go" id="hoSuggest" type="button">Suggest from lateness</button><button class="btn sm" id="hoClearDis" type="button">Clear</button><span id="hoDisMsg"></span></div>
+      <header><div><h2>Trip sequence at the first stop</h2><div class="sub" id="hoTripSub">Type each trip's arrival lateness and mark only the trip that cannot operate its full trip as Disrupted (1 to ${(r.params && r.params.max_disrupted) || 4}). No bus is picked: the schedule at the first stop is the common reference.</div></div></header>
+      <div class="hodisbar"><button class="btn sm" id="hoClearDis" type="button">Clear disrupted selection</button><span id="hoDisMsg"></span></div>
       <div class="tw"><table id="hoTrips"><thead><tr><th>Trip</th><th>Sch Arr</th><th>Act Arr</th><th>Lateness (min)</th><th>Next trip Sch Dep</th><th>Next trip Act Dep</th><th>Dep HW</th><th class="ai">AI plan: Dep</th><th class="ai">AI plan: HW</th><th>Disrupted</th></tr></thead><tbody></tbody></table></div>
       <div class="hx-note">Actual departure = the later of the scheduled departure and the actual arrival + the minimum layover. A Disrupted trip does not depart (the trip is lost). <b>AI plan</b> = the departures the selected option would use after holding / releasing trips (green), and where the replacement starts.</div>
     </section>
@@ -796,12 +796,7 @@ function hoRenderBars(){
 /* ---- wiring */
 function hoThr(){ return (HO.setup && HO.setup.params && HO.setup.params.late_disrupt_min) || 15; }
 function hoMaxDis(){ return (HO.setup && HO.setup.params && HO.setup.params.max_disrupted) || 4; }
-function hoSuggest(){                               // trips whose arrival is at least late_disrupt_min late (never the first / last trip), the latest first, up to the maximum
-  const n = HO.n, c = HO.late.map((v, k) => [k + 1, +v]).filter(x => x[0] >= 2 && x[0] <= n - 1 && x[1] >= hoThr() - 1e-9).sort((a, b) => b[1] - a[1]).slice(0, hoMaxDis()).map(x => x[0]).sort((a, b) => a - b);
-  if(!c.length){ toast(`No trip arrives ${f1(hoThr())} min or more late: mark the disrupted trips yourself`); return; }
-  HO.dis = c; HO.selKey = null; HO.pick = ""; hoBuildTrips(); hoSim(false); toast(`Marked as disrupted from lateness (\u2265 ${f1(hoThr())} min): trip${c.length > 1 ? "s" : ""} ${c.join(", ")}`);
-}
-$("hoSuggest").onclick = hoSuggest;
+
 $("hoClearDis").onclick = () => { HO.dis = []; HO.selKey = null; HO.pick = ""; hoBuildTrips(); hoSim(false); };
 document.querySelectorAll("#hoView button").forEach(b => b.onclick = () => hoSetView(b.dataset.v));
 hoSetView(HO.view);
@@ -820,7 +815,7 @@ $("hoSvc").onchange = () => hoLoad(); $("hoSvc").onkeydown = e => { if(e.key ===
 $("hoExtra").oninput = () => { const v = $("hoExtra").value.trim(); if(/^\d{5}$/.test(v)) HO.selKey = "halfway:" + v; hoSchedule(); };
 document.querySelectorAll("input[name=hopref]").forEach(x => x.onchange = () => { HO.selKey = null; hoSim(false); }); $("hoReg").onchange = () => { HO.selKey = null; hoSim(false); };
 $("hoRun").onclick = () => hoSim(true);
-$("hoEx").onclick = () => { $("hoRef").value = "08:10"; $("hoLay").value = 10; HO.late = [2, 3, 22, 5, 4, 3, 2, 4, 3, 2]; HO.dis = [3]; hoBuildTrips(); hoSim(false); toast("Example loaded: 08:10 first departure, trip 3 arrives +22 min and is Disrupted"); };
+$("hoEx").onclick = () => { $("hoRef").value = "08:10"; $("hoLay").value = 7; HO.late = [2, 3, 22, 5, 4, 3, 2, 4, 3, 2]; HO.dis = [3]; hoBuildTrips(); hoSim(false); toast("Example loaded: 08:10 first departure, trip 3 arrives +22 min and is Disrupted"); };
 /* ---- Settings */
 const HLAB = {n_trips:["Trips simulated", "trips at the first stop"], layover_min:["Scheduled layover at the first stop", "min (default; editable per run)"], min_layover_min:["Minimum layover", "min: a trip leaves no earlier than its arrival + this"],
   start_delay_min:["Replacement start delay", "min after the disrupted trip's scheduled time at the halfway stop (plain halfway option)"], reg_hold_max:["Regulation: max hold", "min a trip may be held beyond its scheduled departure"],

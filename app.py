@@ -1578,6 +1578,12 @@ def ho_init():
         for k_, v_ in (("reg_window", 5), ("reg_window", 2), ("reg_hold_max", 5), ("reg_early_max", 3), ("reg_early_future", 5)):
             bb_sql("DELETE FROM halfway_parameter WHERE k=? AND v=?", (k_, v_))
         bb_sql("INSERT OR REPLACE INTO halfway_parameter(k, v) VALUES ('mig_v92', 1)")
+    if not bb_sql("SELECT 1 FROM halfway_parameter WHERE k='mig_v101'", fetch=True):
+        # V10.1: mandatory 7-min break and stronger headway regulation defaults. Remove only known old defaults.
+        for k_, vals in (("min_layover_min", (2,)), ("reg_window", (3,)), ("reg_min_side", (3,)), ("reg_hold_max", (6,)), ("reg_early_max", (5,)), ("reg_early_future", (6,))):
+            for v_ in vals:
+                bb_sql("DELETE FROM halfway_parameter WHERE k=? AND v=?", (k_, v_))
+        bb_sql("INSERT OR REPLACE INTO halfway_parameter(k, v) VALUES ('mig_v101', 1)")
     for r in bb_sql("SELECT k, v FROM halfway_parameter", fetch=True):
         if r["k"] in HO["params"]:
             HO["params"][r["k"]] = int(r["v"]) if r["k"] in HO_INT else r["v"]
