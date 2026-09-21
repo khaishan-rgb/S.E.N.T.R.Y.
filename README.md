@@ -1,7 +1,60 @@
-# SG Transport Pulse V5.6.1 — Route Traffic + Departure Adjustment + Bunching, Gap & Alerts
+# SG Transport Pulse V6.0 — Route Traffic + Departure Adjustment + Bunching, Gap & Alerts + AI Halfway Optimiser
 
 Live bus positions, live LTA traffic drawn directly on the bus route, and next arrivals per stop.
 FastAPI backend + a single-page Leaflet frontend (OneMap basemap, OpenStreetMap fallback).
+
+## V6.0 - AI Halfway Optimiser (Bunching & Gap page -> **Halfway Optimiser** tab)
+
+A bus is severely late. **Continue the trip, or take it off service, run it to an approved halfway point and start its next service from there? If halfway,
+where?** The tab simulates *every* approved halfway point against "no halfway" and shows the evidence. Nothing is hard-coded to one location, and it is
+**decision support only: there is no Deploy button, nothing is sent to buses or SCS.** Deep link: `/bunching#halfway`.
+
+**How it works**
+
+1. Pick a service / direction; the delayed bus is auto-detected (same bus ids **B1, B2 ...** as the Bunching tab) or chosen from the list.
+2. For each approved point the bus's off-service route is found with OSRM (`alternatives=true`) and **re-timed with the LTA speed bands** along that road
+   geometry. The route with the **shortest travel time under current traffic** is used, not the fewest km (the other options are listed).
+3. The engine (`halfway.py`) takes the arrival times of the bus ahead (A), the delayed bus (X) and the bus behind (B) at every downstream stop. "No halfway":
+   headways A->X and X->B. "Halfway at stop j": X leaves service, arrives at j after off-service time + preparation buffer (+ optional layover), and from
+   there follows the segment times X would have had; the headways are A->H and H->B (re-sorted, so it can also land behind B). Before j the stops lose bus X.
+4. Metrics from the halfway stop to the terminal, with "no halfway" recomputed over the **same stops**: average / max / min / std headway, % >= 1.5x and
+   >= 2x scheduled, % <= 0.5x scheduled, % bunched (< the Bunching page's 3 min), **simulated EWT** (AWT - SWT), mileage loss (skipped revenue km and %),
+   off-service time and km. **Recovery time** (every headway within +/-20% of scheduled at 3 consecutive key stops) is measured over the whole section, so a
+   skipped stretch that stays irregular counts against a candidate.
+5. **Score** = 30% headway regularity + 25% max-gap reduction + 20% recovery time - 10% off-service time - 10% mileage loss - 5% new bunching (all
+   configurable). *Balanced / Faster headway recovery / Minimise mileage loss* re-weight it. The card shows the score parts, not a "confidence %".
+6. A point is rejected (and says why in the table) if: off-service time or mileage loss is over its limit, less than 20% of the route remains, the bus is
+   not faster than staying in service, it would start ahead of the bus in front, or **inserting it creates bunching**. It is not recommended if average
+   headway improves < 10% or the score is not positive. Halfway is not considered at all unless the bus is at least 15 min late **and** the service would
+   not recover by itself within 30 min. All numbers are configurable.
+
+**Screen:** service/bus selector with status, preference, *Run AI Optimisation*, a collapsible **Scenario simulator** (choose an approved point and an
+Auto or Manual start time), map (blue = normal route, purple dotted = off-service, red = existing large headway, star = halfway start, buses), the
+**recommendation card** ("Recommended - Highest Simulation Score"), results table for all options (click a row: map, card, chart, heatmap and takeaways all
+update), headway profile, route travel-time comparison, stop-by-stop heatmap, key takeaways and traffic/incident conditions.
+
+**Settings tab:** all parameters with ranges and defaults; the **approved halfway points** table (upload CSV with the spec's columns - `service, direction,
+stop_code, sequence, enabled, min_late, min_remaining_pct, max_offservice_min, max_mileage_km`, header optional, last four optional per-point limits; or
+add / remove one point); and the **audit log** (every run stored: time, input-data time, service, direction, bus, estimated delay, preference, mode,
+recommended stop, all scenarios, parameters, model version `halfway-1.0`). Same admin token as the other settings. Tables live in the same SQLite file.
+
+**API:** `GET /api/halfway/buses?service=&direction=`, `GET /api/halfway/run?service=&direction=&bus=&pref=balanced|recovery|mileage[&stop=&start=]`,
+`GET /api/halfway/runs`, `GET /api/halfway/runs/{id}`, `GET|POST /api/halfway/config`, `POST /api/halfway/points` (+ `/add`, `/delete`, `/clear`).
+
+**Read this before relying on it**
+
+* **Lateness is estimated**, not read from a timetable (LTA publishes none): *gap to the bus ahead minus scheduled headway*. There are no registration
+  numbers in the LTA feed, so buses are B1, B2 ...; the first bus on the route has nothing ahead and cannot be measured.
+* Everything is **simulated from LTA arrival estimates and speed bands**. EWT is a simulated figure, not LTA's actual EWT. When a stop has already been
+  passed by the bus ahead, its passing time is back-estimated from the traffic model (LTA keeps no history). If no bus is tracked behind X, the next
+  bus is assumed one scheduled headway behind (and the page says so).
+* **Off-service routing uses OSRM** (`OSRM_URL`, public demo by default: no SLA, not for heavy use). If it does not answer, off-service time falls back
+  to a **labelled estimate** (straight line x 1.35 at 30 km/h, marked "estimate" in the table, card and traffic panel). Without speed-band readings the
+  route's free-flow time is used and labelled as such. Consider a self-hosted OSRM/OneMap routing source for production. The OSRM calls were verified
+  against a simulator that mimics its response format, not against the live service.
+* The **scenario date/time is live only**: LTA offers no history to replay. The Scenario simulator overrides the halfway point and its start time.
+* Bunching in this module follows the Bunching page (< 3 min absolute); the table also reports the spec's "<= 0.5x scheduled" share.
+* Weights and limits are starting points from the specification; tune them against operational experience.
 
 ## V5.6 - Alerts (Bunching & Gap page -> **Alerts** tab)
 
@@ -29,6 +82,12 @@ Each case that reaches the logging threshold raises alerts that **escalate while
   **number of alerts** it raised.
 * Limits: alerts and acknowledgements live in the server's memory (a restart clears them; the event log is what persists). Acknowledging needs no admin
   token, so anyone who can open the page can do it. There is no sound, SMS, e-mail or push notification: the page has to be open (Alerts tab or Dashboard).
+* **Fix (V5.6.2): alerts can no longer arrive in a burst.** A second way to get "4 alerts at once, same time, same stop": a case dropped out of the
+  group list for two refreshes (so its event closed) while the tracker still remembered the pair as bunched from many stops earlier; when the case
+  came back, the new event inherited that history and started at 30+ stops. Now **every event counts stops only from where it is first tracked**
+  (never from the tracker's older memory), **at most one alert is raised per refresh**, and an open event that nobody has updated for several refresh
+  intervals is closed instead of being silently continued. `GET /api/bunching/debug?service=32&direction=1` shows what the tracker and each event
+  currently believe (send this output if alerts ever look wrong). To check which build is running, look at the page footer or `/api/health`: it must say **V5.6.2 or newer**.
 * **Fix (V5.6.1): "9 alerts at once, all at the same time and stop".** After nobody had the page open for a while, the server still remembered the buses
   and the "first seen" stops from before, so buses now on the road inherited old ids and the case was counted as already 55 stops long. Now: bus tracks
   are expired **before** matching; after a pause in polling (no update for 150 s, or 3x the refresh interval) all bus ids and pair history are dropped; a

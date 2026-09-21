@@ -98,6 +98,37 @@ tbody tr{cursor:pointer}tbody tr:hover{background:#0d2440}tbody tr.sel{backgroun
 .sk{height:14px;border-radius:6px;background:linear-gradient(90deg,#0d2440,#163a63,#0d2440);background-size:200% 100%;animation:sk 1.2s linear infinite;margin:10px 0}@keyframes sk{to{background-position:-200% 0}}
 @media(max-width:1200px){.kpis{grid-template-columns:repeat(3,1fr)}.grid1,.grid2,.insight{grid-template-columns:1fr}}
 @media(max-width:760px){.kpis{grid-template-columns:repeat(2,1fr)}.hide-m{display:none}.chips{min-width:0;width:100%}.filters .fld{width:100%}.seg{width:100%}.seg button{flex:1;justify-content:center;padding:0 6px}.brand h1{font-size:20px}}
+
+.tabs{flex-wrap:wrap}
+.ho-top{display:grid;grid-template-columns:300px minmax(0,1fr) 410px;gap:12px;margin-top:12px}.ho-mid{display:grid;grid-template-columns:minmax(0,2.3fr) minmax(0,1fr) minmax(0,.8fr);gap:12px;margin-top:12px}
+.ho-bot{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr) minmax(0,1fr);gap:12px;margin-top:12px}
+.ho-sel h2{font-size:16px;margin:0 0 8px}.ho-sel .fld{margin-bottom:10px}.ho-f2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.ho-sel input.sel,.ho-sel select{width:100%}.hostat{display:flex;gap:12px;align-items:center;background:linear-gradient(120deg,#4a0f19,#2a0a12);border:1px solid #8a2632;border-radius:12px;padding:10px 12px;margin:2px 0 14px}
+.hostat.ok{background:linear-gradient(120deg,#0f3a24,#0a2a18);border-color:#2c7a47}.hostat b{font-size:22px;display:block;line-height:1.1}.hostat span{display:block;font-size:12.5px;color:#cfe0f3}.hostat small{display:block;color:var(--mut);font-size:11.5px;margin-top:2px}
+.hopref label{display:flex;gap:8px;align-items:center;margin:7px 0;cursor:pointer}.hopref input{accent-color:#1785ff;width:17px;height:17px}
+.ho-sel details{margin-top:12px;border-top:1px solid var(--line);padding-top:10px}.ho-sel summary{cursor:pointer;color:#9cc4ff;font-weight:600;font-size:13px}.ho-sel .man{display:grid;gap:8px;margin-top:8px}.ho-sel .man .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.ho-sel .man input[type=number]{width:90px;height:38px;background:var(--panel);border:1px solid var(--line2);border-radius:9px;padding:0 8px;color:var(--text)}
+#hoMap{position:relative;height:340px;border-radius:10px;overflow:hidden;background:#dfe6ea}.holeg{display:flex;flex-wrap:wrap;gap:6px 14px;color:var(--mut);font-size:12px;margin-bottom:8px;align-items:center}.holeg i{display:inline-block;width:22px;height:0;border-top:4px solid;vertical-align:middle;margin-right:5px}
+.holeg i.d{border-top-style:dashed;border-color:#b06bff}.ho-msg{padding:16px 6px;color:var(--mut)}
+.horec .pill{display:inline-block;padding:4px 12px;border-radius:8px;font-weight:700;font-size:12.5px;border:1px solid}.pill.g{background:#0f3a24;border-color:#2c7a47;color:#8ff0b3}.pill.a{background:#3a2a06;border-color:#7a5a12;color:#ffe08a}.pill.n{background:#12253c;border-color:var(--line2);color:#cfe0f3}
+.horec .ttl{display:flex;gap:12px;align-items:center;margin:10px 0 6px}.horec .star{font-size:34px;color:#ff4d55;line-height:1}.horec h3{margin:0;font-size:19px}.horec .sub2{color:var(--mut);font-size:13px}
+.horec ul{list-style:none;margin:8px 0 10px;padding:0;display:grid;gap:5px;font-size:13.5px}.horec li:before{content:"\2714";color:#22d36a;margin-right:8px}.horec li.w:before{content:"\26A0";color:var(--amber)}
+.hocmp{display:grid;grid-template-columns:1fr 1fr;gap:8px}.hocmp>div{border-radius:10px;padding:9px 12px;border:1px solid var(--line2)}.hocmp .no{background:#1a2740}.hocmp .yes{background:#0b3320;border-color:#2c7a47}.hocmp h4{margin:0 0 6px;font-size:14px}
+.hocmp .k{color:var(--mut);font-size:12px}.hocmp .v{font-size:19px;font-weight:800;margin-bottom:4px}.hocmp .yes .v{color:#7be7a5}
+.hoimp{display:grid;grid-template-columns:1.2fr 1fr;gap:8px;margin-top:8px;background:#0f3a24;border:1px solid #2c7a47;border-radius:10px;padding:10px 12px}.hoimp b{font-size:20px}.hoimp small{display:block;color:#a9c2da;font-size:11.5px}
+.horec .btns{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+#hoTbl th,#hoTbl td{padding:8px 6px}#hoTbl tr.rec td{background:#0f3a24}#hoTbl tr.sel td{outline:0;background:#10305a}#hoTbl tr.rec.sel td{background:#14523a}#hoTbl tr.bad td{color:#7f97b0}#hoTbl td.rm{white-space:normal;min-width:120px;font-size:12.5px}#hoTbl small{display:block;color:var(--mut)}
+.hoheat{border-collapse:separate;border-spacing:2px}.hoheat td,.hoheat th{text-align:center;padding:7px 2px;border:0;border-radius:4px;font-weight:700;min-width:28px}.hoheat th{background:transparent;color:#b9d0e6;font-weight:600;font-size:12px}.hoheat td.l{text-align:left;background:transparent;color:#cfe0f3;white-space:nowrap;padding-left:2px}
+.hc-r{background:#c2313c;color:#fff}.hc-o{background:#ee8a2a;color:#1a1000}.hc-y{background:#f4d23c;color:#221a00}.hc-g{background:#22b567;color:#03140a}.hc-n{background:#22303f;color:#7f97b0}
+.hokey{display:flex;flex-wrap:wrap;gap:6px 14px;color:var(--mut);font-size:12px;margin-bottom:8px}.hokey i{display:inline-block;width:13px;height:13px;border-radius:3px;vertical-align:middle;margin-right:5px}
+.hotake{list-style:none;margin:0;padding:0;display:grid;gap:9px;font-size:13.5px}.hotake li{display:flex;gap:9px}.hotake li:before{content:"\2714";color:#22d36a}.hotake li.w:before{content:"\26A0";color:var(--amber)}
+.hobar{display:grid;grid-template-columns:minmax(0,1fr) 54px;gap:3px 8px;align-items:center;margin:11px 0;font-size:12.5px}.hobar>span{grid-column:1/-1;color:#cfe0f3}.hobar .bar{height:24px;border-radius:5px;background:#7c4dff}.hobar .bar.b{background:#5b7c99}.hobar .bar.c{background:#a6b8c9}.hobar b{text-align:right}
+.hoverdict{margin-top:8px;border-radius:10px;padding:9px 12px;font-weight:700;background:#0f3a24;border:1px solid #2c7a47;color:#8ff0b3;font-size:13px}.hoverdict.w{background:#3a2a06;border-color:#7a5a12;color:#ffe08a}
+.hotraf{display:grid;gap:8px}.hotraf>div{border-radius:10px;padding:10px 12px;border:1px solid var(--line2);background:#0c2440}.hotraf .g{border-color:#2c7a47;background:#0b3320}.hotraf .a{border-color:#7a5a12;background:#33260a}
+.hotraf b{font-size:15px}.hotraf small{display:block;color:#a9c2da;font-size:12px}
+.hostar{font-size:34px;line-height:30px;color:#ff4d55;text-shadow:0 0 3px #fff,0 0 3px #fff,0 0 6px #fff;text-align:center;width:30px}.ho-note{font-size:12px;color:var(--mut);margin-top:6px}
+@media(max-width:1180px){.ho-top,.ho-mid,.ho-bot{grid-template-columns:minmax(0,1fr)}.ho-top .horec{order:2}.ho-top>section:nth-child(2){order:3}}
+@media(max-width:560px){.hocmp{grid-template-columns:1fr}.hoimp{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -107,7 +138,7 @@ tbody tr{cursor:pointer}tbody tr:hover{background:#0d2440}tbody tr.sel{backgroun
     <nav class="nav" aria-label="Pages"><a href="/">Route Traffic</a><a href="/control">Headway Control</a><a class="on" href="/bunching" aria-current="page">Bunching &amp; Gap</a></nav>
     <div class="hdr-right"><div id="clock">&nbsp;</div><div class="live" id="live"><span class="dot"></span><span id="liveText">Connecting&hellip;</span></div></div>
   </header>
-  <div class="tabs" role="tablist"><button role="tab" id="tabDash" aria-selected="true">Dashboard</button><button role="tab" id="tabAlerts" aria-selected="false">Alerts<span class="tbadge" id="alBadge" hidden>0</span></button><button role="tab" id="tabSet" aria-selected="false">Settings</button></div>
+  <div class="tabs" role="tablist"><button role="tab" id="tabDash" aria-selected="true">Dashboard</button><button role="tab" id="tabAlerts" aria-selected="false">Alerts<span class="tbadge" id="alBadge" hidden>0</span></button><button role="tab" id="tabHo" aria-selected="false">Halfway Optimiser</button><button role="tab" id="tabSet" aria-selected="false">Settings</button></div>
 
   <main id="dash">
     <form class="filters" id="form" autocomplete="off">
@@ -155,15 +186,55 @@ tbody tr{cursor:pointer}tbody tr:hover{background:#0d2440}tbody tr.sel{backgroun
     <section class="card" style="margin-top:12px"><header><div><h2>Active alerts</h2><div class="sub" id="alSub">Alerts are raised when bunching or long headway lasts long enough.</div></div></header>
       <div class="alnote" id="alRule"></div><div id="alList"></div></section>
   </main>
+  <main id="halfway" hidden>
+    <div class="ho-top">
+      <section class="card ho-sel">
+        <h2>1. Select Service &amp; Bus</h2>
+        <div class="ho-f2"><div class="fld"><label for="hoSvc">Service</label><input id="hoSvc" class="sel" maxlength="6" autocapitalize="characters" placeholder="e.g. 32" inputmode="text"></div>
+          <div class="fld"><label>Direction</label><div class="seg" id="hoDir"><button type="button" data-d="1" aria-pressed="true">Dir 1</button><button type="button" data-d="2" aria-pressed="false">Dir 2</button></div></div></div>
+        <div class="fld"><label for="hoBus">Delayed bus <small id="hoBusNote"></small></label><select id="hoBus"></select></div>
+        <div class="hostat" id="hoStat"><div class="ho-msg" style="padding:0">Enter a service to load its buses.</div></div>
+        <h2>2. Optimisation Preference</h2>
+        <div class="hopref" id="hoPref"><label><input type="radio" name="hopref" value="balanced" checked> Balanced (recommended)</label><label><input type="radio" name="hopref" value="recovery"> Faster headway recovery</label><label><input type="radio" name="hopref" value="mileage"> Minimise mileage loss</label></div>
+        <button class="btn go" id="hoRun" type="button" style="width:100%;margin-top:8px">Run AI Optimisation</button>
+        <details id="hoManBox"><summary>Scenario simulator - override the AI</summary><div class="man">
+          <div class="fld" style="margin:0"><label for="hoManStop">Halfway point (approved only)</label><select id="hoManStop"></select></div>
+          <div class="row"><label><input type="radio" name="homan" value="auto" checked> Start time: Auto</label><label><input type="radio" name="homan" value="manual"> Manual</label><input type="number" id="hoManMin" min="0" max="120" step="1" value="10" aria-label="Minutes from now" disabled><span class="m">min from now</span></div>
+          <button class="btn" id="hoSim" type="button">Run simulation</button></div></details>
+        <div class="ho-note" id="hoMsg"></div>
+      </section>
+      <section class="card"><header><div><h2>Route &amp; Recommended Halfway Point</h2></div></header>
+        <div class="holeg"><span><i style="border-color:#1785ff"></i>Normal service route</span><span><i class="d"></i>Off-service route</span><span><i style="border-color:#ff4d55"></i>Existing large headway</span><span style="color:#ff4d55">&#9733; Halfway start</span><span>&#9679; <span style="color:#22d36a">other buses</span> / <span style="color:#ff4d55">delayed bus</span></span></div>
+        <div class="mapwrap"><div id="hoMap"></div></div></section>
+      <section class="card horec" id="hoRec"><div class="ho-msg">Choose a bus and press <b>Run AI Optimisation</b>.</div></section>
+    </div>
+    <div class="ho-mid">
+      <section class="card"><header><div><h2>Simulation Results - All Options</h2><div class="sub" id="hoTblSub">Click a row to view that option on the map and below.</div></div></header><div class="tw"><table id="hoTbl"></table></div><div class="ho-note" id="hoTblNote"></div></section>
+      <section class="card"><header><div><h2>Headway Profile - Key Downstream Stops</h2></div></header><div id="hoProf"></div></section>
+      <section class="card"><header><div><h2>Route Travel Time Comparison</h2></div></header><div id="hoTravel"></div></section>
+    </div>
+    <div class="ho-bot">
+      <section class="card" id="hoHeatCard"><header><div><h2>Stop-by-Stop Headway Heatmap</h2><div class="sub">Largest headway around the bus at each key stop (min). Green = within &plusmn;20% of scheduled.</div></div></header><div class="hokey" id="hoKey"></div><div class="tw" id="hoHeat"></div></section>
+      <section class="card"><header><div><h2>Key Takeaways</h2></div></header><ul class="hotake" id="hoTake"></ul></section>
+      <section class="card"><header><div><h2>Traffic Condition Along Off-Service Route</h2></div></header><div id="hoTraf"></div></section>
+    </div>
+  </main>
   <main id="settings" hidden>
     <section class="card"><header><div><h2>System parameters</h2><div class="sub">Tune the rules without changing code. Saved on the server; applied on the next refresh.</div></div><div><button class="btn sm go" id="parSave" type="button">Save</button> <button class="btn sm" id="parReset" type="button">Reset to defaults</button></div></header><div class="set" id="params"></div></section>
     <section class="card" style="margin-top:12px"><header><div><h2>Service Headway Master</h2><div class="sub">Scheduled headway by service, direction, day type and time. Overrides LTA's frequency band when a row matches (narrowest time window wins).</div></div>
       <div><button class="btn sm" id="mTpl" type="button">Template</button> <button class="btn sm go" id="mUp" type="button">Upload CSV</button> <button class="btn sm" id="mClr" type="button">Clear</button><input id="mFile" type="file" accept=".csv,.tsv,.txt" hidden></div></header>
       <div class="tw" id="master"></div><div class="sub" id="mNote"></div></section>
     <section class="card" style="margin-top:12px"><header><div><h2>Event log</h2><div class="sub" id="evSub">Bunching and long-headway events, logged only when they last long enough.</div></div><button class="btn sm" id="evExport" type="button">Export CSV</button></header><div class="tw" id="events"></div></section>
+    <section class="card" style="margin-top:12px"><header><div><h2>Halfway Optimiser &ndash; parameters</h2><div class="sub">Eligibility limits, recovery rule and score weights. Defaults follow the specification; tune them after operational testing.</div></div><div><button class="btn sm go" id="hoParSave" type="button">Save</button> <button class="btn sm" id="hoParReset" type="button">Reset to defaults</button></div></header><div class="set" id="hoParams"></div><div class="sub" id="hoParNote"></div></section>
+    <section class="card" style="margin-top:12px"><header><div><h2>Halfway Optimiser &ndash; approved halfway points</h2><div class="sub">The optimiser only recommends points listed here. Per-point limits are optional (blank = the parameters above).</div></div>
+      <div><button class="btn sm" id="hoPTpl" type="button">Template</button> <button class="btn sm go" id="hoPUp" type="button">Upload CSV</button> <button class="btn sm" id="hoPClr" type="button">Clear all</button><input type="file" id="hoPFile" accept=".csv,.txt,text/csv,text/plain" hidden></div></header>
+      <div class="tw" id="hoPts"></div>
+      <div class="set" style="margin-top:12px;align-items:end"><div><label for="hoAS">Service</label><input id="hoAS" maxlength="6" placeholder="32"></div><div><label for="hoAD">Direction</label><select id="hoAD" style="width:100%"><option>1</option><option>2</option></select></div><div><label for="hoAC">Stop code (5 digits)</label><input id="hoAC" maxlength="5" inputmode="numeric" placeholder="18011"></div><div><label for="hoAQ">or stop sequence</label><input id="hoAQ" maxlength="3" inputmode="numeric" placeholder="18"></div><div><label><input type="checkbox" id="hoAE" checked style="width:auto;height:auto"> Enabled</label><button class="btn sm go" id="hoPAdd" type="button">Add point</button></div></div>
+      <div class="sub">CSV columns: service, direction, stop_code, sequence, enabled, min_late, min_remaining_pct, max_offservice_min, max_mileage_km (a header row is optional; stop_code or sequence is required).</div></section>
+    <section class="card" style="margin-top:12px"><header><div><h2>Halfway Optimiser &ndash; simulation audit log</h2><div class="sub">Every simulation is stored: time, input data time, bus, delay, all scenarios, parameters and model version.</div></div></header><div class="tw" id="hoRuns"></div></section>
   </main>
 
-  <footer class="foot"><span>Sources: LTA DataMall (Bus Arrival, Bus Routes/Stops/Services, Traffic Speed Bands, Incidents), OneMap &nbsp;|&nbsp; Decision support only, not for operational use</span><span>SG Transport Pulse V5.6.1</span></footer>
+  <footer class="foot"><span>Sources: LTA DataMall (Bus Arrival, Bus Routes/Stops/Services, Traffic Speed Bands, Incidents), OneMap &nbsp;|&nbsp; Decision support only, not for operational use</span><span>SG Transport Pulse V6.0</span></footer>
 </div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -300,7 +371,7 @@ function alertRow(a){
       <div class="alinfo"><b>${a.stops} bus stops</b> &nbsp;${esc(a.start_stop || "")} &rarr; ${esc(a.end_stop || "")}<small>since ${hm(a.start)} &bull; ${hwTxt}${a.clearing ? " &bull; clearing?" : ""}</small></div>
       <div class="alcnt">${a.count} alert${a.count === 1 ? "" : "s"}<small>next at ${a.next_at} stops</small></div>
       <div class="albtns"><button class="albtn" type="button" data-map="${esc(a.key)}">Map</button>${act}<button class="alarrow" type="button" data-more="${a.id}" aria-label="Details" aria-expanded="${!!open}">&#9656;</button></div></div>
-    ${open ? `<div class="almore"><div><h4>Alert history</h4><ol>${tl}</ol><div class="m" style="margin-top:6px">Next alert at ${a.next_at} bus stops (every ${a.step} stops after the first at ${a.gate}).</div></div>
+    ${open ? `<div class="almore"><div><h4>Alert history</h4><ol>${tl}</ol><div class="m" style="margin-top:6px">Counting started ${hm(a.start)} at ${esc(a.start_stop || "?")}. Next alert at ${a.next_at} bus stops (every ${a.step} stops after the first at ${a.gate}).</div></div>
       <div><h4>Buses</h4><div>${esc(a.buses.join(", "))}</div><div class="m" style="margin-top:6px">${a.kind === "bb" ? "Peak group size " + (a.level >= 4 ? "4BB+" : a.level + "BB") : "Scheduled headway " + f1(a.sched) + " min"}. Bus ids come from position tracking (LTA gives no registration number).</div></div></div>` : ""}</div>`;
 }
 function renderAlerts(){
@@ -456,8 +527,8 @@ $("exportBtn").addEventListener("click", () => {
   const rows = visibleRows(); if(!rows.length){ toast("Nothing to export"); return; }
   csvDownload("bunching-gap-status.csv", [["Service", "Dir", "Risk", "Score", "HW now", "+10", "+20", "+30", "Scheduled HW", "Issue", "BB level", "BB status", "Consecutive stops", "Location", "Time to occur (min)", "Trend"], ...rows.map(r => [r.service, r.direction, RNAME[r.risk], r.score, r.hw["0"], r.hw["10"], r.hw["20"], r.hw["30"], r.sched_hw, r.issue, r.bb && r.bb.label, r.bb && r.bb.status, r.bb && r.bb.stops, r.location, r.t_occur, r.trend])]);
 });
-function showTab(t){ S.tab = t; $("dash").hidden = t !== "dash"; $("alerts").hidden = t !== "alerts"; $("settings").hidden = t !== "set"; $("tabDash").setAttribute("aria-selected", t === "dash"); $("tabAlerts").setAttribute("aria-selected", t === "alerts"); $("tabSet").setAttribute("aria-selected", t === "set"); if(t === "set") loadSettings(); else if(t === "alerts") renderAlerts(); else if(map) setTimeout(() => map.invalidateSize(), 100); }
-$("tabDash").onclick = () => showTab("dash"); $("tabAlerts").onclick = () => showTab("alerts"); $("tabSet").onclick = () => showTab("set");
+function showTab(t){ S.tab = t; $("dash").hidden = t !== "dash"; $("alerts").hidden = t !== "alerts"; $("halfway").hidden = t !== "ho"; $("settings").hidden = t !== "set"; $("tabDash").setAttribute("aria-selected", t === "dash"); $("tabAlerts").setAttribute("aria-selected", t === "alerts"); $("tabHo").setAttribute("aria-selected", t === "ho"); $("tabSet").setAttribute("aria-selected", t === "set"); if(t === "set"){ loadSettings(); loadHoSettings(); } else if(t === "alerts") renderAlerts(); else if(t === "ho") hoShow(); else if(map) setTimeout(() => map.invalidateSize(), 100); }
+$("tabHo").onclick = () => showTab("ho"); $("tabDash").onclick = () => showTab("dash"); $("tabAlerts").onclick = () => showTab("alerts"); $("tabSet").onclick = () => showTab("set");
 $("parSave").onclick = async () => { const params = {}; document.querySelectorAll("#params input").forEach(i => params[i.dataset.k] = i.value); const j = await post("/api/bunching/settings", JSON.stringify({params})); if(j.error){ toast(j.error); return; } toast("Parameters saved"); loadSettings(); };
 $("parReset").onclick = async () => { const j = await post("/api/bunching/settings", JSON.stringify({reset:true})); if(j.error){ toast(j.error); return; } toast("Parameters reset to defaults"); loadSettings(); };
 $("mUp").onclick = () => $("mFile").click();
@@ -466,12 +537,234 @@ $("mClr").onclick = async () => { const j = await post("/api/bunching/master/cle
 $("mTpl").onclick = () => csvDownload("service_headway_master_template.csv", [["service", "direction", "day_type", "from", "to", "target_hw"], ["32", "1", "Weekday", "07:00", "09:00", "10"], ["32", "1", "Weekday", "09:00", "16:00", "12"], ["32", "2", "Weekday", "07:00", "09:00", "10"]]);
 $("evExport").onclick = () => { const ev = S.events || []; if(!ev.length){ toast("No events to export"); return; } const t = ts => ts ? sgt({year:"numeric", month:"2-digit", day:"2-digit", hour:"2-digit", minute:"2-digit", second:"2-digit"}).format(new Date(ts * 1000)) : ""; csvDownload("bunching-gap-events.csv", [["type", "service", "dir", "start_time_sgt", "end_time_sgt", "start_bus_stop", "end_bus_stop", "no_of_stops", "alerts", "buses", "level", "min_hw", "max_hw"], ...ev.map(e => [e.kind === "bb" ? "bunching" : "long_headway", e.service, e.direction, t(e.start), e.open ? "open" : t(e.end), e.start_stop, e.end_stop, e.stops, e.alerts, Array.isArray(e.buses) ? e.buses.join(" ") : e.buses, e.level ? e.level + "BB" : "", e.kind === "bb" ? e.min_hw : "", e.max_hw])]); };
 
+/* ===================== AI Halfway Optimiser (decision support: simulates, never deploys) ===================== */
+const HO = {svc:LS.get("ho.svc", ""), dir:LS.get("ho.dir", 1), buses:null, res:null, sel:null, map:null, g:null, busy:false, loaded:false};
+const hoRecT = x => x == null ? "not before terminal" : Math.round(x) + " min", hoF = x => x == null ? "\u2013" : f1(x);
+function hoCls(h, H, bm){ if(h == null) return "hc-n"; if(h < bm || h >= 2 * H - 1e-9) return "hc-r"; if(h >= 1.5 * H - 1e-9) return "hc-o"; if(Math.abs(h - H) <= .2 * H + 1e-9) return "hc-g"; return "hc-y"; }
+function hoSelC(){ const r = HO.res; return r && r.ok && HO.sel != null ? r.candidates[HO.sel] : null; }
+function hoMsg(t){ $("hoMsg").textContent = t || ""; }
+function hoInitMap(){
+  if(HO.map || typeof L === "undefined") return;
+  HO.map = L.map("hoMap", {zoomControl:true, attributionControl:false, minZoom:11, maxZoom:19}).setView([1.3521, 103.8198], 11);
+  const AO = `<a href="https://www.onemap.gov.sg/" target="_blank" rel="noopener">OneMap</a> | \u00a9 ${new Date().getFullYear()} Singapore Land Authority`, AS = `Basemap \u00a9 OpenStreetMap contributors (OneMap unavailable)`, m = HO.map;
+  const om = L.tileLayer("https://www.onemap.gov.sg/maps/tiles/Default/{z}/{x}/{y}.png", {minZoom:11, maxZoom:19, attribution:AO}).addTo(m); let ok = 0, bad = 0, sw = false;
+  om.on("tileload", () => { ok++; }); om.on("tileerror", () => { bad++; if(!sw && ok === 0 && bad >= 4){ sw = true; m.removeLayer(om); L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {minZoom:11, maxZoom:19, attribution:AS}).addTo(m); } });
+  L.control.attribution({position:"bottomleft", prefix:false}).addTo(m);
+  HO.g = {route:L.layerGroup().addTo(m), stops:L.layerGroup().addTo(m), buses:L.layerGroup().addTo(m)};
+}
+/* ---- bus list */
+async function hoLoadBuses(keepBus){
+  const svc = $("hoSvc").value.trim().toUpperCase(); HO.svc = svc; LS.set("ho.svc", svc); HO.res = null; HO.sel = null; hoRender();
+  if(!svc){ $("hoBus").innerHTML = ""; $("hoStat").className = "hostat"; $("hoStat").innerHTML = `<div class="ho-msg" style="padding:0">Enter a service to load its buses.</div>`; hoMsg(""); return; }
+  hoMsg("Loading buses\u2026");
+  const j = await getJSON(`/api/halfway/buses?service=${encodeURIComponent(svc)}&direction=${HO.dir}`, 60000);
+  if(svc !== HO.svc) return;
+  HO.buses = j;
+  if(j.error){ $("hoBus").innerHTML = ""; $("hoStat").className = "hostat"; $("hoStat").innerHTML = `<div class="ho-msg" style="padding:0">${esc(j.error)}</div>`; hoMsg(""); return; }
+  $("hoBus").innerHTML = j.buses.length ? j.buses.map(b => `<option value="${esc(b.id)}">${esc(b.id)} \u2013 ${b.late == null ? "first bus" : "+" + f1(b.late) + " min"} \u2013 ${esc(b.near)}</option>`).join("") : `<option value="">No buses tracked</option>`;
+  const pick = keepBus && j.buses.some(b => b.id === keepBus) ? keepBus : j.auto; if(pick) $("hoBus").value = pick;
+  $("hoBusNote").textContent = j.auto && $("hoBus").value === j.auto ? "(auto-detected)" : "";
+  $("hoManStop").innerHTML = j.points.length ? j.points.map(p => `<option value="${esc(p.code)}">${esc(p.name)} (${esc(p.code)})</option>`).join("") : `<option value="">No approved points</option>`;
+  hoMsg(j.note || (j.points.length ? `${j.points.length} approved halfway point${j.points.length > 1 ? "s" : ""} for Svc ${svc} Dir ${HO.dir}.` : `No approved halfway points for Svc ${svc} Dir ${HO.dir} - add them in Settings.`) + (j.unresolved && j.unresolved.length ? ` Not on this route: ${j.unresolved.join(", ")}.` : ""));
+  hoStatus();
+}
+function hoStatus(){
+  const j = HO.buses, id = $("hoBus").value, b = j && j.buses ? j.buses.find(x => x.id === id) : null, el = $("hoStat");
+  $("hoBusNote").textContent = j && j.auto && id === j.auto ? "(auto-detected)" : "";
+  if(!b){ el.className = "hostat"; el.innerHTML = `<div class="ho-msg" style="padding:0">${j && j.buses && !j.buses.length ? "No buses are being tracked on this service right now." : "Choose a bus."}</div>`; return; }
+  const late = b.late, ok = late != null && late < j.min_late;
+  el.className = "hostat" + (late == null || ok ? " ok" : "");
+  el.innerHTML = `<div><span>Current status</span><b>${late == null ? "First bus" : "+" + f1(late) + " min late"}</b>${late != null ? `<small>estimated: gap to the bus ahead ${f1(b.front_hw)} min vs scheduled ${f1(j.sched_hw)} min</small>` : `<small>no bus ahead to measure a gap against</small>`}</div><div><span>At: ${esc(b.near)}</span><span>Next stop: ${esc(b.next_stop.name)}${b.next_stop.eta != null ? " (" + f1(b.next_stop.eta) + " min)" : ""}</span>${late != null && ok ? `<small>below the ${f1(j.min_late)} min needed for halfway</small>` : ""}</div>`;
+}
+/* ---- run */
+async function hoRun(manual){
+  if(HO.busy) return; const bus = $("hoBus").value; if(!bus){ toast("Choose a bus first"); return; }
+  const pref = (document.querySelector("input[name=hopref]:checked") || {}).value || "balanced";
+  let u = `/api/halfway/run?service=${encodeURIComponent(HO.svc)}&direction=${HO.dir}&bus=${encodeURIComponent(bus)}&pref=${pref}`;
+  if(manual){ const st = $("hoManStop").value; if(!st){ toast("No approved halfway point to simulate"); return; } u += `&stop=${encodeURIComponent(st)}`; if((document.querySelector("input[name=homan]:checked") || {}).value === "manual") u += `&start=${encodeURIComponent($("hoManMin").value)}`; }
+  HO.busy = true; $("hoRun").disabled = $("hoSim").disabled = true; $("hoRun").textContent = "Simulating\u2026"; hoMsg("Routing each approved point and simulating\u2026 this can take a few seconds.");
+  const j = await getJSON(u, 120000);
+  HO.busy = false; $("hoRun").disabled = $("hoSim").disabled = false; $("hoRun").textContent = "Run AI Optimisation"; hoMsg("");
+  HO.res = j; HO.sel = null;
+  if(j.ok){
+    if(j.selected) HO.sel = j.candidates.findIndex(c => c.code === j.selected);
+    else if(j.recommended != null) HO.sel = j.recommended;
+    else { const ranked = j.candidates.map((c, i) => [c, i]).filter(x => x[0].score != null).sort((a, b) => b[0].score - a[0].score); HO.sel = ranked.length ? ranked[0][1] : null; }
+    if(HO.sel < 0) HO.sel = null;
+  }
+  hoRender();
+}
+/* ---- render */
+function hoRender(){ hoRenderRec(); hoRenderTable(); hoRenderProf(); hoRenderTravel(); hoRenderHeat(); hoRenderTake(); hoRenderTraf(); hoRenderMap(); }
+function hoWhy(r, c){
+  const m = c.metrics, nb = c.no_metrics, imp = c.improvement, out = [], P = r.params;
+  if(c.route && c.route.source === "osrm"){ const ch = c.route.alternatives.find(a => a.chosen), sh = c.route.alternatives.find(a => a.shortest_km);
+    out.push(ch && sh && !ch.shortest_km ? [`Fastest off-service route under current traffic (${f1(ch.min)} min, ${f1(ch.km)} km); the shortest-distance route would take ${f1(sh.min)} min`] : [`Off-service route ${f1(c.off_min)} min / ${f1(c.off_km)} km, traffic-adjusted`]); }
+  else if(c.route) out.push([`Off-service time is an estimate (${f1(c.off_min)} min) - the routing service did not answer`, "w"]);
+  if(c.on_route_min != null && c.off_min < c.on_route_min) out.push([`Reaches this stop ${f1(c.on_route_min - c.off_min)} min earlier than staying in service`]);
+  if(imp && imp.avg_pct > 0) out.push([`Average headway ${f1(nb.avg)} \u2192 ${f1(m.avg)} min over the stops after this point (${f1(imp.avg_pct)}% better)`]);
+  if(imp && imp.max_min > 0) out.push([`Largest headway ${f1(nb.max)} \u2192 ${f1(m.max)} min`]);
+  if(imp && imp.recovery_saved != null) out.push([`Regular service returns ${Math.round(imp.recovery_saved)} min sooner`]);
+  else if(c.full && c.full.recovery != null && r.baseline.metrics.recovery == null) out.push([`Headway returns to \u00b1${P.recover_tol_pct}% of scheduled after about ${Math.round(c.full.recovery)} min (without halfway: not before the terminal)`]);
+  (c.warnings || []).forEach(w => out.push([w, "w"])); (c.violations || []).forEach(w => out.push([w, "w"]));
+  return out;
+}
+function hoRenderRec(){
+  const r = HO.res, el = $("hoRec"), c = hoSelC();
+  if(!r){ el.innerHTML = `<div class="ho-msg">Choose a bus and press <b>Run AI Optimisation</b>.</div>`; return; }
+  if(!r.ok){ el.innerHTML = `<div class="ho-msg" style="color:var(--red)">${esc(r.error)}</div>`; return; }
+  const isRec = c && r.recommended === HO.sel;
+  const pill = r.mode === "manual" && c ? `<span class="pill n">Controller scenario${isRec ? " \u00b7 also the highest score" : ""}</span>` : isRec ? `<span class="pill g">Recommended \u2013 Highest Simulation Score</span>` : r.recommended == null ? `<span class="pill a">No halfway recommended</span>` : `<span class="pill n">Selected option (not the top score)</span>`;
+  let h = `<header style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:0"><h2>AI Recommendation</h2>${pill}</header>`;
+  if(!c){
+    h += `<div class="ho-msg">${esc(r.message)}</div>` + (r.gate.reasons.length ? `<ul>${r.gate.reasons.map(x => `<li class="w">${esc(x)}</li>`).join("")}</ul>` : "");
+    el.innerHTML = h + `<div class="ho-note">Simulated from LTA arrival estimates. Decision support only \u2013 nothing is deployed.</div>`; return;
+  }
+  const m = c.metrics, nb = c.no_metrics, imp = c.improvement, base = r.baseline.metrics;
+  h += `<div class="ttl"><span class="star">${isRec ? "\u2605" : "\u25C6"}</span><div><h3>Start Halfway at ${esc(c.name)}</h3><div class="sub2">Stop ${esc(c.code)}${c.manual_start ? " \u00b7 manual start +" + f1(c.ready_min) + " min" : ""}</div></div></div>`;
+  h += `<div class="sub2">Bus ${esc(r.bus.id)} (+${f1(r.gate.late)} min est.) \u00b7 off-service ${f1(c.off_min)} min / ${f1(c.off_km)} km${c.route && c.route.source === "estimate" ? " (estimate)" : ""}</div>`;
+  if(!r.gate.eligible) h += `<ul><li class="w">${r.gate.reasons.map(esc).join("</li><li class=\"w\">")}</li></ul>`;
+  h += `<ul>${hoWhy(r, c).map(w => `<li class="${w[1] || ""}">${esc(w[0])}</li>`).join("")}</ul>`;
+  h += `<div class="hocmp"><div class="no"><h4>If no halfway</h4><div class="k">Avg headway</div><div class="v">${hoF(nb.avg)} min</div><div class="k">Max headway</div><div class="v">${hoF(nb.max)} min</div><div class="k">Est. recovery time</div><div class="v">${base.recovery == null ? "not before end" : Math.round(base.recovery) + " min"}</div></div>`;
+  h += `<div class="yes"><h4>With AI halfway</h4><div class="k">Avg headway</div><div class="v">${hoF(m.avg)} min</div><div class="k">Max headway</div><div class="v">${hoF(m.max)} min</div><div class="k">Est. recovery time</div><div class="v">${c.full.recovery == null ? "not before end" : Math.round(c.full.recovery) + " min"}</div></div></div>`;
+  h += `<div class="hoimp"><div><small>Improvement</small><b>${imp.avg_min >= 0 ? "\u25BC " : "\u25B2 "}${f1(Math.abs(imp.avg_min))} min (${f1(imp.avg_pct)}%)</b></div><div><small>Mileage loss</small><b>${f1(c.lost_km)} km</b><small>${f1(c.lost_pct)}% of trip \u00b7 ${c.skipped_stops} stops skipped</small></div></div>`;
+  h += `<div class="btns"><button class="btn sm go" type="button" id="hoView">View simulation</button><button class="btn sm" type="button" id="hoCmp">Compare other points</button></div>`;
+  h += `<div class="ho-note">Score ${hoF(c.score)} (${Object.keys(c.parts).map(k => k + " " + (c.parts[k] > 0 ? "" : "") + f1(c.parts[k])).join(" \u00b7 ")}). Simulated from LTA arrival estimates and traffic speed bands \u2013 not actual timetables. Decision support only; nothing is deployed.</div>`;
+  el.innerHTML = h;
+  $("hoView").onclick = () => $("hoHeatCard").scrollIntoView({behavior:"smooth", block:"start"});
+  $("hoCmp").onclick = () => $("hoTbl").scrollIntoView({behavior:"smooth", block:"center"});
+}
+function hoRenderTable(){
+  const r = HO.res, t = $("hoTbl");
+  if(!r || !r.ok){ t.innerHTML = ""; $("hoTblNote").textContent = ""; return; }
+  const b = r.baseline.metrics, L_ = "ABCDEFGHIJKLMN";
+  let h = `<thead><tr><th>Scenario</th><th>Halfway start stop</th><th>Off-service (min / km)</th><th>Lost km</th><th>Avg HW no \u2192 with</th><th>Max HW no \u2192 with</th><th>Recovery</th><th>Score</th><th>Remarks</th></tr></thead><tbody>`;
+  h += `<tr><td class="svc">A. No halfway</td><td>\u2013</td><td>\u2013</td><td>0</td><td>${hoF(b.avg)}</td><td>${hoF(b.max)}</td><td>${b.recovery == null ? "no" : Math.round(b.recovery) + " min"}</td><td>\u2013</td><td class="rm">Continue the trip</td></tr>`;
+  r.candidates.forEach((c, i) => {
+    const rec = r.recommended === i, m = c.metrics, nb = c.no_metrics, imp = c.improvement;
+    const rm = c.violations && c.violations.length ? c.violations[0] : rec ? "Best overall outcome (highest score)" : imp ? (imp.avg_pct >= 20 ? "Good improvement" : "Moderate improvement") : "";
+    h += `<tr data-i="${i}" tabindex="0" class="${rec ? "rec " : ""}${HO.sel === i ? "sel " : ""}${c.viable ? "" : "bad"}"><td class="svc">${rec ? "\u2605 " : ""}${L_[i + 1] || i + 2}. Stop ${c.seq}${rec ? "<small>(Recommended)</small>" : ""}</td><td>${esc(c.name)}<small>${esc(c.code)}</small></td><td>${hoF(c.off_min)} / ${hoF(c.off_km)}${c.route && c.route.source === "estimate" ? "<small>estimate</small>" : ""}</td><td>${hoF(c.lost_km)}</td>`;
+    h += m ? `<td>${hoF(nb.avg)} \u2192 <b>${hoF(m.avg)}</b></td><td>${hoF(nb.max)} \u2192 <b>${hoF(m.max)}</b></td><td>${c.full.recovery == null ? "no" : Math.round(c.full.recovery) + " min"}</td><td>${hoF(c.score)}</td>` : `<td>\u2013</td><td>\u2013</td><td>\u2013</td><td>\u2013</td>`;
+    h += `<td class="rm">${esc(rm)}</td></tr>`;
+  });
+  t.innerHTML = h + "</tbody>";
+  t.querySelectorAll("tbody tr[data-i]").forEach(tr => { const go = () => { HO.sel = +tr.dataset.i; hoRender(); }; tr.onclick = go; tr.onkeydown = e => { if(e.key === "Enter" || e.key === " "){ e.preventDefault(); go(); } }; });
+  $("hoTblNote").textContent = `Avg / max headway are measured from each option's start stop to the terminal, compared with no halfway over the same stops. Recovery = every headway within \u00b1${r.params.recover_tol_pct}% of scheduled at ${r.params.recover_points} consecutive key stops. Headway estimated from LTA arrivals (simulated, not actual LTA EWT). Bunching = below ${r.bunch_min} min. ${r.candidates.length ? "" : "No approved halfway points are configured for this service and direction."}`;
+}
+function hoRenderProf(){
+  const r = HO.res, c = hoSelC(), el = $("hoProf");
+  if(!c || !c.series.length){ el.innerHTML = `<div class="ho-msg">${r && r.ok ? "Nothing to plot." : "Run a simulation to see the headway profile."}</div>`; return; }
+  const bj = {}, cj = {}; r.baseline.series.forEach(s => bj[s.j] = s); c.series.forEach(s => cj[s.j] = s);
+  const pts = r.monitor.map(m => ({m, a:bj[m.j] ? bj[m.j].worst : null, b:cj[m.j] ? cj[m.j].worst : null}));
+  const H = r.sched_hw, vals = pts.flatMap(p => [p.a, p.b]).filter(v => v != null).concat([H * 1.5]), ymax = Math.ceil(Math.max(...vals) * 1.12 / 5) * 5 || 10;
+  const W = 560, Ht = 270, pl = 40, pr = 14, pt = 22, pb = 68, x = i => pl + (pts.length < 2 ? 0 : i * (W - pl - pr) / (pts.length - 1)), y = v => pt + (Ht - pt - pb) * (1 - v / ymax);
+  let s = `<svg viewBox="0 0 ${W} ${Ht}" role="img" aria-label="Headway at key downstream stops, with and without halfway" style="width:100%;height:auto">`;
+  for(let g = 0; g <= ymax; g += ymax / 5) s += `<line x1="${pl}" x2="${W - pr}" y1="${y(g)}" y2="${y(g)}" stroke="#163250"/><text x="${pl - 6}" y="${y(g) + 4}" text-anchor="end" font-size="11" fill="#8ba3bd">${Math.round(g)}</text>`;
+  s += `<line x1="${pl}" x2="${W - pr}" y1="${y(H)}" y2="${y(H)}" stroke="#8ba3bd" stroke-dasharray="4 4"/><text x="${W - pr}" y="${y(H) - 4}" text-anchor="end" font-size="10" fill="#8ba3bd">scheduled ${f1(H)}</text>`;
+  const line = (k, col) => { const seg = pts.map((p, i) => p[k] == null ? null : `${x(i).toFixed(1)},${y(p[k]).toFixed(1)}`).filter(Boolean); return seg.length ? `<polyline points="${seg.join(" ")}" fill="none" stroke="${col}" stroke-width="2.5"/>` + pts.map((p, i) => p[k] == null ? "" : `<circle cx="${x(i)}" cy="${y(p[k])}" r="3.5" fill="${col}"/><text x="${x(i)}" y="${y(p[k]) + (k === "a" ? -8 : 15)}" text-anchor="middle" font-size="10" fill="${col}">${Math.round(p[k])}</text>`).join("") : ""; };
+  const fi = pts.findIndex(p => p.m.j >= c.j); if(fi >= 0){ const fx = fi === 0 ? x(0) : x(fi - 1) + (x(fi) - x(fi - 1)) * ((c.j - pts[fi - 1].m.j) / Math.max(1, pts[fi].m.j - pts[fi - 1].m.j)); s += `<line x1="${fx}" x2="${fx}" y1="${pt}" y2="${Ht - pb}" stroke="#b06bff" stroke-dasharray="3 5"/><text x="${fx + 4}" y="${pt + 10}" font-size="10" fill="#c9a2ff">halfway start</text>`; }
+  s += line("a", "#ff5a5f") + line("b", "#22d36a");
+  pts.forEach((p, i) => { const lb = p.m.terminal ? "Terminal" : (p.m.name || "").slice(0, 12); s += `<text transform="translate(${x(i)},${Ht - pb + 12}) rotate(-38)" text-anchor="end" font-size="10" fill="#b9d0e6">${esc(lb)}</text>`; });
+  s += `<text x="12" y="${(pt + Ht - pb) / 2}" transform="rotate(-90 12 ${(pt + Ht - pb) / 2})" text-anchor="middle" font-size="11" fill="#8ba3bd">Headway (min)</text></svg>`;
+  el.innerHTML = `<div class="hokey"><span><i style="background:#ff5a5f"></i>No halfway (continue trip)</span><span><i style="background:#22d36a"></i>With halfway (${esc(c.name)})</span></div>` + s;
+}
+function hoRenderTravel(){
+  const r = HO.res, c = hoSelC(), el = $("hoTravel");
+  if(!c){ el.innerHTML = `<div class="ho-msg">${r && r.ok ? "Nothing to compare." : "Run a simulation to compare route times."}</div>`; return; }
+  const rest = r.baseline.series.length ? r.baseline.series[r.baseline.series.length - 1].t : null;
+  const bars = [["Bus \u2192 halfway stop (off-service)", c.off_min, ""], ["Bus \u2192 same stop (staying on service)", c.on_route_min, "b"], ["Rest of trip if no halfway", rest, "c"]].filter(b => b[1] != null), mx = Math.max(...bars.map(b => b[1]), 1);
+  let h = bars.map(b => `<div class="hobar"><span>${b[0]}</span><div><div class="bar ${b[2]}" style="width:${Math.max(4, 100 * b[1] / mx)}%"></div></div><b>${Math.round(b[1])} min</b></div>`).join("");
+  if(c.on_route_min != null){ const d = c.on_route_min - c.off_min; h += d > 0 ? `<div class="hoverdict">Off-service route is ${f1(d)} min faster than staying on the service route to this stop.</div>` : `<div class="hoverdict w">Off-service route is ${f1(-d)} min slower than the service route \u2013 the bus would not get there sooner.</div>`; }
+  if(c.route && c.route.source === "osrm" && c.route.alternatives.length > 1){ const sh = c.route.alternatives.find(a => a.shortest_km), ch = c.route.alternatives.find(a => a.chosen); if(sh && ch && !ch.shortest_km) h += `<div class="ho-note">Chosen: ${f1(ch.km)} km in ${f1(ch.min)} min. The shortest route (${f1(sh.km)} km) would take ${f1(sh.min)} min under current traffic.</div>`; }
+  el.innerHTML = h;
+}
+function hoRenderHeat(){
+  const r = HO.res, c = hoSelC(), el = $("hoHeat"), key = $("hoKey");
+  if(!r || !r.ok || !c || !c.series.length){ el.innerHTML = `<div class="ho-msg">${r && r.ok ? "Nothing to show." : "Run a simulation to see the stop-by-stop heatmap."}</div>`; key.innerHTML = ""; return; }
+  const H = r.sched_hw, bm = r.bunch_min, bj = {}, cj = {}; r.baseline.series.forEach(s => bj[s.j] = s); c.series.forEach(s => cj[s.j] = s);
+  key.innerHTML = `<span><i class="hc-r"></i>a gap \u2265 2\u00d7 scheduled, or any bunched pair (&lt;${f1(bm)} min)</span><span><i class="hc-o"></i>1.5\u20132\u00d7</span><span><i class="hc-y"></i>other</span><span><i class="hc-g"></i>within \u00b120% of ${f1(H)} min</span>`;
+  const cell = s => s ? `<td class="${s.min != null && s.min < bm - 1e-9 ? "hc-r" : hoCls(s.worst, H, bm)}" title="${s.front != null ? "ahead " + f1(s.front) + " / behind " + f1(s.rear) + " min" : "bus is off service here: gap " + f1(s.gap) + " min"}${s.min != null && s.min < bm ? " (bunched: " + f1(s.min) + " min)" : ""}">${Math.round(s.worst)}</td>` : `<td class="hc-n">\u2013</td>`;
+  let h = `<table class="hoheat"><thead><tr><th>Stop</th>${r.monitor.map(m => `<th title="${esc(m.name)}">${m.terminal ? "End" : m.seq}</th>`).join("")}</tr></thead><tbody>`;
+  h += `<tr><td class="l">No halfway</td>${r.monitor.map(m => cell(bj[m.j])).join("")}</tr>`;
+  h += `<tr><td class="l">With halfway<br><small>(${esc(c.name)})</small></td>${r.monitor.map(m => cell(cj[m.j])).join("")}</tr></tbody></table>`;
+  h += `<div class="ho-note">Before the halfway stop the bus is off service, so those stops lose it (headway there = gap between the bus ahead and the bus behind).</div>`;
+  el.innerHTML = h;
+}
+function hoRenderTake(){
+  const r = HO.res, c = hoSelC(), el = $("hoTake");
+  if(!c){ el.innerHTML = `<li style="color:var(--mut)">${r && r.ok ? esc(r.message) : "Run a simulation to see the takeaways."}</li>`; return; }
+  const m = c.metrics, nb = c.no_metrics, imp = c.improvement, out = [];
+  out.push(imp.avg_pct > 0 ? [`Halfway at ${c.name} (Stop ${c.code}) reduces average headway from ${f1(nb.avg)} to ${f1(m.avg)} min (${f1(imp.avg_pct)}% improvement) over the stops after it.`] : [`Halfway at ${c.name} does not improve average headway (${f1(nb.avg)} \u2192 ${f1(m.avg)} min).`, "w"]);
+  out.push(imp.max_min > 0 ? [`Largest headway falls from ${f1(nb.max)} to ${f1(m.max)} min.`] : [`Largest headway does not fall (${f1(nb.max)} \u2192 ${f1(m.max)} min).`, "w"]);
+  out.push([`Simulated waiting-time penalty (EWT) ${nb.ewt >= 0 ? "+" : ""}${f1(Math.round(nb.ewt * 100) / 100)} \u2192 ${m.ewt >= 0 ? "+" : ""}${f1(Math.round(m.ewt * 100) / 100)} min (estimated, not actual LTA EWT).`]);
+  if(imp.recovery_saved != null) out.push([`Estimated recovery ${Math.round(imp.recovery_saved)} min sooner.`]);
+  else if(c.full.recovery != null) out.push([`Regular headway is reached about ${Math.round(c.full.recovery)} min from now (no halfway: not before the terminal).`]);
+  else out.push([`Headway does not return to \u00b1${r.params.recover_tol_pct}% of scheduled before the terminal, with or without halfway.`, "w"]);
+  out.push([`Off-service travel ${f1(c.off_min)} min${c.route && c.route.source === "osrm" ? " via the fastest route under current traffic" : " (estimate)"}.`]);
+  out.push([`Accepts ${f1(c.lost_km)} km (${f1(c.lost_pct)}%) mileage loss and ${c.skipped_stops} stops without this bus.`]);
+  if(c.route && c.route.incidents && c.route.incidents.length) out.push([`${c.route.incidents.length} traffic incident${c.route.incidents.length > 1 ? "s" : ""} near the off-service route.`, "w"]);
+  (c.warnings || []).filter(w => /Bunched/.test(w)).forEach(w => out.push([w, "w"]));
+  el.innerHTML = out.map(o => `<li class="${o[1] || ""}">${esc(o[0])}</li>`).join("");
+}
+function hoRenderTraf(){
+  const r = HO.res, c = hoSelC(), el = $("hoTraf");
+  if(!c){ el.innerHTML = `<div class="ho-msg">${r && r.ok ? "Nothing to show." : "Run a simulation to see traffic conditions."}</div>`; return; }
+  const box = (cls, ttl, lab, kmh, extra, inc) => `<div class="${cls}"><span>${ttl}</span><br><b>${lab}${kmh != null ? " (avg " + Math.round(kmh) + " km/h)" : ""}</b><small>${extra}</small><small>${inc && inc.length ? "\u26A0 " + inc.length + " incident" + (inc.length > 1 ? "s" : "") + ": " + esc(inc[0].type + (inc[0].message ? " \u2013 " + inc[0].message : "")) : "No major incident near this route"}</small></div>`;
+  const rt = c.route; let h = "";
+  if(!rt) h += `<div><span>Off-service route</span><br><b>Not available</b></div>`;
+  else if(rt.source === "estimate") h += `<div class="a"><span>Off-service route</span><br><b>Estimate only</b><small>${esc(rt.note)}</small></div>`;
+  else h += box(rt.label === "Smooth" ? "g" : rt.label === "Congested" ? "a" : "", "Off-service route", rt.label || "Unknown", rt.avg_kmh, (rt.roads.length ? esc(rt.roads.join(" / ")) + " \u00b7 " : "") + (rt.traffic === "adjusted" ? "traffic-adjusted from LTA speed bands" : "free-flow time (no speed-band reading)"), rt.incidents);
+  if(c.service_kmh != null){ const lb = c.service_kmh >= 35 ? "Smooth" : c.service_kmh >= 22 ? "Moderate" : "Congested"; h += box(lb === "Smooth" ? "g" : lb === "Congested" ? "a" : "", "On-service route (same section)", lb, c.service_kmh, "current bus position \u2192 this stop, incl. stops", c.service_incidents); }
+  el.innerHTML = `<div class="hotraf">${h}</div>`;
+}
+function hoRenderMap(){
+  const r = HO.res; hoInitMap(); if(!HO.map || !HO.g) return;
+  Object.values(HO.g).forEach(g => g.clearLayers());
+  if(!r || !r.ok) return;
+  const mp = r.map, c = hoSelC(), pts = [];
+  L.polyline(mp.line, {color:"#1785ff", weight:4, opacity:.9, interactive:false, pane:"route"}).addTo(HO.g.route);
+  if(mp.gap && mp.gap.length > 1) L.polyline(mp.gap, {color:"#ff4d55", weight:7, opacity:.95, interactive:false, pane:"route"}).addTo(HO.g.route);
+  if(c && c.route && c.route.line.length > 1){ L.polyline(c.route.line, {color:"#b06bff", weight:4, opacity:1, dashArray:"3 9", interactive:false, pane:"route"}).addTo(HO.g.route); c.route.line.forEach(p => pts.push(p)); }
+  r.candidates.forEach((k, i) => { pts.push([k.lat, k.lon]); if(i === HO.sel) return; const m = L.circleMarker([k.lat, k.lon], {radius:7, color:"#cfe0f3", weight:2, fillColor:"#0a1a2e", fillOpacity:1, pane:"stops"}); m.on("click", () => { HO.sel = i; hoRender(); }); m.addTo(HO.g.stops); });
+  if(c) L.marker([c.lat, c.lon], {icon:L.divIcon({className:"", iconSize:[30, 30], iconAnchor:[15, 15], html:`<div class="hostar">\u2605</div>`}), keyboard:false}).addTo(HO.g.stops), pts.push([c.lat, c.lon]);
+  mp.buses.forEach(b => { L.marker([b.lat, b.lon], {icon:L.divIcon({className:"", iconSize:[26, 26], iconAnchor:[13, 13], html:`<div class="bmk ${b.x ? "b" : "n"}" title="${esc(b.id)}">${esc(String(b.id).replace(/^B/, ""))}</div>`}), keyboard:false}).addTo(HO.g.buses); pts.push([b.lat, b.lon]); });
+  if(pts.length) HO.map.fitBounds(L.latLngBounds(pts), {padding:[24, 24], maxZoom:15});
+}
+/* ---- wiring */
+$("hoSvc").value = HO.svc || (S.services && S.services[0]) || "";
+document.querySelectorAll("#hoDir button").forEach(b => { b.setAttribute("aria-pressed", String(+b.dataset.d === HO.dir)); b.onclick = () => { HO.dir = +b.dataset.d; LS.set("ho.dir", HO.dir); document.querySelectorAll("#hoDir button").forEach(x => x.setAttribute("aria-pressed", String(x === b))); hoLoadBuses(); }; });
+$("hoSvc").onchange = () => hoLoadBuses(); $("hoSvc").onkeydown = e => { if(e.key === "Enter"){ e.preventDefault(); hoLoadBuses(); } };
+$("hoBus").onchange = () => { HO.res = null; HO.sel = null; hoStatus(); hoRender(); };
+$("hoRun").onclick = () => hoRun(false); $("hoSim").onclick = () => hoRun(true);
+document.querySelectorAll("input[name=homan]").forEach(i => i.onchange = () => { $("hoManMin").disabled = (document.querySelector("input[name=homan]:checked") || {}).value !== "manual"; });
+function hoShow(){ if(!HO.loaded){ HO.loaded = true; if(!$("hoSvc").value.trim() && S.services && S.services[0]) $("hoSvc").value = S.services[0]; if($("hoSvc").value.trim()) hoLoadBuses(); } hoInitMap(); setTimeout(() => { if(HO.map){ HO.map.invalidateSize(); hoRenderMap(); } }, 120); }
+/* ---- Settings: halfway parameters, approved points, audit log */
+const HLAB = {min_late:["Minimum lateness for halfway", "min"], min_remaining_pct:["Minimum remaining trip", "% of route"], max_offservice_min:["Maximum off-service travel time", "min"], max_mileage_km:["Maximum mileage loss", "km skipped"], min_improve_pct:["Minimum expected HW improvement", "% avg HW"], poor_recovery_min:["Consider halfway only if recovery takes over", "min (no action)"], prep_buffer_min:["Preparation buffer", "min"], extra_layover_min:["Extra layover / recovery time", "min"], recover_tol_pct:["Recovered = within \u00b1", "% of scheduled HW"], recover_points:["... at consecutive monitoring points", "points"], monitor_points:["Monitoring points along the route", "stops"], fallback_kmh:["Fallback bus speed", "km/h (no traffic model)"], w_regularity:["Weight: headway regularity", "%"], w_maxgap:["Weight: maximum gap reduction", "%"], w_recovery:["Weight: recovery time", "%"], w_offservice:["Weight: off-service travel penalty", "%"], w_mileage:["Weight: mileage loss penalty", "%"], w_bunching:["Weight: new bunching risk", "%"], pref_recovery_boost:["'Faster recovery' boosts recovery + max-gap weights by", "\u00d7"], pref_mileage_boost:["'Minimise mileage' boosts the mileage weight by", "\u00d7"]};
+async function loadHoSettings(){
+  const j = await getJSON("/api/halfway/config", 20000); if(j.error){ $("hoParams").innerHTML = `<div class="msg bad">${esc(j.error)}</div>`; return; }
+  S.hoCfg = j;
+  $("hoParams").innerHTML = Object.keys(HLAB).map(k => `<div><label for="hp_${k}">${HLAB[k][0]}</label><input id="hp_${k}" data-k="${k}" type="number" step="any" min="${j.ranges[k][0]}" max="${j.ranges[k][1]}" value="${j.params[k]}"><small>${HLAB[k][1]} &bull; default ${j.defaults[k]} &bull; range ${j.ranges[k][0]}&ndash;${j.ranges[k][1]}</small></div>`).join("");
+  $("hoParNote").textContent = `Model ${j.model}. Bunching limit (${j.bunch_min} min) comes from the Bunching parameters above.${j.tokenRequired ? " Admin token required to change settings." : ""}`;
+  const p = j.points; $("hoPts").innerHTML = p.length ? `<table><thead><tr><th>Service</th><th>Dir</th><th>Stop code</th><th>Stop name</th><th>Seq</th><th>Enabled</th><th>Min late</th><th>Min remaining %</th><th>Max off-service (min)</th><th>Max mileage (km)</th><th></th></tr></thead><tbody>${p.map(r => `<tr><td class="svc">${esc(r.service)}</td><td>${r.direction}</td><td>${esc(r.stop_code || "\u2013")}</td><td>${esc(r.name || "\u2013")}</td><td>${r.seq == null ? "\u2013" : r.seq}</td><td>${r.enabled ? "Yes" : "No"}</td><td>${hoF(r.min_late)}</td><td>${hoF(r.min_remaining_pct)}</td><td>${hoF(r.max_offservice_min)}</td><td>${hoF(r.max_mileage_km)}</td><td><button class="btn sm" type="button" data-del="${r.id}">Remove</button></td></tr>`).join("")}</tbody></table>` : `<div class="msg">No approved halfway points yet. The optimiser only ever recommends points listed here. Upload a CSV or add one below.</div>`;
+  $("hoPts").querySelectorAll("[data-del]").forEach(b => b.onclick = async () => { const r = await post("/api/halfway/points/delete", JSON.stringify({id:+b.dataset.del})); if(r.error){ toast(r.error); return; } loadHoSettings(); });
+  const rn = await getJSON("/api/halfway/runs?limit=20", 20000), full = ts => ts ? sgt({day:"2-digit", month:"short", hour:"2-digit", minute:"2-digit", second:"2-digit"}).format(new Date(ts * 1000)) : "\u2013", runs = rn.runs || [];
+  $("hoRuns").innerHTML = runs.length ? `<table><thead><tr><th>Run</th><th>Time</th><th>Service</th><th>Dir</th><th>Bus</th><th>Est. delay</th><th>Preference</th><th>Mode</th><th>Recommended stop</th><th>Score</th><th>Model</th></tr></thead><tbody>${runs.map(r => `<tr><td>#${r.id}</td><td>${full(r.ts)}</td><td class="svc">${esc(r.service)}</td><td>${r.direction}</td><td>${esc(r.bus)}</td><td>${hoF(r.delay_min)} min</td><td>${esc(r.pref)}</td><td>${esc(r.mode)}</td><td>${esc(r.recommended || "none")}</td><td>${hoF(r.recommended_score)}</td><td>${esc(r.model_version)}</td></tr>`).join("")}</tbody></table>` : `<div class="msg">No simulations have been run yet.</div>`;
+}
+$("hoParSave").onclick = async () => { const params = {}; document.querySelectorAll("#hoParams input").forEach(i => params[i.dataset.k] = i.value); const j = await post("/api/halfway/config", JSON.stringify({params})); if(j.error){ toast(j.error); return; } toast("Halfway Optimiser parameters saved"); loadHoSettings(); };
+$("hoParReset").onclick = async () => { const j = await post("/api/halfway/config", JSON.stringify({reset:true})); if(j.error){ toast(j.error); return; } toast("Halfway Optimiser parameters reset"); loadHoSettings(); };
+$("hoPUp").onclick = () => $("hoPFile").click();
+$("hoPFile").onchange = async e => { const f = e.target.files[0]; e.target.value = ""; if(!f) return; const j = await post("/api/halfway/points", await f.text()); if(j.error){ toast(j.error); return; } toast(`Loaded ${j.rows} approved points${j.errors && j.errors.length ? " (" + j.errors.length + " rows skipped)" : ""}`); loadHoSettings(); };
+$("hoPClr").onclick = async () => { const j = await post("/api/halfway/points/clear", ""); if(j.error){ toast(j.error); return; } toast("Approved halfway points cleared"); loadHoSettings(); };
+$("hoPTpl").onclick = () => csvDownload("halfway_points_template.csv", [["service", "direction", "stop_code", "sequence", "enabled", "min_late", "min_remaining_pct", "max_offservice_min", "max_mileage_km"], ["32", "1", "12031", "12", "yes", "", "", "", ""], ["32", "1", "18011", "18", "yes", "15", "20", "25", "10"], ["32", "1", "24011", "24", "no", "", "", "", ""]]);
+$("hoPAdd").onclick = async () => { const b = {service:$("hoAS").value.trim(), direction:$("hoAD").value, stop_code:$("hoAC").value.trim(), seq:$("hoAQ").value.trim(), enabled:$("hoAE").checked ? "yes" : "no"}; const j = await post("/api/halfway/points/add", JSON.stringify(b)); if(j.error){ toast(j.error); return; } toast("Approved halfway point added"); $("hoAC").value = ""; $("hoAQ").value = ""; loadHoSettings(); };
+
 /* start */
 (async () => {
   const q = new URLSearchParams(location.search); if(q.get("svc")){ S.services = q.get("svc").toUpperCase().split(",").filter(x => /^[0-9A-Z]{1,6}$/.test(x)); } if(q.get("dir") === "1" || q.get("dir") === "2") S.dir = +q.get("dir");
   renderChips(); syncSegs(); renderTable(); renderKpis(); renderDonut();
   const h = await getJSON("/api/health", 15000); if(h.error) setLive("bad", "Server unreachable", h.error); else if(!h.lta) setLive("bad", "LTA key missing", "Set LTA_ACCOUNT_KEY on the server"); else setLive("ok", "Live Data (LTA)", "");
   load();
+  if(location.hash === "#halfway") showTab("ho");
 })();
 window.addEventListener("resize", () => { if(map) map.invalidateSize(); });
 </script>
