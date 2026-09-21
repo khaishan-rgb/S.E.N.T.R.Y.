@@ -1,0 +1,479 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#050d1a">
+<title>SG Transport Pulse – Traffic-Aware Regulation</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+:root{--bg:#050d1a;--panel:#0a1a2e;--panel2:#0d2039;--line:#163250;--line2:#1f4468;--text:#eaf3ff;--mut:#8ba3bd;--blue:#1785ff;--cyan:#3cc8ff;
+  --green:#22d36a;--amber:#ff9f1c;--yellow:#ffd23f;--red:#ff4d55;--dred:#c4121f;--purple:#8b5cf6;--font:Inter,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif}
+*{box-sizing:border-box}html{-webkit-text-size-adjust:100%}
+body{margin:0;background:radial-gradient(1200px 500px at 20% -10%,#0b2140 0%,var(--bg) 60%);color:var(--text);font-family:var(--font);font-size:14px;line-height:1.35;min-height:100vh;
+  padding:env(safe-area-inset-top,0) env(safe-area-inset-right,0) env(safe-area-inset-bottom,0) env(safe-area-inset-left,0)}
+button,input,select{font:inherit;color:inherit}:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+.app{max-width:1560px;margin:0 auto;padding:0 14px 18px}
+.top{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;padding:12px 4px;border-bottom:1px solid var(--line)}
+.brand{display:flex;align-items:center;gap:12px}.logo{width:40px;height:40px;border-radius:11px;background:linear-gradient(160deg,#2a95ff,#0d63d6);display:grid;place-items:center;font-size:22px}
+.brand h1{margin:0;font-size:24px;font-weight:800;letter-spacing:-.4px;line-height:1.05}.brand p{margin:3px 0 0;color:var(--mut);font-size:13px}
+.nav{display:flex;gap:6px;flex-wrap:wrap}.nav a{padding:8px 14px;border:1px solid var(--line2);border-radius:10px;color:#cfe0f3;text-decoration:none;font-weight:600;font-size:13px;background:var(--panel)}
+.nav a.on{background:var(--blue);border-color:#4aa6ff;color:#fff}
+.hdr-right{text-align:right;font-size:13px;color:#cfe0f3;margin-left:auto}.live{display:flex;align-items:center;justify-content:flex-end;gap:7px;color:var(--mut);margin-top:3px}
+.live .dot{width:9px;height:9px;border-radius:50%;background:var(--mut)}.live.ok .dot{background:var(--green);box-shadow:0 0 8px var(--green)}.live.warn .dot{background:var(--amber)}.live.bad .dot{background:var(--red)}
+.tabs{display:flex;gap:6px;padding:10px 2px 0}.tabs button{padding:8px 16px;border-radius:10px 10px 0 0;border:1px solid var(--line2);border-bottom:0;background:var(--panel);cursor:pointer;font-weight:700;color:#a9c2da}
+.tabs button[aria-selected=true]{background:var(--blue);color:#fff;border-color:#4aa6ff}
+.card{background:linear-gradient(180deg,var(--panel),#08172a);border:1px solid var(--line2);border-radius:14px;padding:12px 14px}
+.card h2{margin:0 0 8px;font-size:16px;font-weight:800}.sub{color:var(--mut);font-size:12.5px}
+.btn{padding:8px 14px;border-radius:9px;border:1px solid var(--line2);background:var(--panel2);cursor:pointer;font-weight:700;color:#dcecff}.btn:hover{border-color:#4aa6ff}
+.btn.go{background:var(--blue);border-color:#4aa6ff;color:#fff}.btn.sm{padding:5px 10px;font-size:12.5px}.btn:disabled{opacity:.5;cursor:default}
+.hx-err{color:#ff8a90}
+/* filters */
+.filters{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin:12px 0}
+.fl{display:flex;flex-direction:column;gap:4px}.fl>label{font-size:12px;color:var(--mut);font-weight:600}
+.sel,.inp{background:var(--panel);border:1px solid var(--line2);border-radius:9px;padding:8px 10px;min-height:38px;min-width:120px}
+.svcbox{position:relative;min-width:250px}.chips{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:4px}.chips:empty{display:none}
+.chip{display:inline-flex;align-items:center;gap:5px;background:#12406e;border:1px solid #2a6fbf;border-radius:14px;padding:2px 4px 2px 9px;font-size:12.5px;font-weight:700}.chip button{border:0;background:transparent;cursor:pointer;color:#bcd8f5;padding:0 5px;font-size:14px}
+.sug{position:absolute;z-index:30;left:0;right:0;top:100%;background:var(--panel2);border:1px solid var(--line2);border-radius:9px;margin-top:2px;max-height:220px;overflow:auto}.sug[hidden]{display:none}
+.sug div{padding:6px 10px;cursor:pointer}.sug div:hover,.sug div.on{background:#12406e}
+.typebtns{display:flex;gap:6px;flex-wrap:wrap}.tb{display:inline-flex;align-items:center;gap:6px;padding:8px 12px;border-radius:9px;border:1px solid var(--line2);background:var(--panel);cursor:pointer;font-weight:700;font-size:13px}
+.tb[aria-pressed=true]{background:#0f3a63;border-color:#4aa6ff}.tb[aria-pressed=false]{opacity:.55}
+.statbtns{display:flex;gap:6px}.statbtns .tb{padding:8px 10px}
+/* cards */
+.cards{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px;margin-bottom:12px}
+.sc{border-radius:14px;padding:11px 13px;border:1px solid var(--line2);background:var(--panel);cursor:pointer;display:flex;gap:11px;align-items:center;text-align:left;min-height:84px}
+.sc .ic{width:46px;height:46px;border-radius:50%;display:grid;place-items:center;font-size:22px;flex:0 0 46px}.sc .n{font-size:30px;font-weight:800;line-height:1}.sc .t{font-weight:700}.sc .s{color:#c3d6ea;font-size:12.5px}.sc .d{color:#ff9a9f;font-size:12px}
+.sc.k-congestion{background:linear-gradient(135deg,#3a0f18,#1c0a12);border-color:#7a2a33}.sc.k-congestion .ic{background:#c4121f55}
+.sc.k-incident{background:linear-gradient(135deg,#3a0f18,#1c0a12);border-color:#7a2a33}.sc.k-incident .ic{background:#ff4d5544}
+.sc.k-roadworks{background:linear-gradient(135deg,#3a2408,#1c1408);border-color:#8a5a12}.sc.k-roadworks .ic{background:#ff9f1c44}
+.sc.k-weather{background:linear-gradient(135deg,#0c2a52,#0a1a33);border-color:#245b9c}.sc.k-weather .ic{background:#1785ff44}
+.sc.k-total{background:linear-gradient(135deg,#0f2f4f,#0a1a2e);border-color:#2a6fbf;cursor:default}.sc.k-total .ic{background:#3cc8ff33}
+.sc.k-upd{cursor:default;flex-direction:column;align-items:flex-start;justify-content:center;gap:2px}
+.sc[aria-pressed=false]{opacity:.5}.sc:focus-visible{outline:2px solid var(--cyan)}
+/* middle */
+.mid{display:grid;grid-template-columns:minmax(0,1.22fr) minmax(0,1fr);gap:12px;margin-bottom:12px}
+.mapcard{padding:0;overflow:hidden;position:relative}#trMap{height:600px;background:#0c1b30}
+.legend{position:absolute;z-index:500;left:10px;top:10px;background:#0a1a2ee6;border:1px solid var(--line2);border-radius:10px;padding:8px 10px;font-size:12.5px;max-width:200px}
+.legend .row{display:flex;align-items:center;gap:7px;margin:3px 0}.sw{width:16px;height:12px;border-radius:3px;display:inline-block}
+.legend label{display:flex;align-items:center;gap:6px;margin:3px 0;cursor:pointer}.legend hr{border:0;border-top:1px solid var(--line2);margin:6px 0}
+.mapbtn{position:absolute;z-index:500;right:10px;top:10px;display:flex;gap:6px}
+.tw{overflow-x:auto}table{width:100%;border-collapse:collapse}
+th{font-size:12px;color:var(--mut);text-align:left;font-weight:700;padding:6px 8px;border-bottom:1px solid var(--line2);white-space:nowrap}
+td{padding:8px;border-bottom:1px solid #12304d;vertical-align:middle}
+#qTab td:nth-child(2){white-space:nowrap}tr.al{cursor:pointer}tr.al:hover td{background:#0d2340}tr.al.sel td{background:#123563}
+.dotr{display:inline-block;width:14px;height:14px;border-radius:50%}.lv-critical{background:var(--red);box-shadow:0 0 8px #ff4d55aa}.lv-high{background:var(--amber)}.lv-monitor{background:var(--yellow)}.lv-normal{background:var(--green)}
+.ty{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}.loc b{display:block}.loc small{color:var(--mut)}
+.ack{padding:6px 12px;border-radius:8px;border:0;background:var(--blue);color:#fff;font-weight:700;cursor:pointer;font-size:12.5px}
+.st{display:inline-block;padding:3px 9px;border-radius:12px;font-size:12px;font-weight:800;white-space:nowrap}
+.st.acknowledged{background:#0f3a63;color:#9fd0ff}.st.monitoring{background:#0f3a63;color:#9fd0ff}.st.improving{background:#0f3a24;color:#8ff0b3}.st.cleared{background:#2a3644;color:#b6c6d8}.st.worse{background:#5a1119;color:#ffb3b8;display:block;margin-bottom:4px;text-align:center}
+.foot{display:flex;justify-content:space-between;gap:10px;margin-top:8px;color:var(--mut);font-size:12.5px;align-items:center}
+/* bottom */
+.bot{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr) minmax(0,1fr);gap:12px}
+.facts{display:grid;grid-template-columns:auto 1fr;gap:5px 14px;margin:6px 0}.facts dt{color:var(--mut)}.facts dd{margin:0;font-weight:700}
+.pill{display:inline-block;padding:3px 10px;border-radius:9px;font-weight:800;font-size:12.5px;color:#fff}.pill.congestion,.pill.incident{background:var(--dred)}.pill.roadworks{background:#b8720f}.pill.weather{background:#1c62b8}
+.svcchips{display:flex;flex-wrap:wrap;gap:5px;margin-top:4px}.svcchips span{background:#12406e;border-radius:11px;padding:2px 9px;font-size:12.5px;font-weight:700}
+.strip{margin:8px 0}.strip svg{width:100%;height:auto;display:block}
+.buses{margin:6px 0 0;padding:0;list-style:none;font-size:13px;display:grid;gap:3px}.buses b{color:#fff}.b-approaching{color:#ffd23f}.b-inside{color:#ff8a90}.b-cleared{color:#8ff0b3}
+.reco{list-style:none;margin:6px 0;padding:0;display:grid;gap:9px}.reco li{display:grid;grid-template-columns:28px 1fr;gap:9px}.reco .no{width:26px;height:26px;border-radius:50%;background:#12406e;display:grid;place-items:center;font-weight:800}
+.reco small{display:block;color:var(--mut);margin-top:2px}
+.chartbox svg{width:100%;height:auto;display:block}
+.ho-note{color:var(--mut);font-size:12.5px}.msg{padding:14px;color:var(--mut)}
+.banner{background:#3a2408;border:1px solid #8a5a12;color:#ffd9a0;border-radius:10px;padding:7px 12px;margin:0 0 10px;font-size:13px}.banner[hidden]{display:none}
+.dis{opacity:.55}
+/* modal + toast */
+.ov{position:fixed;inset:0;background:#000a;display:grid;place-items:center;z-index:2000}.ov[hidden]{display:none}
+.modal{background:var(--panel2);border:1px solid var(--line2);border-radius:14px;padding:18px;max-width:440px;width:92%}.modal h3{margin:0 0 8px}.modal .btns{display:flex;gap:8px;justify-content:flex-end;margin-top:14px}
+#toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%) translateY(20px);background:#0f3a63;border:1px solid #4aa6ff;padding:10px 16px;border-radius:10px;opacity:0;pointer-events:none;transition:.25s;z-index:3000}#toast.show{opacity:1;transform:translateX(-50%)}
+.tinfo{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;font-size:14px;border:2px solid #fff;color:#fff;font-weight:800;box-shadow:0 1px 5px #000a}
+.ti-incident{background:var(--dred)}.ti-roadworks{background:#e08a10}.ti-weather{background:#1c62b8}
+.busm{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;font-weight:800;font-size:11px;border:2px solid #fff;color:#04121f}
+.bm-approaching{background:var(--yellow)}.bm-inside{background:var(--red);color:#fff}.bm-cleared{background:var(--green)}
+.sg th{white-space:normal}.sg td input{width:100%;min-width:90px}.grp td{background:#0d2039;font-weight:800;color:#9fd0ff}
+@media(max-width:1180px){.cards{grid-template-columns:repeat(3,minmax(0,1fr))}.mid,.bot{grid-template-columns:minmax(0,1fr)}#trMap{height:460px}}
+@media(max-width:640px){.cards{grid-template-columns:repeat(2,minmax(0,1fr))}.brand h1{font-size:20px}#trMap{height:380px}.legend{max-width:150px;font-size:11.5px}}
+.evl{position:absolute;transform:translate(-50%,-150%);white-space:nowrap;background:#5a1119ee;border:1px solid #ff4d55;color:#fff;padding:3px 8px;border-radius:7px;font-size:11.5px;font-weight:700;pointer-events:none}
+.leaflet-container{background:#0c1b30;font-family:var(--font)}.leaflet-popup-content-wrapper{background:#0a1a2e;color:#eaf3ff;border:1px solid #2a6fbf}.leaflet-popup-tip{background:#0a1a2e}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <div class="brand"><div class="logo">&#128678;</div><div><h1>SG Transport Pulse</h1><p>Traffic-Aware Regulation &bull; Detect disruptions &bull; Anticipate delays &bull; Adjust before impact &bull; Keep headways stable</p></div></div>
+    <nav class="nav" aria-label="Pages"><a href="/">Route Traffic</a><a href="/control">Headway Control</a><a href="/bunching">Bunching &amp; Gap</a><a href="/halfway">Halfway Optimiser</a><a class="on" href="/traffic" aria-current="page">Traffic-Aware</a></nav>
+    <div class="hdr-right"><div id="clock">&nbsp;</div><div class="live" id="live"><span class="dot"></span><span id="liveText">Connecting&hellip;</span></div></div>
+  </header>
+  <div class="tabs" role="tablist"><button role="tab" id="tabMon" aria-selected="true">Monitor</button><button role="tab" id="tabSet" aria-selected="false">Settings</button></div>
+
+  <main id="monitor">
+    <div class="filters" id="filters">
+      <div class="fl svcbox"><label for="svcIn">Services (multi-select)</label><div class="chips" id="svcChips"></div><input class="inp" id="svcIn" autocomplete="off" placeholder="All services &ndash; type 32, 33, 51 &#8629;" aria-label="Services"><div class="sug" id="svcSug" hidden></div></div>
+      <div class="fl"><label for="fDir">Direction</label><select class="sel" id="fDir"><option value="0">Both</option><option value="1">Direction 1</option><option value="2">Direction 2</option></select></div>
+      <div class="fl"><label for="fHor">Time horizon</label><select class="sel" id="fHor"><option value="0">Current</option><option value="30">Next 30 min</option><option value="60">Next 60 min</option><option value="120">Next 120 min</option></select></div>
+      <div class="fl"><label>Risk type</label><div class="typebtns" id="typeBtns"><button class="tb" data-k="congestion" aria-pressed="true">&#128663; Congestion</button><button class="tb" data-k="incident" aria-pressed="true">&#9888;&#65039; Incident</button><button class="tb" data-k="roadworks" aria-pressed="true">&#128679; Road Works</button><button class="tb" data-k="weather" aria-pressed="true">&#127783;&#65039; Weather</button></div></div>
+      <div class="fl"><label>Status</label><div class="statbtns" id="statBtns"><button class="tb" data-s="unacknowledged" aria-pressed="true">Unacknowledged</button><button class="tb" data-s="acknowledged" aria-pressed="true">Acknowledged</button><button class="tb" data-s="cleared" aria-pressed="false">Cleared</button></div></div>
+      <div class="fl" style="flex:1;min-width:190px"><label for="fQ">Search</label><input class="inp" id="fQ" placeholder="Service / road / location&hellip;" aria-label="Search"></div>
+    </div>
+    <div class="banner" id="feedBanner" hidden></div>
+    <section class="cards" id="cards" aria-label="Alert summary"></section>
+
+    <section class="mid">
+      <div class="card mapcard"><div id="trMap"></div>
+        <div class="legend" id="legend"><button class="btn sm" id="legTog" type="button" aria-expanded="true" style="width:100%;margin-bottom:4px">Legend &amp; layers ▾</button><div id="legBody"><div class="row"><span class="sw" style="background:#22d36a"></span>Normal (&ge; 40 km/h)</div><div class="row"><span class="sw" style="background:#ffd23f"></span>Moderate (30&ndash;40)</div><div class="row"><span class="sw" style="background:#ff9f1c"></span>Slow (20&ndash;30)</div><div class="row"><span class="sw" style="background:#e0101f"></span>Very slow (&lt; 20)</div><hr>
+          <label><input type="checkbox" id="lyCong" checked> Congestion stretches</label><label><input type="checkbox" id="lyInc" checked> Incidents</label><label><input type="checkbox" id="lyRw" checked> Road works</label><label><input type="checkbox" id="lyWx" checked> Weather areas</label><label><input type="checkbox" id="lyRoute" checked> Route &amp; buses of the selected service</label></div></div>
+        <div class="mapbtn"><button class="btn sm" id="btnFit" type="button">Fit all</button></div>
+      </div>
+      <div class="card" id="queue">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><h2 id="qTitle">Affected services</h2><div style="display:flex;gap:8px"><button class="btn go" id="btnAckAll" type="button">Acknowledge All</button></div></div>
+        <div class="tw"><table id="qTab" aria-label="Affected services"></table></div>
+        <div class="foot"><a href="#" id="qMore" style="color:var(--cyan);text-decoration:none">Show more services &rarr;</a><span id="qCount"></span></div>
+      </div>
+    </section>
+
+    <section class="bot">
+      <div class="card" id="detail"><h2>Selected alert details</h2><div class="msg">Select an alert in the list to see the whole disruption, the buses approaching it and the predicted headway.</div></div>
+      <div class="card" id="impact"><h2>Impact on headway (selected service)</h2><div class="msg">No alert selected.</div></div>
+      <div class="card" id="reco"><h2>Recommended actions</h2><div class="msg">No alert selected.</div></div>
+    </section>
+    <p class="ho-note" style="margin:12px 2px 0">Sources: LTA DataMall (Traffic Speed Bands, Traffic Incidents, Road Works, Bus Routes, Bus Stops, Bus Arrival), NEA rainfall (data.gov.sg), OneMap. Decision support only &ndash; nothing is sent to buses. Estimated delay is an estimated traffic delay, not actual bus lateness. Weather is a potential operational impact until traffic or bus movement shows a delay.</p>
+  </main>
+
+  <main id="settings" hidden>
+    <div class="card" style="margin-top:12px"><h2>Detection &amp; alert settings</h2><div class="sub">Stored on the server, not in the code. Changes apply at the next refresh.</div>
+      <div class="tw"><table class="sg" id="sgTab"></table></div>
+      <div style="display:flex;gap:8px;margin-top:10px"><button class="btn go" id="sgSave" type="button">Save settings</button><button class="btn" id="sgReset" type="button">Reset to defaults</button><span id="sgMsg" class="ho-note"></span></div></div>
+    <div class="card" style="margin-top:12px"><h2>Data feeds</h2><div id="feedList" class="ho-note"></div></div>
+    <div class="card" style="margin-top:12px"><h2>Acknowledgement log</h2><div class="tw"><table id="logTab"></table></div></div>
+  </main>
+  <footer class="ho-note" style="margin-top:14px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px"><span>SG Transport Pulse V11.0 &nbsp;|&nbsp; For Operational Control Centre use only</span><span id="engine"></span></footer>
+</div>
+<div class="ov" id="ov" hidden><div class="modal" role="dialog" aria-modal="true" aria-labelledby="mTitle"><h3 id="mTitle">Acknowledge</h3><div id="mBody"></div><div class="fl" style="margin-top:10px"><label for="mBy">Acknowledged by</label><input class="inp" id="mBy" maxlength="40" placeholder="Your name / ID"></div><div class="btns"><button class="btn" id="mNo" type="button">Cancel</button><button class="btn go" id="mYes" type="button">Acknowledge</button></div></div></div>
+<div id="toast" role="status" aria-live="polite"></div>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const LS = {get(k, d){ try{ const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); }catch(e){ return d; } }, set(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }};
+const f1 = x => x == null ? "\u2013" : String(Math.round(x * 10) / 10);
+const hm = m => { m = Math.round(m); const h = ((Math.floor(m / 60) % 24) + 24) % 24, mm = ((m % 60) + 60) % 60; return String(h).padStart(2, "0") + ":" + String(mm).padStart(2, "0"); };
+const sgt = o => new Intl.DateTimeFormat("en-GB", {timeZone:"Asia/Singapore", hour12:false, ...o});
+function tickClock(){ const p = Object.fromEntries(sgt({weekday:"short", day:"2-digit", month:"short", year:"numeric", hour:"2-digit", minute:"2-digit"}).formatToParts(new Date()).map(x => [x.type, x.value])); $("clock").textContent = `${p.weekday}, ${p.day} ${p.month} ${p.year}  ${p.hour}:${p.minute}`; }
+tickClock(); setInterval(tickClock, 15000);
+function setLive(state, text, title){ const e = $("live"); e.className = "live " + state; $("liveText").textContent = text; e.title = title || ""; }
+let toastT; function toast(m){ const t = $("toast"); t.textContent = m; t.classList.add("show"); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove("show"), 3800); }
+async function getJSON(u, ms){ const c = new AbortController(), t = setTimeout(() => c.abort(), ms || 60000); try{ const r = await fetch(u, {signal:c.signal}); const j = await r.json().catch(() => ({})); if(!r.ok && !j.error) j.error = "Server error " + r.status; return j; }catch(e){ return {error:e.name === "AbortError" ? "The server took too long to answer." : "Could not reach the server."}; }finally{ clearTimeout(t); } }
+async function postJSON(u, body){ try{ const r = await fetch(u, {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body)}); const j = await r.json().catch(() => ({})); if(!r.ok && !j.error) j.error = "Server error " + r.status; return j; }catch(e){ return {error:"Could not reach the server."}; } }
+
+const KINDS = ["congestion", "incident", "roadworks", "weather"];
+const KLAB = {congestion:"Congestion", incident:"Incident", roadworks:"Road Works", weather:"Weather"};
+const KIC = {congestion:"\u{1F697}", incident:"\u26A0\uFE0F", roadworks:"\u{1F6A7}", weather:"\u{1F327}\uFE0F"};
+const S = {svc:LS.get("tr.svc", []), dir:LS.get("tr.dir", 0), hor:LS.get("tr.hor", 0), kinds:new Set(LS.get("tr.kinds", KINDS)), stat:new Set(LS.get("tr.stat", ["unacknowledged", "acknowledged"])), q:"", data:null, ev:{}, sel:null, detail:null,
+           shown:10, by:LS.get("tr.by", ""), curhw:"", tok:0, dtok:0, all:[], routes:{}, next:0, timer:null, mapReady:false, routeKey:null};
+const qs = () => new URLSearchParams({services:S.svc.join(","), direction:S.dir, horizon:S.hor, types:[...S.kinds].join(","), status:[...S.stat].join(",")});
+
+/* ---------------------------------------------------------------- filters */
+function saveF(){ LS.set("tr.svc", S.svc); LS.set("tr.dir", S.dir); LS.set("tr.hor", S.hor); LS.set("tr.kinds", [...S.kinds]); LS.set("tr.stat", [...S.stat]); }
+function renderChips(){ $("svcChips").innerHTML = S.svc.map(s => `<span class="chip">${esc(s)}<button type="button" data-rm="${esc(s)}" aria-label="Remove service ${esc(s)}">&times;</button></span>`).join(""); $("svcChips").querySelectorAll("button").forEach(b => b.onclick = () => { S.svc = S.svc.filter(x => x !== b.dataset.rm); saveF(); renderChips(); load(); }); }
+function addSvc(tokens){ let add = false; tokens.forEach(t => { t = t.trim().toUpperCase().replace(/[^A-Z0-9]/g, ""); if(t && !S.svc.includes(t)){ S.svc.push(t); add = true; } }); if(add){ saveF(); renderChips(); load(); } $("svcIn").value = ""; $("svcSug").hidden = true; }
+$("svcIn").addEventListener("keydown", e => { if(e.key === "Enter" || e.key === ","){ e.preventDefault(); addSvc($("svcIn").value.split(/[\s,]+/)); } else if(e.key === "Backspace" && !$("svcIn").value && S.svc.length){ S.svc.pop(); saveF(); renderChips(); load(); } });
+$("svcIn").addEventListener("input", () => { const v = $("svcIn").value.trim().toUpperCase(); if(/[\s,]$/.test($("svcIn").value)){ addSvc($("svcIn").value.split(/[\s,]+/)); return; } const m = v ? S.all.filter(x => x.svc.startsWith(v) && !S.svc.includes(x.svc)).slice(0, 12) : []; $("svcSug").innerHTML = m.map(x => `<div data-s="${esc(x.svc)}">${esc(x.svc)} <span class="sub">Dir ${x.dirs.join(", ")}</span></div>`).join(""); $("svcSug").hidden = !m.length; $("svcSug").querySelectorAll("div").forEach(d => d.onclick = () => addSvc([d.dataset.s])); });
+$("svcIn").addEventListener("blur", () => setTimeout(() => { if($("svcIn").value.trim()) addSvc($("svcIn").value.split(/[\s,]+/)); $("svcSug").hidden = true; }, 180));
+$("fDir").value = S.dir; $("fHor").value = S.hor;
+$("fDir").onchange = e => { S.dir = +e.target.value; saveF(); load(); };
+$("fHor").onchange = e => { S.hor = +e.target.value; saveF(); load(); };
+function syncTypeBtns(){ document.querySelectorAll("#typeBtns .tb").forEach(b => b.setAttribute("aria-pressed", String(S.kinds.has(b.dataset.k)))); }
+function syncStatBtns(){ document.querySelectorAll("#statBtns .tb").forEach(b => b.setAttribute("aria-pressed", String(S.stat.has(b.dataset.s)))); }
+document.querySelectorAll("#typeBtns .tb").forEach(b => b.onclick = () => { const k = b.dataset.k; if(S.kinds.has(k)) S.kinds.delete(k); else S.kinds.add(k); if(!S.kinds.size) KINDS.forEach(x => S.kinds.add(x)); syncTypeBtns(); saveF(); load(); });
+document.querySelectorAll("#statBtns .tb").forEach(b => b.onclick = () => { const k = b.dataset.s; if(S.stat.has(k)) S.stat.delete(k); else S.stat.add(k); if(!S.stat.size) ["unacknowledged", "acknowledged"].forEach(x => S.stat.add(x)); syncStatBtns(); saveF(); load(); });
+$("fQ").oninput = e => { S.q = e.target.value.trim().toLowerCase(); S.shown = 10; renderTable(); };
+renderChips(); syncTypeBtns(); syncStatBtns();
+
+/* ---------------------------------------------------------------- data */
+async function load(force){
+  const tok = ++S.tok; clearTimeout(S.timer);
+  setLive("warn", "Updating\u2026");
+  const j = await getJSON("/api/traffic/overview?" + qs() + (force ? "&refresh=1" : ""), 90000);
+  if(tok !== S.tok) return;
+  if(j.error){ setLive("bad", "Error", j.error); $("feedBanner").hidden = false; $("feedBanner").textContent = j.error; schedule(20); return; }
+  S.data = j; S.ev = Object.fromEntries((j.events || []).map(e => [e.id, e]));
+  const bad = Object.entries(j.feeds || {}).filter(([k, v]) => !v.ok);
+  $("feedBanner").hidden = !bad.length; $("feedBanner").innerHTML = bad.map(([k, v]) => `\u26A0 ${esc({bands:"Traffic speed bands", incidents:"Traffic incidents", roadworks:"Road works", rain:"Rainfall", routes:"Bus routes"}[k] || k)} feed unavailable${v.error ? ": " + esc(v.error) : ""}. Its alerts are held, not cleared.`).join("<br>");
+  setLive(bad.length ? "warn" : "ok", bad.length ? "Some feeds unavailable" : "Live Data (LTA DataMall)", "Last refresh " + (j.updated || "?"));
+  $("engine").textContent = "Engine " + j.model + " \u00b7 " + j.updates + " updates";
+  if(S.sel && !(j.rows || []).some(r => r.id === S.sel)) { S.sel = null; S.detail = null; }
+  if(!S.sel && (j.rows || []).length && !S.autoSelDone){ S.autoSelDone = true; }
+  renderCards(); renderTable(); drawMap(); renderDetailAll();
+  schedule(Math.min(30, j.refresh_s || 60));
+  if(S.sel) loadDetail();
+}
+function schedule(s){ S.next = Date.now() + s * 1000; clearTimeout(S.timer); S.timer = setTimeout(() => load(false), s * 1000); }
+setInterval(() => { const e = $("cdown"); if(e) e.textContent = "Auto refresh in " + Math.max(0, Math.round((S.next - Date.now()) / 1000)) + "s"; }, 1000);
+
+/* ---------------------------------------------------------------- cards */
+function renderCards(){
+  const d = S.data, c = d.cards, hz = {0:"current", 30:"next 30 min", 60:"next 60 min", 120:"next 120 min"}[S.hor] || "current";
+  const wx = (d.events || []).find(e => e.kind === "weather");
+  const mk = (k, ic, title, sub, extra) => `<button type="button" class="sc k-${k}" data-k="${k}" aria-pressed="${S.kinds.has(k)}" aria-label="${esc(title)}: ${c[k].events}. Click to filter."><span class="ic">${ic}</span><span><span class="n">${c[k].events}</span> <span class="t">${title}</span><br><span class="s">${sub}</span>${extra || ""}</span></button>`;
+  const dl = k => c[k].vs_last_hour ? `<br><span class="d">${c[k].vs_last_hour > 0 ? "\u2191" : "\u2193"} ${Math.abs(c[k].vs_last_hour)} vs last hour</span>` : `<br><span class="s">No change</span>`;
+  $("cards").innerHTML =
+    mk("congestion", "\u{1F697}", "Congestion Zones", `Affecting ${c.congestion.services} services`, dl("congestion")) +
+    mk("incident", "\u26A0\uFE0F", "Incidents", `Affecting ${c.incident.services} services`, dl("incident")) +
+    mk("roadworks", "\u{1F6A7}", "Road Works", `Affecting ${c.roadworks.services} services`, dl("roadworks")) +
+    mk("weather", "\u{1F327}\uFE0F", "Weather Alert", wx ? esc(`${wx.level === "heavy" ? "Heavy" : "Moderate"} rain (${wx.name})`) : "No active rain area", `<br><span class="s">Affecting ${c.weather.services} services</span>`) +
+    `<div class="sc k-total"><span class="ic">\u{1F68C}</span><span><span class="n">${d.total.services}</span> <span class="t">Services Potentially Affected</span><br><span class="s">(${hz}) \u00b7 ${d.total.unacknowledged} unacknowledged</span></span></div>` +
+    `<div class="sc k-upd"><span class="s">Last updated</span><b style="font-size:17px">${esc(d.updated || "\u2013")}</b><span class="s" id="cdown">Auto refresh in \u2026</span><button class="btn sm" id="btnRef" type="button">\u21BB Refresh now</button></div>`;
+  $("cards").querySelectorAll("button.sc").forEach(b => b.onclick = () => { const k = b.dataset.k; if(S.kinds.size === 1 && S.kinds.has(k)) KINDS.forEach(x => S.kinds.add(x)); else S.kinds = new Set([k]); syncTypeBtns(); saveF(); load(); });
+  $("btnRef").onclick = () => load(true);
+}
+
+/* ---------------------------------------------------------------- work queue */
+const typeLabel = r => r.kind === "weather" ? (r.level_detail === "heavy" ? "Heavy rain" : "Moderate rain") : r.kind === "roadworks" ? "Road Works" + (r.planned ? ` (in ${r.starts_in_min} min)` : "") : KLAB[r.kind];
+function facts(r){
+  if(r.kind === "congestion") return `${f1(r.length_km)} km \u00b7 ${f1(r.speed_kmh)} km/h \u00b7 ${Math.round(r.duration_min)} min`;
+  if(r.kind === "weather") return `${f1(r.route_pct)}% of route in the rain area \u00b7 potential impact`;
+  if(r.kind === "roadworks"){ const e = S.ev[r.event]; return e && e.end_date ? "until " + e.end_date : "End time unavailable"; }
+  const e = S.ev[r.event]; return e && e.reported ? "reported " + e.reported : `${Math.round(r.duration_min)} min`;
+}
+function actionCell(r){
+  if(r.status === "new") return (r.worsened ? `<span class="st worse">\u{1F534} CONDITION WORSENED</span>` : "") + `<button class="ack" type="button" data-ack="${esc(r.id)}">Acknowledge</button>`;
+  const t = {acknowledged:`\u{1F535} ACKNOWLEDGED \u2014 ${r.acked_hhmm || ""}`, monitoring:`\u{1F535} MONITORING \u2014 ack ${r.acked_hhmm || ""}`, improving:`\u{1F7E2} IMPROVING \u2014 ack ${r.acked_hhmm || ""}`, cleared:"CLEARED"}[r.status];
+  return `<span class="st ${r.status}" title="${esc(r.acked_by ? "Acknowledged by " + r.acked_by : "")}">${t}</span>`;
+}
+function visibleRows(){ const q = S.q; return (S.data.rows || []).filter(r => !q || `${r.svc} ${r.location} ${typeLabel(r)}`.toLowerCase().includes(q)); }
+function renderTable(){
+  if(!S.data) return;
+  const rows = visibleRows(), show = rows.slice(0, S.shown);
+  $("qTitle").textContent = "Affected services (" + ({0:"current", 30:"next 30 min", 60:"next 60 min", 120:"next 120 min"}[S.hor]) + ")";
+  $("qTab").innerHTML = `<thead><tr><th>Risk</th><th>Service</th><th>Affected by</th><th>Location / section</th><th>Est. delay</th><th>Action</th></tr></thead><tbody>` + (show.map(r => `<tr class="al ${S.sel === r.id ? "sel" : ""}" data-id="${esc(r.id)}" tabindex="0"><td><span class="dotr lv-${r.level}" title="${esc(r.level)} (score ${r.score})"></span></td><td><b>${esc(r.svc)}</b> <span class="sub">Dir ${r.dir}</span></td><td><span class="ty">${KIC[r.kind]} ${esc(typeLabel(r))}</span></td><td class="loc"><b>${esc(r.location)}</b><small>${esc(facts(r))}</small></td><td>${r.delay_min != null ? `<b>+${f1(r.delay_min)} min</b>` : `<span class="sub">\u2014</span>`}</td><td>${actionCell(r)}</td></tr>`).join("") || `<tr><td colspan="6" class="msg">No disruption currently affects the selected services.</td></tr>`) + `</tbody>`;
+  $("qCount").textContent = rows.length ? `1\u2013${show.length} of ${rows.length} alert${rows.length === 1 ? "" : "s"}` : "";
+  $("qMore").style.display = rows.length > show.length ? "" : "none";
+  $("btnAckAll").disabled = !rows.some(r => r.status === "new");
+  $("qTab").querySelectorAll("tr.al").forEach(tr => { const go = () => selectAlert(tr.dataset.id); tr.onclick = go; tr.onkeydown = e => { if(e.key === "Enter"){ e.preventDefault(); go(); } }; });
+  $("qTab").querySelectorAll("button.ack").forEach(b => b.onclick = e => { e.stopPropagation(); askAck([b.dataset.ack], "this alert"); });
+}
+$("qMore").onclick = e => { e.preventDefault(); S.shown += 10; renderTable(); };
+$("btnAckAll").onclick = () => { const ids = visibleRows().filter(r => r.status === "new").map(r => r.id); if(ids.length) askAck(ids, `${ids.length} active alert${ids.length === 1 ? "" : "s"} affecting ${S.svc.length ? "the selected services (" + S.svc.join(", ") + ")" : "all services in the current view"}`); };
+function selectAlert(id){ S.sel = id; S.detail = null; S.curhw = ""; renderTable(); renderDetailAll(); drawMap(); loadDetail(true); }
+
+/* ---------------------------------------------------------------- acknowledge */
+let pendingAck = null;
+function askAck(ids, what){
+  pendingAck = ids; $("mTitle").textContent = ids.length > 1 ? "Acknowledge all" : "Acknowledge alert";
+  $("mBody").innerHTML = `<p>Acknowledge ${esc(what)}?</p><p class="ho-note">The alert stays in the list (marked acknowledged) and is raised again if the condition worsens.</p>`;
+  $("mBy").value = S.by; $("ov").hidden = false; $("mBy").focus();
+}
+$("mNo").onclick = () => { $("ov").hidden = true; pendingAck = null; };
+$("ov").addEventListener("keydown", e => { if(e.key === "Escape") $("mNo").click(); if(e.key === "Enter" && e.target.id === "mBy") $("mYes").click(); });
+$("mYes").onclick = async () => {
+  const by = $("mBy").value.trim(); if(!by){ $("mBy").focus(); toast("Enter who is acknowledging."); return; }
+  S.by = by; LS.set("tr.by", by); const ids = pendingAck || []; $("ov").hidden = true; pendingAck = null;
+  const j = await postJSON("/api/traffic/ack", {alerts:ids, by});
+  if(j.error){ toast(j.error); return; }
+  toast(`Acknowledged ${j.acked} alert${j.acked === 1 ? "" : "s"} \u2014 ${by}`); S.shown = Math.max(S.shown, Math.min(40, (S.data.rows || []).length)); load(false);          // an acknowledged alert moves below the new ones: keep it in view
+};
+
+/* ---------------------------------------------------------------- map */
+const M = {map:null, g:null};
+function initMap(){
+  if(M.map || typeof L === "undefined") return;
+  M.map = L.map("trMap", {zoomControl:true, attributionControl:false, minZoom:10, maxZoom:19}).setView([1.3521, 103.8198], 12);
+  const AO = `<a href="https://www.onemap.gov.sg/" target="_blank" rel="noopener">OneMap</a> | \u00a9 ${new Date().getFullYear()} Singapore Land Authority`, AS = "Basemap \u00a9 OpenStreetMap contributors (OneMap unavailable)", m = M.map;
+  const om = L.tileLayer("https://www.onemap.gov.sg/maps/tiles/Default/{z}/{x}/{y}.png", {minZoom:10, maxZoom:19, attribution:AO}).addTo(m); let ok = 0, bad = 0, sw = false;
+  om.on("tileload", () => { ok++; }); om.on("tileerror", () => { bad++; if(!sw && ok === 0 && bad >= 4){ sw = true; m.removeLayer(om); L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {minZoom:10, maxZoom:19, attribution:AS}).addTo(m); } });
+  L.control.attribution({position:"bottomleft", prefix:false}).addTo(m);
+  [["wx", 405], ["cong", 410], ["route", 420], ["pts", 440], ["bus", 450]].forEach(([n, z]) => { m.createPane(n).style.zIndex = z; });      // custom panes must exist before a layer uses them
+  M.g = {wx:L.layerGroup(), cong:L.layerGroup(), route:L.layerGroup(), pts:L.layerGroup(), bus:L.layerGroup()};
+  Object.values(M.g).forEach(g => g.addTo(m));
+}
+const spdColor = k => { const p = (S.data && S.data.params) || {very_slow_kmh:20, congest_kmh:30, normal_kmh:40}; return k < p.very_slow_kmh ? "#e0101f" : k < p.congest_kmh ? "#ff9f1c" : k < p.normal_kmh ? "#ffd23f" : "#22d36a"; };
+const icon = (cls, txt, sz) => L.divIcon({className:"", iconSize:[sz || 26, sz || 26], iconAnchor:[(sz || 26) / 2, (sz || 26) / 2], html:`<div class="${cls}">${txt}</div>`});
+function selEventId(){ const r = S.data && S.sel ? (S.data.rows || []).find(x => x.id === S.sel) : null; return r ? r.event : null; }
+function evBounds(e){
+  const pts = [];
+  if(e.kind === "congestion") (e.segments || []).forEach(s => { pts.push([s[0], s[1]], [s[2], s[3]]); });
+  else if(e.lat != null) pts.push([e.lat, e.lon]);
+  return pts;
+}
+function drawMap(fit){
+  if(!S.data) return; initMap(); if(!M.map) return;
+  Object.values(M.g).forEach(g => g.clearLayers());
+  const sel = selEventId();
+  (S.data.events || []).forEach(e => {
+    if(e.kind === "congestion"){
+      if(e.id === sel) (e.segments || []).forEach(s => L.polyline([[s[0], s[1]], [s[2], s[3]]], {color:"#ffffff", weight:14, opacity:.35, interactive:false, pane:"cong"}).addTo(M.g.cong));
+      (e.segments || []).forEach(s => L.polyline([[s[0], s[1]], [s[2], s[3]]], {color:spdColor(s[4]), weight:7, opacity:.95, pane:"cong"}).on("click", () => selectEvent(e.id))
+        .bindPopup(`<b>${esc(e.road)}</b><br>${esc(e.from_)} \u2192 ${esc(e.to)}<br>${f1(e.length_km)} km \u00b7 avg ${f1(e.avg_kmh)} km/h (normal ${f1(e.ref_kmh)})<br>since ${esc(e.start)} \u00b7 services ${esc((e.services || []).slice(0, 12).join(", "))}`).addTo(M.g.cong));
+    } else if(e.kind === "weather"){
+      L.circle([e.lat, e.lon], {radius:(e.radius_km || 2) * 1000, color:"#3b82f6", weight:1, fillColor:"#3b82f6", fillOpacity:.14, pane:"wx", interactive:false}).addTo(M.g.wx);
+      L.marker([e.lat, e.lon], {icon:icon("tinfo ti-weather", "\u{1F327}"), pane:"pts"}).on("click", () => selectEvent(e.id)).bindPopup(`<b>${e.level === "heavy" ? "Heavy" : "Moderate"} rain \u2013 ${esc(e.name)}</b><br>${e.n} gauge(s), max ${f1(e.max_mm)} mm<br>Potential operational impact on ${esc((e.services || []).slice(0, 12).join(", "))}`).addTo(M.g.pts);
+    } else if(e.lat != null){
+      const inc = e.kind === "incident";
+      L.marker([e.lat, e.lon], {icon:icon("tinfo " + (inc ? "ti-incident" : "ti-roadworks"), inc ? "!" : "\u{1F6A7}"), pane:"pts"}).on("click", () => selectEvent(e.id))
+        .bindPopup(inc ? `<b>${esc(e.type || "Incident")}</b><br>${esc(e.message)}<br>${e.reported ? "Reported " + esc(e.reported) : "Report time not given by the source"}<br>Nearby services: ${esc((e.services || []).slice(0, 14).join(", "))}`
+                       : `<b>Road works \u2013 ${esc(e.road)}</b><br>Start ${esc(e.start_date || "?")}<br>${e.end_date ? "Expected end " + esc(e.end_date) : "End time unavailable"}<br>${esc(e.other || "")}<br>Nearby services: ${esc((e.services || []).slice(0, 14).join(", "))}`).addTo(M.g.pts);
+    }
+  });
+  (S.data.events || []).filter(e => e.kind === "congestion").sort((a, b) => a.avg_kmh - b.avg_kmh).slice(0, 4).forEach(e => L.marker(e.center, {icon:L.divIcon({className:"", iconSize:[0, 0], iconAnchor:[0, 0], html:`<div class="evl">${esc(e.road)} \u00b7 ${f1(e.avg_kmh)} km/h</div>`}), interactive:false, keyboard:false, pane:"pts"}).addTo(M.g.pts));
+  drawRoute();
+  applyLayers();
+  if(fit !== false && (fit || !S.mapFit)) fitAll();
+}
+function fitAll(){
+  if(!M.map || !S.data) return; const sel = selEventId(), evs = S.data.events || [], use = sel && S.ev[sel] ? [S.ev[sel]] : evs, pts = [];
+  use.forEach(e => pts.push(...evBounds(e)));
+  if(pts.length){ M.map.fitBounds(L.latLngBounds(pts), {padding:[50, 50], maxZoom:16}); S.mapFit = true; }
+}
+function applyLayers(){
+  if(!M.map) return;
+  const on = {cong:$("lyCong").checked, wx:$("lyWx").checked, route:$("lyRoute").checked, bus:$("lyRoute").checked};
+  Object.entries(on).forEach(([k, v]) => { if(v) M.map.addLayer(M.g[k]); else M.map.removeLayer(M.g[k]); });
+  if($("lyInc").checked && $("lyRw").checked) M.map.addLayer(M.g.pts); else { M.map.removeLayer(M.g.pts); }
+}
+["lyCong", "lyInc", "lyRw", "lyWx", "lyRoute"].forEach(id => $(id).onchange = () => { if(id === "lyInc" || id === "lyRw") drawMap(false); else applyLayers(); });
+$("legTog").onclick = () => { const o = $("legBody").hidden; $("legBody").hidden = !o; $("legTog").setAttribute("aria-expanded", String(o)); };
+if(window.innerWidth < 700){ $("legBody").hidden = true; $("legTog").setAttribute("aria-expanded", "false"); }
+$("btnFit").onclick = () => { S.mapFit = false; fitAll(); };
+function selectEvent(id){ const rows = (S.data.rows || []).filter(r => r.event === id); if(!rows.length) return; const cur = rows.find(r => r.id === S.sel); selectAlert((cur || rows[0]).id); }
+async function drawRoute(){
+  M.g.route.clearLayers(); M.g.bus.clearLayers();
+  const r = S.data && S.sel ? (S.data.rows || []).find(x => x.id === S.sel) : null; if(!r) return;
+  const key = r.svc + "|" + r.dir; let rt = S.routes[key];
+  if(!rt){ rt = await getJSON(`/api/traffic/route?service=${encodeURIComponent(r.svc)}&direction=${r.dir}`, 30000); S.routes[key] = rt; if(S.sel !== r.id) return; M.g.route.clearLayers(); }
+  if(rt && rt.line && rt.line.length > 1) L.polyline(rt.line, {color:"#3cc8ff", weight:3, opacity:.9, dashArray:"8 7", interactive:false, pane:"route"}).addTo(M.g.route);
+  const d = S.detail;
+  if(d && d.buses && d.alert && d.alert.id === S.sel) d.buses.forEach(b => { if(b.lat == null) return; L.marker([b.lat, b.lon], {icon:icon("busm bm-" + b.state, b.id, 22), pane:"bus", interactive:false, keyboard:false}).addTo(M.g.bus); });
+}
+
+/* ---------------------------------------------------------------- selected alert */
+async function loadDetail(first){
+  if(!S.sel) return; const tok = ++S.dtok, id = S.sel;
+  const j = await getJSON("/api/traffic/detail?alert=" + encodeURIComponent(id) + (S.curhw ? "&current_hw=" + encodeURIComponent(S.curhw) : ""), 90000);
+  if(tok !== S.dtok || id !== S.sel) return;
+  S.detail = j.error ? {error:j.error} : j;
+  renderDetailAll(); drawRoute();
+}
+const fact = (k, v) => `<dt>${k}</dt><dd>${v}</dd>`;
+function stripSvg(a, buses){
+  const W = 520, H = 92, L0 = 14, R0 = 14, km = a.route_km || 1, X = k => L0 + (W - L0 - R0) * Math.max(0, Math.min(1, k / km));
+  let s = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Buses relative to the disruption"><line x1="${L0}" x2="${W - R0}" y1="46" y2="46" stroke="#5b7796" stroke-width="4" stroke-linecap="round"/>`;
+  s += `<rect x="${X(a.a_km).toFixed(1)}" y="38" width="${Math.max(6, X(a.b_km) - X(a.a_km)).toFixed(1)}" height="16" rx="6" fill="#e0101f" opacity=".9"/><text x="${((X(a.a_km) + X(a.b_km)) / 2).toFixed(1)}" y="30" fill="#ff9aa0" font-size="11" font-weight="700" text-anchor="middle">${a.kind === "congestion" ? "congestion" : a.kind === "weather" ? "rain area" : "disruption"}</text>`;
+  (buses || []).forEach(b => { const c = {approaching:"#ffd23f", inside:"#ff4d55", cleared:"#22d36a"}[b.state]; s += `<circle cx="${X(b.pos_km).toFixed(1)}" cy="46" r="9" fill="${c}" stroke="#fff" stroke-width="1.5"/><text x="${X(b.pos_km).toFixed(1)}" y="50" fill="#04121f" font-size="10" font-weight="800" text-anchor="middle">${esc(b.id)}</text>`; });
+  s += `<text x="${L0}" y="${H - 8}" fill="#8ba3bd" font-size="11">start</text><text x="${W - R0}" y="${H - 8}" fill="#8ba3bd" font-size="11" text-anchor="end">interchange (end of route) \u25B6</text></svg>`;
+  return s;
+}
+function renderDetail(){
+  const box = $("detail"), d = S.detail;
+  if(!S.sel){ box.innerHTML = `<h2>Selected alert details</h2><div class="msg">Select an alert in the list to see the whole disruption, the buses approaching it and the predicted headway.</div>`; return; }
+  if(!d){ box.innerHTML = `<h2>Selected alert details</h2><div class="msg">Loading\u2026</div>`; return; }
+  if(d.error){ box.innerHTML = `<h2>Selected alert details</h2><div class="msg hx-err">${esc(d.error)}</div>`; return; }
+  const a = d.alert, e = d.event; let f = "";
+  if(e.kind === "congestion") f = fact("Current speed", `<span style="color:#ff8a90">${f1(e.avg_kmh)} km/h</span> <span class="sub">(lowest link ${f1(e.min_kmh)})</span>`) + fact("Normal speed", `${f1(e.ref_kmh)} km/h`) + fact("Extent", `${f1(e.length_km)} km (whole stretch)`) + fact("Start time", esc(e.start)) + fact("Duration so far", `${Math.round(a.duration_min)} min`)
+    + fact("Affected route", `${f1(a.route_pct)}% (${f1(a.overlap_km)} of ${f1(a.route_km)} km) \u2013 Svc ${esc(a.svc)} Dir ${a.dir}`) + fact("Est. traffic delay", a.delay_min != null ? `+${f1(a.delay_min)} min <span class="sub">(estimated, not actual lateness)</span>` : "\u2013") + fact("Source", "LTA Traffic Speed Bands");
+  else if(e.kind === "incident") f = fact("Type", esc(e.type || "Incident")) + fact("Reported", e.reported ? esc(e.reported) : `<span class="sub">not given by the source</span>`) + fact("Details", esc(e.message || "\u2013")) + fact("Direction", `<span class="sub">not given by the source \u2013 both directions near it are listed</span>`) + fact("Status", "Active") + fact("Source", "LTA Traffic Incidents");
+  else if(e.kind === "roadworks") f = fact("Road", esc(e.road)) + fact("Start", esc(e.start_date || "\u2013")) + fact("Expected end", e.end_date ? esc(e.end_date) : `<span class="sub">End time unavailable</span>`) + fact("Notes", esc(e.other || "\u2013")) + fact("Source", "LTA Road Works");
+  else f = fact("Condition", `${e.level === "heavy" ? "Heavy" : "Moderate"} rain`) + fact("Area", esc(e.name)) + fact("Rain gauges", `${e.n}${e.stations ? " (" + esc(e.stations.slice(0, 4).join(", ")) + ")" : ""}`) + fact("Highest reading", `${f1(e.max_mm)} mm`) + fact("Route in the area", `${f1(a.route_pct)}% of Svc ${esc(a.svc)} Dir ${a.dir}`) + fact("Impact", `<span class="sub">Potential operational impact \u2013 not a confirmed delay</span>`) + fact("Source", "NEA rainfall (data.gov.sg)");
+  const buses = (d.buses || []).map(b => `<li><b>Bus ${esc(b.id)}</b> \u00b7 <span class="b-${b.state}">${b.state}</span> \u00b7 ${b.state === "approaching" ? `enters in ~${Math.round(b.tti_min)} min (${f1(b.dist_to_km)} km)` : b.state === "inside" ? "already inside" : "cleared"}${b.delay_min ? ` \u00b7 est. +${f1(b.delay_min)} min` : ""}</li>`).join("");
+  box.innerHTML = `<div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start"><h2 style="margin:0">${KIC[e.kind]} ${esc(e.location)}</h2><span class="pill ${e.kind}">${KLAB[e.kind]}</span></div><div class="sub">Alert ${esc(a.id)} \u00b7 Svc ${esc(a.svc)} Dir ${a.dir}${a.status === "new" ? "" : " \u00b7 " + a.status}</div>
+    <dl class="facts">${f}</dl>
+    <div class="sub">Affected services</div><div class="svcchips">${(d.affected_services || []).map(x => `<span>${esc(x.svc)} <small>D${x.dir}</small></span>`).join("")}</div>
+    <div class="sub" style="margin-top:10px">Buses on Svc ${esc(a.svc)} Dir ${a.dir} relative to the disruption</div>
+    <div class="strip">${stripSvg(a, d.buses)}</div>${buses ? `<ul class="buses">${buses}</ul>` : `<div class="ho-note">${esc(d.buses_note || "No live buses could be placed on this route right now.")}</div>`}
+    <div style="margin-top:8px"><button class="btn sm" id="btnView" type="button">View on map</button></div>`;
+  $("btnView").onclick = () => { S.mapFit = false; fitAll(); $("trMap").scrollIntoView({behavior:"smooth", block:"center"}); };
+}
+function chartSvg(ch, lab){
+  const W = 520, H = 236, l = 40, r = 12, t = 20, b = 36, xs = ch.x, x0 = Math.min(ch.now, xs[0]) - 2, x1 = Math.max(...xs, ch.to) + 4;
+  const ymax = Math.max(ch.sched * 2, ...ch.noadj, ...(ch.reg || [0])) + 2, X = v => l + (W - l - r) * (v - x0) / Math.max(1, x1 - x0), Y = v => t + (H - t - b) * (1 - v / ymax);
+  let s = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Predicted departure headway at the interchange">`;
+  const ys = []; for(let v = 0; v <= ymax; v += ymax > 30 ? 10 : 5) ys.push(v);
+  ys.forEach(v => { s += `<line x1="${l}" x2="${W - r}" y1="${Y(v).toFixed(1)}" y2="${Y(v).toFixed(1)}" stroke="#163250"/><text x="${l - 6}" y="${(Y(v) + 4).toFixed(1)}" fill="#8ba3bd" font-size="11" text-anchor="end">${v}</text>`; });
+  const step = x1 - x0 > 120 ? 30 : 15; for(let v = Math.ceil(x0 / step) * step; v <= x1; v += step) s += `<text x="${X(v).toFixed(1)}" y="${H - 14}" fill="#8ba3bd" font-size="11" text-anchor="middle">${hm(v)}</text>`;
+  s += `<rect x="${X(ch.from).toFixed(1)}" y="${t}" width="${Math.max(4, X(ch.to) - X(ch.from)).toFixed(1)}" height="${H - t - b}" fill="#ff4d55" opacity=".13"/><text x="${((X(ch.from) + X(ch.to)) / 2).toFixed(1)}" y="${t + 12}" fill="#ff9aa0" font-size="11" text-anchor="middle">${esc(lab || "Impact period")}</text>`;
+  s += `<line x1="${X(ch.now).toFixed(1)}" x2="${X(ch.now).toFixed(1)}" y1="${t}" y2="${H - b}" stroke="#eaf3ff" stroke-dasharray="2 3" opacity=".7"/><text x="${X(ch.now).toFixed(1)}" y="${t - 5}" fill="#eaf3ff" font-size="11" text-anchor="middle">now</text>`;
+  s += `<line x1="${l}" x2="${W - r}" y1="${Y(ch.sched).toFixed(1)}" y2="${Y(ch.sched).toFixed(1)}" stroke="#eaf3ff" stroke-dasharray="6 5" opacity=".85"/>`;
+  const line = (arr, col) => `<polyline points="${arr.map((v, i) => X(xs[i]).toFixed(1) + "," + Y(v).toFixed(1)).join(" ")}" fill="none" stroke="${col}" stroke-width="2.4"/>` + arr.map((v, i) => `<circle cx="${X(xs[i]).toFixed(1)}" cy="${Y(v).toFixed(1)}" r="3.6" fill="${col}"/>`).join("");
+  s += line(ch.noadj, "#ff4d55"); if(ch.reg) s += line(ch.reg, "#22d36a");
+  const mi = ch.noadj.indexOf(Math.max(...ch.noadj)), up = ch.noadj[mi] - ch.sched;
+  if(up >= 1) s += `<text x="${X(xs[mi]).toFixed(1)}" y="${(Y(ch.noadj[mi]) - 8).toFixed(1)}" fill="#ff9aa0" font-size="12" font-weight="800" text-anchor="middle">+${f1(up)} min</text>`;
+  return s + "</svg>";
+}
+function renderImpact(){
+  const box = $("impact"), d = S.detail, pairs = []; const seen = new Set();
+  ((S.data && S.data.rows) || []).forEach(r => { const k = r.svc + "|" + r.dir; if(!seen.has(k) && pairs.length < 80){ seen.add(k); pairs.push([r.svc, r.dir, k]); } });
+  const cur = d && d.alert ? d.alert.svc + "|" + d.alert.dir : "";
+  const head = `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><h2 style="margin:0">Impact on headway</h2>${pairs.length ? `<label class="sub">Service <select class="sel" id="impSvc" style="min-width:110px;padding:4px 8px;min-height:30px">${pairs.map(p => `<option value="${esc(p[2])}" ${p[2] === cur ? "selected" : ""}>${esc(p[0])} Dir ${p[1]}</option>`).join("")}</select></label>` : ""}</div>`;
+  let body;
+  if(!S.sel) body = `<div class="msg">No alert selected.</div>`;
+  else if(!d) body = `<div class="msg">Loading\u2026</div>`;
+  else if(d.error) body = `<div class="msg hx-err">${esc(d.error)}</div>`;
+  else if(!d.chart) body = `<div class="msg">Predicted headway needs at least 3 live buses placed on Svc ${esc(d.alert.svc)} Dir ${d.alert.dir}${d.buses && d.buses.length ? ` (${d.buses.length} found)` : ""}. ${d.impact ? "" : "Check again at the next refresh."}</div>`;
+  else {
+    const im = d.impact;
+    body = `${im.deterioration ? `<div class="banner" style="background:#3a0f18;border-color:#7a2a33;color:#ffb3b8"><b>\u{1F534} HEADWAY DETERIORATION EXPECTED</b> \u2013 Svc ${esc(d.alert.svc)} Dir ${d.alert.dir}: ${im.affected} bus(es) affected, predicted maximum headway ${f1(im.max_pred)} min (scheduled ${f1(im.sched_hw)}).</div>` : `<div class="ho-note" style="margin:4px 0">No headway deterioration is predicted from this disruption yet.</div>`}
+      <div class="chartbox">${chartSvg(d.chart, {congestion:"Congestion impact period", incident:"Incident period", roadworks:"Road works period", weather:"Rain period"}[d.alert.kind])}</div>${d.alert.delay_min == null ? `<div class="ho-note">No delay is estimated for this type of disruption, so the lines show the current predicted headway (potential impact only).</div>` : ""}
+      <div class="ho-note"><span style="color:#eaf3ff">- - -</span> Scheduled HW ${f1(d.sched_hw)} min &nbsp; <span style="color:#ff4d55">\u25CF</span> Predicted HW, no adjustment &nbsp; <span style="color:#22d36a">\u25CF</span> With regulation (simulated). Departure headways at the interchange. Scheduled HW: ${esc(d.sched_hw_src || "")}.</div>`;
+  }
+  box.innerHTML = head + body;
+  const sel = $("impSvc"); if(sel) sel.onchange = () => { const r = (S.data.rows || []).find(x => x.svc + "|" + x.dir === sel.value); if(r) selectAlert(r.id); };
+}
+function renderReco(){
+  const box = $("reco"), d = S.detail;
+  if(!S.sel){ box.innerHTML = `<h2>Recommended actions</h2><div class="msg">No alert selected.</div>`; return; }
+  if(!d){ box.innerHTML = `<h2>Recommended actions</h2><div class="msg">Loading\u2026</div>`; return; }
+  if(d.error){ box.innerHTML = `<h2>Recommended actions</h2><div class="msg hx-err">${esc(d.error)}</div>`; return; }
+  const recs = (d.recommendations || []).map((r, i) => `<li><span class="no">${i + 1}</span><span>${esc(r.text)}<small>${esc(r.basis)}</small></span></li>`).join("");
+  const rs = d.restore;
+  box.innerHTML = `<h2>Recommended actions</h2><div class="sub">Rule / simulation based \u2013 each action shows the numbers behind it (no confidence percentage).</div><ol class="reco">${recs}</ol>
+    <div class="fl" style="margin-top:6px"><label for="curHw">Temporary headway in force (min) \u2013 to check when to restore the original</label><div style="display:flex;gap:6px"><input class="inp" id="curHw" inputmode="decimal" style="min-width:90px;width:110px" value="${esc(S.curhw)}" placeholder="e.g. 13"><button class="btn sm" id="btnRe" type="button">Re-check</button></div></div>
+    ${rs && S.curhw ? `<div class="ho-note" style="margin-top:6px">${rs.restore ? "\u{1F7E2} Recovery detected." : esc(rs.reason || "")}</div>` : ""}
+    <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap"><a class="btn sm" href="/halfway" style="text-decoration:none">Halfway Optimiser</a><a class="btn sm" href="/control" style="text-decoration:none">Headway Control</a></div>`;
+  $("btnRe").onclick = () => { S.curhw = $("curHw").value.trim(); loadDetail(); };
+  $("curHw").onkeydown = e => { if(e.key === "Enter") $("btnRe").click(); };
+}
+function renderDetailAll(){ renderDetail(); renderImpact(); renderReco(); }
+
+/* ---------------------------------------------------------------- settings */
+const TRLAB = {
+  very_slow_kmh:["Very slow below","km/h"], congest_kmh:["Congested (slow) below","km/h"], normal_kmh:["Normal from","km/h"], min_len_m:["Minimum congestion length","m"], persist_updates:["Persistence before alert","updates in a row"], clear_updates:["Clear condition","normal updates in a row"],
+  persist_new_data_only:["Count only new LTA snapshots (1 = yes)","0 / 1"], refresh_s:["Refresh","seconds"], join_gap_m:["Join slow links on the same road within","m"], join_gap_other_m:["Join links on different roads only where they meet, within","m"], join_angle:["... and running the same way within","degrees"],
+  ref_A:["Normal speed: expressways (A)","km/h"], ref_B:["Normal speed: major arterial (B)","km/h"], ref_C:["Normal speed: arterial (C)","km/h"], ref_D:["Normal speed: minor arterial (D)","km/h"], ref_E:["Normal speed: small roads (E)","km/h"], ref_F:["Normal speed: slip roads (F)","km/h"], ref_default:["Normal speed: unknown category","km/h"],
+  match_m:["Route counts as on the disrupted road within","m"], match_angle:["... and travelling the same way within","degrees"], min_overlap_m:["Ignore overlaps shorter than","m"], sample_m:["Overlap measured every","m"], incident_m:["Incident affects routes within","m"], roadwork_m:["Road works affect routes within","m"], weather_km:["Rain affects route sections within","km"], rain_group_km:["Rain gauges closer than this form one area","km"], rain_mod_mm:["Moderate rain from","mm per reading"], rain_heavy_mm:["Heavy rain from","mm per reading"],
+  worse_speed_drop_pct:["Worsened: speed lower by","%"], worse_len_add_m:["Worsened: stretch longer by","m"], improve_pct:["Improving: speed higher by","%"], ack_updates:["Acknowledged stays before 'monitoring'","updates"], keep_cleared_min:["Keep cleared alerts","min"],
+  bus_run_kmh:["Assumed bus running speed (time to impact)","km/h"], restore_last_pct:["Recovery checked in the last part of the trip","%"], recover_tol_pct:["Headway recovered when within","% of scheduled"], reg_hold_max:["Regulation: most a departure may be stretched","min"], reg_deps:["Regulation: departures that may be stretched","departures"], min_layover_min:["Minimum layover at the interchange","min"], hw_worse_min:["Deterioration expected when headway is above scheduled by","min"],
+  w_speed:["Priority weight: traffic severity","%"], w_length:["Priority weight: affected route length","%"], w_buses:["Priority weight: number of buses","%"], w_hw:["Priority weight: expected headway impact","%"], w_duration:["Priority weight: duration","%"], crit_score:["Critical from score","0-100"], high_score:["High from score","0-100"], monitor_score:["Monitor from score","0-100"],
+  sev_incident:["Severity assumed for an incident","0-1"], sev_roadwork:["Severity assumed for road works","0-1"], sev_rain_mod:["Severity: moderate rain","0-1"], sev_rain_heavy:["Severity: heavy rain","0-1"]};
+const TRGRP = [["Congestion detection", ["very_slow_kmh", "congest_kmh", "normal_kmh", "min_len_m", "persist_updates", "clear_updates", "persist_new_data_only", "refresh_s", "join_gap_m", "join_gap_other_m", "join_angle"]],
+  ["Normal (reference) speeds by road category", ["ref_A", "ref_B", "ref_C", "ref_D", "ref_E", "ref_F", "ref_default"]],
+  ["Matching a disruption to bus services", ["match_m", "match_angle", "min_overlap_m", "sample_m", "incident_m", "roadwork_m", "weather_km", "rain_group_km", "rain_mod_mm", "rain_heavy_mm"]],
+  ["Alert lifecycle", ["worse_speed_drop_pct", "worse_len_add_m", "improve_pct", "ack_updates", "keep_cleared_min"]],
+  ["Buses, headway and regulation", ["bus_run_kmh", "restore_last_pct", "recover_tol_pct", "reg_hold_max", "reg_deps", "min_layover_min", "hw_worse_min"]],
+  ["Priority score (section 30)", ["w_speed", "w_length", "w_buses", "w_hw", "w_duration", "crit_score", "high_score", "monitor_score", "sev_incident", "sev_roadwork", "sev_rain_mod", "sev_rain_heavy"]]];
+async function loadSettings(){
+  const j = await getJSON("/api/traffic/settings", 20000); if(j.error){ $("sgMsg").textContent = j.error; return; }
+  S.set = j; let h = "<thead><tr><th>Setting</th><th>Value</th><th>Unit</th><th>Default</th></tr></thead><tbody>";
+  TRGRP.forEach(([g, keys]) => { h += `<tr class="grp"><td colspan="4">${esc(g)}</td></tr>`; keys.forEach(k => { const lab = TRLAB[k] || [k, ""], rg = j.ranges[k] || []; h += `<tr><td><label for="sg_${k}">${esc(lab[0])}</label></td><td><input class="inp" id="sg_${k}" data-k="${k}" inputmode="decimal" value="${esc(j.params[k])}" title="Allowed ${rg[0]} to ${rg[1]}"></td><td class="sub">${esc(lab[1])}</td><td class="sub">${esc(j.defaults[k])}</td></tr>`; }); });
+  $("sgTab").innerHTML = h + "</tbody>";
+  const ov = S.data, fd = ov ? ov.feeds || {} : {};
+  $("feedList").innerHTML = Object.entries(fd).map(([k, v]) => `<div>${v.ok ? "\u{1F7E2}" : "\u{1F534}"} <b>${esc(k)}</b> \u2013 ${v.ok ? "ok" : esc(v.error || "unavailable")} ${v.count != null ? "(" + v.count + ")" : v.segments != null ? "(" + v.segments + " links, " + (v.stretches || 0) + " stretches)" : ""}</div>`).join("") + `<div class="sub" style="margin-top:6px">Road works path: <code>${esc(j.roadworks_path)}</code> (set LTA_ROADWORKS_PATH if the DataMall guide names it differently).</div>`;
+  const lg = await getJSON("/api/traffic/log?limit=50", 20000);
+  $("logTab").innerHTML = `<thead><tr><th>Time</th><th>Alert</th><th>By</th></tr></thead><tbody>` + ((lg.acks || []).map(a => `<tr><td>${esc(a.time)}</td><td>${esc(a.alert)}</td><td>${esc(a.by)}</td></tr>`).join("") || `<tr><td colspan="3" class="sub">No acknowledgements yet.</td></tr>`) + `</tbody>`;
+}
+$("sgSave").onclick = async () => {
+  const p = {}; document.querySelectorAll("#sgTab input").forEach(i => { const v = i.value.trim(); if(v !== "" && String(S.set.params[i.dataset.k]) !== v) p[i.dataset.k] = v; });
+  if(!Object.keys(p).length){ $("sgMsg").textContent = "Nothing changed."; return; }
+  const j = await postJSON("/api/traffic/settings", {params:p}); $("sgMsg").textContent = j.error ? j.error : "Saved. Applies at the next refresh."; $("sgMsg").className = "ho-note" + (j.error ? " hx-err" : ""); if(!j.error) loadSettings();
+};
+$("sgReset").onclick = async () => { const j = await postJSON("/api/traffic/settings", {reset:true}); $("sgMsg").textContent = j.error ? j.error : "Defaults restored."; loadSettings(); };
+function showTab(t){ $("monitor").hidden = t !== "mon"; $("settings").hidden = t !== "set"; $("tabMon").setAttribute("aria-selected", String(t === "mon")); $("tabSet").setAttribute("aria-selected", String(t === "set"));
+  if(t === "set") loadSettings(); else setTimeout(() => { initMap(); if(M.map){ M.map.invalidateSize(); drawMap(false); } }, 120); }
+$("tabMon").onclick = () => showTab("mon"); $("tabSet").onclick = () => showTab("set");
+
+/* ---------------------------------------------------------------- start */
+(async function start(){
+  const sv = await getJSON("/api/traffic/services", 30000); S.all = sv.services || [];
+  initMap(); load(false);
+})();
+</script>
+</body>
+</html>

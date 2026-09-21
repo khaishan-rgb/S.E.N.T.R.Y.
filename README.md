@@ -1,7 +1,48 @@
-# SG Transport Pulse V10.3 — Route Traffic + Departure Adjustment + Bunching, Gap & Alerts + AI Halfway Optimiser
+# SG Transport Pulse V11.0 — Route Traffic + Departure Adjustment + Bunching, Gap & Alerts + AI Halfway Optimiser
 
 Live bus positions, live LTA traffic drawn directly on the bus route, and next arrivals per stop.
 FastAPI backend + a single-page Leaflet frontend (OneMap basemap, OpenStreetMap fallback).
+
+## V11.0 - Traffic-Aware Regulation (new page **/traffic**, nav button *Traffic-Aware*)
+
+Early-warning for the controller: **detect** congestion / incidents / road works / rain -> **which service and direction** they affect -> **acknowledge** -> monitor until clear, and (for the selected alert)
+**predict the headway** and **simulate a regulation**. Code layers (specification 29): `traffic.py` = detection, service impact, headway impact, regulation (pure functions, no network); `app.py` = feeds + `/api/traffic/*`; `traffic.html` = the page.
+
+* **Whole-stretch congestion.** Adjacent slow LTA links (< `congest_kmh` 30 km/h) become ONE stretch (links on the same road within 120 m, on different roads only where they meet), reported with road, start -> end
+  (named from the nearest bus stops), length, average / lowest speed, normal speed by road category (A 70 ... F 30), duration. Under 500 m is ignored. Drawn on the map as the whole stretch, coloured by speed
+  (Very slow < 20 red, Slow orange, Moderate yellow, Normal green). All thresholds are in Settings (stored in the database).
+* **One alert per event, stable id.** A jam must persist 3 updates before it is an alert (`persist_updates`) and is cleared after 3 normal updates (`clear_updates`). Its id (`CONGESTION-ORCHARD-001`) is given
+  when the alert is raised and never changes while it lasts, so refreshes never create duplicates; jams that come and go use no id numbers. A feed that fails is skipped (never read as "all clear").
+  Incidents, road works and rain are reported by the source, so they alert at once.
+* **Service AND direction.** Each stretch is matched to the bus routes running along it **the same way** (route within 70 m, bearing within 45 deg), giving affected route length and % of the route
+  (e.g. 2.8 km of 18.2 km = 15.4%). Incidents: routes within 300 m, both directions listed (the source gives no direction). Road works: by coordinates if the feed has them, else by the stops on that road name.
+  Rain: route sections within 3 km of a rain area; moderate rain from 0.5 mm, heavy from 1.5 mm per gauge reading; weather is a *potential operational impact*, never a delay. Noise (an event that touches no
+  bus route) is dropped.
+* **Work queue.** Risk, Svc, Dir, type, location + length / speed / duration, estimated delay (distance / current speed - distance / normal speed, labelled as an estimated traffic delay), status, **Acknowledge** and
+  **Acknowledge All** (only the alerts in the current view, with a confirmation). Sorted: unacknowledged, severity, number of services, duration. Priority score (traffic severity 25, route length 20, buses 20,
+  headway impact 25, duration 10; unknown parts are left out and the weights re-normalised) -> critical / high / monitor / normal, all configurable.
+* **Lifecycle.** NEW -> ACKNOWLEDGED (time and name recorded, the alert stays) -> MONITORING -> IMPROVING -> CLEARED. If it gets clearly worse after the acknowledgement (speed 25% lower or 1 km longer; rain
+  moderate -> heavy) it is raised again as **CONDITION WORSENED**. Acknowledgements are logged (`alert_acknowledgement` table) and survive a restart.
+* **Filters.** Services (multi-select: type `32, 33, 51`), direction, time horizon (Current / next 30 / 60 / 120 min: adds road works that start inside it), risk type, status (unacknowledged / acknowledged /
+  cleared), search; the summary cards filter the map and the table when clicked.
+* **Selected alert.** Facts of the disruption (only what the source gives: incidents show the source's message and "report time / direction not given"; road works show "End time unavailable" when the feed has no end),
+  the affected services, and the **buses of that service relative to it** (approaching with the time to impact, inside, cleared) from LTA Bus Arrival positions. **Impact on headway:** predicted arrivals at the
+  interchange with and without the estimated delay (a delayed bus holds up those behind it), the resulting headways vs the scheduled headway (Service Headway Master, else the LTA frequency band), and
+  *HEADWAY DETERIORATION EXPECTED* when the largest predicted headway is 3 min above scheduled. **Recommended actions** are rule / simulation based, each with its numbers (never a confidence percentage): stretch the next
+  departures (the simulator tries 0 ... 6 min on up to 3 on-time departures and keeps the best only if it lowers the largest headway by 1 min), monitor, and - if you enter the temporary headway in force - the
+  **restore original headway** check (buses in the last 15% of the trip back within the tolerance).
+* **API.** `/api/traffic/overview` (filters: `services, direction, horizon, types, status`), `/detail?alert=&current_hw=`, `/services`, `/route`, `POST /ack`, `/log`, `/settings` (GET / POST / reset). New tables:
+  `traffic_setting`, `traffic_state` (the event book), `alert_acknowledgement`. A background loop refreshes every `refresh_s` (60 s) when the LTA key is set; the page also refreshes.
+
+**What is approximate or not in this version**
+* **Road works feed:** the DataMall path is `RoadWorks` (override with `LTA_ROADWORKS_PATH`); I could not check it against the live API from here, so verify the path and field names (`RoadName`, `StartDate`, `EndDate`). If it fails,
+  the page shows the feed as unavailable and the other alerts carry on.
+* **Route geometry** for matching is the straight line between consecutive bus stops (70 m tolerance), not the road-snapped path, so a very curved road can be missed or over-matched. The speed-band feed changes about every
+  5 min, so 3 "updates" at a 60 s refresh is mostly a debounce; set `persist_new_data_only` = 1 to count only new LTA snapshots.
+* **Bus positions** come from LTA Bus Arrival (sampled stops, up to ~14 calls per selected service); the terminal arrival uses LTA's ETA when the bus is among the next three there, else an estimate at `bus_run_kmh`.
+  Fewer than 3 placed buses = no headway forecast (the page says so).
+* **Not built:** section 28 (temporary *shorter* headway for early running: it needs the timetable), NEA 2-hour forecast areas (the rain layer uses the live rain gauges), a watchlist, and any automatic notification.
+  Halfway deployment stays on its own page (linked from the recommendations). Decision support only: nothing is sent to buses.
 
 ## V10.3 - Run AI Optimisation decides: tick a disrupted trip + halfway + adjust, or adjust and continue service
 

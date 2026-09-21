@@ -104,7 +104,7 @@ tbody tr{cursor:pointer}tbody tr:hover{background:#0d2440}tbody tr.sel{backgroun
 <div class="app">
   <header class="top">
     <div class="brand"><div class="logo">&#128652;</div><div><h1>SG Transport Pulse</h1><p>Bus Bunching &amp; Headway Gap &bull; Detect earlier &bull; Prevent bunching &bull; Keep even headway</p></div></div>
-    <nav class="nav" aria-label="Pages"><a href="/">Route Traffic</a><a href="/control">Headway Control</a><a class="on" href="/bunching" aria-current="page">Bunching &amp; Gap</a><a href="/halfway">Halfway Optimiser</a></nav>
+    <nav class="nav" aria-label="Pages"><a href="/">Route Traffic</a><a href="/control">Headway Control</a><a class="on" href="/bunching" aria-current="page">Bunching &amp; Gap</a><a href="/halfway">Halfway Optimiser</a><a href="/traffic">Traffic-Aware</a></nav>
     <div class="hdr-right"><div id="clock">&nbsp;</div><div class="live" id="live"><span class="dot"></span><span id="liveText">Connecting&hellip;</span></div></div>
   </header>
   <div class="tabs" role="tablist"><button role="tab" id="tabDash" aria-selected="true">Dashboard</button><button role="tab" id="tabAlerts" aria-selected="false">Alerts<span class="tbadge" id="alBadge" hidden>0</span></button><button role="tab" id="tabSet" aria-selected="false">Settings</button></div>
@@ -163,7 +163,7 @@ tbody tr{cursor:pointer}tbody tr:hover{background:#0d2440}tbody tr.sel{backgroun
     <section class="card" style="margin-top:12px"><header><div><h2>Event log</h2><div class="sub" id="evSub">Bunching and long-headway events, logged only when they last long enough.</div></div><button class="btn sm" id="evExport" type="button">Export CSV</button></header><div class="tw" id="events"></div></section>
   </main>
 
-  <footer class="foot"><span>Sources: LTA DataMall (Bus Arrival, Bus Routes/Stops/Services, Traffic Speed Bands, Incidents), OneMap &nbsp;|&nbsp; Decision support only, not for operational use</span><span>SG Transport Pulse V10.3</span></footer>
+  <footer class="foot"><span>Sources: LTA DataMall (Bus Arrival, Bus Routes/Stops/Services, Traffic Speed Bands, Incidents), OneMap &nbsp;|&nbsp; Decision support only, not for operational use</span><span>SG Transport Pulse V11.0</span></footer>
 </div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>

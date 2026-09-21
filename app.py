@@ -19,8 +19,9 @@ from fastapi import FastAPI, Query, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 
 import headway
+import traffic
 
-VERSION = "V10.3"
+VERSION = "V11.0"
 LTA = os.getenv("LTA_BASE", "https://datamall2.mytransport.sg/ltaodataservice").rstrip("/")
 KEY = os.getenv("LTA_ACCOUNT_KEY", "")
 OSRM = os.getenv("OSRM_URL", "https://router.project-osrm.org").rstrip("/")
@@ -537,13 +538,17 @@ async def lifespan(app):
         except Exception:
             pass
     task = None
+    trtask = None
     if KEY:
         asyncio.create_task(warm())
         bb_init()
         task = asyncio.create_task(bb_loop())
+        trtask = asyncio.create_task(tr_loop())
     yield
     if task is not None:
         task.cancel()
+    if trtask is not None:
+        trtask.cancel()
     if _client is not None:
         await _client.aclose()
 
@@ -1034,6 +1039,7 @@ def bb_init():
     BB["master"] = [{"service": r["service"], "direction": r["direction"], "day_type": r["day_type"], "from": r["t_from"], "to": r["t_to"], "hw": r["hw"]}
                     for r in bb_sql("SELECT * FROM service_headway_config ORDER BY service, direction, t_from", fetch=True)]
     ho_init()
+    tr_init()
 
 
 def bb_validate_params(inp):
@@ -2055,3 +2061,339 @@ async def stop_suggest(q: str = Query("")):
         if len(starts) >= 8:
             break
     return [{"code": s["code"], "name": s["name"], "road": s["road"]} for s in (starts + contains)[:8]]
+
+
+# =========================================================================== Traffic-Aware Regulation (the engine is traffic.py)
+EP_ROADWORKS = os.getenv("LTA_ROADWORKS_PATH", "RoadWorks")     # verify against the current DataMall user guide (road works / road openings)
+TTL_ROADWORKS = 600
+TR = {"params": dict(traffic.PARAMS), "book": traffic.new_book(), "last": 0.0, "ridx": None, "ridx_key": None, "feeds": {}, "lock": None, "rw": []}
+
+
+@app.get("/traffic", response_class=HTMLResponse)
+async def page_traffic():
+    return HTMLResponse((HERE / "traffic.html").read_text(encoding="utf-8"))
+
+
+def tr_init():
+    bb_sql("CREATE TABLE IF NOT EXISTS traffic_setting(k TEXT PRIMARY KEY, v REAL)")
+    bb_sql("CREATE TABLE IF NOT EXISTS traffic_state(k TEXT PRIMARY KEY, v TEXT)")
+    bb_sql("CREATE TABLE IF NOT EXISTS alert_acknowledgement(id INTEGER PRIMARY KEY AUTOINCREMENT, alert_id TEXT, event_id TEXT, service TEXT, direction INTEGER, ack_time REAL, ack_by TEXT, condition TEXT)")
+    TR["params"] = dict(traffic.PARAMS)
+    for r in bb_sql("SELECT k, v FROM traffic_setting", fetch=True):
+        if r["k"] in traffic.PARAMS:
+            TR["params"][r["k"]] = int(r["v"]) if r["k"] in traffic.INT_PARAMS else r["v"]
+    row = bb_sql("SELECT v FROM traffic_state WHERE k='book'", fetch=True)
+    if row:
+        try:
+            TR["book"] = {**traffic.new_book(), **json.loads(row[0]["v"])}
+        except ValueError:
+            TR["book"] = traffic.new_book()
+
+
+def tr_save():
+    b = TR["book"]
+    bb_sql("INSERT OR REPLACE INTO traffic_state(k, v) VALUES ('book', ?)", (json.dumps({"events": {i: e for i, e in b["events"].items() if e["status"] in ("active", "cleared")}, "acks": b["acks"], "seq": b["seq"], "snap": b["snap"], "updates": b["updates"]}),))
+
+
+def tr_hhmm(ts):
+    return datetime.fromtimestamp(ts, SGT).strftime("%H:%M") if ts else None
+
+
+def tr_epoch(s, end=False):
+    """A date / time from the road works feed -> epoch seconds (Singapore time). Dates without a time start at 00:00 and end at 23:59."""
+    s = str(s or "")
+    m = re.search(r"(\d{4})-(\d{1,2})-(\d{1,2})", s)
+    if m:
+        y, mo, d = int(m.group(1)), int(m.group(2)), int(m.group(3))
+    else:
+        m = re.search(r"(\d{1,2})/(\d{1,2})/(\d{4})", s)
+        if not m:
+            return None
+        d, mo, y = int(m.group(1)), int(m.group(2)), int(m.group(3))
+    t = re.search(r"[T ](\d{1,2}):(\d{2})", s)
+    hh, mm = (int(t.group(1)), int(t.group(2))) if t else ((23, 59) if end else (0, 0))
+    try:
+        return datetime(y, mo, d, hh, mm, tzinfo=SGT).timestamp()
+    except ValueError:
+        return None
+
+
+async def tr_roadworks(now):
+    async def factory():
+        rows, err = await fetch_pages(EP_ROADWORKS)
+        return {"rows": rows, "error": err}, TTL_ROADWORKS, bool(rows) or not err
+    d = await cached("roadworks", factory)
+    items = []
+    for x in d["rows"]:
+        road = str(x.get("RoadName") or x.get("Road") or "").strip()
+        st, en = tr_epoch(x.get("StartDate")), tr_epoch(x.get("EndDate"), True)
+        if not road or st is None or st > now + 120 * 60 or (en is not None and en < now):
+            continue
+        lat, lon = num(x.get("Latitude")), num(x.get("Longitude"))
+        items.append({"key": str(x.get("EventID") or f"{road}|{x.get('StartDate')}"), "road": road, "lat": lat if in_sg(lat, lon) else None, "lon": lon if in_sg(lat, lon) else None,
+                      "start_epoch": st, "end_epoch": en, "other": str(x.get("Other") or x.get("SvcDept") or "")[:200]})
+    return items, d.get("error")
+
+
+async def tr_refresh(force=False):
+    """One detection cycle: speed bands -> whole congestion stretches; incidents, road works and rain -> events; then every live event is matched to the services (and directions) it affects."""
+    P = TR["params"]
+    now = time.time()
+    if not force and TR["last"] and now - TR["last"] < P["refresh_s"] * 0.9:
+        return
+    if TR["lock"] is None:
+        TR["lock"] = asyncio.Lock()
+    async with TR["lock"]:
+        now = time.time()
+        if not force and TR["last"] and now - TR["last"] < P["refresh_s"] * 0.9:
+            return
+        st = await static()
+        bs = await bands_state()
+        inc = await api_incidents()
+        rain = await api_rain()
+        rw, rw_err = await tr_roadworks(now)
+        book = TR["book"]
+        snap = int(CACHE["bands"][1]) if "bands" in CACHE else None
+        count = traffic.counts(book, P, snap)
+        if st["stops"] and st["routes"]:
+            key = (len(st["routes"]), len(st["stops"]))
+            if TR["ridx"] is None or TR["ridx_key"] != key:
+                TR["ridx"] = await asyncio.to_thread(traffic.RouteIndex, st["routes"], st["stops"])
+                TR["ridx_key"] = key
+        feeds = {"bands": {"ok": bool(bs.get("idx")), "error": bs.get("error"), "segments": bs.get("usable"), "age_s": cache_age("bands")},
+                 "incidents": {"ok": not inc.get("error"), "error": inc.get("error"), "count": len(inc.get("incidents", []))},
+                 "roadworks": {"ok": not rw_err, "error": rw_err, "count": len(rw)},
+                 "rain": {"ok": not rain.get("error"), "error": rain.get("error"), "gauges_wet": len(rain.get("stations", []))},
+                 "routes": {"ok": TR["ridx"] is not None, "services": len({k[0] for k in st["routes"]}) if st["routes"] else 0}}
+        # a feed that failed is skipped (never read as 'all clear'), so a broken feed cannot clear an active alert by mistake
+        if bs.get("idx"):
+            landmarks = [(s["lat"], s["lon"], s["name"]) for s in st["stops"].values()]
+            stretches = await asyncio.to_thread(traffic.build_stretches, bs["idx"].segs, P, landmarks)
+            traffic.update_congestion(book, stretches, now, P, count)
+            feeds["bands"]["stretches"] = len(stretches)
+        if not inc.get("error"):
+            items = []
+            for x in inc.get("incidents", []):
+                m = re.search(r"\((\d{1,2})/(\d{1,2})\)\s*(\d{1,2}:\d{2})", x.get("message") or "")
+                items.append({"key": f"{x['type']}|{round(x['lat'], 4)}|{round(x['lon'], 4)}", "type": x["type"], "message": x.get("message") or "", "lat": x["lat"], "lon": x["lon"], "reported": m.group(3) if m else None})
+            traffic.update_points(book, "incident", items, now, P, count)
+        if not rw_err:
+            traffic.update_points(book, "roadworks", rw[:300], now, P, count)
+        if not rain.get("error"):
+            traffic.update_weather(book, traffic.rain_cells(rain.get("stations", []), P), now, P, count)
+        traffic.tick(book, now, P, snap)
+        if TR["ridx"] is not None:
+            await asyncio.to_thread(traffic.refresh_matches, book, TR["ridx"], P)
+        TR["last"], TR["feeds"] = now, feeds
+        tr_save()
+
+
+async def tr_loop():
+    while True:
+        try:
+            await tr_refresh()
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            pass
+        await asyncio.sleep(max(15, TR["params"]["refresh_s"]))
+
+
+def tr_event_public(e, now):
+    c = e["cur"]
+    out = {"id": e["id"], "kind": e["kind"], "status": e["status"], "start": tr_hhmm(e["first_seen"]), "alerted": tr_hhmm(e["alert_time"]), "location": traffic.location_text(e),
+           "services": sorted({k.split("|")[0] for k in e["match"]}, key=lambda s: (not s.isdigit(), int(s) if s.isdigit() else 0, s))}
+    if e["kind"] == "congestion":
+        out.update(segments=c["segments"], length_km=round(c["length_m"] / 1000, 2), avg_kmh=round(c["avg_kmh"], 1), min_kmh=round(c["min_kmh"], 1), ref_kmh=c["ref_kmh"], road=c["road"], center=c["center"],
+                   very_slow_pct=round(c["very_slow_pct"]), from_=c["from"], to=c["to"], peak_min_kmh=round(e["peak"].get("min_kmh", c["min_kmh"]), 1), peak_len_km=round(e["peak"].get("max_len_m", c["length_m"]) / 1000, 2))
+    elif e["kind"] == "incident":
+        out.update(lat=c["lat"], lon=c["lon"], type=c.get("type"), message=c.get("message"), reported=c.get("reported"))
+    elif e["kind"] == "roadworks":
+        out.update(lat=c.get("lat"), lon=c.get("lon"), road=c.get("road"), start_date=tr_hhmm(c.get("start_epoch")) and datetime.fromtimestamp(c["start_epoch"], SGT).strftime("%d %b %H:%M"),
+                   end_date=(datetime.fromtimestamp(c["end_epoch"], SGT).strftime("%d %b %H:%M") if c.get("end_epoch") else None), other=c.get("other"))
+    else:
+        out.update(lat=c["lat"], lon=c["lon"], radius_km=c.get("radius_km"), level=c.get("level"), max_mm=c.get("max_mm"), n=c.get("n"), name=c.get("name"), stations=c.get("stations"))
+    return out
+
+
+def tr_alert_public(a):
+    o = dict(a)
+    o["start_hhmm"], o["acked_hhmm"] = tr_hhmm(a["start"]), tr_hhmm(a["acked_time"])
+    for k, n in (("length_km", 2), ("speed_kmh", 0), ("duration_min", 0), ("overlap_km", 2), ("route_pct", 1), ("route_km", 1), ("a_km", 2), ("b_km", 2), ("delay_min", 1), ("score", 0), ("starts_in_min", 0)):
+        if o.get(k) is not None:
+            o[k] = round(o[k], n)
+    return o
+
+
+async def tr_hw_map(rows, now_dt):
+    keys = {(a["svc"], a["dir"]) for a in rows}
+    if not keys:
+        return {}
+    try:
+        fq = await freq_table()
+    except Exception:
+        return {}
+    out = {}
+    for svc, d in keys:
+        hw, _ = bb_resolve_hw(svc, d, now_dt, fq)
+        if hw:
+            out[(svc, d)] = hw
+    return out
+
+
+@app.get("/api/traffic/overview")
+async def api_tr_overview(services: str = "", direction: int = 0, horizon: int = 0, types: str = "", status: str = "", refresh: int = 0):
+    await tr_refresh(force=bool(refresh))
+    P, book, now = TR["params"], TR["book"], time.time()
+    svcs = [s for s in re.split(r"[,\s]+", services.upper()) if s]
+    kinds = [k for k in re.split(r"[,\s]+", types.lower()) if k in traffic.KINDS] or list(traffic.KINDS)
+    stat = [k for k in re.split(r"[,\s]+", status.lower()) if k in ("unacknowledged", "acknowledged", "cleared")] or ["unacknowledged", "acknowledged"]
+    full = traffic.overview(book, P, now, svcs, direction, max(0, min(int(horizon), 120)), kinds, stat)
+    hw = await tr_hw_map(full["rows"], now_sgt())
+    ov = traffic.overview(book, P, now, svcs, direction, max(0, min(int(horizon), 120)), kinds, stat, hw)
+    ids = {a["event"] for a in ov["rows"]}
+    return {"rows": [tr_alert_public(a) for a in ov["rows"]], "cards": ov["cards"], "total": ov["total"], "events": [tr_event_public(book["events"][i], now) for i in ids if i in book["events"]],
+            "feeds": TR["feeds"], "updated": tr_hhmm(TR["last"]), "updated_epoch": TR["last"], "refresh_s": P["refresh_s"], "model": traffic.MODEL_VERSION, "updates": book["updates"],
+            "params": {k: P[k] for k in ("persist_updates", "clear_updates", "min_len_m", "congest_kmh", "very_slow_kmh", "normal_kmh")}, "now": tr_hhmm(now)}
+
+
+@app.get("/api/traffic/services")
+async def api_tr_services():
+    st = await static()
+    out = []
+    for svc, dirs in st["dirs"].items():
+        out.append({"svc": svc, "dirs": dirs})
+    out.sort(key=lambda x: (not x["svc"][:1].isdigit(), int(re.match(r"\d+", x["svc"]).group()) if re.match(r"\d+", x["svc"]) else 0, x["svc"]))
+    return {"services": out}
+
+
+@app.get("/api/traffic/route")
+async def api_tr_route(service: str = "", direction: int = 1):
+    svc = service.strip().upper()
+    st = await static()
+    stops = route_stops(st, svc, direction) if st["stops"] else []
+    if not stops:
+        return {"line": [], "stops": [], "error": "Route not available"}
+    line = cached_line(svc, direction, stops)
+    step = max(1, len(line) // 500)
+    return {"service": svc, "direction": direction, "line": [[round(p[0], 5), round(p[1], 5)] for p in line[::step]] + ([[round(line[-1][0], 5), round(line[-1][1], 5)]] if step > 1 else []),
+            "stops": [[s["lat"], s["lon"], s["name"], s["dist"]] for s in stops]}
+
+
+@app.get("/api/traffic/detail")
+async def api_tr_detail(alert: str = "", current_hw: str = ""):
+    """The selected alert: the disruption, the buses relative to it, the headway they will make, and the regulation the simulator recommends."""
+    await tr_refresh()
+    P, book, now = TR["params"], TR["book"], time.time()
+    parts = alert.split(":")
+    if len(parts) != 3 or parts[0] not in book["events"] or f"{parts[1]}|{parts[2]}" not in book["events"][parts[0]]["match"]:
+        return JSONResponse({"error": "That alert is no longer active."}, status_code=404)
+    e, svc, d = book["events"][parts[0]], parts[1], int(parts[2])
+    m = e["match"][f"{svc}|{d}"]
+    now_dt = now_sgt()
+    fq0 = await freq_table()
+    hw0, hw_src = bb_resolve_hw(svc, d, now_dt, fq0)
+    row = next((a for a in traffic.alerts(book, P, now, {(svc, d): hw0} if hw0 else None) if a["id"] == alert), None)
+    out = {"alert": tr_alert_public(row) if row else None, "event": tr_event_public(e, now), "sched_hw": hw0, "sched_hw_src": hw_src, "buses": [], "impact": None, "regulation": None, "restore": None, "chart": None,
+           "affected_services": [{"svc": k.split("|")[0], "dir": int(k.split("|")[1]), "pct": round(v["pct"], 1)} for k, v in sorted(e["match"].items(), key=lambda kv: (-kv[1]["pct"], kv[0]))][:40]}
+    if TR["ridx"] is None or e["status"] != "active":
+        out["recommendations"] = traffic.recommend(row or {"svc": svc, "dir": d}, None, None, None, None, P)
+        return out
+    bj = await api_buses(svc, d)
+    meta = TR["ridx"].meta.get((svc, d))
+    buses = []
+    for b in bj.get("buses", []):
+        if b.get("lat") is None:
+            continue
+        pos = TR["ridx"].position(svc, d, b["lat"], b["lon"])
+        if pos is None or pos[1] > 450:
+            continue
+        n_last = (meta["n"] - 1) if meta else None
+        eta = (b.get("etasf") or {}).get(n_last)
+        buses.append({"id": b["id"], "pos_km": pos[0], "eta_terminal_min": eta, "lat": b["lat"], "lon": b["lon"], "near": (b.get("near") or {}).get("name"), "load": b.get("load")})
+    delay = (row or {}).get("delay_min") or 0.0
+    cb = traffic.classify_buses(buses, m["a_km"], m["b_km"], delay, P)
+    H = hw0 or None
+    h_note = hw_src
+    if not H:
+        etas = sorted(b["eta_terminal_min"] for b in cb if b.get("eta_terminal_min") is not None)
+        gaps = [y - x for x, y in zip(etas, etas[1:])]
+        H = round(sum(gaps) / len(gaps), 1) if gaps else 10.0
+        h_note = "scheduled headway unknown: the average of the current predicted headways" if gaps else "scheduled headway unknown: 10 min assumed"
+    out["sched_hw"], out["sched_hw_src"] = H, h_note
+    out["buses"] = [{k: (round(v, 2) if isinstance(v, float) else v) for k, v in b.items() if k in ("id", "pos_km", "state", "dist_to_km", "tti_min", "delay_min", "eta_terminal_min", "lat", "lon", "near", "load")} for b in cb]
+    if cb and meta:
+        imp = traffic.headway_impact(cb, H, meta["km"], P)
+        cur_hw = num(current_hw)
+        reg = traffic.regulation_options(imp["rows"], H, P)
+        rs = traffic.restore_check(imp["rows"], meta["km"], H, cur_hw, P)
+        lay = P["min_layover_min"]
+        clock0 = now_dt.hour * 60 + now_dt.minute + now_dt.second / 60.0
+        deps = sorted(r["arr1"] + lay for r in imp["rows"])
+        chart = None
+        if reg.get("no_action"):
+            chart = {"x": [round(clock0 + t, 1) for t in deps], "sched": H, "noadj": [round(v, 1) for v in reg["no_action"]["hw"]], "reg": [round(v, 1) for v in reg["best"]["hw"]] if reg.get("best") else None,
+                     "from": round(clock0 + min([b["tti_min"] for b in cb if b["state"] == "approaching"] + [0.0]), 1), "to": round(clock0 + max(r["arr1"] for r in imp["rows"]), 1), "now": round(clock0, 1)}
+        out["impact"] = {k: (round(v, 1) if isinstance(v, float) else v) for k, v in imp.items() if k != "rows"}
+        out["impact"]["rows"] = [{"id": r["id"], "state": r["state"], "arr0": round(r["arr0"], 1), "arr1": round(r["arr1"], 1), "hw0": _r1(r["hw0"]), "hw1": _r1(r["hw1"]), "delay": round(r["delay_min"], 1), "eta_src": r["eta_src"]} for r in imp["rows"]]
+        out["regulation"] = {k: v for k, v in reg.items() if k != "options"}
+        out["regulation"]["options"] = [{"stretch_min": o["stretch_min"], "max_hw": round(o["max_hw"], 1), "rms": round(o["rms"], 2)} for o in reg.get("options", [])]
+        out["restore"] = rs
+        out["chart"] = chart
+        out["recommendations"] = traffic.recommend(row or {"svc": svc, "dir": d}, imp, reg, rs, cur_hw, P)
+    else:
+        out["recommendations"] = traffic.recommend(row or {"svc": svc, "dir": d}, None, None, None, None, P)
+        out["buses_note"] = "No live buses could be placed on this route right now." if not bj.get("error") else bj["error"]
+    return out
+
+
+def _r1(x):
+    return None if x is None else round(x, 1)
+
+
+@app.post("/api/traffic/ack")
+async def api_tr_ack(request: Request):
+    """ACKNOWLEDGE: the controller has seen these alerts. They stay in the list (marked) and are raised again if the condition worsens."""
+    try:
+        body = json.loads((await request.body()).decode("utf-8") or "{}")
+        ids = [str(x) for x in body.get("alerts", [])][:500]
+    except (ValueError, TypeError, AttributeError):
+        return JSONResponse({"error": "Body must be JSON with a list of alert ids."}, status_code=400)
+    by = re.sub(r"[^\w .@-]", "", str(body.get("by") or "")).strip()[:40] or "controller"
+    book = TR["book"]
+    done = traffic.acknowledge(book, ids, by, time.time())
+    for aid in done:
+        p = aid.split(":")
+        bb_sql("INSERT INTO alert_acknowledgement(alert_id, event_id, service, direction, ack_time, ack_by, condition) VALUES (?,?,?,?,?,?,?)", (aid, p[0], p[1], int(p[2]), time.time(), by, json.dumps(book["acks"][aid]["snap"])))
+    tr_save()
+    return {"ok": True, "acked": len(done), "ids": done, "skipped": len(ids) - len(done), "by": by}
+
+
+@app.get("/api/traffic/log")
+async def api_tr_log(limit: int = 100):
+    rows = bb_sql("SELECT * FROM alert_acknowledgement ORDER BY id DESC LIMIT ?", (max(1, min(int(limit), 500)),), fetch=True)
+    return {"acks": [{"alert": r["alert_id"], "service": r["service"], "direction": r["direction"], "time": tr_hhmm(r["ack_time"]), "by": r["ack_by"], "condition": r["condition"]} for r in rows]}
+
+
+@app.get("/api/traffic/settings")
+async def api_tr_settings():
+    return {"params": TR["params"], "defaults": traffic.PARAMS, "ranges": {k: list(v) for k, v in traffic.RANGES.items()}, "model": traffic.MODEL_VERSION, "roadworks_path": EP_ROADWORKS}
+
+
+@app.post("/api/traffic/settings")
+async def api_tr_settings_post(request: Request):
+    try:
+        body = json.loads((await request.body()).decode("utf-8") or "{}")
+    except ValueError:
+        return JSONResponse({"error": "Body must be JSON."}, status_code=400)
+    if body.get("reset"):
+        TR["params"] = dict(traffic.PARAMS)
+        bb_sql("DELETE FROM traffic_setting")
+        return {"ok": True, "params": TR["params"]}
+    clean, errs = traffic.validate_params(body.get("params") or {})
+    if errs:
+        return JSONResponse({"error": "; ".join(errs)}, status_code=400)
+    TR["params"].update(clean)
+    for k, v in clean.items():
+        bb_sql("INSERT OR REPLACE INTO traffic_setting(k, v) VALUES (?, ?)", (k, float(v)))
+    return {"ok": True, "params": TR["params"]}
