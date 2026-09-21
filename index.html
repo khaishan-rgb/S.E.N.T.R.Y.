@@ -1,46 +1,615 @@
-<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>SG Transport Pulse V3.1</title><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#050d1a">
+<title>SG Transport Pulse</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <style>
-*{box-sizing:border-box}body{margin:0;background:#050a10;color:#e9f8ff;font-family:Inter,system-ui,Arial}header{height:56px;display:flex;align-items:center;padding:0 15px;background:#07111b;border-bottom:1px solid #173344}.logo{font-weight:900;letter-spacing:1.5px}.live{margin-left:auto;color:#48efa0;font-size:11px}.shell{display:grid;grid-template-columns:300px 1fr 330px;height:calc(100vh - 56px)}.panel{background:#07111b;padding:14px;overflow:auto;border-right:1px solid #173344}.right{border-left:1px solid #173344;border-right:0}.k{font-size:10px;letter-spacing:1.5px;color:#78a0b3;text-transform:uppercase}.title{font-size:20px;font-weight:850;margin:4px 0 12px}.search{display:grid;gap:8px}.search input,.search select,.search button{width:100%;padding:11px;border-radius:9px;border:1px solid #1b4960;background:#081722;color:#fff;font-size:14px}.search button{background:#24c8ed;color:#00131a;font-weight:900}.clear{background:#0a1b27!important;color:#a8d6e8!important}.card{border:1px solid #173b50;border-radius:12px;padding:12px;margin:10px 0;background:#081722}.metric{font-size:26px;font-weight:900;color:#52d9ff}.muted{color:#82a1b1;font-size:12px}.busrow{padding:9px 0;border-bottom:1px solid #143041}.eta{font-size:20px;font-weight:900}.mapwrap{position:relative}#map{height:100%;width:100%}.scope{position:absolute;z-index:800;top:12px;left:50%;transform:translateX(-50%);background:#07111be8;border:1px solid #1c526b;border-radius:10px;padding:8px 11px;font-size:11px;max-width:80%;text-align:center}.legend{position:absolute;z-index:800;bottom:20px;left:12px;background:#07111bea;border:1px solid #1c526b;border-radius:10px;padding:9px;font-size:11px}.dot{display:inline-block;width:19px;height:5px;border-radius:3px;margin-right:5px}.dirrow{display:flex;gap:7px}.dirbtn{flex:1;padding:9px;border:1px solid #1c526b;border-radius:8px;background:#0a1b27;color:#a9d5e5}.dirbtn.on{background:#17475b;color:#fff}.leaflet-popup-content-wrapper,.leaflet-popup-tip{background:#081722;color:#fff}
-@media(max-width:800px){.shell{display:block;height:auto}.panel{border:0}.mapwrap{height:58vh}.right{border:0}.scope{max-width:92%}.legend{bottom:10px}.title{font-size:18px}}
-</style></head><body>
-<header><div class="logo">SG TRANSPORT // PULSE <span style="color:#4bdcff">V4</span></div><div class="live">● LIVE</div></header>
-<div class="shell"><aside class="panel"><div class="k">Operations Search</div><div class="title">Service focus</div>
-<div class="search"><input id="svc" placeholder="Service e.g. 197"><input id="stop" placeholder="Bus stop (optional) e.g. 10009">
-<div class="dirrow"><button id="d1" class="dirbtn on" onclick="setDir(1)">Direction 1</button><button id="d2" class="dirbtn" onclick="setDir(2)">Direction 2</button></div>
-<button onclick="apply()">SEARCH / FILTER</button><button class="clear" onclick="clearAll()">CLEAR</button></div>
-<div id="routeInfo"></div></aside>
-<main class="mapwrap"><div id="map"></div><div class="scope" id="scope">SINGAPORE NETWORK • Select a service</div>
-<div class="legend"><b>LIVE TRAFFIC</b><br><span class="dot" style="background:#29d66f"></span>Smooth<br><span class="dot" style="background:#ffc642"></span>Moderate<br><span class="dot" style="background:#ff435f"></span>Slow / bad<br><span class="dot" style="background:#3bdcff"></span>No traffic data</div></main>
-<aside class="panel right"><div class="k">Operational Intelligence</div><div class="title" id="focusTitle">Network overview</div><div id="intel"></div><div class="k">Visible buses / arrivals</div><div id="arrivals"></div></aside></div>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script><script>
-const map=L.map('map').setView([1.3521,103.8198],11);L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(map);
-let layer=L.layerGroup().addTo(map),dir=1;const $=x=>document.getElementById(x);
-function setDir(d){dir=d;$('d1').classList.toggle('on',d===1);$('d2').classList.toggle('on',d===2);if($('svc').value.trim())apply()}
-function m(t){if(!t)return null;return Math.max(0,Math.round((new Date(t)-new Date())/60000))}
-function bandColor(b){b=Number(b);if(b<=2)return '#ff435f';if(b<=4)return '#ffc642';return '#29d66f'}
-function busIcon(s){return L.divIcon({className:'',iconSize:[36,28],iconAnchor:[18,14],html:`<div style="background:#15c9f0;color:#00141b;border:2px solid white;border-radius:8px;padding:4px 6px;font-weight:950;text-align:center;box-shadow:0 0 13px #16c9ef">${s}</div>`})}
-async function get(u){let r=await fetch(u);return r.json()}
-async function apply(){let s=$('svc').value.trim(),st=$('stop').value.trim();if(!s&&!st)return;layer.clearLayers();$('scope').textContent=`${s?'SERVICE '+s:'BUS STOP'} • DIRECTION ${dir}${st?' • STOP '+st:''} • LIVE`;$('focusTitle').textContent=s?`Service ${s} • Dir ${dir}`:`Stop ${st}`;$('intel').innerHTML='<div class="card">Loading live data…</div>';let d=await get(`/api/context?service=${encodeURIComponent(s)}&stop=${encodeURIComponent(st)}&direction=${dir}`);render(d)}
-function render(d){let bounds=[],r=d.route||[];
- if(r.length){
-   let ll=r.map(x=>[Number(x.lat),Number(x.lon)]);bounds.push(...ll);
-   const bands=d.speedBands||[];
-   function km(a,b){let R=6371,p1=a[0]*Math.PI/180,p2=b[0]*Math.PI/180,dp=(b[0]-a[0])*Math.PI/180,dl=(b[1]-a[1])*Math.PI/180,q=Math.sin(dp/2)**2+Math.cos(p1)*Math.cos(p2)*Math.sin(dl/2)**2;return 2*R*Math.asin(Math.sqrt(q))}
-   function nearestBand(a,b){let mid=[(a[0]+b[0])/2,(a[1]+b[1])/2],best=null,bd=9e9;for(const x of bands){let xm=[(Number(x.a[0])+Number(x.b[0]))/2,(Number(x.a[1])+Number(x.b[1]))/2],dd=km(mid,xm);if(dd<bd){bd=dd;best=x}}return bd<=0.55?best:null}
-   for(let i=0;i<ll.length-1;i++){let tb=nearestBand(ll[i],ll[i+1]);let c=tb?bandColor(tb.band):'#39c7e8';L.polyline([ll[i],ll[i+1]],{color:c,weight:8,opacity:.95,lineCap:'round'}).bindPopup(tb?`<b>${tb.road||'Traffic segment'}</b><br>${tb.min??''}-${tb.max??''} km/h • LTA Band ${tb.band}`:'Traffic data unavailable for this route section').addTo(layer)}
-   r.forEach((x,i)=>{L.circleMarker([x.lat,x.lon],{radius:3,color:'#fff',weight:2,fillColor:'#06131d',fillOpacity:1}).bindPopup(`<b>${x.code}</b><br>${x.name||''}<br><button onclick="selectStop('${x.code}')" style="margin-top:6px">Monitor this stop</button>`).addTo(layer)})
- }
- (d.incidents||[]).forEach(x=>{if(x.Latitude&&x.Longitude)L.circleMarker([x.Latitude,x.Longitude],{radius:6,color:'#ff3657',fillColor:'#ff3657',fillOpacity:.9}).bindPopup(`<b>${x.Type||'Incident'}</b><br>${x.Message||''}`).addTo(layer)});
- let ah='',busCount=0;(d.arrivals||[]).forEach(s=>{let bs=[s.NextBus,s.NextBus2,s.NextBus3].filter(Boolean);ah+=`<div class="card"><b>Service ${s.ServiceNo}</b>`;bs.forEach(b=>{let eta=m(b.EstimatedArrival),lat=Number(b.Latitude),lon=Number(b.Longitude);ah+=`<div class="busrow"><span class="eta">${eta===null?'--':eta+' min'}</span> <span class="muted">${b.Load||''} ${b.Type||''}</span></div>`;if(lat&&lon){L.marker([lat,lon],{icon:busIcon(s.ServiceNo)}).bindPopup(`<b>BUS • ${s.ServiceNo}</b><br>ETA ${eta} min<br>${b.Load||''}`).addTo(layer);bounds.push([lat,lon]);busCount++}});ah+='</div>'});
- $('arrivals').innerHTML=ah||'<div class="card muted">To show actual approaching bus locations, enter a bus stop on this route. LTA Bus Arrival provides estimated locations for buses approaching the queried stop.</div>';
- let sb=d.speedBands||[],red=sb.filter(x=>Number(x.band)<=2).length,yel=sb.filter(x=>Number(x.band)>=3&&Number(x.band)<=4).length,green=sb.filter(x=>Number(x.band)>=5).length;
- let dbg=d.trafficDebug||{};let feedOK=(dbg.rawSegments||0)>0;
- $('intel').innerHTML=`<div class="card"><div class="k">Selected direction</div><div class="metric">${r.length} stops</div><div class="muted">Direction ${d.direction} only — opposite direction hidden.</div></div><div class="card"><div class="k">Live LTA Traffic • 5-min feed</div><div style="margin-top:8px">🟢 ${green} smooth &nbsp; 🟡 ${yel} moderate &nbsp; 🔴 ${red} slow</div><div class="muted" style="margin-top:7px">${dbg.matchedSegments||0} traffic segments matched • ${dbg.rawSegments||0} received from LTA.<br>${dbg.endpoint?'Feed: '+dbg.endpoint:''}<br><b>The route line itself is traffic-coloured.</b></div><div style="margin-top:8px;font-size:12px;color:${feedOK?'#48efa0':'#ff5571'}">${feedOK?'● TRAFFIC FEED CONNECTED':'● TRAFFIC FEED ERROR'+(dbg.error?' — '+dbg.error:'')}</div></div><div class="card"><div class="k">Other live signals</div><div class="muted">${(d.incidents||[]).length} nearby incident(s) • ${busCount} bus location(s) visible</div></div>`;
- $('routeInfo').innerHTML=`<div class="card"><div class="k">Direction ${d.direction}</div><div class="metric">${r.length}</div><div class="muted">stops • only one direction shown</div></div>`;
- if(bounds.length)map.fitBounds(bounds,{padding:[25,25],maxZoom:14});else if(r.length)map.fitBounds(r.map(x=>[x.lat,x.lon]),{padding:[25,25],maxZoom:14})
+:root{
+  --bg:#050d1a; --bg2:#081426; --panel:#0a1a2e; --panel2:#0d2039; --line:#163250; --line2:#1f4468;
+  --text:#eaf3ff; --mut:#8ba3bd; --blue:#1785ff; --blue2:#0f6fe0; --cyan:#3cc8ff;
+  --green:#20d16a; --amber:#ffc21a; --red:#ff4d55; --route:#2f7dff;
+  --font:Inter,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
 }
-function selectStop(code){$('stop').value=code;apply()}
-function clearAll(){$('svc').value='';$('stop').value='';layer.clearLayers();map.setView([1.3521,103.8198],11);$('scope').textContent='SINGAPORE NETWORK • Select a service';$('intel').innerHTML='';$('arrivals').innerHTML='';$('routeInfo').innerHTML=''}
-setTimeout(()=>map.invalidateSize(),300);
-</script></body></html>
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:radial-gradient(1200px 500px at 20% -10%,#0b2140 0%,var(--bg) 60%);color:var(--text);font-family:var(--font);font-size:14px;line-height:1.35;min-height:100vh;
+  padding:env(safe-area-inset-top,0) env(safe-area-inset-right,0) env(safe-area-inset-bottom,0) env(safe-area-inset-left,0)}
+button,input{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+.i{width:1em;height:1em;flex:none;display:inline-block;vertical-align:middle}
+.app{max-width:1360px;margin:0 auto;padding:0 14px 18px}
+
+/* header */
+.top{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px 4px 12px;border-bottom:1px solid var(--line)}
+.brand{display:flex;align-items:center;gap:12px;min-width:0}
+.logo{width:40px;height:40px;border-radius:11px;background:linear-gradient(160deg,#2a95ff,#0d63d6);display:grid;place-items:center;font-size:24px;color:#fff;box-shadow:0 0 0 1px #4aa6ff55,0 6px 18px #0a63d655}
+.brand h1{margin:0;font-size:26px;font-weight:800;letter-spacing:-.4px;line-height:1.05}
+.brand p{margin:3px 0 0;color:var(--mut);font-size:14px}
+.brand p i{display:inline-block;width:4px;height:4px;border-radius:50%;background:var(--mut);margin:0 9px;vertical-align:middle}
+.hdr-right{display:flex;align-items:center;gap:18px;text-align:right}
+.clock{font-size:13px;color:#cfe0f3;font-variant-numeric:tabular-nums}
+.live{display:flex;align-items:center;justify-content:flex-end;gap:7px;color:var(--mut);margin-top:3px}
+.live .dot{width:9px;height:9px;border-radius:50%;background:var(--mut)}
+.live.ok .dot{background:var(--green);box-shadow:0 0 8px var(--green)}.live.ok{color:#a7e9c4}
+.live.warn .dot{background:var(--amber);box-shadow:0 0 8px var(--amber)}.live.warn{color:#ffe08a}
+.live.bad .dot{background:var(--red);box-shadow:0 0 8px var(--red)}.live.bad{color:#ffb0b4}
+.view{border-left:1px solid var(--line2);padding-left:18px;font-size:14px;line-height:1.25;text-align:left}
+.view b{display:block;font-weight:600}.view span{color:var(--mut)}
+
+/* search */
+.search{display:grid;grid-template-columns:1.1fr 1.1fr auto 150px 150px;gap:14px;align-items:end;padding:16px 2px 14px}
+.fld label{display:block;font-size:13px;color:var(--mut);margin:0 0 6px 2px}
+.fld label small{color:#6f88a3}
+.inp{position:relative}
+.inp input{width:100%;height:48px;background:var(--panel);border:1px solid var(--line2);border-radius:11px;padding:0 44px 0 14px;font-size:16px;color:var(--text)}
+.inp input::placeholder{color:#5f7a96}
+.inp .i{position:absolute;right:14px;top:50%;transform:translateY(-50%);font-size:20px;color:#b4cbe2;pointer-events:none}
+.seg{display:flex;height:48px;background:var(--panel);border:1px solid var(--line2);border-radius:11px;padding:3px;gap:3px}
+.seg button{border:0;background:transparent;color:#a9c2da;padding:0 20px;border-radius:8px;cursor:pointer;font-weight:600}
+.seg button[aria-pressed=true]{background:var(--cyan);color:#03203a}
+.btn{height:48px;border-radius:11px;border:1px solid var(--line2);font-weight:700;font-size:16px;cursor:pointer}
+.btn.go{background:linear-gradient(180deg,#1b8cff,#0c6be0);border-color:#4aa6ff;box-shadow:0 0 22px #0a75ff55;color:#fff}
+.btn.go:disabled{opacity:.7;cursor:progress}
+.btn.clr{background:var(--panel);color:var(--text)}
+.btn:hover{filter:brightness(1.1)}
+
+/* map */
+.mapcard{position:relative;border:1px solid var(--line2);border-radius:14px;overflow:hidden;height:min(64vh,640px);min-height:420px;background:#dfe6ee}
+#map{position:absolute;inset:0;background:#dfe6ee}
+.ov{position:absolute;z-index:800;background:rgba(6,17,32,.93);border:1px solid var(--line2);border-radius:12px;color:var(--text);box-shadow:0 8px 24px rgba(0,10,30,.4)}
+.svc-card{top:12px;left:12px;display:flex;gap:12px;align-items:center;padding:12px 16px 12px 12px;max-width:min(330px,calc(100% - 200px))}
+.svc-card .bb{width:42px;height:42px;border-radius:10px;background:linear-gradient(160deg,#2a95ff,#0d63d6);display:grid;place-items:center;font-size:26px;color:#fff;flex:none}
+.svc-card b{display:block;font-size:19px;font-weight:700;line-height:1.15}
+.svc-card b em{font-style:normal;margin-left:10px}
+.svc-card span{display:block;color:#b6c9de;font-size:13px;margin-top:2px}
+.layers{top:12px;right:12px;padding:10px 14px;min-width:170px}
+.layers .lay-h{display:none;background:none;border:0;width:100%;text-align:left;font-weight:600;cursor:pointer;padding:2px 0}
+.layers label{display:flex;align-items:center;gap:10px;padding:6px 0;font-size:14px;cursor:pointer;white-space:nowrap}
+.layers input{appearance:none;-webkit-appearance:none;width:20px;height:20px;border-radius:5px;border:1.5px solid #6d8aa8;background:transparent;display:grid;place-items:center;margin:0;cursor:pointer;flex:none}
+.layers input:checked{background:var(--blue);border-color:var(--blue)}
+.layers input:checked::after{content:"";width:5px;height:10px;border:solid #fff;border-width:0 2px 2px 0;transform:rotate(45deg) translate(-1px,-1px)}
+.legend{left:12px;bottom:34px;padding:12px 16px;min-width:250px}
+.legend h3{margin:0 0 9px;font-size:16px;font-weight:700}
+.legend .row{display:flex;align-items:center;gap:12px;padding:3px 0;font-size:14px;color:#dbe8f6}
+.legend .row small{color:#a8bdd3;font-size:13px}
+.legend .sw{width:38px;height:9px;border-radius:5px;flex:none;position:relative}
+.legend .sw.rt{background:var(--route)}.legend .sw.rt::after{content:"";position:absolute;left:50%;top:50%;width:11px;height:11px;margin:-5.5px;border-radius:50%;background:#fff;border:2.5px solid #06111f}
+.compass{right:12px;bottom:64px;width:54px;height:54px;border-radius:50%;display:grid;place-items:center;cursor:pointer;font-size:12px;font-weight:700;line-height:1;text-align:center;padding:0}
+.compass .i{font-size:18px;display:block;margin:0 auto 1px}
+.toast{position:absolute;left:50%;bottom:22px;transform:translateX(-50%);z-index:900;background:rgba(6,17,32,.96);border:1px solid var(--line2);border-radius:10px;padding:9px 14px;font-size:13px;max-width:min(92%,520px);text-align:center;display:none}
+.toast.show{display:block}
+.leaflet-top.leaflet-left .leaflet-control-zoom{margin-top:88px;margin-left:12px}
+.leaflet-bar{border:1px solid var(--line2)!important;border-radius:10px!important;overflow:hidden;box-shadow:0 6px 18px rgba(0,10,30,.35)!important}
+.leaflet-bar a{background:rgba(6,17,32,.95);color:#fff;border-bottom:1px solid var(--line2);width:38px;height:38px;line-height:38px;font-size:22px}
+.leaflet-bar a:hover{background:#0d2039;color:#fff}
+.leaflet-control-attribution{background:rgba(6,17,32,.8)!important;color:#c5d6e8!important;font-size:12px!important}
+.leaflet-control-attribution a{color:#8fd0ff!important}
+.leaflet-control-attribution img{height:14px;width:14px;vertical-align:-3px;margin-right:3px}
+.leaflet-control-scale-line{background:rgba(6,17,32,.85);color:#fff;border-color:#fff}
+.leaflet-popup.pp .leaflet-popup-content-wrapper{background:#fff;color:#0a1a2e;border-radius:12px;box-shadow:0 10px 30px rgba(0,10,30,.4)}
+.leaflet-popup.pp .leaflet-popup-tip{background:#fff}
+.leaflet-popup.pp .leaflet-popup-content{margin:12px 16px;font-family:var(--font);font-size:14px;line-height:1.45;min-width:190px}
+.pp b{font-weight:700}.pp .m{color:#6a7f96}.pp h4{margin:0 0 4px;font-size:15px;font-weight:600}
+.pp ul{list-style:none;margin:4px 0 0;padding:0}.pp li{padding:1px 0}
+.bm{width:32px;height:32px;border-radius:9px;background:linear-gradient(160deg,#2a95ff,#0d63d6);border:2px solid #fff;display:grid;place-items:center;color:#fff;font-size:19px;box-shadow:0 2px 10px rgba(6,40,110,.55)}
+.im{width:26px;height:26px;border-radius:50%;background:var(--red);border:2px solid #fff;color:#fff;font-weight:800;display:grid;place-items:center;font-size:15px;box-shadow:0 2px 8px rgba(120,0,10,.5)}
+
+/* panels */
+.panels{display:grid;grid-template-columns:minmax(330px,1.05fr) minmax(400px,1.4fr) minmax(300px,.95fr);gap:12px;margin-top:12px}
+.card{background:linear-gradient(180deg,var(--panel),#08172a);border:1px solid var(--line2);border-radius:14px;padding:16px 18px;min-width:0;container-type:inline-size}
+.card>header{display:flex;gap:12px;align-items:flex-start;margin-bottom:12px}
+.card .ic{width:38px;height:38px;border-radius:10px;background:linear-gradient(160deg,#2a95ff,#0d63d6);display:grid;place-items:center;font-size:23px;color:#fff;flex:none}
+.card h2{margin:0;font-size:19px;font-weight:700;line-height:1.2}
+.card header p{margin:3px 0 0;color:var(--mut);font-size:13.5px}
+.card .go-r{margin-left:auto;color:#c8dcf0;font-size:18px;align-self:center}
+.empty{color:var(--mut);font-size:14px;padding:14px 2px 6px}
+.warn{background:#3a2a06;border:1px solid #7a5a12;color:#ffe08a;border-radius:9px;padding:8px 11px;font-size:13px;margin-bottom:12px}
+.bar{display:flex;height:40px;border-radius:9px;overflow:hidden;gap:2px;background:#06111f}
+.bar div{display:grid;place-items:center;font-weight:700;font-size:15px;color:#04140b;min-width:0;overflow:hidden}
+.bar .smooth{background:var(--green)}.bar .moderate{background:var(--amber);color:#2a1c00}.bar .slow{background:var(--red);color:#fff}.bar .none{background:var(--route);color:#fff}
+.bar-l{display:grid;grid-template-columns:repeat(var(--n,3),1fr);text-align:center;color:#dbe8f6;font-size:14px;margin-top:6px;padding-bottom:14px;border-bottom:1px solid var(--line)}
+.stats{display:grid;grid-template-columns:1.1fr .8fr 1.3fr;padding-top:14px}
+.stats>div{padding:0 14px;border-left:1px solid var(--line);min-width:0}.stats>div:first-child{padding-left:0;border-left:0}
+.stat{display:flex;align-items:center;gap:9px}
+.stat .i{font-size:24px;color:var(--cyan)}
+.stat b{font-size:21px;font-weight:700;line-height:1;white-space:nowrap}
+.stat b small{font-size:15px;font-weight:600}
+.stats .cap{color:var(--mut);font-size:12.5px;margin-top:5px;padding-left:33px;line-height:1.25}
+@container (max-width:430px){.stats{grid-template-columns:1fr 1fr}.stats>div:last-child{grid-column:1/-1;border-left:0;padding:12px 0 0}}
+.nodata{color:var(--mut);font-size:12.5px;margin-top:8px}
+.tw{overflow-x:auto}
+table.tb{width:100%;border-collapse:collapse;font-size:14px}
+.tb th{color:#a8bdd3;font-weight:500;text-align:left;font-size:13px;padding:6px 8px 8px 0;border-bottom:1px solid var(--line)}
+.tb td{padding:9px 8px 9px 0;border-bottom:1px solid #12293f;vertical-align:middle}
+.tb tr:last-child td{border-bottom:0}
+.tb tbody tr[data-id]{cursor:pointer}.tb tbody tr[data-id]:hover td{background:#0d2340}
+.bi{display:inline-grid;place-items:center;width:26px;height:26px;border-radius:7px;background:linear-gradient(160deg,#2a95ff,#0d63d6);color:#fff;font-size:16px;margin-right:8px;vertical-align:middle}
+.tb small{display:block;color:var(--mut);font-size:12px;line-height:1.2}
+.sd{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;background:var(--mut)}.sd.live{background:var(--green)}
+.chip{display:inline-block;min-width:54px;text-align:center;padding:3px 10px;border-radius:7px;font-weight:700;font-size:12.5px;color:#04140b}
+.chip.ok{background:var(--green)}.chip.mid{background:var(--amber);color:#2a1c00}.chip.bad{background:var(--red);color:#fff}.chip.na{background:#33465c;color:#c8d6e6}
+.foot-n{text-align:right;color:var(--mut);font-size:13px;margin-top:8px}
+.selstop{display:flex;align-items:center;gap:10px;margin:-2px 0 10px}
+.selstop .pin{width:26px;height:26px;border-radius:50%;background:linear-gradient(160deg,#2a95ff,#0d63d6);display:grid;place-items:center;font-size:15px;color:#fff;flex:none}
+.selstop b{font-size:16px;font-weight:600}
+.selstop span{color:var(--cyan);font-weight:600;font-size:14px}
+.svcb{display:inline-block;min-width:44px;text-align:center;background:#12365e;border:1px solid #23568a;border-radius:7px;padding:2px 8px;font-weight:700}
+.sk{height:14px;border-radius:7px;background:linear-gradient(90deg,#10263f,#173657,#10263f);background-size:200% 100%;animation:sk 1.3s linear infinite;margin:10px 0}
+@keyframes sk{to{background-position:-200% 0}}
+@media (prefers-reduced-motion:reduce){.sk{animation:none}}
+.foot{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;color:#7f97b0;font-size:12.5px;padding:14px 4px 0}
+
+@media (max-width:1100px){
+  .panels{grid-template-columns:1fr 1fr}
+  #pBuses{grid-column:1/-1;order:3}
+  .search{grid-template-columns:1fr 1fr auto 120px 120px}
+}
+@media (max-width:760px){
+  .app{padding:0 10px 14px}
+  .top{padding:10px 2px}
+  .brand h1{font-size:21px}.brand p{font-size:12.5px}.logo{width:36px;height:36px;font-size:21px}
+  .view{display:none}.hdr-right{gap:0}
+  .clock{font-size:12px}
+  .search{grid-template-columns:1fr 1fr;gap:10px;padding:12px 0}
+  .fld.dir{grid-column:1/-1}.seg{width:100%}.seg button{flex:1}
+  .mapcard{height:64vh;min-height:400px}
+  .svc-card{max-width:calc(100% - 132px);padding:9px 12px 9px 9px;gap:9px}.svc-card .bb{width:34px;height:34px;font-size:21px}.svc-card b{font-size:16px}.svc-card span{font-size:12px}
+  .layers{padding:8px 12px;min-width:0}.layers .lay-h{display:block}.layers .lay-list{display:none}.layers.open .lay-list{display:block;margin-top:4px}
+  .legend{min-width:0;padding:9px 12px;bottom:30px}.legend .row{font-size:12.5px;gap:8px}.legend .row small{display:none}.legend .sw{width:26px}.legend h3{font-size:13px;margin-bottom:5px}
+  .compass{width:46px;height:46px;bottom:58px}
+  .leaflet-top.leaflet-left .leaflet-control-zoom{display:none}
+  .panels{grid-template-columns:1fr}
+  #pBuses{order:0}
+  .stats{grid-template-columns:1fr 1fr}.stats>div:last-child{grid-column:1/-1;border-left:0;padding:12px 0 0}
+}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-bus" viewBox="0 0 24 24"><path fill="currentColor" fill-rule="evenodd" d="M6 3h12a2.5 2.5 0 0 1 2.5 2.5v10.2c0 .7-.4 1.4-1 1.8V20a1 1 0 0 1-1 1h-1.4a1 1 0 0 1-1-1v-1.5H8.9V20a1 1 0 0 1-1 1H6.5a1 1 0 0 1-1-1v-2.5c-.6-.4-1-1.1-1-1.8V5.5A2.5 2.5 0 0 1 6 3zm-.5 2.5V10h13V5.5a.5.5 0 0 0-.5-.5H6a.5.5 0 0 0-.5.5zM8 13.3a1.3 1.3 0 1 0 0 2.6 1.3 1.3 0 0 0 0-2.6zm8 0a1.3 1.3 0 1 0 0 2.6 1.3 1.3 0 0 0 0-2.6z"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 5 5"/></g></symbol>
+  <symbol id="i-pin" viewBox="0 0 24 24"><path fill="currentColor" d="M12 2a7 7 0 0 0-7 7c0 5.2 7 13 7 13s7-7.8 7-13a7 7 0 0 0-7-7zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5z"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5.5l3.5 2"/></g></symbol>
+  <symbol id="i-route" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 4.5 20.5 12 16.5l7.5 4z"/></g></symbol>
+  <symbol id="i-chev" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" d="m9 5 7 7-7 7"/></symbol>
+  <symbol id="i-north" viewBox="0 0 24 24"><path fill="currentColor" d="M12 2 6 20l6-4 6 4z"/></symbol>
+</svg>
+
+<div class="app">
+  <header class="top">
+    <div class="brand">
+      <div class="logo"><svg class="i"><use href="#i-bus"/></svg></div>
+      <div>
+        <h1>SG Transport Pulse</h1>
+        <p>Live Buses<i></i>Live Traffic<i></i>Smarter Journeys</p>
+      </div>
+    </div>
+    <div class="hdr-right">
+      <div>
+        <div class="clock" id="clock">&nbsp;</div>
+        <div class="live" id="live"><span class="dot"></span><span id="liveText">Connecting…</span></div>
+      </div>
+      <div class="view"><b>Singapore</b><span>OneMap View</span></div>
+    </div>
+  </header>
+
+  <form class="search" id="form" autocomplete="off">
+    <div class="fld"><label for="svc">Service</label>
+      <div class="inp"><input id="svc" name="svc" inputmode="text" autocapitalize="characters" placeholder="e.g. 32" maxlength="6"><svg class="i"><use href="#i-search"/></svg></div></div>
+    <div class="fld"><label for="stop">Bus Stop <small>(optional)</small></label>
+      <div class="inp"><input id="stop" name="stop" inputmode="numeric" placeholder="e.g. 10009" list="stopList" maxlength="24"><svg class="i"><use href="#i-search"/></svg></div>
+      <datalist id="stopList"></datalist></div>
+    <div class="fld dir"><label id="dirLabel">Direction</label>
+      <div class="seg" role="group" aria-labelledby="dirLabel"><button type="button" id="d1" aria-pressed="true">Dir 1</button><button type="button" id="d2" aria-pressed="false">Dir 2</button></div></div>
+    <button class="btn go" id="go" type="submit">Show</button>
+    <button class="btn clr" id="clear" type="button">Clear</button>
+  </form>
+
+  <section class="mapcard" aria-label="Map">
+    <div id="map"></div>
+    <div class="ov svc-card"><div class="bb"><svg class="i"><use href="#i-bus"/></svg></div>
+      <div><b id="svcTitle">Pick a service</b><span id="svcSub">Enter a bus service and tap Show</span></div></div>
+    <div class="ov layers" id="layers">
+      <button type="button" class="lay-h" id="layH" aria-expanded="false">Layers</button>
+      <div class="lay-list">
+        <label><input type="checkbox" data-l="stops" checked>Bus Stops</label>
+        <label><input type="checkbox" data-l="buses" checked>Live Buses</label>
+        <label><input type="checkbox" data-l="traffic" checked>Traffic (on route)</label>
+        <label><input type="checkbox" data-l="incidents">Incidents (nearby)</label>
+        <label><input type="checkbox" data-l="rain">Rain (NEA)</label>
+      </div>
+    </div>
+    <div class="ov legend"><h3>Traffic on Route (LTA)</h3>
+      <div class="row"><span class="sw" style="background:var(--green)"></span><span>Smooth <small>(≥ 40 km/h)</small></span></div>
+      <div class="row"><span class="sw" style="background:var(--amber)"></span><span>Moderate <small>(20 – 39 km/h)</small></span></div>
+      <div class="row"><span class="sw" style="background:var(--red)"></span><span>Slow / Congested <small>(&lt; 20 km/h)</small></span></div>
+      <div class="row" title="Blue means the route has no LTA traffic reading on that stretch"><span class="sw rt"></span><span>Bus route &amp; stops</span></div>
+    </div>
+    <button class="ov compass" id="recenter" type="button" title="Fit map to route" aria-label="Fit map to route"><span><svg class="i"><use href="#i-north"/></svg>N</span></button>
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  </section>
+
+  <section class="panels">
+    <article class="card" id="pSummary">
+      <header><div class="ic"><svg class="i"><use href="#i-bus"/></svg></div>
+        <div><h2>Route Traffic Summary</h2><p id="sumSub">Traffic bands along the selected route</p></div></header>
+      <div id="sumBody"><div class="empty">Enter a service number and tap <b>Show</b> to see how traffic is flowing along its route.</div></div>
+    </article>
+    <article class="card" id="pBuses">
+      <header><div class="ic"><svg class="i"><use href="#i-bus"/></svg></div>
+        <div><h2 id="busTitle">Live Buses</h2><p id="busSub">Buses currently on this route • Tap a bus to view details</p></div></header>
+      <div id="busBody"><div class="empty">Live bus positions for the selected service will appear here.</div></div>
+    </article>
+    <article class="card" id="pArr">
+      <header><div class="ic"><svg class="i"><use href="#i-bus"/></svg></div>
+        <div><h2>Next Arrivals at Selected Stop</h2></div></header>
+      <div id="arrBody"><div class="empty">Tap a bus stop on the map, or enter a stop code, to see the next arrivals.</div></div>
+    </article>
+  </section>
+
+  <footer class="foot">
+    <span>Sources: LTA DataMall (Bus, Traffic), OneMap, NEA &nbsp;|&nbsp; Not for operational use</span>
+    <span>SG Transport Pulse V5 &nbsp;|&nbsp; Built for a smarter Singapore</span>
+  </footer>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const ico = (n, cls) => `<svg class="i ${cls || ""}"><use href="#i-${n}"/></svg>`;
+const COL = {smooth:"#22d36a", moderate:"#ffc21a", slow:"#ff4d55", none:"#2f7dff"};
+const bandCls = b => b == null ? "none" : b >= 5 ? "smooth" : b >= 3 ? "moderate" : "slow";
+const LOAD = {SEA:["Seats","ok","Seats available"], SDA:["Standing","mid","Standing available"], LSD:["Limited","bad","Limited standing"]};
+const loadChip = l => { const x = LOAD[l]; return x ? `<span class="chip ${x[1]}" title="${x[2]}">${x[0]}</span>` : `<span class="chip na">n/a</span>`; };
+const loadText = l => (LOAD[l] || [0,0,"not reported"])[2];
+const mins = m => m == null ? "--" : m <= 0 ? "Arr" : m + " min";
+const dur = m => m == null ? "--" : m >= 60 ? `${Math.floor(m/60)} h ${String(m%60).padStart(2,"0")} min` : `${m} min`;
+const sgTime = (d, sec) => new Intl.DateTimeFormat("en-GB", {timeZone:"Asia/Singapore", hour:"2-digit", minute:"2-digit", ...(sec ? {second:"2-digit"} : {}), hour12:false}).format(d);
+
+/* ---------- state ---------- */
+const S = {svc:"", dir:1, route:null, buses:[], sel:null, token:0, bounds:null, busMarkers:{}, stopMarkers:{}, layers:{stops:true, buses:true, traffic:true, incidents:false, rain:false}, auto:false};
+
+/* ---------- header ---------- */
+function tickClock(){
+  const p = Object.fromEntries(new Intl.DateTimeFormat("en-GB", {timeZone:"Asia/Singapore", weekday:"short", day:"2-digit", month:"short", year:"numeric", hour:"2-digit", minute:"2-digit", hour12:false}).formatToParts(new Date()).map(x => [x.type, x.value]));
+  $("clock").textContent = `${p.weekday}, ${p.day} ${p.month} ${p.year}  ${p.hour}:${p.minute}`;
+}
+function setLive(state, text, title){ const e = $("live"); e.className = "live " + state; $("liveText").textContent = text; e.title = title || ""; }
+tickClock(); setInterval(tickClock, 15000);
+
+/* ---------- utilities ---------- */
+let toastT;
+function toast(msg, ms){ const t = $("toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove("show"), ms || 5000); }
+async function api(url, ms){
+  const c = new AbortController(), t = setTimeout(() => c.abort(), ms || 75000);
+  try{
+    const r = await fetch(url, {signal:c.signal});
+    const j = await r.json().catch(() => ({}));
+    if(!r.ok && !j.error) j.error = `Server error (${r.status})`;
+    return j;
+  }catch(e){ return {error: e.name === "AbortError" ? "Request timed out" : "Network error"}; }
+  finally{ clearTimeout(t); }
+}
+const q = o => Object.entries(o).map(([k, v]) => `${k}=${encodeURIComponent(v)}`).join("&");
+
+/* ---------- map ---------- */
+if(typeof L === "undefined"){ document.getElementById("map").innerHTML = '<div style="padding:24px;color:#0a1a2e">The map library could not be loaded. Check your internet connection and reload.</div>'; throw new Error("Leaflet missing"); }
+const map = L.map("map", {zoomControl:false, attributionControl:false, minZoom:11, maxZoom:19, maxBounds:[[1.10,103.50],[1.55,104.20]], maxBoundsViscosity:.8}).setView([1.3521,103.8198], 11);
+const ATTR_OM = `<a href="https://www.onemap.gov.sg/" target="_blank" rel="noopener">OneMap</a> | © ${new Date().getFullYear()} Singapore Land Authority`;
+const ATTR_OSM = `Basemap © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors (OneMap tiles unavailable)`;
+const baseOM = L.tileLayer("https://www.onemap.gov.sg/maps/tiles/Default/{z}/{x}/{y}.png", {minZoom:11, maxZoom:19, attribution:ATTR_OM}).addTo(map);
+/* If OneMap tiles never load (blocked, moved, offline), quietly switch to OpenStreetMap so the map is never blank. */
+(function(){
+  let ok = 0, bad = 0, swapped = false;
+  baseOM.on("tileload", () => { ok++; });
+  baseOM.on("tileerror", () => {
+    bad++;
+    if(!swapped && ok === 0 && bad >= 4){
+      swapped = true; map.removeLayer(baseOM);
+      L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {minZoom:11, maxZoom:19, attribution:ATTR_OSM}).addTo(map);
+    }
+  });
+})();
+L.control.zoom({position:"topleft"}).addTo(map);
+L.control.attribution({position:"bottomleft", prefix:false}).addTo(map);
+L.control.scale({position:"bottomright", imperial:false}).addTo(map);
+[["rain",402],["casing",405],["route",410],["stops",430]].forEach(([n, z]) => { map.createPane(n).style.zIndex = z; });
+const gRain = L.layerGroup(), gCasing = L.layerGroup().addTo(map), gRoute = L.layerGroup(), gBase = L.layerGroup(), gStops = L.layerGroup(), gSel = L.layerGroup().addTo(map), gBuses = L.layerGroup(), gInc = L.layerGroup();
+function syncLayers(){
+  const on = (g, v) => { if(v && !map.hasLayer(g)) map.addLayer(g); if(!v && map.hasLayer(g)) map.removeLayer(g); };
+  on(gRoute, S.layers.traffic); on(gBase, !S.layers.traffic); on(gStops, S.layers.stops); on(gBuses, S.layers.buses); on(gInc, S.layers.incidents); on(gRain, S.layers.rain);
+}
+syncLayers();
+const busIcon = () => L.divIcon({className:"", iconSize:[32,32], iconAnchor:[16,16], popupAnchor:[0,-16], html:`<div class="bm">${ico("bus")}</div>`});
+const incIcon = () => L.divIcon({className:"", iconSize:[26,26], iconAnchor:[13,13], popupAnchor:[0,-12], html:`<div class="im">!</div>`});
+const POP = {className:"pp", maxWidth:290};
+
+function fitRoute(){
+  if(!S.bounds) return;
+  const small = window.innerWidth < 760;
+  map.fitBounds(S.bounds, {paddingTopLeft:small ? [16,76] : [40,110], paddingBottomRight:small ? [16,72] : [40,60], maxZoom:15});
+}
+
+/* ---------- route drawing ---------- */
+function speedText(run){
+  if(run.b == null) return "No LTA traffic reading for this stretch";
+  const r = run.b >= 8 ? "70+ km/h" : (run.mn != null && run.mx != null ? `${run.mn}–${run.mx} km/h` : "");
+  return `${r} <span class="m">• LTA band ${run.b}</span>`;
+}
+function clearRoute(){
+  [gCasing, gRoute, gBase, gStops, gSel, gBuses].forEach(g => g.clearLayers());
+  S.route = null; S.bounds = null; S.buses = []; S.busMarkers = {}; S.stopMarkers = {}; S.sel = null;
+}
+function drawRoute(r){
+  [gCasing, gRoute, gBase, gStops, gSel].forEach(g => g.clearLayers());
+  S.stopMarkers = {};
+  const all = [];
+  r.runs.forEach(run => {
+    all.push(...run.pts);
+    L.polyline(run.pts, {pane:"casing", color:"#04101f", weight:10, opacity:.5, lineCap:"round", lineJoin:"round", interactive:false}).addTo(gCasing);
+    L.polyline(run.pts, {pane:"route", color:COL[bandCls(run.b)], weight:6, opacity:.97, lineCap:"round", lineJoin:"round"}).bindPopup(`<h4>${esc(run.road || "Route")}</h4>${speedText(run)}`, POP).addTo(gRoute);
+    L.polyline(run.pts, {pane:"route", color:COL.none, weight:5, opacity:.95, lineCap:"round", lineJoin:"round", interactive:false}).addTo(gBase);
+  });
+  r.stops.forEach((s, i) => {
+    const end = i === 0 || i === r.stops.length - 1;
+    const m = L.circleMarker([s.lat, s.lon], {pane:"stops", radius:end ? 6.5 : 4.2, color:"#06111f", weight:end ? 3 : 2, fillColor:"#fff", fillOpacity:1});
+    m._end = end;
+    m.bindPopup("Loading…", POP).on("click", () => selectStop(s.code, true)).addTo(gStops);
+    S.stopMarkers[s.code] = m;
+  });
+  styleStops();
+  S.bounds = L.latLngBounds(all.length ? all : r.stops.map(s => [s.lat, s.lon]));
+}
+/* Stop dots shrink as the map zooms out, otherwise on a phone (whole route in view) they hide the traffic colours. */
+function styleStops(){
+  const z = map.getZoom();
+  const [r, w] = z >= 15 ? [4.6, 2] : z >= 14 ? [3.8, 2] : z >= 13 ? [3, 1.5] : z >= 12 ? [2.2, 1] : [1.6, 0];
+  Object.values(S.stopMarkers).forEach(m => { if(!m._end){ m.setRadius(r); m.setStyle({weight:w}); } });
+}
+map.on("zoomend", styleStops);
+function markSelected(stop){
+  gSel.clearLayers();
+  if(stop) L.circleMarker([stop.lat, stop.lon], {pane:"stops", radius:10, color:"#1785ff", weight:3, fillOpacity:0, interactive:false}).addTo(gSel);
+}
+
+/* ---------- panels ---------- */
+function skeleton(id, n){ $(id).innerHTML = Array.from({length:n || 3}, (_, i) => `<div class="sk" style="width:${92 - i * 14}%"></div>`).join(""); }
+function renderSummary(r){
+  const s = r.summary, p = s.pct, t = r.traffic;
+  const segs = [["smooth","Smooth"],["moderate","Moderate"],["slow","Slow"]].concat(p.none > 0 ? [["none","No data"]] : []);
+  const bar = segs.filter(([k]) => p[k] > 0).map(([k]) => `<div class="${k}" style="flex:${p[k]}">${p[k] >= 9 ? p[k] + "%" : ""}</div>`).join("");
+  const lab = segs.map(([k, n]) => `<div>${n}${p[k] < 9 && p[k] > 0 ? ` <b>${p[k]}%</b>` : ""}</div>`).join("");
+  const warn = t.ok ? "" : `<div class="warn"><b>Traffic feed unavailable.</b> Showing the route only, no traffic is estimated.<br><small>${esc(t.error || "")}</small></div>`;
+  const nod = t.ok && p.none > 0 ? `<div class="nodata">${p.none}% of the route has no LTA reading (small roads or gaps), drawn in blue.</div>` : "";
+  $("sumSub").textContent = `Based on traffic bands along Service ${r.service} (Dir ${r.direction})`;
+  $("sumBody").innerHTML = `${warn}${t.ok ? `<div class="bar">${bar}</div><div class="bar-l" style="--n:${segs.length}">${lab}</div>` : ""}${nod}
+    <div class="stats">
+      <div><div class="stat">${ico("route")}<b>${s.lengthKm} <small>km</small></b></div><div class="cap">Route length</div></div>
+      <div><div class="stat">${ico("pin")}<b>${s.stops}</b></div><div class="cap">Total stops</div></div>
+      <div><div class="stat">${ico("clock")}<b>${s.etaMin == null ? "--" : "~ " + dur(s.etaMin)}</b></div><div class="cap">Est. travel time<br>(${esc(s.etaBasis)})</div></div>
+    </div>`;
+}
+function renderBuses(res){
+  const b = res.buses || [];
+  $("busTitle").textContent = `Live Buses (Dir ${S.dir})`;
+  if(res.error && !b.length){ $("busBody").innerHTML = `<div class="warn">Live bus feed problem: ${esc(res.error)}</div>`; return; }
+  if(!b.length){ $("busBody").innerHTML = `<div class="empty">No buses reporting a position on this route right now.</div>`; return; }
+  const rows = b.map(x => `<tr data-id="${x.id}"><td><span class="bi">${ico("bus")}</span>#${x.id}${x.type ? ` <small style="display:inline">${esc(x.type)}</small>` : ""}</td>
+    <td>${esc(x.near.name)}<small>${esc(x.near.road)}</small></td>
+    <td>${loadChip(x.load)}</td>
+    <td><span class="sd ${x.monitored ? "live" : ""}" title="${x.monitored ? "Live tracking" : "Scheduled, not GPS-tracked"}"></span><b>${mins(x.eta)}</b><small>to ${esc(x.toStop.name)}</small></td></tr>`).join("");
+  $("busBody").innerHTML = `<div class="tw"><table class="tb"><thead><tr><th>Bus</th><th>Location (near)</th><th>Load</th><th>ETA</th></tr></thead><tbody>${rows}</tbody></table></div>
+    <div class="foot-n">${b.length} bus${b.length === 1 ? "" : "es"} shown • updated ${sgTime(new Date(res.updated || Date.now()), true)}</div>`;
+}
+function stopHeader(stop, svc, dir){
+  const nm = stop ? stop.name : "Selected stop", code = stop ? stop.code : "";
+  return `<div class="selstop"><span class="pin">${ico("pin")}</span><div><b>${esc(code)} ${esc(nm)}</b><br><span>${svc ? `Service ${esc(svc)} • Dir ${dir}` : "All services"}</span></div></div>`;
+}
+function renderArrivals(res, svc, dir){
+  const stop = res.stop;
+  if(res.error){ $("arrBody").innerHTML = `${stopHeader(stop, svc, dir)}<div class="warn">Could not load arrivals: ${esc(res.error)}</div>`; return; }
+  const list = res.services || [];
+  if(!list.length){ $("arrBody").innerHTML = `${stopHeader(stop, svc, dir)}<div class="empty">No buses due${svc ? " for Service " + esc(svc) : ""} right now.</div>`; return; }
+  if(svc){
+    const bs = list[0].buses;
+    const nth = ["Next", "2nd", "3rd"];
+    $("arrBody").innerHTML = `${stopHeader(stop, svc, dir)}<table class="tb"><thead><tr><th>Bus</th><th>Arrival</th><th>Est. Load</th></tr></thead><tbody>${bs.map((x, i) => `<tr><td><span class="bi">${ico("bus")}</span>${nth[i]}${x.type ? ` <small style="display:inline">${esc(x.type)}</small>` : ""}</td><td><b>${mins(x.eta)}</b></td><td>${loadChip(x.load)}</td></tr>`).join("")}</tbody></table>
+      <div class="foot-n">${bs.length} upcoming bus${bs.length === 1 ? "" : "es"}</div>`;
+  }else{
+    $("arrBody").innerHTML = `${stopHeader(stop, "", dir)}<table class="tb"><thead><tr><th>Service</th><th>Next buses</th><th>Load</th></tr></thead><tbody>${list.map(s => `<tr><td><span class="svcb">${esc(s.service)}</span></td><td><b>${s.buses.length ? s.buses.map(b => mins(b.eta)).join(" · ") : "--"}</b></td><td>${s.buses[0] ? loadChip(s.buses[0].load) : ""}</td></tr>`).join("")}</tbody></table>
+      <div class="foot-n">${list.length} service${list.length === 1 ? "" : "s"}</div>`;
+  }
+}
+function stopPopup(stop, res, svc, dir){
+  const head = `<h4><b>${esc(stop.code)}</b> &nbsp;${esc(stop.name)}</h4>`;
+  if(!res) return `${head}<span class="m">Loading arrivals…</span>`;
+  if(res.error) return `${head}<span class="m">Arrivals unavailable: ${esc(res.error)}</span>`;
+  const list = res.services || [];
+  if(!list.length) return `${head}<span class="m">No buses due right now.</span>`;
+  if(svc){
+    return `${head}<span class="m">Svc: ${esc(svc)}</span><br>Next buses (Dir ${dir}):<ul>${list[0].buses.map(b => `<li><b>${mins(b.eta)}</b> <span class="m">(est. load: ${esc(loadText(b.load))})</span></li>`).join("") || "<li class='m'>None</li>"}</ul>`;
+  }
+  return `${head}<ul>${list.slice(0, 8).map(s => `<li><b>${esc(s.service)}</b> &nbsp;${s.buses.map(b => mins(b.eta)).join(" · ") || "--"}</li>`).join("")}</ul>`;
+}
+
+/* ---------- actions ---------- */
+async function selectStop(code, fromMap){
+  const tok = S.token;
+  const stop = S.route ? S.route.stops.find(s => s.code === code) : null;
+  const svc = S.route ? S.svc : "";
+  if(!stop){ return; }
+  S.sel = code; markSelected(stop);
+  const m = S.stopMarkers[code];
+  if(m){ m.setPopupContent(stopPopup(stop, null)); if(!fromMap) { map.panTo([stop.lat, stop.lon]); } m.openPopup(); }
+  $("arrBody").innerHTML = `${stopHeader(stop, svc, S.dir)}${'<div class="sk"></div>'.repeat(3)}`;
+  const res = await api(`/api/arrivals?${q({stop:code, service:svc})}`);
+  if(tok !== S.token || S.sel !== code) return;
+  renderArrivals({...res, stop}, svc, S.dir);
+  if(m) m.setPopupContent(stopPopup(stop, res, svc, S.dir));
+}
+function drawBuses(res){
+  gBuses.clearLayers(); S.busMarkers = {};
+  (res.buses || []).forEach(b => {
+    const m = L.marker([b.lat, b.lon], {icon:busIcon(), keyboard:false}).bindPopup(
+      `<h4><b>Bus #${b.id}</b> • Svc ${esc(S.svc)}${b.type ? " • " + esc(b.type) : ""}</h4>Near ${esc(b.near.name)}<br>Reaches <b>${esc(b.toStop.name)}</b> in <b>${mins(b.eta)}</b><br><span class="m">Load: ${esc(loadText(b.load))}${b.wab ? " • Wheelchair accessible" : ""}</span><br><span class="m">${b.monitored ? "Live tracked" : "Scheduled (not GPS-tracked)"} • position estimated by LTA</span>`, POP).addTo(gBuses);
+    S.busMarkers[b.id] = m;
+  });
+}
+async function loadBuses(tok){
+  const res = await api(`/api/buses?${q({service:S.svc, direction:S.dir})}`);
+  if(tok !== S.token) return;
+  S.buses = res.buses || [];
+  drawBuses(res); renderBuses(res);
+}
+async function loadIncidents(){
+  gInc.clearLayers();
+  const res = await api(`/api/incidents?${q({service:S.route ? S.svc : "", direction:S.dir})}`);
+  if(res.error){ toast("Incidents unavailable: " + res.error); return; }
+  (res.incidents || []).forEach(x => L.marker([x.lat, x.lon], {icon:incIcon(), keyboard:false}).bindPopup(`<h4><b>${esc(x.type)}</b></h4>${esc(x.message)}`, POP).addTo(gInc));
+  if(!(res.incidents || []).length) toast(res.scoped ? "No traffic incidents reported near this route." : "No traffic incidents reported.");
+}
+async function loadRain(){
+  gRain.clearLayers();
+  const res = await api("/api/rain");
+  if(res.error){ toast(res.error); return; }
+  (res.stations || []).forEach(x => L.circle([x.lat, x.lon], {pane:"rain", radius:Math.min(3200, 900 + x.mm * 450), color:"#4aa8ff", weight:1, fillColor:"#4aa8ff", fillOpacity:.3}).bindPopup(`<h4><b>${esc(x.name)}</b></h4>${x.mm} mm in the last 5 minutes <span class="m">(NEA)</span>`, POP).addTo(gRain));
+  if(!(res.stations || []).length) toast("No rain reported at NEA stations right now.");
+}
+function setSvcCard(title, sub){ $("svcTitle").innerHTML = title; $("svcSub").textContent = sub; }
+function syncDir(){ $("d1").setAttribute("aria-pressed", S.dir === 1); $("d2").setAttribute("aria-pressed", S.dir === 2); }
+function urlState(svc, stop){ const p = new URLSearchParams(); if(svc) p.set("svc", svc); if(stop) p.set("stop", stop); if(svc) p.set("dir", S.dir); try{ history.replaceState(null, "", p.toString() ? "?" + p : location.pathname); }catch(e){} }
+function emptyPanels(){
+  $("sumBody").innerHTML = `<div class="empty">Enter a service number and tap <b>Show</b> to see how traffic is flowing along its route.</div>`;
+  $("busBody").innerHTML = `<div class="empty">Live bus positions for the selected service will appear here.</div>`;
+  $("arrBody").innerHTML = `<div class="empty">Tap a bus stop on the map, or enter a stop code, to see the next arrivals.</div>`;
+  $("busTitle").textContent = "Live Buses"; $("sumSub").textContent = "Traffic bands along the selected route";
+}
+
+async function showStopOnly(code, tok){
+  clearRoute(); gInc.clearLayers();
+  setSvcCard(`Stop ${esc(code)}`, "Next arrivals for all services");
+  skeleton("arrBody", 3);
+  const res = await api(`/api/arrivals?${q({stop:code})}`);
+  if(tok !== S.token) return;
+  if(!res.stop && !(res.services || []).length){ $("arrBody").innerHTML = `<div class="warn">${esc(res.error || "Bus stop " + code + " was not found.")}</div>`; return; }
+  if(res.stop){
+    setSvcCard(`${esc(res.stop.code)} ${esc(res.stop.name)}`, `${(res.servicesAtStop || []).length} services stop here`);
+    L.circleMarker([res.stop.lat, res.stop.lon], {pane:"stops", radius:8, color:"#1785ff", weight:3, fillColor:"#fff", fillOpacity:1, interactive:false}).addTo(gSel);
+    map.setView([res.stop.lat, res.stop.lon], 16);
+  }
+  renderArrivals(res, "", S.dir);
+}
+
+async function apply(o){
+  o = o || {};
+  const svc = $("svc").value.trim().toUpperCase(), stop = $("stop").value.trim();
+  if(!svc && !stop){ toast("Enter a bus service number or a bus stop code."); $("svc").focus(); return; }
+  const tok = ++S.token; S.svc = svc;
+  $("go").disabled = true; urlState(svc, stop);
+  try{
+    if(!svc){ await showStopOnly(stop, tok); return; }
+    clearRoute(); gInc.clearLayers(); emptyPanels();
+    setSvcCard(`Service ${esc(svc)} <em>Dir ${S.dir}</em>`, "Loading route and live traffic…");
+    skeleton("sumBody", 4); skeleton("busBody", 4);
+    const busesP = api(`/api/buses?${q({service:svc, direction:S.dir})}`);
+    const route = await api(`/api/route?${q({service:svc, direction:S.dir})}`);
+    if(tok !== S.token) return;
+    if(route.error){
+      const other = (route.availableDirections || []).filter(d => d !== S.dir);
+      if(other.length && !o.retried){ S.dir = other[0]; syncDir(); toast(`Service ${svc} only runs in direction ${S.dir}.`); $("go").disabled = false; return apply({retried:true}); }
+      setSvcCard(`Service ${esc(svc)}`, "Route not found"); emptyPanels();
+      $("sumBody").innerHTML = `<div class="warn">${esc(route.error)}</div>`;
+      $("busBody").innerHTML = ""; toast(route.error);
+      return;
+    }
+    S.route = route; drawRoute(route); syncLayers(); fitRoute();
+    $("svcTitle").innerHTML = `Service ${esc(svc)} <em>Dir ${route.direction}</em>`;
+    $("svcSub").innerHTML = `${route.summary.stops} stops<br>${route.traffic.ok ? "Showing traffic along bus route" : "Traffic feed unavailable"}`;
+    renderSummary(route);
+    setLive(route.traffic.ok ? "ok" : "warn", route.traffic.ok ? "Live Data (LTA/NEA)" : "Traffic feed unavailable", route.traffic.error || "");
+    if(route.geometry !== "osrm") toast(route.geometry === "stops" ? "Road snapping unavailable: route is drawn stop to stop, so traffic matching is approximate." : "Part of the route is drawn stop to stop.", 7000);
+    const buses = await busesP;
+    if(tok !== S.token) return;
+    S.buses = buses.buses || []; drawBuses(buses); renderBuses(buses);
+    if(stop){
+      if(route.stops.some(s => s.code === stop)) selectStop(stop, false);
+      else toast(`Stop ${stop} is not on Service ${svc} (Dir ${route.direction}).`);
+    }
+    if(S.layers.incidents) loadIncidents();
+    if(S.layers.rain) loadRain();
+  } finally { if(tok === S.token) $("go").disabled = false; }
+}
+function clearAll(){
+  S.token++; S.svc = ""; clearRoute(); gInc.clearLayers();
+  $("svc").value = ""; $("stop").value = ""; emptyPanels(); urlState("", "");
+  setSvcCard("Pick a service", "Enter a bus service and tap Show");
+  map.setView([1.3521, 103.8198], 11); $("go").disabled = false;
+}
+
+/* ---------- wiring ---------- */
+$("form").addEventListener("submit", e => { e.preventDefault(); apply(); });
+$("clear").addEventListener("click", clearAll);
+$("recenter").addEventListener("click", () => S.bounds ? fitRoute() : map.setView([1.3521, 103.8198], 11));
+[["d1",1],["d2",2]].forEach(([id, d]) => $(id).addEventListener("click", () => { if(S.dir === d) return; S.dir = d; syncDir(); if($("svc").value.trim()) apply(); }));
+$("busBody").addEventListener("click", e => {
+  const tr = e.target.closest("tr[data-id]"); if(!tr) return;
+  const b = S.buses.find(x => String(x.id) === tr.dataset.id), m = S.busMarkers[tr.dataset.id];
+  if(!b) return;
+  map.flyTo([b.lat, b.lon], Math.max(map.getZoom(), 15), {duration:.6}); if(m) setTimeout(() => m.openPopup(), 650);
+});
+document.querySelectorAll("#layers input[data-l]").forEach(cb => cb.addEventListener("change", () => {
+  const k = cb.dataset.l; S.layers[k] = cb.checked; syncLayers();
+  if(cb.checked && k === "incidents") loadIncidents();
+  if(cb.checked && k === "rain") loadRain();
+}));
+$("layH").addEventListener("click", () => { const l = $("layers"); const o = l.classList.toggle("open"); $("layH").setAttribute("aria-expanded", o); });
+let sugT;
+$("stop").addEventListener("input", () => {
+  clearTimeout(sugT); const v = $("stop").value.trim();
+  if(v.length < 2) return;
+  sugT = setTimeout(async () => {
+    const r = await api("/api/stop-suggest?q=" + encodeURIComponent(v), 15000);
+    if(Array.isArray(r)) $("stopList").innerHTML = r.map(s => `<option value="${esc(s.code)}">${esc(s.name)} (${esc(s.road)})</option>`).join("");
+  }, 250);
+});
+$("svc").addEventListener("input", e => { e.target.value = e.target.value.toUpperCase(); });
+
+/* auto refresh: buses every 20 s (LTA's rate), traffic every 5 min (LTA's rate); paused while the tab is hidden */
+setInterval(async () => {
+  if(document.hidden || !S.route) return;
+  const tok = S.token; await loadBuses(tok);
+  if(S.sel && tok === S.token){ const stop = S.route.stops.find(s => s.code === S.sel); const res = await api(`/api/arrivals?${q({stop:S.sel, service:S.svc})}`); if(tok === S.token && stop){ renderArrivals({...res, stop}, S.svc, S.dir); } }
+}, 20000);
+setInterval(async () => {
+  if(document.hidden || !S.route) return;
+  const tok = S.token, r = await api(`/api/route?${q({service:S.svc, direction:S.dir})}`);
+  if(tok !== S.token || r.error) return;
+  S.route = r; const keep = S.sel; drawRoute(r); syncLayers(); renderSummary(r); if(keep) markSelected(r.stops.find(s => s.code === keep));
+  setLive(r.traffic.ok ? "ok" : "warn", r.traffic.ok ? "Live Data (LTA/NEA)" : "Traffic feed unavailable", r.traffic.error || "");
+}, 300000);
+
+/* start */
+(async () => {
+  const h = await api("/api/health", 15000);
+  if(h.error) setLive("bad", "Server unreachable", h.error);
+  else if(!h.lta) setLive("bad", "LTA key missing", "Set LTA_ACCOUNT_KEY on the server");
+  else setLive("ok", "Live Data (LTA/NEA)", "");
+  const p = new URLSearchParams(location.search);
+  if(p.get("svc") || p.get("stop")){
+    $("svc").value = (p.get("svc") || "").toUpperCase(); $("stop").value = p.get("stop") || "";
+    S.dir = p.get("dir") === "2" ? 2 : 1; syncDir(); apply();
+  }
+})();
+setTimeout(() => map.invalidateSize(), 300);
+window.addEventListener("resize", () => map.invalidateSize());
+</script>
+</body>
+</html>
