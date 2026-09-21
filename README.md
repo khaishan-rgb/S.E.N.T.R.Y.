@@ -1,7 +1,22 @@
-# SG Transport Pulse V9.0 — Route Traffic + Departure Adjustment + Bunching, Gap & Alerts + AI Halfway Optimiser
+# SG Transport Pulse V9.1 — Route Traffic + Departure Adjustment + Bunching, Gap & Alerts + AI Halfway Optimiser
 
 Live bus positions, live LTA traffic drawn directly on the bus route, and next arrivals per stop.
 FastAPI backend + a single-page Leaflet frontend (OneMap basemap, OpenStreetMap fallback).
+
+## V9.1 - Simple before / after picture, and headway regulation of at least 3 + 3 trips at the interchange
+
+* **Simple view (default).** The middle card of the halfway page is now a road strip like the "halfway insertion" picture: buses placed by the time they pass one stop (the halfway stop,
+  or the first stop for *regulate only*), the gap in **minutes** between neighbouring buses (green = within +-20% of scheduled, amber / red = long or bunched), **Before - no action** (the lost
+  trip is a dashed ghost in the hole), an arrow, **After - the selected option** (the inserted bus is the green star bus; held buses amber, early-released buses cyan, with the minutes),
+  *Before / After* result boxes, *Why it works* and a summary banner. The detailed **Street map** (route, off-service arrow, callouts, clock playback) is one click away (*Street map*
+  button; the choice is remembered). The time-against-route chart stays below.
+* **Interchange regulation over at least 6 trips (3 up + 3 down).** The AI now regulates (holds / releases at the first stop) **at least `reg_min_side` = 3 trips before and 3 after** the
+  gap, even if the regulation window is smaller. If the sequence has fewer than 3 trips **above** the disrupted trip, more **future** trips are adjusted instead (2 above -> 4 below, so
+  at least 6 in total), and those future trips may **leave early** by up to `reg_early_future` = 5 min (never before arrival + minimum layover) to close the gap. The same holds at the end
+  of the sequence (few trips after -> more before). A trip before the first / after the last simulated one is assumed to run on schedule, so trip 1 and the last trip can be regulated too.
+  The recommendation card states how many trips are adjusted above and below the gap, and why future trips are used. Settings: *Regulate at least this many trips each side* (0 = off) and
+  *Future trips may leave early by up to*. The picture shows the same 3 + 3 (2 + 4 when the top is short). Model version `halfway-6.0`; the result has `span` {up, dn, min_side, short_up,
+  show_up, show_dn}.
 
 ## V9.0 - AI halfway deployment plan: no approved list needed, the AI picks the stop from timing and headway
 

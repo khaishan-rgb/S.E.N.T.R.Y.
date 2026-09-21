@@ -156,6 +156,16 @@ details.hall{margin-top:10px}details.hall summary{cursor:pointer;color:#9cc4ff;f
 .horec .hosteps li:before{content:none}.horec .hosteps li{margin:0}
 .hosw{margin-top:8px;font-size:12.5px;color:#cfe0f3;border-top:1px solid var(--line2);padding-top:7px}
 .hotag{display:inline-block;font-size:10.5px;font-weight:700;border-radius:5px;padding:0 5px;margin-left:5px;background:#173a63;color:#9cc8ff}.hotag.a{background:#0f3a24;color:#8ff0b3}
+
+/* V9.1 simple before / after view */
+.hopanel{border:1px solid var(--line2);border-radius:12px;background:#0b1a2e;overflow:hidden}.hopanel .tw{padding:2px 6px 6px}
+.hotitle{display:inline-block;padding:6px 16px;border-radius:0 0 12px 0;font-weight:800;font-size:14.5px}.hotitle.red{background:#3a1219;color:#ff8a90}.hotitle.green{background:#0f3a24;color:#8ff0b3}
+.hoarr{text-align:center;color:#3fbf72;font-size:34px;line-height:30px;margin:2px 0}
+.horesult{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}.horesult>div{border-radius:10px;padding:9px 13px;font-size:13.5px}.horesult b{display:block;margin-bottom:3px;font-size:14px}.horesult ul{margin:0;padding-left:18px;display:grid;gap:2px}
+.horesult .rb{background:#3a1219;border:1px solid #7a2a33;color:#ffc4c8}.horesult .rg{background:#0f3a24;border:1px solid #2c7a47;color:#b9f5d0}
+.howhy{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);gap:12px;margin-top:10px;background:#10294a;border:1px solid #1f4c85;border-radius:12px;padding:12px 14px}.howhy h3{margin:0 0 4px;font-size:16px}.howhy ul{margin:0;padding-left:18px;display:grid;gap:4px;font-size:13.2px;line-height:1.4}
+.hobanner{display:flex;align-items:center;background:#1c5a9a;border-radius:10px;padding:10px 14px;font-weight:800;font-size:15px;line-height:1.3}
+@media(max-width:760px){.horesult,.howhy{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -190,13 +200,15 @@ details.hall{margin-top:10px}details.hall summary{cursor:pointer;color:#9cc4ff;f
         <div class="btns"><button class="btn go" id="hoRun" type="button">Run AI Optimisation</button><button class="btn" id="hoEx" type="button">Load example</button></div>
         <div class="hx-note" id="hoMsg"></div>
       </section>
-      <section class="card"><header><div><h2>Deployment Map &ndash; Where the Halfway Trip Starts</h2><div class="sub">Route, halfway start, the off-service move and every trip running at the chosen clock time.</div></div></header>
-        <div class="hodep" id="hoDep">Enter a service to load its route.</div>
+      <section class="card" id="hoMapCard"><header style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap"><div><h2>How the Halfway Deployment Evens the Headway</h2><div class="sub" id="hoMapSub"></div></div>
+          <div class="seg" id="hoView" style="width:auto"><button type="button" data-v="simple" aria-pressed="true">Simple view</button><button type="button" data-v="street" aria-pressed="false">Street map</button></div></header>
+        <div id="hoSimple"><div class="ho-msg">Enter a service to load its route.</div></div>
+        <div id="hoStreet" hidden><div class="hodep" id="hoDep">Enter a service to load its route.</div>
         <div class="holeg"><span><i style="border-color:#1785ff"></i>Route</span><span><i style="border-color:#ff4d55"></i>Section without the trip</span><span><i style="border-color:#22d36a"></i>Replacement resumes service</span><span><i style="border-color:#b46bff;border-top-style:dashed"></i>Off-service move</span><span style="color:#ff4d55">&#9733; Halfway start</span></div>
         <div class="holeg"><span><b class="hobus" style="display:inline-grid;width:16px;height:16px;font-size:0"></b>Trip (number = trip no.)</span><span><b class="hobus hold" style="display:inline-grid;width:16px;height:16px;font-size:0"></b>Held at first stop</span><span><b class="hobus rel" style="display:inline-grid;width:16px;height:16px;font-size:0"></b>Released early</span><span><b class="hobus rep" style="display:inline-grid;width:16px;height:16px;font-size:0"></b>Replacement</span><span><b class="hopick" style="display:inline-grid;width:15px;height:15px;font-size:0;border-radius:4px"></b>Approved halfway stop (number = stop no.; click to test)</span></div>
         <div class="mapwrap"><div id="hoMap"></div></div>
         <div class="hopb"><button class="btn sm" id="hoPlay" type="button" aria-label="Play the simulation">&#9654;</button><input id="hoClock" type="range" min="0" max="100" step="1" value="0" aria-label="Simulation clock"><b id="hoClockT">--:--</b></div>
-        <div class="hopb2"><label class="hx-chk"><input type="checkbox" id="hoGhost"> Show no-action trips (grey)</label><span id="hoBusCount"></span></div></section>
+        <div class="hopb2"><label class="hx-chk"><input type="checkbox" id="hoGhost"> Show no-action trips (grey)</label><span id="hoBusCount"></span></div></div></section>
       <section class="card horec" id="hoRec"><div class="ho-msg">Enter a service to load its route.</div></section>
     </div>
     <section class="card hx-row">
@@ -230,7 +242,7 @@ details.hall{margin-top:10px}details.hall summary{cursor:pointer;color:#9cc4ff;f
     <section class="card" style="margin-top:12px"><header><div><h2>Simulation audit log</h2><div class="sub">Each time you press <b>Run AI Optimisation</b> the scenario, every option's result, the recommendation, the weights and the model version are stored (live re-simulation while you edit is not).</div></div></header><div class="tw" id="hoRuns"></div></section>
   </main>
 
-  <footer class="foot"><span>Sources: LTA DataMall (Bus Routes/Stops/Services, Traffic Speed Bands, Traffic Incidents) &nbsp;|&nbsp; A scenario simulation from the schedule at the first stop, not live bus data. Decision support only, not for operational use</span><span>SG Transport Pulse V9.0</span></footer>
+  <footer class="foot"><span>Sources: LTA DataMall (Bus Routes/Stops/Services, Traffic Speed Bands, Traffic Incidents) &nbsp;|&nbsp; A scenario simulation from the schedule at the first stop, not live bus data. Decision support only, not for operational use</span><span>SG Transport Pulse V9.1</span></footer>
 </div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -255,7 +267,7 @@ async function post(url, body){
 function csvDownload(name, rows){ const csv = rows.map(r => r.map(v => { v = v == null ? "" : String(v); return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; }).join(",")).join("\n"); const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([csv], {type:"text/csv"})); a.download = name; document.body.appendChild(a); a.click(); a.remove(); }
 /* ===================== AI Halfway Optimiser (a scenario from the schedule at the first stop; never identifies a bus, never deploys) ===================== */
 const S = {tab:"opt", hoCfg:null};
-const HO = {svc:LS.get("ho.svc", ""), dir:LS.get("ho.dir", 1), setup:null, res:null, sel:null, selKey:null, map:null, g:null, late:[], dis:3, tok:0, timer:null, n:10, pb:{t:null, min:0, max:100, play:false, timer:null, res:null, key:null, ghost:false}, geo:null, tsdg:null, barsAt:null, scope:LS.get("ho.scope", "all"), veh:LS.get("ho.veh", "own"), pick:"", showAll:false};
+const HO = {svc:LS.get("ho.svc", ""), dir:LS.get("ho.dir", 1), setup:null, res:null, sel:null, selKey:null, map:null, g:null, late:[], dis:3, tok:0, timer:null, n:10, pb:{t:null, min:0, max:100, play:false, timer:null, res:null, key:null, ghost:false}, geo:null, tsdg:null, barsAt:null, view:LS.get("ho.view", "simple"), scope:LS.get("ho.scope", "all"), veh:LS.get("ho.veh", "own"), pick:"", showAll:false};
 const hm = m => { m = ((Math.round(m) % 1440) + 1440) % 1440; return String(Math.floor(m / 60)).padStart(2, "0") + ":" + String(m % 60).padStart(2, "0"); };
 const hoF = x => x == null ? "\u2013" : f1(x);
 const hoPct = x => x == null ? "\u2013" : f1(x) + "%";
@@ -346,7 +358,7 @@ function hoSelect(i){
   if(o.detail === false){ HO.pick = o.code || ""; hoSim(false); return; }          // a lower-ranked stop of a full scan: fetch its full detail
   HO.sel = i; hoRender();
 }
-function hoRender(){ hoRenderTrips(); hoRenderRec(); hoRenderOpts(); hoRenderProf(); hoRenderTravel(); hoRenderHeat(); hoRenderTake(); hoRenderTraf(); hoRenderMap(); hoRenderTsd(); }
+function hoRender(){ hoRenderTrips(); hoRenderRec(); hoRenderOpts(); hoRenderProf(); hoRenderTravel(); hoRenderHeat(); hoRenderTake(); hoRenderTraf(); hoRenderSimple(); if(HO.view === "street") hoRenderMap(); else hoPbInit(); hoRenderTsd(); }
 /* ---- AI recommendation card */
 function hoPlan(o){
   const out = [];
@@ -377,8 +389,9 @@ function hoWhy(r, o){
   if(o.regulated && o.reg_trips > 0){
     const sh = (o.deps || []).filter(x => Math.abs(x.shift) >= .5), before = sh.filter(x => x.shift > 0).length, after = sh.filter(x => x.shift < 0).length;
     out.push([`Regulation spreads the correction over ${o.reg_trips} trips${o.reg_trips >= 5 ? " (a gradual ramp, no single trip takes the whole gap)" : ""}${before || after ? `: ${before} held, ${after} released early` : ""} \u2013 ${f1(o.hold_min)} min of holding / release in total`, "a"]);
-    const w = r.params.reg_window, d = r.disrupted;
-    if(d - 1 < w || r.n_trips - d < w) out.push([`Only ${Math.min(d - 1, r.n_trips - d)} trip${Math.min(d - 1, r.n_trips - d) === 1 ? "" : "s"} exist on the shorter side of the disrupted trip, so the ramp is shorter there. Raise "Trips simulated" in Settings, or mark a trip nearer the middle, to give it room.`, "w"]);
+    const d = r.disrupted, up = sh.filter(x => x.n < d).length, dn = sh.filter(x => x.n > d).length, sp = r.span || {};
+    out.push([`Interchange (${r.route.first}) departures adjusted: ${up} trip${up === 1 ? "" : "s"} before the gap + ${dn} after it${sp.min_side ? ` (minimum ${sp.min_side} + ${sp.min_side} regulated)` : ""}`, "a"]);
+    if(sp.short_up) out.push([`Only ${sp.up} trip${sp.up === 1 ? "" : "s"} run above the gap, so ${sp.dn} future trips are adjusted instead and may leave up to ${f1(r.params.reg_early_future)} min early to close it. Raise "Trips simulated" or mark a later trip to give the top more room.`, "w"]);
   }
   o.violations.forEach(v => out.push([v, "w"])); o.warnings.forEach(v => out.push([v, "w"]));
   return out;
@@ -626,6 +639,75 @@ function hoRenderMap(){
   if(pts.length) HO.map.fitBounds(L.latLngBounds(pts), {padding:[46, 46], maxZoom:15});
   hoPbInit();
 }
+/* ---- V9.1 simple view: the road strip from the picture - buses placed by the time they pass one stop, the gap in minutes between them, before / after */
+function busSvg(cx, y, col, o){
+  o = o || {}; const w = 58, h = 30, x = cx - w / 2, gh = !!o.ghost;
+  let s = `<g${gh ? ' opacity=".85"' : ""}><rect x="${x.toFixed(1)}" y="${y}" width="${w}" height="${h}" rx="7" fill="${gh ? "#1a0f16" : col}" stroke="${gh ? "#ff6b73" : "#eaf3ff"}" stroke-width="${gh ? 2 : 1.6}"${gh ? ' stroke-dasharray="5 4"' : ""}/>`;
+  if(!gh){ for(let k = 0; k < 3; k++) s += `<rect x="${(x + 7 + k * 13).toFixed(1)}" y="${y + 6}" width="10" height="9" rx="2" fill="#dff1ff"/>`; s += `<rect x="${(x + w - 15).toFixed(1)}" y="${y + 6}" width="9" height="15" rx="2" fill="#bfe0ff"/><rect x="${(x + 3).toFixed(1)}" y="${y + h - 8}" width="${w - 6}" height="3" rx="1.5" fill="#ffffffcc"/>`; }
+  s += `<circle cx="${(x + 14).toFixed(1)}" cy="${y + h}" r="5.2" fill="#161f2b" stroke="#eaf3ff" stroke-width="1.5"/><circle cx="${(x + w - 14).toFixed(1)}" cy="${y + h}" r="5.2" fill="#161f2b" stroke="#eaf3ff" stroke-width="1.5"/>`;
+  if(o.star) s += `<text x="${(x + 22).toFixed(1)}" y="${y + 21}" fill="#fff" font-size="15" font-weight="800" text-anchor="middle">\u2605</text>`;
+  if(gh) s += `<text x="${cx.toFixed(1)}" y="${y + 21}" fill="#ff6b73" font-size="18" font-weight="800" text-anchor="middle">\u2716</text>`;
+  return s + "</g>";
+}
+function hoSimplePanel(items, tmin, tmax, H, bm){                   // items: [{id, t, label, sub, col, ghost, star, shift}]
+  const W = 1000, Hh = 172, k = (W - 130) / Math.max(1, tmax - tmin), X = t => W - 70 - (t - tmin) * k, roadY = 76;
+  let s = `<svg viewBox="0 0 ${W} ${Hh}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Buses placed by the time they pass the reference stop" style="width:100%;height:auto;min-width:640px;display:block">`;
+  s += `<rect x="0" y="${roadY}" width="${W}" height="30" fill="#4b5560"/><line x1="0" x2="${W}" y1="${roadY + 20}" y2="${roadY + 20}" stroke="#aab6c3" stroke-width="2" stroke-dasharray="14 12" opacity=".7"/><text x="16" y="${roadY + 15}" fill="#cfd8e3" font-size="11" opacity=".8">direction of travel \u25B6</text>`;
+  const real = items.filter(i => !i.ghost).sort((a, b) => b.t - a.t);          // left = the buses that are behind (later); right = ahead
+  for(let i = 0; i + 1 < real.length; i++){
+    const xa = X(real[i].t), xb = X(real[i + 1].t), gap = real[i].t - real[i + 1].t, c = HCOL[hoCls(gap, H, bm)];
+    s += `<g><line x1="${xa.toFixed(1)}" x2="${xb.toFixed(1)}" y1="34" y2="34" stroke="${c}" stroke-width="2.2"/><line x1="${xa.toFixed(1)}" x2="${xa.toFixed(1)}" y1="28" y2="40" stroke="${c}" stroke-width="2.2"/><line x1="${xb.toFixed(1)}" x2="${xb.toFixed(1)}" y1="28" y2="40" stroke="${c}" stroke-width="2.2"/>`
+       + `<text x="${((xa + xb) / 2).toFixed(1)}" y="22" fill="${c}" font-size="${Math.abs(xa - xb) < 56 ? 15 : 19}" font-weight="800" text-anchor="middle">${f1(gap)}${Math.abs(xa - xb) >= 58 ? " min" : ""}</text></g>`;
+  }
+  items.forEach(it => { const cx = X(it.t); s += busSvg(cx, roadY - 28, it.col, it)
+      + `<text x="${cx.toFixed(1)}" y="${roadY + 52}" fill="#eaf3ff" font-size="14" font-weight="800" text-anchor="middle">${esc(it.label)}</text><text x="${cx.toFixed(1)}" y="${roadY + 68}" fill="#9fb4ca" font-size="12" text-anchor="middle">${hm(it.t)}</text>`
+      + (it.sub ? `<text x="${cx.toFixed(1)}" y="${roadY + 84}" fill="${it.subCol || "#ffd166"}" font-size="12" font-weight="700" text-anchor="middle">${esc(it.sub)}</text>` : ""); });
+  return s + "</svg>";
+}
+function hoRenderSimple(){
+  const r = HO.res, el = $("hoSimple");
+  if(!r){ el.innerHTML = `<div class="ho-msg">Enter a service to load its route.</div>`; return; }
+  if(!r.ok){ el.innerHTML = `<div class="ho-msg hx-err">${esc(r.error)}</div>`; return; }
+  const o = hoSelC();
+  if(r.disrupted == null || !o || !o.tsd || !r.baseline || !r.baseline.tsd || !r.span){ el.innerHTML = `<div class="ho-msg">${esc(r.message || "Mark one trip as Disrupted, then press Run AI Optimisation.")}</div>`; return; }
+  const d = r.disrupted, H = r.sched_hw, bm = r.bunch_min, j = o.j != null ? o.j : 0, sp = r.span, refName = j === 0 ? r.route.first : r.map.stops[j][3];
+  const ids = []; for(let i = d - sp.show_up; i < d; i++) if(i >= 1) ids.push(String(i)); for(let i = d + 1; i <= d + sp.show_dn; i++) if(i <= r.n_trips) ids.push(String(i));
+  const shift = {}; (o.deps || []).forEach(x => shift[x.n] = x.shift);
+  const A = [], B = [];
+  ids.forEach(id => { const ta = r.baseline.tsd[id] && r.baseline.tsd[id][j], tb = o.tsd[id] && o.tsd[id][j]; if(ta != null) A.push({id, t:ta, label:"Trip " + id, col:"#1e6fd9"});
+    if(tb != null){ const sv = shift[id] || 0; B.push({id, t:tb, label:"Trip " + id, col:sv >= .5 ? "#e0a21a" : sv <= -.5 ? "#39b7e6" : "#1e6fd9", sub:sv >= .5 ? "held +" + f1(sv) : sv <= -.5 ? "early " + f1(sv) : "", subCol:sv >= .5 ? "#ffd166" : "#7fdcff"}); } });
+  const dp = r.baseline.dis_path && r.baseline.dis_path[j]; if(dp != null) A.push({id:"L", t:dp, label:"Trip " + d + " lost", col:"#000", ghost:true});
+  const rt = o.tsd.R && o.tsd.R[j]; if(rt != null) B.push({id:"R", t:rt, label:"Halfway bus", col:"#2fa84f", star:true, sub:o.start_time != null && o.late_start != null && Math.abs(o.late_start) >= .5 ? sg(o.late_start) + " vs slot" : "", subCol:"#8ff0b3"});
+  const all = A.concat(B).map(x => x.t), tmin = Math.min(...all) - 2.5, tmax = Math.max(...all) + 2.5;
+  const gaps = L => { const t = L.filter(x => !x.ghost).map(x => x.t).sort((a, b) => a - b); return t.slice(1).map((x, i) => x - t[i]); };
+  const ga = gaps(A), gb = gaps(B), mxA = Math.max(...ga), mxB = Math.max(...gb), bunA = ga.filter(g => g < bm - 1e-9).length, bunB = gb.filter(g => g < bm - 1e-9).length;
+  const rmsA = Math.sqrt(ga.reduce((s, g) => s + (g - H) ** 2, 0) / ga.length), rmsB = Math.sqrt(gb.reduce((s, g) => s + (g - H) ** 2, 0) / gb.length);
+  const resA = [], resB = [];
+  if(bunA) resA.push("Bunched buses"); if(mxA >= 1.5 * H - 1e-9) resA.push(`Long gap (${f1(mxA)} min)`); resA.push(resA.length ? "Unreliable service" : "Headways already fairly even");
+  resB.push(mxB <= 1.2 * H + 1e-9 ? `More even headways (${f1(Math.min(...gb))}\u2013${f1(mxB)} min)` : `Largest gap ${f1(mxB)} min (was ${f1(mxA)})`);
+  if(bunA > bunB) resB.push("Reduced bunching"); else if(!bunB && bunA === 0) resB.push("No bunching"); resB.push(rmsB < rmsA - 1e-9 ? "More reliable service" : "Reliability not improved");
+  const nh = (o.deps || []).filter(x => x.shift >= .5).length, nr = (o.deps || []).filter(x => x.shift <= -.5).length, ew = x => (x >= 0 ? "+" : "") + f1(Math.round(x * 100) / 100), ma = o.metrics_a, mb = o.metrics;
+  const why = [];
+  if(o.j != null) why.push(`A bus started at ${esc(o.name)} fills the ${f1(mxA)} min gap, balancing the spacing between buses.`);
+  if(o.regulated && (nh || nr)) why.push(`At the interchange (${esc(r.route.first)}) ${nh ? nh + " trip" + (nh > 1 ? "s are" : " is") + " held" : ""}${nh && nr ? " and " : ""}${nr ? nr + " released early" : ""}, so the gap is shared across ${o.reg_trips} trips instead of one.`);
+  why.push(`More even headways cut passenger waiting time (simulated EWT ${ew(ma.ewt)} \u2192 ${ew(mb.ewt)} min) and improve reliability.`);
+  why.push("This can be done with a spare bus, a short-turning bus, or by adjusting dispatching at the interchange in real time.");
+  const title = o.kind === "regulate" ? "Regulating the interchange departures" : "Halfway insertion";
+  const cap = `Each bus is placed by the time it passes <b>${esc(refName)}</b>; the number between two buses is the gap in minutes. Showing ${sp.show_up} trip${sp.show_up === 1 ? "" : "s"} before and ${sp.show_dn} after the gap${sp.short_up ? ` (only ${sp.show_up} run above it, so more future trips are adjusted)` : ""}.`;
+  el.innerHTML = `<div class="ho-note" style="margin:0 0 8px">${cap}</div>
+    <div class="hopanel"><div class="hotitle red">Before \u2013 no action ${bunA || mxA >= 1.5 * H ? "(bunched / long gap)" : ""}</div><div class="tw">${hoSimplePanel(A, tmin, tmax, H, bm)}</div></div>
+    <div class="hoarr">\u25BC</div>
+    <div class="hopanel"><div class="hotitle green">After \u2013 ${esc(o.label)} (more even headways)</div><div class="tw">${hoSimplePanel(B, tmin, tmax, H, bm)}</div></div>
+    <div class="horesult"><div class="rb"><b>Before</b><ul>${resA.map(x => `<li>${esc(x)}</li>`).join("")}</ul></div><div class="rg"><b>After</b><ul>${resB.map(x => `<li>${esc(x)}</li>`).join("")}</ul></div></div>
+    <div class="howhy"><div><h3>Why it works</h3><ul>${why.map(x => `<li>${x}</li>`).join("")}</ul></div><div class="hobanner">${title} helps turn an irregular service into a more reliable and even headway.</div></div>`;
+}
+function hoSetView(v){
+  HO.view = v === "street" ? "street" : "simple"; LS.set("ho.view", HO.view);
+  $("hoSimple").hidden = HO.view !== "simple"; $("hoStreet").hidden = HO.view !== "street";
+  document.querySelectorAll("#hoView button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.v === HO.view)));
+  $("hoMapSub").textContent = HO.view === "simple" ? "The same buses before and after the option: placed by the time they pass one stop, with the gap in minutes." : "Route, halfway start, the off-service move and every trip running at the chosen clock time.";
+  if(HO.view === "street") setTimeout(() => { hoInitMap(); if(HO.map){ HO.map.invalidateSize(); hoRenderMap(); } }, 60);
+}
 /* ---- V8.1 timeline: every trip against the route, the hole left by the lost trip, and the headways it leaves */
 function hoRenderTsd(){
   const r = HO.res, o = hoSelC(), card = $("hoTsdCard"), svg = $("hoTsd");
@@ -684,6 +766,8 @@ function hoRenderBars(){
   $("hoBars").innerHTML = `<h4>No action \u2013 headway (min) between consecutive trips at ${esc(where)}</h4>${hoBarChart(r.baseline.tsd, j, r.sched_hw, r.bunch_min, "No action headways")}<h4>${esc(o.label)}</h4>${hoBarChart(o.tsd, j, r.sched_hw, r.bunch_min, "Headways with the selected option")}<div class="ho-note">Green band = scheduled ${f1(r.sched_hw)} min \u00b1${Math.round(r.params.recover_tol_pct)}%. Red = a bunched or double-length headway. "R" = the replacement trip.</div>`;
 }
 /* ---- wiring */
+document.querySelectorAll("#hoView button").forEach(b => b.onclick = () => hoSetView(b.dataset.v));
+hoSetView(HO.view);
 document.querySelectorAll("input[name=hoscope]").forEach(x => { x.checked = x.value === HO.scope; x.onchange = () => { HO.scope = x.value; LS.set("ho.scope", HO.scope); HO.selKey = null; HO.pick = ""; if(HO.setup) hoLoad(); }; });
 document.querySelectorAll("input[name=hoveh]").forEach(x => { x.checked = x.value === HO.veh; x.onchange = () => { HO.veh = x.value; LS.set("ho.veh", HO.veh); $("hoReady").disabled = HO.veh === "standby"; HO.selKey = null; HO.pick = ""; hoSim(false); }; });
 $("hoReady").disabled = HO.veh === "standby";
@@ -709,6 +793,7 @@ const HLAB = {n_trips:["Trips simulated", "trips at the first stop"], layover_mi
   recover_tol_pct:["Recovered = within \u00b1", "% of scheduled headway"], recover_points:["Consecutive headways to confirm", "kept for the specification; the simulated trips end the check"],
   w_regularity:["Weight: headway regularity", "% (Balanced)"], w_maxgap:["Weight: maximum-gap reduction", "% (Balanced)"], w_recovery:["Weight: recovery time", "% (Balanced)"], w_holding:["Weight: holding cost", "% (Balanced)"], w_mileage:["Weight: mileage loss", "% (Balanced)"], w_bunching:["Weight: new bunching risk", "% (Balanced)"],
   pref_recovery_boost:["'Faster recovery' boosts recovery + max-gap by", "\u00d7"], pref_mileage_boost:["'Minimise mileage' boosts the mileage weight by", "\u00d7"], load_sens:["Headway propagation (advanced)", "0 = every trip runs the same; higher = a big gap grows downstream"], fallback_kmh:["Fallback running speed", "km/h when no traffic model is available"],
+  reg_min_side:["Regulate at least this many trips each side", "trips before AND after the gap regulated at the interchange (3 + 3 = 6). With fewer trips above the gap, more future trips are used (0 = off)"], reg_early_future:["Future trips may leave early by up to", "min, when the trips above the gap are too few (never before arrival + minimum layover)"],
   offsvc_factor:["Off-service run time factor", "the halfway bus runs to the halfway stop in this fraction of the in-service running time (no dwell, no stopping). Unvalidated: 1 = same as in service"]};
 async function loadHoSettings(){
   const j = await getJSON("/api/halfway/config", 20000); if(j.error){ $("hoParams").innerHTML = `<div class="msg bad">${esc(j.error)}</div>`; return; }
@@ -729,7 +814,7 @@ $("hoPTpl").onclick = () => csvDownload("halfway_stops_template.csv", [["service
 $("hoPAdd").onclick = async () => { const b = {service:$("hoAS").value.trim(), direction:$("hoAD").value, stop_code:$("hoAC").value.trim(), seq:$("hoAQ").value.trim(), enabled:$("hoAE").checked ? "yes" : "no"}; const j = await post("/api/halfway/points/add", JSON.stringify(b)); if(j.error){ toast(j.error); return; } toast("Approved stop added"); $("hoAC").value = ""; $("hoAQ").value = ""; loadHoSettings(); };
 /* ---- tabs + start-up */
 function showTab(t){ hoPlay(false); S.tab = t; $("opt").hidden = t !== "opt"; $("settings").hidden = t !== "set"; $("tabOpt").setAttribute("aria-selected", t === "opt"); $("tabSet").setAttribute("aria-selected", t === "set");
-  if(t === "set") loadHoSettings(); else setTimeout(() => { hoInitMap(); if(HO.map){ HO.map.invalidateSize(); hoRenderMap(); } }, 120); }
+  if(t === "set") loadHoSettings(); else if(HO.view === "street") setTimeout(() => { hoInitMap(); if(HO.map){ HO.map.invalidateSize(); hoRenderMap(); } }, 120); }
 $("tabOpt").onclick = () => showTab("opt"); $("tabSet").onclick = () => showTab("set");
 (async () => {
   const q = new URLSearchParams(location.search); if(/^[0-9A-Za-z]{1,6}$/.test(q.get("svc") || "")) $("hoSvc").value = q.get("svc").toUpperCase(); if(q.get("dir") === "1" || q.get("dir") === "2"){ HO.dir = +q.get("dir"); document.querySelectorAll("#hoDir button").forEach(x => x.setAttribute("aria-pressed", String(+x.dataset.d === HO.dir))); }
