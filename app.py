@@ -18,7 +18,9 @@ import httpx
 from fastapi import FastAPI, Query
 from fastapi.responses import HTMLResponse, JSONResponse
 
-VERSION = "V5"
+import headway
+
+VERSION = "V5.1"
 LTA = os.getenv("LTA_BASE", "https://datamall2.mytransport.sg/ltaodataservice").rstrip("/")
 KEY = os.getenv("LTA_ACCOUNT_KEY", "")
 OSRM = os.getenv("OSRM_URL", "https://router.project-osrm.org").rstrip("/")
@@ -266,7 +268,7 @@ def norm_segment(x):
     band = num(x.get("SpeedBand", x.get("Band")))
     if band is None or not (in_sg(alat, alon) and in_sg(blat, blon)):
         return None
-    return (alat, alon, blat, blon, int(band), x.get("RoadName") or "", x.get("MinimumSpeed"), x.get("MaximumSpeed"))
+    return (alat, alon, blat, blon, int(band), x.get("RoadName") or "", x.get("MinimumSpeed"), x.get("MaximumSpeed"), x.get("RoadCategory"))
 
 
 class BandIndex:
@@ -468,7 +470,7 @@ def color_route(line, idx):
             runs[-1]["pts"] += rp[1:]
             runs[-1]["km"] += m / 1000
         else:
-            runs.append({"b": rec[4] if rec else None, "road": rec[5] if rec else "", "mn": num(rec[6]) if rec else None, "mx": num(rec[7]) if rec else None, "pts": rp, "km": m / 1000})
+            runs.append({"b": rec[4] if rec else None, "road": rec[5] if rec else "", "mn": num(rec[6]) if rec else None, "mx": num(rec[7]) if rec else None, "cat": rec[8] if rec else None, "pts": rp, "km": m / 1000})
             cur_key = key
     avg = (known_km / known_h) if known_h > 0 else 30.0
     drive_h = known_h + (km["none"] / avg)
@@ -624,6 +626,12 @@ async def api_buses(service: str = "", direction: int = 1):
     last_code = stops[-1]["code"]
     is_loop = stops[0]["code"] == last_code
     other_dir = {r["code"] for d in st["dirs"].get(svc, []) if d != direction for r in st["routes"].get((svc, d), [])}
+    origin = []          # next arrivals/departures at the first stop (used for the departure ladder), incl. buses with no GPS
+    for sv in parse_services(results[0], now, svc):
+        for b in sv["buses"]:
+            if stops[0]["code"] in other_dir and not is_loop and b["dest"] and b["dest"] != last_code:
+                continue
+            origin.append({"eta": b["eta"], "monitored": b["monitored"]})
     cands, other_way = [], 0
     for i, r in zip(sample, results):
         shared = stops[i]["code"] in other_dir
@@ -641,20 +649,21 @@ async def api_buses(service: str = "", direction: int = 1):
         for cl in clusters:
             if c["src"] not in cl["srcs"] and hav_km(c["lat"], c["lon"], cl["lat"], cl["lon"]) < 0.25:
                 cl["srcs"].add(c["src"])
+                cl["etas"][c["src"]] = c["eta"]
                 break
         else:
-            clusters.append({**c, "srcs": {c["src"]}})
+            clusters.append({**c, "srcs": {c["src"]}, "etas": {c["src"]: c["eta"]}})
     buses = []
     for cl in clusters:
         near_i = min(range(n), key=lambda k: hav_km(cl["lat"], cl["lon"], stops[k]["lat"], stops[k]["lon"]))
         near, to = stops[near_i], stops[cl["src"]]
         buses.append({"lat": cl["lat"], "lon": cl["lon"], "load": cl["load"], "type": cl["type"], "wab": cl["wab"], "monitored": cl["monitored"],
                       "eta": cl["eta"], "toStop": {"code": to["code"], "name": to["name"]},
-                      "near": {"code": near["code"], "name": near["name"], "road": near["road"]}, "progress": near_i})
+                      "near": {"code": near["code"], "name": near["name"], "road": near["road"]}, "progress": near_i, "etas": cl["etas"]})
     buses.sort(key=lambda b: b["progress"])
     for k, b in enumerate(buses, 1):
         b["id"] = k
-    out = {"service": svc, "direction": direction, "buses": buses, "sampled": len(sample), "otherDirectionSkipped": other_way, "updated": now.isoformat(timespec="seconds")}
+    out = {"service": svc, "direction": direction, "buses": buses, "sampled": len(sample), "otherDirectionSkipped": other_way, "origin": origin, "updated": now.isoformat(timespec="seconds")}
     if errors and len(errors) == len(results):
         out["error"] = errors[0]
     return out
@@ -739,6 +748,106 @@ async def api_rain():
         return {"stations": [], "error": f"NEA rainfall unavailable ({err})"}, 0, False
     d = await cached("rain", factory)
     return {"stations": [s for s in d["stations"] if s["mm"] > 0], "total": len(d["stations"]), "error": d["error"]}
+
+
+# --------------------------------------------------------------------------- pre-emptive departure adjustment
+EP_SERVICES = "BusServices"      # carries the scheduled dispatch frequency bands (AM/PM peak / off-peak)
+MAX_COMBOS = 16                  # service+direction pairs evaluated per request (protects the LTA quota)
+PREP = {}                        # route constants per service/direction (never change)
+
+
+async def _load_freq():
+    rows, err = await fetch_pages(EP_SERVICES)
+    fq = {}
+    for r in rows:
+        svc = str(r.get("ServiceNo", "")).strip().upper()
+        try:
+            d = int(r.get("Direction") or 1)
+        except (TypeError, ValueError):
+            d = 1
+        if svc:
+            fq[(svc, d)] = {k: r.get(k + "_Freq") for k in ("AM_Peak", "AM_Offpeak", "PM_Peak", "PM_Offpeak")}
+    return {"freqs": fq, "error": err}, TTL_STATIC, bool(fq) and not err
+
+
+async def freq_table():
+    return await cached("freqs", _load_freq)
+
+
+def parse_triples(s, cast):
+    """'32:1:13,145:2:12' -> {('32', 1): 13, ('145', 2): 12}"""
+    out = {}
+    for tok in (s or "").split(","):
+        p = tok.strip().split(":")
+        if len(p) == 3:
+            try:
+                out[(p[0].strip().upper(), int(p[1]))] = cast(p[2])
+            except ValueError:
+                pass
+    return out
+
+
+@app.get("/control", response_class=HTMLResponse)
+async def control_page():
+    return HTMLResponse((HERE / "control.html").read_text(encoding="utf-8"))
+
+
+@app.get("/api/control")
+async def api_control(services: str = "", direction: int = 0, adj: str = "", plan: str = ""):
+    """Evaluate the five pre-emptive departure checks for each selected service + direction.
+    adj  = HW the controller has already applied, e.g. '32:1:13'   plan = timetable running time (min), e.g. '32:1:45'"""
+    svcs = []
+    for t in re.split(r"[,\s]+", services.upper()):
+        if t and re.fullmatch(r"[0-9A-Z]{1,6}", t) and t not in svcs:
+            svcs.append(t)
+    dirs = [direction] if direction in (1, 2) else [1, 2]
+    combos = [(s, d) for s in svcs for d in dirs][:MAX_COMBOS]
+    adj_m, plan_m = parse_triples(adj, int), parse_triples(plan, float)
+    now = now_sgt()
+    st = await static()
+    fq = await freq_table()
+
+    async def one(svc, d):
+        route = await api_route(svc, d)
+        if route.get("error"):
+            return {"service": svc, "direction": d, "error": route["error"], "skip": len(dirs) == 2 and bool(route.get("availableDirections"))}
+        stops = route_stops(st, svc, d)
+        line = cached_line(svc, d, stops)
+        key = geom_key(svc, d, stops)
+        prep = PREP.get(key)
+        if prep is None:
+            prep = PREP[key] = await asyncio.to_thread(headway.prepare, line, stops)
+        b = await api_buses(svc, d)
+        bl = b.get("buses", [])
+        pos = await asyncio.to_thread(lambda: [headway.project(line, prep["cum"], x["lat"], x["lon"])[0] for x in bl])
+        ctx = {"service": svc, "direction": d, "now": now, "n_stops": len(stops), "stop_s": prep["stop_s"], "route_km": prep["km"],
+               "runs": route.get("runs", []), "traffic_ok": route["traffic"]["ok"],
+               "buses": [{"s_km": s, "etas": x.get("etas", {}), "monitored": x["monitored"], "load": x["load"], "near": x["near"]["name"]} for s, x in zip(pos, bl)],
+               "origin_etas": [o["eta"] for o in b.get("origin", [])],
+               "sched": headway.sched_hw(fq["freqs"].get((svc, d)), now), "adj_hw": adj_m.get((svc, d)), "plan_override": plan_m.get((svc, d))}
+        item = await asyncio.to_thread(headway.evaluate, ctx)
+        for x in item["buses"]:
+            x.pop("etas", None)
+        item.update(stops=len(stops), busError=b.get("error"), key=f"{svc}:{d}")
+        return item
+
+    res = await asyncio.gather(*[one(s, d) for s, d in combos], return_exceptions=True)
+    items, errors = [], []
+    for (s, d), r in zip(combos, res):
+        if isinstance(r, Exception):
+            errors.append(f"{s} Dir {d}: {type(r).__name__}")
+        elif r.get("error"):
+            if not r.get("skip") and r["error"] not in errors and f"{s}: {r['error']}" not in errors:
+                errors.append(r["error"])
+        else:
+            items.append(r)
+    order = {"critical": 0, "developing": 1, "stable": 2, "nodata": 3}
+    items.sort(key=lambda x: (order.get(x["risk"], 9), (not x["service"].isdigit()), int(x["service"]) if x["service"].isdigit() else 0, x["service"], x["direction"]))
+    nb = sum(x["n_buses"] for x in items)
+    summary = {k: sum(1 for x in items if x["risk"] == k) for k in order}
+    summary.update(total=len(items), buses=nb, coverage=round(100 * sum(x["monitored"] for x in items) / nb) if nb else None)
+    return {"updated": now.isoformat(timespec="seconds"), "items": items, "summary": summary, "errors": errors, "cfg": headway.CFG,
+            "truncated": len(svcs) * len(dirs) > MAX_COMBOS, "freqOk": bool(fq["freqs"]), "freqError": fq.get("error")}
 
 
 @app.get("/api/stop-suggest")

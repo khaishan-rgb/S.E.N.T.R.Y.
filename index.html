@@ -32,6 +32,8 @@ button,input{font:inherit;color:inherit}
 .brand h1{margin:0;font-size:26px;font-weight:800;letter-spacing:-.4px;line-height:1.05}
 .brand p{margin:3px 0 0;color:var(--mut);font-size:14px}
 .brand p i{display:inline-block;width:4px;height:4px;border-radius:50%;background:var(--mut);margin:0 9px;vertical-align:middle}
+.navl{display:flex;gap:6px}.navl a{padding:8px 13px;border-radius:9px;border:1px solid var(--line2);color:#b9d0e6;font-weight:600;text-decoration:none;white-space:nowrap}.navl a.on{background:var(--blue);border-color:#4aa6ff;color:#fff}
+@media (max-width:760px){.navl{display:none}}
 .hdr-right{display:flex;align-items:center;gap:18px;text-align:right}
 .clock{font-size:13px;color:#cfe0f3;font-variant-numeric:tabular-nums}
 .live{display:flex;align-items:center;justify-content:flex-end;gap:7px;color:var(--mut);margin-top:3px}
@@ -191,6 +193,7 @@ table.tb{width:100%;border-collapse:collapse;font-size:14px}
       </div>
     </div>
     <div class="hdr-right">
+      <nav class="navl" aria-label="Pages"><a href="/" class="on">Route Traffic</a><a href="/control">Headway Control</a></nav>
       <div>
         <div class="clock" id="clock">&nbsp;</div>
         <div class="live" id="live"><span class="dot"></span><span id="liveText">Connecting…</span></div>
