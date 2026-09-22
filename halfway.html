@@ -385,6 +385,11 @@ async function hoSim(save, decide){
   if(tok !== HO.tok) return;
   $("hoRun").disabled = false; HO.res = j;
   if(j.ok && decide && j.ai){ HO.dis = (j.ai.suggest || []).slice(); HO.selKey = null; HO.pick = ""; hoBuildTrips(); }       // the AI's decision ticks the trips
+  if(j.ok && decide && j.ai && j.ai.needs_standby && HO.veh !== "standby"){                    // the delayed bus itself could not reach the halfway stop in time: the AI switched to a spare bus - reflect that in the toggle
+    HO.veh = "standby"; LS.set("ho.veh", HO.veh);
+    document.querySelectorAll("input[name=hoveh]").forEach(x => x.checked = x.value === HO.veh);
+    $("hoReady").disabled = true;
+  }
   if(j.ok){ HO.dirty = false; $("hoRun").classList.remove("needrun"); HO.prev = j; }
   hoPickSel();
   if(j.ok && HO.sel != null && j.options[HO.sel].detail === false && HO.pick !== j.options[HO.sel].code){ HO.pick = j.options[HO.sel].code; hoSim(false, false); return; }

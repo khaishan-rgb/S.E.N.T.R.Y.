@@ -24,7 +24,7 @@ the halfway stop (at stop 2 for "regulate only"). If the simulated trips end on 
 """
 import math
 
-MODEL_VERSION = "halfway-12.4-operational-priority"
+MODEL_VERSION = "halfway-12.5-standby-fallback"
 EPS = 1e-6
 
 PARAMS = {
@@ -687,27 +687,49 @@ def decide(ctx):
         probe["message"] = "No trip would leave late: nothing to disrupt or adjust."
         return probe
     sc = ctx.get("search_candidates") or ctx.get("candidates") or []
-    entries = []
 
     def rate(res, o, S):
         km = o.get("skipped_km") or 0.0
         return _quality(P, H, bm, W, o.get("tsd"), o.get("hold_min") or 0.0, km, len(o.get("repl") or []), cand, n, n_st)
-    for S in [()] + [(c,) for c in cand]:
-        r = simulate({**ctx, "disrupted": list(S), "block": cand, "candidates": sc, "keep": [], "pref": pref})
-        if not r.get("ok"):
-            continue
-        for o in r["options"]:
-            if not o.get("detail") or not o.get("metrics") or not o.get("viable") or o.get("ref_only") or not o.get("tsd"):
+
+    def build_entries(veh_ctx):
+        ents = []
+        for S in [()] + [(c,) for c in cand]:
+            r = simulate({**veh_ctx, "disrupted": list(S), "block": cand, "candidates": sc, "keep": [], "pref": pref})
+            if not r.get("ok"):
                 continue
-            if S and o["kind"] not in ("halfway", "halfway_reg"):          # a disrupted trip must be deployed halfway: cancelling it is not one of the AI's decisions
-                continue
-            qq = rate(r, o, S)
-            if qq:
-                entries.append({"S": S, "kind": o["kind"], "label": o["label"], "j": o.get("j"), "name": o.get("name"), "skipped_km": o.get("skipped_km") or 0.0, "hold": o.get("hold_min") or 0.0, **qq})
-        if not S and r.get("baseline") and r["baseline"].get("tsd"):
-            qq = _quality(P, H, bm, W, r["baseline"]["tsd"], 0.0, 0.0, 0, cand, n, n_st)
-            if qq:
-                entries.append({"S": (), "kind": "none", "label": "Continue service as it is (no change)", "j": None, "name": None, "skipped_km": 0.0, "hold": 0.0, **qq})
+            for o in r["options"]:
+                if not o.get("detail") or not o.get("metrics") or not o.get("viable") or o.get("ref_only") or not o.get("tsd"):
+                    continue
+                if S and o["kind"] not in ("halfway", "halfway_reg"):          # a disrupted trip must be deployed halfway: cancelling it is not one of the AI's decisions
+                    continue
+                qq = rate(r, o, S)
+                if qq:
+                    ents.append({"S": S, "kind": o["kind"], "label": o["label"], "j": o.get("j"), "name": o.get("name"), "skipped_km": o.get("skipped_km") or 0.0, "hold": o.get("hold_min") or 0.0, **qq})
+            if not S and r.get("baseline") and r["baseline"].get("tsd"):
+                qq = _quality(P, H, bm, W, r["baseline"]["tsd"], 0.0, 0.0, 0, cand, n, n_st)
+                if qq:
+                    ents.append({"S": (), "kind": "none", "label": "Continue service as it is (no change)", "j": None, "name": None, "skipped_km": 0.0, "hold": 0.0, **qq})
+        return ents
+
+    entries = build_entries(ctx)
+    # OPERATIONAL FALLBACK (fixes "AI won't disrupt and deploy halfway" for severe delays):
+    # with veh="own" the delayed bus itself has to reach the halfway stop, and a bus that is
+    # already badly late can rarely get there in time - every halfway option then fails the
+    # "cannot fill the gap" check and the AI is left only with adjust/regulate, which cannot pull
+    # a >=30 min gap under the 30 min target on its own. That is a vehicle-choice dead end, not
+    # proof halfway itself is infeasible, so before giving up on halfway the AI retries the same
+    # search assuming a STANDBY bus is sent to the stop instead (the normal real-world response to
+    # a severe delay). The retry is only used if it actually produces a viable halfway plan.
+    veh_used = ctx.get("veh") if ctx.get("veh") in ("own", "standby") else "standby"
+    if veh_used == "own":
+        half_now = [e for e in entries if e["S"] and e["kind"] in ("halfway", "halfway_reg")]
+        if not half_now:
+            half_sb = [e for e in build_entries({**ctx, "veh": "standby"}) if e["S"] and e["kind"] in ("halfway", "halfway_reg")]
+            if half_sb:
+                for e in half_sb:
+                    e["needs_standby"] = True
+                entries = [e for e in entries if not e["S"]] + half_sb          # keep the "own"-vehicle continue/adjust entries, add the standby halfway ones
     if not entries:
         probe["ai"] = {"mode": "auto", "decision": "none", "suggest": [], "candidates": cand, "alternatives": []}
         probe["message"] = "No plan improves the headways without creating a problem: continue service as it is."
@@ -766,7 +788,7 @@ def decide(ctx):
         if severe and best_half and best_cont and (cont_bad or best_half["max"] <= best_cont["max"] - 0.10 * H):
             top = best_half
     S = top["S"]
-    final = simulate({**ctx, "disrupted": list(S), "block": cand, "pref": pref})
+    final = simulate({**ctx, "veh": "standby" if top.get("needs_standby") else ctx.get("veh"), "disrupted": list(S), "block": cand, "pref": pref})
     if not final.get("ok"):
         return final
     best_i, best_q = None, None
@@ -812,6 +834,9 @@ def decide(ctx):
                 ("Recommended - adjust the trips and continue service (no disruption)" if best_i is not None else "Recommended - continue service as it is: no plan beats it"))
     final["message"] = base_msg if constraint_met else (f"WARNING: <{max_hw_limit:g} min headway is not achievable with the available trips. "
                                                          f"Best achievable maximum headway is {top['max']:.1f} min. " + base_msg)
+    if top.get("needs_standby"):
+        final["ai"]["needs_standby"] = True
+        final["message"] += " Needs a STANDBY bus at the halfway stop - the delayed bus itself cannot reach there in time."
     return final
 
 
