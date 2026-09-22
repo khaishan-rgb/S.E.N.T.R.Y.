@@ -181,6 +181,48 @@ details.hall{margin-top:10px}details.hall summary{cursor:pointer;color:#9cc4ff;f
 @media(max-width:999px){body{padding-bottom:78px}.desktop-shell{display:none}.top{position:sticky!important;top:0;z-index:9000;background:rgba(5,18,33,.96);backdrop-filter:blur(12px);padding:9px 4px!important;min-height:56px;flex-wrap:nowrap!important}.top .brand{min-width:0;flex:1}.top .brand h1{font-size:18px!important;white-space:nowrap}.top .brand p,.top .view{display:none!important}.top .logo{width:36px!important;height:36px!important;min-width:36px!important}.top nav.nav,.top nav.navl{display:none!important}.hdr-right{gap:6px!important}.clock{font-size:10px!important}.live{font-size:11px!important}.mobile-menu-btn{display:grid;width:38px;height:38px;place-items:center;border:1px solid #244766;border-radius:10px;background:#0a2036;color:#fff;font-size:20px;cursor:pointer;order:-1}.mobile-bottom-nav{display:grid;grid-template-columns:repeat(4,1fr);position:fixed;left:0;right:0;bottom:0;z-index:12000;background:rgba(5,18,33,.98);border-top:1px solid #21415e;padding:7px max(6px,env(safe-area-inset-right)) calc(7px + env(safe-area-inset-bottom)) max(6px,env(safe-area-inset-left));box-shadow:0 -8px 24px rgba(0,0,0,.22)}.mbn{color:#829db5;text-decoration:none;text-align:center;font-size:10px;font-weight:650;padding:3px 2px;border-radius:9px}.mbn .mi{display:block;font-size:19px;line-height:22px}.mbn.active{color:#4bc7ff;background:#0a2945}.mobile-more{display:none;position:fixed;left:10px;right:10px;bottom:74px;z-index:13000;background:#091c30;border:1px solid #275176;border-radius:16px;padding:8px;box-shadow:0 18px 50px rgba(0,0,0,.5)}.mobile-more.open{display:block}.mobile-more a{display:flex;align-items:center;gap:12px;color:#d7e7f5;text-decoration:none;padding:13px;border-radius:10px;font-weight:650}.mobile-more a.active{background:#0d3559;color:#55c7ff}.mobile-top-menu{display:none;position:fixed;top:calc(56px + env(safe-area-inset-top) + 8px);left:8px;z-index:13000;min-width:230px;max-width:82vw;background:#091c30;border:1px solid #275176;border-radius:16px;padding:8px;box-shadow:0 18px 50px rgba(0,0,0,.5)}.mobile-top-menu.open{display:block}.mobile-top-menu a{display:flex;align-items:center;gap:12px;color:#d7e7f5;text-decoration:none;padding:13px;border-radius:10px;font-weight:650;white-space:nowrap}.mobile-top-menu a.active{background:#0d3559;color:#55c7ff}.module-intro{display:block}.module-intro h2{font-size:20px}.ai-shell-card{margin:10px 0;padding:11px 12px}.ai-shell-badge{display:none}.search,.filters{scroll-margin-top:70px}#map,.mapcard{max-width:100%}table{max-width:100%}}
 @media(max-width:600px){.app{padding-left:10px!important;padding-right:10px!important}.module-intro{margin:11px 2px 8px}.module-intro p{line-height:1.4}.ai-shell-card span{line-height:1.35}.top .hdr-right>div:first-child .clock{display:none}.top .brand h1{font-size:17px!important}}
 
+/* ===== V12.7 AI Recovery Scenario Optimiser ===== */
+.rv{border-color:#35507a;background:linear-gradient(180deg,#0c1d35,#08172a)}
+.rv>header .btn{height:34px;display:inline-flex;align-items:center;text-decoration:none;color:#fff}
+.rvdec{display:grid;grid-template-columns:auto minmax(0,1fr);gap:4px 14px;align-items:center;border-radius:12px;padding:12px 14px;background:#2a1a05;border:1px solid #a8661a;margin-bottom:10px}
+.rvdec.full{background:#0c2a4a;border-color:#2f7bd0}.rvdec.none{background:#12253c;border-color:var(--line2)}
+.rvdec .ic{grid-row:1/3;width:46px;height:46px;border-radius:12px;display:grid;place-items:center;font-size:24px;background:#ff9f1c;color:#1c1000;font-weight:800}
+.rvdec.full .ic{background:#3c96ff;color:#04182e}.rvdec.none .ic{background:#39536e;color:#fff}
+.rvdec b{font-size:18px;line-height:1.2}.rvdec small{color:#cfe0f3;font-size:12.5px;line-height:1.4}
+.rvins{list-style:none;margin:0 0 10px;padding:0;display:grid;gap:6px}
+.rvins li{display:grid;grid-template-columns:54px minmax(0,1fr);gap:10px;align-items:start;background:#0d2440;border:1px solid var(--line2);border-left:4px solid #3c96ff;border-radius:9px;padding:8px 10px}
+.rvins li.halfway{border-left-color:#ff9f1c;background:#2a1d08}.rvins li.hold{border-left-color:#ffd166}.rvins li.release{border-left-color:#5fd0ff}.rvins li.locked{opacity:.6;border-left-color:#39536e}
+.rvins time{font-weight:800;font-variant-numeric:tabular-nums;font-size:15px;color:#fff}.rvins b{font-size:13.8px;display:block}.rvins small{color:#a9c2da;font-size:12px;display:block;margin-top:2px}
+.rvhead{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px;margin:4px 0 12px}
+.rvhead>div{background:#0c2440;border:1px solid var(--line2);border-radius:10px;padding:8px 10px;min-width:0}.rvhead small{display:block;color:var(--mut);font-size:11.5px;line-height:1.25}
+.rvhead b{display:block;font-size:20px;font-weight:800;margin-top:3px;font-variant-numeric:tabular-nums}.rvhead .ai{border-color:#a8661a;background:#2a1d08}.rvhead .ai b{color:#ffb54d}
+.rvcards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.rvc{border:1px solid var(--line2);border-radius:12px;background:#0b1a2e;padding:12px;min-width:0;position:relative}
+.rvc.pick{border:2px solid #ff9f1c;box-shadow:0 0 0 3px #ff9f1c22}.rvc .tagp{position:absolute;top:-11px;right:12px;background:#ff9f1c;color:#1c1000;font-weight:800;font-size:11.5px;padding:2px 9px;border-radius:7px}
+.rvc h3{margin:0;font-size:16px}.rvc .tl{color:var(--mut);font-size:12px;margin:2px 0 8px;line-height:1.35;min-height:32px}
+.rvc h4{margin:8px 0 3px;font-size:12px;color:#b9d0e6;font-weight:600}
+.rvpat{display:flex;gap:3px;align-items:flex-end;height:74px;padding:2px 0 0;overflow-x:auto}
+.rvpat div{flex:1;min-width:20px;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%}
+.rvpat i{display:block;width:100%;border-radius:3px 3px 0 0}.rvpat span{font-size:10.5px;font-weight:700;line-height:1.1;margin-bottom:2px}.rvpat em{font-style:normal;font-size:9.5px;color:#7f97b0;line-height:1.2}
+.rvkv{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 10px;font-size:12.8px;margin-top:8px}.rvkv span{color:var(--mut)}.rvkv b{text-align:right;font-variant-numeric:tabular-nums}
+.rvkv b.bad{color:#ff8a90}.rvkv b.ok{color:#7be7a5}.rvkv b.amb{color:#ffc46b}
+.rvtr{display:grid;gap:5px;margin-top:10px}.rvtr>div{display:grid;grid-template-columns:104px minmax(0,1fr) 30px;gap:8px;align-items:center;font-size:11.5px;color:#b9d0e6}
+.rvtr .bg{height:8px;border-radius:5px;background:#17304d;overflow:hidden}.rvtr .bg i{display:block;height:100%;border-radius:5px;background:#3c96ff}.rvc.pick .rvtr .bg i{background:#ff9f1c}.rvtr b{text-align:right;color:#dbe8f7}
+.rvgrid2{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:12px;margin-top:12px}
+.rvbox{border:1px solid var(--line2);border-radius:12px;background:#0b1a2e;padding:12px;min-width:0}.rvbox h3{margin:0 0 4px;font-size:15px}.rvbox .sub{margin-bottom:8px}
+.rvchain{border-collapse:separate;border-spacing:3px;width:100%;table-layout:fixed}.rvchain th:first-child,.rvchain td.l{width:26%}.rvchain th{font-size:11.5px;color:#b9d0e6;font-weight:600;text-align:center;padding:4px 2px;border:0}
+.rvchain td{text-align:center;font-weight:800;border-radius:6px;padding:7px 2px;border:0;font-variant-numeric:tabular-nums}.rvchain td.l{text-align:left;background:transparent;color:#cfe0f3;font-weight:600;white-space:normal;font-size:12px}
+.rvflow{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:12px;color:#cfe0f3;margin:0 0 8px}.rvflow span{background:#12253c;border:1px solid var(--line2);border-radius:7px;padding:3px 8px}.rvflow i{font-style:normal;color:#ff9f1c}
+.rvwhy{margin-top:12px;border-radius:12px;padding:12px 14px;background:#fff8ec;color:#1f2a44;border-left:6px solid #ff9f1c}
+.rvwhy h3{margin:0 0 6px;font-size:16px;color:#2b1a6b}.rvwhy ol{margin:0;padding-left:20px;display:grid;gap:5px;font-size:13.6px;line-height:1.45}
+.rvtrade{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;justify-content:center;margin:10px 0 0;font-weight:700;font-size:12.5px;color:#2b1a6b}.rvtrade span{background:#efe6ff;border-radius:8px;padding:3px 9px}.rvtrade i{font-style:normal;color:#ff9f1c;font-size:15px}
+.rvrej{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:3px 10px;font-size:12.3px}.rvrej span{color:#cfe0f3}.rvrej b{color:#ff9aa0;text-align:right}
+.rvstale{background:#3a2a06;border:1px solid #7a5a12;color:#ffe08a;border-radius:10px;padding:8px 12px;font-size:13px;margin-bottom:10px}
+.rvkv.rules{grid-template-columns:minmax(0,1fr) minmax(0,1.1fr)}.rvkv.rules b{text-align:right;font-weight:700}
+.rvmore{background:none;border:1px dashed var(--line2);color:#9cc4ff;border-radius:9px;padding:7px;cursor:pointer;font-weight:600;font-size:12.5px}
+@media(max-width:1100px){.rvcards{grid-template-columns:minmax(0,1fr)}.rvgrid2{grid-template-columns:minmax(0,1fr)}.rvhead{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:560px){.rvhead{grid-template-columns:repeat(2,minmax(0,1fr))}.rvhead b{font-size:18px}.rvdec b{font-size:16px}}
+
 </style>
 </head>
 <body>
@@ -238,6 +280,8 @@ details.hall{margin-top:10px}details.hall summary{cursor:pointer;color:#9cc4ff;f
       <div class="tw"><table id="hoTrips"><thead><tr><th>Trip</th><th>Sch Arr</th><th>Act Arr</th><th>Lateness (min)</th><th>Next trip Sch Dep</th><th>Next trip Act Dep</th><th>Dep HW</th><th class="ai">AI plan: Dep</th><th class="ai">AI plan: HW</th><th>Disrupted</th></tr></thead><tbody></tbody></table></div>
       <div class="hx-note">Actual departure = the later of the scheduled departure and the actual arrival + the minimum layover. AI must consider BC welfare: an on-time BC should not be made substantially late merely to improve one headway, and artificial adjustment is capped at +8 min. A Disrupted trip does not depart (the trip is lost). <b>AI plan</b> = the departures the selected option would use after holding / releasing trips (green), and where the replacement starts.</div>
     </section>
+    <section class="card hx-row rv" id="rvCard"><header><div><h2>AI Recovery Scenario Optimiser &ndash; Full Trip vs Halfway</h2><div class="sub">Every feasible plan is simulated over the next 3 UP + 3 DOWN trips and 1,000 possible futures. Full trip keeps mileage but can leave the BC late; halfway recovers the BC and the headway but loses mileage.</div></div><a class="btn sm" href="/recovery-guide" target="_blank" rel="noopener">How the AI decides</a></header>
+      <div id="rvBody"><div class="ho-msg">Type the lateness of the late trips, then press <b>Run AI Optimisation</b>.</div></div></section>
     <section class="card hx-row" id="hoTsdCard" hidden><header><div><h2>Deployment Timeline &ndash; Trips Running Down the Route</h2><div class="sub">Each line is one trip (top = first stop, bottom = terminal). The horizontal distance between two lines is the headway. The white marker follows the map clock.</div></div></header>
       <div class="hotsdgrid"><div><div class="tw"><svg id="hoTsd" role="img" aria-label="Time versus route position of every trip"></svg></div><div class="hokey2" id="hoTsdKey"></div></div>
         <div id="hoBarsWrap"><div class="seg" id="hoBarsAt"><button type="button" data-at="first" aria-pressed="false">Headway at first stop</button><button type="button" data-at="end" aria-pressed="true">at terminal</button></div><div id="hoBars"></div></div></div></section>
@@ -264,7 +308,7 @@ details.hall{margin-top:10px}details.hall summary{cursor:pointer;color:#9cc4ff;f
     <section class="card" style="margin-top:12px"><header><div><h2>Simulation audit log</h2><div class="sub">Each time you press <b>Run AI Optimisation</b> the scenario, every option's result, the recommendation, the weights and the model version are stored (live re-simulation while you edit is not).</div></div></header><div class="tw" id="hoRuns"></div></section>
   </main>
 
-  <footer class="foot"><span>Sources: LTA DataMall (Bus Routes/Stops/Services, Traffic Speed Bands, Traffic Incidents) &nbsp;|&nbsp; A scenario simulation from the schedule at the first stop, not live bus data. Decision support only, not for operational use</span><span>SG Transport Pulse V11.3</span></footer>
+  <footer class="foot"><span>Sources: LTA DataMall (Bus Routes/Stops/Services, Traffic Speed Bands, Traffic Incidents) &nbsp;|&nbsp; A scenario simulation from the schedule at the first stop, not live bus data. Decision support only, not for operational use</span><span>SG Transport Pulse V12.7</span></footer>
 </div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -289,7 +333,7 @@ async function post(url, body){
 function csvDownload(name, rows){ const csv = rows.map(r => r.map(v => { v = v == null ? "" : String(v); return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; }).join(",")).join("\n"); const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([csv], {type:"text/csv"})); a.download = name; document.body.appendChild(a); a.click(); a.remove(); }
 /* ===================== AI Halfway Optimiser (a scenario from the schedule at the first stop; never identifies a bus, never deploys) ===================== */
 const S = {tab:"opt", hoCfg:null};
-const HO = {svc:LS.get("ho.svc", ""), dir:LS.get("ho.dir", 1), op:LS.get("ho.op", ""), svcAll:null, setup:null, res:null, sel:null, selKey:null, map:null, g:null, late:[], dis:[], dirty:false, prev:null, ptok:0, auto:LS.get("ho.auto", true), tok:0, timer:null, n:10, pb:{t:null, min:0, max:100, play:false, timer:null, res:null, key:null, ghost:false}, geo:null, tsdg:null, barsAt:null, view:LS.get("ho.view", "simple"), scope:LS.get("ho.scope", "all"), veh:LS.get("ho.veh", "own"), pick:"", showAll:false};
+const HO = {svc:LS.get("ho.svc", ""), dir:LS.get("ho.dir", 1), op:LS.get("ho.op", ""), svcAll:null, setup:null, res:null, sel:null, selKey:null, map:null, g:null, late:[], dis:[], dirty:false, prev:null, ptok:0, auto:LS.get("ho.auto", true), tok:0, timer:null, n:10, pb:{t:null, min:0, max:100, play:false, timer:null, res:null, key:null, ghost:false}, geo:null, tsdg:null, barsAt:null, view:LS.get("ho.view", "simple"), scope:LS.get("ho.scope", "all"), veh:LS.get("ho.veh", "own"), pick:"", showAll:false, rec:null, recStale:false, force:null};
 const hm = m => { m = ((Math.round(m) % 1440) + 1440) % 1440; return String(Math.floor(m / 60)).padStart(2, "0") + ":" + String(m % 60).padStart(2, "0"); };
 const hoF = x => x == null ? "\u2013" : f1(x);
 const hoPct = x => x == null ? "\u2013" : f1(x) + "%";
@@ -313,7 +357,8 @@ function hoInitMap(){
   HO.g = {route:L.layerGroup().addTo(m), dep:L.layerGroup().addTo(m), stops:L.layerGroup().addTo(m), buses:L.layerGroup().addTo(m)};
 }
 /* ---- route + defaults for the chosen service */
-async function hoLoad(){
+function hoLoad(){ HO.loadingP = hoLoad0().finally(() => { HO.loadingP = null; }); return HO.loadingP; }
+async function hoLoad0(){
   const svc = $("hoSvc").value.trim().toUpperCase(); HO.svc = svc; LS.set("ho.svc", svc); HO.res = null; HO.sel = null; HO.selKey = null; HO.setup = null;
   if(!svc){ $("hoInfo").textContent = "Enter a service to load its route."; hoMsg(""); hoRender(); return; }
   hoMsg("Loading route\u2026");
@@ -357,7 +402,13 @@ function hoRenderTrips(){
     if(!o || !o.regulated || !x){ rd.textContent = "\u2014"; rh.textContent = "\u2014"; prev = o && x ? x.dep : t.act_dep; return; }
     rd.innerHTML = hm(x.dep) + (Math.abs(x.shift) >= .5 ? ` <small>(${sg(x.shift)})</small>` : "");
     rh.textContent = prev == null ? "\u2014" : f1(x.dep - prev); prev = x.dep; });
+  const rp = !HO.dirty ? rvRows() : null;
+  if(rp) r.trips.forEach(t => { const tr = document.querySelector(`#hoTrips tr[data-i="${t.n}"]`); if(!tr) return; const x = rp[t.n], rd = tr.querySelector(".rd"), rh = tr.querySelector(".rh"); if(!x) return;
+    if(x.type === "halfway"){ rd.innerHTML = `<b>Starts at ${esc(x.stop)} ${esc(x.start_clock)}</b>${Math.abs(x.shift) >= .5 ? ` <small>(${sg(x.shift)} vs slot)</small>` : ""}`; rh.textContent = "\u2014"; return; }
+    rd.innerHTML = esc(x.dep_clock) + (Math.abs(x.shift) >= .5 ? ` <small>(${sg(x.shift)})</small>` : "") + (x.type === "locked" ? ` <small>departed</small>` : "") + (x.overtaken_by && x.overtaken_by.length ? ` <small>after T${x.overtaken_by.join(",T")}</small>` : "");
+    rh.textContent = x.hw == null ? "\u2014" : f1(x.hw); rh.className = "ai rh" + (x.hw != null && x.hw >= 2 * r.sched_hw - 1e-9 ? " wr" : x.hw != null && (x.hw >= 1.5 * r.sched_hw - 1e-9 || x.hw < (r.bunch_min || 3)) ? " wl" : ""); });
   const ai = fresh && HO.res.ai ? HO.res.ai : null;
+  if(rp && HO.rec){ $("hoDisMsg").innerHTML = HO.rec.decision === "halfway" ? `AI Recovery Optimiser: trip <b>${HO.rec.plans.halfway.rows.filter(x => x.type === "halfway").map(x => x.n).join(", ")}</b> starts halfway; every other trip runs in full and is regulated` : HO.rec.decision === "adjust" ? "AI Recovery Optimiser: every trip runs in full \u2013 departures adjusted (no halfway)" : "AI Recovery Optimiser: no intervention needed"; return; }
   $("hoDisMsg").innerHTML = ai ? (ai.suggest.length ? `AI ticked trip <b>${ai.suggest.join(", ")}</b> (halfway); the other trips keep running and are adjusted` : ai.decision === "adjust" ? "AI ticked nothing: adjust the trips and continue service" : "AI ticked nothing: continue service as it is")
     : HO.auto ? "The AI will decide which trips to tick when you press Run" : `Manual: ${HO.dis.length ? "trip " + HO.dis.join(", ") + " ticked" : "no trip ticked"} - press Run`;
 }
@@ -365,13 +416,13 @@ function hoRenderTrips(){
 const HO_TEST_LIVE = !!window.__hoTestLive;         // test scaffolding only (set by the browser tests to re-simulate on every edit); the product never runs the AI on an edit
 function hoDirty(){                                 // an edit never runs the AI: it only marks the plan as out of date (the trip table's own columns refresh)
   if(HO_TEST_LIVE){ clearTimeout(HO.timer); HO.timer = setTimeout(() => hoSim(false, false), 350); return; }
-  HO.dirty = true; hoMsg("Inputs changed \u2013 press Run AI Optimisation to update the plan."); $("hoRun").classList.add("needrun");
+  HO.dirty = true; HO.force = null; if(HO.rec) HO.recStale = true; hoRenderRecovery(); hoMsg("Inputs changed \u2013 press Run AI Optimisation to update the plan."); $("hoRun").classList.add("needrun");
   clearTimeout(HO.timer); HO.timer = setTimeout(hoPreview, 300); hoRenderTrips();
 }
 function hoTouch(){ HO.selKey = null; HO.pick = ""; hoDirty(); }
 function hoUrl(save, decide, preview){
   const hw = $("hoHw").value.trim(), std = HO.setup && HO.setup.sched_hw != null && Math.abs(+hw - HO.setup.sched_hw) < 1e-9, pref = (document.querySelector("input[name=hopref]:checked") || {}).value || "balanced";
-  return "/api/halfway/simulate?" + new URLSearchParams({service:HO.svc, direction:HO.dir, ref:$("hoRef").value.trim(), hw:std ? "" : hw, layover:$("hoLay").value.trim(), delay:$("hoDelay").value.trim(), late:HO.late.join(","), disrupted:decide ? "auto" : (HO.dis || []).join(","), stop:$("hoExtra").value.trim(), save:save ? "1" : "", pref, reg:$("hoReg").checked ? "1" : "0", scope:HO.scope, veh:HO.veh, ready:$("hoReady").value.trim(), pick:HO.pick || "", preview:preview ? "1" : ""});
+  return "/api/halfway/simulate?" + new URLSearchParams({service:HO.svc, direction:HO.dir, ref:$("hoRef").value.trim(), hw:std ? "" : hw, layover:$("hoLay").value.trim(), delay:$("hoDelay").value.trim(), late:HO.late.join(","), disrupted:HO.force && !preview ? HO.force.dis : decide ? "auto" : (HO.dis || []).join(","), stop:HO.force && HO.force.stop && !preview ? HO.force.stop : $("hoExtra").value.trim(), save:save ? "1" : "", pref, reg:$("hoReg").checked ? "1" : "0", scope:HO.scope, veh:HO.veh, ready:$("hoReady").value.trim(), pick:HO.pick || (HO.force && HO.force.stop) || "", preview:preview ? "1" : ""});
 }
 async function hoPreview(){                         // the trip table only (schedule, actual arrival / departure): no AI, nothing stored
   if(!HO.svc || !HO.setup || HO.setup.error) return; const tok = ++HO.ptok;
@@ -408,7 +459,128 @@ function hoSelect(i){
   if(o.detail === false){ HO.pick = o.code || ""; hoSim(false); return; }          // a lower-ranked stop of a full scan: fetch its full detail
   HO.sel = i; hoRender();
 }
-function hoRender(){ hoRenderTrips(); hoRenderRec(); hoRenderOpts(); hoRenderProf(); hoRenderTravel(); hoRenderHeat(); hoRenderTake(); hoRenderTraf(); hoRenderSimple(); if(HO.view === "street") hoRenderMap(); else hoPbInit(); hoRenderTsd(); }
+function hoRender(){ hoRenderTrips(); hoRenderRecovery(); hoRenderRec(); hoRenderOpts(); hoRenderProf(); hoRenderTravel(); hoRenderHeat(); hoRenderTake(); hoRenderTraf(); hoRenderSimple(); if(HO.view === "street") hoRenderMap(); else hoPbInit(); hoRenderTsd(); }
+
+/* ===================== V12.7 AI Recovery Scenario Optimiser ===================== */
+const RV_MODE = {balanced:"balanced", recovery:"headway", mileage:"mileage"};
+function rvUrl(){
+  const hw = $("hoHw").value.trim(), std = HO.setup && HO.setup.sched_hw != null && Math.abs(+hw - HO.setup.sched_hw) < 1e-9, pref = (document.querySelector("input[name=hopref]:checked") || {}).value || "balanced";
+  return "/api/halfway/recovery?" + new URLSearchParams({service:HO.svc, direction:HO.dir, ref:$("hoRef").value.trim(), hw:std ? "" : hw, layover:$("hoLay").value.trim(), late:HO.late.join(","), mode:RV_MODE[pref] || "balanced", veh:HO.veh, scope:HO.scope === "approved" ? "approved" : "all", sims:"1000"});
+}
+function rvChosen(){ const r = HO.rec; return r && r.ok && r.plans && r.plans[r.decision] ? r.plans[r.decision] : null; }
+function rvRows(){                                 // {trip: row of the chosen plan} with the interchange headway in departure order
+  const p = rvChosen(); if(!p || HO.recStale) return null; const out = {};
+  const full = p.rows.filter(x => x.type !== "halfway").sort((a, b) => a.dep - b.dep);
+  full.forEach((x, k) => { out[x.n] = {...x, hw:k ? x.dep - full[k - 1].dep : null}; });
+  p.rows.filter(x => x.type === "halfway").forEach(x => out[x.n] = x);
+  return out;
+}
+async function hoRun(){
+  if(HO.loadingP){ hoMsg("Loading the route\u2026"); await HO.loadingP; }       // the service box was just changed: wait for its route before running
+  if(!HO.svc || !HO.setup || HO.setup.error){ hoMsg("Enter a service first.", true); return; }
+  $("hoRun").disabled = true; hoMsg("AI Recovery Scenario Optimiser: generating plans, simulating the 3 UP + 3 DOWN chain and 1,000 futures per plan\u2026");
+  $("rvBody").innerHTML = `<div class="sk"></div><div class="sk" style="width:70%"></div><div class="sk" style="width:85%"></div>`;
+  const rj = await getJSON(rvUrl(), 120000);
+  HO.rec = rj; HO.recStale = false; HO.force = null;
+  if(rj.ok && rj.plans && rj.plans.none){ try{ const P_ = rj.plans, ch_ = P_[rj.decision]; localStorage.setItem("rv.last", JSON.stringify({ts:Date.now(), svc:HO.svc, dir:HO.dir, decision:rj.decision, H:rj.H, sims:rj.sims,
+    ins:(rj.instructions || []).filter(i => i.kind === "halfway" || i.kind === "hold" || i.kind === "release").slice(0, 7).map(i => i.text), why:rj.why, none:P_.none.mc.max_p85, adjust:P_.adjust.mc.max_p85, ai:ch_.mc.max_p85,
+    rec:[rvRec(P_.none), rvRec(ch_)], km:ch_.det.km, bc:[P_[rj.full_choice === "none" ? "none" : "adjust"].mc.bc_p85, ch_.mc.bc_p85]})); }catch(e){} }
+  if(rj.ok && HO.auto && rj.plans && Object.keys(rj.plans).length){               // align the stop-level view below with the Recovery Optimiser's decision
+    const hw = rj.decision === "halfway" ? rj.plans.halfway.rows.filter(x => x.type === "halfway") : [];
+    HO.dis = hw.map(x => x.n); HO.selKey = null; HO.pick = "";
+    HO.force = hw.length ? {dis:HO.dis.join(","), stop:hw[0].code} : {dis:"continue", stop:""};
+    HO.selKey = hw.length ? "halfway_reg:" + hw[0].code : "regulate:";
+    hoBuildTrips();
+  }
+  $("hoRun").disabled = false;
+  await hoSim(true, HO.auto && !HO.force);
+  hoRenderRecovery();
+  if(rj.ok) $("rvCard").scrollIntoView({behavior:"smooth", block:"start"}); else hoMsg(rj.error || "Recovery Optimiser failed", true);
+}
+const RV_LBL = {none:"No action", adjust:"Full trip + adjustment", halfway:"Halfway + regulation", local:"Next-departure-only fix"};
+const RV_SHORT = {none:"No action", adjust:"Full trip", halfway:"Halfway", local:"Next-dep fix"};
+const RV_COL = {none:"#ff5a5f", adjust:"#3c96ff", halfway:"#ff9f1c", local:"#9b8cff"};
+function rvPat(list, H, bm, n, hwTrips){
+  if(!list || !list.length) return `<div class="m" style="font-size:12px">\u2013</div>`;
+  const mx = Math.max(2 * H, ...list.map(x => x[1] || 0));
+  return `<div class="rvpat">${list.map(([b, g]) => { const c = g < bm || g >= 2 * H - 1e-9 ? "#e0474f" : g >= 1.5 * H - 1e-9 ? "#ee8a2a" : Math.abs(g - H) <= .2 * H + 1e-9 ? "#22b567" : "#e4c63c";
+    return `<div title="headway ${f1(g)} min before ${b > n ? "the next scheduled trip" : "trip " + b}"><span style="color:${c}">${Math.round(g)}</span><i style="height:${Math.max(4, 52 * g / mx)}px;background:${c}"></i><em>${b > n ? "next" : (hwTrips.includes(b) ? "H" : "T") + b}</em></div>`; }).join("")}</div>`;
+}
+function rvRec(p){ const d = p.det; return !d.recovered ? "not in 3 UP+3 DOWN" : d.rec < 1 ? "immediately" : Math.round(d.rec) + " min"; }
+function rvCard(k, p, r){
+  const H = r.H, bm = (r.params && r.params.bunch_min) || 3, m = p.mc, d = p.det, pick = r.decision === k, n = (r.trips || []).length || 10;
+  const hwT = p.rows.filter(x => x.type === "halfway").map(x => x.n);
+  const tl = k === "none" ? "Every bus leaves when it is ready (arrival + 7 min). Nothing is held, nothing is lost." : k === "adjust" ? "Every trip runs the full route. Departures are spread (\u00b18 min, \u2265 7 min layover); the late BC stays late." : `Trip ${hwT.join(", ")} starts halfway, the others run in full and are regulated. The late BC gets back on time.`;
+  const cls = (v, good, bad) => v == null ? "" : v <= good ? "ok" : v >= bad ? "bad" : "amb";
+  const tr = p.trade || {};
+  return `<div class="rvc ${pick ? "pick" : ""}">${pick ? `<span class="tagp">AI PLAN</span>` : ""}<h3>${RV_LBL[k]}</h3><div class="tl">${tl}</div>
+    <h4>Departure headways at ${esc(r.first_stop || "the interchange")} (UP 1)</h4>${rvPat(p.ic_hw, H, bm, n, hwT)}
+    ${p.down_hw ? `<h4>Headways passengers see at ${esc(r.disp_name || "mid-route")}</h4>${rvPat(p.down_hw, H, bm, n, hwT)}` : ""}
+    <div class="rvkv"><span>Max headway, expected</span><b class="${cls(d.max, 1.2 * H, 2 * H)}">${f1(d.max)} min</b>
+      <span>Max headway P50 / P85 / P90</span><b>${f1(m.max_p50)} / <span style="color:#fff">${f1(m.max_p85)}</span> / ${f1(m.max_p90)}</b>
+      <span>Normal headway restored</span><b class="${d.recovered ? "ok" : "bad"}">${rvRec(p)}</b>
+      <span>Settles in (of ${m.n.toLocaleString()} futures)</span><b class="${cls(100 - m.p_recovered, 20, 60)}">${f1(m.p_recovered)}%</b>
+      <span>Bunching risk (&lt; ${f1(bm)} min, any trip)</span><b class="${cls(m.p_bunch, 20, 60)}">${f1(m.p_bunch)}%</b>
+      <span>Mileage lost</span><b class="${d.km > 0 ? "amb" : "ok"}">${f1(d.km)} km</b>
+      <span>BC finishing delay, P85</span><b class="${cls(m.bc_p85, 3, 10)}">+${f1(m.bc_p85)} min</b>
+      <span>Trips held / released \u00b7 halfway</span><b>${p.n_adjusted} \u00b7 ${p.n_halfway}</b></div>
+    <div class="rvtr">${[["Passenger headway", tr.headway], ["Mileage kept", tr.mileage], ["BC welfare", tr.bc], ["Recovery speed", tr.recovery]].map(([l, v]) => `<div><span>${l}</span><div class="bg"><i style="width:${v || 0}%"></i></div><b>${v == null ? "\u2013" : v}</b></div>`).join("")}</div></div>`;
+}
+function rvHist(r){
+  const ks = ["none", "adjust", "halfway"].filter(k => r.plans[k] && r.plans[k].mc && r.plans[k].mc.hist);
+  if(!ks.length) return "";
+  const lo = Math.min(...ks.map(k => r.plans[k].mc.hist.edges[0])), hi = Math.max(...ks.map(k => r.plans[k].mc.hist.edges.slice(-1)[0]));
+  const W = 420, Ht = 220, pl = 12, pr = 10, pt = 16, pb = 40, x = v => pl + (W - pl - pr) * (v - lo) / Math.max(1, hi - lo);
+  const dens = k => { const h = r.plans[k].mc.hist, tot = h.counts.reduce((a, b) => a + b, 0) || 1; return h.counts.map((c, i) => [h.edges[i], h.edges[i + 1], c / tot / (h.edges[i + 1] - h.edges[i])]); };
+  const D = {}; ks.forEach(k => D[k] = dens(k)); const ymax = Math.max(...ks.flatMap(k => D[k].map(b => b[2]))) * 1.1 || 1, y = v => pt + (Ht - pt - pb) * (1 - v / ymax);
+  let s = `<svg viewBox="0 0 ${W} ${Ht}" style="width:100%;height:auto" role="img" aria-label="Distribution of the maximum headway over 1,000 simulated futures for each plan">`;
+  for(let v = Math.ceil(lo / 5) * 5; v <= hi; v += 5) s += `<line x1="${x(v)}" x2="${x(v)}" y1="${pt}" y2="${Ht - pb}" stroke="#163250"/><text x="${x(v)}" y="${Ht - pb + 14}" text-anchor="middle" font-size="13" fill="#b9d0e6">${v}</text>`;
+  s += `<line x1="${x(2 * r.H)}" x2="${x(2 * r.H)}" y1="${pt}" y2="${Ht - pb}" stroke="#e0474f" stroke-dasharray="3 4"/><text x="${x(2 * r.H) + 4}" y="${pt + 2}" font-size="12" fill="#ff8a90">2\u00d7 scheduled</text>`;
+  ks.forEach(k => { const pts = D[k].flatMap(b => [`${x(b[0]).toFixed(1)},${y(b[2]).toFixed(1)}`, `${x(b[1]).toFixed(1)},${y(b[2]).toFixed(1)}`]);
+    s += `<polyline points="${x(D[k][0][0]).toFixed(1)},${y(0)} ${pts.join(" ")} ${x(D[k].slice(-1)[0][1]).toFixed(1)},${y(0)}" fill="${RV_COL[k]}22" stroke="${RV_COL[k]}" stroke-width="2"/>`;
+    const p85 = r.plans[k].mc.max_p85; s += `<line x1="${x(p85)}" x2="${x(p85)}" y1="${pt}" y2="${Ht - pb}" stroke="${RV_COL[k]}" stroke-width="1.5" stroke-dasharray="5 3"/>`; });
+  s += `<text x="${(W + pl) / 2}" y="${Ht - 4}" text-anchor="middle" font-size="12" fill="#8ba3bd">Max headway, next 3 UP + 3 DOWN (min) \u00b7 dashed = P85</text></svg>`;
+  return s + `<div class="hokey">${ks.map(k => `<span><i style="background:${RV_COL[k]}"></i>${RV_LBL[k]}: P50 ${f1(r.plans[k].mc.max_p50)} \u00b7 P85 ${f1(r.plans[k].mc.max_p85)} \u00b7 P90 ${f1(r.plans[k].mc.max_p90)}</span>`).join("")}</div>`;
+}
+function rvChain(r){
+  const ks = ["none", "adjust", "halfway", "local"].filter(k => r.plans[k]), H = r.H, bm = (r.params && r.params.bunch_min) || 3;
+  let h = `<table class="rvchain"><thead><tr><th></th>${ks.map(k => `<th style="color:${RV_COL[k]}">${RV_SHORT[k]}</th>`).join("")}</tr></thead><tbody>`;
+  (r.legs || []).forEach((lg, L) => { h += `<tr><td class="l">${esc(lg)}</td>${ks.map(k => { const c = r.plans[k].chain[L]; const v = c ? c.max : null; return `<td class="${hoCls(v, H, bm)}">${v == null ? "\u2013" : Math.round(v)}</td>`; }).join("")}</tr>`; });
+  h += `<tr><td class="l">BC finish P85</td>${ks.map(k => `<td class="${(r.plans[k].mc.bc_p85 || 0) <= 3 ? "hc-g" : (r.plans[k].mc.bc_p85 || 0) >= 10 ? "hc-r" : "hc-y"}">+${Math.round(r.plans[k].mc.bc_p85 || 0)}</td>`).join("")}</tr></tbody></table>`;
+  return h;
+}
+function hoRenderRecovery(){
+  const el = $("rvBody"); if(!el) return; const r = HO.rec;
+  if(!r){ el.innerHTML = `<div class="ho-msg">Type the lateness of the late trips, then press <b>Run AI Optimisation</b>. The AI compares <b>No action</b>, <b>Full trip + adjustment</b> and <b>Halfway + regulation</b> on the next 3 UP + 3 DOWN trips.</div>`; return; }
+  if(!r.ok){ el.innerHTML = `<div class="ho-msg hx-err">${esc(r.error || "Recovery Optimiser failed")}</div>`; return; }
+  const stale = HO.recStale ? `<div class="rvstale">Inputs changed since this result \u2013 press <b>Run AI Optimisation</b> to update it.</div>` : "";
+  if(!r.plans || !r.plans.none){ el.innerHTML = stale + `<div class="rvdec none"><div class="ic">\u2713</div><b>No intervention needed</b><small>${esc((r.why || [])[0] || r.message || "")}</small></div>`; return; }
+  const P = r.plans, ch = P[r.decision], N = P.none, A = P.adjust, Hw = P.halfway, g = r.generated || {};
+  const title = r.decision === "halfway" ? `Halfway + regulation${r.needs_standby ? " (standby bus)" : ""}` : r.decision === "adjust" ? "Keep every trip in full \u2013 adjust departures" : "No intervention \u2013 keep the natural departures";
+  const icon = r.decision === "halfway" ? "\u00bd" : r.decision === "adjust" ? "\u21c4" : "\u2713";
+  let h = stale + `<div class="rvdec ${r.decision === "halfway" ? "" : r.decision === "adjust" ? "full" : "none"}"><div class="ic">${icon}</div><b>AI recommended recovery plan: ${title}</b><small>${esc(r.rule || "")}</small></div>`;
+  const ins = r.instructions || [], rowOf = n => (ch.rows || []).find(x => x.n === n) || {};
+  const key = i => i.kind === "halfway" || i.kind === "hold" || i.kind === "release" || (i.kind === "full" && (rowOf(i.n).vs_sch || 0) >= .5);
+  const li = i => `<li class="${i.kind}"><time>${esc(i.time)}</time><div><b>${esc(i.text)}</b>${i.sub ? `<small>${esc(i.sub)}</small>` : ""}</div></li>`;
+  const main = ins.filter(key), rest = ins.filter(i => !key(i));
+  h += `<ul class="rvins">${(HO.rvAll ? ins : main).map(li).join("")}</ul>${rest.length ? `<button class="rvmore" type="button" id="rvMore" style="width:100%;margin:-4px 0 10px">${HO.rvAll ? "Show only the trips that change" : `+ ${rest.length} trip${rest.length > 1 ? "s" : ""} unchanged (on time, departed) \u2013 show all`}</button>` : ""}`;
+  const bcFull = (Hw && r.decision === "halfway") ? P[r.full_choice] : ch;
+  h += `<div class="rvhead"><div><small>Without intervention<br>max HW (P85)</small><b>${Math.round(N.mc.max_p85)} min</b></div><div><small>Adjustment only<br>max HW (P85)</small><b>${Math.round(A.mc.max_p85)} min</b></div>
+    <div class="ai"><small>AI plan<br>max HW (P85)</small><b>${Math.round(ch.mc.max_p85)} min</b></div><div><small>Normal headway<br>no action \u2192 AI</small><b style="font-size:15px">${rvRec(N)} \u2192 ${rvRec(ch)}</b></div>
+    <div><small>Mileage loss<br>AI plan</small><b>${f1(ch.det.km)} km</b></div><div><small>BC finishing delay (P85)<br>no action \u2192 AI</small><b>+${Math.round(N.mc.bc_p85)} \u2192 +${Math.round(ch.mc.bc_p85)}</b></div></div>`;
+  h += `<div class="rvcards">${["none", "adjust", "halfway"].filter(k => P[k]).map(k => rvCard(k, P[k], r)).join("")}${!Hw ? `<div class="rvc"><h3>Halfway + regulation</h3><div class="tl">No feasible halfway start: no tested stop can be reached inside the slot window${r.halfway_trips_tested && r.halfway_trips_tested.length ? "" : " (no trip is late enough to be considered)"}.</div></div>` : ""}</div>`;
+  h += `<div class="rvwhy"><h3>Why the AI chose this</h3><ol>${(r.why || []).map(w => `<li>${esc(w)}</li>`).join("")}</ol>
+    <div class="rvtrade"><span>Passenger headway</span><i>\u2194</i><span>Mileage preservation</span><i>\u2194</i><span>BC welfare</span><i>\u2194</i><span>Recovery speed</span></div></div>`;
+  h += `<div class="rvgrid2"><div class="rvbox"><h3>Whole trip chain \u2013 largest headway per trip (min)</h3><div class="sub">A plan that looks good at the next departure can still create a bad headway one or two trips later. The chain shows every plan through UP 1 \u2192 DOWN 3.</div><div class="tw">${rvChain(r)}</div></div>
+    <div class="rvbox"><h3>What happens under 1,000 possible futures</h3><div class="sub">Each plan re-run with varying traffic, running time, dwell, junction delay, incidents and arrival predictions.</div>${rvHist(r)}</div></div>`;
+  const rej = Object.entries(g.rejected || {});
+  h += `<div class="rvgrid2"><div class="rvbox"><h3>Plans the AI generated</h3><div class="rvflow"><span>${(g.generated || 0).toLocaleString()} candidate plans</span><i>\u2192</i><span>${(g.rejected_total || 0).toLocaleString()} rejection hits</span><i>\u2192</i><span>best of each family refined</span><i>\u2192</i><span>4 plans \u00d7 ${(r.sims || 0).toLocaleString()} futures</span></div>
+      <div class="rvrej">${rej.map(([k, v]) => `<span>${esc(k)}</span><b>${v.toLocaleString()}</b>`).join("")}</div><div class="ho-note">Families tested: ${Object.entries(g.families || {}).map(([k, v]) => esc(k) + " " + v).join(" \u00b7 ")}. A plan can fail several checks at once.</div></div>
+    <div class="rvbox"><h3>Hard rules applied</h3><div class="rvkv rules" style="margin-top:0"><span>BC minimum layover (full trip)</span><b>${f1(r.params.min_layover_min)} min</b><span>Artificial adjustment cap</span><b>\u00b1${f1(r.params.adj_max)} min</b><span>Already-departed trips</span><b>locked${r.locked && r.locked.length ? " (T" + r.locked.join(", T") + ")" : ""}</b><span>Horizon</span><b>3 before + 3 after, 3 UP + 3 DOWN</b><span>Halfway considered from</span><b>${f1(r.params.halfway_min_late)} min late</b><span>Halfway bus</span><b>${r.veh === "standby" ? "standby bus at the stop" : "late bus, off-service, no interchange layover"}</b><span>Halfway must beat adjustment by</span><b>\u2265 ${f1(r.params.gain_min)} min P85 max HW (or faster recovery)</b></div>
+      <div class="ho-note">Model ${esc(r.model || "")}. Running times from ${r.traffic_ok ? "current traffic" : "a fallback speed"}; DOWN running assumed equal to UP. Simulation of the entered scenario, not live bus data. Decision support only.</div></div></div>`;
+  el.innerHTML = h;
+  if($("rvMore")) $("rvMore").onclick = () => { HO.rvAll = !HO.rvAll; hoRenderRecovery(); };
+}
 /* ---- AI recommendation card */
 function hoPlan(o){
   const out = [];
@@ -462,6 +634,22 @@ function hoAiBlock(r, o){
   return `<div class="hoai"><div class="hoaih">Whole-trip AI suggestion</div><div>${head}</div>${rows ? `<table class="hoaitab"><thead><tr><th>What the AI compared</th><th>Largest HW</th><th>Spread</th><th>Skipped km</th><th>Quality</th></tr></thead><tbody>${rows}</tbody></table><div class="ho-note">Preference: ${ai.pref === "recovery" ? "faster headway recovery (largest headway first)" : ai.pref === "mileage" ? "minimise mileage loss" : "balanced"}. Quality = regularity, largest headway and share of stops within tolerance, minus holding and skipped mileage, on the same trips for every choice. Two trips are never disrupted together.</div>` : ""}</div>`;
 }
 function hoRenderRec(){
+  hoRenderRec0();
+  const r = HO.rec, ch = rvChosen(), el = $("hoRec");
+  if(!r || !r.ok || !ch || HO.recStale || HO.dirty) return;
+  const legacy = el.innerHTML;
+  const title = r.decision === "halfway" ? "Halfway + regulation" : r.decision === "adjust" ? "Full trip + adjustment" : "No action";
+  const top = (r.instructions || []).filter(i => i.kind === "halfway" || i.kind === "hold" || i.kind === "release").slice(0, 6);
+  el.innerHTML = `<header style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:0"><h2>AI Recommendation</h2><span class="pill g">AI Recovery Optimiser</span></header>
+    <div class="ttl"><span class="star" style="color:#ff9f1c">\u2605</span><div><h3>${title}</h3><div class="sub2">P85 max headway ${Math.round(r.plans.none.mc.max_p85)} \u2192 ${Math.round(ch.mc.max_p85)} min \u00b7 ${f1(ch.det.km)} km lost \u00b7 BC finish +${Math.round(ch.mc.bc_p85)} min (P85)</div></div></div>
+    ${top.length ? `<div class="hoplan"><b>Key actions</b><ol class="hosteps">${top.map(i => `<li><time>${esc(i.time)}</time><span>${esc(i.text.replace(/^Trip \d+ \u2014 /, "Trip " + i.n + ": "))}</span></li>`).join("")}</ol></div>` : ""}
+    <div class="btns"><button class="btn sm go" type="button" id="rvGo">Full comparison: full trip vs halfway</button></div>
+    <details class="hall"><summary>Stop-level what-if for this decision (earlier engine: map, heatmap, per-stop options)</summary><div class="ho-note">The stop-level view re-simulates the same halfway trip and stop with the earlier single-direction engine, so its hold minutes can differ from the Recovery Optimiser plan above. The plan in the trip table is the Recovery Optimiser's.</div>${legacy}</details>`;
+  $("rvGo").onclick = () => $("rvCard").scrollIntoView({behavior:"smooth", block:"start"});
+  if($("hoViewSim")) $("hoViewSim").onclick = () => $("hoHeatCard").scrollIntoView({behavior:"smooth", block:"start"});
+  if($("hoCmp")) $("hoCmp").onclick = () => $("hoOpts").scrollIntoView({behavior:"smooth", block:"center"});
+}
+function hoRenderRec0(){
   const r = HO.res, el = $("hoRec"), o = hoSelC();
   if(!r){ el.innerHTML = `<header><h2>AI Recommendation</h2></header><div class="ho-msg">${HO.setup && !HO.setup.error ? "Type the lateness of the late trips, then press <b>Run AI Optimisation</b>. The AI decides whether to tick a trip as Disrupted (halfway) and adjust the others, or to adjust and continue service." : "Enter a service to load its route."}</div>`; return; }
   if(!r.ok){ el.innerHTML = `<div class="ho-msg hx-err">${esc(r.error)}</div>`; return; }
@@ -860,7 +1048,7 @@ $("hoSvc").onchange = () => hoLoad(); $("hoSvc").onkeydown = e => { if(e.key ===
 ["hoRef", "hoHw", "hoLay", "hoDelay"].forEach(id => $(id).oninput = () => hoTouch());
 $("hoExtra").oninput = () => { const v = $("hoExtra").value.trim(); if(/^\d{5}$/.test(v)) HO.selKey = "halfway:" + v; hoDirty(); };
 document.querySelectorAll("input[name=hopref]").forEach(x => x.onchange = () => { HO.selKey = null; hoDirty(); }); $("hoReg").onchange = () => { HO.selKey = null; hoDirty(); };
-$("hoRun").onclick = () => hoSim(true, HO.auto);          // the AI (decide: which trips to disrupt, halfway, adjust - or just adjust and continue) runs only here
+$("hoRun").onclick = () => hoRun();          // the AI (decide: which trips to disrupt, halfway, adjust - or just adjust and continue) runs only here
 $("hoEx").onclick = () => { $("hoRef").value = "08:10"; $("hoLay").value = 10; HO.late = [2, 3, 22, 5, 4, 3, 2, 4, 3, 2]; HO.dis = []; HO.auto = true; LS.set("ho.auto", true); $("hoAuto").checked = true; hoBuildTrips(); hoDirty(); toast("Example loaded: trip 3 arrives +22 min. Press Run AI Optimisation"); };
 /* ---- Settings */
 const HLAB = {n_trips:["Trips simulated", "trips at the first stop"], layover_min:["Scheduled layover at the first stop", "min (default; editable per run)"], min_layover_min:["Minimum layover", "min: a trip leaves no earlier than its arrival + this"],

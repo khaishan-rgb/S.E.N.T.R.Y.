@@ -1,7 +1,22 @@
-# SG Transport Pulse V11.3 — Route Traffic + Departure Adjustment + Bunching, Gap & Alerts + AI Halfway Optimiser
+# SG Transport Pulse V12.7 — Route Traffic + Departure Adjustment + Bunching, Gap & Alerts + AI Halfway Optimiser
 
 Live bus positions, live LTA traffic drawn directly on the bus route, and next arrivals per stop.
 FastAPI backend + a single-page Leaflet frontend (OneMap basemap, OpenStreetMap fallback).
+
+
+## V12.7 - AI Recovery Scenario Optimiser: full trip + adjustment vs halfway, judged on the whole trip chain
+
+**Why:** the earlier regulation only moved the 3 trips before the gap and put one trip at the midpoint (e.g. 17 | 17 | 7 | 21 | 7 | 8), ignored a second late bus, and only looked at the interchange departure.
+
+**New engine `recovery.py`** (numpy, pure computation) and endpoint **`/api/halfway/recovery`**:
+* **Generate** ~2,000-3,000 plans: no intervention, adjust one trip, spread departures, adjust several trips (+/-8 min), full trip + regulation, halfway one trip + regulate the others, halfway one trip while others run full, two halfway starts (both >= 20 min late).
+* **Reject** automatically: BC layover < 7 min, adjustment > +/-8 min, altering a departed trip (trips whose departure is before "now" are locked), simultaneous departures, worse downstream headway without enough benefit. Counts are shown.
+* **Simulate the chain** UP 1 -> DOWN 1 -> UP 2 -> DOWN 2 -> UP 3 -> DOWN 3 for every bus: at each terminal a bus leaves at max(schedule, arrival + 7 min), so a full trip's lateness is carried into the BC's later trips (BC finishing delay). Buses may leave the interchange out of timetable order (a ready bus runs ahead of a very late one); no overtaking along the route; a bus with a long gap ahead runs slower (load sensitivity).
+* **Refine** the best plans by coordinate search (whole minutes), then **Monte Carlo**: 1,000 futures per short-listed plan (traffic per trip, bus-to-bus running time, dwell / load, incidents, arrival-prediction error, off-service time) -> P50 / P85 / P90 max headway, chance of settling, bunching risk, BC finishing delay.
+* **Decide:** Headway priority (delay > 20: Halfway -> Adjustment -> Regulation), Mileage priority (< 30: adjust; >= 30: halfway only if >= 0.25 min of P85 headway per km lost), Balanced (lowest expected cost). Halfway must beat adjustment by >= 2 min P85 max headway, >= 10 min recovery or >= 30 pp bunching risk. If the late bus cannot reach any stop in time, a standby bus is proposed.
+* **Halfway page:** new panel "AI Recovery Scenario Optimiser - Full Trip vs Halfway" (instructions per trip, No action / Full trip + adjustment / Halfway + regulation cards with headway patterns, BC finishing delay and trade-off bars, whole-chain table incl. a "next-departure-only fix" for comparison, 1,000-future distribution, why the AI chose it, plans generated / rejected). The trip table's AI plan columns now show this plan; the earlier per-stop engine is kept (collapsed) for the map and heatmap and is re-run on the same decision.
+* **New page `/recovery-guide`:** management infographic "How AI optimisation makes trip adjustment & halfway deployment decisions" (7 stages); shows the last run from the same browser when available.
+* **Assumptions to validate:** DOWN running time = UP running time; halfway bus runs off-service at 0.7 x running time and skips the interchange layover; Monte Carlo spreads are starting values (see `recovery.PARAMS`). `numpy` added to requirements.
 
 ## V11.3 - Standardized filters across every page: Transport Operator, consistently placed and labelled
 

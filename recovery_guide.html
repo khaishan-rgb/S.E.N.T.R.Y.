@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#ffffff">
+<title>How AI Optimisation Makes Trip Adjustment &amp; Halfway Deployment Decisions</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{--navy:#1d1a5e;--purple:#4b2a9b;--lav:#eee9fb;--orange:#f26b1d;--amber:#ffb020;--ink:#1f2437;--mut:#5d6378;--line:#dcd8ea;--green:#1f9d57;--red:#d8343f;--blue:#2b6fd6;
+  --fh:"Barlow Condensed","Arial Narrow",Arial,sans-serif;--fb:Barlow,"Segoe UI",Roboto,Arial,sans-serif}
+*{box-sizing:border-box}html{-webkit-text-size-adjust:100%}
+body{margin:0;background:#fff;color:var(--ink);font-family:var(--fb);font-size:15px;line-height:1.45;padding:env(safe-area-inset-top,0) 0 env(safe-area-inset-bottom,0)}
+.wrap{max-width:1240px;margin:0 auto;padding:18px 18px 40px}
+.top{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:18px;align-items:center;border-bottom:3px solid var(--navy);padding-bottom:14px}
+.brand{font-family:var(--fh);font-weight:800;color:var(--navy);line-height:.95;font-size:22px}.brand span{display:block;font-size:11px;font-family:var(--fb);font-weight:600;color:var(--purple);letter-spacing:.02em;margin-top:4px}
+h1{margin:0;font-family:var(--fh);font-weight:800;font-size:clamp(28px,4.2vw,50px);line-height:.98;color:var(--navy);letter-spacing:-.01em}
+h1 em{font-style:normal;color:var(--orange);display:block}
+.lede{margin:6px 0 0;color:var(--mut);font-size:15px;max-width:62ch}
+.back{font-weight:700;color:var(--purple);text-decoration:none;border:2px solid var(--purple);border-radius:10px;padding:7px 12px;white-space:nowrap}
+.back:focus-visible,a:focus-visible{outline:3px solid var(--orange);outline-offset:2px}
+.flow{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-top:18px;position:relative}
+.st{border:2px solid var(--line);border-radius:14px;padding:12px 13px 14px;background:#fff;position:relative;min-width:0}
+.st h2{margin:0 0 8px;display:flex;gap:9px;align-items:center;font-family:var(--fh);font-weight:800;font-size:19px;line-height:1.05;color:var(--navy);text-transform:uppercase}
+.st h2 b{flex:none;width:30px;height:30px;border-radius:50%;background:var(--navy);color:#fff;display:grid;place-items:center;font-size:17px}
+.st.o h2 b{background:var(--orange)}
+.flow>.st:not(:last-child)::after{content:"";position:absolute;right:-11px;top:50%;width:0;height:0;border:8px solid transparent;border-left:10px solid var(--navy);transform:translate(50%,-50%);z-index:2}
+.st ul{margin:6px 0 0;padding-left:17px;display:grid;gap:2px;font-size:13.5px}.st li::marker{color:var(--orange)}
+.st .small{font-size:12.5px;color:var(--mut)}
+.pill{display:inline-block;background:var(--lav);color:var(--purple);font-weight:700;border-radius:7px;padding:1px 7px;font-size:12.5px;margin:2px 3px 0 0}
+.pill.x{background:#fde7e8;color:var(--red)}
+svg{display:block;max-width:100%;height:auto}
+.row2{display:grid;grid-template-columns:minmax(0,1fr);gap:12px;margin-top:14px}
+.sec{border:2px solid var(--line);border-radius:14px;padding:14px}
+.sec>h2{margin:0 0 10px;display:flex;gap:9px;align-items:center;font-family:var(--fh);font-weight:800;font-size:22px;color:var(--navy);text-transform:uppercase}
+.sec>h2 b{width:32px;height:32px;border-radius:50%;background:var(--navy);color:#fff;display:grid;place-items:center;font-size:18px;flex:none}
+.sec.o{border-color:var(--orange)}.sec.o>h2 b{background:var(--orange)}
+.cmp{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.card{border-radius:12px;padding:12px;border:2px solid var(--line);min-width:0}
+.card h3{margin:0;font-family:var(--fh);font-size:21px;font-weight:800;color:var(--navy);text-transform:uppercase}
+.card .t{font-size:13px;color:var(--mut);margin:2px 0 8px;min-height:38px}
+.card.best{border-color:var(--orange);background:#fff8f1;position:relative}.card.best::before{content:"Recommended when it shows a measurable benefit";position:absolute;top:-12px;left:12px;background:var(--orange);color:#fff;font-size:11.5px;font-weight:700;border-radius:6px;padding:2px 8px}
+.bars{display:flex;gap:4px;align-items:flex-end;height:92px;margin:6px 0 4px}
+.bars div{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;font-weight:700;font-size:12px}
+.bars i{display:block;width:100%;border-radius:4px 4px 0 0;margin-top:2px}
+.g{background:var(--green)}.y{background:var(--amber)}.r{background:var(--red)}
+.kv{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:3px 10px;font-size:13.5px;margin-top:8px}.kv span{color:var(--mut)}.kv b{text-align:right}
+.kv b.bad{color:var(--red)}.kv b.ok{color:var(--green)}
+.rec{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:14px}
+.modes{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
+.mode{border-radius:10px;padding:10px 12px;background:var(--lav)}.mode h4{margin:0 0 3px;font-family:var(--fh);font-size:18px;color:var(--purple);text-transform:uppercase}.mode p{margin:0;font-size:13px}
+.ins{list-style:none;margin:0;padding:0;display:grid;gap:7px}
+.ins li{display:grid;grid-template-columns:auto minmax(0,1fr);gap:10px;align-items:center;border-left:5px solid var(--navy);background:#f6f5fb;border-radius:8px;padding:8px 10px;font-weight:700;font-size:14.5px}
+.ins li.h{border-left-color:var(--orange);background:#fff1e6}
+.ins svg{width:46px}
+.nums{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.nums div{border:2px solid var(--line);border-radius:10px;padding:8px 10px}.nums small{display:block;color:var(--mut);font-size:12.5px}.nums b{font-family:var(--fh);font-size:28px;color:var(--navy);line-height:1.05}
+.nums .ai{border-color:var(--orange);background:#fff8f1}.nums .ai b{color:var(--orange)}
+.why{background:var(--navy);color:#fff;border-radius:14px;padding:16px 18px;margin-top:14px}
+.why h2{margin:0 0 6px;font-family:var(--fh);font-size:24px;text-transform:uppercase;color:var(--amber)}
+.why p{margin:0;font-size:16px;line-height:1.55;max-width:90ch}
+.trade{display:grid;grid-template-columns:repeat(7,auto);gap:6px;justify-content:center;align-items:center;margin-top:14px}
+.trade span{background:#fff;color:var(--navy);font-weight:700;border-radius:9px;padding:6px 11px;font-size:14px;text-align:center}.trade i{font-style:normal;color:var(--amber);font-size:22px;font-weight:800}
+.foot{display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;color:var(--mut);font-size:12.5px;margin-top:16px}
+.live{display:none;background:#e9f7ef;border:1px solid #9ad3b1;color:#15592f;border-radius:9px;padding:6px 10px;font-size:13px;margin-top:8px}
+@media(max-width:1000px){.flow{grid-template-columns:repeat(2,minmax(0,1fr))}.flow>.st:nth-child(2)::after{display:none}.cmp,.rec{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:620px){.nums b{font-size:21px}.wrap{padding:12px 12px 30px}.top{grid-template-columns:minmax(0,1fr);gap:8px}.brand{display:none}.flow{grid-template-columns:minmax(0,1fr)}
+  .flow>.st::after{right:50%!important;top:auto!important;bottom:-11px;border:8px solid transparent!important;border-top:10px solid var(--navy)!important;transform:translate(50%,50%)!important;display:block!important}
+  .flow>.st:last-child::after{display:none!important}.modes{grid-template-columns:1fr}.trade{grid-template-columns:1fr;justify-items:center}.trade i{transform:rotate(90deg)}.card .t{min-height:0}}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="bus" viewBox="0 0 120 52">
+      <rect x="2" y="4" width="114" height="38" rx="7" fill="#fff" stroke="#1d1a5e" stroke-width="2.5"/>
+      <path d="M2 30h114v6a6 6 0 0 1-6 6H8a6 6 0 0 1-6-6z" fill="#4b2a9b"/>
+      <path d="M60 30h56v4H64z" fill="#f26b1d"/>
+      <rect x="9" y="10" width="17" height="14" rx="2" fill="#bfd6f2"/><rect x="30" y="10" width="17" height="14" rx="2" fill="#bfd6f2"/><rect x="51" y="10" width="17" height="14" rx="2" fill="#bfd6f2"/><rect x="72" y="10" width="17" height="14" rx="2" fill="#bfd6f2"/>
+      <rect x="95" y="8" width="17" height="22" rx="2" fill="#bfd6f2"/>
+      <circle cx="26" cy="43" r="7" fill="#1f2437"/><circle cx="26" cy="43" r="3" fill="#c9cbd6"/><circle cx="92" cy="43" r="7" fill="#1f2437"/><circle cx="92" cy="43" r="3" fill="#c9cbd6"/>
+    </symbol>
+  </defs>
+</svg>
+<div class="wrap">
+  <header class="top">
+    <div class="brand">AI Recovery<br>Scenario Optimiser<span>SG Transport Pulse</span></div>
+    <div><h1>How AI optimisation makes <em>trip adjustment &amp; halfway deployment decisions</em></h1>
+      <p class="lede">Not &ldquo;late bus = halfway&rdquo;. The AI works like an experienced controller: look at the situation, try every feasible action, follow each one through the next trips, test it against a thousand possible futures, then recommend &ndash; and explain the trade-off.</p>
+      <div class="live" id="live"></div></div>
+    <a class="back" href="/halfway">&larr; Back to optimiser</a>
+  </header>
+
+  <div class="flow">
+    <section class="st">
+      <h2><b>1</b>Real-time operating conditions</h2>
+      <svg viewBox="0 0 300 150" role="img" aria-label="Four buses approaching the interchange, 4, 12, 25 and 32 minutes late">
+        <rect x="222" y="26" width="72" height="92" rx="6" fill="#eee9fb" stroke="#1d1a5e" stroke-width="2"/><text x="258" y="44" text-anchor="middle" font-family="Barlow Condensed" font-weight="800" font-size="11" fill="#1d1a5e">INTERCHANGE</text>
+        <rect x="232" y="54" width="52" height="8" rx="2" fill="#4b2a9b"/><rect x="232" y="72" width="52" height="8" rx="2" fill="#4b2a9b"/><rect x="232" y="90" width="52" height="8" rx="2" fill="#4b2a9b"/>
+        <line x1="0" y1="140" x2="222" y2="140" stroke="#c9c5dc" stroke-width="3" stroke-dasharray="10 7"/>
+        <use href="#bus" x="150" y="4" width="64" height="28"/><use href="#bus" x="104" y="40" width="64" height="28"/><use href="#bus" x="52" y="76" width="64" height="28"/><use href="#bus" x="4" y="110" width="64" height="28"/>
+        <g font-family="Barlow Condensed" font-weight="800" font-size="15">
+          <rect x="176" y="0" width="30" height="16" rx="4" fill="#1f9d57"/><text x="191" y="13" text-anchor="middle" fill="#fff">+4</text>
+          <rect x="128" y="36" width="34" height="16" rx="4" fill="#ffb020"/><text x="145" y="49" text-anchor="middle" fill="#1f2437">+12</text>
+          <rect x="76" y="72" width="34" height="16" rx="4" fill="#f26b1d"/><text x="93" y="85" text-anchor="middle" fill="#fff">+25</text>
+          <rect x="28" y="106" width="34" height="16" rx="4" fill="#d8343f"/><text x="45" y="119" text-anchor="middle" fill="#fff">+32</text>
+        </g>
+      </svg>
+      <ul>
+        <li>Scheduled, actual &amp; predicted arrival and departure</li>
+        <li>Bus lateness, current &amp; projected headway</li>
+        <li>BC minimum 7-min layover, finishing-time impact</li>
+        <li>Traffic, incidents, remaining trip distance</li>
+        <li>Full-trip or halfway-start options</li>
+        <li>Trips already departed are locked</li>
+      </ul>
+    </section>
+    <section class="st">
+      <h2><b>2</b>AI generates possible recovery plans</h2>
+      <p class="small" style="margin:0">Across at least the next 3 UP + 3 DOWN trips, not just the late bus.</p>
+      <div style="margin-top:6px"><span class="pill">No intervention</span><span class="pill">Spread departures</span><span class="pill">Adjust one trip</span><span class="pill">Adjust several &plusmn;8 min</span><span class="pill">Full trip + regulation</span><span class="pill">Halfway one trip + regulate</span><span class="pill">Halfway one, others full</span><span class="pill">Mixed combinations</span></div>
+      <p class="small" style="margin:10px 0 2px;font-weight:700;color:var(--red)">Rejected automatically</p>
+      <div><span class="pill x">Layover &lt; 7 min</span><span class="pill x">Adjustment &gt; &plusmn;8 min</span><span class="pill x">Alters a departed trip</span><span class="pill x">Simultaneous departures</span><span class="pill x">Worse downstream headway, no real benefit</span></div>
+    </section>
+    <section class="st">
+      <h2><b>3</b>Simulate the whole trip chain</h2>
+      <svg viewBox="0 0 300 150" role="img" aria-label="Trip chain from UP 1 to DOWN 3; a local fix looks good at first and then produces a 29 minute gap two trips later">
+        <g font-family="Barlow Condensed,Arial Narrow,sans-serif" font-weight="800" font-size="10.5" text-anchor="middle">
+          <g fill="#1d1a5e"><rect x="2" y="4" width="44" height="22" rx="5"/><rect x="52" y="4" width="44" height="22" rx="5"/><rect x="102" y="4" width="44" height="22" rx="5"/><rect x="152" y="4" width="44" height="22" rx="5"/><rect x="202" y="4" width="44" height="22" rx="5"/><rect x="252" y="4" width="44" height="22" rx="5"/></g>
+          <g fill="#fff"><text x="24" y="20">UP 1</text><text x="74" y="20">DOWN 1</text><text x="124" y="20">UP 2</text><text x="174" y="20">DOWN 2</text><text x="224" y="20">UP 3</text><text x="274" y="20">DOWN 3</text></g>
+          <text x="4" y="52" text-anchor="start" font-size="12" fill="#5d6378">Local fix</text>
+          <g><rect x="12" y="58" width="24" height="26" fill="#1f9d57"/><rect x="62" y="62" width="24" height="22" fill="#1f9d57"/><rect x="112" y="46" width="24" height="38" fill="#ffb020"/><rect x="162" y="30" width="24" height="54" fill="#d8343f"/><rect x="212" y="32" width="24" height="52" fill="#d8343f"/><rect x="262" y="40" width="24" height="44" fill="#ffb020"/></g>
+          <text x="174" y="44" fill="#fff" font-size="12">29</text>
+          <text x="4" y="104" text-anchor="start" font-size="12" fill="#5d6378">AI plan</text>
+          <g><rect x="12" y="110" width="24" height="28" fill="#1f9d57"/><rect x="62" y="112" width="24" height="26" fill="#1f9d57"/><rect x="112" y="111" width="24" height="27" fill="#1f9d57"/><rect x="162" y="113" width="24" height="25" fill="#1f9d57"/><rect x="212" y="114" width="24" height="24" fill="#1f9d57"/><rect x="262" y="114" width="24" height="24" fill="#1f9d57"/></g>
+        </g>
+      </svg>
+      <p class="small" style="margin:4px 0 0">A decision that looks good at the next departure can create a bad gap one or two trips later. For every plan the AI measures:</p>
+      <ul><li>Headways, maximum headway, spread &amp; bunching</li><li>Time to recover normal headway</li><li>BC layover &amp; end-of-duty delay</li><li>Mileage lost, trips disrupted / full / halfway</li></ul>
+    </section>
+    <section class="st o">
+      <h2><b>4</b>Monte Carlo: 1,000 futures per plan</h2>
+      <svg viewBox="0 0 300 130" role="img" aria-label="Distribution of maximum headway with P50, P85 and P90 markers">
+        <line x1="10" y1="108" x2="292" y2="108" stroke="#1d1a5e" stroke-width="2"/>
+        <g fill="#4b2a9b">
+          <rect x="30" y="100" width="14" height="8"/><rect x="46" y="92" width="14" height="16"/><rect x="62" y="78" width="14" height="30"/><rect x="78" y="60" width="14" height="48"/><rect x="94" y="42" width="14" height="66"/><rect x="110" y="30" width="14" height="78"/><rect x="126" y="28" width="14" height="80"/><rect x="142" y="36" width="14" height="72"/><rect x="158" y="50" width="14" height="58"/><rect x="174" y="64" width="14" height="44"/><rect x="190" y="76" width="14" height="32"/><rect x="206" y="86" width="14" height="22"/><rect x="222" y="94" width="14" height="14"/><rect x="238" y="100" width="14" height="8"/><rect x="254" y="104" width="14" height="4"/>
+        </g>
+        <g font-family="Barlow Condensed" font-weight="800" font-size="13" text-anchor="middle">
+          <line x1="133" y1="14" x2="133" y2="108" stroke="#1d1a5e" stroke-dasharray="4 3" stroke-width="2"/><text x="133" y="11" fill="#1d1a5e">P50</text>
+          <line x1="197" y1="14" x2="197" y2="108" stroke="#f26b1d" stroke-dasharray="4 3" stroke-width="2"/><text x="197" y="11" fill="#f26b1d">P85</text>
+          <line x1="229" y1="14" x2="229" y2="108" stroke="#d8343f" stroke-dasharray="4 3" stroke-width="2"/><text x="229" y="11" fill="#d8343f">P90</text>
+          <text x="150" y="126" font-size="12" fill="#5d6378" font-weight="600">Maximum headway (min)</text>
+        </g>
+      </svg>
+      <p class="small" style="margin:4px 0 0">Each plan is re-run with different traffic, running time, passenger dwell, junction delay, incidents and arrival predictions. The result is a range, not a single guess:</p>
+      <ul><li>Expected, P50 / P85 / P90 max headway</li><li>Recovery time &amp; chance of bunching</li><li>Mileage loss &amp; BC finishing-time impact</li></ul>
+      <p class="small" style="margin:6px 0 0"><b style="color:var(--orange)">Why it matters:</b> it separates a plan that only works on a perfect day from one that still works when conditions get worse.</p>
+    </section>
+  </div>
+
+  <section class="sec" style="margin-top:14px">
+    <h2><b>5</b>Compare: no action vs adjustment vs halfway</h2>
+    <div class="cmp">
+      <div class="card"><h3>No action</h3><div class="t">Every bus leaves when it is ready. The gap stays and grows as the crowded bus slows down.</div>
+        <div class="bars" aria-label="Headways 11, 11, 34, 4, 12 minutes"><div>11<i class="g" style="height:26px"></i></div><div>11<i class="g" style="height:26px"></i></div><div style="color:var(--red)">34<i class="r" style="height:80px"></i></div><div style="color:var(--red)">4<i class="r" style="height:9px"></i></div><div>12<i class="g" style="height:28px"></i></div></div>
+        <div class="kv"><span>Max headway</span><b class="bad">34 min</b><span>Recovery</span><b class="bad">72 min</b><span>Mileage lost</span><b class="ok">0 km</b><span>BC finishing delay</span><b class="bad">+11 min</b></div></div>
+      <div class="card"><h3>Trip adjustment / regulation</h3><div class="t">Every trip runs the full route; departures are spread within &plusmn;8 min. Mileage is kept, but the late BC stays late.</div>
+        <div class="bars" aria-label="Headways 10, 11, 25, 9, 12 minutes"><div>10<i class="g" style="height:24px"></i></div><div>11<i class="g" style="height:26px"></i></div><div style="color:var(--red)">25<i class="r" style="height:60px"></i></div><div>9<i class="y" style="height:21px"></i></div><div>12<i class="g" style="height:28px"></i></div></div>
+        <div class="kv"><span>Max headway</span><b>25 min</b><span>Recovery</span><b>58 min</b><span>Mileage lost</span><b class="ok">0 km</b><span>BC finishing delay</span><b class="bad">+11 min</b></div></div>
+      <div class="card best"><h3>Halfway + regulation</h3><div class="t">One late trip starts downstream, the others are spread. Faster recovery, BC back on time &ndash; at a mileage cost.</div>
+        <div class="bars" aria-label="Headways 13, 14, 15, 13, 14 minutes"><div>13<i class="g" style="height:31px"></i></div><div>14<i class="g" style="height:33px"></i></div><div>15<i class="g" style="height:36px"></i></div><div>13<i class="g" style="height:31px"></i></div><div>14<i class="g" style="height:33px"></i></div></div>
+        <div class="kv"><span>Max headway</span><b class="ok">16 min</b><span>Recovery</span><b class="ok">39 min</b><span>Mileage lost</span><b class="bad">8.4 km</b><span>BC finishing delay</span><b class="ok">+3 min</b></div></div>
+    </div>
+    <p class="small" style="margin:10px 0 0;color:var(--mut)">Halfway is <b>never</b> recommended just because a bus is late. It must show a measurable network benefit: at least 2 min lower P85 maximum headway than adjustment, or clearly faster recovery. The first stops before the halfway point still lose one trip &ndash; that is counted.</p>
+  </section>
+
+  <section class="sec o" style="margin-top:14px">
+    <h2><b>6</b>AI recommended recovery plan</h2>
+    <div class="rec">
+      <div>
+        <div class="modes">
+          <div class="mode"><h4>Headway priority</h4><p>Severe delay (&gt; 20 min): evaluate Halfway &rarr; Adjustment &rarr; Regulation and pick the feasible plan with the strongest headway recovery.</p></div>
+          <div class="mode"><h4>Mileage priority</h4><p>Delay &lt; 30 min: balance the next 3 UP + 3 DOWN trips by adjustment. &ge; 30 min: halfway only if its benefit is worth the km lost.</p></div>
+        </div>
+        <ul class="ins" id="ins">
+          <li><svg viewBox="0 0 120 52" aria-hidden="true"><use href="#bus"/></svg><span>Bus 1 &mdash; Full trip | Depart 14:06</span></li>
+          <li class="h"><svg viewBox="0 0 120 52" aria-hidden="true"><use href="#bus"/></svg><span>Bus 2 &mdash; Start halfway at Stop XXXXX | 14:18</span></li>
+          <li><svg viewBox="0 0 120 52" aria-hidden="true"><use href="#bus"/></svg><span>Bus 3 &mdash; Full trip | Hold 4 min | Depart 14:31</span></li>
+        </ul>
+      </div>
+      <div class="nums" id="nums">
+        <div><small>Without intervention</small><b>Max HW 34</b></div>
+        <div><small>Adjustment only</small><b>Max HW 25</b></div>
+        <div class="ai"><small>AI plan</small><b>Max HW 16</b></div>
+        <div><small>Recovery</small><b>72 &rarr; 39 min</b></div>
+        <div><small>Mileage loss</small><b>8.4 km</b></div>
+        <div><small>BC finishing delay</small><b>+11 &rarr; +3 min</b></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="why">
+    <h2>7 &nbsp;Why the AI chose this</h2>
+    <p id="why">&ldquo;Halfway deployment was selected because departure adjustment alone could not close the projected 31-minute gap within the next three trips. Starting Bus 2 halfway reduces the downstream gap while Bus 1 continues the full trip. Remaining departures are then spread to prevent a second large gap. This sacrifices 8.4 km of operated mileage but restores stable headways 33 minutes earlier.&rdquo;</p>
+    <div class="trade" aria-label="The trade-off"><span>Passenger headway</span><i>&harr;</i><span>Mileage preservation</span><i>&harr;</i><span>BC welfare</span><i>&harr;</i><span>Recovery speed</span></div>
+  </section>
+
+  <div class="foot"><span>Illustrative figures unless a live result is shown above. Decision support only &ndash; the controller decides.</span><span>SG Transport Pulse V12.7 &middot; AI Recovery Scenario Optimiser</span></div>
+</div>
+<script>
+(function(){                       // show the latest optimiser result from this browser, if there is one
+  let d = null; try{ d = JSON.parse(localStorage.getItem("rv.last") || "null"); }catch(e){}
+  if(!d || !d.ins || Date.now() - d.ts > 6 * 3600e3) return;
+  const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+  const r = x => x == null ? "\u2013" : Math.round(x), bus = '<svg viewBox="0 0 120 52" aria-hidden="true"><use href="#bus"/></svg>';
+  const L = document.getElementById("live"); L.style.display = "block";
+  L.textContent = `Live result: service ${d.svc} direction ${d.dir}, ${new Date(d.ts).toLocaleTimeString("en-GB", {hour:"2-digit", minute:"2-digit"})} \u2013 sections 6 and 7 show your last run (${(d.sims || 1000).toLocaleString()} futures per plan, P85 figures).`;
+  document.getElementById("ins").innerHTML = d.ins.map(t => `<li class="${/halfway/i.test(t) ? "h" : ""}">${bus}<span>${esc(t)}</span></li>`).join("");
+  document.getElementById("nums").innerHTML = `<div><small>Without intervention</small><b>Max HW ${r(d.none)}</b></div><div><small>Adjustment only</small><b>Max HW ${r(d.adjust)}</b></div><div class="ai"><small>AI plan</small><b>Max HW ${r(d.ai)}</b></div>
+    <div><small>Normal headway</small><b style="font-size:20px">${esc(d.rec[0])} &rarr; ${esc(d.rec[1])}</b></div><div><small>Mileage loss</small><b>${(+d.km || 0).toFixed(1)} km</b></div><div><small>BC finishing delay</small><b>+${r(d.bc[0])} &rarr; +${r(d.bc[1])} min</b></div>`;
+  if(d.why && d.why.length) document.getElementById("why").textContent = "\u201c" + d.why.join(" ") + "\u201d";
+})();
+</script>
+</body>
+</html>

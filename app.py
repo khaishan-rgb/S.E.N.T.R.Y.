@@ -21,7 +21,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 import headway
 import traffic
 
-VERSION = "V11.3"
+VERSION = "V12.7"
 LTA = os.getenv("LTA_BASE", "https://datamall2.mytransport.sg/ltaodataservice").rstrip("/")
 KEY = os.getenv("LTA_ACCOUNT_KEY", "")
 OSRM = os.getenv("OSRM_URL", "https://router.project-osrm.org").rstrip("/")
@@ -1387,6 +1387,11 @@ async def halfway_page():
     return HTMLResponse((HERE / "halfway.html").read_text(encoding="utf-8"))
 
 
+@app.get("/recovery-guide", response_class=HTMLResponse)
+async def recovery_guide_page():
+    return HTMLResponse((HERE / "recovery_guide.html").read_text(encoding="utf-8"))
+
+
 @app.get("/api/bunching")
 async def api_bunching(services: str = "", direction: int = 0):
     """Cached gap / bunching state for the selected services. Browsers never call DataMall; the collector does."""
@@ -1879,6 +1884,9 @@ async def api_ho_simulate(service: str = "", direction: int = 1, ref: str = "", 
         lates.append(f)
     lates = (lates + [0.0] * n)[:n]
     dis = None
+    force_cont = disrupted.strip().lower() == "continue"           # the Recovery Optimiser kept every trip in full: show the adjust-and-continue view
+    if force_cont:
+        disrupted = ""
     auto = disrupted.strip().lower() == "auto"                # "auto": the AI decides which trips to disrupt (Run AI Optimisation), or to just adjust and continue service
     if disrupted.strip() and not auto:
         try:
@@ -1902,6 +1910,10 @@ async def api_ho_simulate(service: str = "", direction: int = 1, ref: str = "", 
            "pref": pref, "regulate": reg.strip() not in ("0", "false", "no", "off"), "veh": veh, "ready": rdy,
            "search_candidates": (cands[::math.ceil(len(cands) / 10)] if len(cands) > 10 else cands),           # the AI's search compares its decisions on a coarser set of stops; the chosen one is then simulated on every stop
            "keep": [c for c in pick.split(",") if re.fullmatch(r"\d{5}", c.strip())][:6]}
+    if force_cont:
+        P_ = {**halfway.PARAMS, **ctx["params"]}
+        tr0 = halfway.build_trips(P_, H, t0, lates, [])
+        ctx["block"] = [t["n"] for t in tr0 if 2 <= t["n"] <= int(P_["n_trips"]) - 1 and t["act_arr"] + P_["min_layover_min"] - t["sch_dep"] >= P_["auto_late_min"] - 1e-6]
     res = halfway.decide(ctx) if auto else halfway.simulate(ctx)
     if not res["ok"]:
         return res
@@ -1932,6 +1944,49 @@ async def api_ho_simulate(service: str = "", direction: int = 1, ref: str = "", 
                     "stops": [[round(s_["lat"], 5), round(s_["lon"], 5), s_["seq"], s_["name"], s_["code"]] for s_ in stops]}, updated=now.isoformat(timespec="seconds"))
     if save.strip() and (dis is not None or auto) and res.get("options"):
         res["run_id"] = ho_audit(res, lates)
+    return res
+
+
+# ----------------------------------------------------------------------------- V12.7 AI Recovery Scenario Optimiser (recovery.py)
+import recovery
+
+
+@app.get("/api/halfway/recovery")
+async def api_ho_recovery(service: str = "", direction: int = 1, ref: str = "", hw: str = "", layover: str = "", late: str = "", mode: str = "balanced",
+                          veh: str = "own", sims: str = "", scope: str = "all"):
+    """Trip adjustment vs halfway deployment on the whole 3 UP + 3 DOWN chain, with Monte Carlo. Decision support only."""
+    svc = service.strip().upper()
+    g = await ho_route(svc, direction)
+    if g.get("error"):
+        return {"ok": False, "error": g["error"]}
+    P = {**halfway.PARAMS, **HO["params"]}
+    now = g["now"]
+    t0 = ho_parse_hhmm(ref) if ref.strip() else ((now.hour * 60 + now.minute) // 5 + 1) * 5
+    if t0 is None:
+        return {"ok": False, "error": "First scheduled departure must be a time like 08:10."}
+    try:
+        H = float(hw) if hw.strip() else g["H"]
+        lay = float(layover) if layover.strip() else P["layover_min"]
+        lates = [float(x) if x.strip() else 0.0 for x in late.split(",")] if late.strip() else []
+        ns = int(float(sims)) if sims.strip() else 1000
+    except ValueError:
+        return {"ok": False, "error": "Headway, layover, lateness and simulations must be numbers."}
+    if not H or H <= 0:
+        return {"ok": False, "error": "Scheduled headway unknown for this service - enter it in the Headway box."}
+    n = int(P["n_trips"])
+    lates = (lates + [0.0] * n)[:n]
+    stops = g["stops"]
+    cands, _unres, _info = ho_candidates(svc, direction, stops, "", scope if scope in ("auto", "all", "approved") else "all", g["prep"], P)
+    mode = {"recovery": "headway", "pref": "balanced"}.get(mode, mode)
+    ctx = {"H": H, "t0": t0, "late": lates, "tau": g["tau"], "stop_s": g["prep"]["stop_s"], "route_km": g["prep"]["km"], "stop_names": [s_["name"] for s_ in stops],
+           "stop_codes": [s_["code"] for s_ in stops], "candidates": cands, "now": now.hour * 60 + now.minute, "mode": mode, "veh": veh,
+           "params": {"n_trips": n, "layover_min": lay, "min_layover_min": P["min_layover_min"], "adj_max": min(8.0, P["reg_hold_max"]), "offsvc_factor": P["offsvc_factor"],
+                      "start_early_max": P["start_early_max"], "start_late_max": P["start_late_max"], "max_mileage_km": P["max_mileage_km"],
+                      "min_remaining_pct": P["min_remaining_pct"], "sims": max(100, min(3000, ns)), "bunch_min": BB["params"]["bunch_min"]}}
+    res = await asyncio.to_thread(recovery.optimise, ctx)
+    if res.get("ok"):
+        res.update(service=svc, direction=direction, ref=ho_hhmm(t0), route={"km": round(g["prep"]["km"], 1), "run_min": round(g["tau"][-1], 1), "first": stops[0]["name"], "last": stops[-1]["name"]},
+                   traffic_ok=g["traffic_ok"], updated=now.isoformat(timespec="seconds"))
     return res
 
 
