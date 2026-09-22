@@ -24,7 +24,7 @@ the halfway stop (at stop 2 for "regulate only"). If the simulated trips end on 
 """
 import math
 
-MODEL_VERSION = "halfway-12.3-hard-constraints"
+MODEL_VERSION = "halfway-12.4-operational-priority"
 EPS = 1e-6
 
 PARAMS = {
@@ -713,9 +713,13 @@ def decide(ctx):
         probe["message"] = "No plan improves the headways without creating a problem: continue service as it is."
         return probe
     # Whole-trip operational decision. Do not judge only the first-stop adjustment.
-    # A severely late duty can poison several following headways and force healthy BCs to be held.
-    # Compare the complete route result at every stop, then apply the selected operating philosophy.
-    severe = [c for c in cand if own_late(trips0[c - 1]) >= max(20.0, 2.0 * H) - EPS]
+    # Operational priority requested by OCC:
+    #   Headway focus: arrival delay >20 min => Halfway first, then adjustment, then regulation.
+    #   Mileage focus: arrival delay >30 min => Halfway first, then adjustment, then regulation.
+    #                  arrival delay <=30 min => preserve the full trip and regulate 3 before + 3 after as evenly as possible.
+    # `late` is the entered/observed arrival delay, not delay created later by regulation.
+    max_input_delay = max((float(t.get("late") or 0.0) for t in trips0), default=0.0)
+    severe = [c for c in cand if float(trips0[c - 1].get("late") or 0.0) > 20.0 + EPS]
     # HARD company constraints. Only plans below 30 min max headway are eligible when at least
     # one such plan exists. If physics/fleet availability makes <30 impossible, choose the plan
     # with the LOWEST achievable maximum headway first, then quality, and flag the exception.
@@ -738,25 +742,26 @@ def decide(ctx):
     cont_bad = bool(best_cont and (best_cont["max"] >= 2.0 * H - EPS or
                     (severe and best_cont["hold"] >= P["reg_hold_max"] * 1.5 - EPS)))
 
-    if pref == "recovery" and best_half:
-        # Headway focus: Halfway > Adjustment. Use halfway whenever it improves the whole-route
-        # maximum headway, or when the adjustment-only plan remains operationally unacceptable.
-        if (best_cont is None or cont_bad or best_half["max"] < best_cont["max"] - EPS):
+    if pref == "recovery":
+        # HEADWAY FOCUS: when observed arrival delay is >20 min, Halfway has first priority.
+        # Only fall back to adjustment/regulation when no viable halfway plan exists.
+        if max_input_delay > 20.0 + EPS and best_half:
             top = best_half
-        else:
-            top = best_cont
-    elif pref == "mileage":
-        # Mileage focus: Adjustment > Halfway, but not at any cost. Preserve mileage only when
-        # the full-route headway remains controllable; otherwise recover the severely late duty.
-        if best_cont and not cont_bad:
+        elif best_cont:
             top = best_cont
         elif best_half:
             top = best_half
         else:
-            top = best_cont or max(entries, key=lambda e: e["q"])
+            top = max(decision_pool, key=lambda e: e["q"])
+    elif pref == "mileage":
+        # MILEAGE FOCUS: when observed arrival delay is >30 min, Halfway has first priority.
+        # At <=30 min preserve mileage: keep the full trip and balance/regulate the 3+3 horizon.
+        if max_input_delay > 30.0 + EPS:
+            top = best_half or best_cont or max(decision_pool, key=lambda e: e["q"])
+        else:
+            top = best_cont or best_half or max(decision_pool, key=lambda e: e["q"])
     else:
-        # Balanced: normally use the best whole-route quality. For a severe late trip, prefer
-        # halfway if it materially cuts the worst headway (>=10% of scheduled HW) or fixes >=2H.
+        # Balanced/company mode keeps the whole-route quality comparison, subject to hard constraints.
         top = max(decision_pool, key=lambda e: (e["q"], -len(e["S"]), -e["skipped_km"], -e["hold"]))
         if severe and best_half and best_cont and (cont_bad or best_half["max"] <= best_cont["max"] - 0.10 * H):
             top = best_half
@@ -798,7 +803,11 @@ def decide(ctx):
     final["ai"] = {"mode": "auto", "decision": decision, "suggest": list(S), "candidates": cand, "alternatives": alts, "pref": pref,
                    "constraints": {"max_adjustment_min": 8, "min_layover_min": 7, "halfway_layover_omitted": True,
                                    "min_horizon": "3 UP + 3 DOWN", "departed_locked": True, "headway_lt_min": max_hw_limit},
-                   "headway_constraint_met": constraint_met, "best_achievable_max_headway": top["max"]}
+                   "headway_constraint_met": constraint_met, "best_achievable_max_headway": top["max"],
+                   "observed_max_delay_min": _r(max_input_delay, 1),
+                   "priority_rule": ("delay>20: halfway>adjustment>regulate" if pref == "recovery" else
+                                     "delay>30: halfway>adjustment>regulate; delay<=30: regulate 3+3" if pref == "mileage" else
+                                     "balanced whole-route optimisation")}
     base_msg = ("Recommended - the AI ticks trip %d as Disrupted (halfway) and adjusts the trips around it" % S[0] if S else
                 ("Recommended - adjust the trips and continue service (no disruption)" if best_i is not None else "Recommended - continue service as it is: no plan beats it"))
     final["message"] = base_msg if constraint_met else (f"WARNING: <{max_hw_limit:g} min headway is not achievable with the available trips. "
