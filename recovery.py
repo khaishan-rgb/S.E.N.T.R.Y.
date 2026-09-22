@@ -23,7 +23,7 @@ Pure computation (numpy), no I/O. Decision support only.
 import math
 import numpy as np
 
-MODEL_VERSION = "recovery-1.0"
+MODEL_VERSION = "recovery-1.1"
 EPS = 1e-6
 
 PARAMS = {
@@ -37,10 +37,13 @@ PARAMS = {
     "down_run_factor": 1.0,       # DOWN running time = UP running time x this
     "halfway_min_late": 10.0,     # a trip is considered for a halfway start from this lateness
     "halfway_skip_layover": 1.0,  # 1 = the halfway bus leaves the interchange straight away (starts downstream, no interchange layover)
-    "offsvc_factor": 0.7,         # off-service running = this x in-service running time
+    "offsvc_factor": 0.7,         # off-service running = this x in-service running time (only when no road-routed time is available)
+    "prep_min": 2.0,              # operational preparation at the halfway stop before entering passenger service
     "start_early_max": 5.0,       # a halfway start may be this much before the lost trip's slot at that stop ...
     "start_late_max": 10.0,       # ... or this much after it
     "max_mileage_km": 15.0,
+    "min_halfway_km": 2.0,        # a "halfway" start this close to the interchange is just a departure without layover: not allowed
+    "w_ic_short": 1.5,            # cost per minute that an interchange departure headway is below half the scheduled headway (dispatching buses 1 min apart)
     "min_remaining_pct": 20.0,
     "max_stops_tested": 10,
     "bunch_min": 3.0,
@@ -108,7 +111,14 @@ class Chain:
         self.ready = self.act_arr + ml
         self.nat = np.maximum(self.S, self.ready)
         now = ctx.get("now")
-        self.now = float(now) if now is not None and abs(float(now) - self.t0) < 600 else None
+        now = float(now) if now is not None else None
+        late_b = [b for b in range(1, n + 1) if self.nat[b] - self.S[b] >= 1.0 - EPS]
+        first_late = min((self.nat[b] for b in late_b), default=None)
+        # LIVE only while the disruption is still ahead of us (the first late trip has not left yet). If the entered timetable is
+        # already in the past (a what-if / replay), locking by the clock would freeze every trip and the AI could do nothing:
+        # plan from the first departure instead (only trip 1 counts as departed).
+        self.live = bool(now is not None and self.t0 - 180 <= now and (first_late is None or now < first_late - EPS))
+        self.now = now if self.live else self.t0
         self.locked = np.zeros(self.B, bool)
         if self.now is not None:
             for b in range(1, n + 1):
@@ -132,6 +142,7 @@ class Chain:
         self.prof_dn = np.array([R_dn * f for f in np.linspace(0, 1, 7)])
         self.w_dn = np.ones(len(self.prof_dn))
         self.pidx = {j: k for k, j in enumerate(self.pts_up)}
+        self.offsvc = {int(k): float(v) for k, v in (ctx.get("offsvc_min") or {}).items() if v is not None}
         self.chain_len = self.off[-1] + self.R[-1] + (self.S[-1] - self.ref)
 
     # ---------------------------------------------------------------- one leg
@@ -267,7 +278,8 @@ class Chain:
         bunch_pts = sum(((lg["ming"] < P["bunch_min"] - EPS) * lg["w"][None, :]).sum(1) for lg in legs)
         bunch_tot = sum(lg["w"].sum() for lg in legs)
         g0 = legs[0]["dep_g"]
-        out = {"leg_min": leg_min, "max": np.nanmax(leg_max, 1), "ic_max": np.nanmax(g0, 1), "ic_sq": np.nansum((g0 - H) ** 2, 1), "wmax": leg_wmax.mean(1), "leg_max": leg_max, "leg_wmax": leg_wmax,
+        ic_short = np.nansum(np.maximum(0.0, 0.5 * H - g0), 1)
+        out = {"ic_short": ic_short, "leg_min": leg_min, "max": np.nanmax(leg_max, 1), "ic_max": np.nanmax(g0, 1), "ic_sq": np.nansum((g0 - H) ** 2, 1), "wmax": leg_wmax.mean(1), "leg_max": leg_max, "leg_wmax": leg_wmax,
                "rms": np.sqrt(sq / np.maximum(cnt, 1)), "bunch": bunch_pts / bunch_tot, "any_bunch": (leg_min < P["bunch_min"] - EPS).any(1),
                "rec": np.where(np.isinf(rec), 0.0, np.maximum(0.0, rec - self.ref)), "unrec": late_irr, "bc": bc, "bc_max": np.maximum(bc, 0).max(1),
                "bc_sum": np.maximum(bc, 0).sum(1), "up1_late": up1_late, "D": D}
@@ -302,14 +314,19 @@ class Chain:
 
 
 # ============================================================================ plans
-def _cost(m, w, H, km, adj):
-    return (w["mx"] * np.maximum(0.0, m["max"] - H) + w["wmx"] * np.maximum(0.0, m["wmax"] - H) + w["rms"] * m["rms"] + w["bunch"] * 10.0 * m["bunch"]
+def _cost(m, w, H, km, adj, w_short=1.5):
+    return (w_short * m["ic_short"] + w["mx"] * np.maximum(0.0, m["max"] - H) + w["wmx"] * np.maximum(0.0, m["wmax"] - H) + w["rms"] * m["rms"] + w["bunch"] * 10.0 * m["bunch"]
             + w["rec"] * m["rec"] / H + w["km"] * km + w["bc"] * m["bc_max"] + w["bcsum"] * m["bc_sum"] / 10.0 + w["adj"] * adj)
 
 
 def _local_cost(m, H):
     """what a 'next departure only' controller looks at: the interchange headways of UP 1."""
     return np.maximum(0.0, m["ic_max"] - H) * 3.0 + 0.3 * m["ic_sq"] / H + 0.02 * m["adj"]
+
+
+def _off(C, P, j):
+    """off-service minutes from the interchange to stop j: road-routed if known, else a share of the in-service running time."""
+    return C.offsvc.get(j, P["offsvc_factor"] * C.tau[j])
 
 
 class Optimiser:
@@ -353,14 +370,21 @@ class Optimiser:
                 why.append("Halfway start is outside the lost trip's slot window")
             if self.veh == "own":
                 leave = C.act_arr[b] + (0.0 if P["halfway_skip_layover"] else C.ml)
-                if leave + P["offsvc_factor"] * C.tau[j] > st + C.tau[j] + 1e-6:
+                if leave + _off(C, P, j) + P["prep_min"] > st + C.tau[j] + 1e-6:
                     why.append("The late bus cannot reach the halfway stop in time")
-        xs = sorted([x for b, x in dep.items() if b not in hwb] + [C.S[0], C.S[-1]])
-        moved = any(abs(x - C.nat[b]) > 0.49 for b, x in dep.items())
-        for a, c in zip(xs, xs[1:]):
-            if c - a < P["min_dep_gap"] - 1e-6 and moved:
+        # simultaneous departures: only a pair that the PLAN creates (one of the two was moved) counts - buses that arrive together on their own
+        # must stay adjustable, otherwise the AI could never spread them apart
+        full = {b: dep.get(b, C.nat[b]) for b in range(1, C.n + 1) if b not in hwb}
+        full[0], full[C.n + 1] = C.S[0], C.S[-1]
+        seq = sorted(full.items(), key=lambda kv: (kv[1], kv[0]))
+        mv = lambda b: b in dep and abs(dep[b] - C.nat[b]) > 0.49
+        for (a, xa), (c, xc) in zip(seq, seq[1:]):
+            if xc - xa < P["min_dep_gap"] - 1e-6 and (mv(a) or mv(c)):
                 why.append("Creates simultaneous departures at the interchange")
                 break
+        km = sum(C.stop_s[j] for (_, j, _) in hw)
+        if hw and km > P["max_mileage_km"] + 1e-6:
+            why.append(f"Mileage loss over the {P['max_mileage_km']:g} km limit")
         return sorted(set(why))
 
     def _count(self, fam, why):
@@ -386,7 +410,7 @@ class Optimiser:
         hwb = [{h[0] for h in pl["hw"]} for pl in plans]
         adj = np.array([sum(abs(x - C.nat[b]) for b, x in pl["dep"].items() if b not in hwb[r]) for r, pl in enumerate(plans)])
         m["km"], m["adj"] = km, adj
-        m["cost"] = _cost(m, self.W, C.H, km, adj)
+        m["cost"] = _cost(m, self.W, C.H, km, adj, self.P["w_ic_short"])
         m["local"] = _local_cost(m, C.H)
         return m
 
@@ -466,7 +490,7 @@ class Optimiser:
         out = {}
         hk = [b for b in lateb if C.late[b - 1] >= P["halfway_min_late"] - EPS and 2 <= b <= C.n - 1 and not C.locked[b]]
         js = [j for j in C.cand_j if C.route_km <= 0 or 100.0 * (C.route_km - C.stop_s[j]) / C.route_km >= P["min_remaining_pct"] - EPS]
-        js = [j for j in js if C.stop_s[j] <= P["max_mileage_km"] + EPS]
+        js = [j for j in js if P["min_halfway_km"] - EPS <= C.stop_s[j] <= P["max_mileage_km"] + EPS]
         if len(js) > P["max_stops_tested"]:
             st = math.ceil(len(js) / P["max_stops_tested"])
             js = js[::st]
@@ -484,7 +508,7 @@ class Optimiser:
                 starts = []
                 for b in combo:
                     slot = C.S[b]
-                    own = C.act_arr[b] + (0.0 if P["halfway_skip_layover"] else C.ml) + P["offsvc_factor"] * C.tau[j] - C.tau[j]
+                    own = C.act_arr[b] + (0.0 if P["halfway_skip_layover"] else C.ml) + _off(C, P, j) + P["prep_min"] - C.tau[j]
                     cand = [slot - 5, slot, slot + 5, slot + 10, slot + 12]
                     if self.veh == "own":
                         cand.append(math.ceil(own))
@@ -560,7 +584,9 @@ class Optimiser:
                 leave = C.act_arr[b] + (0.0 if P["halfway_skip_layover"] else C.ml)
                 rows.append({"n": b, "type": "halfway", "stop": C.names[j], "code": C.codes[j], "j": j, "start": _r(st + C.tau[j], 1),
                              "start_clock": hm(st + C.tau[j]), "slot_clock": hm(C.S[b] + C.tau[j]), "shift": _r(st - C.S[b], 1), "leave": _r(leave, 1),
-                             "leave_clock": hm(leave), "km_lost": _r(C.stop_s[j], 2), "late": C.late[b - 1], "sch": hm(C.S[b])})
+                             "leave_clock": hm(leave), "km_lost": _r(C.stop_s[j], 2), "late": C.late[b - 1], "sch": hm(C.S[b]),
+                             "off_min": _r(_off(C, P, j), 1), "off_routed": j in C.offsvc, "arrive": _r(leave + _off(C, P, j), 1), "arrive_clock": hm(leave + _off(C, P, j)),
+                             "act_arr": _r(C.act_arr[b], 1), "nat_dep": _r(C.nat[b], 1), "tau_j": _r(C.tau[j], 1)})
                 continue
             x = float(D[b])
             rows.append({"n": b, "type": "locked" if C.locked[b] else "full", "dep": _r(x, 1), "dep_clock": hm(x), "sch": hm(C.S[b]),
@@ -580,16 +606,21 @@ class Optimiser:
             chain.append({"leg": LEG_NAMES[L], "max": _r(det["leg_max"][0, L], 1), "wmax": _r(det["leg_wmax"][0, L], 1),
                           "dep_hw": [x for x in pat if 1 <= x[0] <= C.n or True]})
         ic = chain[0]["dep_hw"]
-        down = None
+        down, at_j = None, None
         if disp_j is not None and disp_j in C.pidx:
             T_, o_, g_ = legs[0]["pts"][C.pidx[disp_j]]
             down = [(int(o_[k]), _r(g_[k], 1)) for k in range(len(o_)) if not math.isnan(g_[k])]
+            at_j = [(int(o_[k]), _r(T_[k], 2)) for k in range(len(o_)) if not math.isnan(T_[k])]
+        up1 = {}
+        for (T_, o_, g_) in legs[0]["pts"]:
+            for k in range(len(o_)):
+                up1.setdefault(int(o_[k]), []).append(None if math.isnan(T_[k]) else _r(T_[k], 2))
         out = {"key": key, "label": label, "fam": plan.get("fam"), "rows": rows, "chain": chain,
                "det": {"max": _r(det["max"][0]), "ic_max": _r(det["ic_max"][0]), "wmax": _r(det["wmax"][0]), "rms": _r(det["rms"][0], 2),
                        "bunch_pct": _r(100 * det["bunch"][0], 0), "rec": _r(det["rec"][0], 0), "recovered": bool(not det["unrec"][0]), "min_hw": _r(float(np.nanmin(det["leg_min"][0])) if "leg_min" in det else None, 1), "km": _r(det["km"][0], 2), "adj": _r(det["adj"][0], 0),
                        "bc_max": _r(det["bc_max"][0], 1), "bc_sum": _r(det["bc_sum"][0], 1), "cost": _r(det["cost"][0], 1),
                        "bc": [_r(x, 1) for x in det["bc"][0]], "up1_late": [_r(x, 1) for x in det["up1_late"][0]]},
-               "ic_hw": ic, "down_hw": down, "n_adjusted": sum(1 for r in rows if r["type"] == "full" and abs(r["shift"]) >= 0.5),
+               "ic_hw": ic, "down_hw": down, "at_j": at_j, "up1_times": {str(k): v for k, v in up1.items()}, "n_adjusted": sum(1 for r in rows if r["type"] == "full" and abs(r["shift"]) >= 0.5),
                "n_halfway": len(hwb), "n_full": sum(1 for r in rows if r["type"] != "halfway")}
         if mc is not None:
             out["mc"] = {"n": int(len(mc["max"])), "max_mean": _r(mc["max"].mean()), "max_p50": _pct(mc["max"], 50), "max_p85": _pct(mc["max"], 85), "max_p90": _pct(mc["max"], 90),
@@ -685,7 +716,7 @@ class Optimiser:
         hwb = {h[0] for h in pl["hw"]}
         adj = np.array([sum(abs(x - C.nat[b]) for b, x in pl["dep"].items() if b not in hwb)])
         m["km"], m["adj"] = km, adj
-        m["cost"] = _cost(m, self.W, C.H, km, adj)
+        m["cost"] = _cost(m, self.W, C.H, km, adj, self.P["w_ic_short"])
         return m
 
     def _eval_mc(self, pl, nz, sims):
@@ -700,7 +731,7 @@ class Optimiser:
                 s = np.full(sims, float(st))
                 if self.veh == "own":
                     leave = C.act_arr[b] + nz["eta"][:, b] + (0.0 if P["halfway_skip_layover"] else C.ml)
-                    arrive = leave + P["offsvc_factor"] * C.tau[j] * nz["off"]
+                    arrive = leave + _off(C, P, j) * nz["off"] + P["prep_min"]
                     s = np.maximum(s, arrive - C.tau[j])
                 hw.append((b, j, s))
         m = C.run(D, hw, nz)
@@ -708,7 +739,7 @@ class Optimiser:
         hwb = {h[0] for h in pl["hw"]}
         adj = np.full(sims, sum(abs(x - C.nat[b]) for b, x in pl["dep"].items() if b not in hwb))
         m["km"] = km
-        m["cost"] = _cost(m, self.W, C.H, km, adj)
+        m["cost"] = _cost(m, self.W, C.H, km, adj, self.P["w_ic_short"])
         return m
 
     # -------------------------------------------------- the decision (priority modes + measurable benefit)
@@ -765,7 +796,7 @@ class Optimiser:
             if r["type"] == "halfway":
                 instr.append({"n": r["n"], "kind": "halfway", "time": r["start_clock"],
                               "text": f"Trip {r['n']} \u2014 Start halfway at {r['stop']} ({r['code']}) | {r['start_clock']}",
-                              "sub": (f"Leave {C.names[0]} off-service {r['leave_clock']} (no interchange layover) \u00b7 " if self.veh == "own" else "Standby bus \u00b7 ")
+                              "sub": (f"Leave {C.names[0]} off-service {r['leave_clock']} (no interchange layover), about {r['off_min']:.0f} min {'by road' if r['off_routed'] else '(estimated)'} \u00b7 " if self.veh == "own" else "Standby bus \u00b7 ")
                               + f"slot {r['slot_clock']} \u00b7 {r['km_lost']:.1f} km not operated"})
                 continue
             if r["type"] == "locked":
@@ -797,10 +828,10 @@ class Optimiser:
                 "benefit": dec["benefit"], "halfway_ok": dec["halfway_ok"], "adjust_unacceptable": dec["adjust_unacceptable"], "delay": dec["delay"],
                 "instructions": instr, "why": why, "plans": res, "sims": sims, "legs": LEG_NAMES[:C.NL], "focus": self.focus, "late_trips": self.lateb,
                 "halfway_trips_tested": self.hk, "stops_tested": [{"j": j, "name": C.names[j], "code": C.codes[j]} for j in self.js],
-                "generated": self._gen_info(), "veh": self.veh, "needs_standby": self.needs_standby, "not_recovered_min": _r(C.chain_len, 0), "now": _r(C.now, 1), "now_clock": hm(C.now) if C.now is not None else None,
-                "locked": [b for b in range(1, C.n + 1) if C.locked[b]], "first_stop": C.names[0], "disp_j": disp_j, "disp_name": C.names[disp_j] if disp_j is not None else None,
+                "generated": self._gen_info(), "live": C.live, "veh": self.veh, "needs_standby": self.needs_standby, "not_recovered_min": _r(C.chain_len, 0), "now": _r(C.now, 1), "now_clock": hm(C.now) if C.now is not None else None,
+                "locked": [b for b in range(1, C.n + 1) if C.locked[b]], "first_stop": C.names[0], "pts_up": C.pts_up, "pts_km": [_r(C.stop_s[j], 3) for j in C.pts_up], "prep_min": P["prep_min"], "disp_j": disp_j, "disp_name": C.names[disp_j] if disp_j is not None else None,
                 "trips": [{"n": b, "sch": hm(C.S[b]), "act_arr": hm(C.act_arr[b]), "late": C.late[b - 1], "ready": hm(C.ready[b]), "nat": hm(C.nat[b])} for b in range(1, C.n + 1)],
-                "params": {k: P[k] for k in ("bunch_min", "adj_max", "min_layover_min", "legs", "sims", "gain_min", "halfway_min_late", "severe_headway_min", "severe_mileage_min", "offsvc_factor")}}
+                "params": {k: P[k] for k in ("bunch_min", "adj_max", "min_layover_min", "legs", "sims", "gain_min", "halfway_min_late", "severe_headway_min", "severe_mileage_min", "offsvc_factor", "prep_min")}}
 
     def _gen_info(self):
         return {"generated": self.generated, "rejected": dict(sorted(self.reject.items(), key=lambda x: -x[1])), "families": self.families,
@@ -831,7 +862,8 @@ class Optimiser:
                 rec_txt = (f"settles to normal headways {('within ' + format(hd['rec'], '.0f') + ' min') if hd['rec'] else 'straight away'} "
                            f"(and in {h['p_recovered']:.0f}% of the {h['n']:,} simulated futures, against {f['p_recovered']:.0f}% for the full-trip plan, which does not settle within the 3 UP + 3 DOWN trips)")
             else:
-                rec_txt = f"raises the chance of settling within the 3 UP + 3 DOWN trips from {f['p_recovered']:.0f}% to {h['p_recovered']:.0f}%"
+                fl = max((c["max"] or 0) for c in full_ref["chain"][1:]); hl = max((c["max"] or 0) for c in Hw["chain"][1:])
+                rec_txt = f"keeps the largest headway on the later trips (DOWN 1 to DOWN 3) at {hl:.0f} min instead of {fl:.0f} min"
             out.append(f"It sacrifices {r['km_lost']:.1f} km of operated mileage but {rec_txt}, "
                        f"and cuts the late BC's finishing delay from +{f['bc_p85']:.0f} to +{h['bc_p85']:.0f} min (P85).")
             if self.needs_standby:
@@ -855,6 +887,19 @@ class Optimiser:
                     out.append(f"Trade-off: the late BC finishes about +{f['bc_p85']:.0f} min late (P85) with the full trip, against +{h['bc_p85']:.0f} min with halfway.")
             else:
                 out.append(f"No halfway start is feasible here (no stop can be reached inside the slot window, even with a standby bus), so the AI balances the trips around the late bus: P85 maximum headway {n_['max_p85']:.0f} \u2192 {f['max_p85']:.0f} min.")
+        # is the biggest interchange gap physically unavoidable? (bus before it already held to the cap, bus after it leaves as soon as it is ready)
+        best = res[ch]
+        full = sorted([r for r in best["rows"] if r["type"] != "halfway"], key=lambda r: r["dep"])
+        if len(full) > 1:
+            gaps = [(full[k + 1]["dep"] - full[k]["dep"], full[k], full[k + 1]) for k in range(len(full) - 1)]
+            g, a, c = max(gaps, key=lambda x: x[0])
+            a_cap = a["type"] == "locked" or (a["shift"] or 0) >= self.P["adj_max"] - 0.5 or a["late"] >= 1
+            c_ready = abs((c["dep"] or 0) - C.ready[c["n"]]) < 0.6 and C.ready[c["n"]] > C.S[c["n"]]
+            if g >= 1.5 * C.H and a_cap and c_ready:
+                out.append(f"The {g:.0f}-min gap at {C.names[0]} between {a['dep_clock']} (Trip {a['n']}) and {c['dep_clock']} (Trip {c['n']}) cannot be closed by holding: "
+                           f"Trip {a['n']} is already at its {self.P['adj_max']:g}-min limit and no other bus is ready before {c['dep_clock']}. "
+                           + ("The halfway start covers it downstream; " if ch == "halfway" else "")
+                           + "only a standby bus at the interchange would close it for the first stops.")
         loc = res.get("local")
         if loc is not None:
             best = res[ch]

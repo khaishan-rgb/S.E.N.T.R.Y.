@@ -17,3 +17,5 @@ services:
         sync: false
       - key: BUNCHING_ALWAYS_ON   # optional: 1 = keep collecting when nobody has the page open (needed for an unattended event log; uses more LTA quota)
         sync: false
+      - key: OVERPASS_URL         # optional: road-restriction data for the off-service route check (default public overpass-api.de)
+        sync: false

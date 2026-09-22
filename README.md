@@ -1,8 +1,24 @@
-# SG Transport Pulse V12.7 — Route Traffic + Departure Adjustment + Bunching, Gap & Alerts + AI Halfway Optimiser
+# SG Transport Pulse V12.9 — Route Traffic + Departure Adjustment + Bunching, Gap & Alerts + AI Halfway Optimiser
 
 Live bus positions, live LTA traffic drawn directly on the bus route, and next arrivals per stop.
 FastAPI backend + a single-page Leaflet frontend (OneMap basemap, OpenStreetMap fallback).
 
+
+
+## V12.9 - Halfway Deployment & Off-Service Route Planner
+
+Answers, for the best halfway deployment: **where** the bus starts service, **which roads** it takes off-service, **whether this bus type can use them**, and **how much headway** it earns.
+
+* **Real road times for every candidate stop.** One OSRM `table` request gives the off-service time from the interchange to every candidate halfway stop (x 1.25 for a bus); the optimiser now uses it instead of 0.7 x running time. If routing is unavailable the old estimate is used and the page says so. A 2-min preparation time is added before the bus enters service.
+* **Several off-service routes, not just the shortest.** OSRM alternatives plus "along the service route (no stops)". Travel time from LTA speed bands when they cover at least half the route, otherwise OSRM time x 1.25. Tags: **A Fastest**, **B Shortest**, **C Preferred** (balances time, congestion, turns / sharp turns, items needing review, road works, and how much of it follows the service's own road path). If the detailed route time differs from the screening estimate by more than 1.5 min, the optimisation is re-run once with it.
+* **Route suitability per bus type** (Single deck / Double deck / Articulated, plus optional vehicle height / width / weight from your fleet data):
+  * checks OpenStreetMap (Overpass) along the route for height / width / weight limits, bus / motor-vehicle / heavy-vehicle / access restrictions, tunnels and covered roads without a recorded clearance, bridges and rail viaducts over or beside the route; OSRM manoeuvres for sharp turns / U-turns; LTA road works and incidents on the route;
+  * **UNSUITABLE** only when map data explicitly shows a limit below the entered vehicle size or no bus access; **VERIFIED** only when a controller has recorded this exact road sequence for this stop and bus type; everything else is **REQUIRES REVIEW** ("Double-decker suitability not verified - operational review required"). No bridge height, clearance or restriction is ever assumed.
+* **Headway maths at the halfway stop:** Scenario A (continue full service: arrival -> layover -> next departure -> largest gap) vs Scenario B (off-service departure + travel = arrival; + preparation = insertion; placed between the surrounding buses) -> **HEADWAY EARNED = largest gap A - largest gap B**, plus the comparison with regulate-only, average gap, mileage operated / lost / off-service, BC finishing delay.
+* **Page:** new card above the comparison: large map (normal route with direction arrows, off-service route dashed over live congestion colours, recovered service, section not operated, interchange / halfway / final stop, other buses at the insertion time, incidents, road works; click the route for roads, distance, time, stop and insertion time); recommendation panel; route options (table on desktop, cards on phones); passenger time-axis for both scenarios; route timeline synchronised with the map; "why this improves headway" and "why this route"; suitability findings; controller approval.
+* **Controller records** (table `offservice_record`, admin token as other admin actions): "Record route as verified for <bus type>" (requires a confirmation tick) and "Approve this deployment" (audit only - nothing is dispatched). `GET /api/halfway/offservice/records`.
+* **Settings:** `OVERPASS_URL` (default public overpass-api.de) and the existing `OSRM_URL`. For heavy use, run your own OSRM / Overpass or pass their URLs.
+* **Limits to know:** OSRM car profile (no bus-specific turning rules); OpenStreetMap is community data, incomplete for clearances; the halfway bus starts from the interchange (not a live GPS position); other buses' positions come from the simulation.
 
 ## V12.7 - AI Recovery Scenario Optimiser: full trip + adjustment vs halfway, judged on the whole trip chain
 

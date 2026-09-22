@@ -223,6 +223,35 @@ details.hall{margin-top:10px}details.hall summary{cursor:pointer;color:#9cc4ff;f
 @media(max-width:1100px){.rvcards{grid-template-columns:minmax(0,1fr)}.rvgrid2{grid-template-columns:minmax(0,1fr)}.rvhead{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:560px){.rvhead{grid-template-columns:repeat(2,minmax(0,1fr))}.rvhead b{font-size:18px}.rvdec b{font-size:16px}}
 
+/* ===== V12.9 Off-Service Route Planner ===== */
+.os{border-color:#5a4a1a}
+.osban{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;border-radius:12px;padding:10px 14px;margin-bottom:10px;background:#2a1d08;border:1px solid #a8661a}
+.osban.no{background:#12253c;border-color:var(--line2)}.osban b{font-size:17px}.osban small{color:#cfe0f3;font-size:12.5px;flex-basis:100%}
+.osgrid{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(300px,1fr);gap:12px}
+#osMap{height:470px;border-radius:12px;border:1px solid var(--line2);background:#0a1a2e}
+.oskey{display:flex;flex-wrap:wrap;gap:6px 12px;font-size:11.5px;color:#b9d0e6;margin-top:6px}.oskey span{display:inline-flex;align-items:center;gap:5px}
+.oskey i{display:inline-block;width:22px;height:0;border-top:4px solid #6f8bb0}.oskey i.off{border-top:4px dashed #ff9f1c}.oskey i.rec{border-top-color:#22c55e}.oskey i.skip{border-top:3px dotted #8a97a8}
+.osrec{border:1px solid var(--line2);border-radius:12px;background:#0b1a2e;padding:12px;min-width:0}
+.osrec .hd{font-weight:800;font-size:15px;letter-spacing:.02em;margin-bottom:6px;color:#ffb54d}.osrec .hd.no{color:#9cc4ff}
+.oskv{display:grid;grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr);gap:5px 10px;font-size:13px}.oskv span{color:var(--mut)}.oskv b{text-align:right;font-weight:700}
+.earn{margin:10px 0;border-radius:12px;padding:10px 12px;background:#ff9f1c;color:#1c1000;text-align:center}.earn small{display:block;font-weight:700;font-size:11.5px;letter-spacing:.06em}.earn b{font-size:30px;line-height:1.05}
+.st-badge{display:inline-block;border-radius:7px;padding:2px 8px;font-weight:800;font-size:12px}.st-verified{background:#16502f;color:#9ff0bf}.st-review{background:#5a4308;color:#ffe08a}.st-unsuitable{background:#5a1216;color:#ffb3b8}
+.oswarn{margin-top:8px;border-radius:10px;padding:8px 10px;background:#3a2a06;border:1px solid #7a5a12;color:#ffe08a;font-size:12.8px;line-height:1.4}
+.ostab{width:100%;border-collapse:collapse;font-size:12.8px;margin-top:4px}.ostab th{color:#b9d0e6;font-weight:600;text-align:left;padding:6px 6px;border-bottom:1px solid var(--line2);white-space:nowrap}
+.ostab td{padding:7px 6px;border-bottom:1px solid #16304e;vertical-align:top}.ostab tr.sel td{background:#1d2a12}.ostab tr{cursor:pointer}.ostab .tg{display:inline-block;background:#12253c;border-radius:5px;padding:0 5px;margin-right:3px;font-size:11px;font-weight:700;color:#9cc4ff}
+.hwviz{display:grid;gap:10px}.hwrow{border:1px solid var(--line2);border-radius:10px;padding:8px 10px;background:#0b1a2e}.hwrow h4{margin:0 0 4px;font-size:13px}.hwrow h4 span{color:var(--mut);font-weight:500}
+.hwaxis{position:relative;height:66px;margin:4px 6px 0}.hwaxis .ln{position:absolute;left:0;right:0;top:30px;border-top:2px solid #35507a}
+.hwaxis .bus{position:absolute;top:18px;width:14px;height:24px;margin-left:-7px;border-radius:4px;background:#6f8bb0}.hwaxis .bus.hw{background:#ff9f1c}
+.hwaxis .lb{position:absolute;top:46px;font-size:10.5px;color:#b9d0e6;transform:translateX(-50%);white-space:nowrap}.hwaxis .gp{position:absolute;top:0;font-size:11.5px;font-weight:800;transform:translateX(-50%);white-space:nowrap}
+.tl{list-style:none;margin:0;padding:0;display:grid;gap:4px}.tl li{display:grid;grid-template-columns:52px minmax(0,1fr) auto;gap:8px;align-items:center;padding:6px 8px;border-radius:8px;border:1px solid transparent;font-size:13px}
+.tl li time{font-weight:800;font-variant-numeric:tabular-nums}.tl li small{color:var(--mut);font-size:11.5px}.tl li.road{background:#0d2440}.tl li.hi{border-color:#ff9f1c;background:#2a1d08}.tl li.svc{background:#12351f}.tl li.key{background:#1b2b45}
+.osfind{list-style:none;margin:6px 0 0;padding:0;display:grid;gap:4px;font-size:12.5px}.osfind li{padding:5px 8px;border-radius:7px;background:#0d2440;border-left:4px solid #39536e}.osfind li.block{border-left-color:#e0474f}.osfind li.review{border-left-color:#ffc46b}
+.osappr{display:grid;gap:8px}.osappr .row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}.osappr input{flex:1;min-width:140px}
+.oscards{display:none;gap:8px}.oscard{border:1px solid var(--line2);border-radius:10px;padding:9px 11px;background:#0d2440;cursor:pointer}.oscard.sel{border:2px solid #ff9f1c;background:#1d2a12}
+.oscard .t{display:flex;justify-content:space-between;gap:8px;align-items:flex-start;font-weight:700}.oscard .g{display:grid;grid-template-columns:1fr 1fr;gap:3px 10px;font-size:12.5px;margin-top:6px}.oscard .g span{color:var(--mut)}
+@media(max-width:1100px){.osgrid{grid-template-columns:minmax(0,1fr)}#osMap{height:360px}}
+@media(max-width:700px){.ostab{display:none}.oscards{display:grid}}
+
 </style>
 </head>
 <body>
@@ -258,8 +287,10 @@ details.hall{margin-top:10px}details.hall summary{cursor:pointer;color:#9cc4ff;f
         <h2>3. Halfway deployment</h2>
         <div class="hopref" id="hoScope"><label><input type="radio" name="hoscope" value="all" checked> AI tests every stop (timing &amp; headway)</label><label><input type="radio" name="hoscope" value="approved"> Approved stops list only</label></div>
         <div class="hopref" id="hoVeh"><label><input type="radio" name="hoveh" value="own" checked> Bus runs off-service to the stop (timing decides)</label><label><input type="radio" name="hoveh" value="standby"> Spare bus already at the stop (starts on the slot)</label></div>
+        <div class="fld"><label>Bus type <small>(route suitability check)</small></label><div class="hopref" id="hoBus"><label><input type="radio" name="hobus" value="sd"> Single deck</label><label><input type="radio" name="hobus" value="dd" checked> Double deck</label><label><input type="radio" name="hobus" value="art"> Articulated</label></div></div>
+        <details class="hall" id="hoDims"><summary>Vehicle dimensions (optional &ndash; from your fleet data)</summary><div class="hx-f2" style="margin-top:6px"><div class="fld"><label for="hoVh">Height, m</label><input id="hoVh" class="sel" type="number" step="0.01" min="2" max="5.5" inputmode="decimal" placeholder="not set"></div><div class="fld"><label for="hoVw">Width, m</label><input id="hoVw" class="sel" type="number" step="0.01" min="2" max="3" inputmode="decimal" placeholder="not set"></div></div><div class="fld"><label for="hoVt">Gross weight, t</label><input id="hoVt" class="sel" type="number" step="0.5" min="5" max="40" inputmode="decimal" placeholder="not set"></div><div class="hx-note">Used only to compare against limits recorded in map data. The app never assumes a vehicle size or a bridge height.</div></details>
         <div class="fld"><label for="hoReady">Halfway bus ready at the first stop <small>(HH:MM, optional)</small></label><input id="hoReady" class="sel" type="text" maxlength="5" inputmode="numeric" placeholder="auto: the delayed bus itself"></div>
-        <div class="hx-note" style="margin:0 0 6px">The halfway bus runs off-service from the first stop (in <b>Settings</b>: a fraction of the in-service running time). The AI tests the eligible halfway starts and regulates surrounding full trips to minimise the largest headway and overall headway spread. Full trips must receive at least the 7-min minimum layover before departure. A halfway-start trip omits interchange layover because it starts downstream. AI uses a minimum 6-trip regulation horizon (3 before + 3 after) and caps artificial departure adjustment at +8 min to reduce BC welfare impact.</div>
+        <div class="hx-note" style="margin:0 0 6px">The halfway bus runs off-service from the first stop along real roads (road routing for every candidate stop; an estimate only if routing is unavailable). The AI tests the eligible halfway starts and regulates surrounding full trips to minimise the largest headway and overall headway spread. Full trips must receive at least the 7-min minimum layover before departure. A halfway-start trip omits interchange layover because it starts downstream. AI uses a minimum 6-trip regulation horizon (3 before + 3 after) and caps artificial departure adjustment at +8 min to reduce BC welfare impact.</div>
         <div class="btns"><button class="btn go" id="hoRun" type="button">Run AI Optimisation</button><button class="btn" id="hoEx" type="button">Load example</button></div>
         <div class="hx-note" id="hoMsg"></div>
       </section>
@@ -280,6 +311,8 @@ details.hall{margin-top:10px}details.hall summary{cursor:pointer;color:#9cc4ff;f
       <div class="tw"><table id="hoTrips"><thead><tr><th>Trip</th><th>Sch Arr</th><th>Act Arr</th><th>Lateness (min)</th><th>Next trip Sch Dep</th><th>Next trip Act Dep</th><th>Dep HW</th><th class="ai">AI plan: Dep</th><th class="ai">AI plan: HW</th><th>Disrupted</th></tr></thead><tbody></tbody></table></div>
       <div class="hx-note">Actual departure = the later of the scheduled departure and the actual arrival + the minimum layover. AI must consider BC welfare: an on-time BC should not be made substantially late merely to improve one headway, and artificial adjustment is capped at +8 min. A Disrupted trip does not depart (the trip is lost). <b>AI plan</b> = the departures the selected option would use after holding / releasing trips (green), and where the replacement starts.</div>
     </section>
+    <section class="card hx-row os" id="osCard"><header><div><h2>Halfway Deployment &amp; Off-Service Route Planner</h2><div class="sub">Where the bus starts service, which roads it takes to get there, whether this bus type can use them, and how much headway it earns.</div></div></header>
+      <div id="osBody"><div class="ho-msg">Press <b>Run AI Optimisation</b>. If a halfway deployment is possible, its off-service route appears here.</div></div></section>
     <section class="card hx-row rv" id="rvCard"><header><div><h2>AI Recovery Scenario Optimiser &ndash; Full Trip vs Halfway</h2><div class="sub">Every feasible plan is simulated over the next 3 UP + 3 DOWN trips and 1,000 possible futures. Full trip keeps mileage but can leave the BC late; halfway recovers the BC and the headway but loses mileage.</div></div><a class="btn sm" href="/recovery-guide" target="_blank" rel="noopener">How the AI decides</a></header>
       <div id="rvBody"><div class="ho-msg">Type the lateness of the late trips, then press <b>Run AI Optimisation</b>.</div></div></section>
     <section class="card hx-row" id="hoTsdCard" hidden><header><div><h2>Deployment Timeline &ndash; Trips Running Down the Route</h2><div class="sub">Each line is one trip (top = first stop, bottom = terminal). The horizontal distance between two lines is the headway. The white marker follows the map clock.</div></div></header>
@@ -308,7 +341,7 @@ details.hall{margin-top:10px}details.hall summary{cursor:pointer;color:#9cc4ff;f
     <section class="card" style="margin-top:12px"><header><div><h2>Simulation audit log</h2><div class="sub">Each time you press <b>Run AI Optimisation</b> the scenario, every option's result, the recommendation, the weights and the model version are stored (live re-simulation while you edit is not).</div></div></header><div class="tw" id="hoRuns"></div></section>
   </main>
 
-  <footer class="foot"><span>Sources: LTA DataMall (Bus Routes/Stops/Services, Traffic Speed Bands, Traffic Incidents) &nbsp;|&nbsp; A scenario simulation from the schedule at the first stop, not live bus data. Decision support only, not for operational use</span><span>SG Transport Pulse V12.7</span></footer>
+  <footer class="foot"><span>Sources: LTA DataMall (Bus Routes/Stops/Services, Traffic Speed Bands, Traffic Incidents) &nbsp;|&nbsp; A scenario simulation from the schedule at the first stop, not live bus data. Decision support only, not for operational use</span><span>SG Transport Pulse V12.9</span></footer>
 </div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -333,7 +366,7 @@ async function post(url, body){
 function csvDownload(name, rows){ const csv = rows.map(r => r.map(v => { v = v == null ? "" : String(v); return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; }).join(",")).join("\n"); const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([csv], {type:"text/csv"})); a.download = name; document.body.appendChild(a); a.click(); a.remove(); }
 /* ===================== AI Halfway Optimiser (a scenario from the schedule at the first stop; never identifies a bus, never deploys) ===================== */
 const S = {tab:"opt", hoCfg:null};
-const HO = {svc:LS.get("ho.svc", ""), dir:LS.get("ho.dir", 1), op:LS.get("ho.op", ""), svcAll:null, setup:null, res:null, sel:null, selKey:null, map:null, g:null, late:[], dis:[], dirty:false, prev:null, ptok:0, auto:LS.get("ho.auto", true), tok:0, timer:null, n:10, pb:{t:null, min:0, max:100, play:false, timer:null, res:null, key:null, ghost:false}, geo:null, tsdg:null, barsAt:null, view:LS.get("ho.view", "simple"), scope:LS.get("ho.scope", "all"), veh:LS.get("ho.veh", "own"), pick:"", showAll:false, rec:null, recStale:false, force:null};
+const HO = {svc:LS.get("ho.svc", ""), dir:LS.get("ho.dir", 1), op:LS.get("ho.op", ""), svcAll:null, setup:null, res:null, sel:null, selKey:null, map:null, g:null, late:[], dis:[], dirty:false, prev:null, ptok:0, auto:LS.get("ho.auto", true), tok:0, timer:null, n:10, pb:{t:null, min:0, max:100, play:false, timer:null, res:null, key:null, ghost:false}, geo:null, tsdg:null, barsAt:null, view:LS.get("ho.view", "simple"), scope:LS.get("ho.scope", "all"), veh:LS.get("ho.veh", "own"), pick:"", showAll:false, rec:null, recStale:false, force:null, bus:LS.get("ho.bus", "dd"), osSel:null, osMap:null, osG:null, osLines:[]};
 const hm = m => { m = ((Math.round(m) % 1440) + 1440) % 1440; return String(Math.floor(m / 60)).padStart(2, "0") + ":" + String(m % 60).padStart(2, "0"); };
 const hoF = x => x == null ? "\u2013" : f1(x);
 const hoPct = x => x == null ? "\u2013" : f1(x) + "%";
@@ -465,7 +498,7 @@ function hoRender(){ hoRenderTrips(); hoRenderRecovery(); hoRenderRec(); hoRende
 const RV_MODE = {balanced:"balanced", recovery:"headway", mileage:"mileage"};
 function rvUrl(){
   const hw = $("hoHw").value.trim(), std = HO.setup && HO.setup.sched_hw != null && Math.abs(+hw - HO.setup.sched_hw) < 1e-9, pref = (document.querySelector("input[name=hopref]:checked") || {}).value || "balanced";
-  return "/api/halfway/recovery?" + new URLSearchParams({service:HO.svc, direction:HO.dir, ref:$("hoRef").value.trim(), hw:std ? "" : hw, layover:$("hoLay").value.trim(), late:HO.late.join(","), mode:RV_MODE[pref] || "balanced", veh:HO.veh, scope:HO.scope === "approved" ? "approved" : "all", sims:"1000"});
+  return "/api/halfway/recovery?" + new URLSearchParams({service:HO.svc, direction:HO.dir, ref:$("hoRef").value.trim(), hw:std ? "" : hw, layover:$("hoLay").value.trim(), late:HO.late.join(","), mode:RV_MODE[pref] || "balanced", veh:HO.veh, scope:HO.scope === "approved" ? "approved" : "all", sims:"1000", bus:HO.bus, vh:$("hoVh").value.trim(), vw:$("hoVw").value.trim(), vt:$("hoVt").value.trim()});
 }
 function rvChosen(){ const r = HO.rec; return r && r.ok && r.plans && r.plans[r.decision] ? r.plans[r.decision] : null; }
 function rvRows(){                                 // {trip: row of the chosen plan} with the interchange headway in departure order
@@ -481,7 +514,7 @@ async function hoRun(){
   $("hoRun").disabled = true; hoMsg("AI Recovery Scenario Optimiser: generating plans, simulating the 3 UP + 3 DOWN chain and 1,000 futures per plan\u2026");
   $("rvBody").innerHTML = `<div class="sk"></div><div class="sk" style="width:70%"></div><div class="sk" style="width:85%"></div>`;
   const rj = await getJSON(rvUrl(), 120000);
-  HO.rec = rj; HO.recStale = false; HO.force = null;
+  HO.rec = rj; HO.recStale = false; HO.force = null; HO.osSel = null;
   if(rj.ok && rj.plans && rj.plans.none){ try{ const P_ = rj.plans, ch_ = P_[rj.decision]; localStorage.setItem("rv.last", JSON.stringify({ts:Date.now(), svc:HO.svc, dir:HO.dir, decision:rj.decision, H:rj.H, sims:rj.sims,
     ins:(rj.instructions || []).filter(i => i.kind === "halfway" || i.kind === "hold" || i.kind === "release").slice(0, 7).map(i => i.text), why:rj.why, none:P_.none.mc.max_p85, adjust:P_.adjust.mc.max_p85, ai:ch_.mc.max_p85,
     rec:[rvRec(P_.none), rvRec(ch_)], km:ch_.det.km, bc:[P_[rj.full_choice === "none" ? "none" : "adjust"].mc.bc_p85, ch_.mc.bc_p85]})); }catch(e){} }
@@ -523,7 +556,8 @@ function rvCard(k, p, r){
       <span>Bunching risk (&lt; ${f1(bm)} min, any trip)</span><b class="${cls(m.p_bunch, 20, 60)}">${f1(m.p_bunch)}%</b>
       <span>Mileage lost</span><b class="${d.km > 0 ? "amb" : "ok"}">${f1(d.km)} km</b>
       <span>BC finishing delay, P85</span><b class="${cls(m.bc_p85, 3, 10)}">+${f1(m.bc_p85)} min</b>
-      <span>Trips held / released \u00b7 halfway</span><b>${p.n_adjusted} \u00b7 ${p.n_halfway}</b></div>
+      <span>Trips held / released \u00b7 halfway</span><b>${p.n_adjusted} \u00b7 ${p.n_halfway}</b>
+      ${k === "halfway" && r.planner && r.planner.ok ? (() => { const o = r.planner.options[r.planner.recommended]; return `<span>Off-service distance</span><b>${f1(o.km)} km</b><span>Headway earned at ${esc(r.planner.stop.name)}</span><b class="ok">${f1(Math.max(0, o.benefit.earned || 0))} min</b>`; })() : ""}</div>
     <div class="rvtr">${[["Passenger headway", tr.headway], ["Mileage kept", tr.mileage], ["BC welfare", tr.bc], ["Recovery speed", tr.recovery]].map(([l, v]) => `<div><span>${l}</span><div class="bg"><i style="width:${v || 0}%"></i></div><b>${v == null ? "\u2013" : v}</b></div>`).join("")}</div></div>`;
 }
 function rvHist(r){
@@ -550,6 +584,7 @@ function rvChain(r){
   return h;
 }
 function hoRenderRecovery(){
+  osRender();
   const el = $("rvBody"); if(!el) return; const r = HO.rec;
   if(!r){ el.innerHTML = `<div class="ho-msg">Type the lateness of the late trips, then press <b>Run AI Optimisation</b>. The AI compares <b>No action</b>, <b>Full trip + adjustment</b> and <b>Halfway + regulation</b> on the next 3 UP + 3 DOWN trips.</div>`; return; }
   if(!r.ok){ el.innerHTML = `<div class="ho-msg hx-err">${esc(r.error || "Recovery Optimiser failed")}</div>`; return; }
@@ -558,7 +593,7 @@ function hoRenderRecovery(){
   const P = r.plans, ch = P[r.decision], N = P.none, A = P.adjust, Hw = P.halfway, g = r.generated || {};
   const title = r.decision === "halfway" ? `Halfway + regulation${r.needs_standby ? " (standby bus)" : ""}` : r.decision === "adjust" ? "Keep every trip in full \u2013 adjust departures" : "No intervention \u2013 keep the natural departures";
   const icon = r.decision === "halfway" ? "\u00bd" : r.decision === "adjust" ? "\u21c4" : "\u2713";
-  let h = stale + `<div class="rvdec ${r.decision === "halfway" ? "" : r.decision === "adjust" ? "full" : "none"}"><div class="ic">${icon}</div><b>AI recommended recovery plan: ${title}</b><small>${esc(r.rule || "")}</small></div>`;
+  let h = stale + `<div class="rvdec ${r.decision === "halfway" ? "" : r.decision === "adjust" ? "full" : "none"}"><div class="ic">${icon}</div><b>AI recommended recovery plan: ${title}</b><small>${esc(r.rule || "")}${r.live === false ? " Planning mode: the timetable you entered is already in the past, so only trip 1 is treated as departed." : ""}</small></div>`;
   const ins = r.instructions || [], rowOf = n => (ch.rows || []).find(x => x.n === n) || {};
   const key = i => i.kind === "halfway" || i.kind === "hold" || i.kind === "release" || (i.kind === "full" && (rowOf(i.n).vs_sch || 0) >= .5);
   const li = i => `<li class="${i.kind}"><time>${esc(i.time)}</time><div><b>${esc(i.text)}</b>${i.sub ? `<small>${esc(i.sub)}</small>` : ""}</div></li>`;
@@ -580,6 +615,155 @@ function hoRenderRecovery(){
       <div class="ho-note">Model ${esc(r.model || "")}. Running times from ${r.traffic_ok ? "current traffic" : "a fallback speed"}; DOWN running assumed equal to UP. Simulation of the entered scenario, not live bus data. Decision support only.</div></div></div>`;
   el.innerHTML = h;
   if($("rvMore")) $("rvMore").onclick = () => { HO.rvAll = !HO.rvAll; hoRenderRecovery(); };
+}
+
+/* ===================== V12.9 Halfway Deployment & Off-Service Route Planner ===================== */
+const OS_TAG = {A:"Fastest", B:"Shortest", C:"Preferred"};
+const OS_BAND = b => b == null ? "#6f8bb0" : b >= 5 ? "#22c55e" : b >= 3 ? "#f5b82e" : "#e0474f";
+function osPlanner(){ const r = HO.rec; return r && r.ok && !HO.recStale ? r.planner : null; }
+function osOpt(){ const p = osPlanner(); if(!p || !p.ok) return null; const i = HO.osSel != null ? HO.osSel : p.recommended; return p.options[i] || p.options[p.recommended]; }
+function osInitMap(){
+  if(HO.osMap || typeof L === "undefined" || !$("osMap")) return;
+  const m = HO.osMap = L.map("osMap", {zoomControl:true, attributionControl:false, minZoom:11, maxZoom:19}).setView([1.3521, 103.8198], 12);
+  const om = L.tileLayer("https://www.onemap.gov.sg/maps/tiles/Default/{z}/{x}/{y}.png", {minZoom:11, maxZoom:19, attribution:"OneMap \u00a9 Singapore Land Authority"}).addTo(m); let ok = 0, bad = 0, sw = false;
+  om.on("tileload", () => ok++); om.on("tileerror", () => { bad++; if(!sw && !ok && bad >= 4){ sw = true; m.removeLayer(om); L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {minZoom:11, maxZoom:19, attribution:"\u00a9 OpenStreetMap contributors"}).addTo(m); } });
+  L.control.attribution({position:"bottomleft", prefix:false}).addTo(m);
+  [["osroute", 410], ["osoff", 420], ["osmk", 440]].forEach(([n, z]) => { m.createPane(n).style.zIndex = z; });
+  HO.osG = L.layerGroup().addTo(m);
+}
+function osArrowIcons(line, g){                     // small direction arrows along the normal route
+  if(!line || line.length < 2) return; let acc = 0;
+  for(let i = 1; i < line.length; i++){
+    const a = line[i - 1], b = line[i], d = Math.hypot((b[0] - a[0]) * 110.6, (b[1] - a[1]) * 111.3 * Math.cos(a[0] * Math.PI / 180)); acc += d;
+    if(acc >= 1.2){ acc = 0; const ang = Math.atan2((b[1] - a[1]) * Math.cos(a[0] * Math.PI / 180), b[0] - a[0]) * 180 / Math.PI;
+      L.marker(b, {pane:"osroute", interactive:false, icon:L.divIcon({className:"", iconSize:[12, 12], html:`<div style="transform:rotate(${ang}deg);color:#9cc4ff;font-size:12px;line-height:12px;text-align:center">\u25b2</div>`})}).addTo(g); }
+  }
+}
+function osHi(gi, zoom){
+  document.querySelectorAll("#osTl li[data-g]").forEach(li => li.classList.toggle("hi", +li.dataset.g === gi));
+  HO.osLines.forEach((pl, i) => pl.setStyle(i === gi ? {weight:9, color:"#ffd166", opacity:1} : {weight:6, color:"#ff9f1c", opacity:.95}));
+  if(zoom && HO.osLines[gi]) HO.osMap.fitBounds(HO.osLines[gi].getBounds(), {padding:[40, 40], maxZoom:17});
+}
+function osDraw(p, o){
+  osInitMap(); if(!HO.osMap) return; const g = HO.osG; g.clearLayers(); HO.osLines = [];
+  L.polyline(p.service_line, {pane:"osroute", color:"#6f8bb0", weight:5, opacity:.75}).bindTooltip("Normal service route").addTo(g);
+  osArrowIcons(p.service_line, g);
+  L.polyline(p.skipped_line, {pane:"osroute", color:"#8a97a8", weight:3, opacity:.9, dashArray:"2 7"}).bindTooltip("Section this trip does not serve (mileage lost)").addTo(g);
+  L.polyline(p.recovered_line, {pane:"osroute", color:"#22c55e", weight:6, opacity:.9}).bindTooltip("Recovered service: passenger service after the halfway start").addTo(g);
+  (o.traffic.runs || []).forEach(x => L.polyline(x.pts, {pane:"osoff", color:OS_BAND(x.b), weight:13, opacity:.35, interactive:false}).addTo(g));      // live congestion under the off-service line
+  const road = o.groups.map(x => `${esc(x.road)} ${f1(x.km)} km`).join(" \u2192 ");
+  o.groups.forEach((x, i) => {
+    const pl = L.polyline(x.line, {pane:"osoff", color:"#ff9f1c", weight:6, opacity:.95, dashArray:"10 8"}).addTo(g);
+    pl.bindPopup(`<b>Off-service: ${esc(o.label)}</b><br>${road}<br><b>${f1(o.km)} km \u00b7 about ${Math.round(o.time_min)} min</b><br>Halfway stop: ${esc(p.stop.name)} (${esc(p.stop.code)})<br>Expected insertion: <b>${esc(o.insert_clock)}</b><br><small>This road: ${esc(x.road)}, ${f1(x.km)} km, ~${f1(x.min)} min</small>`);
+    pl.on("mouseover", () => osHi(i)); pl.on("click", () => osHi(i)); HO.osLines.push(pl);
+  });
+  const mk = (ll, html, cls, tip) => L.marker(ll, {pane:"osmk", icon:L.divIcon({className:"", iconSize:[26, 26], iconAnchor:[13, 13], html:`<div style="width:26px;height:26px;border-radius:50%;display:grid;place-items:center;font-weight:800;font-size:12px;border:2px solid #fff;${cls}">${html}</div>`})}).bindTooltip(tip).addTo(g);
+  mk([p.origin.lat, p.origin.lon], "I", "background:#3c96ff;color:#fff", `${esc(p.origin.name)} \u2013 interchange, off-service departure ${esc(p.leave_clock)}`);
+  mk([p.stop.lat, p.stop.lon], "\u00bd", "background:#ff9f1c;color:#1c1000", `Halfway start: ${esc(p.stop.name)} (${esc(p.stop.code)}) \u2013 enters service ${esc(o.insert_clock)}`);
+  mk([p.last.lat, p.last.lon], "E", "background:#22c55e;color:#04210f", `${esc(p.last.name)} \u2013 final stop`);
+  (p.buses || []).filter(b => b.n !== p.trip).forEach(b => L.marker([b.lat, b.lon], {pane:"osmk", icon:L.divIcon({className:"", iconSize:[30, 18], iconAnchor:[15, 9], html:`<div style="background:#0b1a2e;border:1.5px solid #9cc4ff;border-radius:6px;color:#eaf3ff;font-size:10.5px;font-weight:700;text-align:center;line-height:15px">T${b.n}</div>`})})
+    .bindTooltip(`Trip ${b.n} at ${esc(o.insert_clock)} (simulated position)`).addTo(g));
+  (p.incidents || []).forEach(x => L.marker([x.lat, x.lon], {pane:"osmk", icon:L.divIcon({className:"", iconSize:[18, 18], html:`<div style="color:#ff5a5f;font-size:18px;line-height:18px">\u26a0</div>`})}).bindTooltip(`${esc(x.type)}: ${esc(x.message.slice(0, 120))}`).addTo(g));
+  (p.roadworks || []).forEach(x => L.marker([x.lat, x.lon], {pane:"osmk", icon:L.divIcon({className:"", iconSize:[18, 18], html:`<div style="color:#ffb020;font-size:16px;line-height:18px">\u25b2</div>`})}).bindTooltip(`Road works: ${esc(x.road)}`).addTo(g));
+  setTimeout(() => { HO.osMap.invalidateSize(); HO.osMap.fitBounds(L.latLngBounds([...o.line, [p.stop.lat, p.stop.lon], [p.origin.lat, p.origin.lon]]), {padding:[30, 30], maxZoom:16}); }, 60);
+}
+function osAxis(title, sub, pts, hwBus, keys){          // passengers' view at the halfway stop: buses on a time axis with the gaps between them
+  if(!pts.length) return "";
+  keys = keys || [];
+  const t0 = pts[0].t, t1 = pts[pts.length - 1].t, span = Math.max(1, t1 - t0), x = t => 3 + 94 * (t - t0) / span;
+  let h = `<div class="hwrow"><h4>${title} <span>${sub}</span></h4><div class="hwaxis"><div class="ln"></div>`;
+  pts.forEach((p, i) => { const key = p.b === hwBus || keys.includes(p.b);
+    h += `<div class="bus ${p.b === hwBus ? "hw" : ""}" style="left:${x(p.t)}%" title="${p.b === hwBus ? "halfway bus" : "trip " + p.b} ${hm(p.t)}"></div>${key ? `<div class="lb" style="left:${x(p.t)}%;color:${p.b === hwBus ? "#ffb54d" : "#dbe8f7"}">${p.b === hwBus ? "\u00bd" : "T" + p.b} ${hm(p.t)}</div>` : ""}`;
+    if(i){ const g = p.t - pts[i - 1].t, H = HO.rec.H, c = g >= 2 * H - 1e-9 ? "#ff6b72" : g >= 1.5 * H - 1e-9 ? "#ffa04a" : "#7be7a5"; h += `<div class="gp" style="left:${(x(p.t) + x(pts[i - 1].t)) / 2}%;color:${c}">${Math.round(g)}</div>`; } });
+  return h + `</div></div>`;
+}
+function osRender(){
+  const el = $("osBody"); if(!el) return; const r = HO.rec, p = osPlanner();
+  if(!r){ el.innerHTML = `<div class="ho-msg">Press <b>Run AI Optimisation</b>. If a halfway deployment is possible, its off-service route appears here.</div>`; return; }
+  if(HO.recStale){ el.innerHTML = `<div class="rvstale">Inputs changed \u2013 press <b>Run AI Optimisation</b> to update the route plan.</div>`; return; }
+  if(!r.ok || !p){ el.innerHTML = `<div class="ho-msg">${esc((r && r.error) || "No route plan.")}</div>`; return; }
+  if(!p.ok){ el.innerHTML = `<div class="osban no"><b>No off-service route to plan</b><small>${esc(p.reason || "")}</small></div>`; return; }
+  const o = osOpt(), rec = p.options[p.recommended], b = o.benefit, A = b.A, B = b.B, pick = p.recommended_by_ai;
+  const statusBadge = x => `<span class="st-badge st-${x.status}">${esc(x.status_label)}</span>`;
+  let h = `<div class="osban ${pick ? "" : "no"}"><b>${pick ? "HALFWAY RECOMMENDED" : "Halfway NOT recommended \u2013 best calculated halfway option shown for inspection"}</b>
+    <small>${pick ? "Best calculated halfway / off-service option. The controller remains responsible for approving the deployment." : "The AI Recovery Optimiser found that adjusting the trips is enough (see the comparison below). You can still inspect this option."}</small></div>`;
+  h += `<div class="osgrid"><div><div id="osMap" role="region" aria-label="Map of the normal route, the off-service route and the halfway start"></div>
+    <div class="oskey"><span><i></i>Normal service route (\u25b2 direction)</span><span><i class="off"></i>Off-service (no passengers)</span><span><i class="rec"></i>Recovered service</span><span><i class="skip"></i>Not operated</span><span>\u26a0 incident</span><span style="color:#ffb020">\u25b2</span><span>road works</span><span>Tn = other buses at insertion time</span></div></div>
+    <div class="osrec"><div class="hd ${pick ? "" : "no"}">${pick ? "HALFWAY RECOMMENDED" : "BEST HALFWAY OPTION (not recommended)"}</div>
+      <div class="oskv"><span>Trip</span><b>Trip ${p.trip} (${esc(p.bus_label)})</b>
+        <span>Halfway point</span><b>${esc(p.stop.name)} (${esc(p.stop.code)})</b>
+        <span>Off-service route</span><b>${esc(o.label)}${o.tags.length ? " \u00b7 " + o.tags.map(t => OS_TAG[t]).join(", ") : ""}</b>
+        <span>Roads</span><b style="font-weight:600;font-size:12px">${o.roads.map(esc).join(" \u2192 ")}</b>
+        <span>Travel time</span><b>${Math.round(o.time_min)} min <small style="color:var(--mut);font-weight:500">(${esc(o.time_src)})</small></b>
+        <span>Distance</span><b>${f1(o.km)} km off-service</b>
+        <span>${esc(p.bus_label)} suitability</span><b>${statusBadge(o)}</b>
+        <span>Leave ${esc(p.origin.name)}</span><b>${esc(p.leave_clock)}</b>
+        <span>Expected insertion</span><b>${esc(o.insert_clock)}</b>
+        <span>Headway before (max, at stop)</span><b style="color:#ff8a90">${f1(A.max)} min</b>
+        <span>Headway after (max, at stop)</span><b style="color:#7be7a5">${f1(B.max)} min</b>
+        <span>Mileage lost</span><b>${f1(p.km_lost)} km</b></div>
+      <div class="earn"><small>HEADWAY EARNED</small><b>${Math.max(0, Math.round(b.earned || 0))} MIN</b></div>
+      <div class="oswarn">${o.status === "verified" ? "\u2714 " : "\u26a0 "}${esc(o.status_text)}${o.status !== "verified" && !/review required/i.test(o.status_text) ? " Operational verification required." : ""}</div></div></div>`;
+  // route options
+  h += `<div class="rvbox" style="margin-top:12px"><h3>Off-service route options</h3><div class="sub">Tap a row to show it on the map. A routing engine finding a road does not prove the bus type can use it.</div><div class="tw"><table class="ostab"><thead><tr><th>Option</th><th>Distance</th><th>Travel time</th><th>Traffic</th><th>${esc(p.bus_label)} suitability</th><th>Arrive halfway</th><th>Enter service</th><th>Headway result</th></tr></thead><tbody>
+    ${p.options.map(x => `<tr data-i="${x.idx}" class="${x.idx === o.idx ? "sel" : ""}"><td>${x.tags.map(t => `<span class="tg">${t}</span>`).join("")}<b>${esc(x.label)}</b>${x.idx === p.recommended ? " <small style='color:#ffb54d'>\u2605 AI</small>" : ""}<br><small style="color:var(--mut)">${x.tags.map(t => OS_TAG[t]).join(", ")}</small></td>
+      <td>${f1(x.km)} km</td><td>${Math.round(x.time_min)} min</td><td>${x.congested_km > 0.05 ? `<span style="color:#ff8a90">${f1(x.congested_km)} km slow</span>` : (x.traffic.runs || []).length ? "Smooth / moderate" : "No live data"}</td>
+      <td>${statusBadge(x)}</td><td>${esc(x.arrive_clock)}</td><td>${esc(x.insert_clock)}</td><td>${f1(x.benefit.A.max)} \u2192 <b>${f1(x.benefit.B.max)}</b> min</td></tr>`).join("")}</tbody></table></div>
+    <div class="oscards">${p.options.map(x => `<div class="oscard ${x.idx === o.idx ? "sel" : ""}" data-i="${x.idx}"><div class="t"><span>${x.tags.map(t => `<span class="tg" style="display:inline-block;background:#12253c;border-radius:5px;padding:0 5px;margin-right:3px;font-size:11px;color:#9cc4ff">${t}</span>`).join("")}${esc(x.label)}${x.idx === p.recommended ? " <small style='color:#ffb54d'>\u2605 AI</small>" : ""}</span>${statusBadge(x)}</div>
+      <div class="g"><span>Distance</span><b>${f1(x.km)} km</b><span>Travel time</span><b>${Math.round(x.time_min)} min</b><span>Traffic</span><b>${x.congested_km > 0.05 ? f1(x.congested_km) + " km slow" : (x.traffic.runs || []).length ? "smooth / moderate" : "no live data"}</b>
+      <span>Arrive \u00b7 enter service</span><b>${esc(x.arrive_clock)} \u00b7 ${esc(x.insert_clock)}</b><span>Largest gap at stop</span><b>${f1(x.benefit.A.max)} \u2192 ${f1(x.benefit.B.max)} min</b><span>Tags</span><b>${x.tags.map(t => OS_TAG[t]).join(", ") || "\u2013"}</b></div></div>`).join("")}</div></div>`;
+  // headway maths
+  const H = r.plans, focus = r.focus || [], lo = Math.min(...focus) - 1, hi = Math.max(...focus) + 1, n = (r.trips || []).length;
+  const win = at => (at || []).filter(([bb]) => (bb >= lo && bb <= hi) || bb === 0 || bb === n + 1).map(([bb, t]) => ({b:bb, t}));
+  const span = 2.2 * r.H, near = q => q.t >= o.insert - span - (A.max || 0) / 2 && q.t <= o.insert + span + (A.max || 0) / 2;
+  const aPts = win(H.none.at_j).filter(near).sort((x, y) => x.t - y.t);
+  const bPts = win(H.halfway.at_j).map(q => q.b === p.trip ? {b:q.b, t:o.insert} : q).filter(near).sort((x, y) => x.t - y.t);
+  h += `<div class="rvgrid2"><div class="rvbox"><h3>How halfway deployment earns headway</h3><div class="sub">Buses passing ${esc(p.stop.name)}, the halfway stop. Numbers between buses are the passenger gaps (min).</div>
+    <div class="hwviz">${osAxis("Scenario A \u2013 continue full service", `largest gap ${f1(A.max)} min`, aPts, -1, [A.prev, A.next])}${osAxis("Scenario B \u2013 halfway deployment", `largest gap ${f1(B.max)} min`, bPts, p.trip, [B.prev_bus, B.next_bus])}</div>
+    <div class="rvkv" style="margin-top:10px"><span><b style="color:#dbe8f7">A.</b> Trip ${p.trip} arrives ${esc(p.origin.name)}</span><b>${esc(p.act_arr_clock)}</b>
+      <span>+ minimum layover \u2192 next departure</span><b>${esc(p.nat_dep_clock)}</b>
+      <span>Largest gap at ${esc(p.stop.name)}</span><b class="bad">${A.t_prev != null ? `${hm(A.t_prev)} \u2192 ${hm(A.t_next)} = ` : ""}${f1(A.max)} min</b>
+      <span><b style="color:#dbe8f7">B.</b> Off-service departure</span><b>${esc(p.leave_clock)}</b>
+      <span>+ off-service travel ${Math.round(o.time_min)} min = arrive halfway</span><b>${esc(o.arrive_clock)}</b>
+      <span>+ preparation ${f1(p.prep_min)} min${o.insert - o.arrive - p.prep_min > 0.4 ? ` + wait ${Math.round(o.insert - o.arrive - p.prep_min)} min for the slot` : ""} = enter service</span><b>${esc(o.insert_clock)}</b>
+      <span>Previous bus \u2192 halfway bus</span><b>${B.t_prev != null ? `${hm(B.t_prev)} \u2192 ${hm(B.insert)} = ${f1(B.gap_prev)} min` : "\u2013"}</b>
+      <span>Halfway bus \u2192 next bus</span><b>${B.t_next != null ? `${hm(B.insert)} \u2192 ${hm(B.t_next)} = ${f1(B.gap_next)} min` : "\u2013"}</b>
+      <span>Headway earned = ${f1(A.max)} \u2212 ${f1(B.max)}</span><b class="ok">${f1(Math.max(0, b.earned || 0))} min</b>
+      <span>Compared with regulate only (largest gap ${f1(b.R.max)} min)</span><b class="${(b.earned_vs_reg || 0) >= 0 ? "ok" : "bad"}">${b.earned_vs_reg == null ? "\u2013" : b.earned_vs_reg >= 0 ? `halfway ${f1(b.earned_vs_reg)} min better` : `regulate only ${f1(-b.earned_vs_reg)} min better`}</b>
+      <span>Average gap at the stop before \u2192 after</span><b>${f1(A.avg)} \u2192 ${f1(B.avg)} min</b>
+      <span>Mileage operated / lost / off-service</span><b>${f1(p.km_operated)} / ${f1(p.km_lost)} / ${f1(o.km)} km</b>
+      <span>Late BC finishing delay (P85) full \u2192 halfway</span><b>${p.bc_full_p85 != null ? `+${Math.round(p.bc_full_p85)} \u2192 +${Math.round(p.bc_halfway_p85)} min` : "\u2013"}</b></div></div>
+    <div class="rvbox"><h3>Route timeline</h3><div class="sub">Tap a road to find it on the map.</div><ul class="tl" id="osTl">${o.timeline.map(x => x.kind === "road"
+      ? `<li class="road" data-g="${x.g}"><time>${esc(x.clock)}</time><span>${esc(x.label)}</span><small>${f1(x.km)} km \u00b7 ${f1(x.min)} min</small></li>`
+      : `<li class="${x.kind === "service" ? "svc" : "key"}"><time>${esc(x.clock)}</time><span><b>${esc(x.label)}</b></span><small>${x.kind === "service" ? `prep ${f1(x.prep)} min${x.wait > 0.4 ? ` + wait ${f1(x.wait)}` : ""}` : ""}</small></li>`).join("")}</ul></div></div>`;
+  // explanation + findings
+  h += `<div class="rvwhy"><h3>Why this improves headway</h3><ol>${(p.why_works || []).map(w => `<li>${esc(w)}</li>`).join("")}</ol></div>
+    <details class="hall" style="margin-top:10px"><summary>Why did the AI choose this route?</summary><ol style="margin:8px 0 0;padding-left:20px;display:grid;gap:4px;font-size:13.5px">${(p.why_route || []).map(w => `<li>${esc(w)}</li>`).join("")}</ol></details>
+    <div class="rvgrid2"><div class="rvbox"><h3>Route suitability \u2013 ${esc(p.bus_label)}: ${statusBadge(o)}</h3><div class="sub">${esc(o.status_text)}</div>
+      <ul class="osfind">${o.findings.length ? o.findings.map(f => `<li class="${f.sev}">${f.sev === "block" ? "\u2716 " : f.sev === "review" ? "\u26a0 " : ""}${esc(f.text)}</li>`).join("") : `<li>No restriction found in the map data along this route. This does not prove the route is suitable.</li>`}</ul>
+      <div class="ho-note">Checked: height / width / weight limits, bus / heavy-vehicle / access restrictions, tunnels and covered roads, bridges and viaducts over the route, sharp turns and U-turns, LTA road works and incidents. Source: ${esc(p.sources.restrictions)}.${o.osm_ok ? "" : " Restriction data could not be loaded this time."}</div></div>
+      <div class="rvbox osappr"><h3>Controller approval</h3><div class="sub">Optimisation is separate from approval. Recording below does not dispatch anything.</div>
+        <div class="row"><input id="osBy" class="sel" placeholder="Your name" maxlength="80" value="${esc(LS.get("os.by", ""))}"><input id="osNote" class="sel" placeholder="Note (optional)" maxlength="300"></div>
+        <label class="hx-chk"><input type="checkbox" id="osChk"> I have checked this road sequence for a ${esc(p.bus_label.toLowerCase())} against authoritative records or on site.</label>
+        <div class="row"><button class="btn sm" id="osVer" type="button" ${o.status === "unsuitable" ? "disabled" : ""}>Record route as verified for ${esc(p.bus_label.toLowerCase())}</button><button class="btn sm go" id="osApp" type="button">Approve this deployment</button></div>
+        <div class="ho-note" id="osRecMsg">${o.verified ? `Verified by ${esc(o.verified.by)} on ${esc(o.verified.date)}.` : "This exact road sequence has not been verified for this bus type yet."}</div>
+        <div class="ho-note">Assumptions: off-service time from ${esc(o.time_src)}; the bus leaves the interchange straight after arriving; bus positions come from the simulation, not live tracking. ${esc(r.offsvc_source || "")}.</div></div></div>`;
+  el.innerHTML = h;
+  document.querySelectorAll("#osBody .ostab tr[data-i], #osBody .oscard[data-i]").forEach(tr => tr.onclick = () => { HO.osSel = +tr.dataset.i; osRender(); $("osCard").scrollIntoView({behavior:"smooth", block:"start"}); });
+  document.querySelectorAll("#osTl li[data-g]").forEach(li => { li.onmouseenter = () => osHi(+li.dataset.g); li.onclick = () => osHi(+li.dataset.g, true); });
+  const rec_ = async kind => {
+    const by = $("osBy").value.trim(); if(!by){ toast("Enter your name for the record."); return; } LS.set("os.by", by);
+    if(kind === "route_verified" && !$("osChk").checked){ toast("Tick the confirmation box first."); return; }
+    const j = await post("/api/halfway/offservice/record", JSON.stringify({kind, service:HO.svc, direction:HO.dir, stop:p.stop.code, bus:p.bus, signature:o.signature, roads:o.roads, by, note:$("osNote").value.trim(),
+      detail:{trip:p.trip, insert:o.insert_clock, leave:p.leave_clock, km:o.km, earned:b.earned, status:o.status}}));
+    $("osRecMsg").textContent = j.ok ? (kind === "route_verified" ? `Recorded: route verified for ${p.bus_label.toLowerCase()} by ${by}. Run again to see it marked VERIFIED.` : `Deployment approval recorded by ${by}.`) : (j.error || "Could not save");
+    };
+  $("osVer").onclick = () => rec_("route_verified"); $("osApp").onclick = () => rec_("deployment_approved");
+  HO.osMap = null; osDraw(p, o);
+}
+async function rvRefresh(){                          // bus type / vehicle size changed: re-check the route (the optimisation itself is cached on the server)
+  if(!HO.rec || !HO.rec.ok) return; $("osBody").innerHTML = `<div class="sk"></div><div class="sk" style="width:70%"></div>`;
+  const rj = await getJSON(rvUrl(), 120000); if(rj.ok){ HO.rec = rj; HO.osSel = null; } hoRenderRecovery();
 }
 /* ---- AI recommendation card */
 function hoPlan(o){
@@ -1048,7 +1232,9 @@ $("hoSvc").onchange = () => hoLoad(); $("hoSvc").onkeydown = e => { if(e.key ===
 ["hoRef", "hoHw", "hoLay", "hoDelay"].forEach(id => $(id).oninput = () => hoTouch());
 $("hoExtra").oninput = () => { const v = $("hoExtra").value.trim(); if(/^\d{5}$/.test(v)) HO.selKey = "halfway:" + v; hoDirty(); };
 document.querySelectorAll("input[name=hopref]").forEach(x => x.onchange = () => { HO.selKey = null; hoDirty(); }); $("hoReg").onchange = () => { HO.selKey = null; hoDirty(); };
-$("hoRun").onclick = () => hoRun();          // the AI (decide: which trips to disrupt, halfway, adjust - or just adjust and continue) runs only here
+$("hoRun").onclick = () => hoRun();
+document.querySelectorAll("input[name=hobus]").forEach(x => { x.checked = x.value === HO.bus; x.onchange = () => { HO.bus = x.value; LS.set("ho.bus", HO.bus); rvRefresh(); }; });
+["hoVh", "hoVw", "hoVt"].forEach(id => { $(id).value = LS.get("os." + id, ""); $(id).onchange = () => { LS.set("os." + id, $(id).value.trim()); rvRefresh(); }; });          // the AI (decide: which trips to disrupt, halfway, adjust - or just adjust and continue) runs only here
 $("hoEx").onclick = () => { $("hoRef").value = "08:10"; $("hoLay").value = 10; HO.late = [2, 3, 22, 5, 4, 3, 2, 4, 3, 2]; HO.dis = []; HO.auto = true; LS.set("ho.auto", true); $("hoAuto").checked = true; hoBuildTrips(); hoDirty(); toast("Example loaded: trip 3 arrives +22 min. Press Run AI Optimisation"); };
 /* ---- Settings */
 const HLAB = {n_trips:["Trips simulated", "trips at the first stop"], layover_min:["Scheduled layover at the first stop", "min (default; editable per run)"], min_layover_min:["Minimum layover", "min: a trip leaves no earlier than its arrival + this"],
