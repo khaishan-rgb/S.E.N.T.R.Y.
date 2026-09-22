@@ -24,7 +24,7 @@ the halfway stop (at stop 2 for "regulate only"). If the simulated trips end on 
 """
 import math
 
-MODEL_VERSION = "halfway-12.1-welfare"
+MODEL_VERSION = "halfway-12.3-hard-constraints"
 EPS = 1e-6
 
 PARAMS = {
@@ -33,7 +33,8 @@ PARAMS = {
     "min_layover_min": 7.0,      # mandatory break: every trip cannot depart earlier than actual arrival + 7 min
     "start_delay_min": 0.0,      # option C: replacement passes the halfway stop this many min after the disrupted trip's scheduled time there
     # ---- regulation (options B and D)
-    "reg_hold_max": 8.0,          # HARD welfare cap: never artificially hold a trip >8 min beyond scheduled departure
+    "reg_hold_max": 8.0,          # HARD: artificial departure adjustment may not exceed +8 min
+    "max_headway_min": 30.0,      # HARD service target: selected plan must keep max headway <30 min when feasible
     "reg_early_max": 15.0,        # ... or released at most this many min before it (never before arrival + minimum layover)
     "reg_window": 3,             # rolling regulation horizon: minimum 3 trips before + 3 after the affected slot; spread recovery instead of over-holding one BC
                                  # trips either side of the disrupted trip that may be regulated (and that count as "affected"): 3 up + 3 down = 6, the lost trip's slot is shared
@@ -711,18 +712,54 @@ def decide(ctx):
         probe["ai"] = {"mode": "auto", "decision": "none", "suggest": [], "candidates": cand, "alternatives": []}
         probe["message"] = "No plan improves the headways without creating a problem: continue service as it is."
         return probe
-    # Operational preference hierarchy after quality scoring:
-    # Mileage focus: adjustment/continue wins close calls before halfway.
-    # Headway focus: halfway wins close calls when it materially improves headway/recovery.
-    # Balanced: simpler plan first. A 1.0-point band avoids tiny score noise overriding the chosen philosophy.
-    bestq = max(e["q"] for e in entries)
-    near = [e for e in entries if e["q"] >= bestq - 1.0]
-    if pref == "mileage":
-        top = max(near, key=lambda e: (-len(e["S"]), -e["skipped_km"], e["q"], -e["hold"]))
-    elif pref == "recovery":
-        top = max(near, key=lambda e: (1 if e["S"] else 0, -e["max"], e["q"], -e["hold"]))
+    # Whole-trip operational decision. Do not judge only the first-stop adjustment.
+    # A severely late duty can poison several following headways and force healthy BCs to be held.
+    # Compare the complete route result at every stop, then apply the selected operating philosophy.
+    severe = [c for c in cand if own_late(trips0[c - 1]) >= max(20.0, 2.0 * H) - EPS]
+    # HARD company constraints. Only plans below 30 min max headway are eligible when at least
+    # one such plan exists. If physics/fleet availability makes <30 impossible, choose the plan
+    # with the LOWEST achievable maximum headway first, then quality, and flag the exception.
+    max_hw_limit = float(P.get("max_headway_min", 30.0))
+    feasible_hw = [e for e in entries if e["max"] < max_hw_limit - EPS]
+    constraint_met = bool(feasible_hw)
+    decision_pool = feasible_hw if constraint_met else entries
+    if not constraint_met:
+        min_achievable = min(e["max"] for e in entries)
+        decision_pool = [e for e in entries if e["max"] <= min_achievable + EPS]
+
+    cont = [e for e in decision_pool if not e["S"]]
+    half = [e for e in decision_pool if e["S"]]
+    best_cont = max(cont, key=lambda e: e["q"]) if cont else None
+    best_half = max(half, key=lambda e: e["q"]) if half else None
+
+    # A continue/adjust plan is operationally unacceptable when it still leaves a >=2H gap,
+    # or needs heavy cumulative holding while a severely late trip exists. In that case the AI
+    # must actively test recovery by disrupting ONE trip and starting it halfway.
+    cont_bad = bool(best_cont and (best_cont["max"] >= 2.0 * H - EPS or
+                    (severe and best_cont["hold"] >= P["reg_hold_max"] * 1.5 - EPS)))
+
+    if pref == "recovery" and best_half:
+        # Headway focus: Halfway > Adjustment. Use halfway whenever it improves the whole-route
+        # maximum headway, or when the adjustment-only plan remains operationally unacceptable.
+        if (best_cont is None or cont_bad or best_half["max"] < best_cont["max"] - EPS):
+            top = best_half
+        else:
+            top = best_cont
+    elif pref == "mileage":
+        # Mileage focus: Adjustment > Halfway, but not at any cost. Preserve mileage only when
+        # the full-route headway remains controllable; otherwise recover the severely late duty.
+        if best_cont and not cont_bad:
+            top = best_cont
+        elif best_half:
+            top = best_half
+        else:
+            top = best_cont or max(entries, key=lambda e: e["q"])
     else:
-        top = max(near, key=lambda e: (e["q"], -len(e["S"]), -e["skipped_km"], -e["hold"]))         # a tie goes to the simpler decision (fewer disrupted trips, less mileage, less holding)
+        # Balanced: normally use the best whole-route quality. For a severe late trip, prefer
+        # halfway if it materially cuts the worst headway (>=10% of scheduled HW) or fixes >=2H.
+        top = max(decision_pool, key=lambda e: (e["q"], -len(e["S"]), -e["skipped_km"], -e["hold"]))
+        if severe and best_half and best_cont and (cont_bad or best_half["max"] <= best_cont["max"] - 0.10 * H):
+            top = best_half
     S = top["S"]
     final = simulate({**ctx, "disrupted": list(S), "block": cand, "pref": pref})
     if not final.get("ok"):
@@ -737,6 +774,12 @@ def decide(ctx):
         if not qq:
             continue
         o["q"] = qq
+        # Keep the final displayed recommendation inside the same hard <30 min rule.
+        # When <30 is impossible globally, only accept the best-achievable max headway.
+        if constraint_met and qq["max"] >= max_hw_limit - EPS:
+            continue
+        if not constraint_met and qq["max"] > top["max"] + EPS:
+            continue
         if best_q is None or (round(qq["q"], 1), -(o.get("skipped_km") or 0.0)) > best_q:
             best_i, best_q = k, (round(qq["q"], 1), -(o.get("skipped_km") or 0.0))
     if top["kind"] == "none" and final.get("baseline") and final["baseline"].get("tsd"):
@@ -752,9 +795,14 @@ def decide(ctx):
     alts = [{"suggest": list(e["S"]), "kind": e["kind"], "label": e["label"], "stop": e["name"], "q": e["q"], "max_hw": e["max"], "rms": e["rms"], "ok_stops_pct": e["ok_stops_pct"], "skipped_km": _r(e["skipped_km"], 1),
              "hold_min": _r(e["hold"], 1), "chosen": e["S"] == S and e["kind"] == top["kind"]} for e in sorted(by_S.values(), key=lambda e: -e["q"])]
     decision = "halfway" if S else ("adjust" if best_i is not None else "none")
-    final["ai"] = {"mode": "auto", "decision": decision, "suggest": list(S), "candidates": cand, "alternatives": alts, "pref": pref}
-    final["message"] = ("Recommended - the AI ticks trip %d as Disrupted (halfway) and adjusts the trips around it" % S[0] if S else
-                        ("Recommended - adjust the trips and continue service (no disruption)" if best_i is not None else "Recommended - continue service as it is: no plan beats it"))
+    final["ai"] = {"mode": "auto", "decision": decision, "suggest": list(S), "candidates": cand, "alternatives": alts, "pref": pref,
+                   "constraints": {"max_adjustment_min": 8, "min_layover_min": 7, "halfway_layover_omitted": True,
+                                   "min_horizon": "3 UP + 3 DOWN", "departed_locked": True, "headway_lt_min": max_hw_limit},
+                   "headway_constraint_met": constraint_met, "best_achievable_max_headway": top["max"]}
+    base_msg = ("Recommended - the AI ticks trip %d as Disrupted (halfway) and adjusts the trips around it" % S[0] if S else
+                ("Recommended - adjust the trips and continue service (no disruption)" if best_i is not None else "Recommended - continue service as it is: no plan beats it"))
+    final["message"] = base_msg if constraint_met else (f"WARNING: <{max_hw_limit:g} min headway is not achievable with the available trips. "
+                                                         f"Best achievable maximum headway is {top['max']:.1f} min. " + base_msg)
     return final
 
 
