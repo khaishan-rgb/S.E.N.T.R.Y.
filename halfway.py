@@ -24,7 +24,7 @@ the halfway stop (at stop 2 for "regulate only"). If the simulated trips end on 
 """
 import math
 
-MODEL_VERSION = "halfway-10.3"
+MODEL_VERSION = "halfway-12.1-welfare"
 EPS = 1e-6
 
 PARAMS = {
@@ -33,15 +33,16 @@ PARAMS = {
     "min_layover_min": 7.0,      # mandatory break: every trip cannot depart earlier than actual arrival + 7 min
     "start_delay_min": 0.0,      # option C: replacement passes the halfway stop this many min after the disrupted trip's scheduled time there
     # ---- regulation (options B and D)
-    "reg_hold_max": 20.0,         # a trip may be held at most this many min beyond its scheduled departure
+    "reg_hold_max": 8.0,          # HARD welfare cap: never artificially hold a trip >8 min beyond scheduled departure
     "reg_early_max": 15.0,        # ... or released at most this many min before it (never before arrival + minimum layover)
-    "reg_window": 5,             # trips either side of the disrupted trip that may be regulated (and that count as "affected"): 3 up + 3 down = 6, the lost trip's slot is shared
+    "reg_window": 3,             # rolling regulation horizon: minimum 3 trips before + 3 after the affected slot; spread recovery instead of over-holding one BC
+                                 # trips either side of the disrupted trip that may be regulated (and that count as "affected"): 3 up + 3 down = 6, the lost trip's slot is shared
                                  # by those 6 trips (7 slots x headway / 6 trips). A wider window ramps the correction over more trips
     "reg_even_share": 1,         # 1 = the interchange departures share the lost trip's slot evenly (the halfway bus is NOT part of that calculation; it is placed on top);
                                  # the last trip of the window settles on its own time. 0 = the older joint calculation (kept for comparison)
-    "reg_min_side": 4,           # the AI regulates at least this many trips BEFORE and AFTER the gap at the interchange (3 up + 3 down = 6). If the sequence has fewer trips before
+    "reg_min_side": 3,           # the AI regulates at least this many trips BEFORE and AFTER the gap at the interchange (3 up + 3 down = 6). If the sequence has fewer trips before
                                  # the disrupted one, more trips AFTER it are regulated instead (0 = off: use reg_window only)
-    "reg_early_future": 15.0,     # ... and then those future trips may depart up to this many min early (never before arrival + minimum layover) to close the gap
+    "reg_early_future": 8.0,     # ... and then those future trips may depart up to this many min early (never before arrival + minimum layover) to close the gap
     "min_dep_gap": 2.0,          # minimum gap between two consecutive departures at the first stop
     "start_early_max": 5.0,      # option D: the replacement may start this many min earlier than the disrupted trip's scheduled time ...
     "start_late_max": 10.0,      # ... or this many min later (the AI picks the start that evens the headways)
@@ -52,7 +53,7 @@ PARAMS = {
     "recover_tol_pct": 20.0,     # recovered = every headway within +/- this % of scheduled
     "recover_points": 3,         # ... for at least this many consecutive headways after the last irregular one
     # ---- score weights (Balanced), %
-    "w_regularity": 35.0, "w_maxgap": 35.0, "w_recovery": 15.0, "w_holding": 5.0, "w_mileage": 7.0, "w_bunching": 3.0,
+    "w_regularity": 30.0, "w_maxgap": 30.0, "w_recovery": 15.0, "w_holding": 15.0, "w_mileage": 7.0, "w_bunching": 3.0,
     "pref_recovery_boost": 1.6,  # "Faster headway recovery" multiplies the recovery and max-gap weights by this
     "pref_mileage_boost": 3.0,   # "Minimise mileage loss" multiplies the mileage weight by this
     # ---- propagation
@@ -710,7 +711,18 @@ def decide(ctx):
         probe["ai"] = {"mode": "auto", "decision": "none", "suggest": [], "candidates": cand, "alternatives": []}
         probe["message"] = "No plan improves the headways without creating a problem: continue service as it is."
         return probe
-    top = max(entries, key=lambda e: (round(e["q"], 1), -len(e["S"]), -e["skipped_km"], -e["hold"]))         # a tie goes to the simpler decision (fewer disrupted trips, less mileage, less holding)
+    # Operational preference hierarchy after quality scoring:
+    # Mileage focus: adjustment/continue wins close calls before halfway.
+    # Headway focus: halfway wins close calls when it materially improves headway/recovery.
+    # Balanced: simpler plan first. A 1.0-point band avoids tiny score noise overriding the chosen philosophy.
+    bestq = max(e["q"] for e in entries)
+    near = [e for e in entries if e["q"] >= bestq - 1.0]
+    if pref == "mileage":
+        top = max(near, key=lambda e: (-len(e["S"]), -e["skipped_km"], e["q"], -e["hold"]))
+    elif pref == "recovery":
+        top = max(near, key=lambda e: (1 if e["S"] else 0, -e["max"], e["q"], -e["hold"]))
+    else:
+        top = max(near, key=lambda e: (e["q"], -len(e["S"]), -e["skipped_km"], -e["hold"]))         # a tie goes to the simpler decision (fewer disrupted trips, less mileage, less holding)
     S = top["S"]
     final = simulate({**ctx, "disrupted": list(S), "block": cand, "pref": pref})
     if not final.get("ok"):

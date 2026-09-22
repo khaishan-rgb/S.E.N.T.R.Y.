@@ -1560,7 +1560,7 @@ import bisect
 
 HO = {"params": dict(halfway.PARAMS), "points": []}
 HO_INT = ("n_trips", "reg_window", "recover_points", "reg_min_side", "reg_even_share", "max_disrupted")
-HO_RANGES = {"n_trips": (5, 20), "layover_min": (0, 60), "min_layover_min": (0, 30), "start_delay_min": (-30, 60), "reg_hold_max": (0, 30), "reg_early_max": (0, 30), "reg_window": (1, 9), "reg_min_side": (0, 5), "auto_late_min": (0, 120), "reg_even_share": (0, 1), "max_disrupted": (1, 6), "reg_early_future": (0, 30),
+HO_RANGES = {"n_trips": (5, 20), "layover_min": (0, 60), "min_layover_min": (0, 30), "start_delay_min": (-30, 60), "reg_hold_max": (0, 8), "reg_early_max": (0, 30), "reg_window": (1, 9), "reg_min_side": (0, 5), "auto_late_min": (0, 120), "reg_even_share": (0, 1), "max_disrupted": (1, 6), "reg_early_future": (0, 30),
              "min_dep_gap": (0, 10), "start_early_max": (0, 30), "start_late_max": (0, 60), "min_remaining_pct": (0, 90), "min_improve_pct": (0, 100), "max_mileage_km": (0.5, 100),
              "recover_tol_pct": (5, 100), "recover_points": (1, 8), "w_regularity": (0, 100), "w_maxgap": (0, 100), "w_recovery": (0, 100), "w_holding": (0, 100), "w_mileage": (0, 100),
              "w_bunching": (0, 100), "pref_recovery_boost": (1, 5), "pref_mileage_boost": (1, 10), "load_sens": (0, 0.3), "fallback_kmh": (5, 60), "offsvc_factor": (0.3, 1.0)}
@@ -1591,6 +1591,19 @@ def ho_init():
             for v_ in vals:
                 bb_sql("DELETE FROM halfway_parameter WHERE k=? AND v=?", (k_, v_))
         bb_sql("INSERT OR REPLACE INTO halfway_parameter(k, v) VALUES ('mig_v101', 1)")
+    if not bb_sql("SELECT 1 FROM halfway_parameter WHERE k='mig_v121_welfare'", fetch=True):
+        # V12.1 welfare: hard +8 min adjustment cap, 7-min layover, minimum 3+3 rolling regulation horizon.
+        # Remove legacy stored defaults that would otherwise override the safer engine defaults.
+        bb_sql("DELETE FROM halfway_parameter WHERE k='reg_hold_max' AND v>8")
+        bb_sql("DELETE FROM halfway_parameter WHERE k='reg_min_side'")
+        bb_sql("DELETE FROM halfway_parameter WHERE k='reg_window'")
+        bb_sql("DELETE FROM halfway_parameter WHERE k='reg_early_future' AND v>8")
+        bb_sql("INSERT OR REPLACE INTO halfway_parameter(k, v) VALUES ('reg_hold_max', 8)")
+        bb_sql("INSERT OR REPLACE INTO halfway_parameter(k, v) VALUES ('reg_min_side', 3)")
+        bb_sql("INSERT OR REPLACE INTO halfway_parameter(k, v) VALUES ('reg_window', 3)")
+        bb_sql("INSERT OR REPLACE INTO halfway_parameter(k, v) VALUES ('reg_early_future', 8)")
+        bb_sql("INSERT OR REPLACE INTO halfway_parameter(k, v) VALUES ('min_layover_min', 7)")
+        bb_sql("INSERT OR REPLACE INTO halfway_parameter(k, v) VALUES ('mig_v121_welfare', 1)")
     for r in bb_sql("SELECT k, v FROM halfway_parameter", fetch=True):
         if r["k"] in HO["params"]:
             HO["params"][r["k"]] = int(r["v"]) if r["k"] in HO_INT else r["v"]
