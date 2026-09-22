@@ -189,7 +189,9 @@ details.hall{margin-top:10px}details.hall summary{cursor:pointer;color:#9cc4ff;f
     <div class="hx-top">
       <section class="card hx-sc">
         <h2>1. Scenario</h2>
-        <div class="hx-f2"><div class="fld"><label for="hoSvc">Service</label><input id="hoSvc" class="sel" maxlength="6" autocapitalize="characters" placeholder="e.g. 32"></div>
+        <div class="fld"><label for="hoOp">Transport Operator</label>
+          <select id="hoOp"><option value="">All operators</option><option value="SBST">SBS Transit</option><option value="SMRT">SMRT</option><option value="TTS">Tower Transit</option><option value="GAS">Go-Ahead</option></select></div>
+        <div class="hx-f2"><div class="fld"><label for="hoSvc">Service</label><input id="hoSvc" class="sel" list="hoSvcList" maxlength="6" autocapitalize="characters" placeholder="e.g. 32"><datalist id="hoSvcList"></datalist></div>
           <div class="fld"><label>Direction</label><div class="seg" id="hoDir"><button type="button" data-d="1" aria-pressed="true">Dir 1</button><button type="button" data-d="2" aria-pressed="false">Dir 2</button></div></div></div>
         <div class="hx-f2"><div class="fld"><label for="hoRef">First departure</label><input id="hoRef" class="sel" type="text" maxlength="5" inputmode="numeric" placeholder="08:10" aria-label="Scheduled departure of trip 1 at the first stop (HH:MM)"></div>
           <div class="fld"><label for="hoHw">Headway, min</label><input id="hoHw" class="sel" type="number" min="1" max="120" step="0.5" inputmode="decimal"></div></div>
@@ -251,7 +253,7 @@ details.hall{margin-top:10px}details.hall summary{cursor:pointer;color:#9cc4ff;f
     <section class="card" style="margin-top:12px"><header><div><h2>Simulation audit log</h2><div class="sub">Each time you press <b>Run AI Optimisation</b> the scenario, every option's result, the recommendation, the weights and the model version are stored (live re-simulation while you edit is not).</div></div></header><div class="tw" id="hoRuns"></div></section>
   </main>
 
-  <footer class="foot"><span>Sources: LTA DataMall (Bus Routes/Stops/Services, Traffic Speed Bands, Traffic Incidents) &nbsp;|&nbsp; A scenario simulation from the schedule at the first stop, not live bus data. Decision support only, not for operational use</span><span>SG Transport Pulse V11.2</span></footer>
+  <footer class="foot"><span>Sources: LTA DataMall (Bus Routes/Stops/Services, Traffic Speed Bands, Traffic Incidents) &nbsp;|&nbsp; A scenario simulation from the schedule at the first stop, not live bus data. Decision support only, not for operational use</span><span>SG Transport Pulse V11.3</span></footer>
 </div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -276,7 +278,7 @@ async function post(url, body){
 function csvDownload(name, rows){ const csv = rows.map(r => r.map(v => { v = v == null ? "" : String(v); return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; }).join(",")).join("\n"); const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([csv], {type:"text/csv"})); a.download = name; document.body.appendChild(a); a.click(); a.remove(); }
 /* ===================== AI Halfway Optimiser (a scenario from the schedule at the first stop; never identifies a bus, never deploys) ===================== */
 const S = {tab:"opt", hoCfg:null};
-const HO = {svc:LS.get("ho.svc", ""), dir:LS.get("ho.dir", 1), setup:null, res:null, sel:null, selKey:null, map:null, g:null, late:[], dis:[], dirty:false, prev:null, ptok:0, auto:LS.get("ho.auto", true), tok:0, timer:null, n:10, pb:{t:null, min:0, max:100, play:false, timer:null, res:null, key:null, ghost:false}, geo:null, tsdg:null, barsAt:null, view:LS.get("ho.view", "simple"), scope:LS.get("ho.scope", "all"), veh:LS.get("ho.veh", "own"), pick:"", showAll:false};
+const HO = {svc:LS.get("ho.svc", ""), dir:LS.get("ho.dir", 1), op:LS.get("ho.op", ""), svcAll:null, setup:null, res:null, sel:null, selKey:null, map:null, g:null, late:[], dis:[], dirty:false, prev:null, ptok:0, auto:LS.get("ho.auto", true), tok:0, timer:null, n:10, pb:{t:null, min:0, max:100, play:false, timer:null, res:null, key:null, ghost:false}, geo:null, tsdg:null, barsAt:null, view:LS.get("ho.view", "simple"), scope:LS.get("ho.scope", "all"), veh:LS.get("ho.veh", "own"), pick:"", showAll:false};
 const hm = m => { m = ((Math.round(m) % 1440) + 1440) % 1440; return String(Math.floor(m / 60)).padStart(2, "0") + ":" + String(m % 60).padStart(2, "0"); };
 const hoF = x => x == null ? "\u2013" : f1(x);
 const hoPct = x => x == null ? "\u2013" : f1(x) + "%";
@@ -879,6 +881,13 @@ $("hoPAdd").onclick = async () => { const b = {service:$("hoAS").value.trim(), d
 function showTab(t){ hoPlay(false); S.tab = t; $("opt").hidden = t !== "opt"; $("settings").hidden = t !== "set"; $("tabOpt").setAttribute("aria-selected", t === "opt"); $("tabSet").setAttribute("aria-selected", t === "set");
   if(t === "set") loadHoSettings(); else if(HO.view === "street") setTimeout(() => { hoInitMap(); if(HO.map){ HO.map.invalidateSize(); hoRenderMap(); } }, 120); }
 $("tabOpt").onclick = () => showTab("opt"); $("tabSet").onclick = () => showTab("set");
+function hoFillSvcList(){
+  const list = HO.op && HO.svcAll ? HO.svcAll.filter(x => !x.operators.length || x.operators.includes(HO.op)) : (HO.svcAll || []);          // a service with no known operator is never hidden
+  $("hoSvcList").innerHTML = list.slice(0, 400).map(x => `<option value="${esc(x.svc)}">`).join("");
+}
+$("hoOp").value = HO.op;
+$("hoOp").onchange = () => { HO.op = $("hoOp").value; LS.set("ho.op", HO.op); hoFillSvcList(); };
+getJSON("/api/traffic/services", 20000).then(j => { if(j.services){ HO.svcAll = j.services; hoFillSvcList(); } });
 (async () => {
   const q = new URLSearchParams(location.search); if(/^[0-9A-Za-z]{1,6}$/.test(q.get("svc") || "")) $("hoSvc").value = q.get("svc").toUpperCase(); if(q.get("dir") === "1" || q.get("dir") === "2"){ HO.dir = +q.get("dir"); document.querySelectorAll("#hoDir button").forEach(x => x.setAttribute("aria-pressed", String(+x.dataset.d === HO.dir))); }
   hoBuildTrips(); hoInitMap(); hoRender();

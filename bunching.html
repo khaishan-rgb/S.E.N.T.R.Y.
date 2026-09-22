@@ -111,6 +111,8 @@ tbody tr{cursor:pointer}tbody tr:hover{background:#0d2440}tbody tr.sel{backgroun
 
   <main id="dash">
     <form class="filters" id="form" autocomplete="off">
+      <div class="fld"><label for="opSel">Transport Operator</label>
+        <select id="opSel"><option value="">All operators</option><option value="SBST">SBS Transit</option><option value="SMRT">SMRT</option><option value="TTS">Tower Transit</option><option value="GAS">Go-Ahead</option></select></div>
       <div class="fld"><label for="svcIn">Services</label><div class="chips" id="chips"><input id="svcIn" placeholder="All monitored (add e.g. 32)" maxlength="6" autocapitalize="characters"></div></div>
       <div class="fld"><label id="dl">Direction</label><div class="seg" id="dirSeg" role="group" aria-labelledby="dl"><button type="button" data-d="0">Both</button><button type="button" data-d="1">Dir 1</button><button type="button" data-d="2">Dir 2</button></div></div>
       <div class="fld"><label for="win">Time period</label><select id="win"><option value="0">Current</option><option value="10">Next 10 min</option><option value="20">Next 20 min</option><option value="30" selected>Next 30 min</option></select></div>
@@ -163,7 +165,7 @@ tbody tr{cursor:pointer}tbody tr:hover{background:#0d2440}tbody tr.sel{backgroun
     <section class="card" style="margin-top:12px"><header><div><h2>Event log</h2><div class="sub" id="evSub">Bunching and long-headway events, logged only when they last long enough.</div></div><button class="btn sm" id="evExport" type="button">Export CSV</button></header><div class="tw" id="events"></div></section>
   </main>
 
-  <footer class="foot"><span>Sources: LTA DataMall (Bus Arrival, Bus Routes/Stops/Services, Traffic Speed Bands, Incidents), OneMap &nbsp;|&nbsp; Decision support only, not for operational use</span><span>SG Transport Pulse V11.2</span></footer>
+  <footer class="foot"><span>Sources: LTA DataMall (Bus Arrival, Bus Routes/Stops/Services, Traffic Speed Bands, Incidents), OneMap &nbsp;|&nbsp; Decision support only, not for operational use</span><span>SG Transport Pulse V11.3</span></footer>
 </div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -175,7 +177,7 @@ const f1 = x => x == null ? "\u2013" : (Math.abs(x - Math.round(x)) < .05 ? Stri
 const LS = {get(k, d){ try{ const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); }catch(e){ return d; } }, set(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }};
 const COL = {smooth:"#22d36a", moderate:"#ffc21a", slow:"#ff4d55", none:"#2f7dff"}, bandCls = b => b == null ? "none" : b >= 5 ? "smooth" : b >= 3 ? "moderate" : "slow";
 const RNK = {red:0, orange:1, yellow:2, green:3, nodata:4}, RNAME = {red:"Critical", orange:"Developing", yellow:"Early sign", green:"Normal", nodata:"No data"};
-const S = {services:LS.get("bb.services", []), dir:LS.get("bb.dir", 0), win:LS.get("bb.win", 30), view:"service", issue:"all", lv:{2:true, 3:true, 4:true}, sort:"risk", page:1, data:null, sel:null,
+const S = {services:LS.get("bb.services", []), dir:LS.get("bb.dir", 0), win:LS.get("bb.win", 30), view:"service", issue:"all", lv:{2:true, 3:true, 4:true}, op:LS.get("bb.op", ""), opMap:null, sort:"risk", page:1, data:null, sel:null,
            detail:{}, auto:LS.get("bb.auto", true), left:30, tok:0, busy:false, tab:"dash", alOpen:{}};
 const sgt = o => new Intl.DateTimeFormat("en-GB", {timeZone:"Asia/Singapore", hour12:false, ...o});
 function tick(){ const p = Object.fromEntries(sgt({weekday:"short", day:"2-digit", month:"short", year:"numeric", hour:"2-digit", minute:"2-digit"}).formatToParts(new Date()).map(x => [x.type, x.value])); $("clock").textContent = `${p.weekday}, ${p.day} ${p.month} ${p.year}  ${p.hour}:${p.minute}`; }
@@ -211,6 +213,7 @@ function stopsCell(r){ return r.bb && r.bb.status !== "early" ? r.bb.stops : `<s
 function visibleRows(){
   if(!S.data) return [];
   const rows = S.data.rows.filter(r => {
+    if(S.op && S.opMap && S.opMap[r.service] && S.opMap[r.service].length && !S.opMap[r.service].includes(S.op)) return false;
     if(S.issue === "gap" && !r.gap) return false;
     if(S.issue === "bb" && !r.bb) return false;
     if(r.bb && !r.gap && !S.lv[Math.min(4, r.bb.size)]) return false;
@@ -469,6 +472,8 @@ $("evExport").onclick = () => { const ev = S.events || []; if(!ev.length){ toast
 /* start */
 (async () => {
   const q = new URLSearchParams(location.search); if(q.get("svc")){ S.services = q.get("svc").toUpperCase().split(",").filter(x => /^[0-9A-Z]{1,6}$/.test(x)); } if(q.get("dir") === "1" || q.get("dir") === "2") S.dir = +q.get("dir");
+  $("opSel").value = S.op; $("opSel").onchange = () => { S.op = $("opSel").value; LS.set("bb.op", S.op); renderTable(); };
+  getJSON("/api/traffic/services", 20000).then(j => { if(j.services){ S.opMap = {}; j.services.forEach(x => { S.opMap[x.svc] = x.operators || []; }); if(S.op) renderTable(); } });
   renderChips(); syncSegs(); renderTable(); renderKpis(); renderDonut();
   const h = await getJSON("/api/health", 15000); if(h.error) setLive("bad", "Server unreachable", h.error); else if(!h.lta) setLive("bad", "LTA key missing", "Set LTA_ACCOUNT_KEY on the server"); else setLive("ok", "Live Data (LTA)", "");
   load();

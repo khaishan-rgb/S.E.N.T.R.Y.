@@ -72,6 +72,7 @@ table.mini td.n{font-variant-numeric:tabular-nums}
 /* messages */
 .chips.off{opacity:.45;pointer-events:none}
 .fld select{height:44px;background:var(--panel);border:1px solid var(--line2);border-radius:11px;padding:0 10px;color:var(--text);font-size:15px}
+.fld select:disabled{opacity:.45;cursor:not-allowed}
 .ttbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;background:var(--panel);border:1px solid var(--line2);border-radius:12px;padding:9px 12px;margin-bottom:12px;font-size:13px}
 .ttbar .tta{display:flex;gap:8px;flex-wrap:wrap}
 .pager{display:flex;gap:6px;justify-content:center;align-items:center;padding:12px 0 2px}
@@ -194,12 +195,12 @@ details.rules summary{cursor:pointer;font-weight:700;font-size:16px}
   </header>
 
   <form class="filters" id="form" autocomplete="off">
+    <div class="fld" id="scopeFld"><label for="scope">Transport Operator</label>
+      <select id="scope"><option value="">All operators</option><option value="SBST">SBS Transit</option><option value="SMRT">SMRT</option><option value="TTS">Tower Transit</option><option value="GAS">Go-Ahead</option></select></div>
     <div class="fld"><label for="svcIn">Services <span class="m">(up to 8)</span></label>
       <div class="chips" id="chips"><input id="svcIn" placeholder="Add service, e.g. 32" maxlength="6" inputmode="text" autocapitalize="characters"></div></div>
     <div class="fld"><label id="allL">Scope</label>
       <div class="seg" role="group" aria-labelledby="allL" id="allSeg"><button type="button" data-a="0">Selected</button><button type="button" data-a="1">All services</button></div></div>
-    <div class="fld" id="scopeFld" hidden><label for="scope">Operator</label>
-      <select id="scope"><option value="">All operators</option><option value="SBST">SBS Transit</option><option value="SMRT">SMRT</option><option value="TTS">Tower Transit</option><option value="GAS">Go-Ahead</option></select></div>
     <div class="fld"><label id="dl">Direction</label>
       <div class="seg" role="group" aria-labelledby="dl" id="dirSeg"><button type="button" data-d="0">Both</button><button type="button" data-d="1">Dir 1</button><button type="button" data-d="2">Dir 2</button></div></div>
     <div class="fld"><label id="rl">Risk level</label>
@@ -246,7 +247,7 @@ details.rules summary{cursor:pointer;font-weight:700;font-size:16px}
 
   <section class="card"><details class="rules"><summary>Rules &amp; thresholds used (tap to view)</summary><div id="rules"></div></details></section>
 
-  <footer class="foot"><span>Sources: LTA DataMall (Bus Arrival, Bus Services, Traffic Speed Bands) &nbsp;|&nbsp; Decision support only, not for operational use</span><span>SG Transport Pulse V11.2 &nbsp;|&nbsp; Built for a smarter Singapore</span></footer>
+  <footer class="foot"><span>Sources: LTA DataMall (Bus Arrival, Bus Services, Traffic Speed Bands) &nbsp;|&nbsp; Decision support only, not for operational use</span><span>SG Transport Pulse V11.3 &nbsp;|&nbsp; Built for a smarter Singapore</span></footer>
 </div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
@@ -290,7 +291,7 @@ $("chips").addEventListener("click", e => { const b = e.target.closest("button[d
 $("svcIn").addEventListener("keydown", e => { if(e.key === "," || e.key === " "){ e.preventDefault(); if(addService($("svcIn").value)) $("svcIn").value = ""; } else if(e.key === "Backspace" && !$("svcIn").value && S.services.length){ S.services.pop(); save(); renderChips(); } });
 function syncAll(){
   document.querySelectorAll("#allSeg button").forEach(b => b.setAttribute("aria-pressed", (+b.dataset.a === 1) === S.all));
-  $("scopeFld").hidden = !S.all; $("scope").value = S.scope; $("svcIn").disabled = S.all; $("chips").classList.toggle("off", S.all);
+  $("scope").value = S.scope; $("scope").disabled = !S.all; $("scopeFld").title = S.all ? "" : "Applies when Scope is \u2018All services\u2019"; $("svcIn").disabled = S.all; $("chips").classList.toggle("off", S.all);
   $("svcIn").placeholder = S.all ? "All services" : (S.services.length ? "Add another" : "Add service, e.g. 32");
 }
 function syncSegs(){ syncAll(); document.querySelectorAll("#dirSeg button").forEach(b => b.setAttribute("aria-pressed", +b.dataset.d === S.dir)); document.querySelectorAll("#riskSeg button").forEach(b => b.setAttribute("aria-pressed", b.dataset.r === S.risk)); $("autoCb").checked = S.auto; }

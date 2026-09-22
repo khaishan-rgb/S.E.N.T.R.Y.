@@ -114,12 +114,12 @@ td{padding:8px;border-bottom:1px solid #12304d;vertical-align:middle}
 
   <main id="monitor">
     <div class="filters" id="filters">
+      <div class="fl"><label>Transport Operator</label><div class="typebtns" id="opBtns"></div></div>
       <div class="fl svcbox"><label for="svcIn">Services (multi-select)</label><div class="chips" id="svcChips"></div><div style="display:flex;gap:6px"><input class="inp" id="svcIn" autocomplete="off" placeholder="Type to search, or browse &#9662;" aria-label="Services" style="flex:1" role="combobox" aria-expanded="false" aria-controls="svcSug"><button class="btn sm" id="svcBrowse" type="button" title="Browse all services" aria-label="Browse all services" aria-expanded="false">&#9662;</button></div><div class="sug" id="svcSug" hidden role="listbox" aria-label="Services" aria-multiselectable="true"></div></div>
-      <div class="fl"><label for="fDir">Direction</label><select class="sel" id="fDir"><option value="0">Both</option><option value="1">Direction 1</option><option value="2">Direction 2</option></select></div>
+      <div class="fl"><label id="dirLabel">Direction</label><div class="seg" id="dirSeg" role="group" aria-labelledby="dirLabel"><button type="button" data-d="0" aria-pressed="true">Both</button><button type="button" data-d="1" aria-pressed="false">Dir 1</button><button type="button" data-d="2" aria-pressed="false">Dir 2</button></div></div>
       <div class="fl"><label for="fHor">Time horizon</label><select class="sel" id="fHor"><option value="0">Current</option><option value="30">Next 30 min</option><option value="60">Next 60 min</option><option value="120">Next 120 min</option></select></div>
       <div class="fl"><label for="fDelay">Min. estimated delay <small>(hides noise)</small></label><input class="inp" id="fDelay" type="number" min="0" max="60" step="1" style="min-width:80px;width:86px" aria-label="Minimum estimated delay in minutes"></div>
       <div class="fl"><label>Risk type</label><div class="typebtns" id="typeBtns"><button class="tb" data-k="congestion" aria-pressed="true">&#128663; Congestion</button><button class="tb" data-k="incident" aria-pressed="true">&#9888;&#65039; Incident</button><button class="tb" data-k="roadworks" aria-pressed="true">&#128679; Road Works</button><button class="tb" data-k="weather" aria-pressed="true">&#127783;&#65039; Weather</button></div></div>
-      <div class="fl"><label>Transport operator</label><div class="typebtns" id="opBtns"></div></div>
       <div class="fl"><label>Status</label><div class="statbtns" id="statBtns"><button class="tb" data-s="unacknowledged" aria-pressed="true">Unacknowledged</button><button class="tb" data-s="acknowledged" aria-pressed="true">Acknowledged</button><button class="tb" data-s="cleared" aria-pressed="false">Cleared</button></div></div>
       <div class="fl" style="flex:1;min-width:190px"><label for="fQ">Search</label><input class="inp" id="fQ" placeholder="Service / road / location&hellip;" aria-label="Search"></div>
     </div>
@@ -154,7 +154,7 @@ td{padding:8px;border-bottom:1px solid #12304d;vertical-align:middle}
     <div class="card" style="margin-top:12px"><h2>Data feeds</h2><div id="feedList" class="ho-note"></div></div>
     <div class="card" style="margin-top:12px"><h2>Acknowledgement log</h2><div class="tw"><table id="logTab"></table></div></div>
   </main>
-  <footer class="ho-note" style="margin-top:14px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px"><span>SG Transport Pulse V11.2 &nbsp;|&nbsp; For Operational Control Centre use only</span><span id="engine"></span></footer>
+  <footer class="ho-note" style="margin-top:14px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px"><span>SG Transport Pulse V11.3 &nbsp;|&nbsp; For Operational Control Centre use only</span><span id="engine"></span></footer>
 </div>
 <div class="ov" id="ov" hidden><div class="modal" role="dialog" aria-modal="true" aria-labelledby="mTitle"><h3 id="mTitle">Acknowledge</h3><div id="mBody"></div><div class="fl" style="margin-top:10px"><label for="mBy">Acknowledged by</label><input class="inp" id="mBy" maxlength="40" placeholder="Your name / ID"></div><div class="btns"><button class="btn" id="mNo" type="button">Cancel</button><button class="btn go" id="mYes" type="button">Acknowledge</button></div></div></div>
 <div id="toast" role="status" aria-live="polite"></div>
@@ -211,8 +211,8 @@ function renderOpBtns(){
   $("opBtns").innerHTML = S.allOps.length ? S.allOps.map(o => `<button class="tb" data-o="${esc(o)}" aria-pressed="${S.ops.has(o)}">${esc(o)}</button>`).join("") : `<span class="sub">No operator data yet</span>`;
   $("opBtns").querySelectorAll(".tb").forEach(b => b.onclick = () => { const o = b.dataset.o; if(S.ops.has(o)) S.ops.delete(o); else S.ops.add(o); saveF(); renderOpBtns(); load(); });
 }
-$("fDir").value = S.dir; $("fHor").value = S.hor;
-$("fDir").onchange = e => { S.dir = +e.target.value; saveF(); load(); };
+document.querySelectorAll("#dirSeg button").forEach(b => { b.setAttribute("aria-pressed", String(+b.dataset.d === S.dir)); b.onclick = () => { S.dir = +b.dataset.d; document.querySelectorAll("#dirSeg button").forEach(x => x.setAttribute("aria-pressed", String(x === b))); saveF(); load(); }; });
+$("fHor").value = S.hor;
 $("fHor").onchange = e => { S.hor = +e.target.value; saveF(); load(); };
 $("fDelay").value = S.minDelay;
 let delayT; $("fDelay").oninput = () => { clearTimeout(delayT); delayT = setTimeout(() => { const v = $("fDelay").value.trim(); S.minDelay = v === "" ? 0 : Math.max(0, Math.min(60, +v)); LS.set("tr.minDelay", S.minDelay); load(); }, 500); };

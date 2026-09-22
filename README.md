@@ -1,7 +1,22 @@
-# SG Transport Pulse V11.2 — Route Traffic + Departure Adjustment + Bunching, Gap & Alerts + AI Halfway Optimiser
+# SG Transport Pulse V11.3 — Route Traffic + Departure Adjustment + Bunching, Gap & Alerts + AI Halfway Optimiser
 
 Live bus positions, live LTA traffic drawn directly on the bus route, and next arrivals per stop.
 FastAPI backend + a single-page Leaflet frontend (OneMap basemap, OpenStreetMap fallback).
+
+## V11.3 - Standardized filters across every page: Transport Operator, consistently placed and labelled
+
+* **Transport Operator, everywhere.** Every analysis page now has the same **Transport Operator** filter (SBS Transit / SMRT / Tower Transit / Go-Ahead, or All operators), with the same label and the same four
+  operator codes (SBST / SMRT / TTS / GAS), placed as the **first** field in the filter row on every page:
+  - **Route Traffic** and **Halfway Optimiser** - narrows a new Service datalist (`/api/traffic/services`), so typing a service number now offers real suggestions instead of a blank text box.
+  - **Bunching & Gap** - filters the dashboard table client-side to the services run by the chosen operator.
+  - **Headway Control** - the existing Operator field (used for *All services* scanning) is now always visible instead of hidden, just greyed out and explained by a tooltip when Scope is *Selected* (it only applies
+    to *All services* mode).
+  - **Traffic-Aware** - unchanged multi-select behaviour (it can watch several operators' services at once), just relabelled and moved to the first position to match the other pages.
+  A service with no recorded operator in the data is never hidden by this filter on any page - we only filter what we actually know, never guess.
+* **Direction, one consistent control.** Traffic-Aware's Direction filter was a dropdown; every other page used a Both / Dir 1 / Dir 2 toggle-button group. It's now the same toggle-button group everywhere, sending
+  the same values (0 / 1 / 2) as before.
+* **No calculation, backend, or API changes.** This was pure front-end restructuring - reusing the already-existing `/api/traffic/services` endpoint (and Headway Control's own `/api/control/services`), reordering
+  and relabelling existing filter fields, and adding a datalist where none existed. Nothing about how a route, headway, bunching, halfway plan, or traffic alert is calculated has changed.
 
 ## V11.2 - Less noise, a sortable delay column, a clearer route line, and LTA traffic camera images
 
