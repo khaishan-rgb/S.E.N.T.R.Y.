@@ -10,7 +10,7 @@ Everything is deterministic and decision support only.
 """
 import math
 
-MODEL_VERSION = "traffic-1.1"
+MODEL_VERSION = "traffic-1.2"
 EPS = 1e-9
 
 PARAMS = {
@@ -53,6 +53,8 @@ PARAMS = {
     "reg_deps": 3,                  # how many next departures the regulation may stretch
     "min_layover_min": 2.0,
     "hw_worse_min": 3.0,            # predicted headway this much above scheduled = deterioration expected
+    "min_delay_min": 3.0,           # hide an alert with an estimated traffic delay below this (noise reduction); alerts with no delay estimate (incidents, road works, weather) are not affected
+    "camera_km": 3.0,               # the nearest LTA traffic camera is shown if it is within this distance of the disruption
     # ---- priority score (section 30): weights (%) and levels
     "w_speed": 25.0, "w_length": 20.0, "w_buses": 20.0, "w_hw": 25.0, "w_duration": 10.0,
     "crit_score": 60.0, "high_score": 40.0, "monitor_score": 20.0,
@@ -65,7 +67,7 @@ RANGES = {
     "match_m": (20, 200), "match_angle": (10, 120), "min_overlap_m": (0, 2000), "sample_m": (10, 200), "incident_m": (50, 2000), "roadwork_m": (50, 2000),
     "weather_km": (0.5, 20), "rain_group_km": (0.5, 20), "rain_mod_mm": (0.05, 20), "rain_heavy_mm": (0.1, 40),
     "worse_speed_drop_pct": (5, 90), "worse_len_add_m": (100, 10000), "improve_pct": (5, 200), "ack_updates": (0, 20), "keep_cleared_min": (0, 1440),
-    "bus_run_kmh": (5, 60), "restore_last_pct": (5, 50), "recover_tol_pct": (5, 60), "reg_hold_max": (0, 20), "reg_deps": (1, 8), "min_layover_min": (0, 30), "hw_worse_min": (0.5, 30),
+    "bus_run_kmh": (5, 60), "restore_last_pct": (5, 50), "recover_tol_pct": (5, 60), "reg_hold_max": (0, 20), "reg_deps": (1, 8), "min_layover_min": (0, 30), "hw_worse_min": (0.5, 30), "min_delay_min": (0, 60), "camera_km": (0.2, 15),
     "w_speed": (0, 100), "w_length": (0, 100), "w_buses": (0, 100), "w_hw": (0, 100), "w_duration": (0, 100),
     "crit_score": (1, 100), "high_score": (1, 100), "monitor_score": (1, 100),
     "sev_incident": (0, 1), "sev_roadwork": (0, 1), "sev_rain_mod": (0, 1), "sev_rain_heavy": (0, 1),
@@ -736,11 +738,13 @@ def acknowledge(book, alert_ids, by, now):
 ORDER = {"critical": 0, "high": 1, "monitor": 2, "normal": 3}
 
 
-def overview(book, P, now, services=None, direction=0, horizon=0, kinds=None, statuses=None, hw_map=None, bus_counts=None):
-    """Filtered alert queue + the summary cards. services: set of service numbers (empty / None = all). statuses: subset of {unacknowledged, acknowledged, cleared}."""
+def overview(book, P, now, services=None, direction=0, horizon=0, kinds=None, statuses=None, hw_map=None, bus_counts=None, min_delay=None):
+    """Filtered alert queue + the summary cards. services: set of service numbers (empty / None = all). statuses: subset of {unacknowledged, acknowledged, cleared}.
+    min_delay: hide alerts with a KNOWN estimated delay below this many minutes (an alert with no delay estimate, e.g. an incident or weather, always passes)."""
     services = {s.strip().upper() for s in (services or []) if s and s.strip()}
     kinds = set(kinds or KINDS)
     statuses = set(statuses or ("unacknowledged", "acknowledged"))
+    min_delay = P["min_delay_min"] if min_delay is None else min_delay
     allrows = alerts(book, P, now, hw_map, bus_counts)
     rows = []
     for a in allrows:
@@ -751,6 +755,8 @@ def overview(book, P, now, services=None, direction=0, horizon=0, kinds=None, st
         if a["kind"] not in kinds:
             continue
         if a["planned"] and not (horizon and a["starts_in_min"] <= horizon):        # planned roadworks only show inside the chosen time horizon
+            continue
+        if a["delay_min"] is not None and a["delay_min"] < min_delay - EPS:
             continue
         grp = "cleared" if a["status"] == "cleared" else "unacknowledged" if a["status"] == "new" else "acknowledged"
         if grp not in statuses:

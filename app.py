@@ -21,7 +21,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 import headway
 import traffic
 
-VERSION = "V11.1"
+VERSION = "V11.2"
 LTA = os.getenv("LTA_BASE", "https://datamall2.mytransport.sg/ltaodataservice").rstrip("/")
 KEY = os.getenv("LTA_ACCOUNT_KEY", "")
 OSRM = os.getenv("OSRM_URL", "https://router.project-osrm.org").rstrip("/")
@@ -2067,6 +2067,10 @@ async def stop_suggest(q: str = Query("")):
 # =========================================================================== Traffic-Aware Regulation (the engine is traffic.py)
 EP_ROADWORKS = os.getenv("LTA_ROADWORKS_PATH", "RoadWorks")     # verify against the current DataMall user guide (road works / road openings)
 TTL_ROADWORKS = 600
+CAMERA_PATHS = [p for p in [os.getenv("LTA_CAMERAS_PATH", "").strip("/ "), "Traffic-Imagesv2", "v3/Traffic-Images", "TrafficImages"] if p]
+CAMERA_PATHS = list(dict.fromkeys(CAMERA_PATHS))     # verify against the current DataMall user guide (Traffic Images / traffic camera snapshots)
+GOOD_CAMERA_PATH = None
+TTL_CAMERAS = 120      # LTA's ImageLink is a short-lived signed URL, so this list is not cached long
 TR = {"params": dict(traffic.PARAMS), "book": traffic.new_book(), "last": 0.0, "ridx": None, "ridx_key": None, "feeds": {}, "lock": None, "rw": [], "stretch_cache": None}
 
 
@@ -2134,6 +2138,52 @@ async def tr_roadworks(now):
         items.append({"key": str(x.get("EventID") or f"{road}|{x.get('StartDate')}"), "road": road, "lat": lat if in_sg(lat, lon) else None, "lon": lon if in_sg(lat, lon) else None,
                       "start_epoch": st, "end_epoch": en, "other": str(x.get("Other") or x.get("SvcDept") or "")[:200]})
     return items, d.get("error")
+
+
+async def fetch_cameras():
+    global GOOD_CAMERA_PATH
+    paths = [GOOD_CAMERA_PATH] if GOOD_CAMERA_PATH else CAMERA_PATHS
+    errors = []
+    for path in paths:
+        d = await get_lta(path, {"$skip": 0})
+        if d.get("_error"):
+            errors.append(d["_error"])
+            if d.get("_status") == 404:
+                if path == GOOD_CAMERA_PATH:
+                    GOOD_CAMERA_PATH = None
+                continue
+            break  # auth / network / rate limit problem: other paths will not help
+        GOOD_CAMERA_PATH = path
+        return list(d.get("value", [])), None
+    return [], " | ".join(errors[-3:])
+
+
+def norm_camera(x):
+    lat, lon = num(x.get("Latitude") or x.get("Lat")), num(x.get("Longitude") or x.get("Lng") or x.get("Lon"))
+    link = x.get("ImageLink") or x.get("Image") or x.get("ImageURL") or x.get("image")
+    cid = str(x.get("CameraID") or x.get("CameraId") or x.get("ID") or x.get("id") or "").strip()
+    if not (in_sg(lat, lon) and link and cid):
+        return None
+    return {"id": cid, "lat": lat, "lon": lon, "link": str(link)}
+
+
+async def cameras_state():
+    async def factory():
+        rows, err = await fetch_cameras()
+        cams = [c for c in (norm_camera(x) for x in rows) if c]
+        return {"cams": cams, "error": err if not cams else None, "raw_error": err}, TTL_CAMERAS, bool(cams) or not err
+    return await cached("cameras", factory)
+
+
+def nearest_camera(cams, lat, lon, max_km):
+    if lat is None or lon is None:
+        return None, None
+    best, bd = None, max_km
+    for c in cams:
+        d = hav_km(lat, lon, c["lat"], c["lon"])
+        if d < bd:
+            best, bd = c, d
+    return (best, bd) if best else (None, None)
 
 
 async def tr_refresh(force=False):
@@ -2263,7 +2313,7 @@ async def tr_hw_map(rows, now_dt):
 
 
 @app.get("/api/traffic/overview")
-async def api_tr_overview(services: str = "", direction: int = 0, horizon: int = 0, types: str = "", status: str = "", operators: str = "", refresh: int = 0):
+async def api_tr_overview(services: str = "", direction: int = 0, horizon: int = 0, types: str = "", status: str = "", operators: str = "", min_delay: str = "", refresh: int = 0):
     await tr_ensure_fresh(bool(refresh))
     P, book, now = TR["params"], TR["book"], time.time()
     svcs = [s for s in re.split(r"[,\s]+", services.upper()) if s]
@@ -2278,13 +2328,14 @@ async def api_tr_overview(services: str = "", direction: int = 0, horizon: int =
                     "params": {k: P[k] for k in ("persist_updates", "clear_updates", "min_len_m", "congest_kmh", "very_slow_kmh", "normal_kmh")}, "now": tr_hhmm(now)}
     kinds = [k for k in re.split(r"[,\s]+", types.lower()) if k in traffic.KINDS] or list(traffic.KINDS)
     stat = [k for k in re.split(r"[,\s]+", status.lower()) if k in ("unacknowledged", "acknowledged", "cleared")] or ["unacknowledged", "acknowledged"]
-    full = traffic.overview(book, P, now, svcs, direction, max(0, min(int(horizon), 120)), kinds, stat)
+    md = num(min_delay) if min_delay.strip() else None
+    full = traffic.overview(book, P, now, svcs, direction, max(0, min(int(horizon), 120)), kinds, stat, min_delay=md)
     hw = await tr_hw_map(full["rows"], now_sgt())
-    ov = traffic.overview(book, P, now, svcs, direction, max(0, min(int(horizon), 120)), kinds, stat, hw)
+    ov = traffic.overview(book, P, now, svcs, direction, max(0, min(int(horizon), 120)), kinds, stat, hw, min_delay=md)
     ids = {a["event"] for a in ov["rows"]}
     return {"rows": [tr_alert_public(a) for a in ov["rows"]], "cards": ov["cards"], "total": ov["total"], "events": [tr_event_public(book["events"][i], now) for i in ids if i in book["events"]],
             "feeds": TR["feeds"], "updated": tr_hhmm(TR["last"]), "updated_epoch": TR["last"], "loading": TR["last"] == 0, "refresh_s": P["refresh_s"], "model": traffic.MODEL_VERSION, "updates": book["updates"],
-            "params": {k: P[k] for k in ("persist_updates", "clear_updates", "min_len_m", "congest_kmh", "very_slow_kmh", "normal_kmh")}, "now": tr_hhmm(now)}
+            "params": {k: P[k] for k in ("persist_updates", "clear_updates", "min_len_m", "congest_kmh", "very_slow_kmh", "normal_kmh", "min_delay_min")}, "now": tr_hhmm(now)}
 
 
 @app.get("/api/traffic/services")
@@ -2328,7 +2379,12 @@ async def api_tr_detail(alert: str = "", current_hw: str = ""):
     fq0 = await freq_table()
     hw0, hw_src = bb_resolve_hw(svc, d, now_dt, fq0)
     row = next((a for a in traffic.alerts(book, P, now, {(svc, d): hw0} if hw0 else None) if a["id"] == alert), None)
+    cs = await cameras_state()
+    pt = e["cur"].get("center") or [e["cur"].get("lat"), e["cur"].get("lon")]
+    cam, cam_dist = nearest_camera(cs.get("cams") or [], pt[0] if pt else None, pt[1] if pt else None, P["camera_km"]) if pt else (None, None)
+    camera = {"id": cam["id"], "image": cam["link"], "dist_km": round(cam_dist, 2)} if cam else None
     out = {"alert": tr_alert_public(row) if row else None, "event": tr_event_public(e, now), "sched_hw": hw0, "sched_hw_src": hw_src, "buses": [], "impact": None, "regulation": None, "restore": None, "chart": None,
+           "camera": camera, "camera_error": cs.get("error") if not camera and not cs.get("cams") else None,
            "affected_services": [{"svc": k.split("|")[0], "dir": int(k.split("|")[1]), "pct": round(v["pct"], 1)} for k, v in sorted(e["match"].items(), key=lambda kv: (-kv[1]["pct"], kv[0]))][:40]}
     if TR["ridx"] is None or e["status"] != "active":
         out["recommendations"] = traffic.recommend(row or {"svc": svc, "dir": d}, None, None, None, None, P)

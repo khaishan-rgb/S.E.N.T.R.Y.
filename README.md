@@ -1,7 +1,25 @@
-# SG Transport Pulse V11.1 — Route Traffic + Departure Adjustment + Bunching, Gap & Alerts + AI Halfway Optimiser
+# SG Transport Pulse V11.2 — Route Traffic + Departure Adjustment + Bunching, Gap & Alerts + AI Halfway Optimiser
 
 Live bus positions, live LTA traffic drawn directly on the bus route, and next arrivals per stop.
 FastAPI backend + a single-page Leaflet frontend (OneMap basemap, OpenStreetMap fallback).
+
+## V11.2 - Less noise, a sortable delay column, a clearer route line, and LTA traffic camera images
+
+* **Noise: only material delays by default.** A congestion alert is hidden if its estimated traffic delay is under `min_delay_min` (default **3 min**; 0 shows every alert); this is a Settings value, editable per
+  deployment, and can be overridden per request (`min_delay=0` to see everything for a moment). Alerts with no delay estimate (incidents, road works, weather - the specification never invents one for these) are
+  unaffected, since there is nothing to threshold. The summary cards and totals count the same filtered set as the table, so the numbers always agree with what is listed.
+* **Sortable "Est. delay".** Click the column header to sort the work queue by estimated delay (a second click reverses it; a small arrow shows the direction); click "Risk" to go back to the default order
+  (unacknowledged, then severity, then number of services, then duration).
+* **Clearer route line.** The selected service's route on the map is now drawn with a dark casing, a white halo, then the blue line on top, with small direction arrows along it - legible over any basemap or
+  speed-band colour instead of a thin dashed line that blended into OneMap's blue tiles.
+* **LTA traffic camera images.** The Selected Alert Details panel now shows the nearest LTA traffic camera image (within `camera_km`, default 3 km, of the disruption's location) as a periodic snapshot, with the
+  camera id and its distance; captioned as a snapshot, not live video, since DataMall does not push a live feed. If the image link has expired or no camera is close enough, the panel says so instead of showing a
+  broken image. New setting `camera_km`.
+* **API.** `/api/traffic/overview` gains `min_delay` (float, optional); the result's `params` include `min_delay_min`. `/api/traffic/detail` gains `camera` ({id, image, dist_km}) and `camera_error`. Model `traffic-1.2`.
+
+**What I could not verify:** the camera endpoint path. LTA DataMall's traffic-image dataset has been named differently across guide versions, so the code tries `Traffic-Imagesv2`, then `v3/Traffic-Images`, then
+`TrafficImages` (override with `LTA_CAMERAS_PATH` if none of those match your account's guide) - the same fallback pattern already used for `TrafficSpeedBands`. I have no network access here to confirm which one
+LTA currently serves, so please check the camera photo appears after deploying, and tell me the working path if it needs a fourth candidate.
 
 ## V11.1 - Faster refresh, a browsable service dropdown, transport operator filter
 
