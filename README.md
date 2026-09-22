@@ -1,7 +1,23 @@
-# SG Transport Pulse V11.0 — Route Traffic + Departure Adjustment + Bunching, Gap & Alerts + AI Halfway Optimiser
+# SG Transport Pulse V11.1 — Route Traffic + Departure Adjustment + Bunching, Gap & Alerts + AI Halfway Optimiser
 
 Live bus positions, live LTA traffic drawn directly on the bus route, and next arrivals per stop.
 FastAPI backend + a single-page Leaflet frontend (OneMap basemap, OpenStreetMap fallback).
+
+## V11.1 - Faster refresh, a browsable service dropdown, transport operator filter
+
+* **Performance fix (the slow refresh).** Route matching was running on every candidate congestion stretch, not just the ones that had actually persisted into an alert - with a large
+  real speed-band feed most of that work was thrown away every cycle. It now only matches events once they are ACTIVE. `build_stretches` (scanning the whole speed-band feed for
+  jams) was also being recomputed from scratch every `refresh_s` (60 s) even though LTA only publishes a new speed-band snapshot every ~5 min; the result is now cached against that
+  snapshot and reused until it actually changes. Together these cut a warm refresh from over a second to well under 100 ms in testing at ~4x the real number of services, and the
+  first (cold) refresh dropped by about 4x. A refresh that is already stale when the person's request arrives, or the very first one after a restart, is still the one that pays
+  the real cost; everything after that is fast because the background loop (`tr_loop`) keeps the data warm.
+* **Service filter is a real dropdown.** The arrow button (or focusing the box) opens every service as a checklist (service, its directions, its operator), not just what has been
+  typed; picking one leaves the list open so several can be picked in a row, with a running count and a "clear selected" link. Typing still narrows the list live. Works the same
+  on a phone.
+* **Transport operator filter.** A new filter row next to Risk type lists every operator present in the data (SBST, SMRT, TTS, GAS, ...) as toggle buttons; picking one narrows both
+  the work queue and the service dropdown to that operator's services, and combines with a typed/picked service list (their intersection). Selection is saved like the other filters.
+  API: `/api/traffic/overview` takes `operators=SBST,SMRT`; `/api/traffic/services` now also returns each service's `operators` and the overall `operators` list.
+* **Model:** `traffic-1.1`.
 
 ## V11.0 - Traffic-Aware Regulation (new page **/traffic**, nav button *Traffic-Aware*)
 

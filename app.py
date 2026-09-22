@@ -21,7 +21,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 import headway
 import traffic
 
-VERSION = "V11.0"
+VERSION = "V11.1"
 LTA = os.getenv("LTA_BASE", "https://datamall2.mytransport.sg/ltaodataservice").rstrip("/")
 KEY = os.getenv("LTA_ACCOUNT_KEY", "")
 OSRM = os.getenv("OSRM_URL", "https://router.project-osrm.org").rstrip("/")
@@ -543,6 +543,7 @@ async def lifespan(app):
         asyncio.create_task(warm())
         bb_init()
         task = asyncio.create_task(bb_loop())
+        asyncio.create_task(tr_refresh(force=True))
         trtask = asyncio.create_task(tr_loop())
     yield
     if task is not None:
@@ -2066,7 +2067,7 @@ async def stop_suggest(q: str = Query("")):
 # =========================================================================== Traffic-Aware Regulation (the engine is traffic.py)
 EP_ROADWORKS = os.getenv("LTA_ROADWORKS_PATH", "RoadWorks")     # verify against the current DataMall user guide (road works / road openings)
 TTL_ROADWORKS = 600
-TR = {"params": dict(traffic.PARAMS), "book": traffic.new_book(), "last": 0.0, "ridx": None, "ridx_key": None, "feeds": {}, "lock": None, "rw": []}
+TR = {"params": dict(traffic.PARAMS), "book": traffic.new_book(), "last": 0.0, "ridx": None, "ridx_key": None, "feeds": {}, "lock": None, "rw": [], "stretch_cache": None}
 
 
 @app.get("/traffic", response_class=HTMLResponse)
@@ -2147,11 +2148,7 @@ async def tr_refresh(force=False):
         now = time.time()
         if not force and TR["last"] and now - TR["last"] < P["refresh_s"] * 0.9:
             return
-        st = await static()
-        bs = await bands_state()
-        inc = await api_incidents()
-        rain = await api_rain()
-        rw, rw_err = await tr_roadworks(now)
+        st, bs, inc, rain, (rw, rw_err) = await asyncio.gather(static(), bands_state(), api_incidents(), api_rain(), tr_roadworks(now))     # concurrent: a slow feed no longer holds up the others
         book = TR["book"]
         snap = int(CACHE["bands"][1]) if "bands" in CACHE else None
         count = traffic.counts(book, P, snap)
@@ -2167,8 +2164,15 @@ async def tr_refresh(force=False):
                  "routes": {"ok": TR["ridx"] is not None, "services": len({k[0] for k in st["routes"]}) if st["routes"] else 0}}
         # a feed that failed is skipped (never read as 'all clear'), so a broken feed cannot clear an active alert by mistake
         if bs.get("idx"):
-            landmarks = [(s["lat"], s["lon"], s["name"]) for s in st["stops"].values()]
-            stretches = await asyncio.to_thread(traffic.build_stretches, bs["idx"].segs, P, landmarks)
+            # build_stretches is the expensive part of a refresh; LTA speed bands only change every ~5 min (TTL_BANDS), so recomputing on
+            # every refresh_s (60s) cycle wastes most of that work. Reuse the last result while the underlying band snapshot is unchanged.
+            bkey = (id(bs["idx"]), len(st["stops"]))
+            if TR["stretch_cache"] and TR["stretch_cache"][0] == bkey:
+                stretches = TR["stretch_cache"][1]
+            else:
+                landmarks = [(s["lat"], s["lon"], s["name"]) for s in st["stops"].values()]
+                stretches = await asyncio.to_thread(traffic.build_stretches, bs["idx"].segs, P, landmarks)
+                TR["stretch_cache"] = (bkey, stretches)
             traffic.update_congestion(book, stretches, now, P, count)
             feeds["bands"]["stretches"] = len(stretches)
         if not inc.get("error"):
@@ -2186,6 +2190,23 @@ async def tr_refresh(force=False):
             await asyncio.to_thread(traffic.refresh_matches, book, TR["ridx"], P)
         TR["last"], TR["feeds"] = now, feeds
         tr_save()
+
+
+async def tr_ensure_fresh(force):
+    """Kick tr_refresh if the data is stale, WITHOUT making the caller wait for a slow LTA round trip: a refresh already running is left to finish on its own (the caller uses
+    whatever is in TR now), and a fresh one is only started in the background. The single exception is the very first request after startup, which has nothing to show yet:
+    that one waits, but never more than a few seconds, so the page always answers quickly even while LTA is slow."""
+    P = TR["params"]
+    stale = force or not TR["last"] or (time.time() - TR["last"] >= P["refresh_s"] * 0.9)
+    if not stale or (TR["lock"] is not None and TR["lock"].locked()):
+        return
+    first = TR["last"] == 0
+    task = asyncio.create_task(tr_refresh(force=True))
+    if first:
+        try:
+            await asyncio.wait_for(asyncio.shield(task), timeout=6.0)
+        except Exception:
+            pass
 
 
 async def tr_loop():
@@ -2242,10 +2263,19 @@ async def tr_hw_map(rows, now_dt):
 
 
 @app.get("/api/traffic/overview")
-async def api_tr_overview(services: str = "", direction: int = 0, horizon: int = 0, types: str = "", status: str = "", refresh: int = 0):
-    await tr_refresh(force=bool(refresh))
+async def api_tr_overview(services: str = "", direction: int = 0, horizon: int = 0, types: str = "", status: str = "", operators: str = "", refresh: int = 0):
+    await tr_ensure_fresh(bool(refresh))
     P, book, now = TR["params"], TR["book"], time.time()
     svcs = [s for s in re.split(r"[,\s]+", services.upper()) if s]
+    ops = {o for o in re.split(r"[,\s]+", operators.upper()) if o}
+    if ops:
+        fq = await freq_table()
+        op_svcs = {svc for (svc, d), r in fq["freqs"].items() if r["Operator"] in ops}
+        svcs = sorted(set(svcs) & op_svcs) if svcs else sorted(op_svcs)
+        if not svcs:                                                # named operator(s) run no service the person typed, or (with none typed) no service at all
+            return {"rows": [], "cards": {k: {"events": 0, "services": 0, "unacknowledged": 0, "vs_last_hour": 0} for k in traffic.KINDS}, "total": {"services": 0, "alerts": 0, "unacknowledged": 0},
+                    "events": [], "feeds": TR["feeds"], "updated": tr_hhmm(TR["last"]), "updated_epoch": TR["last"], "refresh_s": P["refresh_s"], "model": traffic.MODEL_VERSION, "updates": book.get("updates", 0),
+                    "params": {k: P[k] for k in ("persist_updates", "clear_updates", "min_len_m", "congest_kmh", "very_slow_kmh", "normal_kmh")}, "now": tr_hhmm(now)}
     kinds = [k for k in re.split(r"[,\s]+", types.lower()) if k in traffic.KINDS] or list(traffic.KINDS)
     stat = [k for k in re.split(r"[,\s]+", status.lower()) if k in ("unacknowledged", "acknowledged", "cleared")] or ["unacknowledged", "acknowledged"]
     full = traffic.overview(book, P, now, svcs, direction, max(0, min(int(horizon), 120)), kinds, stat)
@@ -2253,18 +2283,22 @@ async def api_tr_overview(services: str = "", direction: int = 0, horizon: int =
     ov = traffic.overview(book, P, now, svcs, direction, max(0, min(int(horizon), 120)), kinds, stat, hw)
     ids = {a["event"] for a in ov["rows"]}
     return {"rows": [tr_alert_public(a) for a in ov["rows"]], "cards": ov["cards"], "total": ov["total"], "events": [tr_event_public(book["events"][i], now) for i in ids if i in book["events"]],
-            "feeds": TR["feeds"], "updated": tr_hhmm(TR["last"]), "updated_epoch": TR["last"], "refresh_s": P["refresh_s"], "model": traffic.MODEL_VERSION, "updates": book["updates"],
+            "feeds": TR["feeds"], "updated": tr_hhmm(TR["last"]), "updated_epoch": TR["last"], "loading": TR["last"] == 0, "refresh_s": P["refresh_s"], "model": traffic.MODEL_VERSION, "updates": book["updates"],
             "params": {k: P[k] for k in ("persist_updates", "clear_updates", "min_len_m", "congest_kmh", "very_slow_kmh", "normal_kmh")}, "now": tr_hhmm(now)}
 
 
 @app.get("/api/traffic/services")
 async def api_tr_services():
     st = await static()
+    fq = await freq_table()
     out = []
+    ops = set()
     for svc, dirs in st["dirs"].items():
-        out.append({"svc": svc, "dirs": dirs})
+        svc_ops = sorted({fq["freqs"][(svc, d)]["Operator"] for d in dirs if (svc, d) in fq["freqs"] and fq["freqs"][(svc, d)]["Operator"]})
+        ops.update(svc_ops)
+        out.append({"svc": svc, "dirs": dirs, "operators": svc_ops})
     out.sort(key=lambda x: (not x["svc"][:1].isdigit(), int(re.match(r"\d+", x["svc"]).group()) if re.match(r"\d+", x["svc"]) else 0, x["svc"]))
-    return {"services": out}
+    return {"services": out, "operators": sorted(ops)}
 
 
 @app.get("/api/traffic/route")
@@ -2283,7 +2317,7 @@ async def api_tr_route(service: str = "", direction: int = 1):
 @app.get("/api/traffic/detail")
 async def api_tr_detail(alert: str = "", current_hw: str = ""):
     """The selected alert: the disruption, the buses relative to it, the headway they will make, and the regulation the simulator recommends."""
-    await tr_refresh()
+    await tr_ensure_fresh(False)
     P, book, now = TR["params"], TR["book"], time.time()
     parts = alert.split(":")
     if len(parts) != 3 or parts[0] not in book["events"] or f"{parts[1]}|{parts[2]}" not in book["events"][parts[0]]["match"]:

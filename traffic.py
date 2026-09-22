@@ -10,7 +10,7 @@ Everything is deterministic and decision support only.
 """
 import math
 
-MODEL_VERSION = "traffic-1.0"
+MODEL_VERSION = "traffic-1.1"
 EPS = 1e-9
 
 PARAMS = {
@@ -564,9 +564,12 @@ def rain_cells(stations, P):
 
 
 def refresh_matches(book, ridx, P):
-    """Layer 2: for every live event, which service + direction it affects and how much of the route. An event that touches no bus route is not a bus alert and is dropped."""
+    """Layer 2: for every live event, which service + direction it affects and how much of the route. An event that touches no bus route is not a bus alert and is dropped.
+    Only ACTIVE events are matched (never mere candidates): route matching is the expensive part of a refresh, and most congestion candidates are noise that never persists into an
+    alert, so matching them would be pure waste, repeated every cycle. A candidate is matched for the first time on the very refresh it gets promoted to active (update_congestion /
+    update_points / update_weather run before this, so a newly promoted event already has status 'active' by the time this runs)."""
     for e in book["events"].values():
-        if e["status"] not in ("active", "candidate"):
+        if e["status"] != "active":
             continue
         c = e["cur"]
         if e["kind"] == "congestion":

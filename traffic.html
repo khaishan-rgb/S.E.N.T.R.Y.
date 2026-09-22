@@ -95,6 +95,9 @@ td{padding:8px;border-bottom:1px solid #12304d;vertical-align:middle}
 @media(max-width:640px){.cards{grid-template-columns:repeat(2,minmax(0,1fr))}.brand h1{font-size:20px}#trMap{height:380px}.legend{max-width:150px;font-size:11.5px}}
 .evl{position:absolute;transform:translate(-50%,-150%);white-space:nowrap;background:#5a1119ee;border:1px solid #ff4d55;color:#fff;padding:3px 8px;border-radius:7px;font-size:11.5px;font-weight:700;pointer-events:none}
 .leaflet-container{background:#0c1b30;font-family:var(--font)}.leaflet-popup-content-wrapper{background:#0a1a2e;color:#eaf3ff;border:1px solid #2a6fbf}.leaflet-popup-tip{background:#0a1a2e}
+
+.sug.browse{max-height:340px}.sug label{display:flex;align-items:center;gap:8px;padding:6px 10px;cursor:pointer;margin:0}.sug label:hover,.sug label.on{background:#12406e}.sug label input{margin:0}.sug label .d{color:var(--mut);font-size:11.5px;margin-left:auto}
+.sug .sughead{position:sticky;top:0;background:var(--panel2);padding:6px 10px;font-size:11.5px;color:var(--mut);border-bottom:1px solid var(--line2);display:flex;justify-content:space-between}.sug .sughead a{color:var(--cyan);cursor:pointer;text-decoration:none}
 </style>
 </head>
 <body>
@@ -108,10 +111,11 @@ td{padding:8px;border-bottom:1px solid #12304d;vertical-align:middle}
 
   <main id="monitor">
     <div class="filters" id="filters">
-      <div class="fl svcbox"><label for="svcIn">Services (multi-select)</label><div class="chips" id="svcChips"></div><input class="inp" id="svcIn" autocomplete="off" placeholder="All services &ndash; type 32, 33, 51 &#8629;" aria-label="Services"><div class="sug" id="svcSug" hidden></div></div>
+      <div class="fl svcbox"><label for="svcIn">Services (multi-select)</label><div class="chips" id="svcChips"></div><div style="display:flex;gap:6px"><input class="inp" id="svcIn" autocomplete="off" placeholder="Type to search, or browse &#9662;" aria-label="Services" style="flex:1" role="combobox" aria-expanded="false" aria-controls="svcSug"><button class="btn sm" id="svcBrowse" type="button" title="Browse all services" aria-label="Browse all services" aria-expanded="false">&#9662;</button></div><div class="sug" id="svcSug" hidden role="listbox" aria-label="Services" aria-multiselectable="true"></div></div>
       <div class="fl"><label for="fDir">Direction</label><select class="sel" id="fDir"><option value="0">Both</option><option value="1">Direction 1</option><option value="2">Direction 2</option></select></div>
       <div class="fl"><label for="fHor">Time horizon</label><select class="sel" id="fHor"><option value="0">Current</option><option value="30">Next 30 min</option><option value="60">Next 60 min</option><option value="120">Next 120 min</option></select></div>
       <div class="fl"><label>Risk type</label><div class="typebtns" id="typeBtns"><button class="tb" data-k="congestion" aria-pressed="true">&#128663; Congestion</button><button class="tb" data-k="incident" aria-pressed="true">&#9888;&#65039; Incident</button><button class="tb" data-k="roadworks" aria-pressed="true">&#128679; Road Works</button><button class="tb" data-k="weather" aria-pressed="true">&#127783;&#65039; Weather</button></div></div>
+      <div class="fl"><label>Transport operator</label><div class="typebtns" id="opBtns"></div></div>
       <div class="fl"><label>Status</label><div class="statbtns" id="statBtns"><button class="tb" data-s="unacknowledged" aria-pressed="true">Unacknowledged</button><button class="tb" data-s="acknowledged" aria-pressed="true">Acknowledged</button><button class="tb" data-s="cleared" aria-pressed="false">Cleared</button></div></div>
       <div class="fl" style="flex:1;min-width:190px"><label for="fQ">Search</label><input class="inp" id="fQ" placeholder="Service / road / location&hellip;" aria-label="Search"></div>
     </div>
@@ -146,7 +150,7 @@ td{padding:8px;border-bottom:1px solid #12304d;vertical-align:middle}
     <div class="card" style="margin-top:12px"><h2>Data feeds</h2><div id="feedList" class="ho-note"></div></div>
     <div class="card" style="margin-top:12px"><h2>Acknowledgement log</h2><div class="tw"><table id="logTab"></table></div></div>
   </main>
-  <footer class="ho-note" style="margin-top:14px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px"><span>SG Transport Pulse V11.0 &nbsp;|&nbsp; For Operational Control Centre use only</span><span id="engine"></span></footer>
+  <footer class="ho-note" style="margin-top:14px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px"><span>SG Transport Pulse V11.1 &nbsp;|&nbsp; For Operational Control Centre use only</span><span id="engine"></span></footer>
 </div>
 <div class="ov" id="ov" hidden><div class="modal" role="dialog" aria-modal="true" aria-labelledby="mTitle"><h3 id="mTitle">Acknowledge</h3><div id="mBody"></div><div class="fl" style="margin-top:10px"><label for="mBy">Acknowledged by</label><input class="inp" id="mBy" maxlength="40" placeholder="Your name / ID"></div><div class="btns"><button class="btn" id="mNo" type="button">Cancel</button><button class="btn go" id="mYes" type="button">Acknowledge</button></div></div></div>
 <div id="toast" role="status" aria-live="polite"></div>
@@ -168,17 +172,40 @@ async function postJSON(u, body){ try{ const r = await fetch(u, {method:"POST", 
 const KINDS = ["congestion", "incident", "roadworks", "weather"];
 const KLAB = {congestion:"Congestion", incident:"Incident", roadworks:"Road Works", weather:"Weather"};
 const KIC = {congestion:"\u{1F697}", incident:"\u26A0\uFE0F", roadworks:"\u{1F6A7}", weather:"\u{1F327}\uFE0F"};
-const S = {svc:LS.get("tr.svc", []), dir:LS.get("tr.dir", 0), hor:LS.get("tr.hor", 0), kinds:new Set(LS.get("tr.kinds", KINDS)), stat:new Set(LS.get("tr.stat", ["unacknowledged", "acknowledged"])), q:"", data:null, ev:{}, sel:null, detail:null,
+const S = {svc:LS.get("tr.svc", []), dir:LS.get("tr.dir", 0), hor:LS.get("tr.hor", 0), kinds:new Set(LS.get("tr.kinds", KINDS)), stat:new Set(LS.get("tr.stat", ["unacknowledged", "acknowledged"])), ops:new Set(LS.get("tr.ops", [])), allOps:[], q:"", data:null, ev:{}, sel:null, detail:null,
            shown:10, by:LS.get("tr.by", ""), curhw:"", tok:0, dtok:0, all:[], routes:{}, next:0, timer:null, mapReady:false, routeKey:null};
-const qs = () => new URLSearchParams({services:S.svc.join(","), direction:S.dir, horizon:S.hor, types:[...S.kinds].join(","), status:[...S.stat].join(",")});
+const qs = () => new URLSearchParams({services:S.svc.join(","), direction:S.dir, horizon:S.hor, types:[...S.kinds].join(","), status:[...S.stat].join(","), operators:[...S.ops].join(",")});
 
 /* ---------------------------------------------------------------- filters */
-function saveF(){ LS.set("tr.svc", S.svc); LS.set("tr.dir", S.dir); LS.set("tr.hor", S.hor); LS.set("tr.kinds", [...S.kinds]); LS.set("tr.stat", [...S.stat]); }
+function saveF(){ LS.set("tr.svc", S.svc); LS.set("tr.dir", S.dir); LS.set("tr.hor", S.hor); LS.set("tr.kinds", [...S.kinds]); LS.set("tr.stat", [...S.stat]); LS.set("tr.ops", [...S.ops]); }
 function renderChips(){ $("svcChips").innerHTML = S.svc.map(s => `<span class="chip">${esc(s)}<button type="button" data-rm="${esc(s)}" aria-label="Remove service ${esc(s)}">&times;</button></span>`).join(""); $("svcChips").querySelectorAll("button").forEach(b => b.onclick = () => { S.svc = S.svc.filter(x => x !== b.dataset.rm); saveF(); renderChips(); load(); }); }
-function addSvc(tokens){ let add = false; tokens.forEach(t => { t = t.trim().toUpperCase().replace(/[^A-Z0-9]/g, ""); if(t && !S.svc.includes(t)){ S.svc.push(t); add = true; } }); if(add){ saveF(); renderChips(); load(); } $("svcIn").value = ""; $("svcSug").hidden = true; }
-$("svcIn").addEventListener("keydown", e => { if(e.key === "Enter" || e.key === ","){ e.preventDefault(); addSvc($("svcIn").value.split(/[\s,]+/)); } else if(e.key === "Backspace" && !$("svcIn").value && S.svc.length){ S.svc.pop(); saveF(); renderChips(); load(); } });
-$("svcIn").addEventListener("input", () => { const v = $("svcIn").value.trim().toUpperCase(); if(/[\s,]$/.test($("svcIn").value)){ addSvc($("svcIn").value.split(/[\s,]+/)); return; } const m = v ? S.all.filter(x => x.svc.startsWith(v) && !S.svc.includes(x.svc)).slice(0, 12) : []; $("svcSug").innerHTML = m.map(x => `<div data-s="${esc(x.svc)}">${esc(x.svc)} <span class="sub">Dir ${x.dirs.join(", ")}</span></div>`).join(""); $("svcSug").hidden = !m.length; $("svcSug").querySelectorAll("div").forEach(d => d.onclick = () => addSvc([d.dataset.s])); });
-$("svcIn").addEventListener("blur", () => setTimeout(() => { if($("svcIn").value.trim()) addSvc($("svcIn").value.split(/[\s,]+/)); $("svcSug").hidden = true; }, 180));
+function addSvc(tokens, keepOpen){ let add = false; tokens.forEach(t => { t = t.trim().toUpperCase().replace(/[^A-Z0-9]/g, ""); if(t && !S.svc.includes(t)){ S.svc.push(t); add = true; } }); if(add){ saveF(); renderChips(); load(); } if(!keepOpen){ $("svcIn").value = ""; closeSug(); } }
+function eligibleServices(){ return S.ops.size ? S.all.filter(x => x.operators.some(o => S.ops.has(o))) : S.all; }
+function sugHead(m){ return `<div class="sughead"><span>${m.length} service${m.length === 1 ? "" : "s"}${S.ops.size ? " (" + [...S.ops].join(", ") + ")" : ""}</span>${S.svc.length ? `<a id="sugClear">clear selected (${S.svc.length})</a>` : ""}</div>`; }
+function bindSugHead(browse){ const cl = $("sugClear"); if(cl) cl.onclick = () => { S.svc = []; saveF(); renderChips(); load(); refreshSugHead(browse); }; }
+function refreshSugHead(browse){ const head = $("svcSug").querySelector(".sughead"); if(head) head.outerHTML = sugHead(S._sugM || []); bindSugHead(browse); }
+function openSug(browse){
+  const v = $("svcIn").value.trim().toUpperCase();
+  const pool = eligibleServices();
+  const m = browse || !v ? pool : pool.filter(x => x.svc.startsWith(v));
+  if(!m.length && !browse){ closeSug(); return; }
+  S._sugM = m;
+  $("svcSug").innerHTML = sugHead(m) + m.slice(0, 400).map(x => `<label><input type="checkbox" data-s="${esc(x.svc)}" ${S.svc.includes(x.svc) ? "checked" : ""}> ${esc(x.svc)}<span class="d">Dir ${x.dirs.join(", ")}${x.operators.length ? " \u00b7 " + esc(x.operators.join("/")) : ""}</span></label>`).join("");
+  $("svcSug").classList.toggle("browse", !!browse || !v);
+  $("svcSug").hidden = false; $("svcIn").setAttribute("aria-expanded", "true"); $("svcBrowse").setAttribute("aria-expanded", "true");
+  $("svcSug").querySelectorAll("input[type=checkbox]").forEach(cb => cb.onchange = () => { if(cb.checked) addSvc([cb.dataset.s], true); else { S.svc = S.svc.filter(x => x !== cb.dataset.s); saveF(); renderChips(); load(); } cb.closest("label").classList.toggle("on", cb.checked); refreshSugHead(browse); });
+  bindSugHead(browse);
+}
+function closeSug(){ $("svcSug").hidden = true; $("svcIn").setAttribute("aria-expanded", "false"); $("svcBrowse").setAttribute("aria-expanded", "false"); }
+$("svcBrowse").onclick = () => { if($("svcSug").hidden) openSug(true); else closeSug(); };
+$("svcIn").addEventListener("focus", () => openSug($("svcIn").value.trim() === ""));
+$("svcIn").addEventListener("keydown", e => { if(e.key === "Enter" || e.key === ","){ e.preventDefault(); addSvc($("svcIn").value.split(/[\s,]+/)); } else if(e.key === "Escape"){ closeSug(); } else if(e.key === "Backspace" && !$("svcIn").value && S.svc.length){ S.svc.pop(); saveF(); renderChips(); load(); } });
+$("svcIn").addEventListener("input", () => { if(/[\s,]$/.test($("svcIn").value)){ addSvc($("svcIn").value.split(/[\s,]+/), true); return; } openSug(false); });
+document.addEventListener("click", e => { if(!$("svcSug").hidden && !e.target.closest(".svcbox")) closeSug(); });
+function renderOpBtns(){
+  $("opBtns").innerHTML = S.allOps.length ? S.allOps.map(o => `<button class="tb" data-o="${esc(o)}" aria-pressed="${S.ops.has(o)}">${esc(o)}</button>`).join("") : `<span class="sub">No operator data yet</span>`;
+  $("opBtns").querySelectorAll(".tb").forEach(b => b.onclick = () => { const o = b.dataset.o; if(S.ops.has(o)) S.ops.delete(o); else S.ops.add(o); saveF(); renderOpBtns(); load(); });
+}
 $("fDir").value = S.dir; $("fHor").value = S.hor;
 $("fDir").onchange = e => { S.dir = +e.target.value; saveF(); load(); };
 $("fHor").onchange = e => { S.hor = +e.target.value; saveF(); load(); };
@@ -187,24 +214,26 @@ function syncStatBtns(){ document.querySelectorAll("#statBtns .tb").forEach(b =>
 document.querySelectorAll("#typeBtns .tb").forEach(b => b.onclick = () => { const k = b.dataset.k; if(S.kinds.has(k)) S.kinds.delete(k); else S.kinds.add(k); if(!S.kinds.size) KINDS.forEach(x => S.kinds.add(x)); syncTypeBtns(); saveF(); load(); });
 document.querySelectorAll("#statBtns .tb").forEach(b => b.onclick = () => { const k = b.dataset.s; if(S.stat.has(k)) S.stat.delete(k); else S.stat.add(k); if(!S.stat.size) ["unacknowledged", "acknowledged"].forEach(x => S.stat.add(x)); syncStatBtns(); saveF(); load(); });
 $("fQ").oninput = e => { S.q = e.target.value.trim().toLowerCase(); S.shown = 10; renderTable(); };
-renderChips(); syncTypeBtns(); syncStatBtns();
+renderChips(); syncTypeBtns(); syncStatBtns(); renderOpBtns();
 
 /* ---------------------------------------------------------------- data */
 async function load(force){
   const tok = ++S.tok; clearTimeout(S.timer);
   setLive("warn", "Updating\u2026");
-  const j = await getJSON("/api/traffic/overview?" + qs() + (force ? "&refresh=1" : ""), 90000);
+  const t0 = performance.now();
+  const j = await getJSON("/api/traffic/overview?" + qs() + (force ? "&refresh=1" : ""), 20000);           // the server never makes this wait on a slow LTA round trip (except the very first load ever)
   if(tok !== S.tok) return;
-  if(j.error){ setLive("bad", "Error", j.error); $("feedBanner").hidden = false; $("feedBanner").textContent = j.error; schedule(20); return; }
+  if(j.error){ setLive("bad", "Error", j.error); $("feedBanner").hidden = false; $("feedBanner").textContent = j.error; schedule(10); return; }
   S.data = j; S.ev = Object.fromEntries((j.events || []).map(e => [e.id, e]));
   const bad = Object.entries(j.feeds || {}).filter(([k, v]) => !v.ok);
-  $("feedBanner").hidden = !bad.length; $("feedBanner").innerHTML = bad.map(([k, v]) => `\u26A0 ${esc({bands:"Traffic speed bands", incidents:"Traffic incidents", roadworks:"Road works", rain:"Rainfall", routes:"Bus routes"}[k] || k)} feed unavailable${v.error ? ": " + esc(v.error) : ""}. Its alerts are held, not cleared.`).join("<br>");
-  setLive(bad.length ? "warn" : "ok", bad.length ? "Some feeds unavailable" : "Live Data (LTA DataMall)", "Last refresh " + (j.updated || "?"));
+  $("feedBanner").hidden = !bad.length && !j.loading; $("feedBanner").innerHTML = j.loading ? "\u23F3 Loading disruption data for the first time \u2013 this can take a few seconds while LTA is queried\u2026" :
+    bad.map(([k, v]) => `\u26A0 ${esc({bands:"Traffic speed bands", incidents:"Traffic incidents", roadworks:"Road works", rain:"Rainfall", routes:"Bus routes"}[k] || k)} feed unavailable${v.error ? ": " + esc(v.error) : ""}. Its alerts are held, not cleared.`).join("<br>");
+  setLive(j.loading ? "warn" : bad.length ? "warn" : "ok", j.loading ? "Loading\u2026" : bad.length ? "Some feeds unavailable" : "Live Data (LTA DataMall)", "Last refresh " + (j.updated || "?") + " \u00b7 answered in " + Math.round(performance.now() - t0) + "ms");
   $("engine").textContent = "Engine " + j.model + " \u00b7 " + j.updates + " updates";
   if(S.sel && !(j.rows || []).some(r => r.id === S.sel)) { S.sel = null; S.detail = null; }
   if(!S.sel && (j.rows || []).length && !S.autoSelDone){ S.autoSelDone = true; }
   renderCards(); renderTable(); drawMap(); renderDetailAll();
-  schedule(Math.min(30, j.refresh_s || 60));
+  schedule(j.loading || force ? 3 : Math.min(30, j.refresh_s || 60));                                       // still loading, or just asked for a manual refresh: check back again soon rather than waiting a full cycle
   if(S.sel) loadDetail();
 }
 function schedule(s){ S.next = Date.now() + s * 1000; clearTimeout(S.timer); S.timer = setTimeout(() => load(false), s * 1000); }
@@ -471,7 +500,7 @@ $("tabMon").onclick = () => showTab("mon"); $("tabSet").onclick = () => showTab(
 
 /* ---------------------------------------------------------------- start */
 (async function start(){
-  const sv = await getJSON("/api/traffic/services", 30000); S.all = sv.services || [];
+  const sv = await getJSON("/api/traffic/services", 30000); S.all = sv.services || []; S.allOps = sv.operators || []; renderOpBtns();
   initMap(); load(false);
 })();
 </script>
