@@ -21,7 +21,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 import headway
 import traffic
 
-VERSION = "V13.3"
+VERSION = "V13.4"
 LTA = os.getenv("LTA_BASE", "https://datamall2.mytransport.sg/ltaodataservice").rstrip("/")
 KEY = os.getenv("LTA_ACCOUNT_KEY", "")
 OSRM = os.getenv("OSRM_URL", "https://router.project-osrm.org").rstrip("/")
@@ -996,7 +996,6 @@ BB_MAX_PAIRS = int(os.getenv("BUNCHING_MAX_PAIRS", "40"))
 BB_ADMIN = os.getenv("BUNCHING_ADMIN_TOKEN", "") or TT_TOKEN
 BB_IDLE_SEC = 600                     # stop polling LTA when nobody has looked at the page for 10 min
 BB_ALWAYS = os.getenv("BUNCHING_ALWAYS_ON", "").strip().lower() in ("1", "true", "yes")   # keep polling with nobody watching, so the event log keeps filling
-RT_ALWAYS = os.getenv("RUNNING_TIME_ALWAYS_ON", "1").strip().lower() in ("1", "true", "yes")  # Running Time Analytics builds observations continuously
 BB = {"params": dict(bunching.PARAMS), "labels": {}, "master": [], "rows": {}, "watch": {}, "hist": deque(maxlen=900), "trk": {}, "open": {}, "seq": 0,
       "last_req": 0.0, "cycle": {"at": None, "took": None, "pairs": 0}, "loop_at": 0.0, "db_ok": True, "db_err": None}
 BB_INT_PARAMS = ("confirm_stops", "gap_stops", "alert_step", "refresh_sec", "horizon_min")
@@ -1042,6 +1041,7 @@ def bb_init():
                     for r in bb_sql("SELECT * FROM service_headway_config ORDER BY service, direction, t_from", fetch=True)]
     ho_init()
     os_init()
+    in_init()
     rt_init()
     tr_init()
 
@@ -1155,13 +1155,16 @@ async def bb_eval(svc, d, now, st, fq):
     trk.gap_sec = max(150, 3 * int(BB["params"]["refresh_sec"]))                     # no update for this long = polling was paused: forget everything
     ts = now.timestamp()
     trk.update(ts, buses, prep["km"])
-    rt_observe(svc, d, ts, buses, stops, prep["stop_s"])
     res = bunching.evaluate({"service": svc, "direction": d, "stop_s": prep["stop_s"], "stop_names": [s["name"] for s in stops], "route_km": prep["km"], "buses": buses,
                              "stop_labels": [f"{s['name']} ({s['code']})" if s.get("code") else s["name"] for s in stops],
                              "tm": tm, "H": H, "H_src": H_src, "prior": trk.prior(), "prior_gap": trk.prior_gap(),
                              "prior_last": trk.prior_last(), "prior_last_gap": trk.prior_last_gap(), "now_ts": ts}, BB["params"])
     BB["labels"][key] = [f"{s['name']} ({s['code']})" if s.get("code") else s["name"] for s in stops]
     trk.commit(res.pop("bunched_pairs", {}), res.pop("long_pairs", {}), ts)
+    try:
+        rt_track(key, svc, d, ts, buses, prep["stop_s"], prep["km"])                 # running-time observations for /running-time
+    except Exception:
+        pass
     res.pop("score_parts", None)
     res.update(key=key, stops=len(stops), route_km=round(prep["km"], 1), updated=now.isoformat(timespec="seconds"), at=ts, busError=b.get("error"), traffic_ok=tm is not None)
     return res
@@ -1357,7 +1360,7 @@ async def bb_loop():
     while True:
         t0 = time.time()
         try:
-            if BB_ALWAYS or RT_ALWAYS or t0 - BB["last_req"] < BB_IDLE_SEC:
+            if BB_ALWAYS or t0 - BB["last_req"] < BB_IDLE_SEC:
                 await bb_cycle()
             elif BB["open"]:
                 bb_close_all()
@@ -2178,199 +2181,441 @@ async def os_plan(g, res, svc, d, bus, dims):
             "sources": {"routing": OSRM, "restrictions": "OpenStreetMap (Overpass) - community data, not an authoritative clearance register", "traffic": "LTA speed bands, incidents, road works"}}
 
 
-# ----------------------------------------------------------------------------- RUNNING TIME ANALYTICS - DataMall observation engine (/insight)
-import statistics as _rt_st
+# ----------------------------------------------------------------------------- V13.3 PROJECT INSIGHT - running time analytics (/insight)
+import insight
+import gzip
+import base64
 
-RT_SESSION = str(int(time.time()))
-RT_STATE = {}  # (service,direction,tracker-id) -> last observation
+IN_CACHE = {}          # dataset id -> (trips, info) parsed on demand
+
+
+RT = {"trk": {}, "saved": 0, "last": None}          # live running-time collection, built from the bunching collector's bus tracks
+RT_MIN_COVER = 0.82                                  # a trip must be observed over at least this share of the route to be stored
+RT_KEEP_DAYS = float(os.getenv("RT_KEEP_DAYS", "120"))
 
 
 def rt_init():
-    """Persistent observation store. No uploaded/synthetic schedule data is used."""
-    bb_sql("CREATE TABLE IF NOT EXISTS rt_passage(id INTEGER PRIMARY KEY AUTOINCREMENT, service TEXT, direction INTEGER, journey TEXT, seq INTEGER, stop_code TEXT, stop_name TEXT, ts REAL, quality TEXT, source TEXT, UNIQUE(journey,seq))")
-    bb_sql("CREATE INDEX IF NOT EXISTS idx_rt_passage_svc ON rt_passage(service,direction,ts,seq)")
-    bb_sql("CREATE TABLE IF NOT EXISTS rt_important(service TEXT, direction INTEGER, seq INTEGER, stop_code TEXT, PRIMARY KEY(service,direction,seq))")
-    bb_sql("CREATE TABLE IF NOT EXISTS rt_meta(k TEXT PRIMARY KEY, v TEXT)")
-    if not bb_sql("SELECT v FROM rt_meta WHERE k='collector_started'", fetch=True):
-        bb_sql("INSERT OR REPLACE INTO rt_meta(k,v) VALUES('collector_started',?)", (str(time.time()),))
+    bb_sql("CREATE TABLE IF NOT EXISTS rt_trip(id INTEGER PRIMARY KEY AUTOINCREMENT, service TEXT, direction INTEGER, day_type TEXT, date TEXT, start_ts REAL, end_ts REAL, "
+           "rt_min REAL, cover REAL, n_obs INTEGER, marks TEXT)")
+    bb_sql("CREATE INDEX IF NOT EXISTS rt_trip_i ON rt_trip(service, direction, start_ts)")
+    bb_sql("CREATE TABLE IF NOT EXISTS rt_sched(id INTEGER PRIMARY KEY AUTOINCREMENT, service TEXT, direction INTEGER, day_type TEXT, t_from TEXT, t_to TEXT, rt_min REAL, by_name TEXT, ts REAL)")
 
 
-def _rt_nearest_seq(s_km, stop_s):
-    if not stop_s: return 0
-    return min(range(len(stop_s)), key=lambda i: abs(stop_s[i]-s_km)) + 1
-
-
-def rt_observe(svc, direction, ts, buses, stops, stop_s):
-    """Reuse stable IDs assigned by the existing bunching Tracker; interpolate passage times across sequence transitions."""
+def rt_track(key, svc, d, ts, buses, stop_s, route_km):
+    """Follow every tracked bus along the route; when one completes the route, store the trip with its crossing time at each stop.
+    Running time here is MEASURED from live positions (LTA DataMall), not from a timetable feed."""
+    if not buses or route_km <= 0.5:
+        return
+    T = RT["trk"].setdefault(key, {})
+    seen = set()
     for b in buses:
-        bid = str(b.get("id") or "")
-        if not bid: continue
-        seq = _rt_nearest_seq(float(b.get("s_km") or 0), stop_s)
-        if seq < 1 or seq > len(stops): continue
-        key=(svc,int(direction),bid)
-        cur={"seq":seq,"ts":float(ts),"s":float(b.get("s_km") or 0)}
-        prev=RT_STATE.get(key)
-        journey=f"{svc}:{direction}:{RT_SESSION}:{bid}"
-        if prev is None:
-            st=stops[seq-1]
-            bb_sql("INSERT OR IGNORE INTO rt_passage(service,direction,journey,seq,stop_code,stop_name,ts,quality,source) VALUES(?,?,?,?,?,?,?,?,?)",
-                   (svc,direction,journey,seq,st.get('code',''),st.get('name',''),ts,'MEDIUM','DataMall BusArrival tracker'))
-        elif seq > prev['seq']:
-            jump=seq-prev['seq']; dt=ts-prev['ts']
-            if dt <= 900 and jump <= max(12, bunching.max_stops_moved(dt)):
-                # Linear interpolation between the two observed route positions. Exact GPS stop passage is unavailable in DataMall.
-                for q in range(prev['seq']+1, seq+1):
-                    f=(q-prev['seq'])/jump
-                    pts=prev['ts']+f*dt
-                    st=stops[q-1]
-                    quality='HIGH' if jump==1 and dt<=90 else ('MEDIUM' if dt<=240 else 'LOW')
-                    bb_sql("INSERT OR IGNORE INTO rt_passage(service,direction,journey,seq,stop_code,stop_name,ts,quality,source) VALUES(?,?,?,?,?,?,?,?,?)",
-                           (svc,direction,journey,q,st.get('code',''),st.get('name',''),pts,quality,'DataMall BusArrival tracker'))
-        elif seq < prev['seq']-2:
-            # Tracker mismatch / new physical journey: do not stitch backwards.
-            journey=f"{svc}:{direction}:{RT_SESSION}:{bid}:{int(ts)}"
-        RT_STATE[key]=cur
+        bid = b.get("id")
+        if not bid:
+            continue
+        seen.add(bid)
+        t = T.setdefault(bid, {"pts": [], "svc": svc, "dir": d})
+        if t["pts"] and ts - t["pts"][-1][0] > 420:                      # a long gap in polling: the track cannot be trusted any more
+            t["pts"] = []
+        if not t["pts"] or b["s_km"] >= t["pts"][-1][1] - 0.05:
+            t["pts"].append((ts, float(b["s_km"])))
+    for bid in list(T):
+        t = T[bid]
+        done = bid not in seen
+        pts = t["pts"]
+        if not pts:
+            if done:
+                T.pop(bid, None)
+            continue
+        finished = pts[-1][1] >= route_km - 0.35
+        if not (done or finished):
+            continue
+        rt_store(svc, d, pts, stop_s, route_km)
+        T.pop(bid, None)
 
 
-def _rt_pct(vals,p):
-    a=sorted(float(x) for x in vals if x is not None)
-    if not a:return None
-    if len(a)==1:return a[0]
-    k=(len(a)-1)*p/100; lo=int(k); hi=min(len(a)-1,lo+1); f=k-lo
-    return a[lo]*(1-f)+a[hi]*f
+def rt_store(svc, d, pts, stop_s, route_km):
+    if len(pts) < 4:
+        return
+    start_km, end_km = pts[0][1], pts[-1][1]
+    cover = (end_km - start_km) / route_km
+    if cover < RT_MIN_COVER or start_km > 0.25 * route_km:
+        return                                                            # only trips seen from near the start of the route
+    dur = (pts[-1][0] - pts[0][0]) / 60.0
+    if not (3.0 <= dur <= 300.0):
+        return
+    def at(km):
+        """time the bus passed a point: interpolated between polls, and extrapolated up to 0.45 km beyond the first / last
+        observation (the last poll is usually a few hundred metres short of the terminal)."""
+        if km < pts[0][1] - 0.45 or km > pts[-1][1] + 0.45:
+            return None
+        if km <= pts[0][1] or km >= pts[-1][1]:
+            end = 0 if km <= pts[0][1] else -1
+            (t0, k0), (t1, k1) = (pts[0], pts[1]) if end == 0 else (pts[-2], pts[-1])
+            if k1 <= k0:
+                return pts[end][0]
+            return pts[end][0] + (km - pts[end][1]) * (t1 - t0) / (k1 - k0)
+        for (t0, k0), (t1, k1) in zip(pts, pts[1:]):
+            if k0 <= km <= k1:
+                return t0 + (t1 - t0) * (0.0 if k1 <= k0 else (km - k0) / (k1 - k0))
+        return None
+
+    marks = []
+    for i, km in enumerate(stop_s):
+        t = at(km)
+        marks.append(None if t is None else int(round(t - pts[0][0])))
+    full = at(0.0) is not None and at(route_km) is not None
+    rt_min = ((at(route_km) - at(0.0)) / 60.0) if full else dur / max(cover, 0.01)   # scaled when the ends were not observed
+    now = datetime.fromtimestamp(pts[0][0], SGT)
+    bb_sql("INSERT INTO rt_trip(service,direction,day_type,date,start_ts,end_ts,rt_min,cover,n_obs,marks) VALUES (?,?,?,?,?,?,?,?,?,?)",
+           (svc, d, insight.day_type(now.strftime("%Y-%m-%d")), now.strftime("%Y-%m-%d"), pts[0][0], pts[-1][0], round(rt_min, 2), round(cover, 3), len(pts), json.dumps(marks)))
+    RT["saved"] += 1
+    RT["last"] = time.time()
+    if RT["saved"] % 50 == 0 and RT_KEEP_DAYS > 0:
+        bb_sql("DELETE FROM rt_trip WHERE start_ts < ?", (time.time() - RT_KEEP_DAYS * 86400,))
 
 
-def _rt_daytype(ts):
-    d=datetime.fromtimestamp(ts,SGT)
-    return 'Weekday' if d.weekday()<5 else ('Saturday' if d.weekday()==5 else 'Sunday/PH')
+def rt_sched_for(svc, d, daytype, start_min):
+    rows = bb_sql("SELECT day_type, t_from, t_to, rt_min FROM rt_sched WHERE service=? AND direction=?", (svc.upper(), d), fetch=True)
+    best = None
+    for r in rows:
+        if r["day_type"] and r["day_type"] not in ("All", daytype):
+            continue
+        a, b = ho_parse_hhmm(r["t_from"] or "00:00"), ho_parse_hhmm(r["t_to"] or "23:59")
+        if a is None or b is None:
+            continue
+        inside = (a <= start_min <= b) if a <= b else (start_min >= a or start_min <= b)
+        if inside and (best is None or r["day_type"] == daytype):
+            best = r["rt_min"]
+    return best
 
 
-def _rt_band(ts, minutes):
-    d=datetime.fromtimestamp(ts,SGT); m=d.hour*60+d.minute; b=(m//minutes)*minutes
-    return f"{b//60:02d}:{b%60:02d}–{((b+minutes)//60)%24:02d}:{(b+minutes)%60:02d}"
-
-
-def _rt_dist(vals):
-    if not vals:return {"n":0,"avg":None,"min":None,"max":None,"p50":None,"p75":None,"p85":None,"p90":None,"p95":None}
-    return {"n":len(vals),"avg":sum(vals)/len(vals),"min":min(vals),"max":max(vals),"p50":_rt_pct(vals,50),"p75":_rt_pct(vals,75),"p85":_rt_pct(vals,85),"p90":_rt_pct(vals,90),"p95":_rt_pct(vals,95)}
-
-
-def _rt_journeys(service=None,direction=None,daytype='',date_from='',date_to='',quality_low=False):
-    wh=["1=1"]; args=[]
-    if service: wh.append("service=?"); args.append(service.upper())
-    if direction in (1,2): wh.append("direction=?"); args.append(direction)
-    if date_from:
-        try: wh.append("ts>=?"); args.append(datetime.fromisoformat(date_from).replace(tzinfo=SGT).timestamp())
-        except: pass
-    if date_to:
-        try: wh.append("ts<?"); args.append((datetime.fromisoformat(date_to).replace(tzinfo=SGT)+timedelta(days=1)).timestamp())
-        except: pass
-    if not quality_low: wh.append("quality!='LOW'")
-    rows=bb_sql("SELECT * FROM rt_passage WHERE "+" AND ".join(wh)+" ORDER BY journey,seq",tuple(args),fetch=True)
-    if daytype: rows=[r for r in rows if _rt_daytype(r['ts'])==daytype]
-    by={}
-    for r in rows: by.setdefault(r['journey'],[]).append(r)
-    return by
-
-
-def _rt_section_samples(by, a, z, band=60):
-    out=[]
-    for jid,rs in by.items():
-        m={r['seq']:r for r in rs}
-        if a in m and z in m and m[z]['ts']>m[a]['ts']:
-            mins=(m[z]['ts']-m[a]['ts'])/60
-            if 0.2<=mins<=240:
-                out.append({"journey":jid,"rt":mins,"start_ts":m[a]['ts'],"band":_rt_band(m[a]['ts'],band),"daytype":_rt_daytype(m[a]['ts'])})
+async def rt_trips(service="", days=120):
+    """stored live trips -> the trip records the analytics engine works with."""
+    q = "SELECT * FROM rt_trip WHERE start_ts > ?"
+    args = [time.time() - days * 86400]
+    if service.strip():
+        q += " AND service=?"
+        args.append(service.strip().upper())
+    rows = bb_sql(q + " ORDER BY start_ts", tuple(args), fetch=True)
+    st = await static()
+    stops_cache = {}
+    out = []
+    for r in rows:
+        svc, d = r["service"], r["direction"]
+        if (svc, d) not in stops_cache:
+            stops_cache[(svc, d)] = route_stops(st, svc, d)
+        stops = stops_cache[(svc, d)]
+        s0 = datetime.fromtimestamp(r["start_ts"], SGT)
+        ss_min = s0.hour * 60 + s0.minute + s0.second / 60.0
+        srt = rt_sched_for(svc, d, r["day_type"], ss_min)
+        marks = json.loads(r["marks"] or "[]")
+        t = {"svc": svc, "dir": d, "date": r["date"], "trip": str(r["id"]), "bus": "", "daytype": r["day_type"],
+             "ss": ss_min, "as": ss_min, "se": None if srt is None else ss_min + srt, "ae": ss_min + r["rt_min"],
+             "srt": srt, "art": r["rt_min"], "cond": {}, "cover": r["cover"],
+             "stops": [{"seq": i + 1, "code": (stops[i]["code"] if i < len(stops) else f"S{i}"), "name": (stops[i]["name"] if i < len(stops) else ""),
+                        "sa": None, "sd": None, "aa": None if m is None else ss_min + m / 60.0, "ad": None if m is None else ss_min + m / 60.0}
+                       for i, m in enumerate(marks) if i < len(stops)]}
+        out.append(t)
     return out
 
 
-def _rt_maturity(n):
-    return 'COLLECTING DATA' if n<10 else ('LOW CONFIDENCE' if n<30 else ('DEVELOPING' if n<100 else 'ESTABLISHED'))
+@app.get("/api/rt/status")
+async def api_rt_status():
+    rows = bb_sql("SELECT service, direction, COUNT(*) n, MIN(start_ts) a, MAX(start_ts) b, AVG(rt_min) avg FROM rt_trip GROUP BY service, direction ORDER BY service, direction", (), fetch=True)
+    watch = sorted({f"{k[0]}:{k[1]}" for k in bb_keys()})
+    return {"ok": True, "collecting": bool(BB_ALWAYS or time.time() - BB["last_req"] < BB_IDLE_SEC), "always_on": bool(BB_ALWAYS), "watch": watch,
+            "refresh_sec": BB["params"]["refresh_sec"], "saved_this_run": RT["saved"], "keep_days": RT_KEEP_DAYS,
+            "services": [{"service": r["service"], "direction": r["direction"], "trips": r["n"], "avg_rt": round(r["avg"], 1),
+                          "from": datetime.fromtimestamp(r["a"], SGT).strftime("%d %b %H:%M"), "to": datetime.fromtimestamp(r["b"], SGT).strftime("%d %b %H:%M")} for r in rows],
+            "note": "Running time is measured from live bus positions (LTA DataMall). A trip is stored once a bus has been followed over the route, so the history grows while the collector runs."}
+
+
+@app.post("/api/rt/watch")
+async def api_rt_watch(request: Request):
+    b = json.loads((await request.body()).decode("utf-8") or "{}")
+    svc = str(b.get("service") or "").strip().upper()
+    if not re.fullmatch(r"[0-9A-Z]{1,6}", svc):
+        return JSONResponse({"error": "Enter a service number."}, status_code=400)
+    for d in ((int(b.get("direction")),) if b.get("direction") in (1, 2, "1", "2") else (1, 2)):
+        BB["watch"][(svc, int(d))] = time.time()
+    BB["last_req"] = time.time()
+    try:
+        await bb_cycle([(svc, d) for d in (1, 2)])
+    except Exception:
+        pass
+    return {"ok": True, "watch": sorted({f"{k[0]}:{k[1]}" for k in bb_keys()})}
+
+
+@app.get("/api/rt/sched")
+async def api_rt_sched(service: str = ""):
+    q = "SELECT * FROM rt_sched" + (" WHERE service=?" if service.strip() else "") + " ORDER BY service, direction, t_from"
+    rows = bb_sql(q, ((service.strip().upper(),) if service.strip() else ()), fetch=True)
+    return {"rows": [dict(r) for r in rows]}
+
+
+@app.post("/api/rt/sched")
+async def api_rt_sched_set(request: Request):
+    """Scheduled running time is not published by LTA DataMall, so the timetable value is entered here per service / direction / day type / period."""
+    if not bb_auth(request):
+        return JSONResponse({"error": "Admin token missing or wrong."}, status_code=401)
+    b = json.loads((await request.body()).decode("utf-8") or "{}")
+    if b.get("delete"):
+        bb_sql("DELETE FROM rt_sched WHERE id=?", (int(b["delete"]),))
+        return {"ok": True}
+    svc = str(b.get("service") or "").strip().upper()
+    try:
+        d, rt = int(b.get("direction") or 1), float(b.get("rt_min"))
+    except (TypeError, ValueError):
+        return JSONResponse({"error": "Direction and running time must be numbers."}, status_code=400)
+    if not svc or not (1 <= rt <= 400):
+        return JSONResponse({"error": "Enter a service and a running time between 1 and 400 min."}, status_code=400)
+    dt = b.get("day_type") if b.get("day_type") in ("All",) + insight.DAY_TYPES else "All"
+    bb_sql("INSERT INTO rt_sched(service,direction,day_type,t_from,t_to,rt_min,by_name,ts) VALUES (?,?,?,?,?,?,?,?)",
+           (svc, d, dt, str(b.get("t_from") or "00:00")[:5], str(b.get("t_to") or "23:59")[:5], rt, str(b.get("by") or "")[:60], time.time()))
+    IN_CACHE.clear()
+    return {"ok": True}
+
+
+def in_init():
+    bb_sql("CREATE TABLE IF NOT EXISTS insight_dataset(id INTEGER PRIMARY KEY AUTOINCREMENT, ts REAL, name TEXT, kind TEXT, rows INTEGER, trips INTEGER, info TEXT, blob TEXT)")
+
+
+async def in_live():
+    """the live LTA-measured trips, in the same shape as an uploaded dataset."""
+    hit = IN_CACHE.get(0)
+    if hit and time.time() - hit[2] < 120:
+        return hit[0], hit[1]
+    trips = await rt_trips()
+    if not trips:
+        info = {"error": "No running time has been measured yet. Add a service to the collector below and leave the page open; trips appear as buses complete the route.",
+                "trips": 0, "rows": 0, "services": []}
+        return None, info
+    keep, removed = await asyncio.to_thread(insight.drop_outliers, trips)
+    dates = sorted({t["date"] for t in keep if t["date"]})
+    info = {"trips": len(trips), "rows": len(trips), "dropped_incomplete": 0, "bad_rows": 0, "stop_level": True, "columns_used": ["live"],
+            "columns_missing": [], "conditions": [], "dates": [dates[0], dates[-1]] if dates else [None, None],
+            "services": sorted({t["svc"] for t in keep}), "daytypes": sorted({t["daytype"] for t in keep}), "source": "live",
+            "outliers_removed": removed, "analysed": len(keep), "no_sched": sum(1 for t in keep if t["srt"] is None),
+            "cover_p50": round(insight.pct([t.get("cover") or 1 for t in keep], 50) * 100, 1)}
+    IN_CACHE[0] = (keep, info, time.time())
+    return keep, info
+
+
+def in_load(ds_id):
+    """parsed trips for a stored dataset (cached in memory)."""
+    hit = IN_CACHE.get(ds_id)
+    if hit:
+        return hit[0], hit[1]
+    rows = bb_sql("SELECT blob FROM insight_dataset WHERE id=?", (ds_id,), fetch=True)
+    if not rows:
+        return None, {"error": "Dataset not found."}
+    text = gzip.decompress(base64.b64decode(rows[0]["blob"])).decode("utf-8", "replace")
+    trips, info = insight.parse_csv(text)
+    if trips is None:
+        return None, info
+    trips, removed = insight.drop_outliers(trips)
+    info["outliers_removed"] = removed
+    info["analysed"] = len(trips)
+    if len(IN_CACHE) > 4:
+        IN_CACHE.clear()
+    IN_CACHE[ds_id] = (trips, info, time.time())
+    return trips, info
+
+
+def in_save(name, kind, text):
+    trips, info = insight.parse_csv(text)
+    if trips is None:
+        return None, info.get("error") or "The file could not be read."
+    blob = base64.b64encode(gzip.compress(text.encode("utf-8"))).decode()
+    bb_sql("INSERT INTO insight_dataset(ts, name, kind, rows, trips, info, blob) VALUES (?,?,?,?,?,?,?)",
+           (time.time(), name[:80], kind, info["rows"], info["trips"], json.dumps(info), blob))
+    r = bb_sql("SELECT id FROM insight_dataset ORDER BY id DESC LIMIT 1", (), fetch=True)
+    IN_CACHE.clear()
+    return (r[0]["id"] if r else None), None
+
+
+async def in_get(ds_id):
+    """ds 0 = the live LTA-measured trips; any other id = a stored sample dataset."""
+    if not ds_id:
+        return await in_live()
+    return await asyncio.to_thread(in_load, int(ds_id))
+
+
+def in_pctl(v, d=85):
+    try:
+        p = float(v) if str(v).strip() else d
+    except ValueError:
+        return d
+    return min(99.0, max(50.0, p))
+
+
+def in_num(v, d, lo, hi):
+    try:
+        x = float(str(v).strip()) if str(v).strip() else d
+    except ValueError:
+        return d
+    return min(hi, max(lo, x))
+
+
+@app.get("/running-time", response_class=HTMLResponse)
+async def running_time_page():
+    return HTMLResponse((HERE / "insight.html").read_text(encoding="utf-8"))
 
 
 @app.get("/insight", response_class=HTMLResponse)
 async def insight_page():
-    BB["last_req"] = time.time()
     return HTMLResponse((HERE / "insight.html").read_text(encoding="utf-8"))
 
 
-@app.get("/api/insight/status")
-async def api_rt_status():
-    BB["last_req"] = time.time()
-    meta=bb_sql("SELECT v FROM rt_meta WHERE k='collector_started'",fetch=True)
-    started=float(meta[0]['v']) if meta else time.time()
-    obs_rows=bb_sql("SELECT COUNT(*) n, COUNT(DISTINCT journey) journeys, MIN(ts) first_ts, MAX(ts) last_ts FROM rt_passage",fetch=True)
-    obs=obs_rows[0] if obs_rows else {"n":0,"journeys":0,"first_ts":None,"last_ts":None}
-    sv=bb_sql("SELECT service,direction,COUNT(*) observations,COUNT(DISTINCT journey) journeys FROM rt_passage GROUP BY service,direction ORDER BY service,direction",fetch=True) or []
-    st=await static()
-    all_services=sorted(st["dirs"].keys(), key=lambda s: ((not s.isdigit()), int(s) if s.isdigit() else 0, s))
-    diag=None
-    if not sv and not all_services:
-        diag = st.get("error") or ("LTA_ACCOUNT_KEY is not configured" if not KEY else "No route/stop data loaded yet - retry shortly")
-    return {"ok":True,"collector":{"started":started,"observations":obs['n'],"journeys":obs['journeys'],"first_ts":obs['first_ts'],"last_ts":obs['last_ts'],"alive":time.time()-BB['loop_at']<3*BB['params']['refresh_sec'],"db_ok":BB['db_ok']},"services":sv,"all_services":all_services,"diag":diag}
+@app.get("/api/insight/datasets")
+async def api_in_datasets():
+    rows = bb_sql("SELECT id, ts, name, kind, rows, trips, info FROM insight_dataset ORDER BY id DESC LIMIT 30", (), fetch=True)
+    out = []
+    for r in rows:
+        info = json.loads(r["info"] or "{}")
+        out.append({"id": r["id"], "name": r["name"], "kind": r["kind"], "rows": r["rows"], "trips": r["trips"],
+                    "time": datetime.fromtimestamp(r["ts"], SGT).strftime("%d %b %H:%M"), "services": info.get("services", []),
+                    "dates": info.get("dates", [None, None]), "stop_level": info.get("stop_level"), "conditions": info.get("conditions", []),
+                    "daytypes": info.get("daytypes", [])})
+    return {"datasets": out, "model": insight.VERSION}
 
 
-@app.get("/api/insight/stops")
-async def api_rt_stops(service:str="",direction:int=1):
-    st=await static(); svc=service.strip().upper(); arr=route_stops(st,svc,direction)
-    saved={r['seq'] for r in bb_sql("SELECT seq FROM rt_important WHERE service=? AND direction=?",(svc,direction),fetch=True)}
-    return {"ok":bool(arr),"service":svc,"direction":direction,"stops":[{"seq":i+1,"code":x['code'],"name":x['name'],"road":x.get('road',''),"selected":i+1 in saved} for i,x in enumerate(arr)]}
+@app.post("/api/insight/demo")
+async def api_in_demo(request: Request, days: int = 40):
+    """Create a MODELLED demo dataset so the page can be seen working without real data."""
+    if not bb_auth(request):
+        return JSONResponse({"error": "Admin token missing or wrong."}, status_code=401)
+    text = await asyncio.to_thread(insight.demo, max(7, min(90, days)))
+    ds_id, err = await asyncio.to_thread(in_save, f"DEMO (modelled data, {max(7, min(90, days))} days)", "demo", text)
+    if err:
+        return JSONResponse({"error": err}, status_code=400)
+    return {"ok": True, "id": ds_id}
 
 
-@app.post("/api/insight/important")
-async def api_rt_important(request:Request):
-    b=await request.json(); svc=str(b.get('service','')).strip().upper(); d=int(b.get('direction',1)); seqs=sorted({int(x) for x in b.get('seqs',[]) if str(x).isdigit()})
-    st=await static(); arr=route_stops(st,svc,d)
-    bb_sql("DELETE FROM rt_important WHERE service=? AND direction=?",(svc,d))
-    for q in seqs:
-        if 1<=q<=len(arr): bb_sql("INSERT OR REPLACE INTO rt_important(service,direction,seq,stop_code) VALUES(?,?,?,?)",(svc,d,q,arr[q-1]['code']))
-    return {"ok":True,"seqs":seqs}
+@app.post("/api/insight/delete")
+async def api_in_delete(request: Request):
+    if not bb_auth(request):
+        return JSONResponse({"error": "Admin token missing or wrong."}, status_code=401)
+    b = json.loads((await request.body()).decode("utf-8") or "{}")
+    bb_sql("DELETE FROM insight_dataset WHERE id=?", (int(b.get("id") or 0),))
+    IN_CACHE.clear()
+    return {"ok": True}
 
 
-@app.get("/api/insight/service")
-async def api_rt_service(service:str="",direction:int=1,band:int=60,daytype:str="",date_from:str="",date_to:str="",baseline_days:int=56):
-    BB["last_req"] = time.time(); svc=service.strip().upper(); band=30 if band==30 else 60
-    st=await static(); stops=route_stops(st,svc,direction)
-    if not stops:return {"ok":False,"error":"Service / direction not found in LTA BusRoutes."}
-    by=_rt_journeys(svc,direction,daytype,date_from,date_to)
-    saved=[r['seq'] for r in bb_sql("SELECT seq FROM rt_important WHERE service=? AND direction=? ORDER BY seq",(svc,direction),fetch=True)]
-    picked=saved if len(saved)>=2 else ([1,len(stops)] if len(stops)>=2 else [])
-    sections=list(zip(picked,picked[1:]))
-    now=time.time(); recent_cut=now-14*86400; base_start=recent_cut-baseline_days*86400
-    secrows=[]; heatbands={}
-    for a,z in sections:
-        vals=_rt_section_samples(by,a,z,band)
-        recent=[x['rt'] for x in vals if x['start_ts']>=recent_cut]
-        base=[x['rt'] for x in vals if base_start<=x['start_ts']<recent_cut]
-        rd,bd=_rt_dist(recent),_rt_dist(base)
-        change=(rd['p85']-bd['p85']) if rd['p85'] is not None and bd['p85'] is not None else None
-        secrows.append({"from_seq":a,"to_seq":z,"from_code":stops[a-1]['code'],"from_name":stops[a-1]['name'],"to_code":stops[z-1]['code'],"to_name":stops[z-1]['name'],"recent":rd,"baseline":bd,"p85_change":change,"maturity":_rt_maturity(rd['n'])})
-        for x in vals: heatbands.setdefault(x['band'],{}).setdefault((a,z),{"r":[],"b":[]})['r' if x['start_ts']>=recent_cut else 'b'].append(x['rt'])
-    # whole-route observations
-    whole=_rt_section_samples(by,1,len(stops),band) if len(stops)>1 else []
-    recent=[x['rt'] for x in whole if x['start_ts']>=recent_cut]; base=[x['rt'] for x in whole if base_start<=x['start_ts']<recent_cut]
-    hourly=[]
-    bands=sorted({x['band'] for x in whole})
-    for bl in bands:
-        rv=[x['rt'] for x in whole if x['band']==bl and x['start_ts']>=recent_cut]
-        bv=[x['rt'] for x in whole if x['band']==bl and base_start<=x['start_ts']<recent_cut]
-        r,b=_rt_dist(rv),_rt_dist(bv); hourly.append({"label":bl,**r,"baseline_p85":b['p85'],"change":(r['p85']-b['p85']) if r['p85'] is not None and b['p85'] is not None else None,"maturity":_rt_maturity(r['n'])})
-    heat=[]
-    for sr in secrows:
-        a,z=sr['from_seq'],sr['to_seq']; cells=[]
-        for bl in sorted(heatbands):
-            v=heatbands[bl].get((a,z),{"r":[],"b":[]}); rp=_rt_pct(v['r'],85); bp=_rt_pct(v['b'],85)
-            cells.append({"label":bl,"current":rp,"baseline":bp,"change":rp-bp if rp is not None and bp is not None else None,"n":len(v['r'])})
-        heat.append({"label":f"{a:02d}→{z:02d}","cells":cells})
-    rd,bd=_rt_dist(recent),_rt_dist(base); ch=rd['p85']-bd['p85'] if rd['p85'] is not None and bd['p85'] is not None else None
-    return {"ok":True,"service":svc,"direction":direction,"band":band,"important":picked,"pairs":[f"{a:02d}→{z:02d}" for a,z in sections],"overall":{"recent":rd,"baseline":bd,"p85_change":ch,"change_pct":(ch/bd['p85']*100) if ch is not None and bd['p85'] else None,"maturity":_rt_maturity(rd['n'])},"hourly":hourly,"sections":secrows,"heat":heat,"stops_count":len(stops),"note":"Observed/estimated from LTA DataMall BusArrival tracking; no scheduled running time is inferred."}
+def in_filters(trips, daytype, date_from, date_to):
+    return insight.filt(trips, daytype=daytype or None, date_from=(date_from or None), date_to=(date_to or None))
 
 
 @app.get("/api/insight/summary")
-async def api_rt_summary():
-    BB["last_req"] = time.time()
-    rows=bb_sql("SELECT service,direction,COUNT(*) observations,COUNT(DISTINCT journey) journeys,MIN(ts) first_ts,MAX(ts) last_ts FROM rt_passage GROUP BY service,direction",fetch=True)
-    return {"ok":True,"rows":[{**r,"maturity":_rt_maturity(r['journeys'])} for r in rows]}
+async def api_in_summary(ds: int = 0, pctl: str = "85", band: str = "30", daytype: str = "", date_from: str = "", date_to: str = "", min_n: str = "10"):
+    trips, info = await in_get(ds)
+    if trips is None:
+        return {"ok": False, "error": info.get("error", "No data")}
+    p, b, mn = in_pctl(pctl), int(in_num(band, 30, 15, 60)), int(in_num(min_n, 10, 1, 500))
+    sel = in_filters(trips, daytype, date_from, date_to)
+    rows = await asyncio.to_thread(insight.summary, sel, p, b, mn)
+    return {"ok": True, "rows": rows, "pctl": p, "band": b, "min_n": mn, "n_trips": len(sel), "info": info,
+            "quality": {"trips_in_file": info.get("trips"), "analysed": len(sel), "outliers_removed": info.get("outliers_removed"),
+                        "dropped_incomplete": info.get("dropped_incomplete"), "dates": info.get("dates"), "stop_level": info.get("stop_level"),
+                        "conditions": info.get("conditions"), "missing_columns": info.get("columns_missing")}}
+
+
+@app.get("/api/insight/service")
+async def api_in_service(ds: int = 0, service: str = "", pctl: str = "85", band: str = "30", daytype: str = "", date_from: str = "", date_to: str = "",
+                         min_n: str = "5", model: str = "0"):
+    trips, info = await in_get(ds)
+    if trips is None:
+        return {"ok": False, "error": info.get("error", "No data")}
+    svc = service.strip().upper()
+    p, b, mn = in_pctl(pctl), int(in_num(band, 30, 15, 60)), int(in_num(min_n, 5, 1, 500))
+    sel = in_filters(trips, daytype, date_from, date_to)
+    g = [t for t in sel if t["svc"] == svc]
+    if not g:
+        return {"ok": False, "error": f"No trips for service {svc} with these filters."}
+    out = {"ok": True, "service": svc, "pctl": p, "band": b, "min_n": mn, "dirs": {}, "n": len(g),
+           "dates": [min((t["date"] for t in g if t["date"]), default=None), max((t["date"] for t in g if t["date"]), default=None)],
+           "daytypes": sorted({t["daytype"] for t in g}), "info": info}
+    for d in (1, 2):
+        gd = [t for t in g if t["dir"] == d]
+        if not gd:
+            out["dirs"][str(d)] = None
+            continue
+        sched = insight.pct([t["srt"] for t in gd], 50)
+        dd = insight.dist([t["art"] for t in gd], sched, p)
+        periods = await asyncio.to_thread(insight.by_period, gd, svc, d, b, p, mn)
+        short = [r for r in periods if (r.get("gap") or 0) > 0.5 and not r["small_sample"]]
+        out["dirs"][str(d)] = {"overall": dd, "periods": periods, "n_short": len(short),
+                               "worst": max(short, key=lambda r: r["gap"]) if short else None,
+                               "options": insight.options([t["art"] for t in gd], sched, p),
+                               "stops": insight.stop_list(gd, svc, d),
+                               "scenarios": await asyncio.to_thread(insight.scenarios, gd, p),
+                               "contributors": await asyncio.to_thread(insight.contributors, gd, None, p)}
+        if str(model) == "1":
+            out["dirs"][str(d)]["model"] = await asyncio.to_thread(insight.quantile_model, gd)
+    return out
+
+
+@app.get("/api/insight/sections")
+async def api_in_sections(ds: int = 0, service: str = "", direction: int = 1, stops: str = "", pctl: str = "85", band: str = "30",
+                          daytype: str = "", date_from: str = "", date_to: str = "", min_n: str = "5"):
+    trips, info = await in_get(ds)
+    if trips is None:
+        return {"ok": False, "error": info.get("error", "No data")}
+    svc = service.strip().upper()
+    p, b, mn = in_pctl(pctl), int(in_num(band, 30, 15, 60)), int(in_num(min_n, 5, 1, 500))
+    sel = [t for t in in_filters(trips, daytype, date_from, date_to) if t["svc"] == svc and t["dir"] == direction]
+    if not sel:
+        return {"ok": False, "error": f"No trips for service {svc} direction {direction}."}
+    all_stops = insight.stop_list(sel, svc, direction)
+    if not all_stops:
+        return {"ok": False, "error": "This dataset has no stop-level times, so the route cannot be split into sections. Upload stop-level data for sectional analysis."}
+    picked = [c for c in re.split(r"[,\s]+", stops.strip()) if c]
+    if len(picked) < 2:
+        step = max(1, len(all_stops) // 5)
+        picked = [s["code"] for s in all_stops[::step]]
+        if all_stops[-1]["code"] not in picked:
+            picked.append(all_stops[-1]["code"])
+    secs = insight.pair_sections(all_stops, picked)
+    if not secs:
+        return {"ok": False, "error": "Select at least two stops of this direction."}
+    rows, heat = await asyncio.to_thread(insight.sections_analysis, sel, secs, p, b, mn)
+    worst = max([r for r in rows if r.get("gap") is not None], key=lambda r: r["gap"], default=None)
+    contrib = None
+    if worst:
+        wsec = next(s for s in secs if s["label"] == worst["label"])
+        vals = insight.section_times(sel, wsec)
+        contrib = await asyncio.to_thread(insight.contributors, sel, vals, p)
+    return {"ok": True, "service": svc, "direction": direction, "pctl": p, "band": b, "stops": all_stops, "picked": picked,
+            "sections": rows, "heat": heat, "worst": worst, "contributors": contrib, "n": len(sel),
+            "route_gap": round(sum(max(0.0, r.get("gap") or 0.0) for r in rows), 1)}
+
+
+@app.get("/api/insight/cell")
+async def api_in_cell(ds: int = 0, service: str = "", direction: int = 1, section: str = "", stops: str = "", band_start: str = "", band: str = "30",
+                      daytype: str = "", date_from: str = "", date_to: str = "", limit: int = 60):
+    """the trips behind one heatmap cell."""
+    trips, info = await in_get(ds)
+    if trips is None:
+        return {"ok": False, "error": info.get("error", "No data")}
+    svc = service.strip().upper()
+    b = int(in_num(band, 30, 15, 60))
+    sel = [t for t in in_filters(trips, daytype, date_from, date_to) if t["svc"] == svc and t["dir"] == direction]
+    all_stops = insight.stop_list(sel, svc, direction)
+    picked = [c for c in re.split(r"[,\s]+", stops.strip()) if c]
+    secs = insight.pair_sections(all_stops, picked)
+    sec = next((s for s in secs if s["label"] == section), None)
+    if not sec:
+        return {"ok": False, "error": "Unknown section."}
+    bs = insight.parse_time(band_start)
+    vals = [v for v in insight.section_times(sel, sec) if v["start"] is not None and (bs is None or insight.band_of(v["start"], b) == insight.band_of(bs, b))]
+    vals.sort(key=lambda v: -v["act"])
+    out = [{"date": v["trip"]["date"], "trip": v["trip"]["trip"], "bus": v["trip"]["bus"], "daytype": v["trip"]["daytype"],
+            "start": insight.band_label(insight.band_of(v["start"], b), b), "start_clock": f"{int(v['start'] // 60) % 24:02d}:{int(v['start'] % 60):02d}",
+            "section_act": round(v["act"], 1), "section_sch": None if v["sch"] is None else round(v["sch"], 1),
+            "gap": None if v["sch"] is None else round(v["act"] - v["sch"], 1), "trip_act": round(v["trip"]["art"], 1), "trip_sch": round(v["trip"]["srt"], 1),
+            "cond": {k: round(x, 2) for k, x in v["trip"]["cond"].items()}} for v in vals[:limit]]
+    return {"ok": True, "section": section, "band": insight.band_label(insight.band_of(bs, b), b) if bs is not None else "All day", "n": len(vals), "trips": out}
+
 
 # ----------------------------------------------------------------------------- V13.0 Halfway Deployment Planner (proactive: /planner)
 @app.get("/planner", response_class=HTMLResponse)

@@ -341,10 +341,11 @@ def summary(trips, pctl=85, band=30, min_n=10):
                     continue
                 s_ = pct([x["srt"] for x in ts], 50)
                 dp = dist([x["art"] for x in ts], s_, pctl)
-                if dp["gap"] > 0.5:
+                if (dp.get("gap") or 0) > 0.5:
                     row["periods_short"] += 1
                     if row["worst"] is None or dp["gap"] > row["worst"]:
                         row["worst"], row["worst_period"], row["worst_dir"] = dp["gap"], band_label(b, band), d
+        row["no_sched"] = all((row.get(f"d{d}") or {}).get("gap") is None for d in (1, 2))
         g1, g2 = (row.get("d1") or {}).get("gap"), (row.get("d2") or {}).get("gap")
         row["direction_affected"] = "D1 & D2" if (g1 or 0) > 0.5 and (g2 or 0) > 0.5 else ("D1" if (g1 or 0) > 0.5 else ("D2" if (g2 or 0) > 0.5 else "-"))
         row["suggested_review"] = row["worst_period"] or "-"
@@ -375,6 +376,8 @@ def by_period(trips, svc, direction, band=30, pctl=85, min_n=5):
 def assess(d, min_n=5):
     if d["n"] < min_n:
         return "Too few trips"
+    if d.get("gap") is None:
+        return "No timetable RT entered"
     if d["gap"] <= 0:
         return "Adequate"
     if d["gap"] <= 1:
@@ -451,8 +454,15 @@ def sections_analysis(trips, sections, pctl=85, band=30, min_n=5):
             rows.append({**{k: sec[k] for k in ("label", "from", "to", "from_name", "to_name", "stops")}, "n": 0, "note": "No stop times for this section in the data"})
             continue
         sch = pct([v["sch"] for v in vals if v["sch"] is not None], 50)
+        basis = "timetable"
+        if sch is None:
+            # no scheduled stop-to-stop time (LTA DataMall does not publish one): compare each section with its own typical level instead,
+            # so the analysis still shows WHERE and WHEN extra time is needed. Clearly labelled.
+            sch = pct([v["act"] for v in vals], 50)
+            basis = "typical"
         d = dist([v["act"] for v in vals], sch, pctl)
         d.update({k: sec[k] for k in ("label", "from", "to", "from_name", "to_name", "stops")})
+        d["basis"] = basis
         rows.append(d)
         if d.get("gap"):
             total_gap += max(0.0, d["gap"])
@@ -465,6 +475,8 @@ def sections_analysis(trips, sections, pctl=85, band=30, min_n=5):
         for b in sorted(cells):
             vv = cells[b]
             s_ = pct([x["sch"] for x in vv if x["sch"] is not None], 50)
+            if s_ is None:
+                s_ = sch                                                  # same basis as the section row above
             dd = dist([x["act"] for x in vv], s_, pctl)
             line["cells"].append({"band": b, "label": band_label(b, band), "gap": dd.get("gap"), "n": dd["n"], "p85": dd["p85"], "sched": dd.get("sched"),
                                   "small": dd["n"] < min_n})

@@ -1,10 +1,21 @@
-# SG Transport Pulse V13.3 — Route Traffic + Departure Adjustment + Bunching, Gap & Alerts + AI Halfway Optimiser
+# SG Transport Pulse V13.4 — Route Traffic + Departure Adjustment + Bunching, Gap & Alerts + AI Halfway Optimiser
 
 Live bus positions, live LTA traffic drawn directly on the bus route, and next arrivals per stop.
 FastAPI backend + a single-page Leaflet frontend (OneMap basemap, OpenStreetMap fallback).
 
 
 
+
+## V13.4 - Running Time Analytics is measured from LTA DataMall (CSV upload removed)
+
+Renamed from "Project Insight" to **Running Time Analytics** (`/running-time`, `/insight` still works). There is no historical file to upload, so the page now builds its own data.
+
+* **Actual running time is measured, not imported.** The bunching collector already tracks every bus along the route; it now also records each tracked bus's position, and when a bus completes the route the trip is stored in `rt_trip` with its crossing time at **every stop** (interpolated between polls, extrapolated up to 0.45 km at the terminals). A trip is kept only if it was observed over at least 82% of the route and started near the origin; partial trips are scaled and flagged by their coverage. History therefore grows while any page is open, or continuously with `BUNCHING_ALWAYS_ON`. `RT_KEEP_DAYS` (default 120) prunes old trips.
+* **Collection panel** on the page: add a service to the collector, see trips measured per service and direction, the average measured RT, the period covered and the collector state.
+* **Scheduled running time** is not published by DataMall, so it is entered per service / direction / day type / period (`rt_sched`, admin token) and matched to each measured trip. Without it the page still shows the measured distribution (P50 / P85 / P90) and says the gap cannot be computed.
+* **Sections** still work on live data: DataMall has no stop-to-stop timetable, so each section is compared with **its own typical level (P50)** and the column is labelled "Extra vs typical" with a banner explaining it - it shows where and when time is lost, not a timetable shortfall. If stop-level scheduled times ever exist, the timetable basis is used automatically.
+* **CSV upload removed** (`/api/insight/upload` deleted). A clearly labelled **modelled sample** dataset can still be added for training and is marked MODELLED SAMPLE - TRAINING ONLY.
+* New endpoints: `GET /api/rt/status`, `POST /api/rt/watch`, `GET|POST /api/rt/sched`. Everything else (percentile filters, management summary, D1/D2 charts and period reports, important-stop auto-paired sections, waterfall, heatmap with drill-down, contributors, RT options, bootstrap scenarios, quantile model, data quality) is unchanged.
 
 ## V13.3 - PROJECT INSIGHT: running time analytics (`/insight`)
 

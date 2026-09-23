@@ -1,46 +1,430 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#061525"><title>Running Time Analytics · SG Transport Pulse</title>
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#061525">
+<title>Running Time Analytics &middot; SG Transport Pulse</title>
 <style>
-:root{--bg:#061525;--card:#0b1a2e;--card2:#0d2440;--line:#244766;--ink:#eaf3ff;--mut:#8ea6bd;--acc:#ff9f1c;--blue:#3c96ff;--grn:#22c55e;--red:#e0474f}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 system-ui,-apple-system,Segoe UI,Arial;padding-bottom:70px}.wrap{max-width:1450px;margin:auto;padding:12px}.top{position:sticky;top:0;z-index:20;background:#061525ee;border-bottom:1px solid #16304e;padding:11px 16px;display:flex;align-items:center;gap:10px}.top b{font-size:18px}.top small,.sub,.mut{color:var(--mut)}.nav{display:flex;gap:6px;overflow:auto;padding:8px 12px;border-bottom:1px solid #16304e}.nav a{color:#bdd5ea;text-decoration:none;padding:7px 10px;border-radius:8px;white-space:nowrap}.nav a.on{background:#17304d;color:white}.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:13px;margin-top:12px}.card h2{margin:0 0 4px;font-size:16px}.filters{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px}.fld label{display:block;color:var(--mut);font-size:11px;margin-bottom:3px}.fld select,.fld input,.btn{width:100%;min-height:40px;background:#08192c;color:var(--ink);border:1px solid var(--line);border-radius:9px;padding:8px}.btn{cursor:pointer;font-weight:650}.btn.go{background:#f59a23;color:#211000}.cards{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px}.k{background:var(--card2);border:1px solid var(--line);border-radius:11px;padding:10px}.k small{color:var(--mut);display:block}.k b{font-size:22px}.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}.tw{overflow:auto}table{border-collapse:collapse;width:100%;font-size:12.5px}th,td{padding:7px;border-bottom:1px solid #16304e;white-space:nowrap;text-align:left}th{color:#bdd5ea}.bad{color:#ff8a90}.good{color:#7be7a5}.warn{color:#ffc46b}.chips{display:flex;gap:5px;flex-wrap:wrap;margin-top:8px}.chip{border:1px solid var(--line);background:#12283f;border-radius:999px;padding:4px 9px;font-size:12px}.stopbox{max-height:300px;overflow:auto;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:3px;margin-top:8px}.stopbox label{display:flex;gap:8px;align-items:center;padding:7px;border-radius:7px}.stopbox label:hover{background:#12283f}.heat td{text-align:center}.msg{padding:18px;text-align:center;color:#bdd5ea}.bar{height:9px;background:#132a43;border-radius:5px;overflow:hidden}.bar i{display:block;height:100%;background:#ff9f1c}.tag{font-size:11px;border-radius:999px;padding:3px 8px;border:1px solid var(--line)}@media(max-width:900px){.filters{grid-template-columns:repeat(2,1fr)}.cards{grid-template-columns:repeat(3,1fr)}.grid2{grid-template-columns:1fr}}@media(max-width:520px){.filters,.stopbox{grid-template-columns:1fr}.cards{grid-template-columns:repeat(2,1fr)}}
-.brand{display:flex;align-items:center;gap:12px}.logo{width:40px;height:40px;border-radius:11px;background:linear-gradient(160deg,#2a95ff,#0d63d6);display:grid;place-items:center;font-size:20px}
-.brand h1{margin:0;font-size:20px;font-weight:800;letter-spacing:-.3px;line-height:1.05}.brand p{margin:2px 0 0;color:var(--mut);font-size:12px}
-.hdr-right{margin-left:auto;display:flex;align-items:center}
-.desktop-shell{display:none}.mobile-bottom-nav{display:none}.mobile-more{display:none}.mobile-top-menu{display:none}.mobile-menu-btn{display:none}
-@media(min-width:1000px){body{padding-left:232px}.wrap{max-width:none!important;margin:0!important;padding-left:22px!important;padding-right:22px!important}.desktop-shell{display:flex;position:fixed;left:0;top:0;bottom:0;width:232px;background:#061425;border-right:1px solid #17324d;z-index:10000;flex-direction:column;padding:18px 12px}.shell-brand{padding:7px 10px 18px;border-bottom:1px solid #17324d}.shell-brand strong{font-size:16px;color:#f3f8ff}.shell-brand small{display:block;color:#718da7;margin-top:4px}.shell-label{padding:20px 10px 8px;color:#607d98;font-size:10px;font-weight:800;letter-spacing:.12em}.shell-link{display:flex;align-items:center;gap:10px;color:#9eb6cc;text-decoration:none;padding:11px 12px;margin:2px 0;border-radius:10px;font-size:13px;font-weight:650;position:relative}.shell-link .si{width:24px;text-align:center;font-size:16px}.shell-link:hover{background:#0c2238;color:#fff}.shell-link.active{background:#0c3154;color:#fff}.shell-link.active:before{content:'';position:absolute;left:-12px;top:8px;bottom:8px;width:3px;border-radius:4px;background:#35bfff}.shell-foot{margin-top:auto;padding:12px 10px;color:#64819b;font-size:11px}.top nav.nav{display:none!important}}
-@media(max-width:999px){.top nav.nav{display:none!important}.mobile-menu-btn{display:grid;width:38px;height:38px;place-items:center;border:1px solid #244766;border-radius:10px;background:#0a2036;color:#fff;font-size:20px;cursor:pointer;order:-1}.mobile-bottom-nav{display:grid;grid-template-columns:repeat(4,1fr);position:fixed;left:0;right:0;bottom:0;z-index:12000;background:rgba(5,18,33,.98);border-top:1px solid #21415e;padding:7px max(6px,env(safe-area-inset-right)) calc(7px + env(safe-area-inset-bottom)) max(6px,env(safe-area-inset-left));box-shadow:0 -8px 24px rgba(0,0,0,.22)}.mbn{color:#829db5;text-decoration:none;text-align:center;font-size:10px;font-weight:650;padding:3px 2px;border-radius:9px}.mbn .mi{display:block;font-size:19px;line-height:22px}.mbn.active{color:#4bc7ff;background:#0a2945}.mobile-more{display:none;position:fixed;left:10px;right:10px;bottom:74px;z-index:13000;background:#091c30;border:1px solid #275176;border-radius:16px;padding:8px;box-shadow:0 18px 50px rgba(0,0,0,.5)}.mobile-more.open{display:block}.mobile-more a{display:flex;align-items:center;gap:12px;color:#d7e7f5;text-decoration:none;padding:13px;border-radius:10px;font-weight:650}.mobile-more a.active{background:#0d3559;color:#55c7ff}.mobile-top-menu{display:none;position:fixed;top:calc(56px + env(safe-area-inset-top) + 8px);left:8px;z-index:13000;min-width:230px;max-width:82vw;background:#091c30;border:1px solid #275176;border-radius:16px;padding:8px;box-shadow:0 18px 50px rgba(0,0,0,.5)}.mobile-top-menu.open{display:block}.mobile-top-menu a{display:flex;align-items:center;gap:12px;color:#d7e7f5;text-decoration:none;padding:13px;border-radius:10px;font-weight:650;white-space:nowrap}.mobile-top-menu a.active{background:#0d3559;color:#55c7ff}body{padding-bottom:78px}}
-</style></head><body>
-<aside class="desktop-shell" aria-label="Primary navigation"><div class="shell-brand"><strong>SG Transport Pulse</strong><small>Operations Intelligence</small></div><div class="shell-label">ANALYSIS TOOLS</div><a class="shell-link" href="/"><span class="si">▰</span><span>Route Traffic</span></a><a class="shell-link" href="/control"><span class="si">↔</span><span>Headway Control</span></a><a class="shell-link" href="/bunching"><span class="si">≋</span><span>Bunching &amp; Gap</span></a><a class="shell-link" href="/halfway"><span class="si">½</span><span>Halfway Optimiser</span></a><a class="shell-link" href="/traffic"><span class="si">⚠</span><span>Traffic-Aware</span></a><a class="shell-link" href="/planner"><span class="si">◉</span><span>Halfway Planner</span></a><a class="shell-link active" href="/insight"><span class="si">⏱</span><span>Running Time Analytics</span></a><div class="shell-foot">● Live operational workspace</div></aside>
-<header class="top">
-<button class="mobile-menu-btn" type="button" aria-label="Open navigation" onclick="document.getElementById('mobileTopMenu').classList.toggle('open')">☰</button><div class="mobile-top-menu" id="mobileTopMenu"><a href="/">▰ Route</a><a href="/control">↔ Headway</a><a href="/bunching">≋ Bunching</a><a href="/halfway">½ Halfway Optimiser</a><a href="/traffic">⚠ Traffic-Aware Regulation</a><a href="/planner">◉ Halfway Planner</a><a class="active" href="/insight">⏱ Running Time Analytics</a></div>
-<div class="brand"><div class="logo">⏱</div><div><h1>Running Time Analytics</h1><p>DataMall observations · historical running-time learning</p></div></div>
-<nav class="nav" aria-label="Pages"><a href="/">Route Traffic</a><a href="/control">Headway Control</a><a href="/bunching">Bunching &amp; Gap</a><a href="/halfway">Halfway Optimiser</a><a href="/traffic">Traffic-Aware</a><a href="/planner">Halfway Planner</a><a class="on" href="/insight" aria-current="page">Running Time Analytics</a></nav>
-<div class="hdr-right"><span id="alive" class="tag">Collector…</span></div>
-</header>
-<main class="wrap">
-<section class="card"><h2>Analysis filters</h2><div class="sub">No file upload. This page learns from observations collected by the existing DataMall bus tracker.</div><div class="filters" style="margin-top:9px">
-<div class="fld"><label>Service</label><select id="svc"></select></div><div class="fld"><label>Direction</label><select id="dir"><option value="1">Direction 1</option><option value="2">Direction 2</option></select></div><div class="fld"><label>Day type</label><select id="day"><option value="">All comparable days</option><option>Weekday</option><option>Saturday</option><option>Sunday/PH</option></select></div><div class="fld"><label>Time band</label><select id="band"><option value="30">30 minutes</option><option value="60" selected>60 minutes</option></select></div><div class="fld"><label>Date from</label><input type="date" id="from"></div><div class="fld"><label>Date to</label><input type="date" id="to"></div></div></section>
-<section class="card"><h2>Important Bus Stops</h2><div class="sub">Tick important points in route order. Pairing is automatic: 01→05, 05→10, 10→16…</div><input id="q" placeholder="Search stop code or name" style="width:100%;margin-top:8px;min-height:40px;background:#08192c;color:white;border:1px solid var(--line);border-radius:9px;padding:8px"><div id="stops" class="stopbox"></div><div class="chips" id="pairs"></div><div style="display:flex;gap:8px;margin-top:8px"><button class="btn" id="reset">Reset</button><button class="btn go" id="save">Save Important Points</button></div></section>
-<div id="body"><div class="card msg">Collecting Running Time Analytics status…</div></div>
-</main><script>
-const $=x=>document.getElementById(x), f=x=>x==null?'–':(Math.round(x*10)/10).toFixed(1), sg=x=>x==null?'–':(x>0?'+':'')+f(x), esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));let ST=[],SEL=new Set();
-async function j(u,o){try{let r=await fetch(u,o),x=await r.json();return x}catch(e){return{ok:false,error:'Network error'}}}function params(){let p=new URLSearchParams({service:$('#svc').value,direction:$('#dir').value,band:$('#band').value,daytype:$('#day').value,date_from:$('#from').value,date_to:$('#to').value});return p}
-async function status(){let x=await j('/api/insight/status');if(!x.ok){$('#body').innerHTML=`<div class="card msg">${esc(x.error||'Could not reach the server.')}</div>`;return}$('#alive').textContent=x.collector.alive?'● Collector active':'○ Collector waiting';$('#alive').className='tag '+(x.collector.alive?'good':'warn');let services=[...new Set((x.services||[]).map(r=>r.service))];if(!services.length)services=x.all_services||[];let old=$('#svc').value;$('#svc').innerHTML=services.map(s=>`<option>${esc(s)}</option>`).join('');if(services.includes(old))$('#svc').value=old;if(!services.length){$('#body').innerHTML=`<div class="card msg">No services available: ${esc(x.diag||'unknown reason')}</div>`;return}await loadStops();await run()}
-async function loadStops(){let x=await j('/api/insight/stops?service='+encodeURIComponent($('#svc').value)+'&direction='+$('#dir').value);ST=x.stops||[];SEL=new Set(ST.filter(s=>s.selected).map(s=>s.seq));if(SEL.size<2&&ST.length){SEL.add(1);SEL.add(ST.length)}renderStops()}
-function renderStops(){let q=$('#q').value.toLowerCase();$('#stops').innerHTML=ST.filter(s=>!q||(`${s.code} ${s.name}`).toLowerCase().includes(q)).map(s=>`<label><input type="checkbox" data-seq="${s.seq}" ${SEL.has(s.seq)?'checked':''}><span><b>${String(s.seq).padStart(2,'0')} · ${esc(s.code)}</b><br><span class="mut">${esc(s.name)}</span></span></label>`).join('');$('#stops').querySelectorAll('input').forEach(c=>c.onchange=()=>{c.checked?SEL.add(+c.dataset.seq):SEL.delete(+c.dataset.seq);showPairs()});showPairs()}
-function showPairs(){let a=[...SEL].sort((a,b)=>a-b),h=[];for(let i=0;i<a.length-1;i++)h.push(`<span class="chip">${String(a[i]).padStart(2,'0')}→${String(a[i+1]).padStart(2,'0')}</span>`);$('#pairs').innerHTML=h.join('')||'<span class="mut">Select at least two stops.</span>'}
-$('#q').oninput=renderStops;$('#reset').onclick=()=>{SEL=new Set(ST.length?[1,ST.length]:[]);renderStops()};$('#save').onclick=async()=>{await j('/api/insight/important',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({service:$('#svc').value,direction:+$('#dir').value,seqs:[...SEL]})});await run()};
-function maturity(m){return `<span class="tag">${esc(m||'COLLECTING DATA')}</span>`}function col(x){return x==null?'':x>3?'bad':x>0?'warn':'good'}
-async function run(){let x=await j('/api/insight/service?'+params());if(!x.ok){$('#body').innerHTML=`<div class="card msg">${esc(x.error||'Collecting data…')}</div>`;return}let o=x.overall,r=o.recent,b=o.baseline;let h=`<section class="card"><h2>Running Time Pressure · Service ${esc(x.service)} D${x.direction}</h2><div class="sub">Recent = latest 14 days · baseline = preceding comparable observations. ${esc(x.note)}</div><div class="cards"><div class="k"><small>Current P50</small><b>${f(r.p50)}</b></div><div class="k"><small>Current P85</small><b>${f(r.p85)}</b></div><div class="k"><small>Current P90</small><b>${f(r.p90)}</b></div><div class="k"><small>Baseline P85</small><b>${f(b.p85)}</b></div><div class="k"><small>P85 change</small><b class="${col(o.p85_change)}">${sg(o.p85_change)}</b></div><div class="k"><small>Recent samples</small><b>${r.n}</b>${maturity(o.maturity)}</div></div></section>`;
-h+=`<div class="grid2"><section class="card"><h2>Hourly / time-period RT</h2><div class="sub">Observed whole-route running-time distribution</div><div class="tw"><table><thead><tr><th>Period</th><th>P50</th><th>P75</th><th>P85</th><th>P90</th><th>Baseline P85</th><th>Change</th><th>Samples</th></tr></thead><tbody>${x.hourly.map(z=>`<tr><td>${z.label}</td><td>${f(z.p50)}</td><td>${f(z.p75)}</td><td>${f(z.p85)}</td><td>${f(z.p90)}</td><td>${f(z.baseline_p85)}</td><td class="${col(z.change)}">${sg(z.change)}</td><td>${z.n}</td></tr>`).join('')||'<tr><td colspan="8">Collecting completed journeys…</td></tr>'}</tbody></table></div></section>`;
-h+=`<section class="card"><h2>Important-point section analysis</h2><div class="sub">Where the additional running time is accumulating</div><div class="tw"><table><thead><tr><th>Section</th><th>Current P50</th><th>Current P85</th><th>Baseline P85</th><th>Change</th><th>Samples</th></tr></thead><tbody>${x.sections.map(z=>`<tr><td>${String(z.from_seq).padStart(2,'0')}→${String(z.to_seq).padStart(2,'0')}<br><span class="mut">${esc(z.from_name)} → ${esc(z.to_name)}</span></td><td>${f(z.recent.p50)}</td><td>${f(z.recent.p85)}</td><td>${f(z.baseline.p85)}</td><td class="${col(z.p85_change)}">${sg(z.p85_change)}</td><td>${z.recent.n}</td></tr>`).join('')||'<tr><td colspan="6">Save at least two important points.</td></tr>'}</tbody></table></div></section></div>`;
-let bands=x.hourly.map(z=>z.label);h+=`<section class="card"><h2>Time × Route Section Heatmap</h2><div class="sub">Cell = Current P85 − Baseline P85. Positive values mean running time has increased.</div><div class="tw"><table class="heat"><thead><tr><th>Section</th>${bands.map(b=>`<th>${b}</th>`).join('')}</tr></thead><tbody>${x.heat.map(row=>`<tr><td>${row.label}</td>${row.cells.map(c=>{let v=c.change,bg=v==null?'transparent':v>5?'#632a32':v>2?'#60471e':v>0?'#31492c':'#17304d';return `<td style="background:${bg}" title="Current P85 ${f(c.current)}, baseline ${f(c.baseline)}, n=${c.n}">${sg(v)}</td>`}).join('')}</tr>`).join('')}</tbody></table></div></section>`;$('#body').innerHTML=h}
-['svc','dir'].forEach(id=>$('#'+id).onchange=async()=>{await loadStops();await run()});['day','band','from','to'].forEach(id=>$('#'+id).onchange=run);status();setInterval(()=>j('/api/insight/status').then(x=>{if(x.ok)$('#alive').textContent=x.collector.alive?'● Collector active':'○ Collector waiting'}),30000);
-</script>
-<nav class="mobile-bottom-nav" aria-label="Mobile primary navigation"><a class="mbn" href="/"><span class="mi">▰</span>Route</a><a class="mbn" href="/control"><span class="mi">↔</span>Headway</a><a class="mbn" href="/bunching"><span class="mi">≋</span>Bunching</a><button class="mbn" type="button" style="border:0;background:transparent;font-family:inherit" onclick="document.getElementById('mobileMore').classList.toggle('open')"><span class="mi">•••</span>More</button></nav><div class="mobile-more" id="mobileMore"><a href="/halfway">½ Halfway Optimiser</a><a href="/traffic">⚠ Traffic-Aware Regulation</a><a href="/planner">◉ Halfway Planner</a><a class="active" href="/insight">⏱ Running Time Analytics</a></div>
+:root{--bg:#061525;--card:#0b1a2e;--card2:#0d2440;--line:#16304e;--line2:#244766;--ink:#eaf3ff;--mut:#8ea6bd;--acc:#ff9f1c;--blue:#3c96ff;--grn:#22c55e;--amb:#ffb020;--red:#e0474f;--pur:#9b8cff}
+*{box-sizing:border-box}html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;padding:env(safe-area-inset-top,0) 0 calc(78px + env(safe-area-inset-bottom,0))}
+.wrap{max-width:1500px;margin:0 auto;padding:10px 12px 30px}
+.top{position:sticky;top:0;z-index:9000;display:flex;gap:10px;align-items:center;background:rgba(5,18,33,.96);backdrop-filter:blur(12px);padding:9px 6px;border-bottom:1px solid var(--line)}
+.top .logo{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#3c96ff,#9b8cff);display:grid;place-items:center;font-size:17px;font-weight:800}
+.top h1{margin:0;font-size:17px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.top h1 small{display:block;font-size:11px;color:var(--mut);font-weight:500}
+.top .sp{flex:1}.top .clk{font-size:11px;color:var(--mut);white-space:nowrap}
+a{color:#7fc0ff}
+.card{background:var(--card);border:1px solid var(--line2);border-radius:14px;padding:13px;margin-top:12px}
+.card>h2{margin:0 0 3px;font-size:17px}.card>.sub{color:var(--mut);font-size:12.5px;margin-bottom:9px}
+.flt{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px}
+.fld{min-width:0;display:flex;flex-direction:column;gap:3px}.fld label{font-size:11.5px;color:var(--mut);font-weight:600}
+.sel,input,select,button.btn{font:inherit}
+.sel,input,select{width:100%;background:#08192c;color:var(--ink);border:1px solid var(--line2);border-radius:9px;padding:9px 10px;font-size:14px;min-height:40px}
+.btn{background:#12283f;border:1px solid var(--line2);color:var(--ink);border-radius:10px;padding:9px 13px;font-weight:650;cursor:pointer;min-height:40px}
+.btn:hover{border-color:#3b6f9f}.btn.go{background:linear-gradient(180deg,#ffb54d,#f08a12);color:#231000;border-color:#f08a12}
+.btn.sm{padding:6px 10px;font-size:12.5px;min-height:34px}.btn[disabled]{opacity:.55;cursor:default}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.ms{position:relative}.msbox{position:absolute;z-index:8000;left:0;right:0;top:calc(100% + 4px);background:#08192c;border:1px solid var(--line2);border-radius:10px;padding:8px;display:none;box-shadow:0 18px 40px rgba(0,0,0,.5)}
+.ms.open .msbox{display:block}.mslist{max-height:260px;overflow:auto;margin-top:6px;display:grid;gap:2px}
+.mslist label{display:flex;gap:8px;align-items:center;padding:7px 6px;border-radius:7px;font-size:13px;cursor:pointer}.mslist label:hover{background:#12283f}
+.mslist input{width:auto;min-height:0}.mslist .sq{color:var(--mut);font-variant-numeric:tabular-nums;min-width:22px}
+.chips{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}
+.chip{background:#12283f;border:1px solid var(--line2);border-radius:999px;padding:3px 10px;font-size:12px}
+.chip.sec{background:#1a2f4d;border-color:#3b6f9f;color:#cfe4ff;font-weight:650}
+.cards{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:9px}
+.kpi{background:var(--card2);border:1px solid var(--line2);border-radius:12px;padding:10px 12px;min-width:0}
+.kpi small{display:block;color:var(--mut);font-size:11.5px;line-height:1.3}.kpi b{display:block;font-size:24px;margin-top:3px;font-variant-numeric:tabular-nums}
+.kpi.bad b{color:#ff8a90}.kpi.ok b{color:#7be7a5}.kpi.warn b{color:#ffc46b}
+.tw{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;color:#b9d0e6;font-weight:600;padding:7px 6px;border-bottom:1px solid var(--line2);white-space:nowrap;font-size:12px}
+th.s{cursor:pointer}th.s .ar{color:var(--acc)}
+td{padding:7px 6px;border-bottom:1px solid var(--line);white-space:nowrap}
+tbody tr.click{cursor:pointer}tbody tr.sel td{background:#1d2a12}
+.gapv{font-weight:700}.g-ok{color:#7be7a5}.g-mar{color:#ffe08a}.g-short{color:#ffc46b}.g-bad{color:#ff8a90}
+.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.chart{position:relative}.chart svg{width:100%;height:auto;display:block}
+.tip{position:absolute;pointer-events:none;background:#04101d;border:1px solid var(--line2);border-radius:9px;padding:8px 10px;font-size:12px;box-shadow:0 12px 30px rgba(0,0,0,.5);display:none;z-index:50;min-width:150px}
+.tip b{color:#fff}.legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:11.5px;color:#b9d0e6;margin-top:4px}
+.legend span{display:inline-flex;gap:5px;align-items:center}.legend i{width:20px;height:0;border-top:3px solid}
+.wf{display:grid;gap:0}
+.wf .st{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:10px;align-items:center;font-size:13px;padding:5px 0}
+.wf .pt{width:12px;height:12px;border-radius:50%;background:#3c96ff;border:2px solid #0b1a2e;box-shadow:0 0 0 2px #3c96ff}
+.wf .lnk{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:10px;align-items:center;font-size:12.5px;color:#b9d0e6}
+.wf .bar{height:10px;border-radius:5px;background:#17304d;overflow:hidden}.wf .bar i{display:block;height:100%;background:var(--amb)}
+.wf .bar.max i{background:var(--red)}.wf .vl{margin-left:5px;width:14px;border-left:2px dashed #2c4a6e;height:14px}
+.heat{border-collapse:separate;border-spacing:3px}
+.heat td.c{text-align:center;font-weight:700;border-radius:6px;cursor:pointer;min-width:42px;font-variant-numeric:tabular-nums}
+.heat td.l{color:#cfe0f3;font-weight:650;white-space:nowrap;font-size:12.5px}
+.msg{background:var(--card2);border:1px solid var(--line2);border-radius:10px;padding:10px 12px;font-size:13.5px}
+.msg.err{background:#3a1216;border-color:#7a2228;color:#ffb3b8}.msg.warn{background:#3a2a06;border-color:#7a5a12;color:#ffe08a}
+.note{color:var(--mut);font-size:12px;margin-top:8px;line-height:1.45}
+.tagm{display:inline-block;border-radius:6px;padding:1px 7px;font-size:11px;font-weight:700;background:#123;border:1px solid var(--line2);color:#9cc4ff}
+.tag-actual{background:#12351f;border-color:#2b6b45;color:#9ff0bf}.tag-model{background:#2a1d08;border-color:#7a5a12;color:#ffd79a}
+.sk{height:14px;border-radius:7px;background:linear-gradient(90deg,#102944,#16375a,#102944);background-size:200% 100%;animation:sh 1.1s infinite;margin:6px 0}
+@keyframes sh{0%{background-position:200% 0}100%{background-position:-200% 0}}
+.opts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px}
+.opt{border:1px solid var(--line2);border-radius:12px;background:var(--card2);padding:11px}
+.opt h4{margin:0 0 2px;font-size:14px}.opt .rt{font-size:24px;font-weight:800}.opt .ch{font-size:13px;color:var(--acc);font-weight:700}
+.opt .rel{font-size:12.5px;color:#b9d0e6;margin-top:4px}.opt .why{font-size:12px;color:var(--mut);margin-top:4px}
+.bn{display:grid;grid-template-columns:repeat(6,1fr);position:fixed;left:0;right:0;bottom:0;z-index:12000;background:rgba(5,18,33,.98);border-top:1px solid #21415e;padding:7px 6px calc(7px + env(safe-area-inset-bottom,0))}
+.bn a{color:#829db5;text-decoration:none;text-align:center;font-size:9.5px;font-weight:650;padding:3px 2px;border-radius:9px}
+.bn a .mi{display:block;font-size:17px;line-height:20px}.bn a.on{color:#4bc7ff;background:#0a2945}
+.desktop-shell{display:none}.mobile-top-menu{display:none}.mobile-menu-btn{display:none}
+@media(min-width:1000px){body{padding-left:232px;padding-bottom:20px}.bn{display:none}.desktop-shell{display:flex;position:fixed;left:0;top:0;bottom:0;width:232px;background:#061425;border-right:1px solid #17324d;z-index:10000;flex-direction:column;padding:18px 12px}
+.shell-brand{padding:7px 10px 18px;border-bottom:1px solid #17324d}.shell-brand strong{font-size:16px;color:#f3f8ff}.shell-brand small{display:block;color:#718da7;margin-top:4px}
+.shell-label{padding:20px 10px 8px;color:#607d98;font-size:10px;font-weight:800;letter-spacing:.12em}
+.shell-link{display:flex;align-items:center;gap:10px;color:#9eb6cc;text-decoration:none;padding:11px 12px;margin:2px 0;border-radius:10px;font-size:13px;font-weight:650;position:relative}
+.shell-link .si{width:24px;text-align:center;font-size:16px}.shell-link:hover{background:#0c2238;color:#fff}.shell-link.active{background:#0c3154;color:#fff}
+.shell-link.active:before{content:'';position:absolute;left:-12px;top:8px;bottom:8px;width:3px;border-radius:4px;background:#35bfff}.shell-foot{margin-top:auto;padding:12px 10px;color:#64819b;font-size:11px}}
+@media(max-width:999px){.mobile-menu-btn{display:grid;width:38px;height:38px;place-items:center;border:1px solid #244766;border-radius:10px;background:#0a2036;color:#fff;font-size:20px;cursor:pointer}
+.mobile-top-menu{display:none;position:fixed;top:calc(56px + env(safe-area-inset-top) + 8px);left:8px;z-index:13000;min-width:236px;max-width:82vw;background:#091c30;border:1px solid #275176;border-radius:16px;padding:8px;box-shadow:0 18px 50px rgba(0,0,0,.5)}
+.mobile-top-menu.open{display:block}.mobile-top-menu a{display:flex;align-items:center;gap:12px;color:#d7e7f5;text-decoration:none;padding:13px;border-radius:10px;font-weight:650;white-space:nowrap}
+.mobile-top-menu a.active{background:#0d3559;color:#55c7ff}}
+@media(max-width:1200px){.cards{grid-template-columns:repeat(3,minmax(0,1fr))}.opts{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:1000px){.grid2{grid-template-columns:minmax(0,1fr)}.flt{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:560px){.flt{grid-template-columns:minmax(0,1fr)}.cards{grid-template-columns:repeat(2,minmax(0,1fr))}.opts{grid-template-columns:minmax(0,1fr)}.kpi b{font-size:20px}}
+</style>
+</head>
+<body>
+<aside class="desktop-shell" aria-label="Primary navigation"><div class="shell-brand"><strong>SG Transport Pulse</strong><small>Operations Intelligence</small></div>
+<div class="shell-label">ANALYSIS TOOLS</div>
+<a class="shell-link " href="/"><span class="si">&#9648;</span><span>Route Traffic</span></a>
+<a class="shell-link " href="/control"><span class="si">&#8596;</span><span>Headway Control</span></a>
+<a class="shell-link " href="/bunching"><span class="si">&#8776;</span><span>Bunching &amp; Gap</span></a>
+<a class="shell-link " href="/halfway"><span class="si">&frac12;</span><span>Halfway Optimiser</span></a>
+<a class="shell-link " href="/traffic"><span class="si">&#9888;</span><span>Traffic-Aware</span></a>
+<a class="shell-link " href="/planner"><span class="si">&#9673;</span><span>Halfway Planner</span></a>
+<a class="shell-link active" href="/running-time"><span class="si">&#9201;</span><span>Running Time Analytics</span></a>
+<div class="shell-foot">&#9679; Running time analytics</div></aside>
+<header class="top"><button class="mobile-menu-btn" type="button" aria-label="Open navigation" onclick="document.getElementById('inMenu').classList.toggle('open')">&#9776;</button>
+<div class="logo">&#9201;</div><h1>RUNNING TIME ANALYTICS<small>Measured from live LTA data &middot; Smarter Planning, Better Journeys</small></h1><div class="sp"></div><div class="clk" id="clk"></div></header>
+<div class="mobile-top-menu" id="inMenu"><a href="/">&#9648; Route</a><a href="/control">&#8596; Headway</a><a href="/bunching">&#8776; Bunching</a><a href="/halfway">&frac12; Halfway Optimiser</a><a href="/traffic">&#9888; Traffic-Aware</a><a href="/planner">&#9673; Halfway Planner</a><a class="active" href="/running-time">&#9201; Running Time</a></div>
+<div class="wrap">
+  <section class="card">
+    <h2>Data &amp; filters</h2><div class="sub" id="inDsSub">Actual running time is measured from live bus positions (LTA DataMall). Scheduled running time is not published by DataMall, so the timetable value is entered below.</div>
+    <div class="row" style="margin-bottom:9px">
+      <select id="inDs" class="sel" style="max-width:440px"></select>
+      <button class="btn sm" id="inRefresh" type="button">Refresh</button>
+      <button class="btn sm" id="inDemo" type="button">Add modelled sample</button>
+      <button class="btn sm" id="inDel" type="button">Delete sample</button>
+    </div>
+    <div class="flt">
+      <div class="fld"><label for="inSvc">Service</label><select id="inSvc"></select></div>
+      <div class="fld"><label for="inDay">Day type</label><select id="inDay"><option value="">All</option><option value="Weekday">Weekday</option><option value="Saturday">Saturday</option><option value="Sunday/PH">Sunday / PH</option></select></div>
+      <div class="fld"><label for="inFrom">Date from</label><input id="inFrom" class="sel" type="date"></div>
+      <div class="fld"><label for="inTo">Date to</label><input id="inTo" class="sel" type="date"></div>
+      <div class="fld"><label for="inPctl">Planning percentile</label><select id="inPctl"><option value="50">P50 &ndash; typical</option><option value="85" selected>P85 &ndash; reliable planning</option><option value="90">P90 &ndash; conservative</option><option value="95">P95</option></select></div>
+      <div class="fld"><label for="inBand">Time band</label><select id="inBand"><option value="15">15 min</option><option value="30" selected>30 min</option><option value="60">60 min</option></select></div>
+      <div class="fld"><label for="inMinN">Minimum sample per period</label><input id="inMinN" class="sel" type="number" min="1" max="200" value="5"></div>
+      <div class="fld"><label for="inDir">Section direction</label><select id="inDir"><option value="1">Direction 1</option><option value="2">Direction 2</option></select></div>
+    </div>
+    <div class="ms" id="inImpWrap" style="margin-top:9px">
+      <label style="font-size:11.5px;color:var(--mut);font-weight:600">Important bus stops &ndash; the route sections are paired automatically</label>
+      <button class="btn" id="inImpBtn" type="button" style="width:100%;text-align:left">Important Bus Stops: 0 selected &#9662;</button>
+      <div class="msbox"><input id="inImpQ" class="sel" placeholder="Search 5-digit code or stop name" autocomplete="off">
+        <div class="row" style="margin-top:6px"><button class="btn sm" id="inImpAll" type="button">Select all</button><button class="btn sm" id="inImpNone" type="button">Clear all</button><button class="btn sm" id="inImpClose" type="button">Done</button></div>
+        <div class="mslist" id="inImpList"></div></div>
+      <div class="chips" id="inImpChips"></div>
+    </div>
+    <div class="note" id="inQual"></div>
+  </section>
+  <section class="card"><h2>Collection &amp; timetable</h2>
+    <div class="sub">The collector follows each bus along the route and stores a trip when the bus completes it, so history builds up while a page is open (or continuously if the always-on collector is enabled).</div>
+    <div class="grid2">
+      <div><h3 style="margin:0 0 6px;font-size:15px">Live collection <span id="inColState" class="tagm"></span></h3>
+        <div class="row"><input id="inWatchSvc" class="sel" style="max-width:140px" maxlength="6" placeholder="Service"><button class="btn sm" id="inWatch" type="button">Collect this service</button></div>
+        <div class="tw" style="margin-top:8px"><table id="inColTab"><thead><tr><th>Service</th><th>Dir</th><th>Trips measured</th><th>Average actual RT</th><th>From</th><th>To</th></tr></thead><tbody></tbody></table></div>
+        <div class="note" id="inColNote"></div></div>
+      <div><h3 style="margin:0 0 6px;font-size:15px">Scheduled running time (timetable)</h3>
+        <div class="row"><input id="inSSvc" class="sel" style="max-width:110px" maxlength="6" placeholder="Service">
+          <select id="inSDir" style="max-width:110px"><option value="1">Dir 1</option><option value="2">Dir 2</option></select>
+          <select id="inSDay" style="max-width:150px"><option value="All">All days</option><option value="Weekday">Weekday</option><option value="Saturday">Saturday</option><option value="Sunday/PH">Sunday / PH</option></select>
+          <input id="inSFrom" class="sel" style="max-width:100px" maxlength="5" placeholder="from 07:00"><input id="inSTo" class="sel" style="max-width:100px" maxlength="5" placeholder="to 09:30">
+          <input id="inSRt" class="sel" style="max-width:120px" type="number" step="0.5" min="1" max="400" placeholder="RT min">
+          <button class="btn sm" id="inSAdd" type="button">Add</button></div>
+        <div class="tw" style="margin-top:8px"><table id="inSTab"><thead><tr><th>Service</th><th>Dir</th><th>Day type</th><th>Period</th><th>Scheduled RT</th><th></th></tr></thead><tbody></tbody></table></div>
+        <div class="note">Without a timetable value the page still shows the measured distribution (P50 / P85 / P90), but it cannot show a gap.</div></div>
+    </div>
+  </section>
+  <div id="inBody"><div class="card"><div class="msg">Loading measured running times…</div></div></div>
+</div>
+<nav class="bn" aria-label="Mobile primary navigation"><a href="/"><span class="mi">&#9648;</span>Route</a><a href="/control"><span class="mi">&#8596;</span>Headway</a><a href="/bunching"><span class="mi">&#8776;</span>Bunching</a><a href="/halfway"><span class="mi">&frac12;</span>Optimiser</a><a href="/planner"><span class="mi">&#9673;</span>Planner</a><a class="on" href="/running-time"><span class="mi">&#9201;</span>Run time</a></nav>
 <script>
-document.addEventListener("click", function(e){
-  var topMenu = document.getElementById("mobileTopMenu"), moreMenu = document.getElementById("mobileMore");
-  if(topMenu && topMenu.classList.contains("open") && !topMenu.contains(e.target) && !e.target.closest(".mobile-menu-btn")) topMenu.classList.remove("open");
-  if(moreMenu && moreMenu.classList.contains("open") && !moreMenu.contains(e.target) && !e.target.closest(".mbn")) moreMenu.classList.remove("open");
-}, true);
+const $ = id => document.getElementById(id);
+const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const f1 = x => x == null ? "\u2013" : (Math.abs(x - Math.round(x)) < .05 ? String(Math.round(x)) : x.toFixed(1));
+const sg = x => x == null ? "\u2013" : (x > 0 ? "+" : "") + f1(x);
+const LS = {get(k, d){ try{ const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); }catch(e){ return d; } }, set(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }};
+const S = {ds:LS.get("in.ds", 0), svc:LS.get("in.svc", ""), dir:LS.get("in.dir", 1), imp:new Set(), stops:[], sum:null, svcData:null, sec:null, sort:"worst", desc:true, cell:null};
+function clk(){ $("clk").textContent = new Intl.DateTimeFormat("en-GB", {timeZone:"Asia/Singapore", hour12:false, day:"2-digit", month:"short", hour:"2-digit", minute:"2-digit"}).format(new Date()) + " SGT"; }
+clk(); setInterval(clk, 30000);
+async function getJSON(u, ms){ const c = new AbortController(), t = setTimeout(() => c.abort(), ms || 90000);
+  try{ const r = await fetch(u, {signal:c.signal}); const j = await r.json().catch(() => ({})); if(!r.ok && !j.error) j.error = "Server error " + r.status; return j; }
+  catch(e){ return {error:e.name === "AbortError" ? "Timed out" : "Network error"}; } finally{ clearTimeout(t); } }
+async function post(u, body, hdr){ const tok = LS.get("bb.tok", "");
+  const go = t => fetch(u, {method:"POST", headers:Object.assign(t ? {"x-admin-token":t} : {}, hdr || {}), body});
+  let r = await go(tok);
+  if(r.status === 401){ const t = prompt("Admin token"); if(!t) return {error:"Cancelled"}; LS.set("bb.tok", t); r = await go(t); }
+  return r.json().catch(() => ({error:"Server error " + r.status})); }
+const qs = extra => new URLSearchParams(Object.assign({ds:S.ds, pctl:$("inPctl").value, band:$("inBand").value, daytype:$("inDay").value,
+  date_from:$("inFrom").value, date_to:$("inTo").value, min_n:$("inMinN").value}, extra || {}));
+
+/* ---------- datasets ---------- */
+async function loadDatasets(pick){
+  const j = await getJSON("/api/insight/datasets");
+  const ds = j.datasets || [];
+  $("inDs").innerHTML = `<option value="0">Live measurement (LTA DataMall)</option>` + ds.map(d => `<option value="${d.id}">${esc(d.name)} \u00b7 ${d.trips.toLocaleString()} trips</option>`).join("");
+  if(pick != null) S.ds = pick;
+  if(S.ds && !ds.some(d => d.id === S.ds)) S.ds = 0;
+  $("inDs").value = String(S.ds); LS.set("in.ds", S.ds);
+  const cur = ds.find(d => d.id === S.ds);
+  $("inDsSub").innerHTML = cur ? `<span class="tagm tag-model">MODELLED SAMPLE \u2013 TRAINING ONLY</span> ${cur.trips.toLocaleString()} trips \u00b7 ${esc(cur.dates[0] || "?")} to ${esc(cur.dates[1] || "?")} \u00b7 services ${cur.services.map(esc).join(", ")}`
+    : `<span class="tagm tag-actual">MEASURED FROM LIVE LTA DATA</span> Actual running time is measured by following each bus along its route; scheduled running time comes from the timetable values you enter below.`;
+  loadCollector(); loadSched(); run();
+}
+$("inDs").onchange = () => { S.ds = +$("inDs").value; LS.set("in.ds", S.ds); S.svc = ""; loadDatasets(S.ds); };
+$("inRefresh").onclick = () => { LS.set("in.ds", S.ds); loadDatasets(S.ds); };
+$("inDemo").onclick = async () => { $("inDsSub").textContent = "Building a modelled sample\u2026"; const j = await post("/api/insight/demo?days=40", "");
+  if(j.error){ $("inDsSub").innerHTML = `<span style="color:#ff8a90">${esc(j.error)}</span>`; return; } loadDatasets(j.id); };
+$("inDel").onclick = async () => { if(!S.ds){ alert("The live measurement cannot be deleted here."); return; } if(!confirm("Delete this sample dataset?")) return;
+  await post("/api/insight/delete", JSON.stringify({id:S.ds})); S.ds = 0; loadDatasets(0); };
+/* ---------- collector + timetable ---------- */
+async function loadCollector(){
+  const j = await getJSON("/api/rt/status");
+  if(!j.ok) return;
+  $("inColState").textContent = j.collecting ? (j.always_on ? "always on" : "collecting while a page is open") : "idle";
+  $("inColState").className = "tagm " + (j.collecting ? "tag-actual" : "");
+  document.querySelector("#inColTab tbody").innerHTML = j.services.length
+    ? j.services.map(r => `<tr><td><b>${esc(r.service)}</b></td><td>${r.direction}</td><td>${r.trips.toLocaleString()}</td><td>${f1(r.avg_rt)} min</td><td>${esc(r.from)}</td><td>${esc(r.to)}</td></tr>`).join("")
+    : `<tr><td colspan="6" style="color:var(--mut)">No trip measured yet. Add a service and keep a page open \u2013 a trip is stored each time a bus completes the route (about one running time per bus per trip).</td></tr>`;
+  $("inColNote").textContent = `Collector refresh ${j.refresh_sec}s \u00b7 watching ${j.watch.join(", ") || "nothing"} \u00b7 trips kept ${j.keep_days} days \u00b7 ${j.note}`;
+}
+$("inWatch").onclick = async () => { const svc = $("inWatchSvc").value.trim().toUpperCase(); if(!svc) return;
+  $("inColNote").textContent = "Starting collection\u2026";
+  const j = await post("/api/rt/watch", JSON.stringify({service:svc}));
+  if(j.error) $("inColNote").textContent = j.error; else loadCollector(); };
+async function loadSched(){
+  const j = await getJSON("/api/rt/sched");
+  document.querySelector("#inSTab tbody").innerHTML = (j.rows || []).length ? j.rows.map(r => `<tr><td><b>${esc(r.service)}</b></td><td>${r.direction}</td><td>${esc(r.day_type)}</td><td>${esc(r.t_from)}\u2013${esc(r.t_to)}</td><td>${f1(r.rt_min)} min</td><td><button class="btn sm" data-del="${r.id}" type="button">Delete</button></td></tr>`).join("")
+    : `<tr><td colspan="6" style="color:var(--mut)">No timetable running time entered yet.</td></tr>`;
+  document.querySelectorAll("#inSTab [data-del]").forEach(b => b.onclick = async () => { await post("/api/rt/sched", JSON.stringify({delete:+b.dataset.del})); loadSched(); run(); });
+}
+$("inSAdd").onclick = async () => {
+  const body = {service:$("inSSvc").value.trim(), direction:+$("inSDir").value, day_type:$("inSDay").value, t_from:$("inSFrom").value.trim() || "00:00", t_to:$("inSTo").value.trim() || "23:59", rt_min:$("inSRt").value};
+  const j = await post("/api/rt/sched", JSON.stringify(body));
+  if(j.error){ alert(j.error); return; } $("inSRt").value = ""; loadSched(); run(); };
+["inPctl", "inBand", "inDay", "inFrom", "inTo", "inMinN"].forEach(id => $(id).onchange = () => run());
+$("inSvc").onchange = () => { S.svc = $("inSvc").value; LS.set("in.svc", S.svc); S.imp.clear(); runService(); };
+$("inDir").onchange = () => { S.dir = +$("inDir").value; LS.set("in.dir", S.dir); S.imp.clear(); runService(); };
+
+/* ---------- important stops ---------- */
+function renderImp(){
+  const q = $("inImpQ").value.trim().toLowerCase();
+  const show = S.stops.filter(s => !q || (s.code || "").includes(q) || (s.name || "").toLowerCase().includes(q));
+  $("inImpList").innerHTML = show.length ? show.map(s => `<label><input type="checkbox" value="${esc(s.code)}" ${S.imp.has(s.code) ? "checked" : ""}><span class="sq">${String(s.pos).padStart(2, "0")}</span><span><b>${esc(s.code)}</b> \u2014 ${esc(s.name || "(no name)")}</span></label>`).join("")
+    : `<div class="note" style="padding:8px">${S.stops.length ? "No stop matches." : "This dataset has no stop-level times."}</div>`;
+  $("inImpList").querySelectorAll("input").forEach(i => i.onchange = () => { i.checked ? S.imp.add(i.value) : S.imp.delete(i.value); impLabel(); runSections(); });
+  impLabel();
+}
+function impLabel(){
+  $("inImpBtn").textContent = `Important Bus Stops: ${S.imp.size} selected \u25be`;
+  const pick = S.stops.filter(s => S.imp.has(s.code));
+  const secs = pick.slice(0, -1).map((s, i) => `${s.pos}\u2192${pick[i + 1].pos}`);
+  $("inImpChips").innerHTML = pick.map(s => `<span class="chip">${String(s.pos).padStart(2, "0")} ${esc(s.code)} ${esc(s.name || "")}</span>`).join("")
+    + (secs.length ? `<span class="chip" style="background:transparent;border:0;color:var(--mut)">auto sections:</span>` + secs.map(x => `<span class="chip sec">${x}</span>`).join("") : "");
+}
+$("inImpBtn").onclick = () => { $("inImpWrap").classList.toggle("open"); if($("inImpWrap").classList.contains("open")) renderImp(); };
+$("inImpQ").oninput = renderImp;
+$("inImpAll").onclick = () => { const q = $("inImpQ").value.trim().toLowerCase(); S.stops.filter(s => !q || (s.code || "").includes(q) || (s.name || "").toLowerCase().includes(q)).forEach(s => S.imp.add(s.code)); renderImp(); runSections(); };
+$("inImpNone").onclick = () => { S.imp.clear(); renderImp(); runSections(); };
+$("inImpClose").onclick = () => $("inImpWrap").classList.remove("open");
+document.addEventListener("click", e => { if(!e.target.closest("#inImpWrap")) $("inImpWrap").classList.remove("open"); });
+
+/* ---------- run ---------- */
+async function run(){
+  $("inBody").innerHTML = `<div class="card"><div class="sk"></div><div class="sk" style="width:80%"></div><div class="sk" style="width:60%"></div></div>`;
+  const j = await getJSON("/api/insight/summary?" + qs());
+  S.sum = j;
+  if(!j.ok){ $("inBody").innerHTML = `<div class="card"><div class="msg err">${esc(j.error)}</div></div>`; return; }
+  const svcs = j.rows.map(r => r.service);
+  $("inSvc").innerHTML = svcs.map(s => `<option value="${esc(s)}">Service ${esc(s)}</option>`).join("");
+  if(!svcs.includes(S.svc)) S.svc = svcs[0] || "";
+  $("inSvc").value = S.svc;
+  const q = j.quality;
+  $("inQual").innerHTML = `Data quality: ${(q.analysed || 0).toLocaleString()} trips analysed of ${(q.trips_in_file || 0).toLocaleString()} measured \u00b7 ${q.dates[0] || "?"} to ${q.dates[1] || "?"}
+    \u00b7 outliers removed ${(q.outliers_removed || 0).toLocaleString()} (MAD, within service + direction + hour)${j.info && j.info.no_sched ? ` \u00b7 <b style="color:#ffc46b">${j.info.no_sched.toLocaleString()} trips have no timetable running time entered</b>` : ""}${j.info && j.info.cover_p50 ? ` \u00b7 median route coverage ${f1(j.info.cover_p50)}%` : ""}
+    ${q.missing_columns.length ? " \u00b7 columns not supplied: " + q.missing_columns.map(esc).join(", ") : ""} \u00b7 minimum sample per period ${$("inMinN").value} trips.`;
+  renderAll();
+  runService();
+}
+async function runService(){
+  if(!S.svc) return;
+  const j = await getJSON("/api/insight/service?" + qs({service:S.svc, model:"1"}));
+  S.svcData = j;
+  if(j.ok){
+    const d = j.dirs[String(S.dir)] || j.dirs["1"] || j.dirs["2"];
+    S.stops = (d && d.stops) || [];
+    if(!S.imp.size && S.stops.length >= 3){ const step = Math.max(1, Math.floor(S.stops.length / 4));
+      for(let i = 0; i < S.stops.length; i += step) S.imp.add(S.stops[i].code); S.imp.add(S.stops[S.stops.length - 1].code); }
+    impLabel();
+  }
+  renderAll(); runSections();
+}
+async function runSections(){
+  if(!S.svc || !S.stops.length){ S.sec = null; renderAll(); return; }
+  const j = await getJSON("/api/insight/sections?" + qs({service:S.svc, direction:S.dir, stops:[...S.imp].join(",")}));
+  S.sec = j; renderAll();
+}
+
+/* ---------- charts ---------- */
+function chart(rows, pctl){
+  if(!rows || !rows.length) return `<div class="msg">No trips in this direction.</div>`;
+  const W = 680, H = 250, pl = 42, pr = 12, pt = 14, pb = 40;
+  const ys = rows.flatMap(r => [r.sched, r.p50, r.p85, r.p90]).filter(v => v != null);
+  const lo = Math.floor(Math.min(...ys) / 5) * 5 - 2, hi = Math.ceil(Math.max(...ys) / 5) * 5 + 2;
+  const x = i => pl + (W - pl - pr) * (rows.length === 1 ? .5 : i / (rows.length - 1));
+  const y = v => pt + (H - pt - pb) * (1 - (v - lo) / Math.max(1, hi - lo));
+  const line = (key, col, w) => `<polyline points="${rows.map((r, i) => r[key] == null ? "" : `${x(i).toFixed(1)},${y(r[key]).toFixed(1)}`).filter(Boolean).join(" ")}" fill="none" stroke="${col}" stroke-width="${w}" stroke-linejoin="round"/>`;
+  let s = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Scheduled and actual running time by time of day">`;
+  for(let v = Math.ceil(lo / 5) * 5; v <= hi; v += (hi - lo > 60 ? 20 : hi - lo > 25 ? 10 : 5)){
+    s += `<line x1="${pl}" x2="${W - pr}" y1="${y(v)}" y2="${y(v)}" stroke="#12304e"/><text x="${pl - 6}" y="${y(v) + 4}" text-anchor="end" font-size="11" fill="#8ea6bd">${v}</text>`; }
+  rows.forEach((r, i) => { if((r.gap || 0) > 0.5 && !r.small_sample){ const w = (W - pl - pr) / Math.max(1, rows.length - 1);
+      s += `<rect x="${x(i) - w / 2}" y="${pt}" width="${w}" height="${H - pt - pb}" fill="#ff5a5f" opacity=".16"/>`; } });
+  s += line("sched", "#9b8cff", 2.5) + line("p50", "#22c55e", 2) + line("p85", "#ffb020", 2.5) + line("p90", "#e0474f", 1.8);
+  rows.forEach((r, i) => { if(i % Math.ceil(rows.length / 8) === 0) s += `<text x="${x(i)}" y="${H - pb + 16}" text-anchor="middle" font-size="11" fill="#8ea6bd">${esc(r.start)}</text>`; });
+  rows.forEach((r, i) => { const w = (W - pl - pr) / Math.max(1, rows.length - 1);
+    s += `<rect class="hv" data-i="${i}" x="${x(i) - w / 2}" y="${pt}" width="${w}" height="${H - pt - pb}" fill="transparent" style="cursor:crosshair"/>`; });
+  s += `<text x="${pl}" y="${H - 6}" font-size="11" fill="#8ea6bd">Trip start time \u00b7 minutes on the vertical axis</text></svg>`;
+  return s;
+}
+function bindChart(box, rows){
+  const tip = box.querySelector(".tip"), svg = box.querySelector("svg");
+  if(!svg) return;
+  svg.querySelectorAll("rect.hv").forEach(r => {
+    const show = e => { const d = rows[+r.dataset.i]; const b = box.getBoundingClientRect();
+      tip.innerHTML = `<b>${esc(d.label)}</b><br>Scheduled: ${f1(d.sched)} min<br>P50: ${f1(d.p50)} \u00b7 P85: ${f1(d.p85)} \u00b7 P90: ${f1(d.p90)}<br><b style="color:${(d.gap || 0) > .5 ? "#ff8a90" : "#7be7a5"}">Gap at P${S.sum.pctl}: ${sg(d.gap)} min</b><br>Samples: ${d.n} trips \u00b7 reliability ${f1(d.reliability)}%`;
+      tip.style.display = "block";
+      const px = (e.touches ? e.touches[0].clientX : e.clientX) - b.left, py = (e.touches ? e.touches[0].clientY : e.clientY) - b.top;
+      tip.style.left = Math.min(Math.max(4, px - 70), b.width - tip.offsetWidth - 4) + "px"; tip.style.top = Math.max(2, py - tip.offsetHeight - 12) + "px"; };
+    r.addEventListener("mousemove", show); r.addEventListener("touchstart", show, {passive:true});
+    r.addEventListener("mouseleave", () => tip.style.display = "none");
+  });
+  box.addEventListener("touchend", () => setTimeout(() => tip.style.display = "none", 2500), {passive:true});
+}
+const gcls = g => g == null ? "" : g <= 0 ? "g-ok" : g <= 1 ? "g-mar" : g <= 3 ? "g-short" : "g-bad";
+const heatCol = g => g == null ? "#12253c" : g <= 0 ? "#12351f" : g <= 1 ? "#2a3a10" : g <= 3 ? "#5a4308" : g <= 6 ? "#6a3208" : "#5a1216";
+const heatTxt = g => g == null ? "#5f7894" : g <= 0 ? "#7be7a5" : g <= 3 ? "#ffe08a" : "#ffb3b8";
+
+/* ---------- render ---------- */
+function renderAll(){
+  const j = S.sum; if(!j || !j.ok) return;
+  let h = "";
+  // management summary over all services
+  const sorted = [...j.rows].sort((a, b) => { const v = r => S.sort === "service" ? r.service : S.sort === "periods" ? r.periods_short : (r.worst || -99);
+    const x = v(a), y = v(b); return (x === y ? 0 : x < y ? -1 : 1) * (S.desc ? -1 : 1); });
+  h += `<section class="card"><h2>Which services are lacking running time?</h2>
+    <div class="sub">Every service in the dataset, both directions, at P${f1(j.pctl)} with ${j.band}-min periods. Sorted by the largest shortage.</div>
+    <div class="tw"><table><thead><tr><th class="s" data-s="service">Service</th><th>D1 Sch</th><th>D1 P50</th><th>D1 P${f1(j.pctl)}</th><th>D1 gap</th><th>D2 Sch</th><th>D2 P50</th><th>D2 P${f1(j.pctl)}</th><th>D2 gap</th>
+      <th class="s" data-s="periods">Periods short</th><th class="s" data-s="worst">Largest shortage</th><th>Direction affected</th><th>Suggested review</th><th>Trips</th></tr></thead><tbody>
+      ${sorted.map(r => `<tr class="click" data-svc="${esc(r.service)}"><td><b>${esc(r.service)}</b></td>
+        ${[r.d1, r.d2].map(d => d ? `<td>${f1(d.sched)}</td><td>${f1(d.p50)}</td><td>${f1(d.planning)}</td><td class="gapv ${gcls(d.gap)}">${sg(d.gap)}</td>` : `<td colspan="4" style="color:var(--mut)">no data</td>`).join("")}
+        <td>${r.periods_short}</td><td class="gapv ${gcls(r.worst)}">${sg(r.worst)}</td><td>${esc(r.direction_affected)}</td><td>${esc(r.suggested_review)}</td><td>${r.n.toLocaleString()}${r.small_sample ? ' <span style="color:#ffc46b">small</span>' : ""}</td></tr>`).join("")}
+      </tbody></table></div><div class="note">Click a row to analyse that service. "Periods short" counts time bands where P${f1(j.pctl)} exceeds the scheduled running time with enough trips.</div></section>`;
+  // service detail
+  const sd = S.svcData;
+  if(sd && sd.ok){
+    const dirs = ["1", "2"].filter(d => sd.dirs[d]);
+    const cur = sd.dirs[String(S.dir)] || sd.dirs[dirs[0]];
+    h += `<section class="card"><h2>Service ${esc(sd.service)} &ndash; is the running time enough?</h2>
+      <div class="sub">${sd.n.toLocaleString()} trips \u00b7 ${esc(sd.dates[0] || "?")} to ${esc(sd.dates[1] || "?")} \u00b7 ${sd.daytypes.map(esc).join(", ")} \u00b7 planning percentile P${f1(sd.pctl)}</div>
+      ${dirs.map(d => { const x = sd.dirs[d], o = x.overall;
+        return `<div style="margin-top:8px"><b>Direction ${d}</b> ${x.n_short ? `<span class="chip" style="background:#3a1216;border-color:#7a2228;color:#ffb3b8">${x.n_short} periods short</span>` : `<span class="chip" style="background:#12351f;border-color:#2b6b45;color:#9ff0bf">adequate overall</span>`}
+        <div class="cards" style="margin-top:6px"><div class="kpi"><small>Scheduled RT</small><b>${f1(o.sched)}</b></div><div class="kpi"><small>P50 actual</small><b>${f1(o.p50)}</b></div>
+          <div class="kpi"><small>P${f1(sd.pctl)} actual</small><b>${f1(o.planning)}</b></div><div class="kpi ${o.gap > 0.5 ? "bad" : "ok"}"><small>RT gap at P${f1(sd.pctl)}</small><b>${sg(o.gap)}</b></div>
+          <div class="kpi ${o.reliability >= 85 ? "ok" : o.reliability >= 60 ? "warn" : "bad"}"><small>Trips finishing within schedule</small><b>${f1(o.reliability)}%</b></div>
+          <div class="kpi"><small>Trips analysed</small><b>${o.n.toLocaleString()}</b></div></div>
+        ${x.worst ? `<div class="note">Worst period: <b>${esc(x.worst.label)}</b> \u2013 scheduled ${f1(x.worst.sched)}, P${f1(sd.pctl)} ${f1(x.worst.planning)} (${sg(x.worst.gap)} min) from ${x.worst.n} trips.</div>` : ""}</div>`; }).join("")}
+      <div class="grid2" style="margin-top:10px">${dirs.map(d => `<div><h3 style="margin:0 0 4px;font-size:15px">Direction ${d} \u2013 running time by time of day</h3>
+        <div class="chart" id="ch${d}">${chart(sd.dirs[d].periods, sd.pctl)}<div class="tip"></div></div>
+        <div class="legend"><span><i style="border-color:#9b8cff"></i>Scheduled</span><span><i style="border-color:#22c55e"></i>P50</span><span><i style="border-color:#ffb020"></i>P85</span><span><i style="border-color:#e0474f"></i>P90</span><span style="color:#ff8a90">shaded = P${f1(sd.pctl)} above scheduled</span></div></div>`).join("")}</div>
+      <div class="grid2" style="margin-top:12px">${dirs.map(d => `<div><h3 style="margin:0 0 4px;font-size:15px">Direction ${d} \u2013 time period report</h3><div class="tw" style="max-height:420px;overflow:auto"><table>
+        <thead><tr><th>Period</th><th>Sch</th><th>Avg</th><th>P50</th><th>P75</th><th>P85</th><th>P90</th><th>P95</th><th>Gap</th><th>n</th><th>Rel %</th><th>Assessment</th></tr></thead><tbody>
+        ${sd.dirs[d].periods.map(r => `<tr><td>${esc(r.label)}</td><td>${f1(r.sched)}</td><td>${f1(r.mean)}</td><td>${f1(r.p50)}</td><td>${f1(r.p75)}</td><td>${f1(r.p85)}</td><td>${f1(r.p90)}</td><td>${f1(r.p95)}</td>
+          <td class="gapv ${gcls(r.gap)}">${sg(r.gap)}</td><td>${r.n}</td><td>${f1(r.reliability)}</td><td>${esc(r.assessment)}</td></tr>`).join("")}</tbody></table></div></div>`).join("")}</div></section>`;
+    // sections
+    const sec = S.sec;
+    h += `<section class="card"><h2>Where along the route is the running time lost?</h2>
+      <div class="sub">Direction ${S.dir} \u00b7 sections are paired automatically from the important stops above (1\u21925, 5\u219210, 10\u219216 \u2026), always following the route sequence.</div>`;
+    if(!sec || !sec.ok){ h += `<div class="msg">${esc((sec && sec.error) || "Select at least two important stops.")}</div>`; }
+    else {
+      const worst = sec.worst;
+      const basis = (sec.sections.find(r => r.basis) || {}).basis;
+      if(basis === "typical") h += `<div class="msg warn">LTA DataMall does not publish a stop-to-stop timetable, so each section is compared with <b>its own typical level (P50)</b> instead of a scheduled time. The column below is therefore "extra minutes above the typical level" – it shows <b>where and when</b> time is lost, not a timetable shortfall.</div>`;
+      h += `<div class="tw"><table><thead><tr><th>Section</th><th>From</th><th>To</th><th>Stops</th><th>${basis === "typical" ? "Typical (P50)" : "Sch"}</th><th>Avg</th><th>P50</th><th>P${f1(sec.pctl)}</th><th>${basis === "typical" ? "Extra vs typical" : "Gap"}</th><th>Share</th><th>n</th></tr></thead><tbody>
+        ${sec.sections.map(r => `<tr ${worst && r.label === worst.label ? 'style="background:#2a1d08"' : ""}><td><b>${esc(r.label)}</b></td><td>${esc(r.from)} ${esc(r.from_name || "")}</td><td>${esc(r.to)} ${esc(r.to_name || "")}</td>
+          <td>${r.stops}</td><td>${f1(r.sched)}</td><td>${f1(r.mean)}</td><td>${f1(r.p50)}</td><td>${f1(r.planning)}</td><td class="gapv ${gcls(r.gap)}">${sg(r.gap)}</td><td>${r.share == null ? "\u2013" : f1(r.share) + "%"}</td><td>${r.n}${r.note ? ` <span style="color:#ffc46b">${esc(r.note)}</span>` : ""}</td></tr>`).join("")}
+        </tbody></table></div>
+        <div class="grid2" style="margin-top:12px"><div><h3 style="margin:0 0 6px;font-size:15px">Where the extra time accumulates</h3><div class="wf">
+          ${sec.sections.map((r, i) => { const mx = Math.max(...sec.sections.map(s => s.gap || 0));
+            return `<div class="st"><span class="pt"></span><span>${esc(r.from)} ${esc(r.from_name || "")}</span><span style="color:var(--mut)">${i === 0 ? "start" : ""}</span></div>
+              <div class="lnk"><span class="vl"></span><span class="bar ${(r.gap || 0) >= mx && mx > 0 ? "max" : ""}"><i style="width:${mx > 0 ? Math.max(2, 100 * Math.max(0, r.gap || 0) / mx) : 0}%"></i></span><span class="gapv ${gcls(r.gap)}">${sg(r.gap)} min${(r.gap || 0) >= mx && mx > 0 ? " \u2190 largest" : ""}</span></div>`; }).join("")}
+          <div class="st"><span class="pt"></span><span>${esc(sec.sections[sec.sections.length - 1].to)} ${esc(sec.sections[sec.sections.length - 1].to_name || "")}</span><span style="color:var(--mut)">end</span></div></div>
+          <div class="note">Total measured shortage across these sections: <b>${f1(sec.route_gap)} min</b> at P${f1(sec.pctl)}.</div></div>
+        <div><h3 style="margin:0 0 6px;font-size:15px">When and where \u2013 section \u00d7 time period (gap, min)</h3><div class="tw"><table class="heat"><thead><tr><th></th>
+          ${(sec.heat[0] ? sec.heat[0].cells : []).map(c => `<th style="font-size:11px">${esc(c.label.split("\u2013")[0])}</th>`).join("")}</tr></thead><tbody>
+          ${sec.heat.map(rw => `<tr><td class="l">${esc(rw.label)}</td>${rw.cells.map(c => `<td class="c" data-sec="${esc(rw.label)}" data-b="${esc(c.label.split("\u2013")[0])}" style="background:${heatCol(c.gap)};color:${heatTxt(c.gap)};${c.small ? "opacity:.55" : ""}" title="${esc(rw.label)} ${esc(c.label)} \u00b7 scheduled ${f1(c.sched)} \u00b7 P85 ${f1(c.p85)} \u00b7 ${c.n} trips">${sg(c.gap)}</td>`).join("")}</tr>`).join("")}
+          </tbody></table></div><div class="note">Tap a cell to see the trips behind it. Faded cells have fewer trips than your minimum sample.</div><div id="inCell"></div></div></div>`;
+      if(sec.contributors && sec.contributors.ok){
+        const c = sec.contributors;
+        h += `<div class="card" style="background:var(--card2);margin-top:12px"><h3 style="margin:0 0 4px;font-size:15px">What is the slowest section associated with?</h3>
+          <div class="sub">Section ${esc(worst ? worst.label : "")} \u00b7 comparing the slowest ${c.n_slow} trips (at or above P${f1(sec.pctl)}, ${f1(c.cut)} min) with the other ${c.n_rest}.</div>
+          <div class="tw"><table><thead><tr><th>Condition</th><th>Slowest trips</th><th>Other trips</th><th>Difference</th></tr></thead><tbody>
+          ${c.factors.map(f => `<tr><td>${esc(f.factor)}</td><td>${f1(f.slow)}${esc(f.unit ? " " + f.unit : "")}</td><td>${f1(f.rest)}${esc(f.unit ? " " + f.unit : "")}</td><td><b>${sg(f.diff)}${f.pct != null ? ` (${sg(f.pct)}%)` : ""}</b></td></tr>`).join("")}
+          </tbody></table></div><div class="note">${esc(c.wording)}</div></div>`;
+      } else if(sec.contributors){
+        h += `<div class="note">${esc(sec.contributors.reason || "No condition data in this dataset (traffic speed, dwell, road works, weather, demand), so contributors cannot be examined.")}</div>`;
+      }
+    }
+    h += `</section>`;
+    // recommendation + scenarios + model + quality
+    const x = sd.dirs[String(S.dir)] || sd.dirs[dirs[0]];
+    h += `<section class="card"><h2>How much running time should be provided?</h2>
+      <div class="sub">Direction ${S.dir} over the whole day. Management decides; these are the options with their measured reliability.</div>
+      <div class="opts">${x.options.map(o => `<div class="opt" style="${o.name === "Keep current" ? "" : "border-color:#3b6f9f"}"><h4>${esc(o.name)}</h4><div class="rt">${f1(o.rt)} min</div>
+        <div class="ch">${sg(o.change)} min</div><div class="rel">Trips finishing within it: <b>${f1(o.reliability)}%</b></div><div class="why">${esc(o.why)} \u00b7 ${esc(o.cost)}</div></div>`).join("")}</div>
+      <div class="note">Percentiles are measured from ${x.overall.n.toLocaleString()} trips. Running time should normally be set per time period, not for the whole day: use the period report above for the periods that are short.</div>
+      <div class="grid2" style="margin-top:12px">
+        <div><h3 style="margin:0 0 6px;font-size:15px">Scenario comparison <span class="tagm">bootstrap</span></h3><div class="tw"><table><thead><tr><th>Condition</th><th>Trips</th><th>P50</th><th>P${f1(sd.pctl)}</th><th>90% interval</th></tr></thead><tbody>
+          ${x.scenarios.map(s => s.available ? `<tr><td>${esc(s.name)}</td><td>${s.n}</td><td>${f1(s.p50)}</td><td><b>${f1(s.planning)}</b></td><td>${f1(s.ci[0])}\u2013${f1(s.ci[1])}</td></tr>`
+            : `<tr style="color:var(--mut)"><td>${esc(s.name)}</td><td>${s.n}</td><td colspan="3">not enough trips with this condition in the data</td></tr>`).join("")}</tbody></table></div>
+          <div class="note">Resampled from the historical trips themselves (400 draws), so the interval shows how certain the percentile is.</div></div>
+        <div><h3 style="margin:0 0 6px;font-size:15px">Quantile model <span class="tagm tag-model">MODELLED</span></h3>
+          ${x.model && x.model.ok ? `<div class="tw"><table><thead><tr><th>Quantile</th><th>Pinball loss</th><th>Achieved coverage</th></tr></thead><tbody>
+            ${Object.entries(x.model.quality).map(([k, v]) => `<tr><td>${esc(k.toUpperCase())}</td><td>${f1(v.pinball)}</td><td>${f1(v.coverage)}%</td></tr>`).join("")}</tbody></table></div>
+            <div class="note">Linear quantile regression (pinball loss) on ${x.model.n.toLocaleString()} trips. Features: ${x.model.features.map(esc).join(", ")}. ${esc(x.model.note)}</div>`
+            : `<div class="msg">${esc((x.model && x.model.reason) || "Model not run.")}</div>`}</div></div></section>`;
+  }
+  $("inBody").innerHTML = h;
+  // bindings
+  document.querySelectorAll("#inBody th.s").forEach(t => t.onclick = () => { const k = t.dataset.s; if(S.sort === k) S.desc = !S.desc; else { S.sort = k; S.desc = k !== "service"; } renderAll(); });
+  document.querySelectorAll("#inBody tr[data-svc]").forEach(tr => tr.onclick = () => { S.svc = tr.dataset.svc; $("inSvc").value = S.svc; LS.set("in.svc", S.svc); S.imp.clear(); runService(); });
+  if(sd && sd.ok) ["1", "2"].forEach(d => { const b = $("ch" + d); if(b) bindChart(b, sd.dirs[d].periods); });
+  document.querySelectorAll("#inBody .heat td.c").forEach(td => td.onclick = () => showCell(td.dataset.sec, td.dataset.b));
+}
+async function showCell(section, bandStart){
+  const box = $("inCell"); if(!box) return;
+  box.innerHTML = `<div class="sk"></div>`;
+  const j = await getJSON("/api/insight/cell?" + qs({service:S.svc, direction:S.dir, section, band_start:bandStart, stops:[...S.imp].join(",")}));
+  if(!j.ok){ box.innerHTML = `<div class="msg err">${esc(j.error)}</div>`; return; }
+  box.innerHTML = `<div class="card" style="background:#08192c;margin-top:8px"><h3 style="margin:0 0 4px;font-size:14px">Section ${esc(j.section)} \u00b7 ${esc(j.band)} \u00b7 ${j.n} trips (slowest first)</h3>
+    <div class="tw" style="max-height:300px;overflow:auto"><table><thead><tr><th>Date</th><th>Trip</th><th>Start</th><th>Section sch</th><th>Section actual</th><th>Gap</th><th>Whole trip sch \u2192 actual</th><th>Conditions</th></tr></thead><tbody>
+    ${j.trips.map(t => `<tr><td>${esc(t.date)}</td><td>${esc(t.trip || "\u2013")}</td><td>${esc(t.start_clock)}</td><td>${f1(t.section_sch)}</td><td>${f1(t.section_act)}</td><td class="gapv ${gcls(t.gap)}">${sg(t.gap)}</td>
+      <td>${f1(t.trip_sch)} \u2192 ${f1(t.trip_act)}</td><td style="white-space:normal;color:var(--mut)">${Object.entries(t.cond).map(([k, v]) => esc(k) + " " + f1(v)).join(" \u00b7 ") || "\u2013"}</td></tr>`).join("")}
+    </tbody></table></div></div>`;
+}
+loadDatasets();
 </script>
-</body></html>
+</body>
+</html>
