@@ -21,7 +21,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 import headway
 import traffic
 
-VERSION = "V13.2"
+VERSION = "V13.3"
 LTA = os.getenv("LTA_BASE", "https://datamall2.mytransport.sg/ltaodataservice").rstrip("/")
 KEY = os.getenv("LTA_ACCOUNT_KEY", "")
 OSRM = os.getenv("OSRM_URL", "https://router.project-osrm.org").rstrip("/")
@@ -1041,6 +1041,7 @@ def bb_init():
                     for r in bb_sql("SELECT * FROM service_headway_config ORDER BY service, direction, t_from", fetch=True)]
     ho_init()
     os_init()
+    in_init()
     tr_init()
 
 
@@ -2173,6 +2174,237 @@ async def os_plan(g, res, svc, d, bus, dims):
             "skipped_line": ho_simplify(svc_line, 200), "roadworks": [x for x in rw if x.get("lat") is not None and any(offservice.dist_to_line_m((x["lat"], x["lon"]), r["line"]) <= 300 for r in routes)][:20],
             "incidents": [x for x in inc if any(offservice.dist_to_line_m((x["lat"], x["lon"]), r["line"]) <= 300 for r in routes)][:20],
             "sources": {"routing": OSRM, "restrictions": "OpenStreetMap (Overpass) - community data, not an authoritative clearance register", "traffic": "LTA speed bands, incidents, road works"}}
+
+
+# ----------------------------------------------------------------------------- V13.3 PROJECT INSIGHT - running time analytics (/insight)
+import insight
+import gzip
+import base64
+
+IN_CACHE = {}          # dataset id -> (trips, info) parsed on demand
+
+
+def in_init():
+    bb_sql("CREATE TABLE IF NOT EXISTS insight_dataset(id INTEGER PRIMARY KEY AUTOINCREMENT, ts REAL, name TEXT, kind TEXT, rows INTEGER, trips INTEGER, info TEXT, blob TEXT)")
+
+
+def in_load(ds_id):
+    """parsed trips for a dataset (cached in memory)."""
+    hit = IN_CACHE.get(ds_id)
+    if hit:
+        return hit
+    rows = bb_sql("SELECT blob FROM insight_dataset WHERE id=?", (ds_id,), fetch=True)
+    if not rows:
+        return None, {"error": "Dataset not found."}
+    text = gzip.decompress(base64.b64decode(rows[0]["blob"])).decode("utf-8", "replace")
+    trips, info = insight.parse_csv(text)
+    if trips is None:
+        return None, info
+    trips, removed = insight.drop_outliers(trips)
+    info["outliers_removed"] = removed
+    info["analysed"] = len(trips)
+    if len(IN_CACHE) > 4:
+        IN_CACHE.clear()
+    IN_CACHE[ds_id] = (trips, info)
+    return trips, info
+
+
+def in_save(name, kind, text):
+    trips, info = insight.parse_csv(text)
+    if trips is None:
+        return None, info.get("error") or "The file could not be read."
+    blob = base64.b64encode(gzip.compress(text.encode("utf-8"))).decode()
+    bb_sql("INSERT INTO insight_dataset(ts, name, kind, rows, trips, info, blob) VALUES (?,?,?,?,?,?,?)",
+           (time.time(), name[:80], kind, info["rows"], info["trips"], json.dumps(info), blob))
+    r = bb_sql("SELECT id FROM insight_dataset ORDER BY id DESC LIMIT 1", (), fetch=True)
+    IN_CACHE.clear()
+    return (r[0]["id"] if r else None), None
+
+
+def in_pctl(v, d=85):
+    try:
+        p = float(v) if str(v).strip() else d
+    except ValueError:
+        return d
+    return min(99.0, max(50.0, p))
+
+
+def in_num(v, d, lo, hi):
+    try:
+        x = float(str(v).strip()) if str(v).strip() else d
+    except ValueError:
+        return d
+    return min(hi, max(lo, x))
+
+
+@app.get("/insight", response_class=HTMLResponse)
+async def insight_page():
+    return HTMLResponse((HERE / "insight.html").read_text(encoding="utf-8"))
+
+
+@app.get("/api/insight/datasets")
+async def api_in_datasets():
+    rows = bb_sql("SELECT id, ts, name, kind, rows, trips, info FROM insight_dataset ORDER BY id DESC LIMIT 30", (), fetch=True)
+    out = []
+    for r in rows:
+        info = json.loads(r["info"] or "{}")
+        out.append({"id": r["id"], "name": r["name"], "kind": r["kind"], "rows": r["rows"], "trips": r["trips"],
+                    "time": datetime.fromtimestamp(r["ts"], SGT).strftime("%d %b %H:%M"), "services": info.get("services", []),
+                    "dates": info.get("dates", [None, None]), "stop_level": info.get("stop_level"), "conditions": info.get("conditions", []),
+                    "daytypes": info.get("daytypes", [])})
+    return {"datasets": out, "model": insight.VERSION}
+
+
+@app.post("/api/insight/upload")
+async def api_in_upload(request: Request):
+    """Upload trip-level or stop-level running time data (CSV / TSV, max 12 MB)."""
+    if not bb_auth(request):
+        return JSONResponse({"error": "Admin token missing or wrong."}, status_code=401)
+    raw = await request.body()
+    if len(raw) > 12 * 1024 * 1024:
+        return JSONResponse({"error": "File is larger than 12 MB. Split it or filter it first."}, status_code=400)
+    name = request.headers.get("x-file-name", "upload.csv")
+    ds_id, err = await asyncio.to_thread(in_save, name, "upload", raw.decode("utf-8", "replace"))
+    if err:
+        return JSONResponse({"error": err}, status_code=400)
+    return {"ok": True, "id": ds_id}
+
+
+@app.post("/api/insight/demo")
+async def api_in_demo(request: Request, days: int = 40):
+    """Create a MODELLED demo dataset so the page can be seen working without real data."""
+    if not bb_auth(request):
+        return JSONResponse({"error": "Admin token missing or wrong."}, status_code=401)
+    text = await asyncio.to_thread(insight.demo, max(7, min(90, days)))
+    ds_id, err = await asyncio.to_thread(in_save, f"DEMO (modelled data, {max(7, min(90, days))} days)", "demo", text)
+    if err:
+        return JSONResponse({"error": err}, status_code=400)
+    return {"ok": True, "id": ds_id}
+
+
+@app.post("/api/insight/delete")
+async def api_in_delete(request: Request):
+    if not bb_auth(request):
+        return JSONResponse({"error": "Admin token missing or wrong."}, status_code=401)
+    b = json.loads((await request.body()).decode("utf-8") or "{}")
+    bb_sql("DELETE FROM insight_dataset WHERE id=?", (int(b.get("id") or 0),))
+    IN_CACHE.clear()
+    return {"ok": True}
+
+
+def in_filters(trips, daytype, date_from, date_to):
+    return insight.filt(trips, daytype=daytype or None, date_from=(date_from or None), date_to=(date_to or None))
+
+
+@app.get("/api/insight/summary")
+async def api_in_summary(ds: int = 0, pctl: str = "85", band: str = "30", daytype: str = "", date_from: str = "", date_to: str = "", min_n: str = "10"):
+    trips, info = await asyncio.to_thread(in_load, ds)
+    if trips is None:
+        return {"ok": False, "error": info.get("error", "No data")}
+    p, b, mn = in_pctl(pctl), int(in_num(band, 30, 15, 60)), int(in_num(min_n, 10, 1, 500))
+    sel = in_filters(trips, daytype, date_from, date_to)
+    rows = await asyncio.to_thread(insight.summary, sel, p, b, mn)
+    return {"ok": True, "rows": rows, "pctl": p, "band": b, "min_n": mn, "n_trips": len(sel), "info": info,
+            "quality": {"trips_in_file": info.get("trips"), "analysed": len(sel), "outliers_removed": info.get("outliers_removed"),
+                        "dropped_incomplete": info.get("dropped_incomplete"), "dates": info.get("dates"), "stop_level": info.get("stop_level"),
+                        "conditions": info.get("conditions"), "missing_columns": info.get("columns_missing")}}
+
+
+@app.get("/api/insight/service")
+async def api_in_service(ds: int = 0, service: str = "", pctl: str = "85", band: str = "30", daytype: str = "", date_from: str = "", date_to: str = "",
+                         min_n: str = "5", model: str = "0"):
+    trips, info = await asyncio.to_thread(in_load, ds)
+    if trips is None:
+        return {"ok": False, "error": info.get("error", "No data")}
+    svc = service.strip().upper()
+    p, b, mn = in_pctl(pctl), int(in_num(band, 30, 15, 60)), int(in_num(min_n, 5, 1, 500))
+    sel = in_filters(trips, daytype, date_from, date_to)
+    g = [t for t in sel if t["svc"] == svc]
+    if not g:
+        return {"ok": False, "error": f"No trips for service {svc} with these filters."}
+    out = {"ok": True, "service": svc, "pctl": p, "band": b, "min_n": mn, "dirs": {}, "n": len(g),
+           "dates": [min((t["date"] for t in g if t["date"]), default=None), max((t["date"] for t in g if t["date"]), default=None)],
+           "daytypes": sorted({t["daytype"] for t in g}), "info": info}
+    for d in (1, 2):
+        gd = [t for t in g if t["dir"] == d]
+        if not gd:
+            out["dirs"][str(d)] = None
+            continue
+        sched = insight.pct([t["srt"] for t in gd], 50)
+        dd = insight.dist([t["art"] for t in gd], sched, p)
+        periods = await asyncio.to_thread(insight.by_period, gd, svc, d, b, p, mn)
+        short = [r for r in periods if (r.get("gap") or 0) > 0.5 and not r["small_sample"]]
+        out["dirs"][str(d)] = {"overall": dd, "periods": periods, "n_short": len(short),
+                               "worst": max(short, key=lambda r: r["gap"]) if short else None,
+                               "options": insight.options([t["art"] for t in gd], sched, p),
+                               "stops": insight.stop_list(gd, svc, d),
+                               "scenarios": await asyncio.to_thread(insight.scenarios, gd, p),
+                               "contributors": await asyncio.to_thread(insight.contributors, gd, None, p)}
+        if str(model) == "1":
+            out["dirs"][str(d)]["model"] = await asyncio.to_thread(insight.quantile_model, gd)
+    return out
+
+
+@app.get("/api/insight/sections")
+async def api_in_sections(ds: int = 0, service: str = "", direction: int = 1, stops: str = "", pctl: str = "85", band: str = "30",
+                          daytype: str = "", date_from: str = "", date_to: str = "", min_n: str = "5"):
+    trips, info = await asyncio.to_thread(in_load, ds)
+    if trips is None:
+        return {"ok": False, "error": info.get("error", "No data")}
+    svc = service.strip().upper()
+    p, b, mn = in_pctl(pctl), int(in_num(band, 30, 15, 60)), int(in_num(min_n, 5, 1, 500))
+    sel = [t for t in in_filters(trips, daytype, date_from, date_to) if t["svc"] == svc and t["dir"] == direction]
+    if not sel:
+        return {"ok": False, "error": f"No trips for service {svc} direction {direction}."}
+    all_stops = insight.stop_list(sel, svc, direction)
+    if not all_stops:
+        return {"ok": False, "error": "This dataset has no stop-level times, so the route cannot be split into sections. Upload stop-level data for sectional analysis."}
+    picked = [c for c in re.split(r"[,\s]+", stops.strip()) if c]
+    if len(picked) < 2:
+        step = max(1, len(all_stops) // 5)
+        picked = [s["code"] for s in all_stops[::step]]
+        if all_stops[-1]["code"] not in picked:
+            picked.append(all_stops[-1]["code"])
+    secs = insight.pair_sections(all_stops, picked)
+    if not secs:
+        return {"ok": False, "error": "Select at least two stops of this direction."}
+    rows, heat = await asyncio.to_thread(insight.sections_analysis, sel, secs, p, b, mn)
+    worst = max([r for r in rows if r.get("gap") is not None], key=lambda r: r["gap"], default=None)
+    contrib = None
+    if worst:
+        wsec = next(s for s in secs if s["label"] == worst["label"])
+        vals = insight.section_times(sel, wsec)
+        contrib = await asyncio.to_thread(insight.contributors, sel, vals, p)
+    return {"ok": True, "service": svc, "direction": direction, "pctl": p, "band": b, "stops": all_stops, "picked": picked,
+            "sections": rows, "heat": heat, "worst": worst, "contributors": contrib, "n": len(sel),
+            "route_gap": round(sum(max(0.0, r.get("gap") or 0.0) for r in rows), 1)}
+
+
+@app.get("/api/insight/cell")
+async def api_in_cell(ds: int = 0, service: str = "", direction: int = 1, section: str = "", stops: str = "", band_start: str = "", band: str = "30",
+                      daytype: str = "", date_from: str = "", date_to: str = "", limit: int = 60):
+    """the trips behind one heatmap cell."""
+    trips, info = await asyncio.to_thread(in_load, ds)
+    if trips is None:
+        return {"ok": False, "error": info.get("error", "No data")}
+    svc = service.strip().upper()
+    b = int(in_num(band, 30, 15, 60))
+    sel = [t for t in in_filters(trips, daytype, date_from, date_to) if t["svc"] == svc and t["dir"] == direction]
+    all_stops = insight.stop_list(sel, svc, direction)
+    picked = [c for c in re.split(r"[,\s]+", stops.strip()) if c]
+    secs = insight.pair_sections(all_stops, picked)
+    sec = next((s for s in secs if s["label"] == section), None)
+    if not sec:
+        return {"ok": False, "error": "Unknown section."}
+    bs = insight.parse_time(band_start)
+    vals = [v for v in insight.section_times(sel, sec) if v["start"] is not None and (bs is None or insight.band_of(v["start"], b) == insight.band_of(bs, b))]
+    vals.sort(key=lambda v: -v["act"])
+    out = [{"date": v["trip"]["date"], "trip": v["trip"]["trip"], "bus": v["trip"]["bus"], "daytype": v["trip"]["daytype"],
+            "start": insight.band_label(insight.band_of(v["start"], b), b), "start_clock": f"{int(v['start'] // 60) % 24:02d}:{int(v['start'] % 60):02d}",
+            "section_act": round(v["act"], 1), "section_sch": None if v["sch"] is None else round(v["sch"], 1),
+            "gap": None if v["sch"] is None else round(v["act"] - v["sch"], 1), "trip_act": round(v["trip"]["art"], 1), "trip_sch": round(v["trip"]["srt"], 1),
+            "cond": {k: round(x, 2) for k, x in v["trip"]["cond"].items()}} for v in vals[:limit]]
+    return {"ok": True, "section": section, "band": insight.band_label(insight.band_of(bs, b), b) if bs is not None else "All day", "n": len(vals), "trips": out}
 
 
 # ----------------------------------------------------------------------------- V13.0 Halfway Deployment Planner (proactive: /planner)

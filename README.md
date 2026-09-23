@@ -1,10 +1,25 @@
-# SG Transport Pulse V13.0 — Route Traffic + Departure Adjustment + Bunching, Gap & Alerts + AI Halfway Optimiser
+# SG Transport Pulse V13.3 — Route Traffic + Departure Adjustment + Bunching, Gap & Alerts + AI Halfway Optimiser
 
 Live bus positions, live LTA traffic drawn directly on the bus route, and next arrivals per stop.
 FastAPI backend + a single-page Leaflet frontend (OneMap basemap, OpenStreetMap fallback).
 
 
 
+
+## V13.3 - PROJECT INSIGHT: running time analytics (`/insight`)
+
+"Smarter Planning, Better Journeys" - a separate page answering which services lack running time, which direction, at what time of day, on which section of the route, and how much time should reasonably be provided.
+
+* **Data (`insight.py`).** Upload trip-level OR stop-level CSV/TSV (12 MB max); headers are matched loosely (Service / Svc / ServiceNo, ScheduledDeparture / SchDep ...). Trips are rebuilt from stop times when terminal times are missing, after-midnight times unwrapped, day type taken from the column or derived from the date, incomplete trips dropped and counted. A **modelled demo dataset** can be generated to see the page working - labelled MODELLED DEMO DATA everywhere, never presented as actual observations. Datasets are stored gzipped in SQLite (`insight_dataset`).
+* **Adequacy engine.** Never judged from one trip: every service + direction + day type + time band (15 / 30 / 60 min) is summarised as mean, P50, P75, P85, P90, P95, SD and n against the scheduled running time, with gaps at P50 / P85 / P90 and at a **configurable planning percentile** (P85 is the default, not a hard-coded truth). Outliers are removed by MAD *within service + direction + hour*, so genuinely slow peak trips are not discarded.
+* **Management summary** of every service: D1/D2 scheduled, P50, planning percentile, gap, periods short, largest shortage, direction affected, suggested review period, sample size - sortable.
+* **Per service:** KPI cards, D1 and D2 running-time charts (scheduled, P50, P85, P90, short periods shaded, hover/tap detail) and the full time-period report with reliability % and an assessment (Adequate / Marginal / Short / Clearly short / Too few trips).
+* **Important bus stops -> sections.** Every stop of the service + direction is listed in route sequence with its 5-digit code in a searchable tick-box multi-select. Selected stops are **auto-paired along the sequence** (1>5, 5>10, 10>16 ...), never 1>5, 6>10, and never reversed. Each section gets the same distribution treatment plus its share of the route shortage, a **waterfall** of where the time accumulates, and a **section x time-period heatmap**; tapping a cell lists the trips behind it.
+* **Contributors** for the worst section: the slowest trips (at or above the planning percentile) compared with the rest on whatever condition columns exist (traffic speed, dwell, road works, incident, rain, demand, events). Always worded as associations, never as proven causes.
+* **Recommendation:** Keep current / Option A (P50) / Option B (P85) / Option C (P90), each with the measured share of trips that would finish within it - management decides.
+* **Supporting analyses:** historical **bootstrap** scenarios (normal weekday, AM peak, PM peak, rain, road works, heavy traffic, high demand) with a 90% interval on the percentile, and a small **linear quantile regression** (pinball loss, numpy) reported with its pinball loss and achieved coverage and labelled MODELLED - Monte Carlo is deliberately not the main engine.
+* **Data quality** always on screen: trips analysed vs trips in the file, date range, dropped rows, outliers removed, missing columns, configurable minimum sample per period with small samples flagged.
+* Works on desktop and mobile (stacked cards, horizontally scrolling tables, touch-friendly multi-select). Added to the left launcher and to every menu.
 
 ## V13.0 - Halfway Deployment Planner (`/planner`): proactive, standalone
 
