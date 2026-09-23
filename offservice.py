@@ -373,3 +373,58 @@ def why_works(ben, trip, first_name, stop_name, km_lost, lay):
          else f"The largest gap at this stop becomes {b['max']:.0f} min."),
         f"Headway benefit: {max(0.0, ben['earned']):.0f} min. Trade-off: {km_lost:.1f} km of scheduled mileage is not operated.",
     ]
+
+
+# ============================================================================ proactive planner: quick headway estimate for one candidate stop
+def quick_gain(H, t_j, late, ins):
+    """Headway at the halfway stop for one disrupted trip, assuming the buses before and after it run on time.
+    t_j = the trip's scheduled passing time at that stop, late = how late the bus is, ins = when it would enter service there.
+    Returns the largest gap if it runs the full trip vs if it starts halfway."""
+    prev, nxt = t_j - H, t_j + H
+    def gaps(t):
+        ts = sorted([prev, t, nxt])
+        return [round(b - a, 1) for a, b in zip(ts, ts[1:])]
+    gA, gB = gaps(t_j + late), gaps(ins)
+    mA, mB = max(gA), max(gB)
+    return {"prev": round(prev, 1), "next": round(nxt, 1), "sched": round(t_j, 1), "full_pass": round(t_j + late, 1), "insert": round(ins, 1),
+            "gaps_full": gA, "gaps_half": gB, "max_full": mA, "max_half": mB, "gain": round(mA - mB, 1),
+            "dev_full": round(late, 1), "dev_half": round(ins - t_j, 1), "after_next": ins > nxt + 1e-6}
+
+
+def rank_candidates(cands, W=None):
+    """Not distance alone: headway gain against off-service cost, omitted stops and important stops missed."""
+    W = W or {"gain": 1.0, "min": 0.30, "km": 0.20, "omit": 12.0, "imp": 10.0}
+    for c in cands:
+        c["score"] = round(W["gain"] * c["gain"] - W["min"] * c["off_min"] - W["km"] * c["off_km"]
+                           - W["omit"] * (c["stops_omitted"] / max(1, c["stops_total"])) - W["imp"] * c["important_missed"], 2)
+    cands.sort(key=lambda c: (-c["score"], c["off_min"]))
+    for i, c in enumerate(cands, 1):
+        c["rank"] = i
+    return cands
+
+
+def band_of(c, min_gain, H):
+    if c["gain"] <= 0 or c["after_next"]:
+        return "red"
+    if c["important_missed"] or c["gain"] < max(min_gain, 0.5 * H) or c["stops_omitted"] / max(1, c["stops_total"]) > 0.6:
+        return "amber"
+    return "green"
+
+
+def trade_off_text(top):
+    """the doc's 'the closest is not always the best' explanation, written from the real numbers."""
+    if len(top) < 2:
+        return []
+    out = []
+    for c in top[:3]:
+        miss = f", {c['important_missed']} important stop(s) missed" if c["important_missed"] else ""
+        out.append(f"{c['code']} {c['name']}: {c['off_min']:.0f} min / {c['off_km']:.1f} km off-service, about {c['gain']:.0f} min less maximum headway, "
+                   f"{c['stops_omitted']} stops not served{miss}.")
+    a = top[0]
+    b = min(top[1:3], key=lambda c: c["off_min"])
+    if b["off_min"] < a["off_min"] - 0.5:
+        extra = "keeps more important stops and " if b["important_missed"] > a["important_missed"] else ""
+        more = f" while omitting {a['stops_omitted'] - b['stops_omitted']} more stops" if a["stops_omitted"] > b["stops_omitted"] else ""
+        out.append(f"{b['code']} is {a['off_min'] - b['off_min']:.0f} min closer, but {a['code']} is ranked first because it {extra}"
+                   f"gives about {a['gain'] - b['gain']:.0f} min more headway benefit{more}.")
+    return out

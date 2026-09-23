@@ -1,9 +1,24 @@
-# SG Transport Pulse V12.9 — Route Traffic + Departure Adjustment + Bunching, Gap & Alerts + AI Halfway Optimiser
+# SG Transport Pulse V13.0 — Route Traffic + Departure Adjustment + Bunching, Gap & Alerts + AI Halfway Optimiser
 
 Live bus positions, live LTA traffic drawn directly on the bus route, and next arrivals per stop.
 FastAPI backend + a single-page Leaflet frontend (OneMap basemap, OpenStreetMap fallback).
 
 
+
+
+## V13.0 - Halfway Deployment Planner (`/planner`): proactive, standalone
+
+Until now halfway information only appeared after the optimiser decided a halfway start was needed. This page lets a controller open it at any time, pick a service and direction, and explore halfway points independently.
+
+**Filter panel (top):** service -> direction (labelled `UP - first -> last`) -> current location / starting point (first stop, any 5-digit stop code, or the device's map location) -> **important bus stops** (searchable multi-select by code or name, select all / clear all, shows "Important Bus Stops: n selected") -> max time to halfway -> max off-service distance -> minimum headway gain -> bus type and optional vehicle height / width / weight -> scheduled headway, how late the bus is, the trip's scheduled departure and when the bus is free to move -> **Find possible halfway points**.
+
+**Search (`/api/planner/search`):** every stop on the direction is tested. One routing request gives the road time and distance from where the bus is now to every stop. For each stop: off-service time and distance, stops remaining and omitted, important stops served / missed, when the bus could enter service, and the headway gain (largest gap at that stop if the bus runs the full trip vs if it starts there, assuming the buses around it are on time). Stops the bus would reach after the following bus are not candidates and are counted separately.
+
+**Ranking is never by distance alone:** headway gain minus off-service time and distance, the share of stops omitted and important stops missed; green / amber / red bands; and a written "why the closest is not always the best" comparison of the top three.
+
+**Selected candidate (`/api/planner/route`):** the V12.9 routing and suitability engine for that stop - up to three road routes (fastest / shortest / preferred), live congestion, restriction and structure checks for the chosen bus type, findings list, VERIFIED / REQUIRES REVIEW / UNSUITABLE, road-by-road timeline linked to the map, and the map itself (revenue route in purple, off-service dashed blue, section not served dotted, red halfway pin, green / red important-stop markers, incidents and road works). A "bus stops affected" strip shows every stop as a dot (grey = not served, green = served, ringed = important). If the detailed road time differs from the screening estimate, the page says so and shows both headway figures.
+
+**Note:** the headway figure here is a quick estimate for one delayed trip. The full Monte Carlo comparison of No action / Full trip + adjustment / Halfway + regulation stays on the Halfway Optimiser page.
 
 ## V12.9 - Halfway Deployment & Off-Service Route Planner
 

@@ -1,0 +1,295 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#061525">
+<title>Halfway Deployment Planner &middot; SG Transport Pulse</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+:root{--bg:#061525;--card:#0b1a2e;--card2:#0d2440;--line:#16304e;--line2:#244766;--ink:#eaf3ff;--mut:#8ea6bd;--acc:#ff9f1c;--blue:#3c96ff;--grn:#22c55e;--amb:#ffb020;--red:#e0474f;--pur:#9b8cff}
+*{box-sizing:border-box}html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;padding:env(safe-area-inset-top,0) 0 calc(78px + env(safe-area-inset-bottom,0))}
+.wrap{max-width:1400px;margin:0 auto;padding:10px 12px 30px}
+.top{position:sticky;top:0;z-index:9000;display:flex;gap:10px;align-items:center;background:rgba(5,18,33,.96);backdrop-filter:blur(12px);padding:9px 4px;border-bottom:1px solid var(--line)}
+.top .logo{width:36px;height:36px;border-radius:10px;background:var(--blue);display:grid;place-items:center;font-size:19px}
+.top h1{margin:0;font-size:18px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.top .sp{flex:1}
+.top .clk{font-size:11px;color:var(--mut);text-align:right;white-space:nowrap}
+a{color:#7fc0ff}
+.card{background:var(--card);border:1px solid var(--line2);border-radius:14px;padding:13px;margin-top:12px}
+.card>h2{margin:0 0 3px;font-size:17px}.card>.sub{color:var(--mut);font-size:12.5px;margin-bottom:9px}
+.flt{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px}
+.fld{min-width:0;display:flex;flex-direction:column;gap:3px}.fld label{font-size:11.5px;color:var(--mut);font-weight:600}
+.sel,input,select{width:100%;background:#08192c;color:var(--ink);border:1px solid var(--line2);border-radius:9px;padding:9px 10px;font:inherit;font-size:14px;min-height:40px}
+select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,#7fa6c9 50%),linear-gradient(135deg,#7fa6c9 50%,transparent 50%);background-position:calc(100% - 16px) 18px,calc(100% - 11px) 18px;background-size:5px 5px;background-repeat:no-repeat}
+.btn{border:1px solid var(--line2);color:var(--ink);border-radius:10px;padding:9px 13px;font:inherit;font-weight:650;cursor:pointer;background:#12283f}
+.btn:hover{border-color:#3b6f9f}.btn.go{background:linear-gradient(180deg,#ffb54d,#f08a12);color:#231000;border-color:#f08a12}
+.btn.big{width:100%;font-size:16px;padding:14px;margin-top:10px}.btn.sm{padding:6px 10px;font-size:12.5px;min-height:34px}
+.btn[disabled]{opacity:.55;cursor:default}
+.ms{position:relative}.msbox{position:absolute;z-index:8000;left:0;right:0;top:calc(100% + 4px);background:#08192c;border:1px solid var(--line2);border-radius:10px;padding:8px;display:none;box-shadow:0 18px 40px rgba(0,0,0,.5)}
+.ms.open .msbox{display:block}.mslist{max-height:240px;overflow:auto;margin-top:6px;display:grid;gap:2px}
+.mslist label{display:flex;gap:8px;align-items:center;padding:7px 6px;border-radius:7px;font-size:13px;cursor:pointer}.mslist label:hover{background:#12283f}
+.mslist input{width:auto;min-height:0}.msbtns{display:flex;gap:6px;margin-top:6px}
+.chips{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}.chip{background:#12283f;border:1px solid var(--line2);border-radius:999px;padding:3px 9px;font-size:11.5px}
+.chip.miss{background:#3a1216;border-color:#7a2228;color:#ffb3b8}.chip.ok{background:#12351f;border-color:#2b6b45;color:#9ff0bf}
+.tw{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;color:#b9d0e6;font-weight:600;padding:7px 6px;border-bottom:1px solid var(--line2);white-space:nowrap;font-size:12px}
+td{padding:8px 6px;border-bottom:1px solid var(--line);vertical-align:top}
+tr.sel td{background:#1d2a12}tbody tr{cursor:pointer}
+.dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px}.dot.green{background:var(--grn)}.dot.amber{background:var(--amb)}.dot.red{background:var(--red)}
+.cards{display:none;gap:9px}
+.cc{border:1px solid var(--line2);border-radius:12px;background:var(--card2);padding:10px 12px;cursor:pointer}
+.cc.sel{border:2px solid var(--acc);background:#1d2a12}
+.cc .t{display:flex;justify-content:space-between;gap:8px;font-weight:700}.cc .g{display:grid;grid-template-columns:1fr 1fr;gap:3px 10px;font-size:12.5px;margin-top:6px}.cc .g span{color:var(--mut)}
+.grid2{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(300px,1fr);gap:12px}
+#plMap{height:460px;border-radius:12px;border:1px solid var(--line2);background:#0a1a2e}
+.key{display:flex;flex-wrap:wrap;gap:6px 12px;font-size:11.5px;color:#b9d0e6;margin-top:6px}.key span{display:inline-flex;gap:5px;align-items:center}
+.key i{width:22px;border-top:4px solid var(--pur);display:inline-block}.key i.off{border-top:4px dashed var(--blue)}.key i.skip{border-top:3px dotted #8a97a8}
+.kv{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 10px;font-size:13px}.kv span{color:var(--mut)}.kv b{text-align:right}
+.kv b.ok{color:#7be7a5}.kv b.bad{color:#ff8a90}.kv b.amb{color:#ffc46b}
+.badge{display:inline-block;border-radius:7px;padding:2px 8px;font-weight:800;font-size:12px}
+.b-verified{background:#16502f;color:#9ff0bf}.b-review{background:#5a4308;color:#ffe08a}.b-unsuitable{background:#5a1216;color:#ffb3b8}
+.gain{border-radius:12px;padding:10px;text-align:center;background:var(--acc);color:#1c1000;margin:10px 0}.gain small{display:block;font-weight:700;font-size:11.5px;letter-spacing:.06em}.gain b{font-size:28px}
+.tl{list-style:none;margin:0;padding:0;display:grid;gap:4px}
+.tl li{display:grid;grid-template-columns:52px minmax(0,1fr) auto;gap:8px;align-items:center;padding:6px 8px;border-radius:8px;border:1px solid transparent;font-size:13px}
+.tl li time{font-weight:800}.tl li small{color:var(--mut);font-size:11.5px}.tl li.road{background:var(--card2)}.tl li.hi{border-color:var(--acc);background:#2a1d08}.tl li.svc{background:#12351f}.tl li.key2{background:#1b2b45}
+.find{list-style:none;margin:6px 0 0;padding:0;display:grid;gap:4px;font-size:12.5px}
+.find li{padding:5px 8px;border-radius:7px;background:var(--card2);border-left:4px solid #39536e}.find li.block{border-left-color:var(--red)}.find li.review{border-left-color:#ffc46b}
+.dots{display:flex;flex-wrap:wrap;gap:3px;margin-top:6px}.dots i{width:9px;height:9px;border-radius:50%;background:#2c4460}.dots i.on{background:var(--grn)}.dots i.imp{background:#fff;box-shadow:0 0 0 2px var(--acc)}
+.note{color:var(--mut);font-size:12px;margin-top:8px;line-height:1.45}
+.msg{background:var(--card2);border:1px solid var(--line2);border-radius:10px;padding:10px 12px;font-size:13.5px}
+.msg.err{background:#3a1216;border-color:#7a2228;color:#ffb3b8}
+.sk{height:14px;border-radius:7px;background:linear-gradient(90deg,#102944,#16375a,#102944);background-size:200% 100%;animation:sh 1.1s infinite;margin:6px 0}
+@keyframes sh{0%{background-position:200% 0}100%{background-position:-200% 0}}
+.bn{display:grid;grid-template-columns:repeat(5,1fr);position:fixed;left:0;right:0;bottom:0;z-index:12000;background:rgba(5,18,33,.98);border-top:1px solid #21415e;padding:7px 6px calc(7px + env(safe-area-inset-bottom,0))}
+.bn a{color:#829db5;text-decoration:none;text-align:center;font-size:10px;font-weight:650;padding:3px 2px;border-radius:9px}
+.bn a .mi{display:block;font-size:18px;line-height:21px}.bn a.on{color:#4bc7ff;background:#0a2945}
+.leaflet-popup-content-wrapper,.leaflet-popup-tip{background:#0a1a2e;color:#eaf3ff}
+@media(max-width:1100px){.flt{grid-template-columns:repeat(2,minmax(0,1fr))}.grid2{grid-template-columns:minmax(0,1fr)}#plMap{height:340px}}
+@media(max-width:700px){table.cand{display:none}.cards{display:grid}}
+@media(max-width:560px){.flt{grid-template-columns:minmax(0,1fr)}.kv{grid-template-columns:minmax(0,1fr);gap:0}.kv span{margin-top:7px}.kv b{text-align:left}}
+</style>
+</head>
+<body>
+<header class="top"><div class="logo">&frac12;</div><h1>Halfway Deployment Planner</h1><div class="sp"></div><div class="clk" id="clk"></div></header>
+<div class="wrap">
+  <section class="card">
+    <h2>1. Find possible halfway points</h2>
+    <div class="sub">Open this at any time: pick a service and direction and see which stops a bus could start from, how it would get there and what it would earn.</div>
+    <div class="flt">
+      <div class="fld"><label for="pSvc">Service</label><input id="pSvc" class="sel" list="pSvcList" maxlength="6" placeholder="e.g. 33" inputmode="text"><datalist id="pSvcList"></datalist></div>
+      <div class="fld"><label for="pDir">Direction</label><select id="pDir"><option value="1">Direction 1</option><option value="2">Direction 2</option></select></div>
+      <div class="fld"><label for="pFrom">Current location / starting point</label><input id="pFrom" class="sel" list="pStopList" placeholder="first stop, 5-digit code, or lat,lon"><datalist id="pStopList"></datalist></div>
+      <div class="fld"><label>&nbsp;</label><button class="btn sm" id="pGeo" type="button">Use my map location</button></div>
+      <div class="fld ms" id="pImpWrap"><label for="pImpBtn">Important bus stops <small style="font-weight:400">(optional)</small></label>
+        <button class="btn" id="pImpBtn" type="button" aria-expanded="false">Important Bus Stops: 0 selected &#9662;</button>
+        <div class="msbox"><input id="pImpQ" class="sel" placeholder="Search 5-digit code or stop name" autocomplete="off">
+          <div class="msbtns"><button class="btn sm" id="pImpAll" type="button">Select all</button><button class="btn sm" id="pImpNone" type="button">Clear all</button><button class="btn sm" id="pImpClose" type="button">Done</button></div>
+          <div class="mslist" id="pImpList"></div></div></div>
+      <div class="fld"><label for="pMaxMin">Max time to halfway point</label><select id="pMaxMin"><option value="">Any</option><option value="10">&le; 10 min</option><option value="15">&le; 15 min</option><option value="20">&le; 20 min</option><option value="30">&le; 30 min</option></select></div>
+      <div class="fld"><label for="pMaxKm">Max off-service distance</label><select id="pMaxKm"><option value="">Any</option><option value="5">&le; 5 km</option><option value="10">&le; 10 km</option><option value="15">&le; 15 km</option><option value="20">&le; 20 km</option></select></div>
+      <div class="fld"><label for="pMinGain">Minimum headway gain</label><select id="pMinGain"><option value="">Any</option><option value="5">&ge; 5 min</option><option value="10">&ge; 10 min</option><option value="15">&ge; 15 min</option><option value="20">&ge; 20 min</option></select></div>
+      <div class="fld"><label for="pBus">Bus type</label><select id="pBus"><option value="sd">Single deck</option><option value="dd" selected>Double deck</option><option value="art">Articulated</option></select></div>
+      <div class="fld"><label for="pHw">Scheduled headway, min</label><input id="pHw" class="sel" type="number" min="1" max="120" step="0.5" inputmode="decimal" placeholder="auto"></div>
+      <div class="fld"><label for="pLate">Bus late by, min</label><input id="pLate" class="sel" type="number" min="0" max="120" step="1" inputmode="numeric" value="30"></div>
+      <div class="fld"><label for="pRef">Trip scheduled departure</label><input id="pRef" class="sel" maxlength="5" inputmode="numeric" placeholder="auto"></div>
+      <div class="fld"><label for="pReady">Bus free to move from</label><input id="pReady" class="sel" maxlength="5" inputmode="numeric" placeholder="now"></div>
+      <div class="fld"><label>Vehicle size (optional)</label><div style="display:flex;gap:6px"><input id="pVh" class="sel" type="number" step="0.01" placeholder="H m" inputmode="decimal"><input id="pVw" class="sel" type="number" step="0.01" placeholder="W m" inputmode="decimal"><input id="pVt" class="sel" type="number" step="0.5" placeholder="t" inputmode="decimal"></div></div>
+    </div>
+    <button class="btn go big" id="pFind" type="button">&#128269; Find possible halfway points</button>
+    <div class="note" id="pInfo">Pick a service to load its stops.</div>
+  </section>
+
+  <section class="card" id="pResCard" hidden><h2>2. Candidate halfway points</h2><div class="sub" id="pResSub"></div><div id="pRes"></div></section>
+  <section class="card" id="pDetCard" hidden><h2>3. Off-service route &amp; impact</h2><div class="sub" id="pDetSub">Select a candidate above.</div><div id="pDet"></div></section>
+</div>
+<nav class="bn"><a href="/"><span class="mi">&#9648;</span>Route</a><a href="/control"><span class="mi">&#8596;</span>Headway</a><a href="/bunching"><span class="mi">&#8776;</span>Bunching</a><a href="/halfway"><span class="mi">&frac12;</span>Optimiser</a><a class="on" href="/planner"><span class="mi">&#128205;</span>Planner</a></nav>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const f1 = x => x == null ? "\u2013" : (Math.abs(x - Math.round(x)) < .05 ? String(Math.round(x)) : x.toFixed(1));
+const LS = {get(k, d){ try{ const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); }catch(e){ return d; } }, set(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }};
+const P = {svc:LS.get("pl.svc", ""), dir:LS.get("pl.dir", 1), setup:null, imp:new Set(LS.get("pl.imp", [])), res:null, det:null, sel:null, optSel:null, map:null, g:null, lines:[]};
+const TAG = {A:"Fastest", B:"Shortest", C:"Preferred"};
+function clk(){ const p = new Intl.DateTimeFormat("en-GB", {timeZone:"Asia/Singapore", hour12:false, weekday:"short", day:"2-digit", month:"short", hour:"2-digit", minute:"2-digit"}).format(new Date()); $("clk").textContent = p + " SGT"; }
+clk(); setInterval(clk, 20000);
+async function getJSON(u, ms){ const c = new AbortController(), t = setTimeout(() => c.abort(), ms || 60000);
+  try{ const r = await fetch(u, {signal:c.signal}); const j = await r.json().catch(() => ({})); if(!r.ok && !j.error) j.error = "Server error " + r.status; return j; }
+  catch(e){ return {error: e.name === "AbortError" ? "Timed out" : "Network error"}; } finally{ clearTimeout(t); } }
+const hm = m => { m = ((Math.round(m) % 1440) + 1440) % 1440; return String(Math.floor(m / 60)).padStart(2, "0") + ":" + String(m % 60).padStart(2, "0"); };
+
+/* ---------- setup: services, directions, stop list ---------- */
+async function loadServices(){ const j = await getJSON("/api/planner/setup"); if(j.services) $("pSvcList").innerHTML = j.services.map(s => `<option value="${esc(s)}">`).join(""); }
+async function loadSetup(){
+  const svc = $("pSvc").value.trim().toUpperCase(); if(!svc) return;
+  P.svc = svc; LS.set("pl.svc", svc); $("pInfo").textContent = "Loading route\u2026";
+  const j = await getJSON(`/api/planner/setup?service=${encodeURIComponent(svc)}&direction=${P.dir}`);
+  if(j.error){ P.setup = null; $("pInfo").textContent = j.error; return; }
+  P.setup = j;
+  $("pDir").innerHTML = (j.directions || []).map(d => `<option value="${d.direction}" ${d.direction === P.dir ? "selected" : ""}>${esc(d.label)}</option>`).join("") || `<option value="1">Direction 1</option>`;
+  $("pStopList").innerHTML = `<option value="first">first stop \u2013 ${esc(j.route.first)}</option>` + j.stops.map(s => `<option value="${s.code}">${s.code} \u2014 ${esc(s.name)}</option>`).join("");
+  if(!$("pHw").value) $("pHw").placeholder = j.sched_hw ? `auto: ${f1(j.sched_hw)} (${esc(j.hw_src)})` : "enter the headway";
+  $("pRef").placeholder = `auto: ${esc(j.ref)}`; $("pReady").placeholder = `now: ${esc(j.now)}`;
+  const codes = new Set(j.stops.map(s => s.code)); P.imp = new Set([...P.imp].filter(c => codes.has(c)));
+  renderImp();
+  $("pInfo").innerHTML = `${esc(j.route.first)} \u2192 ${esc(j.route.last)} \u00b7 ${j.route.n_stops} stops \u00b7 ${f1(j.route.km)} km \u00b7 running ${f1(j.route.run_min)} min \u00b7 headway ${j.sched_hw ? f1(j.sched_hw) + " min (" + esc(j.hw_src) + ")" : "unknown \u2013 enter it"}${j.traffic_ok ? "" : " \u00b7 no live traffic, times estimated"}`;
+}
+/* ---------- important stops multi-select ---------- */
+function renderImp(){
+  const st = P.setup ? P.setup.stops : [], q = $("pImpQ").value.trim().toLowerCase();
+  const show = st.filter(s => !q || s.code.includes(q) || s.name.toLowerCase().includes(q));
+  $("pImpList").innerHTML = show.length ? show.map(s => `<label><input type="checkbox" value="${s.code}" ${P.imp.has(s.code) ? "checked" : ""}><span><b>${s.code}</b> \u2014 ${esc(s.name)}</span></label>`).join("")
+    : `<div class="note" style="padding:8px">${st.length ? "No stop matches." : "Load a service first."}</div>`;
+  $("pImpList").querySelectorAll("input").forEach(i => i.onchange = () => { i.checked ? P.imp.add(i.value) : P.imp.delete(i.value); LS.set("pl.imp", [...P.imp]); impLabel(); });
+  impLabel();
+}
+function impLabel(){ $("pImpBtn").textContent = `Important Bus Stops: ${P.imp.size} selected \u25be`; }
+$("pImpBtn").onclick = () => { const w = $("pImpWrap"); w.classList.toggle("open"); $("pImpBtn").setAttribute("aria-expanded", w.classList.contains("open")); if(w.classList.contains("open")) renderImp(); };
+$("pImpQ").oninput = renderImp;
+$("pImpAll").onclick = () => { const q = $("pImpQ").value.trim().toLowerCase(); (P.setup ? P.setup.stops : []).filter(s => !q || s.code.includes(q) || s.name.toLowerCase().includes(q)).forEach(s => P.imp.add(s.code)); LS.set("pl.imp", [...P.imp]); renderImp(); };
+$("pImpNone").onclick = () => { P.imp.clear(); LS.set("pl.imp", []); renderImp(); };
+$("pImpClose").onclick = () => $("pImpWrap").classList.remove("open");
+document.addEventListener("click", e => { if(!e.target.closest("#pImpWrap")) $("pImpWrap").classList.remove("open"); });
+$("pGeo").onclick = () => { if(!navigator.geolocation){ alert("This device cannot give a location."); return; }
+  navigator.geolocation.getCurrentPosition(p => { $("pFrom").value = `${p.coords.latitude.toFixed(5)},${p.coords.longitude.toFixed(5)}`; }, () => alert("Location not available."), {enableHighAccuracy:true, timeout:8000}); };
+$("pSvc").onchange = () => loadSetup(); $("pSvc").onkeydown = e => { if(e.key === "Enter"){ e.preventDefault(); loadSetup(); } };
+$("pDir").onchange = () => { P.dir = +$("pDir").value; LS.set("pl.dir", P.dir); loadSetup(); };
+["pBus", "pVh", "pVw", "pVt"].forEach(id => { $(id).value = LS.get("pl." + id, $(id).value || ""); $(id).onchange = () => LS.set("pl." + id, $(id).value); });
+
+/* ---------- search ---------- */
+function qs(extra){ return new URLSearchParams(Object.assign({service:P.svc, direction:P.dir, frm:$("pFrom").value.trim(), important:[...P.imp].join(","), bus:$("pBus").value,
+  hw:$("pHw").value.trim(), late:$("pLate").value.trim() || "30", ref:$("pRef").value.trim(), ready:$("pReady").value.trim(), vh:$("pVh").value.trim(), vw:$("pVw").value.trim(), vt:$("pVt").value.trim()}, extra || {})); }
+async function find(){
+  if(!P.svc){ $("pInfo").textContent = "Enter a service first."; return; }
+  $("pFind").disabled = true; $("pResCard").hidden = false; $("pDetCard").hidden = true;
+  $("pRes").innerHTML = `<div class="sk"></div><div class="sk" style="width:80%"></div><div class="sk" style="width:60%"></div>`;
+  const j = await getJSON("/api/planner/search?" + qs({max_min:$("pMaxMin").value, max_km:$("pMaxKm").value, min_gain:$("pMinGain").value}), 90000);
+  $("pFind").disabled = false; P.res = j; P.sel = null;
+  if(!j.ok){ $("pRes").innerHTML = `<div class="msg err">${esc(j.error || "Search failed")}</div>`; return; }
+  renderRes();
+  if(j.candidates.length) selectCand(j.candidates[0].code);
+}
+$("pFind").onclick = find;
+function renderRes(){
+  const j = P.res, all = j.candidates, C = P.showAll ? all : all.slice(0, 10);
+  $("pResSub").textContent = `${j.n_feasible} of ${j.n_tested} stops are usable (${j.skipped.no_benefit} would be reached too late to help) \u00b7 bus ${j.bus_label.toLowerCase()} \u00b7 from ${j.origin.label} \u00b7 free from ${j.ready} \u00b7 trip due ${j.ref}, ${f1(j.late)} min late \u00b7 headway ${f1(j.H)} min`;
+  if(!C.length){ $("pRes").innerHTML = `<div class="msg">No candidate passes the filters. Skipped: ${j.skipped.no_benefit} where the bus would arrive too late to close the gap, ${j.skipped.time} over the time limit, ${j.skipped.km} over the distance limit, ${j.skipped.gain} below the headway gain, ${j.skipped.no_route} with no road route.</div>`; return; }
+  const row = c => `<tr data-c="${c.code}" class="${P.sel === c.code ? "sel" : ""}"><td><b>${c.rank}</b></td><td><span class="dot ${c.band}"></span><b>${c.code}</b></td><td>${esc(c.name)}</td>
+    <td>${f1(c.off_min)} min</td><td>${f1(c.off_km)} km</td><td>${c.stops_remaining}</td><td>${c.stops_omitted}</td>
+    <td>${j.important.length ? `${c.important_served}/${c.important_total}` : "\u2013"}</td><td><b style="color:${c.gain > 0 ? "#7be7a5" : "#ff8a90"}">${f1(c.gain)} min</b></td>
+    <td>${c.after_next ? "<span class='badge b-unsuitable'>too late</span>" : "<span class='badge b-review'>to check</span>"}</td><td><button class="btn sm" type="button">Select</button></td></tr>`;
+  $("pRes").innerHTML = `<div class="tw"><table class="cand"><thead><tr><th>Rank</th><th>Code</th><th>Bus stop</th><th>Off-service time</th><th>Distance</th><th>Stops remaining</th><th>Stops omitted</th><th>Important</th><th>Est. headway gain</th><th>Road status</th><th></th></tr></thead><tbody>${C.map(row).join("")}</tbody></table></div>
+    <div class="cards">${C.map(c => `<div class="cc ${P.sel === c.code ? "sel" : ""}" data-c="${c.code}"><div class="t"><span><span class="dot ${c.band}"></span>#${c.rank} <b>${c.code}</b> ${esc(c.name)}</span><b style="color:${c.gain > 0 ? "#7be7a5" : "#ff8a90"}">${f1(c.gain)} min</b></div>
+      <div class="g"><span>Off-service</span><b>${f1(c.off_min)} min \u00b7 ${f1(c.off_km)} km</b><span>Stops remaining / omitted</span><b>${c.stops_remaining} / ${c.stops_omitted}</b>
+      <span>Important stops</span><b>${j.important.length ? `${c.important_served}/${c.important_total} served` : "\u2013"}</b><span>Enter service</span><b>${esc(c.insert_clock)}</b></div></div>`).join("")}</div>
+    ${j.trade_off.length ? `<div class="msg" style="margin-top:10px"><b>Why the closest is not always the best</b><ul style="margin:6px 0 0;padding-left:18px">${j.trade_off.map(t => `<li>${esc(t)}</li>`).join("")}</ul></div>` : ""}
+    <div class="note">Ranking uses headway gain, off-service time and distance, stops omitted and important stops missed \u2013 never distance alone. ${esc(j.screening)}. ${esc(j.note)} Road suitability is checked when you select a candidate.</div>`;
+  if(all.length > 10){ const b = document.createElement("button"); b.className = "btn"; b.style.cssText = "width:100%;margin-top:8px";
+    b.textContent = P.showAll ? "Show the top 10 only" : `Show all ${all.length} candidates`; b.onclick = () => { P.showAll = !P.showAll; renderRes(); }; $("pRes").append(b); }
+  document.querySelectorAll("#pRes [data-c]").forEach(el => el.onclick = () => selectCand(el.dataset.c));
+}
+/* ---------- selected candidate: off-service route ---------- */
+async function selectCand(code){
+  P.sel = code; P.optSel = null; renderRes();
+  const c = P.res.candidates.find(x => x.code === code); if(!c) return;
+  $("pDetCard").hidden = false; $("pDetSub").textContent = `${code} \u2014 ${c.name}`;
+  $("pDet").innerHTML = `<div class="sk"></div><div class="sk" style="width:70%"></div><div class="sk" style="width:85%"></div>`;
+  $("pDetCard").scrollIntoView({behavior:"smooth", block:"start"});
+  const j = await getJSON("/api/planner/route?" + qs({stop:code}), 90000);
+  P.det = j;
+  if(!j.ok){ $("pDet").innerHTML = `<div class="msg err">${esc(j.error || "No route")}</div>`; return; }
+  renderDet();
+}
+function badge(x){ return `<span class="badge b-${x.status}">${esc(x.status_label)}</span>`; }
+function renderDet(){
+  const d = P.det, o = d.options[P.optSel != null ? P.optSel : d.recommended], c = P.res.candidates.find(x => x.code === d.stop.code), q = o.hw || c.hw;
+  const impServed = d.important.filter(x => x.served), impMiss = d.important.filter(x => !x.served);
+  let h = `<div class="grid2"><div><div id="plMap" role="region" aria-label="Off-service route map"></div>
+    <div class="key"><span><i></i>Revenue service route</span><span><i class="off"></i>Off-service route</span><span><i class="skip"></i>Not served after halfway start</span><span>&#128205; halfway stop</span><span style="color:#7be7a5">&#9679; important stop served</span><span style="color:#ff8a90">&#9679; important stop missed</span></div>
+    <div class="note">Tap the off-service line for roads, distance and time. Tap a road in the timeline to find it on the map.</div></div>
+    <div><div class="kv"><span>Halfway point</span><b>${esc(d.stop.code)} \u2014 ${esc(d.stop.name)}</b>
+      <span>Off-service route</span><b>${esc(o.label)}${o.tags.length ? " \u00b7 " + o.tags.map(t => TAG[t]).join(", ") : ""}</b>
+      <span>Roads</span><b style="font-size:12px;font-weight:600">${o.roads.map(esc).join(" \u2192 ")}</b>
+      <span>Travel time</span><b>${f1(o.time_min)} min <small style="color:var(--mut)">(${esc(o.time_src)})</small></b>
+      <span>Off-service distance</span><b>${f1(o.km)} km</b>
+      <span>Traffic on the route</span><b>${o.congested_km > .05 ? `<span style="color:#ff8a90">${f1(o.congested_km)} km slow</span>` : (o.traffic.runs || []).length ? "Smooth / moderate" : "No live data"}</b>
+      <span>Leave ${esc(d.origin.label)}</span><b>${esc(d.ready)}</b>
+      <span>Arrive halfway point</span><b>${esc(o.arrive_clock)}</b>
+      <span>Enter passenger service</span><b>${esc(o.insert_clock)}</b>
+      <span>${esc(d.bus_label)} suitability</span><b>${badge(o)}</b>
+      <span>Bus stops remaining / omitted</span><b>${d.stops_remaining} / ${d.stops_omitted} of ${d.stops_total}</b>
+      <span>Mileage operated / lost</span><b>${f1(d.km_operated)} / ${f1(d.km_lost)} km</b>
+      ${d.important.length ? `<span>Important stops served</span><b class="${impMiss.length ? "amb" : "ok"}">${impServed.length}/${d.important.length}</b>` : ""}</div>
+    ${q ? `<div class="gain"><small>ESTIMATED HEADWAY GAIN</small><b>${f1(Math.max(0, q.gain))} MIN</b><small style="font-weight:600;letter-spacing:0">largest gap ${f1(q.max_full)} \u2192 ${f1(q.max_half)} min at this stop</small></div>` : ""}
+    <div class="msg" style="border-left:4px solid var(--acc)">${o.status === "verified" ? "\u2714 " : "\u26a0 "}${esc(o.status_text)}</div>
+    ${c && Math.abs(o.time_min - c.off_min) > 1.5 ? `<div class="msg" style="margin-top:8px">The ranking used a screening time of ${f1(c.off_min)} min for this stop; the detailed road route gives ${f1(o.time_min)} min, so the headway gain here (${f1(q ? q.gain : 0)} min) differs from the table (${f1(c.gain)} min). Check the next candidates too.</div>` : ""}
+    ${d.important.length ? `<div class="chips">${d.important.map(x => `<span class="chip ${x.served ? "ok" : "miss"}">${x.served ? "\u2713" : "\u2716"} ${esc(x.code)} ${esc(x.name)}</span>`).join("")}</div>` : ""}</div></div>`;
+  // stops affected visual
+  h += `<div class="card" style="margin-top:12px;background:var(--card2)"><h2 style="font-size:15px">Bus stops affected</h2>
+    <div class="sub">Full route ${d.stops_total} stops \u00b7 omitted ${d.stops_omitted} \u00b7 served after the halfway start ${d.stops_remaining}</div>
+    <div class="dots">${d.stop_dots.map(s => `<i class="${s.served ? "on" : ""} ${d.important.some(x => x.code === s.code) ? "imp" : ""}" title="${esc(s.code)} ${esc(s.name)}${s.served ? "" : " \u2013 not served"}"></i>`).join("")}</div>
+    <div class="note">Grey = not served (before the halfway start) \u00b7 green = served \u00b7 ringed = an important stop you selected.</div></div>`;
+  // route options + timeline
+  h += `<div class="grid2" style="margin-top:12px"><div class="card" style="margin:0;background:var(--card2)"><h2 style="font-size:15px">Off-service route options</h2><div class="sub">A routing engine finding a road does not prove this bus type can use it.</div>
+    <div class="tw"><table><thead><tr><th>Option</th><th>Distance</th><th>Time</th><th>Traffic</th><th>${esc(d.bus_label)} suitability</th><th>Enter service</th></tr></thead><tbody>
+    ${d.options.map(x => `<tr data-o="${x.idx}" class="${x.idx === o.idx ? "sel" : ""}"><td><b>${esc(x.label)}</b>${x.idx === d.recommended ? " <small style='color:#ffb54d'>\u2605</small>" : ""}<br><small style="color:var(--mut)">${x.tags.map(t => TAG[t]).join(", ") || "\u2013"}</small></td>
+      <td>${f1(x.km)} km</td><td>${f1(x.time_min)} min</td><td>${x.congested_km > .05 ? f1(x.congested_km) + " km slow" : "\u2013"}</td><td>${badge(x)}</td><td>${esc(x.insert_clock)}</td></tr>`).join("")}</tbody></table></div>
+    <details style="margin-top:8px"><summary style="cursor:pointer;color:#9cc4ff">Why this route?</summary><ol style="margin:6px 0 0;padding-left:18px;font-size:13px">${(d.why_route || []).map(w => `<li>${esc(w)}</li>`).join("")}</ol></details></div>
+    <div class="card" style="margin:0;background:var(--card2)"><h2 style="font-size:15px">Off-service route details</h2><ul class="tl" id="plTl">${o.timeline.map(x => x.kind === "road"
+      ? `<li class="road" data-g="${x.g}"><time>${esc(x.clock)}</time><span>${esc(x.label)}</span><small>${f1(x.km)} km \u00b7 ${f1(x.min)} min</small></li>`
+      : `<li class="${x.kind === "service" ? "svc" : "key2"}"><time>${esc(x.clock)}</time><span><b>${esc(x.label)}</b></span><small>${x.kind === "service" ? `prep ${f1(x.prep)} min${x.wait > .4 ? " + wait " + f1(x.wait) : ""}` : ""}</small></li>`).join("")}</ul></div></div>`;
+  // suitability
+  h += `<div class="card" style="margin-top:12px;background:var(--card2)"><h2 style="font-size:15px">Road and bus suitability \u2013 ${esc(d.bus_label)}: ${badge(o)}</h2><div class="sub">${esc(o.status_text)}</div>
+    <ul class="find">${o.findings.length ? o.findings.map(f => `<li class="${f.sev}">${f.sev === "block" ? "\u2716 " : f.sev === "review" ? "\u26a0 " : "\u2713 "}${esc(f.text)}</li>`).join("")
+      : `<li>\u2713 No height, width, weight, access or heavy-vehicle restriction found in the map data along this route.</li>`}</ul>
+    <div class="note">Checked: height / width / weight limits, bus and access restrictions, tunnels and covered roads, bridges and viaducts over the route, sharp turns and U-turns, LTA road works and incidents.${o.osm_ok ? "" : " Restriction data could not be loaded this time."} Map data is community-maintained and not an authoritative clearance register, so suitability requires controller verification unless it has been recorded as verified on the Halfway Optimiser page.</div></div>`;
+  $("pDet").innerHTML = h;
+  document.querySelectorAll("#pDet [data-o]").forEach(tr => tr.onclick = () => { P.optSel = +tr.dataset.o; renderDet(); });
+  document.querySelectorAll("#plTl li[data-g]").forEach(li => { li.onmouseenter = () => hi(+li.dataset.g); li.onclick = () => hi(+li.dataset.g, true); });
+  P.map = null; draw(d, o);
+}
+/* ---------- map ---------- */
+function initMap(){
+  if(P.map || typeof L === "undefined" || !$("plMap")) return;
+  const m = P.map = L.map("plMap", {zoomControl:true, attributionControl:false, minZoom:11, maxZoom:19}).setView([1.3521, 103.8198], 12);
+  const om = L.tileLayer("https://www.onemap.gov.sg/maps/tiles/Default/{z}/{x}/{y}.png", {minZoom:11, maxZoom:19, attribution:"OneMap \u00a9 Singapore Land Authority"}).addTo(m);
+  let ok = 0, bad = 0, sw = false;
+  om.on("tileload", () => ok++); om.on("tileerror", () => { bad++; if(!sw && !ok && bad >= 4){ sw = true; m.removeLayer(om); L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {minZoom:11, maxZoom:19, attribution:"\u00a9 OpenStreetMap contributors"}).addTo(m); } });
+  L.control.attribution({position:"bottomleft", prefix:false}).addTo(m);
+  P.g = L.layerGroup().addTo(m);
+}
+function hi(gi, zoom){
+  document.querySelectorAll("#plTl li[data-g]").forEach(li => li.classList.toggle("hi", +li.dataset.g === gi));
+  P.lines.forEach((pl, i) => pl.setStyle(i === gi ? {weight:9, color:"#7fc0ff", opacity:1} : {weight:6, color:"#3c96ff", opacity:.95}));
+  if(zoom && P.lines[gi]) P.map.fitBounds(P.lines[gi].getBounds(), {padding:[40, 40], maxZoom:17});
+}
+function draw(d, o){
+  initMap(); if(!P.map) return; const g = P.g; g.clearLayers(); P.lines = [];
+  L.polyline(d.service_line, {color:"#9b8cff", weight:5, opacity:.8}).bindTooltip("Revenue service route").addTo(g);
+  L.polyline(d.skipped_line, {color:"#8a97a8", weight:3, opacity:.9, dashArray:"2 7"}).bindTooltip("Not served after the halfway start").addTo(g);
+  L.polyline(d.recovered_line, {color:"#22c55e", weight:6, opacity:.9}).bindTooltip("Revenue service continues from the halfway stop").addTo(g);
+  (o.traffic.runs || []).forEach(x => L.polyline(x.pts, {color:x.b == null ? "#6f8bb0" : x.b >= 5 ? "#22c55e" : x.b >= 3 ? "#f5b82e" : "#e0474f", weight:13, opacity:.32, interactive:false}).addTo(g));
+  const roads = o.groups.map(x => `${esc(x.road)} ${f1(x.km)} km`).join(" \u2192 ");
+  o.groups.forEach((x, i) => {
+    const pl = L.polyline(x.line, {color:"#3c96ff", weight:6, opacity:.95, dashArray:"10 8"}).addTo(g);
+    pl.bindPopup(`<b>Off-service: ${esc(o.label)}</b><br>${roads}<br><b>${f1(o.km)} km \u00b7 ${f1(o.time_min)} min</b><br>Halfway stop: ${esc(d.stop.name)} (${esc(d.stop.code)})<br>Enters service <b>${esc(o.insert_clock)}</b><br><small>This road: ${esc(x.road)}, ${f1(x.km)} km, ~${f1(x.min)} min</small>`);
+    pl.on("mouseover", () => hi(i)); pl.on("click", () => hi(i)); P.lines.push(pl);
+  });
+  const pin = (ll, html, css, tip) => L.marker(ll, {icon:L.divIcon({className:"", iconSize:[26, 26], iconAnchor:[13, 13], html:`<div style="width:26px;height:26px;border-radius:50%;display:grid;place-items:center;font-weight:800;font-size:12px;border:2px solid #fff;${css}">${html}</div>`})}).bindTooltip(tip).addTo(g);
+  pin([d.origin.lat, d.origin.lon], "B", "background:#3c96ff;color:#fff", `Bus now: ${esc(d.origin.label)} \u00b7 free from ${esc(d.ready)}`);
+  pin([d.stop.lat, d.stop.lon], "\u00bd", "background:#e0474f;color:#fff", `Halfway start: ${esc(d.stop.name)} (${esc(d.stop.code)}) \u00b7 ${esc(o.insert_clock)}`);
+  pin([d.last.lat, d.last.lon], "E", "background:#22c55e;color:#04210f", `${esc(d.last.name)} \u2013 final stop`);
+  d.important.forEach(x => { if(x.lat == null) return;
+    L.circleMarker([x.lat, x.lon], {radius:7, color:"#fff", weight:2, fillColor:x.served ? "#22c55e" : "#e0474f", fillOpacity:1}).bindTooltip(`${esc(x.code)} ${esc(x.name)} \u2013 ${x.served ? "still served" : "NOT served"}`).addTo(g); });
+  (d.incidents || []).forEach(x => L.marker([x.lat, x.lon], {icon:L.divIcon({className:"", iconSize:[18, 18], html:`<div style="color:#ff5a5f;font-size:18px;line-height:18px">\u26a0</div>`})}).bindTooltip(`${esc(x.type)}: ${esc((x.message || "").slice(0, 120))}`).addTo(g));
+  (d.roadworks || []).forEach(x => L.marker([x.lat, x.lon], {icon:L.divIcon({className:"", iconSize:[18, 18], html:`<div style="color:#ffb020;font-size:16px;line-height:18px">\u25b2</div>`})}).bindTooltip(`Road works: ${esc(x.road)}`).addTo(g));
+  setTimeout(() => { P.map.invalidateSize(); P.map.fitBounds(L.latLngBounds([...o.line, [d.stop.lat, d.stop.lon], [d.origin.lat, d.origin.lon]]), {padding:[30, 30], maxZoom:16}); }, 60);
+}
+/* ---------- start ---------- */
+$("pSvc").value = P.svc; $("pDir").value = P.dir;
+loadServices(); if(P.svc) loadSetup(); impLabel();
+</script>
+</body>
+</html>

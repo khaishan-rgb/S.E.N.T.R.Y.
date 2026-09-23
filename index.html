@@ -194,7 +194,7 @@ table.tb{width:100%;border-collapse:collapse;font-size:14px}
 
 <div class="app">
   <header class="top">
-    <button class="mobile-menu-btn" type="button" aria-label="Open navigation" onclick="document.getElementById('mobileTopMenu').classList.toggle('open')">☰</button><div class="mobile-top-menu" id="mobileTopMenu"><a class="active" href="/">▰ Route</a><a href="/control">↔ Headway</a><a href="/bunching">≋ Bunching</a><a href="/halfway">½ Halfway Optimiser</a><a href="/traffic">⚠ Traffic-Aware Regulation</a><a href="#" onclick="this.parentElement.classList.remove('open');return false">⚙ Settings / page options</a></div>
+    <button class="mobile-menu-btn" type="button" aria-label="Open navigation" onclick="document.getElementById('mobileTopMenu').classList.toggle('open')">☰</button><div class="mobile-top-menu" id="mobileTopMenu"><a class="active" href="/">▰ Route</a><a href="/control">↔ Headway</a><a href="/bunching">≋ Bunching</a><a href="/halfway">½ Halfway Optimiser</a><a href="/traffic">⚠ Traffic-Aware Regulation</a><a href="/planner">📍 Halfway Planner</a><a href="#" onclick="this.parentElement.classList.remove('open');return false">⚙ Settings / page options</a></div>
     <div class="brand">
       <div class="logo"><svg class="i"><use href="#i-bus"/></svg></div>
       <div>
@@ -203,7 +203,7 @@ table.tb{width:100%;border-collapse:collapse;font-size:14px}
       </div>
     </div>
     <div class="hdr-right">
-      <nav class="navl" aria-label="Pages"><a href="/" class="on">Route Traffic</a><a href="/control">Headway Control</a><a href="/bunching">Bunching &amp; Gap</a><a href="/halfway">Halfway Optimiser</a><a href="/traffic">Traffic-Aware</a></nav>
+      <nav class="navl" aria-label="Pages"><a href="/" class="on">Route Traffic</a><a href="/control">Headway Control</a><a href="/bunching">Bunching &amp; Gap</a><a href="/halfway">Halfway Optimiser</a><a href="/traffic">Traffic-Aware</a><a href="/planner">Halfway Planner</a></nav>
       <div>
         <div class="clock" id="clock">&nbsp;</div>
         <div class="live" id="live"><span class="dot"></span><span id="liveText">Connecting…</span></div>
@@ -635,7 +635,7 @@ api("/api/traffic/services", 20000).then(j => { if(j.services){ S.svcAll = j.ser
 setTimeout(() => map.invalidateSize(), 300);
 window.addEventListener("resize", () => map.invalidateSize());
 </script>
-<nav class="mobile-bottom-nav" aria-label="Mobile primary navigation"><a class="mbn active" href="/"><span class="mi">▰</span>Route</a><a class="mbn " href="/control"><span class="mi">↔</span>Headway</a><a class="mbn " href="/bunching"><span class="mi">≋</span>Bunching</a><button class="mbn " type="button" style="border:0;background:transparent;font-family:inherit" onclick="document.getElementById('mobileMore').classList.toggle('open')"><span class="mi">•••</span>More</button></nav><div class="mobile-more" id="mobileMore"><a class="" href="/halfway">½ Halfway Optimiser</a><a class="" href="/traffic">⚠ Traffic-Aware Regulation</a><a href="#" onclick="this.parentElement.classList.remove('open');return false">⚙ Settings / page options</a></div>
+<nav class="mobile-bottom-nav" aria-label="Mobile primary navigation"><a class="mbn active" href="/"><span class="mi">▰</span>Route</a><a class="mbn " href="/control"><span class="mi">↔</span>Headway</a><a class="mbn " href="/bunching"><span class="mi">≋</span>Bunching</a><button class="mbn " type="button" style="border:0;background:transparent;font-family:inherit" onclick="document.getElementById('mobileMore').classList.toggle('open')"><span class="mi">•••</span>More</button></nav><div class="mobile-more" id="mobileMore"><a class="" href="/halfway">½ Halfway Optimiser</a><a class="" href="/traffic">⚠ Traffic-Aware Regulation</a><a href="/planner">📍 Halfway Planner</a><a href="#" onclick="this.parentElement.classList.remove('open');return false">⚙ Settings / page options</a></div>
 
 <script>
 document.addEventListener("click", function(e){

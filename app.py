@@ -21,7 +21,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 import headway
 import traffic
 
-VERSION = "V12.9"
+VERSION = "V13.0"
 LTA = os.getenv("LTA_BASE", "https://datamall2.mytransport.sg/ltaodataservice").rstrip("/")
 KEY = os.getenv("LTA_ACCOUNT_KEY", "")
 OSRM = os.getenv("OSRM_URL", "https://router.project-osrm.org").rstrip("/")
@@ -2013,7 +2013,14 @@ async def os_table(origin, dests):
     d = await cached(f"osrmtab:{path}", factory)
     if not d.get("dur"):
         return {}, d.get("error")
-    return {i: (d["dur"][i + 1] / 60.0 if d["dur"][i + 1] is not None else None) for i in range(len(dests))}, None
+    dist = d.get("dist") or []
+    out = {}
+    for i in range(len(dests)):
+        mins = d["dur"][i + 1] / 60.0 if d["dur"][i + 1] is not None else None
+        km = dist[i + 1] / 1000.0 if len(dist) > i + 1 and dist[i + 1] is not None else None
+        if mins is not None:
+            out[i] = {"min": mins, "km": km}
+    return out, None
 
 
 async def os_overpass(line):
@@ -2168,6 +2175,250 @@ async def os_plan(g, res, svc, d, bus, dims):
             "sources": {"routing": OSRM, "restrictions": "OpenStreetMap (Overpass) - community data, not an authoritative clearance register", "traffic": "LTA speed bands, incidents, road works"}}
 
 
+# ----------------------------------------------------------------------------- V13.0 Halfway Deployment Planner (proactive: /planner)
+@app.get("/planner", response_class=HTMLResponse)
+async def planner_page():
+    return HTMLResponse((HERE / "planner.html").read_text(encoding="utf-8"))
+
+
+async def pl_origin(frm, stops):
+    """where the bus is now: the first stop, any stop code, or 'lat,lon'."""
+    f = (frm or "").strip()
+    if not f or f.lower() in ("first", "start", "terminal"):
+        return (stops[0]["lat"], stops[0]["lon"]), f"{stops[0]['name']} ({stops[0]['code']})", None
+    m = re.match(r"^\s*(-?\d+\.\d+)\s*,\s*(-?\d+\.\d+)\s*$", f)
+    if m:
+        lat, lon = float(m.group(1)), float(m.group(2))
+        if not in_sg(lat, lon):
+            return None, None, "That location is outside Singapore."
+        return (lat, lon), f"map location {lat:.4f}, {lon:.4f}", None
+    code = re.sub(r"\D", "", f)
+    if len(code) == 5:
+        on = next((x for x in stops if x["code"] == code), None)
+        if on:
+            return (on["lat"], on["lon"]), f"{on['name']} ({code})", None
+        st = await static()
+        sp = (st["stops"] or {}).get(code)
+        if sp:
+            return (sp["lat"], sp["lon"]), f"{sp['name']} ({code})", None
+    return None, None, "Enter the first stop, a 5-digit bus stop code, or a map location."
+
+
+async def os_routes(origin, dest, svc, d, stop_code, bus, dims, service_line, leave, planned_start=None, prep=None):
+    """road routes from `origin` to one halfway stop, with traffic, restrictions and suitability. Used by the planner page."""
+    P = dict(offservice.PARAMS)
+    if prep is not None:
+        P["prep_min"] = prep
+    alt = await os_osrm([origin, dest], alternatives=3)
+    routes = [dict(r, label=f"Road route {i + 1}", kind="osrm") for i, r in enumerate(alt["routes"])]
+    if not routes:
+        return None, alt.get("error") or "routing service unavailable"
+    uniq = []
+    for r in routes:
+        if any(abs(r["km"] - u["km"]) < 0.15 and abs(r["osrm_min"] - u["osrm_min"]) < 0.6 for u in uniq):
+            continue
+        uniq.append(r)
+    routes = uniq[:3]
+    bands = await bands_state()
+    idx = bands.get("idx") if isinstance(bands, dict) else None
+    try:
+        rw, _ = await tr_roadworks(now_sgt().timestamp())
+    except Exception:
+        rw = []
+    try:
+        inc = (await api_incidents("", 1)).get("incidents", [])
+    except Exception:
+        inc = []
+    osms = await asyncio.gather(*[os_overpass(r["line"]) for r in routes])
+    for r, osm in zip(routes, osms):
+        r["groups"] = offservice.group_roads(r["steps"])
+        runs, tinfo = color_route(r["line"], idx) if idx else ([], {"km": {}, "driveMin": None, "known": False})
+        known = sum(v for kk, v in (tinfo.get("km") or {}).items() if kk != "none")
+        use_band = bool(idx) and tinfo.get("known") and known >= P["band_min_share"] * max(r["km"], 0.01)
+        r["time_min"] = tinfo["driveMin"] if use_band else r["osrm_min"] * P["bus_time_factor"]
+        r["time_src"] = "live speed bands" if use_band else f"routing time x {P['bus_time_factor']:g} (no live speed data)"
+        r["traffic"] = {"km": {kk: round(v, 2) for kk, v in (tinfo.get("km") or {}).items()}, "runs": [{"b": x["b"], "road": x["road"], "pts": offservice.simplify(x["pts"], 40)} for x in runs][:120]}
+        r["overlap"] = os_overlap(r["line"], service_line, P["service_overlap_m"]) if service_line else 0.0
+        r["signature"] = offservice.signature(stop_code, r["groups"])
+        r["verified"] = os_verified(svc, d, stop_code, bus, r["signature"])
+        r["findings"] = offservice.findings(r, osm, bus, dims, rw, inc, P)
+        r["status"], r["status_text"] = offservice.suitability(r["findings"], bus, r["verified"])
+        r["osm_ok"] = bool(osm and osm.get("ok"))
+    opts, rec, fastest, shortest = offservice.build_options(routes, {"leave": leave, "planned_start": planned_start}, P)
+    return {"options": opts, "recommended": rec, "fastest": fastest, "shortest": shortest, "roadworks": rw, "incidents": inc, "P": P}, None
+
+
+@app.get("/api/planner/setup")
+async def api_pl_setup(service: str = "", direction: int = 1):
+    svc = service.strip().upper()
+    if not svc:
+        st = await static()
+        return {"services": sorted({k[0] for k in st["routes"]})[:900]}
+    g = await ho_route(svc, direction)
+    if g.get("error"):
+        return {"error": g["error"]}
+    st = await static()
+    dirs = []
+    for d_ in (1, 2):
+        ds = route_stops(st, svc, d_)
+        if ds:
+            dirs.append({"direction": d_, "label": f"{'UP' if d_ == 1 else 'DOWN'} \u2014 {ds[0]['name']} \u2192 {ds[-1]['name']}", "n": len(ds)})
+    stops, ss, tau = g["stops"], g["prep"]["stop_s"], g["tau"]
+    now = g["now"]
+    return {"service": svc, "direction": direction, "directions": dirs, "sched_hw": g["H"], "hw_src": g["H_src"], "traffic_ok": g["traffic_ok"],
+            "route": {"km": round(g["prep"]["km"], 2), "run_min": round(tau[-1], 1), "first": stops[0]["name"], "last": stops[-1]["name"], "n_stops": len(stops)},
+            "stops": [{"code": s_["code"], "name": s_["name"], "seq": s_["seq"], "j": i, "km": round(ss[i], 2), "tau": round(tau[i], 1)} for i, s_ in enumerate(stops)],
+            "now": now.strftime("%H:%M"), "ref": ho_hhmm(((now.hour * 60 + now.minute) // 5 + 1) * 5), "updated": now.isoformat(timespec="seconds")}
+
+
+@app.get("/api/planner/search")
+async def api_pl_search(service: str = "", direction: int = 1, frm: str = "", important: str = "", max_min: str = "", max_km: str = "", min_gain: str = "",
+                        bus: str = "dd", hw: str = "", ref: str = "", late: str = "30", ready: str = "", limit: int = 40):
+    """Every bus stop on the direction is tested as a halfway start: road time and distance from where the bus is now (one routing request),
+    stops omitted / remaining, important stops kept, and the headway the deployment would earn. Ranked - never by distance alone."""
+    svc = service.strip().upper()
+    g = await ho_route(svc, direction)
+    if g.get("error"):
+        return {"ok": False, "error": g["error"]}
+    stops, ss, tau, now = g["stops"], g["prep"]["stop_s"], g["tau"], g["now"]
+    origin, origin_label, err = await pl_origin(frm, stops)
+    if err:
+        return {"ok": False, "error": err}
+    P = {**halfway.PARAMS, **HO["params"]}
+    bus = bus if bus in offservice.BUS_TYPES else "dd"
+    def fnum(v, dflt=None):
+        try:
+            return float(str(v).strip()) if str(v).strip() else dflt
+        except ValueError:
+            return dflt
+    H = fnum(hw, g["H"]) or 0.0
+    if H <= 0:
+        return {"ok": False, "error": "Scheduled headway unknown for this service - enter it."}
+    L = fnum(late, 30.0) or 0.0
+    t0 = ho_parse_hhmm(ref) if ref.strip() else ((now.hour * 60 + now.minute) // 5 + 1) * 5
+    rdy = ho_parse_hhmm(ready) if ready.strip() else now.hour * 60 + now.minute
+    if t0 is None or rdy is None:
+        return {"ok": False, "error": "Times must be like 14:05."}
+    mx_min, mx_km, mn_gain = fnum(max_min), fnum(max_km), fnum(min_gain, 0.0) or 0.0
+    imp = [c for c in re.split(r"[,\s]+", important.strip()) if c]
+    imp_j = {c: next((i for i, s_ in enumerate(stops) if s_["code"] == c), None) for c in imp}
+    n = len(stops)
+    idxs = [j for j in range(1, n - 1) if n - j >= 3]
+    offs, off_err = await os_table(origin, [(stops[j]["lat"], stops[j]["lon"]) for j in idxs])
+    prep = float(P.get("prep_min", offservice.PARAMS["prep_min"]))
+    cands, skipped = [], {"time": 0, "km": 0, "gain": 0, "no_route": 0, "no_benefit": 0}
+    for i, j in enumerate(idxs):
+        om = offs.get(i)
+        if not om:
+            skipped["no_route"] += 1
+            continue
+        off_min = om["min"] * offservice.PARAMS["bus_time_factor"]
+        off_km = om["km"] if om.get("km") is not None else max(0.0, ss[j])
+        ins = max(rdy + off_min + prep, t0 + tau[j] - 5.0)
+        q = offservice.quick_gain(H, t0 + tau[j], L, ins)
+        missed = [c for c, jj in imp_j.items() if jj is not None and jj < j]
+        c = {"j": j, "code": stops[j]["code"], "name": stops[j]["name"], "seq": stops[j]["seq"], "lat": stops[j]["lat"], "lon": stops[j]["lon"],
+             "off_min": round(off_min, 1), "off_km": round(off_km, 2), "route_km_from_start": round(ss[j], 2), "arrive": round(rdy + off_min, 1),
+             "arrive_clock": offservice.hm(rdy + off_min), "insert": round(ins, 1), "insert_clock": offservice.hm(ins), "sched_clock": offservice.hm(t0 + tau[j]),
+             "stops_total": n, "stops_omitted": j, "stops_remaining": n - j, "km_lost": round(ss[j], 2),
+             "important_total": len(imp), "important_served": len(imp) - len(missed), "important_missed": len(missed),
+             "missed": [{"code": c_, "name": next((x["name"] for x in stops if x["code"] == c_), c_)} for c_ in missed],
+             "gain": q["gain"], "hw": q, "after_next": q["after_next"], "dev_half": q["dev_half"]}
+        if mx_min is not None and off_min > mx_min + 1e-6:
+            skipped["time"] += 1
+            continue
+        if mx_km is not None and off_km > mx_km + 1e-6:
+            skipped["km"] += 1
+            continue
+        if q["gain"] <= 1e-6 or q["after_next"]:
+            skipped["no_benefit"] += 1                 # the bus would reach this stop too late to close the gap: not a halfway candidate at all
+            continue
+        if q["gain"] < mn_gain - 1e-6:
+            skipped["gain"] += 1
+            continue
+        cands.append(c)
+    offservice.rank_candidates(cands)
+    for c in cands:
+        c["band"] = offservice.band_of(c, mn_gain, H)
+    top = cands[:limit]
+    return {"ok": True, "service": svc, "direction": direction, "bus": bus, "bus_label": offservice.BUS_TYPES[bus], "origin": {"label": origin_label, "lat": origin[0], "lon": origin[1]},
+            "H": H, "late": L, "ref": ho_hhmm(t0), "ready": ho_hhmm(rdy), "prep_min": prep, "now": now.strftime("%H:%M"),
+            "route": {"km": round(g["prep"]["km"], 2), "run_min": round(tau[-1], 1), "first": stops[0]["name"], "last": stops[-1]["name"], "n_stops": n},
+            "candidates": top, "n_tested": len(idxs), "n_feasible": len(cands), "skipped": skipped,
+            "important": [{"code": c_, "name": next((x["name"] for x in stops if x["code"] == c_), c_), "j": imp_j[c_]} for c_ in imp],
+            "trade_off": offservice.trade_off_text(cands), "line": ho_simplify(g["line"], 400),
+            "screening": "road distance and time from one routing request" if offs else f"estimate only ({off_err or 'routing unavailable'})",
+            "note": "Headway figures assume the buses before and after the delayed trip run on time; the full simulation is on the Halfway Optimiser page.",
+            "updated": now.isoformat(timespec="seconds")}
+
+
+@app.get("/api/planner/route")
+async def api_pl_route(service: str = "", direction: int = 1, frm: str = "", stop: str = "", bus: str = "dd", vh: str = "", vw: str = "", vt: str = "",
+                       hw: str = "", ref: str = "", late: str = "30", ready: str = "", important: str = ""):
+    """Off-service road routes to ONE chosen halfway stop: alternatives, traffic, restrictions, suitability, timeline and the headway effect."""
+    svc = service.strip().upper()
+    g = await ho_route(svc, direction)
+    if g.get("error"):
+        return {"ok": False, "error": g["error"]}
+    stops, ss, tau, now = g["stops"], g["prep"]["stop_s"], g["tau"], g["now"]
+    j = next((i for i, s_ in enumerate(stops) if s_["code"] == re.sub(r"\D", "", stop)), None)
+    if j is None or j == 0:
+        return {"ok": False, "error": "Choose a halfway stop on this route."}
+    origin, origin_label, err = await pl_origin(frm, stops)
+    if err:
+        return {"ok": False, "error": err}
+    bus = bus if bus in offservice.BUS_TYPES else "dd"
+    dims = {}
+    for key_, v_ in (("height_m", vh), ("width_m", vw), ("weight_t", vt)):
+        try:
+            dims[key_] = float(v_) if str(v_).strip() else None
+        except ValueError:
+            dims[key_] = None
+    P = {**halfway.PARAMS, **HO["params"]}
+    prep = float(P.get("prep_min", offservice.PARAMS["prep_min"]))
+    try:
+        H = float(hw) if hw.strip() else (g["H"] or 0.0)
+        L = float(late) if late.strip() else 30.0
+    except ValueError:
+        return {"ok": False, "error": "Headway and lateness must be numbers."}
+    t0 = ho_parse_hhmm(ref) if ref.strip() else ((now.hour * 60 + now.minute) // 5 + 1) * 5
+    rdy = ho_parse_hhmm(ready) if ready.strip() else now.hour * 60 + now.minute
+    cum = g["prep"]["cum"]
+    R, rerr = await os_routes(origin, (stops[j]["lat"], stops[j]["lon"]), svc, direction, stops[j]["code"], bus, dims, g["line"], rdy,
+                              planned_start=(t0 + tau[j] - 5.0 if H else None), prep=prep)
+    if R is None:
+        return {"ok": False, "error": f"No road route could be calculated ({rerr})."}
+    imp = [c for c in re.split(r"[,\s]+", important.strip()) if c]
+    out = []
+    for x in R["options"]:
+        ins = max(rdy + x["time_min"] + prep, t0 + tau[j] - 5.0)
+        q = offservice.quick_gain(H, t0 + tau[j], L, ins) if H else None
+        out.append({"idx": x["idx"], "label": x["label"], "tags": x["tags"], "km": round(x["km"], 2), "time_min": round(x["time_min"], 1), "time_src": x["time_src"],
+                    "arrive": round(rdy + x["time_min"], 1), "arrive_clock": offservice.hm(rdy + x["time_min"]), "insert_clock": offservice.hm(ins), "insert": round(ins, 1),
+                    "status": x["status"], "status_label": offservice.STATUS_TXT[x["status"]], "status_text": x["status_text"], "findings": x["findings"], "osm_ok": x["osm_ok"],
+                    "verified": x["verified"], "signature": x["signature"], "overlap": round(x["overlap"], 2), "n_turns": x["n_turns"], "n_sharp": x["n_sharp"],
+                    "congested_km": round(x["congested_km"], 2), "traffic": x["traffic"], "line": offservice.simplify(x["line"], 250), "roads": [q_["road"] for q_ in x["groups"]],
+                    "groups": [{"road": q_["road"], "km": round(q_["km"], 2), "min": round(q_["min"] * (x["time_min"] / (sum(z["min"] for z in x["groups"]) or 1.0)), 1),
+                                "line": offservice.simplify(q_["line"], 60)} for q_ in x["groups"]],
+                    "timeline": offservice.timeline(x, rdy, prep, ins, ins + (tau[-1] - tau[j]), origin_label, stops[j]["name"], stops[-1]["name"]),
+                    "hw": q})
+    served = [s_ for i_, s_ in enumerate(stops) if i_ >= j]
+    return {"ok": True, "service": svc, "direction": direction, "bus": bus, "bus_label": offservice.BUS_TYPES[bus], "dims": dims,
+            "stop": {"j": j, "code": stops[j]["code"], "name": stops[j]["name"], "lat": stops[j]["lat"], "lon": stops[j]["lon"], "km_from_start": round(ss[j], 2)},
+            "origin": {"label": origin_label, "lat": origin[0], "lon": origin[1]}, "last": {"name": stops[-1]["name"], "lat": stops[-1]["lat"], "lon": stops[-1]["lon"]},
+            "options": out, "recommended": R["recommended"], "fastest": R["fastest"], "shortest": R["shortest"], "ready": ho_hhmm(rdy), "ref": ho_hhmm(t0), "H": H, "late": L, "prep_min": prep,
+            "stops_total": len(stops), "stops_omitted": j, "stops_remaining": len(stops) - j, "km_lost": round(ss[j], 2), "km_operated": round(g["prep"]["km"] - ss[j], 2),
+            "important": [{"code": c_, "name": next((x_["name"] for x_ in stops if x_["code"] == c_), c_), "served": any(x_["code"] == c_ for x_ in served),
+                           "lat": next((x_["lat"] for x_ in stops if x_["code"] == c_), None), "lon": next((x_["lon"] for x_ in stops if x_["code"] == c_), None)} for c_ in imp],
+            "service_line": ho_simplify(g["line"], 500), "skipped_line": ho_simplify(ho_cut(g["line"], cum, 0.0, ss[j]), 200),
+            "recovered_line": ho_simplify(ho_cut(g["line"], cum, ss[j], cum[-1]), 250),
+            "stop_dots": [{"code": s_["code"], "name": s_["name"], "served": i_ >= j} for i_, s_ in enumerate(stops)],
+            "roadworks": [x for x in R["roadworks"] if x.get("lat") is not None and any(offservice.dist_to_line_m((x["lat"], x["lon"]), y["line"]) <= 300 for y in R["options"])][:20],
+            "incidents": [x for x in R["incidents"] if any(offservice.dist_to_line_m((x["lat"], x["lon"]), y["line"]) <= 300 for y in R["options"])][:20],
+            "why_route": offservice.why_route(R["options"], R["recommended"], R["fastest"], R["shortest"], None, stops[j]["name"]),
+            "updated": now.isoformat(timespec="seconds")}
+
+
 @app.post("/api/halfway/offservice/record")
 async def api_os_record(request: Request):
     """controller records: route_verified (this road sequence is verified for this bus type at this stop) or deployment_approved (audit)."""
@@ -2233,7 +2484,7 @@ async def api_ho_recovery(service: str = "", direction: int = 1, ref: str = "", 
             dims[key_] = None
     # real road time from the interchange to every candidate halfway stop (one OSRM table request); falls back to an estimate
     offs, off_err = await os_table((stops[0]["lat"], stops[0]["lon"]), [(c["lat"], c["lon"]) for c in cands])
-    offsvc = {c["j"]: offs[i] * offservice.PARAMS["bus_time_factor"] for i, c in enumerate(cands) if offs.get(i) is not None}
+    offsvc = {c["j"]: offs[i]["min"] * offservice.PARAMS["bus_time_factor"] for i, c in enumerate(cands) if offs.get(i)}
     ctx = {"H": H, "t0": t0, "late": lates, "tau": g["tau"], "stop_s": g["prep"]["stop_s"], "route_km": g["prep"]["km"], "stop_names": [s_["name"] for s_ in stops],
            "stop_codes": [s_["code"] for s_ in stops], "candidates": cands, "now": now.hour * 60 + now.minute, "mode": mode, "veh": veh, "offsvc_min": offsvc,
            "params": {"n_trips": n, "layover_min": lay, "min_layover_min": P["min_layover_min"], "adj_max": min(8.0, P["reg_hold_max"]), "offsvc_factor": P["offsvc_factor"],
