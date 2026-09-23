@@ -1042,7 +1042,6 @@ def bb_init():
                     for r in bb_sql("SELECT * FROM service_headway_config ORDER BY service, direction, t_from", fetch=True)]
     ho_init()
     os_init()
-    in_init()
     rt_init()
     tr_init()
 
