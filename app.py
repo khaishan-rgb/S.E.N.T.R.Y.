@@ -2299,9 +2299,12 @@ async def api_rt_status():
     BB["last_req"] = time.time()
     meta=bb_sql("SELECT v FROM rt_meta WHERE k='collector_started'",fetch=True)
     started=float(meta[0]['v']) if meta else time.time()
-    obs=bb_sql("SELECT COUNT(*) n, COUNT(DISTINCT journey) journeys, MIN(ts) first_ts, MAX(ts) last_ts FROM rt_passage",fetch=True)[0]
-    sv=bb_sql("SELECT service,direction,COUNT(*) observations,COUNT(DISTINCT journey) journeys FROM rt_passage GROUP BY service,direction ORDER BY service,direction",fetch=True)
-    return {"ok":True,"collector":{"started":started,"observations":obs['n'],"journeys":obs['journeys'],"first_ts":obs['first_ts'],"last_ts":obs['last_ts'],"alive":time.time()-BB['loop_at']<3*BB['params']['refresh_sec'],"db_ok":BB['db_ok']},"services":sv}
+    obs_rows=bb_sql("SELECT COUNT(*) n, COUNT(DISTINCT journey) journeys, MIN(ts) first_ts, MAX(ts) last_ts FROM rt_passage",fetch=True)
+    obs=obs_rows[0] if obs_rows else {"n":0,"journeys":0,"first_ts":None,"last_ts":None}
+    sv=bb_sql("SELECT service,direction,COUNT(*) observations,COUNT(DISTINCT journey) journeys FROM rt_passage GROUP BY service,direction ORDER BY service,direction",fetch=True) or []
+    st=await static()
+    all_services=sorted(st["dirs"].keys(), key=lambda s: ((not s.isdigit()), int(s) if s.isdigit() else 0, s))
+    return {"ok":True,"collector":{"started":started,"observations":obs['n'],"journeys":obs['journeys'],"first_ts":obs['first_ts'],"last_ts":obs['last_ts'],"alive":time.time()-BB['loop_at']<3*BB['params']['refresh_sec'],"db_ok":BB['db_ok']},"services":sv,"all_services":all_services}
 
 
 @app.get("/api/insight/stops")
