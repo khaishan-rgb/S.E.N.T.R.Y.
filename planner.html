@@ -11,6 +11,7 @@
 *{box-sizing:border-box}html{-webkit-text-size-adjust:100%}
 body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;padding:env(safe-area-inset-top,0) 0 calc(78px + env(safe-area-inset-bottom,0))}
 .wrap{max-width:1400px;margin:0 auto;padding:10px 12px 30px}
+@media(min-width:1000px){.top{padding-left:14px}.bn{display:none}body{padding-bottom:20px}}
 .top{position:sticky;top:0;z-index:9000;display:flex;gap:10px;align-items:center;background:rgba(5,18,33,.96);backdrop-filter:blur(12px);padding:9px 4px;border-bottom:1px solid var(--line)}
 .top .logo{width:36px;height:36px;border-radius:10px;background:var(--blue);display:grid;place-items:center;font-size:19px}
 .top h1{margin:0;font-size:18px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.top .sp{flex:1}
@@ -58,6 +59,13 @@ tr.sel td{background:#1d2a12}tbody tr{cursor:pointer}
 .find li{padding:5px 8px;border-radius:7px;background:var(--card2);border-left:4px solid #39536e}.find li.block{border-left-color:var(--red)}.find li.review{border-left-color:#ffc46b}
 .dots{display:flex;flex-wrap:wrap;gap:3px;margin-top:6px}.dots i{width:9px;height:9px;border-radius:50%;background:#2c4460}.dots i.on{background:var(--grn)}.dots i.imp{background:#fff;box-shadow:0 0 0 2px var(--acc)}
 .note{color:var(--mut);font-size:12px;margin-top:8px;line-height:1.45}
+.aibox{border:1px solid #a8661a;background:#2a1d08;border-radius:12px;padding:11px 13px;margin-bottom:10px}
+.aibox h3{margin:0 0 4px;font-size:15px;color:#ffb54d}.aibox ul{margin:6px 0 0;padding-left:18px;font-size:13px;display:grid;gap:4px}
+.aibox .pick{font-size:17px;font-weight:800}
+.sortbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:8px;font-size:12.5px;color:var(--mut)}
+.sortbar select{width:auto;min-width:190px;min-height:36px;padding:6px 26px 6px 9px;font-size:13px}
+.sortbar button{min-height:36px}
+th.s{cursor:pointer;user-select:none}th.s:hover{color:#fff}th.s .ar{color:var(--acc)}
 .msg{background:var(--card2);border:1px solid var(--line2);border-radius:10px;padding:10px 12px;font-size:13.5px}
 .msg.err{background:#3a1216;border-color:#7a2228;color:#ffb3b8}
 .sk{height:14px;border-radius:7px;background:linear-gradient(90deg,#102944,#16375a,#102944);background-size:200% 100%;animation:sh 1.1s infinite;margin:6px 0}
@@ -69,10 +77,13 @@ tr.sel td{background:#1d2a12}tbody tr{cursor:pointer}
 @media(max-width:1100px){.flt{grid-template-columns:repeat(2,minmax(0,1fr))}.grid2{grid-template-columns:minmax(0,1fr)}#plMap{height:340px}}
 @media(max-width:700px){table.cand{display:none}.cards{display:grid}}
 @media(max-width:560px){.flt{grid-template-columns:minmax(0,1fr)}.kv{grid-template-columns:minmax(0,1fr);gap:0}.kv span{margin-top:7px}.kv b{text-align:left}}
+.desktop-shell{display:none}.mobile-top-menu{display:none}.mobile-menu-btn{display:none}
+@media(min-width:1000px){body{padding-left:232px}.wrap{max-width:none!important;margin:0!important;padding-left:22px!important;padding-right:22px!important}.desktop-shell{display:flex;position:fixed;left:0;top:0;bottom:0;width:232px;background:#061425;border-right:1px solid #17324d;z-index:10000;flex-direction:column;padding:18px 12px}.shell-brand{padding:7px 10px 18px;border-bottom:1px solid #17324d}.shell-brand strong{font-size:16px;color:#f3f8ff}.shell-brand small{display:block;color:#718da7;margin-top:4px}.shell-label{padding:20px 10px 8px;color:#607d98;font-size:10px;font-weight:800;letter-spacing:.12em}.shell-link{display:flex;align-items:center;gap:10px;color:#9eb6cc;text-decoration:none;padding:11px 12px;margin:2px 0;border-radius:10px;font-size:13px;font-weight:650;position:relative}.shell-link .si{width:24px;text-align:center;font-size:16px}.shell-link:hover{background:#0c2238;color:#fff}.shell-link.active{background:#0c3154;color:#fff}.shell-link.active:before{content:'';position:absolute;left:-12px;top:8px;bottom:8px;width:3px;border-radius:4px;background:#35bfff}.shell-foot{margin-top:auto;padding:12px 10px;color:#64819b;font-size:11px}.top nav.nav,.top nav.navl{display:none!important}.top .brand p{display:none}.module-intro{display:block}}
+@media(max-width:999px){.mobile-menu-btn{display:grid;width:38px;height:38px;place-items:center;border:1px solid #244766;border-radius:10px;background:#0a2036;color:#fff;font-size:20px;cursor:pointer;order:-1}.mobile-bottom-nav{display:grid;grid-template-columns:repeat(4,1fr);position:fixed;left:0;right:0;bottom:0;z-index:12000;background:rgba(5,18,33,.98);border-top:1px solid #21415e;padding:7px max(6px,env(safe-area-inset-right)) calc(7px + env(safe-area-inset-bottom)) max(6px,env(safe-area-inset-left));box-shadow:0 -8px 24px rgba(0,0,0,.22)}.mbn{color:#829db5;text-decoration:none;text-align:center;font-size:10px;font-weight:650;padding:3px 2px;border-radius:9px}.mbn .mi{display:block;font-size:19px;line-height:22px}.mbn.active{color:#4bc7ff;background:#0a2945}.mobile-more{display:none;position:fixed;left:10px;right:10px;bottom:74px;z-index:13000;background:#091c30;border:1px solid #275176;border-radius:16px;padding:8px;box-shadow:0 18px 50px rgba(0,0,0,.5)}.mobile-more.open{display:block}.mobile-more a{display:flex;align-items:center;gap:12px;color:#d7e7f5;text-decoration:none;padding:13px;border-radius:10px;font-weight:650}.mobile-more a.active{background:#0d3559;color:#55c7ff}.mobile-top-menu{display:none;position:fixed;top:calc(56px + env(safe-area-inset-top) + 8px);left:8px;z-index:13000;min-width:230px;max-width:82vw;background:#091c30;border:1px solid #275176;border-radius:16px;padding:8px;box-shadow:0 18px 50px rgba(0,0,0,.5)}.mobile-top-menu.open{display:block}.mobile-top-menu a{display:flex;align-items:center;gap:12px;color:#d7e7f5;text-decoration:none;padding:13px;border-radius:10px;font-weight:650;white-space:nowrap}.mobile-top-menu a.active{background:#0d3559;color:#55c7ff}}
 </style>
 </head>
 <body>
-<header class="top"><div class="logo">&frac12;</div><h1>Halfway Deployment Planner</h1><div class="sp"></div><div class="clk" id="clk"></div></header>
+<aside class="desktop-shell" aria-label="Primary navigation"><div class="shell-brand"><strong>SG Transport Pulse</strong><small>Operations Intelligence</small></div><div class="shell-label">ANALYSIS TOOLS</div><a class="shell-link " href="/"><span class="si">▰</span><span>Route Traffic</span></a><a class="shell-link " href="/control"><span class="si">↔</span><span>Headway Control</span></a><a class="shell-link " href="/bunching"><span class="si">≋</span><span>Bunching &amp; Gap</span></a><a class="shell-link " href="/halfway"><span class="si">½</span><span>Halfway Optimiser</span></a><a class="shell-link " href="/traffic"><span class="si">⚠</span><span>Traffic-Aware</span></a><a class="shell-link active" href="/planner"><span class="si">◉</span><span>Halfway Planner</span></a><div class="shell-foot">● Live operational workspace</div></aside><header class="top"><button class="mobile-menu-btn" type="button" aria-label="Open navigation" onclick="document.getElementById('plTopMenu').classList.toggle('open')">☰</button><div class="logo">◉</div><h1>Halfway Deployment Planner</h1><div class="sp"></div><div class="clk" id="clk"></div></header><div class="mobile-top-menu" id="plTopMenu"><a href="/">▰ Route</a><a href="/control">↔ Headway</a><a href="/bunching">≋ Bunching</a><a href="/halfway">½ Halfway Optimiser</a><a href="/traffic">⚠ Traffic-Aware Regulation</a><a class="active" href="/planner">◉ Halfway Planner</a></div>
 <div class="wrap">
   <section class="card">
     <h2>1. Find possible halfway points</h2>
@@ -104,14 +115,22 @@ tr.sel td{background:#1d2a12}tbody tr{cursor:pointer}
   <section class="card" id="pResCard" hidden><h2>2. Candidate halfway points</h2><div class="sub" id="pResSub"></div><div id="pRes"></div></section>
   <section class="card" id="pDetCard" hidden><h2>3. Off-service route &amp; impact</h2><div class="sub" id="pDetSub">Select a candidate above.</div><div id="pDet"></div></section>
 </div>
-<nav class="bn"><a href="/"><span class="mi">&#9648;</span>Route</a><a href="/control"><span class="mi">&#8596;</span>Headway</a><a href="/bunching"><span class="mi">&#8776;</span>Bunching</a><a href="/halfway"><span class="mi">&frac12;</span>Optimiser</a><a class="on" href="/planner"><span class="mi">&#128205;</span>Planner</a></nav>
+<nav class="bn" aria-label="Mobile primary navigation"><a href="/"><span class="mi">▰</span>Route</a><a href="/control"><span class="mi">↔</span>Headway</a><a href="/bunching"><span class="mi">≋</span>Bunching</a><a href="/halfway"><span class="mi">½</span>Optimiser</a><a class="on" href="/planner"><span class="mi">◉</span>Planner</a></nav>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const f1 = x => x == null ? "\u2013" : (Math.abs(x - Math.round(x)) < .05 ? String(Math.round(x)) : x.toFixed(1));
 const LS = {get(k, d){ try{ const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); }catch(e){ return d; } }, set(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }};
-const P = {svc:LS.get("pl.svc", ""), dir:LS.get("pl.dir", 1), setup:null, imp:new Set(LS.get("pl.imp", [])), res:null, det:null, sel:null, optSel:null, map:null, g:null, lines:[]};
+const P = {svc:LS.get("pl.svc", ""), dir:LS.get("pl.dir", 1), setup:null, imp:new Set(LS.get("pl.imp", [])), res:null, det:null, sel:null, optSel:null, map:null, g:null, lines:[],
+  showAll:false, sort:LS.get("pl.sort", "rank"), desc:LS.get("pl.desc", false)};
+const SORTS = [["rank", "AI rank (best trade-off)", false], ["gain", "Headway gain", true], ["off_min", "Off-service time", false], ["off_km", "Off-service distance", false],
+  ["stops_remaining", "Bus stops remaining", true], ["stops_omitted", "Bus stops omitted", false], ["important_served", "Important stops served", true], ["seq", "Stop sequence along the route", false]];
+function sortCands(list){
+  const k = P.sort, d = P.desc ? -1 : 1;
+  const v = c => k === "rank" ? c.rank : k === "seq" ? c.seq : c[k];
+  return [...list].sort((a, b) => { const x = v(a), y = v(b); return x === y ? a.rank - b.rank : (x < y ? -1 : 1) * d; });
+}
 const TAG = {A:"Fastest", B:"Shortest", C:"Preferred"};
 function clk(){ const p = new Intl.DateTimeFormat("en-GB", {timeZone:"Asia/Singapore", hour12:false, weekday:"short", day:"2-digit", month:"short", hour:"2-digit", minute:"2-digit"}).format(new Date()); $("clk").textContent = p + " SGT"; }
 clk(); setInterval(clk, 20000);
@@ -169,25 +188,34 @@ async function find(){
   $("pFind").disabled = false; P.res = j; P.sel = null;
   if(!j.ok){ $("pRes").innerHTML = `<div class="msg err">${esc(j.error || "Search failed")}</div>`; return; }
   renderRes();
-  if(j.candidates.length) selectCand(j.candidates[0].code);
+  if(j.candidates.length) selectCand((j.best && j.best.code) || j.candidates[0].code);
 }
 $("pFind").onclick = find;
 function renderRes(){
-  const j = P.res, all = j.candidates, C = P.showAll ? all : all.slice(0, 10);
+  const j = P.res, sorted = sortCands(j.candidates), all = sorted, C = P.showAll ? all : all.slice(0, 10);
   $("pResSub").textContent = `${j.n_feasible} of ${j.n_tested} stops are usable (${j.skipped.no_benefit} would be reached too late to help) \u00b7 bus ${j.bus_label.toLowerCase()} \u00b7 from ${j.origin.label} \u00b7 free from ${j.ready} \u00b7 trip due ${j.ref}, ${f1(j.late)} min late \u00b7 headway ${f1(j.H)} min`;
   if(!C.length){ $("pRes").innerHTML = `<div class="msg">No candidate passes the filters. Skipped: ${j.skipped.no_benefit} where the bus would arrive too late to close the gap, ${j.skipped.time} over the time limit, ${j.skipped.km} over the distance limit, ${j.skipped.gain} below the headway gain, ${j.skipped.no_route} with no road route.</div>`; return; }
-  const row = c => `<tr data-c="${c.code}" class="${P.sel === c.code ? "sel" : ""}"><td><b>${c.rank}</b></td><td><span class="dot ${c.band}"></span><b>${c.code}</b></td><td>${esc(c.name)}</td>
+  const ai = j.best ? `<div class="aibox"><h3>AI recommendation</h3><div class="pick">${esc(j.best.code)} \u2014 ${esc(j.best.name)}</div><ul>${j.best.reasons.map(t => `<li>${esc(t)}</li>`).join("")}</ul></div>` : "";
+  const th = (k, label) => { const on = P.sort === k; return `<th class="s" data-s="${k}">${label}${on ? ` <span class="ar">${P.desc ? "\u25bc" : "\u25b2"}</span>` : ""}</th>`; };
+  const bar = `<div class="sortbar"><label for="pSort">Sort by</label><select id="pSort">${SORTS.map(([k, l]) => `<option value="${k}" ${P.sort === k ? "selected" : ""}>${l}</option>`).join("")}</select>
+    <button class="btn sm" id="pDesc" type="button">${P.sort === "rank" ? (P.desc ? "\u25bc Worst first" : "\u2605 Best first") : P.desc ? "\u25bc Highest first" : "\u25b2 Lowest first"}</button><span>${all.length} candidate${all.length === 1 ? "" : "s"}</span></div>`;
+  const row = c => `<tr data-c="${c.code}" class="${P.sel === c.code ? "sel" : ""}"><td><b>${c.rank}</b>${j.best && j.best.code === c.code ? ' <span style="color:#ffb54d" title="AI recommendation">\u2605</span>' : ""}</td><td><span class="dot ${c.band}"></span><b>${c.code}</b></td><td>${esc(c.name)}</td>
     <td>${f1(c.off_min)} min</td><td>${f1(c.off_km)} km</td><td>${c.stops_remaining}</td><td>${c.stops_omitted}</td>
     <td>${j.important.length ? `${c.important_served}/${c.important_total}` : "\u2013"}</td><td><b style="color:${c.gain > 0 ? "#7be7a5" : "#ff8a90"}">${f1(c.gain)} min</b></td>
     <td>${c.after_next ? "<span class='badge b-unsuitable'>too late</span>" : "<span class='badge b-review'>to check</span>"}</td><td><button class="btn sm" type="button">Select</button></td></tr>`;
-  $("pRes").innerHTML = `<div class="tw"><table class="cand"><thead><tr><th>Rank</th><th>Code</th><th>Bus stop</th><th>Off-service time</th><th>Distance</th><th>Stops remaining</th><th>Stops omitted</th><th>Important</th><th>Est. headway gain</th><th>Road status</th><th></th></tr></thead><tbody>${C.map(row).join("")}</tbody></table></div>
-    <div class="cards">${C.map(c => `<div class="cc ${P.sel === c.code ? "sel" : ""}" data-c="${c.code}"><div class="t"><span><span class="dot ${c.band}"></span>#${c.rank} <b>${c.code}</b> ${esc(c.name)}</span><b style="color:${c.gain > 0 ? "#7be7a5" : "#ff8a90"}">${f1(c.gain)} min</b></div>
+  $("pRes").innerHTML = ai + bar + `<div class="tw"><table class="cand"><thead><tr>${th("rank", "Rank")}<th>Code</th><th>Bus stop</th>${th("off_min", "Off-service time")}${th("off_km", "Distance")}${th("stops_remaining", "Stops remaining")}${th("stops_omitted", "Stops omitted")}${th("important_served", "Important")}${th("gain", "Est. headway gain")}<th>Road status</th><th></th></tr></thead><tbody>${C.map(row).join("")}</tbody></table></div>
+    <div class="cards">${C.map(c => `<div class="cc ${P.sel === c.code ? "sel" : ""}" data-c="${c.code}"><div class="t"><span><span class="dot ${c.band}"></span>#${c.rank}${j.best && j.best.code === c.code ? ' <span style="color:#ffb54d">\u2605 AI</span>' : ""} <b>${c.code}</b> ${esc(c.name)}</span><b style="color:${c.gain > 0 ? "#7be7a5" : "#ff8a90"}">${f1(c.gain)} min</b></div>
       <div class="g"><span>Off-service</span><b>${f1(c.off_min)} min \u00b7 ${f1(c.off_km)} km</b><span>Stops remaining / omitted</span><b>${c.stops_remaining} / ${c.stops_omitted}</b>
       <span>Important stops</span><b>${j.important.length ? `${c.important_served}/${c.important_total} served` : "\u2013"}</b><span>Enter service</span><b>${esc(c.insert_clock)}</b></div></div>`).join("")}</div>
     ${j.trade_off.length ? `<div class="msg" style="margin-top:10px"><b>Why the closest is not always the best</b><ul style="margin:6px 0 0;padding-left:18px">${j.trade_off.map(t => `<li>${esc(t)}</li>`).join("")}</ul></div>` : ""}
     <div class="note">Ranking uses headway gain, off-service time and distance, stops omitted and important stops missed \u2013 never distance alone. ${esc(j.screening)}. ${esc(j.note)} Road suitability is checked when you select a candidate.</div>`;
   if(all.length > 10){ const b = document.createElement("button"); b.className = "btn"; b.style.cssText = "width:100%;margin-top:8px";
     b.textContent = P.showAll ? "Show the top 10 only" : `Show all ${all.length} candidates`; b.onclick = () => { P.showAll = !P.showAll; renderRes(); }; $("pRes").append(b); }
+  const applySort = (k) => { if(P.sort === k){ P.desc = !P.desc; } else { P.sort = k; P.desc = (SORTS.find(s => s[0] === k) || [])[2] !== false ? true : false; if(k === "rank") P.desc = false; }
+    LS.set("pl.sort", P.sort); LS.set("pl.desc", P.desc); renderRes(); };
+  $("pSort").onchange = () => { P.sort = $("pSort").value; P.desc = P.sort === "rank" ? false : ((SORTS.find(s => s[0] === P.sort) || [])[2] === true); LS.set("pl.sort", P.sort); LS.set("pl.desc", P.desc); renderRes(); };
+  $("pDesc").onclick = () => { P.desc = !P.desc; LS.set("pl.desc", P.desc); renderRes(); };
+  document.querySelectorAll("#pRes th.s").forEach(t => t.onclick = () => applySort(t.dataset.s));
   document.querySelectorAll("#pRes [data-c]").forEach(el => el.onclick = () => selectCand(el.dataset.c));
 }
 /* ---------- selected candidate: off-service route ---------- */

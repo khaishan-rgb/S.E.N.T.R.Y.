@@ -21,7 +21,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 import headway
 import traffic
 
-VERSION = "V13.0"
+VERSION = "V13.2"
 LTA = os.getenv("LTA_BASE", "https://datamall2.mytransport.sg/ltaodataservice").rstrip("/")
 KEY = os.getenv("LTA_ACCOUNT_KEY", "")
 OSRM = os.getenv("OSRM_URL", "https://router.project-osrm.org").rstrip("/")
@@ -2344,7 +2344,7 @@ async def api_pl_search(service: str = "", direction: int = 1, frm: str = "", im
     return {"ok": True, "service": svc, "direction": direction, "bus": bus, "bus_label": offservice.BUS_TYPES[bus], "origin": {"label": origin_label, "lat": origin[0], "lon": origin[1]},
             "H": H, "late": L, "ref": ho_hhmm(t0), "ready": ho_hhmm(rdy), "prep_min": prep, "now": now.strftime("%H:%M"),
             "route": {"km": round(g["prep"]["km"], 2), "run_min": round(tau[-1], 1), "first": stops[0]["name"], "last": stops[-1]["name"], "n_stops": n},
-            "candidates": top, "n_tested": len(idxs), "n_feasible": len(cands), "skipped": skipped,
+            "candidates": top, "n_tested": len(idxs), "n_feasible": len(cands), "skipped": skipped, "best": offservice.best_reasons(cands, H, mn_gain),
             "important": [{"code": c_, "name": next((x["name"] for x in stops if x["code"] == c_), c_), "j": imp_j[c_]} for c_ in imp],
             "trade_off": offservice.trade_off_text(cands), "line": ho_simplify(g["line"], 400),
             "screening": "road distance and time from one routing request" if offs else f"estimate only ({off_err or 'routing unavailable'})",

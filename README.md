@@ -18,6 +18,10 @@ Until now halfway information only appeared after the optimiser decided a halfwa
 
 **Selected candidate (`/api/planner/route`):** the V12.9 routing and suitability engine for that stop - up to three road routes (fastest / shortest / preferred), live congestion, restriction and structure checks for the chosen bus type, findings list, VERIFIED / REQUIRES REVIEW / UNSUITABLE, road-by-road timeline linked to the map, and the map itself (revenue route in purple, off-service dashed blue, section not served dotted, red halfway pin, green / red important-stop markers, incidents and road works). A "bus stops affected" strip shows every stop as a dot (grey = not served, green = served, ringed = important). If the detailed road time differs from the screening estimate, the page says so and shows both headway figures.
 
+**V13.2:** the Halfway Planner is in the navigation everywhere - the left launcher on desktop, the top menu and the "More" sheet on phones - and the page itself now carries the same left launcher, hamburger menu and bottom bar as the other pages.
+
+**V13.1:** the candidate list carries an **AI recommendation** panel (the pick, plus why it beats the quickest-to-reach point, the largest-gain point and any point that keeps every important stop) and is **sortable** - AI rank, headway gain, off-service time, distance, stops remaining or omitted, important stops served, or stop sequence - ascending or descending, from the dropdown or by tapping a column heading. The AI pick is starred and selected automatically.
+
 **Note:** the headway figure here is a quick estimate for one delayed trip. The full Monte Carlo comparison of No action / Full trip + adjustment / Halfway + regulation stays on the Halfway Optimiser page.
 
 ## V12.9 - Halfway Deployment & Off-Service Route Planner

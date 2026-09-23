@@ -428,3 +428,37 @@ def trade_off_text(top):
         out.append(f"{b['code']} is {a['off_min'] - b['off_min']:.0f} min closer, but {a['code']} is ranked first because it {extra}"
                    f"gives about {a['gain'] - b['gain']:.0f} min more headway benefit{more}.")
     return out
+
+
+def best_reasons(cands, H, min_gain=0.0):
+    """Why the top-ranked halfway point is the AI's pick, compared with the obvious alternatives."""
+    if not cands:
+        return None
+    a = cands[0]
+    out = [f"Best overall trade-off: start at {a['code']} {a['name']} - about {a['gain']:.0f} min less maximum headway for {a['off_min']:.0f} min / "
+           f"{a['off_km']:.1f} km off-service, keeping {a['stops_remaining']} of {a['stops_total']} stops in service."]
+    others = cands[1:]
+    if others:
+        fastest = min(others, key=lambda c: c["off_min"])
+        if fastest["off_min"] < a["off_min"] - 0.5:
+            out.append(f"Quicker to reach: {fastest['code']} {fastest['name']} ({fastest['off_min']:.0f} min, {fastest['off_km']:.1f} km) - but it earns "
+                       f"{a['gain'] - fastest['gain']:.0f} min less headway" + (f" and misses {fastest['important_missed']} important stop(s)" if fastest["important_missed"] > a["important_missed"] else "") + ".")
+        top_gain = max(others, key=lambda c: c["gain"])
+        if top_gain["gain"] > a["gain"] + 0.5:
+            cost = []
+            if top_gain["off_min"] > a["off_min"] + 0.5:
+                cost.append(f"{top_gain['off_min'] - a['off_min']:.0f} min more off-service running")
+            if top_gain["stops_omitted"] > a["stops_omitted"]:
+                cost.append(f"{top_gain['stops_omitted'] - a['stops_omitted']} more stops not served")
+            if top_gain["important_missed"] > a["important_missed"]:
+                cost.append(f"{top_gain['important_missed'] - a['important_missed']} more important stop(s) missed")
+            out.append(f"Largest headway gain: {top_gain['code']} {top_gain['name']} ({top_gain['gain']:.0f} min, {top_gain['gain'] - a['gain']:+.0f} min) - "
+                       f"at the cost of {', '.join(cost) or 'a longer off-service move'}.")
+        keeps = [c for c in others if c["important_missed"] < a["important_missed"]]
+        if a["important_missed"] and keeps:
+            k = max(keeps, key=lambda c: c["gain"])
+            out.append(f"Keeps every important stop: {k['code']} {k['name']} ({k['gain']:.0f} min gain, {k['off_min']:.0f} min off-service) - choose this one if those stops must be served.")
+    if a["gain"] < 0.75 * H:
+        out.append(f"Note: even the best point only recovers about {a['gain']:.0f} min against a {H:.0f}-min headway; regulating the following trips may be enough on its own.")
+    out.append("Road suitability is only checked once you select a candidate, so confirm it before deploying.")
+    return {"code": a["code"], "name": a["name"], "reasons": out}
