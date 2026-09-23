@@ -503,8 +503,8 @@ def contributors(trips, vals=None, pctl=85):
         if len(a) < 5 or len(b) < 5:
             continue
         ma, mb = sum(a) / len(a), sum(b) / len(b)
-        label = {"traffic_speed": "Traffic speed", "dwell": "Passenger dwell time", "roadworks": "Road works present",
-                 "incident": "Traffic incident", "weather": "Rain", "demand": "Passenger demand", "event": "Special event / holiday"}[f]
+        label = {"traffic_speed": "Traffic speed on the route (km/h)", "dwell": "Passenger dwell time", "roadworks": "Road works on the route",
+                 "incident": "Traffic incident on the route", "weather": "Rain (≥ 0.2 mm during the trip)", "demand": "Passenger demand (tap-ins on the route, that hour)", "event": "School or public holiday"}[f]
         if f in ("roadworks", "incident", "weather", "event"):
             out.append({"factor": label, "slow": round(100 * ma, 0), "rest": round(100 * mb, 0), "unit": "% of trips", "diff": round(100 * (ma - mb), 0)})
         else:

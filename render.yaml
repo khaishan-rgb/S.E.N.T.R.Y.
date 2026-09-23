@@ -19,3 +19,11 @@ services:
         sync: false
       - key: OVERPASS_URL         # optional: road-restriction data for the off-service route check (default public overpass-api.de)
         sync: false
+      - key: RT_POLL_SEC          # optional: running-time polling interval when unattended (default 60)
+        sync: false
+      - key: RT_MAX_SERVICES      # optional: services measured round the clock (default 8)
+        sync: false
+      - key: RT_KEEP_DAYS         # optional: days of measured trips kept (default 180)
+        sync: false
+      - key: DATAGOV_API_KEY      # optional: data.gov.sg API key for higher rate limits
+        sync: false

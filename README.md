@@ -1,10 +1,26 @@
-# SG Transport Pulse V13.5 — Route Traffic + Departure Adjustment + Bunching, Gap & Alerts + AI Halfway Optimiser
+# SG Transport Pulse V13.6 — Route Traffic + Departure Adjustment + Bunching, Gap & Alerts + AI Halfway Optimiser
 
 Live bus positions, live LTA traffic drawn directly on the bus route, and next arrivals per stop.
 FastAPI backend + a single-page Leaflet frontend (OneMap basemap, OpenStreetMap fallback).
 
 
 
+
+## V13.6 - Running Time Analytics fully automated from open data
+
+Everything runs on the server by itself; no uploads and no manual timetable are needed.
+
+* **Round-the-clock measurement.** Services added under "Services measured round the clock" are stored in `rt_watch` and polled even with every page closed (every `RT_POLL_SEC`, default 60 s, when nobody is watching; the normal page rate when someone is). Up to `RT_MAX_SERVICES` (default 8) services, each about 15 cached DataMall Bus Arrival calls per direction per poll.
+* **Live conditions captured per trip** (these feeds have no history, so they are recorded as each trip ends, `rt_cond`): average speed-band traffic speed along the route and the share of slow road, LTA incidents and road works within 60 m of the route.
+* **Scheduled open-data jobs** (`rt_data_loop`, every 10 min, new module `rtdata.py`):
+  * **Rainfall** - data.gov.sg v2 real-time rainfall API with `?date=` (past days allowed), 5-minute readings from the three gauges nearest the route, summed over each trip's window; cached per day in `weather_day`; backfills up to 10 days per run. Optional `DATAGOV_API_KEY` for higher rate limits.
+  * **Public holidays** - data.gov.sg MOM datasets (consolidated + 2026 + 2027), daily; trips on a PH are analysed as Sunday/PH.
+  * **School holidays** - MOE 2026 vacation periods seeded (14-22 Mar, 30 May-28 Jun, 5-13 Sep, 21 Nov-31 Dec); later years are added on the page when MOE publishes them.
+  * **Passenger volume** - DataMall *Passenger Volume by Bus Stops* (monthly zip, last 3 months kept by LTA), limited to the stops of the measured services (`pv_stop`); each trip gets the tap-ins along its route in its hour and day type as its demand.
+* **Contributors panel** now uses these real per-trip conditions: traffic speed, incidents, road works, rain, passenger demand, school / public holiday - still worded as associations.
+* **Page:** "Automated data sources" replaces the collection box: always-on service list (add / remove), a feed status table (source, status, last run, "Fetch now"), school-holiday editor; the timetable entry is folded into an optional section.
+* New endpoints: `GET /api/rt/sources`, `POST /api/rt/refresh-data`, `POST /api/rt/school`; `POST /api/rt/watch` now persists (`remove: true` to stop).
+* **Remember:** a persistent disk is required on Render for the history to survive restarts.
 
 ## V13.5 - the timetable is optional, and 6 months of history
 

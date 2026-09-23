@@ -21,7 +21,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 import headway
 import traffic
 
-VERSION = "V13.5"
+VERSION = "V13.6"
 LTA = os.getenv("LTA_BASE", "https://datamall2.mytransport.sg/ltaodataservice").rstrip("/")
 KEY = os.getenv("LTA_ACCOUNT_KEY", "")
 OSRM = os.getenv("OSRM_URL", "https://router.project-osrm.org").rstrip("/")
@@ -543,6 +543,7 @@ async def lifespan(app):
         asyncio.create_task(warm())
         bb_init()
         task = asyncio.create_task(bb_loop())
+        asyncio.create_task(rt_data_loop())
         asyncio.create_task(tr_refresh(force=True))
         trtask = asyncio.create_task(tr_loop())
     yield
@@ -1162,7 +1163,9 @@ async def bb_eval(svc, d, now, st, fq):
     BB["labels"][key] = [f"{s['name']} ({s['code']})" if s.get("code") else s["name"] for s in stops]
     trk.commit(res.pop("bunched_pairs", {}), res.pop("long_pairs", {}), ts)
     try:
-        rt_track(key, svc, d, ts, buses, prep["stop_s"], prep["km"])                 # running-time observations for /running-time
+        ids = rt_track(key, svc, d, ts, buses, prep["stop_s"], prep["km"])           # running-time observations for /running-time
+        if ids:
+            asyncio.create_task(rt_enrich_live(ids, line))
     except Exception:
         pass
     res.pop("score_parts", None)
@@ -1338,7 +1341,8 @@ def bb_keys():
     now = time.time()
     keys = [(s, d) for s in [x for x in re.split(r"[,\s]+", BB_DEFAULT.upper()) if re.fullmatch(r"[0-9A-Z]{1,6}", x)] for d in (1, 2)]
     keys += [k for k, t in BB["watch"].items() if now - t < 2700 and k not in keys]
-    return keys[:BB_MAX_PAIRS]
+    keys += [(s_, d_) for s_ in rt_watch_list() for d_ in (1, 2) if (s_, d_) not in keys]      # measured round the clock
+    return keys[:BB_MAX_PAIRS + 2 * RT_MAX_SERVICES]
 
 
 async def bb_cycle(keys=None):
@@ -1360,15 +1364,21 @@ async def bb_loop():
     while True:
         t0 = time.time()
         try:
-            if BB_ALWAYS or t0 - BB["last_req"] < BB_IDLE_SEC:
+            attended = BB_ALWAYS or t0 - BB["last_req"] < BB_IDLE_SEC
+            if attended:
                 await bb_cycle()
-            elif BB["open"]:
-                bb_close_all()
+            else:
+                if BB["open"]:
+                    bb_close_all()
+                rk = [(s_, d_) for s_ in rt_watch_list() for d_ in (1, 2)]
+                if rk:
+                    await bb_cycle(rk)                  # running-time services keep being measured with nobody watching
         except asyncio.CancelledError:
             raise
         except Exception:
             pass
-        await asyncio.sleep(max(5.0, BB["params"]["refresh_sec"] - (time.time() - t0)))
+        every = BB["params"]["refresh_sec"] if (BB_ALWAYS or time.time() - BB["last_req"] < BB_IDLE_SEC) else max(BB["params"]["refresh_sec"], RT_POLL_SEC)
+        await asyncio.sleep(max(5.0, every - (time.time() - t0)))
 
 
 def bb_auth(request):
@@ -2189,7 +2199,12 @@ import base64
 IN_CACHE = {}          # dataset id -> (trips, info) parsed on demand
 
 
-RT = {"trk": {}, "saved": 0, "last": None}          # live running-time collection, built from the bunching collector's bus tracks
+import rtdata
+
+RT = {"trk": {}, "saved": 0, "last": None, "src": {}}   # live running-time collection, built from the bunching collector's bus tracks
+RT_POLL_SEC = float(os.getenv("RT_POLL_SEC", "60"))       # polling interval when nobody has a page open (always-on services only)
+RT_MAX_SERVICES = int(os.getenv("RT_MAX_SERVICES", "8"))   # services measured round the clock (each = 2 directions x ~15 cached Bus Arrival calls)
+DATAGOV_KEY = os.getenv("DATAGOV_API_KEY", "").strip()    # optional: higher data.gov.sg rate limits
 RT_MIN_COVER = 0.82                                  # a trip must be observed over at least this share of the route to be stored
 RT_KEEP_DAYS = float(os.getenv("RT_KEEP_DAYS", "180"))          # six months of measured trips by default
 
@@ -2199,13 +2214,31 @@ def rt_init():
            "rt_min REAL, cover REAL, n_obs INTEGER, marks TEXT)")
     bb_sql("CREATE INDEX IF NOT EXISTS rt_trip_i ON rt_trip(service, direction, start_ts)")
     bb_sql("CREATE TABLE IF NOT EXISTS rt_sched(id INTEGER PRIMARY KEY AUTOINCREMENT, service TEXT, direction INTEGER, day_type TEXT, t_from TEXT, t_to TEXT, rt_min REAL, by_name TEXT, ts REAL)")
+    bb_sql("CREATE TABLE IF NOT EXISTS rt_watch(service TEXT PRIMARY KEY, ts REAL)")
+    bb_sql("CREATE TABLE IF NOT EXISTS rt_cond(trip_id INTEGER PRIMARY KEY, traffic_speed REAL, slow_share REAL, incident INTEGER, roadworks INTEGER, rain_mm REAL, demand REAL, "
+           "rain_done INTEGER DEFAULT 0, demand_done INTEGER DEFAULT 0)")
+    bb_sql("CREATE TABLE IF NOT EXISTS weather_day(date TEXT PRIMARY KEY, ts REAL, stations TEXT, readings TEXT)")
+    bb_sql("CREATE TABLE IF NOT EXISTS holiday(date TEXT PRIMARY KEY, name TEXT)")
+    bb_sql("CREATE TABLE IF NOT EXISTS school_holiday(id INTEGER PRIMARY KEY AUTOINCREMENT, d_from TEXT, d_to TEXT, label TEXT)")
+    bb_sql("CREATE TABLE IF NOT EXISTS pv_stop(month TEXT, day_type TEXT, hour INTEGER, stop TEXT, tap_in INTEGER, tap_out INTEGER, PRIMARY KEY(month, day_type, hour, stop))")
+    if not bb_sql("SELECT COUNT(*) n FROM school_holiday", (), fetch=True)[0]["n"]:
+        for a, b, l in rtdata.SCHOOL_HOLIDAYS_SEED:
+            bb_sql("INSERT INTO school_holiday(d_from, d_to, label) VALUES (?,?,?)", (a, b, l))
+
+
+def rt_watch_list():
+    try:
+        return [r["service"] for r in bb_sql("SELECT service FROM rt_watch ORDER BY ts", (), fetch=True)][:RT_MAX_SERVICES]
+    except Exception:
+        return []
 
 
 def rt_track(key, svc, d, ts, buses, stop_s, route_km):
     """Follow every tracked bus along the route; when one completes the route, store the trip with its crossing time at each stop.
     Running time here is MEASURED from live positions (LTA DataMall), not from a timetable feed."""
+    done_ids = []
     if not buses or route_km <= 0.5:
-        return
+        return done_ids
     T = RT["trk"].setdefault(key, {})
     seen = set()
     for b in buses:
@@ -2229,20 +2262,23 @@ def rt_track(key, svc, d, ts, buses, stop_s, route_km):
         finished = pts[-1][1] >= route_km - 0.35
         if not (done or finished):
             continue
-        rt_store(svc, d, pts, stop_s, route_km)
+        tid = rt_store(svc, d, pts, stop_s, route_km)
+        if tid:
+            done_ids.append(tid)
         T.pop(bid, None)
+    return done_ids
 
 
 def rt_store(svc, d, pts, stop_s, route_km):
     if len(pts) < 4:
-        return
+        return None
     start_km, end_km = pts[0][1], pts[-1][1]
     cover = (end_km - start_km) / route_km
     if cover < RT_MIN_COVER or start_km > 0.25 * route_km:
-        return                                                            # only trips seen from near the start of the route
+        return None                                                       # only trips seen from near the start of the route
     dur = (pts[-1][0] - pts[0][0]) / 60.0
     if not (3.0 <= dur <= 300.0):
-        return
+        return None
     def at(km):
         """time the bus passed a point: interpolated between polls, and extrapolated up to 0.45 km beyond the first / last
         observation (the last poll is usually a few hundred metres short of the terminal)."""
@@ -2271,7 +2307,204 @@ def rt_store(svc, d, pts, stop_s, route_km):
     RT["saved"] += 1
     RT["last"] = time.time()
     if RT["saved"] % 50 == 0 and RT_KEEP_DAYS > 0:
-        bb_sql("DELETE FROM rt_trip WHERE start_ts < ?", (time.time() - RT_KEEP_DAYS * 86400,))
+        cut = time.time() - RT_KEEP_DAYS * 86400
+        bb_sql("DELETE FROM rt_cond WHERE trip_id IN (SELECT id FROM rt_trip WHERE start_ts < ?)", (cut,))
+        bb_sql("DELETE FROM rt_trip WHERE start_ts < ?", (cut,))
+    r = bb_sql("SELECT id FROM rt_trip ORDER BY id DESC LIMIT 1", (), fetch=True)
+    return r[0]["id"] if r else None
+
+
+async def rt_enrich_live(ids, line):
+    """Conditions on the route at the time each trip finished (live-only feeds, so they must be captured now):
+    speed-band traffic along the route, LTA incidents and road works within 60 m of it."""
+    if not ids:
+        return
+    try:
+        bands = await bands_state()
+        idx = bands.get("idx") if isinstance(bands, dict) else None
+        speed, slow = None, None
+        if idx:
+            runs, tinfo = color_route(line, idx)
+            km = tinfo.get("km") or {}
+            known = sum(v for k, v in km.items() if k != "none")
+            if tinfo.get("driveMin") and known > 0.3:
+                speed = round(known / (tinfo["driveMin"] / 60.0), 1)
+                slow = round(km.get("slow", 0.0) / known, 3)
+        try:
+            inc = (await api_incidents("", 1)).get("incidents", [])
+        except Exception:
+            inc = []
+        try:
+            rw, _ = await tr_roadworks(time.time())
+        except Exception:
+            rw = []
+        sl = offservice.simplify(line, 200)
+        n_inc = sum(1 for x in inc if x.get("lat") is not None and offservice.dist_to_line_m((x["lat"], x["lon"]), sl) <= 60)
+        n_rw = sum(1 for x in rw if x.get("lat") is not None and offservice.dist_to_line_m((x["lat"], x["lon"]), sl) <= 60)
+        for tid in ids:
+            bb_sql("INSERT OR REPLACE INTO rt_cond(trip_id, traffic_speed, slow_share, incident, roadworks, rain_mm, demand, rain_done, demand_done) "
+                   "VALUES (?,?,?,?,?, NULL, NULL, 0, 0)", (tid, speed, slow, 1 if n_inc else 0, 1 if n_rw else 0))
+        RT["src"]["live_conditions"] = {"ts": time.time(), "ok": True, "detail": f"speed bands {'on' if idx else 'unavailable'}, {len(inc)} incidents, {len(rw)} road works island-wide"}
+    except Exception as e:
+        RT["src"]["live_conditions"] = {"ts": time.time(), "ok": False, "detail": type(e).__name__}
+
+
+# ---------------------------------------------------------------- scheduled open-data jobs (rain backfill, holidays, passenger volume)
+async def dg_get(url, params):
+    h = {"accept": "application/json"}
+    if DATAGOV_KEY:
+        h["x-api-key"] = DATAGOV_KEY
+    r = await client().get(url, params=params, headers=h, timeout=30)
+    r.raise_for_status()
+    return r.json()
+
+
+async def rt_holidays():
+    got = {}
+    for ds in rtdata.HOLIDAY_DATASETS:
+        try:
+            got.update(rtdata.parse_holidays(await dg_get(rtdata.HOLIDAY_URL, {"resource_id": ds, "limit": 500})))
+        except Exception:
+            continue
+    for d, n in got.items():
+        bb_sql("INSERT OR REPLACE INTO holiday(date, name) VALUES (?,?)", (d, str(n)[:80]))
+    RT["src"]["holidays"] = {"ts": time.time(), "ok": bool(got), "detail": f"{len(got)} public holidays from data.gov.sg (MOM)" if got else "data.gov.sg not reachable"}
+
+
+async def rt_weather_day(date_s):
+    """all 5-minute rainfall readings for one day (cached; today's refreshed every 30 min)."""
+    row = bb_sql("SELECT ts, stations, readings FROM weather_day WHERE date=?", (date_s,), fetch=True)
+    today = now_sgt().strftime("%Y-%m-%d")
+    if row and (date_s != today or time.time() - row[0]["ts"] < 1800):
+        return json.loads(row[0]["stations"]), json.loads(row[0]["readings"])
+    stations, readings, token, pages = {}, [], None, 0
+    while pages < 60:
+        prm = {"date": date_s}
+        if token:
+            prm["paginationToken"] = token
+        st, rd, token = rtdata.parse_rain_page(await dg_get(rtdata.RAIN_URL, prm))
+        stations.update(st)
+        readings.extend(rd)
+        pages += 1
+        if not token:
+            break
+    stations = {k: list(v) for k, v in stations.items()}
+    bb_sql("INSERT OR REPLACE INTO weather_day(date, ts, stations, readings) VALUES (?,?,?,?)", (date_s, time.time(), json.dumps(stations), json.dumps(readings)))
+    return stations, readings
+
+
+async def rt_fill_rain(limit_days=10):
+    rows = bb_sql("SELECT t.id, t.service, t.direction, t.date, t.start_ts, t.end_ts FROM rt_trip t JOIN rt_cond c ON c.trip_id=t.id "
+                  "WHERE c.rain_done=0 AND t.end_ts < ? ORDER BY t.date DESC", (time.time() - 900,), fetch=True)
+    if not rows:
+        RT["src"].setdefault("rain", {"ts": time.time(), "ok": True, "detail": "nothing waiting"})
+        return
+    st = await static()
+    by_date, done, lines = {}, 0, {}
+    for r in rows:
+        by_date.setdefault(r["date"], []).append(r)
+    for date_s in sorted(by_date, reverse=True)[:limit_days]:
+        try:
+            stations, readings = await rt_weather_day(date_s)
+        except Exception as e:
+            RT["src"]["rain"] = {"ts": time.time(), "ok": False, "detail": f"data.gov.sg rainfall: {type(e).__name__}"}
+            return
+        stations = {k: tuple(v) for k, v in stations.items()}
+        for r in by_date[date_s]:
+            k = (r["service"], r["direction"])
+            if k not in lines:
+                ss = route_stops(st, *k)
+                lines[k] = [(x["lat"], x["lon"]) for x in ss[::max(1, len(ss) // 6)]] if ss else []
+            ids = rtdata.stations_near(lines[k], stations) if lines[k] else []
+            a, b = datetime.fromtimestamp(r["start_ts"], SGT), datetime.fromtimestamp(r["end_ts"], SGT)
+            mm = rtdata.rain_for_trip(readings, ids, a.hour * 60 + a.minute, b.hour * 60 + b.minute + (1440 if b.date() > a.date() else 0))
+            bb_sql("UPDATE rt_cond SET rain_mm=?, rain_done=1 WHERE trip_id=?", (mm, r["id"]))
+            done += 1
+    RT["src"]["rain"] = {"ts": time.time(), "ok": True, "detail": f"rainfall matched to {done} trips (data.gov.sg, nearest gauges to the route)"}
+
+
+async def rt_fill_pv():
+    """DataMall Passenger Volume by Bus Stops: monthly, published after the month ends, last 3 months kept by LTA."""
+    now = now_sgt()
+    svcs = rt_watch_list() or sorted({r["service"] for r in bb_sql("SELECT DISTINCT service FROM rt_trip", (), fetch=True)})
+    if not svcs:
+        return
+    st = await static()
+    keep = {x["code"] for s_ in svcs for d_ in (1, 2) for x in route_stops(st, s_, d_)}
+    got_any, msgs = False, []
+    for back in (1, 2, 3):
+        y, m = now.year, now.month - back
+        while m <= 0:
+            y, m = y - 1, m + 12
+        month = f"{y}{m:02d}"
+        have = bb_sql("SELECT COUNT(*) n FROM pv_stop WHERE month=?", (month,), fetch=True)[0]["n"]
+        if have:
+            got_any = True
+            continue
+        try:
+            j = await get_lta(rtdata.PV_PATH, {"Date": month})
+            link = ((j.get("value") or [{}])[0] or {}).get("Link")
+            if not link:
+                msgs.append(f"{month}: not published")
+                continue
+            raw = (await client().get(link, timeout=120)).content
+            data = await asyncio.to_thread(rtdata.parse_pv_zip, raw, keep)
+            for (dt, hr, stop), (tin, tout) in data.items():
+                bb_sql("INSERT OR REPLACE INTO pv_stop(month, day_type, hour, stop, tap_in, tap_out) VALUES (?,?,?,?,?,?)", (month, dt, hr, stop, tin, tout))
+            got_any = got_any or bool(data)
+            msgs.append(f"{month}: {len(data)} stop-hours")
+        except Exception as e:
+            msgs.append(f"{month}: {type(e).__name__}")
+    RT["src"]["passenger_volume"] = {"ts": time.time(), "ok": got_any, "detail": "; ".join(msgs) or "up to date"}
+
+
+async def rt_fill_demand():
+    """demand for each trip = average monthly tap-ins along its route in its hour (from the nearest month available)."""
+    months = [r["month"] for r in bb_sql("SELECT DISTINCT month FROM pv_stop ORDER BY month DESC", (), fetch=True)]
+    if not months:
+        return
+    rows = bb_sql("SELECT t.id, t.service, t.direction, t.date, t.start_ts, t.day_type FROM rt_trip t JOIN rt_cond c ON c.trip_id=t.id WHERE c.demand_done=0 LIMIT 3000", (), fetch=True)
+    st = await static()
+    cache = {}
+    for r in rows:
+        a = datetime.fromtimestamp(r["start_ts"], SGT)
+        mon = a.strftime("%Y%m")
+        use = mon if mon in months else months[0]
+        dt = "Weekday" if r["day_type"] == "Weekday" else "Weekend/PH"
+        k = (r["service"], r["direction"], use, dt, a.hour)
+        if k not in cache:
+            codes = [x["code"] for x in route_stops(st, r["service"], r["direction"])]
+            if not codes:
+                cache[k] = None
+            else:
+                q = bb_sql("SELECT SUM(tap_in) s FROM pv_stop WHERE month=? AND day_type=? AND hour=? AND stop IN (%s)" % ",".join("?" * len(codes)),
+                           (use, dt, a.hour, *codes), fetch=True)
+                cache[k] = q[0]["s"]
+        bb_sql("UPDATE rt_cond SET demand=?, demand_done=1 WHERE trip_id=?", (cache[k], r["id"]))
+
+
+async def rt_data_cycle():
+    for job in (rt_holidays, rt_fill_rain, rt_fill_pv, rt_fill_demand):
+        if job is rt_holidays and time.time() - (RT["src"].get("holidays") or {}).get("ts", 0) < 86400:
+            continue
+        if job is rt_fill_pv and time.time() - (RT["src"].get("passenger_volume") or {}).get("ts", 0) < 6 * 3600:
+            continue
+        try:
+            await job()
+        except Exception as e:
+            RT["src"][job.__name__] = {"ts": time.time(), "ok": False, "detail": f"{type(e).__name__}: {e}"[:200]}
+
+
+async def rt_data_loop():
+    await asyncio.sleep(20)
+    while True:
+        try:
+            await rt_data_cycle()
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            pass
+        await asyncio.sleep(600)
 
 
 def rt_sched_for(svc, d, daytype, start_min):
@@ -2297,6 +2530,9 @@ async def rt_trips(service="", days=120):
         q += " AND service=?"
         args.append(service.strip().upper())
     rows = bb_sql(q + " ORDER BY start_ts", tuple(args), fetch=True)
+    conds = {r["trip_id"]: r for r in bb_sql("SELECT * FROM rt_cond", (), fetch=True)}
+    ph = {r["date"] for r in bb_sql("SELECT date FROM holiday", (), fetch=True)}
+    sch = [(r["d_from"], r["d_to"], r["label"]) for r in bb_sql("SELECT d_from, d_to, label FROM school_holiday", (), fetch=True)]
     st = await static()
     stops_cache = {}
     out = []
@@ -2307,11 +2543,27 @@ async def rt_trips(service="", days=120):
         stops = stops_cache[(svc, d)]
         s0 = datetime.fromtimestamp(r["start_ts"], SGT)
         ss_min = s0.hour * 60 + s0.minute + s0.second / 60.0
-        srt = rt_sched_for(svc, d, r["day_type"], ss_min)
+        daytype = "Sunday/PH" if r["date"] in ph else r["day_type"]
+        srt = rt_sched_for(svc, d, daytype, ss_min)
+        c = conds.get(r["id"])
+        cond = {}
+        if c:
+            if c["traffic_speed"] is not None:
+                cond["traffic_speed"] = float(c["traffic_speed"])
+            if c["incident"] is not None:
+                cond["incident"] = float(c["incident"])
+            if c["roadworks"] is not None:
+                cond["roadworks"] = float(c["roadworks"])
+            if c["rain_mm"] is not None:
+                cond["weather"] = 1.0 if c["rain_mm"] >= 0.2 else 0.0
+                cond["rain_mm"] = float(c["rain_mm"])
+            if c["demand"] is not None:
+                cond["demand"] = float(c["demand"])
+        cond["event"] = 1.0 if (r["date"] in ph or rtdata.school_holiday_on(r["date"], sch)) else 0.0
         marks = json.loads(r["marks"] or "[]")
-        t = {"svc": svc, "dir": d, "date": r["date"], "trip": str(r["id"]), "bus": "", "daytype": r["day_type"],
+        t = {"svc": svc, "dir": d, "date": r["date"], "trip": str(r["id"]), "bus": "", "daytype": daytype,
              "ss": ss_min, "as": ss_min, "se": None if srt is None else ss_min + srt, "ae": ss_min + r["rt_min"],
-             "srt": srt, "art": r["rt_min"], "cond": {}, "cover": r["cover"],
+             "srt": srt, "art": r["rt_min"], "cond": cond, "cover": r["cover"],
              "stops": [{"seq": i + 1, "code": (stops[i]["code"] if i < len(stops) else f"S{i}"), "name": (stops[i]["name"] if i < len(stops) else ""),
                         "sa": None, "sd": None, "aa": None if m is None else ss_min + m / 60.0, "ad": None if m is None else ss_min + m / 60.0}
                        for i, m in enumerate(marks) if i < len(stops)]}
@@ -2338,14 +2590,71 @@ async def api_rt_watch(request: Request):
     svc = str(b.get("service") or "").strip().upper()
     if not re.fullmatch(r"[0-9A-Z]{1,6}", svc):
         return JSONResponse({"error": "Enter a service number."}, status_code=400)
-    for d in ((int(b.get("direction")),) if b.get("direction") in (1, 2, "1", "2") else (1, 2)):
+    if b.get("remove"):
+        bb_sql("DELETE FROM rt_watch WHERE service=?", (svc,))
+        return {"ok": True, "watch": rt_watch_list()}
+    if svc not in rt_watch_list() and len(rt_watch_list()) >= RT_MAX_SERVICES:
+        return JSONResponse({"error": f"Already measuring {RT_MAX_SERVICES} services round the clock (RT_MAX_SERVICES). Remove one first."}, status_code=400)
+    bb_sql("INSERT OR REPLACE INTO rt_watch(service, ts) VALUES (?,?)", (svc, time.time()))
+    for d in (1, 2):
         BB["watch"][(svc, int(d))] = time.time()
     BB["last_req"] = time.time()
     try:
         await bb_cycle([(svc, d) for d in (1, 2)])
     except Exception:
         pass
-    return {"ok": True, "watch": sorted({f"{k[0]}:{k[1]}" for k in bb_keys()})}
+    return {"ok": True, "watch": rt_watch_list()}
+
+
+@app.get("/api/rt/sources")
+async def api_rt_sources():
+    n = lambda q: bb_sql(q, (), fetch=True)[0]["n"]
+    pv = bb_sql("SELECT month, COUNT(*) n FROM pv_stop GROUP BY month ORDER BY month DESC", (), fetch=True)
+    fmt = lambda x: datetime.fromtimestamp(x["ts"], SGT).strftime("%d %b %H:%M") if x and x.get("ts") else "not yet"
+    src = RT["src"]
+    return {"always_on": rt_watch_list(), "max_services": RT_MAX_SERVICES, "poll_sec": RT_POLL_SEC,
+            "sources": [
+                {"name": "Bus positions → running time", "by": "LTA DataMall Bus Arrival", "when": "every poll", "status": f"{n('SELECT COUNT(*) n FROM rt_trip'):,} trips measured",
+                 "ok": True, "last": datetime.fromtimestamp(RT["last"], SGT).strftime("%d %b %H:%M") if RT["last"] else "none this run"},
+                {"name": "Traffic, incidents, road works on the route", "by": "LTA DataMall (live)", "when": "captured as each trip ends",
+                 "status": f"{n('SELECT COUNT(*) n FROM rt_cond WHERE traffic_speed IS NOT NULL'):,} trips with traffic speed",
+                 "ok": (src.get("live_conditions") or {}).get("ok", True), "last": fmt(src.get("live_conditions")), "detail": (src.get("live_conditions") or {}).get("detail", "")},
+                {"name": "Rainfall", "by": "data.gov.sg (NEA gauges, 5-min)", "when": "every 10 min, backfilled by date",
+                 "status": f"{n('SELECT COUNT(*) n FROM rt_cond WHERE rain_done=1'):,} trips matched · {n('SELECT COUNT(*) n FROM weather_day'):,} days cached",
+                 "ok": (src.get("rain") or {}).get("ok", True), "last": fmt(src.get("rain")), "detail": (src.get("rain") or {}).get("detail", "")},
+                {"name": "Public holidays", "by": "data.gov.sg (MOM)", "when": "daily", "status": f"{n('SELECT COUNT(*) n FROM holiday'):,} dates",
+                 "ok": (src.get("holidays") or {}).get("ok", True), "last": fmt(src.get("holidays")), "detail": (src.get("holidays") or {}).get("detail", "")},
+                {"name": "School holidays", "by": "MOE calendar (seeded 2026, editable)", "when": "on change",
+                 "status": f"{n('SELECT COUNT(*) n FROM school_holiday'):,} periods", "ok": True, "last": "-", "detail": ""},
+                {"name": "Passenger volume by bus stop", "by": "LTA DataMall (monthly)", "when": "every 6 h until the new month is published",
+                 "status": ", ".join(f"{p['month'][:4]}-{p['month'][4:]}: {p['n']:,}" for p in pv[:3]) or "no month loaded yet",
+                 "ok": (src.get("passenger_volume") or {}).get("ok", True), "last": fmt(src.get("passenger_volume")), "detail": (src.get("passenger_volume") or {}).get("detail", "")},
+            ],
+            "school": [dict(r) for r in bb_sql("SELECT id, d_from, d_to, label FROM school_holiday ORDER BY d_from", (), fetch=True)]}
+
+
+@app.post("/api/rt/refresh-data")
+async def api_rt_refresh(request: Request):
+    RT["src"].pop("holidays", None)
+    RT["src"].pop("passenger_volume", None)
+    await rt_data_cycle()
+    return await api_rt_sources()
+
+
+@app.post("/api/rt/school")
+async def api_rt_school(request: Request):
+    if not bb_auth(request):
+        return JSONResponse({"error": "Admin token missing or wrong."}, status_code=401)
+    b = json.loads((await request.body()).decode("utf-8") or "{}")
+    if b.get("delete"):
+        bb_sql("DELETE FROM school_holiday WHERE id=?", (int(b["delete"]),))
+        return {"ok": True}
+    a, z = str(b.get("from") or "")[:10], str(b.get("to") or "")[:10]
+    if not (re.match(r"\d{4}-\d{2}-\d{2}$", a) and re.match(r"\d{4}-\d{2}-\d{2}$", z) and a <= z):
+        return JSONResponse({"error": "Dates must be YYYY-MM-DD, from before to."}, status_code=400)
+    bb_sql("INSERT INTO school_holiday(d_from, d_to, label) VALUES (?,?,?)", (a, z, str(b.get("label") or "School holidays")[:80]))
+    IN_CACHE.clear()
+    return {"ok": True}
 
 
 @app.get("/api/rt/sched")

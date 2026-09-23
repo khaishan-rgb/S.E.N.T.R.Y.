@@ -131,22 +131,28 @@ tbody tr.click{cursor:pointer}tbody tr.sel td{background:#1d2a12}
     </div>
     <div class="note" id="inQual"></div>
   </section>
-  <section class="card"><h2>Collection &amp; timetable</h2>
-    <div class="sub">The collector follows each bus along the route and stores a trip when the bus completes it, so history builds up while a page is open (or continuously if the always-on collector is enabled).</div>
+  <section class="card"><h2>Automated data sources</h2>
+    <div class="sub">Everything below runs on the server by itself: bus positions are measured round the clock for the services listed, and rainfall, holidays and passenger volume are fetched and matched to each trip automatically. No uploads, no manual timetable needed.</div>
     <div class="grid2">
-      <div><h3 style="margin:0 0 6px;font-size:15px">Live collection <span id="inColState" class="tagm"></span></h3>
-        <div class="row"><input id="inWatchSvc" class="sel" style="max-width:140px" maxlength="6" placeholder="Service"><button class="btn sm" id="inWatch" type="button">Collect this service</button></div>
+      <div><h3 style="margin:0 0 6px;font-size:15px">Services measured round the clock <span id="inColState" class="tagm"></span></h3>
+        <div class="row"><input id="inWatchSvc" class="sel" style="max-width:140px" maxlength="6" placeholder="Service"><button class="btn sm go" id="inWatch" type="button">Measure round the clock</button></div>
+        <div class="chips" id="inAlways" style="margin-top:8px"></div>
         <div class="tw" style="margin-top:8px"><table id="inColTab"><thead><tr><th>Service</th><th>Dir</th><th>Trips measured</th><th>Average actual RT</th><th>From</th><th>To</th></tr></thead><tbody></tbody></table></div>
         <div class="note" id="inColNote"></div></div>
-      <div><h3 style="margin:0 0 6px;font-size:15px">Scheduled running time (timetable)</h3>
-        <div class="row"><input id="inSSvc" class="sel" style="max-width:110px" maxlength="6" placeholder="Service">
-          <select id="inSDir" style="max-width:110px"><option value="1">Dir 1</option><option value="2">Dir 2</option></select>
-          <select id="inSDay" style="max-width:150px"><option value="All">All days</option><option value="Weekday">Weekday</option><option value="Saturday">Saturday</option><option value="Sunday/PH">Sunday / PH</option></select>
-          <input id="inSFrom" class="sel" style="max-width:100px" maxlength="5" placeholder="from 07:00"><input id="inSTo" class="sel" style="max-width:100px" maxlength="5" placeholder="to 09:30">
-          <input id="inSRt" class="sel" style="max-width:120px" type="number" step="0.5" min="1" max="400" placeholder="RT min">
-          <button class="btn sm" id="inSAdd" type="button">Add</button></div>
-        <div class="tw" style="margin-top:8px"><table id="inSTab"><thead><tr><th>Service</th><th>Dir</th><th>Day type</th><th>Period</th><th>Scheduled RT</th><th></th></tr></thead><tbody></tbody></table></div>
-        <div class="note">Without a timetable value the page still shows the measured distribution (P50 / P85 / P90), but it cannot show a gap.</div></div>
+      <div><h3 style="margin:0 0 6px;font-size:15px">Data feeds <button class="btn sm" id="inSrcRefresh" type="button" style="margin-left:6px">Fetch now</button></h3>
+        <div class="tw"><table id="inSrcTab"><thead><tr><th>Feed</th><th>Source</th><th>Status</th><th>Last run</th></tr></thead><tbody></tbody></table></div>
+        <details style="margin-top:8px"><summary style="cursor:pointer;color:#9cc4ff">School holidays (MOE) – add future years here</summary>
+          <div class="row" style="margin-top:6px"><input id="inShFrom" class="sel" type="date" style="max-width:170px"><input id="inShTo" class="sel" type="date" style="max-width:170px"><input id="inShLbl" class="sel" style="max-width:200px" placeholder="e.g. June holidays 2027"><button class="btn sm" id="inShAdd" type="button">Add</button></div>
+          <div class="chips" id="inShList"></div></details>
+        <details style="margin-top:8px"><summary style="cursor:pointer;color:#9cc4ff">Optional: timetable running time (only if you want the gap against the timetable)</summary>
+          <div class="row" style="margin-top:6px"><input id="inSSvc" class="sel" style="max-width:110px" maxlength="6" placeholder="Service">
+            <select id="inSDir" style="max-width:110px"><option value="1">Dir 1</option><option value="2">Dir 2</option></select>
+            <select id="inSDay" style="max-width:150px"><option value="All">All days</option><option value="Weekday">Weekday</option><option value="Saturday">Saturday</option><option value="Sunday/PH">Sunday / PH</option></select>
+            <input id="inSFrom" class="sel" style="max-width:100px" maxlength="5" placeholder="from 07:00"><input id="inSTo" class="sel" style="max-width:100px" maxlength="5" placeholder="to 09:30">
+            <input id="inSRt" class="sel" style="max-width:120px" type="number" step="0.5" min="1" max="400" placeholder="RT min">
+            <button class="btn sm" id="inSAdd" type="button">Add</button></div>
+          <div class="tw" style="margin-top:8px"><table id="inSTab"><thead><tr><th>Service</th><th>Dir</th><th>Day type</th><th>Period</th><th>Scheduled RT</th><th></th></tr></thead><tbody></tbody></table></div>
+          <div class="note">Without it, each service is compared with its own measured off-peak baseline.</div></details></div>
     </div>
   </section>
   <div id="inBody"><div class="card"><div class="msg">Loading measured running times…</div></div></div>
@@ -193,19 +199,35 @@ $("inDel").onclick = async () => { if(!S.ds){ alert("The live measurement cannot
   await post("/api/insight/delete", JSON.stringify({id:S.ds})); S.ds = 0; loadDatasets(0); };
 /* ---------- collector + timetable ---------- */
 async function loadCollector(){
-  const j = await getJSON("/api/rt/status");
-  if(!j.ok) return;
-  $("inColState").textContent = j.collecting ? (j.always_on ? "always on" : "collecting while a page is open") : "idle";
-  $("inColState").className = "tagm " + (j.collecting ? "tag-actual" : "");
-  document.querySelector("#inColTab tbody").innerHTML = j.services.length
-    ? j.services.map(r => `<tr><td><b>${esc(r.service)}</b></td><td>${r.direction}</td><td>${r.trips.toLocaleString()}</td><td>${f1(r.avg_rt)} min</td><td>${esc(r.from)}</td><td>${esc(r.to)}</td></tr>`).join("")
-    : `<tr><td colspan="6" style="color:var(--mut)">No trip measured yet. Add a service and keep a page open \u2013 a trip is stored each time a bus completes the route (about one running time per bus per trip).</td></tr>`;
-  $("inColNote").textContent = `Collector refresh ${j.refresh_sec}s \u00b7 watching ${j.watch.join(", ") || "nothing"} \u00b7 trips kept ${j.keep_days} days \u00b7 ${j.note}`;
+  const [j, src] = await Promise.all([getJSON("/api/rt/status"), getJSON("/api/rt/sources")]);
+  if(j.ok){
+    $("inColState").textContent = src.always_on && src.always_on.length ? `${src.always_on.length} of ${src.max_services} \u00b7 every ${src.poll_sec}s when unattended` : "none yet";
+    $("inColState").className = "tagm " + (src.always_on && src.always_on.length ? "tag-actual" : "");
+    $("inAlways").innerHTML = (src.always_on || []).map(v => `<span class="chip">${esc(v)} <button class="btn sm" data-rm="${esc(v)}" type="button" style="min-height:22px;padding:0 6px;margin-left:4px">\u00d7</button></span>`).join("")
+      || `<span class="note">No service yet \u2013 add one above and it will be measured round the clock, even with this page closed.</span>`;
+    document.querySelectorAll("#inAlways [data-rm]").forEach(b => b.onclick = async () => { if(!confirm(`Stop measuring ${b.dataset.rm}? Trips already measured are kept.`)) return;
+      await post("/api/rt/watch", JSON.stringify({service:b.dataset.rm, remove:true})); loadCollector(); });
+    document.querySelector("#inColTab tbody").innerHTML = j.services.length
+      ? j.services.map(r => `<tr><td><b>${esc(r.service)}</b></td><td>${r.direction}</td><td>${r.trips.toLocaleString()}</td><td>${f1(r.avg_rt)} min</td><td>${esc(r.from)}</td><td>${esc(r.to)}</td></tr>`).join("")
+      : `<tr><td colspan="6" style="color:var(--mut)">No trip measured yet \u2013 a trip is stored each time a bus completes the route.</td></tr>`;
+    $("inColNote").textContent = `Kept ${j.keep_days} days \u00b7 ${(j.total_trips || 0).toLocaleString()} trips stored \u00b7 about ${((j.bytes || 0) / 1048576).toFixed(1)} MB \u00b7 ${j.note}`;
+  }
+  if(src && src.sources){
+    document.querySelector("#inSrcTab tbody").innerHTML = src.sources.map(x => `<tr><td><b>${esc(x.name)}</b><br><small style="color:var(--mut)">${esc(x.when)}</small></td><td>${esc(x.by)}</td>
+      <td style="white-space:normal"><span style="color:${x.ok ? "#7be7a5" : "#ff8a90"}">${x.ok ? "\u25cf" : "\u25cf"}</span> ${esc(x.status)}${x.detail ? `<br><small style="color:var(--mut)">${esc(x.detail)}</small>` : ""}</td><td>${esc(x.last)}</td></tr>`).join("");
+    $("inShList").innerHTML = (src.school || []).map(r => `<span class="chip">${esc(r.label)} \u00b7 ${esc(r.d_from)} \u2192 ${esc(r.d_to)} <button class="btn sm" data-sh="${r.id}" type="button" style="min-height:22px;padding:0 6px;margin-left:4px">\u00d7</button></span>`).join("");
+    document.querySelectorAll("#inShList [data-sh]").forEach(b => b.onclick = async () => { await post("/api/rt/school", JSON.stringify({delete:+b.dataset.sh})); loadCollector(); });
+    const yr = new Date().getFullYear() + 1;
+    if(!(src.school || []).some(r => r.d_from.startsWith(String(yr)))) $("inShList").insertAdjacentHTML("beforeend", `<span class="note">No ${yr} school holidays yet \u2013 add them when MOE publishes the calendar.</span>`);
+  }
 }
 $("inWatch").onclick = async () => { const svc = $("inWatchSvc").value.trim().toUpperCase(); if(!svc) return;
-  $("inColNote").textContent = "Starting collection\u2026";
+  $("inColNote").textContent = "Adding\u2026";
   const j = await post("/api/rt/watch", JSON.stringify({service:svc}));
-  if(j.error) $("inColNote").textContent = j.error; else loadCollector(); };
+  if(j.error) $("inColNote").textContent = j.error; else { $("inWatchSvc").value = ""; loadCollector(); } };
+$("inSrcRefresh").onclick = async () => { $("inSrcRefresh").disabled = true; await post("/api/rt/refresh-data", "{}"); $("inSrcRefresh").disabled = false; loadCollector(); run(); };
+$("inShAdd").onclick = async () => { const j = await post("/api/rt/school", JSON.stringify({from:$("inShFrom").value, to:$("inShTo").value, label:$("inShLbl").value.trim()}));
+  if(j.error) alert(j.error); else { $("inShLbl").value = ""; loadCollector(); run(); } };
 async function loadSched(){
   const j = await getJSON("/api/rt/sched");
   document.querySelector("#inSTab tbody").innerHTML = (j.rows || []).length ? j.rows.map(r => `<tr><td><b>${esc(r.service)}</b></td><td>${r.direction}</td><td>${esc(r.day_type)}</td><td>${esc(r.t_from)}\u2013${esc(r.t_to)}</td><td>${f1(r.rt_min)} min</td><td><button class="btn sm" data-del="${r.id}" type="button">Delete</button></td></tr>`).join("")
@@ -249,12 +271,12 @@ async function run(){
   const j = await getJSON("/api/insight/summary?" + qs());
   S.sum = j;
   if(!j.ok){ $("inBody").innerHTML = `<div class="card"><h2>No running time measured yet</h2><div class="msg">${esc(j.error)}</div>
-    <div class="row" style="margin-top:10px"><input id="inStartSvc" class="sel" style="max-width:150px" maxlength="6" placeholder="Service e.g. 54"><button class="btn go" id="inStart" type="button">Start measuring this service</button></div>
-    <div class="note">Measurement starts now: a trip is stored each time a bus completes the route (roughly one per bus per trip). DataMall and OneMap publish no historical running times, so there is no back-history to load.
+    <div class="row" style="margin-top:10px"><input id="inStartSvc" class="sel" style="max-width:150px" maxlength="6" placeholder="Service e.g. 54"><button class="btn go" id="inStart" type="button">Measure this service round the clock</button></div>
+    <div class="note">Measurement starts now and continues on the server with this page closed: a trip is stored each time a bus completes the route. DataMall and OneMap publish no historical running times, so there is no back-history to load.
     You can meanwhile add the modelled sample above to see how the analysis works.</div></div>`;
     $("inStart").onclick = async () => { const v = $("inStartSvc").value.trim().toUpperCase(); if(!v) return;
       $("inStart").disabled = true; const r = await post("/api/rt/watch", JSON.stringify({service:v})); $("inStart").disabled = false;
-      if(r.error) alert(r.error); else { loadCollector(); alert(`Now measuring service ${v}. Keep a page open; trips appear as buses complete the route.`); } };
+      if(r.error) alert(r.error); else { loadCollector(); alert(`Service ${v} is now measured round the clock. Trips appear as buses complete the route – the page does not need to stay open.`); } };
     $("inSvc").innerHTML = `<option value="">no data yet</option>`; return; }
   const svcs = j.rows.map(r => r.service);
   $("inSvc").innerHTML = svcs.map(s => `<option value="${esc(s)}">Service ${esc(s)}</option>`).join("");
@@ -262,7 +284,7 @@ async function run(){
   $("inSvc").value = S.svc;
   const q = j.quality;
   $("inQual").innerHTML = `Data quality: ${(q.analysed || 0).toLocaleString()} trips analysed of ${(q.trips_in_file || 0).toLocaleString()} measured \u00b7 ${q.dates[0] || "?"} to ${q.dates[1] || "?"}
-    \u00b7 outliers removed ${(q.outliers_removed || 0).toLocaleString()} (MAD, within service + direction + hour)${j.info && j.info.no_sched ? ` \u00b7 <b style="color:#ffc46b">${j.info.no_sched.toLocaleString()} trips have no timetable running time entered</b>` : ""}${j.info && j.info.cover_p50 ? ` \u00b7 median route coverage ${f1(j.info.cover_p50)}%` : ""}
+    \u00b7 outliers removed ${(q.outliers_removed || 0).toLocaleString()} (MAD, within service + direction + hour)${j.info && j.info.no_sched && $("inRef").value === "timetable" ? ` \u00b7 <b style="color:#ffc46b">${j.info.no_sched.toLocaleString()} trips have no timetable running time entered</b>` : ""}${j.info && j.info.cover_p50 ? ` \u00b7 median route coverage ${f1(j.info.cover_p50)}%` : ""}
     ${q.missing_columns.length ? " \u00b7 columns not supplied: " + q.missing_columns.map(esc).join(", ") : ""} \u00b7 minimum sample per period ${$("inMinN").value} trips.`;
   renderAll();
   runService();
