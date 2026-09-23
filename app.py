@@ -2304,7 +2304,10 @@ async def api_rt_status():
     sv=bb_sql("SELECT service,direction,COUNT(*) observations,COUNT(DISTINCT journey) journeys FROM rt_passage GROUP BY service,direction ORDER BY service,direction",fetch=True) or []
     st=await static()
     all_services=sorted(st["dirs"].keys(), key=lambda s: ((not s.isdigit()), int(s) if s.isdigit() else 0, s))
-    return {"ok":True,"collector":{"started":started,"observations":obs['n'],"journeys":obs['journeys'],"first_ts":obs['first_ts'],"last_ts":obs['last_ts'],"alive":time.time()-BB['loop_at']<3*BB['params']['refresh_sec'],"db_ok":BB['db_ok']},"services":sv,"all_services":all_services}
+    diag=None
+    if not sv and not all_services:
+        diag = st.get("error") or ("LTA_ACCOUNT_KEY is not configured" if not KEY else "No route/stop data loaded yet - retry shortly")
+    return {"ok":True,"collector":{"started":started,"observations":obs['n'],"journeys":obs['journeys'],"first_ts":obs['first_ts'],"last_ts":obs['last_ts'],"alive":time.time()-BB['loop_at']<3*BB['params']['refresh_sec'],"db_ok":BB['db_ok']},"services":sv,"all_services":all_services,"diag":diag}
 
 
 @app.get("/api/insight/stops")
