@@ -85,6 +85,13 @@ tbody tr.click{cursor:pointer}tbody tr.sel td{background:#1d2a12}
 @media(max-width:1200px){.cards{grid-template-columns:repeat(3,minmax(0,1fr))}.opts{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:1000px){.grid2{grid-template-columns:minmax(0,1fr)}.flt{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:560px){.flt{grid-template-columns:minmax(0,1fr)}.cards{grid-template-columns:repeat(2,minmax(0,1fr))}.opts{grid-template-columns:minmax(0,1fr)}.kpi b{font-size:20px}}
+.tpr-leg{display:flex;flex-wrap:wrap;gap:5px 8px;margin-top:6px}
+.tpr-leg button{display:inline-flex;align-items:center;gap:6px;background:#0d2440;border:1px solid var(--line2);color:#cfe0f3;border-radius:999px;padding:3px 10px;font:inherit;font-size:12px;cursor:pointer}
+.tpr-leg button i{width:14px;height:3px;border-radius:2px}.tpr-leg button.off{opacity:.38}
+.tpr-tab td.c{text-align:center;font-variant-numeric:tabular-nums;font-weight:650;border-radius:5px;min-width:44px}
+.tpr-tab tr.tot td{background:#10223a;font-weight:700}.tpr-tab tr.rec td{background:#2a1d08;color:#ffd79a;font-weight:800}
+.tpr-tab td.l{position:sticky;left:0;background:var(--card);z-index:1}
+@media(max-width:560px){.tpr-tab td.l{white-space:normal;min-width:112px;max-width:128px;font-size:11.5px}}
 </style>
 </head>
 <body>
@@ -116,6 +123,24 @@ tbody tr.click{cursor:pointer}tbody tr.sel td{background:#1d2a12}
       <div class="fld"><label>&nbsp;</label><button class="btn go" id="zhRun" type="button">Run 1,000 simulations</button></div>
     </div>
     <div id="zhOut" style="margin-top:10px"><div class="msg">Enter a service and run the model. This works before any historical trip has been collected.</div></div>
+  </section>
+  <section class="card" id="tprCard" style="border-color:#8a5a16">
+    <h2>Hourly Time Period Report <span class="tag-model">FORMULA &middot; NO PAST TRIPS</span></h2>
+    <div class="sub">Running time for every pair of important stops and every time period, worked out from distance, live LTA road speed, DataMall passenger volume and the dwell / signal formula. Same layout as the operator TPR, with graphs and an Excel download.</div>
+    <div class="flt">
+      <div class="fld"><label>Service</label><input id="tpSvc" class="sel" maxlength="6" placeholder="e.g. 54"></div>
+      <div class="fld"><label>Direction</label><select id="tpDir"><option value="1">Direction 1</option><option value="2">Direction 2</option></select></div>
+      <div class="fld"><label>Day type</label><select id="tpDay"><option>Weekday</option><option>Saturday</option><option>Sunday</option></select></div>
+      <div class="fld"><label>Time periods</label><select id="tpScheme"><option value="tpr">TPR periods (22, half-hour in peaks)</option><option value="hourly">Hourly (05:00 to 00:59)</option></select></div>
+      <div class="fld ms" id="tpStopsMs"><label>Important bus stops</label><button class="sel" id="tpStopsBtn" type="button" style="text-align:left">Generate once to load the stops</button>
+        <div class="msbox"><div class="row"><input id="tpStopsQ" placeholder="Search code or name" style="flex:1"><button class="btn sm" id="tpAll" type="button">All</button><button class="btn sm" id="tpNone" type="button">Ends only</button></div><div class="mslist" id="tpStopsList"></div>
+        <div class="row" style="margin-top:8px;justify-content:flex-end"><button class="btn sm go" id="tpApply" type="button">Apply stops</button></div></div></div>
+      <div class="fld"><label>Planning percentile</label><select id="tpP"><option value="50">P50</option><option value="85" selected>P85</option><option value="90">P90</option><option value="95">P95</option></select></div>
+      <div class="fld"><label>Terminus recovery (min)</label><input id="tpRec" class="sel" type="number" min="0" max="60" step="0.5" value="7"></div>
+      <div class="fld"><label>Passengers per stop if no DataMall data</label><input id="tpPax" class="sel" type="number" min="0" max="50" step="0.5" value="3"></div>
+    </div>
+    <div class="row" style="margin-top:9px"><button class="btn go" id="tpRun" type="button">Generate report</button><button class="btn" id="tpXls" type="button" disabled>Download Excel (both directions)</button><span class="note" id="tpXlsNote" style="margin:0"></span></div>
+    <div id="tpOut" style="margin-top:10px"><div class="msg">Enter a service and generate. First and last stop are always included; tick the stops in between that you want as timing points.</div></div>
   </section>
   <section class="card">
     <h2>Data &amp; filters</h2><div class="sub" id="inDsSub">Actual running time is measured from live bus positions (LTA DataMall). Scheduled running time is not published by DataMall, so the timetable value is entered below.</div>
@@ -284,6 +309,106 @@ async function runZeroHistory(){
 }
 $('zhRun').onclick=runZeroHistory;
 $('zhSvc').addEventListener('keydown',e=>{if(e.key==='Enter')runZeroHistory();});
+/* ---------- V13.8 hourly Time Period Report (formula, no past trips) ---------- */
+const TP = {j:null, stops:[], pick:new Set(), off:new Set(), slot:null};
+const TPC = ["#3c96ff","#ff9f1c","#22c55e","#e0474f","#9b8cff","#2dd4bf","#f472b6","#facc15","#60a5fa","#fb7185","#a3e635","#c084fc"];
+const tpKey = () => `tp.pick.${$("tpSvc").value.trim().toUpperCase()}.${$("tpDir").value}`;
+function tpParams(extra){ return new URLSearchParams(Object.assign({service:$("tpSvc").value.trim().toUpperCase(), day_type:$("tpDay").value, scheme:$("tpScheme").value,
+  pctl:$("tpP").value, recovery:$("tpRec").value || 7, pax:$("tpPax").value || 3}, extra || {})); }
+async function tpRun(){
+  const svc = $("tpSvc").value.trim().toUpperCase(); if(!svc){ $("tpOut").innerHTML = '<div class="msg warn">Enter a service first.</div>'; return; }
+  LS.set("tp.svc", svc);
+  const saved = LS.get(tpKey(), null);
+  $("tpRun").disabled = true; $("tpOut").innerHTML = '<div class="sk"></div><div class="sk" style="width:80%"></div><div class="sk" style="width:60%"></div>';
+  const j = await getJSON("/api/insight/tpr?" + tpParams({direction:$("tpDir").value, stops:(saved || []).join(",")}), 120000);
+  $("tpRun").disabled = false;
+  if(!j.ok){ $("tpOut").innerHTML = `<div class="msg err">${esc(j.error || "Could not build the report.")}</div>`; $("tpXls").disabled = true; return; }
+  TP.j = j; TP.stops = j.stops;
+  if(!saved){ const n = j.stops.length, step = Math.max(1, Math.round((n - 1) / 6)); TP.pick = new Set(j.stops.filter((s, i) => i % step === 0).map(s => s.code));
+    TP.pick.add(j.stops[n - 1].code); LS.set(tpKey(), [...TP.pick]); return tpRun(); }
+  TP.pick = new Set(j.tpr.picked); TP.off.clear();
+  if(!TP.slot || !j.tpr.slots.includes(TP.slot)) TP.slot = j.tpr.slots[Math.max(0, j.tpr.total.prop.indexOf(Math.max(...j.tpr.total.prop)))];
+  $("tpXls").disabled = false; tpStopsList(); tpRender();
+}
+function tpStopsList(){
+  const q = $("tpStopsQ").value.trim().toLowerCase(), n = TP.stops.length;
+  $("tpStopsList").innerHTML = TP.stops.map((s, i) => { const end = i === 0 || i === n - 1;
+    if(q && !s.code.includes(q) && !(s.name || "").toLowerCase().includes(q)) return "";
+    return `<label><input type="checkbox" value="${esc(s.code)}" ${TP.pick.has(s.code) || end ? "checked" : ""} ${end ? "disabled" : ""}><span class="sq">${String(i + 1).padStart(2, "0")}</span><span><b>${esc(s.code)}</b> \u2014 ${esc(s.name || "")}${s.km != null ? ` <small style="color:var(--mut)">${f1(s.km)} km</small>` : ""}</span></label>`; }).join("");
+  $("tpStopsList").querySelectorAll("input:not([disabled])").forEach(c => c.onchange = () => { c.checked ? TP.pick.add(c.value) : TP.pick.delete(c.value); tpBtn(); });
+  tpBtn();
+}
+function tpBtn(){ const k = TP.stops.filter((s, i) => TP.pick.has(s.code) || i === 0 || i === TP.stops.length - 1).length;
+  $("tpStopsBtn").textContent = `${k} timing points \u2192 ${Math.max(0, k - 1)} stop pairs \u25be`; }
+$("tpStopsBtn").onclick = () => $("tpStopsMs").classList.toggle("open");
+$("tpStopsQ").oninput = tpStopsList;
+$("tpAll").onclick = () => { TP.stops.forEach(s => TP.pick.add(s.code)); tpStopsList(); };
+$("tpNone").onclick = () => { TP.pick.clear(); tpStopsList(); };
+$("tpApply").onclick = () => { $("tpStopsMs").classList.remove("open"); LS.set(tpKey(), [...TP.pick]); tpRun(); };
+document.addEventListener("click", e => { if(!$("tpStopsMs").contains(e.target)) $("tpStopsMs").classList.remove("open"); });
+$("tpRun").onclick = tpRun; $("tpSvc").addEventListener("keydown", e => { if(e.key === "Enter") tpRun(); });
+["tpDir", "tpDay", "tpScheme", "tpP"].forEach(id => $(id).onchange = () => { if(TP.j) tpRun(); });
+$("tpXls").onclick = () => { const svc = $("tpSvc").value.trim().toUpperCase();
+  const s1 = LS.get(`tp.pick.${svc}.1`, []), s2 = LS.get(`tp.pick.${svc}.2`, []);
+  $("tpXlsNote").textContent = "Building the Excel file (first time for a service can take up to 2 min while passenger volume downloads)\u2026";
+  const a = document.createElement("a"); a.href = "/api/insight/tpr.xlsx?" + tpParams({direction:0, stops1:s1.join(","), stops2:s2.join(",")}); a.download = ""; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => $("tpXlsNote").textContent = "", 15000); };
+const tpHeat = (v, lo, hi) => { const t = hi > lo ? (v - lo) / (hi - lo) : 0; return t < .33 ? ["#12351f", "#9ff0bf"] : t < .66 ? ["#4a3c08", "#ffe08a"] : ["#5a1a16", "#ffb3b8"]; };
+function tpRender(){
+  const j = TP.j, t = j.tpr, P = t.pairs, T = t.total, ns = t.slots.length;
+  const peak = Math.max(...T.prop), low = Math.min(...T.prop), pi = T.prop.indexOf(peak);
+  let h = `<div class="cards">
+    <div class="kpi"><small>Route</small><b>${f1(j.route_km)} km</b></div><div class="kpi"><small>Stops / timing points</small><b>${j.stops.length} / ${t.picked.length}</b></div>
+    <div class="kpi ok"><small>Quietest period</small><b>${f1(low)} min</b></div><div class="kpi bad"><small>Busiest period ${esc(t.slots[pi])}</small><b>${f1(peak)} min</b></div>
+    <div class="kpi warn"><small>Recommended P${t.pctl} + ${f1(t.recovery_min)} min recovery (max)</small><b>${f1(Math.max(...T.recommended))} min</b></div>
+    <div class="kpi"><small>Traffic basis</small><b style="font-size:15px">${/^live/.test(j.sources.traffic) ? "LIVE LTA" : "FALLBACK"}</b></div></div>`;
+  if(j.pv_note) h += `<div class="msg warn" style="margin-top:9px">${esc(j.pv_note)}</div>`;
+  h += `<h3 style="margin:14px 0 4px;font-size:15px">Time Period Report \u2013 Svc ${esc(j.service)} D${j.direction} ${esc(j.day_type)} (minutes, travel + dwell)</h3><div class="note" style="margin:0 0 6px">Each row is coloured against its own day: green = that pair's quickest periods, red = its slowest.</div>
+    <div class="tw"><table class="heat tpr-tab"><thead><tr><th>Stop to stop</th>${t.slots.map(x => `<th style="text-align:center">${esc(x.replace("-", "\u2013"))}</th>`).join("")}<th>Avg</th><th>Peak</th></tr></thead><tbody>`;
+  P.forEach(p => { const av = p.prop.reduce((a, b) => a + b, 0) / ns, lo = Math.min(...p.prop), hi = Math.max(...p.prop);
+    h += `<tr><td class="l" title="${esc(p.from_name)} \u2192 ${esc(p.to_name)}">${esc(p.from)} \u2192 ${esc(p.to)}<br><small style="color:var(--mut)">${f1(p.km)} km \u00b7 ${p.stops_between} ${p.stops_between === 1 ? "stop" : "stops"} between</small></td>` +
+      p.prop.map((v, i) => { const c = tpHeat(v, lo, hi); return `<td class="c" style="background:${c[0]};color:${c[1]}" title="${esc(t.slots[i])}: travel ${f1(p.travel[i])} + dwell ${f1(p.dwell[i])} min">${f1(v)}</td>`; }).join("") +
+      `<td class="c">${f1(av)}</td><td class="c">${f1(Math.max(...p.prop))}</td></tr>`; });
+  const row = (lab, arr, cls) => `<tr class="${cls}"><td class="l">${lab}</td>${arr.map(v => `<td class="c">${f1(v)}</td>`).join("")}<td class="c">${f1(arr.reduce((a, b) => a + b, 0) / ns)}</td><td class="c">${f1(Math.max(...arr))}</td></tr>`;
+  h += row("Total travel time", T.travel, "tot") + row("Total dwell time", T.dwell, "tot") + row("Prop RunTime", T.prop, "tot") + row(`Recommended RT (P${t.pctl} + recovery)`, T.recommended, "rec");
+  h += `</tbody></table></div>`;
+  h += `<div class="grid2" style="margin-top:12px"><div class="card" style="background:var(--card2);margin:0"><h3 style="margin:0 0 4px;font-size:15px">Stop-to-stop running time through the day</h3>
+      <div class="chart" id="tpLine"></div><div class="tpr-leg" id="tpLeg"></div></div>
+    <div class="card" style="background:var(--card2);margin:0"><div class="row" style="justify-content:space-between"><h3 style="margin:0;font-size:15px">Stop to stop at one time period</h3>
+      <select id="tpSlot" style="width:auto;min-height:34px;padding:5px 8px">${t.slots.map(x => `<option ${x === TP.slot ? "selected" : ""}>${esc(x)}</option>`).join("")}</select></div>
+      <div id="tpBar" style="margin-top:8px"></div></div></div>`;
+  h += `<div class="msg" style="margin-top:10px"><b>${esc(j.label)}</b><br>Traffic: ${esc(j.sources.traffic)}.<br>Passengers: ${esc(j.sources.passengers)}.<br>Headway: ${esc(j.sources.headway)}.</div>
+    <div class="note">Section time = driving (live speed, shaped by an hourly speed profile, never faster than free-flow) + ${j.assumptions.junctions_per_km} junctions/km \u00d7 ${j.assumptions.signal_s_per_junction} s + dwell at each stop: P(stop) \u00d7 (${j.assumptions.dwell_base_s} s + ${j.assumptions.decel_s} s decel + queue) + ${j.assumptions.dwell_per_pax_s} s \u00d7 passengers per bus. Live traffic tells us about now; the other periods are an engineering projection until measured trips are available to calibrate it. Generated ${esc(j.generated)}.</div>`;
+  $("tpOut").innerHTML = h;
+  $("tpSlot").onchange = () => { TP.slot = $("tpSlot").value; tpBar(); };
+  tpLine(); tpBar();
+}
+function tpLine(){
+  const t = TP.j.tpr, P = t.pairs, ns = t.slots.length, W = 640, H = 300, pl = 38, pr = 10, pt = 12, pb = 58;
+  const vis = P.map((p, i) => !TP.off.has(i)), vals = P.filter((p, i) => vis[i]).flatMap(p => p.prop);
+  const mx = Math.max(1, ...vals) * 1.1, x = i => pl + (W - pl - pr) * (ns > 1 ? i / (ns - 1) : .5), y = v => pt + (H - pt - pb) * (1 - v / mx);
+  let s = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Stop-to-stop running time by time period">`;
+  const step = mx > 30 ? 10 : mx > 12 ? 5 : mx > 6 ? 2 : 1;
+  for(let v = 0; v <= mx; v += step) s += `<line x1="${pl}" x2="${W - pr}" y1="${y(v)}" y2="${y(v)}" stroke="#16304e"/><text x="${pl - 5}" y="${y(v) + 4}" font-size="10" fill="#8ea6bd" text-anchor="end">${v}</text>`;
+  t.slots.forEach((lab, i) => { if(ns <= 12 || i % 2 === 0) s += `<text x="${x(i)}" y="${H - pb + 12}" font-size="9.5" fill="#8ea6bd" text-anchor="end" transform="rotate(-50 ${x(i)} ${H - pb + 12})">${esc(lab.slice(0, 4))}</text>`; });
+  P.forEach((p, k) => { if(!vis[k]) return; const c = TPC[k % TPC.length];
+    s += `<polyline fill="none" stroke="${c}" stroke-width="2.2" points="${p.prop.map((v, i) => `${x(i)},${y(v)}`).join(" ")}"/>` + p.prop.map((v, i) => `<circle cx="${x(i)}" cy="${y(v)}" r="2.6" fill="${c}"><title>${esc(p.from)} \u2192 ${esc(p.to)} \u00b7 ${esc(t.slots[i])}: ${f1(v)} min</title></circle>`).join(""); });
+  s += `<text x="${pl}" y="${H - 4}" font-size="10.5" fill="#8ea6bd">Time period start \u00b7 minutes on the vertical axis</text></svg>`;
+  $("tpLine").innerHTML = s;
+  $("tpLeg").innerHTML = P.map((p, k) => `<button type="button" data-k="${k}" class="${TP.off.has(k) ? "off" : ""}"><i style="background:${TPC[k % TPC.length]}"></i>${esc(p.from)} \u2192 ${esc(p.to)}</button>`).join("");
+  $("tpLeg").querySelectorAll("button").forEach(b => b.onclick = () => { const k = +b.dataset.k; TP.off.has(k) ? TP.off.delete(k) : TP.off.add(k); tpLine(); });
+}
+function tpBar(){
+  const t = TP.j.tpr, P = t.pairs, si = Math.max(0, t.slots.indexOf(TP.slot)), ns = t.slots.length;
+  const mx = Math.max(1, ...P.flatMap(p => p.prop));
+  $("tpBar").innerHTML = `<div class="wf">` + P.map((p, k) => { const v = p.prop[si], av = p.prop.reduce((a, b) => a + b, 0) / ns, hot = v >= Math.max(...p.prop) - .05;
+    return `<div class="lnk" style="grid-template-columns:118px minmax(0,1fr) auto;padding:4px 0"><span><b style="color:${TPC[k % TPC.length]}">\u25cf</b> ${esc(p.from)} \u2192 ${esc(p.to)}</span>
+      <div class="bar ${hot ? "max" : ""}" style="position:relative;height:14px"><i style="width:${100 * v / mx}%"></i><span title="Daily average ${f1(av)} min" style="position:absolute;top:-2px;bottom:-2px;left:${100 * av / mx}%;border-left:2px solid #eaf3ff"></span></div>
+      <span style="text-align:right;white-space:nowrap"><small style="color:var(--mut)">${f1(p.travel[si])}+${f1(p.dwell[si])} =</small> <b>${f1(v)}</b></span></div>`; }).join("") +
+    `</div><div class="note">Bar = travel + dwell at ${esc(TP.slot)}; white tick = daily average for that pair; red bar = this is the pair's slowest period.</div>`;
+}
+if(LS.get("tp.svc", "")) $("tpSvc").value = LS.get("tp.svc", "");
+
 
 /* ---------- important stops ---------- */
 function renderImp(){

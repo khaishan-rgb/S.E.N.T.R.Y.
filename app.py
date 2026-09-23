@@ -2975,6 +2975,183 @@ async def api_in_cell(ds: int = 0, ref: str = "auto", service: str = "", directi
     return {"ok": True, "section": section, "band": insight.band_label(insight.band_of(bs, b), b) if bs is not None else "All day", "n": len(vals), "trips": out}
 
 
+# ----------------------------------------------------------------------------- V13.8 zero-history Time Period Report (hourly TPR + graphs + Excel)
+import tpr_engine
+import tpr_excel
+from fastapi.responses import Response
+
+TPR_PV_TRY = {}      # "svc:dir" -> ts of the last passenger-volume download attempt for a service nobody is collecting
+
+
+def tpr_pv_init():
+    bb_sql("CREATE TABLE IF NOT EXISTS tpr_pv(month TEXT, day_type TEXT, hour INTEGER, stop TEXT, tap_in INTEGER, tap_out INTEGER, PRIMARY KEY(month, day_type, hour, stop))")
+
+
+async def tpr_fetch_pv(codes):
+    """Latest published DataMall Passenger Volume month, kept only for these stops (separate table so the collector's own months are untouched)."""
+    tpr_pv_init()
+    now = now_sgt()
+    for back in (1, 2, 3):
+        y, m = now.year, now.month - back
+        while m <= 0:
+            y, m = y - 1, m + 12
+        month = f"{y}{m:02d}"
+        try:
+            j = await get_lta(rtdata.PV_PATH, {"Date": month})
+            link = ((j.get("value") or [{}])[0] or {}).get("Link")
+            if not link:
+                continue
+            raw = (await client().get(link, timeout=180)).content
+            data = await asyncio.to_thread(rtdata.parse_pv_zip, raw, set(codes))
+            for (dt, hr, stop), (tin, tout) in data.items():
+                bb_sql("INSERT OR REPLACE INTO tpr_pv(month, day_type, hour, stop, tap_in, tap_out) VALUES (?,?,?,?,?,?)", (month, dt, hr, stop, tin, tout))
+            if data:
+                return month
+        except Exception:
+            continue
+    return None
+
+
+def tpr_pv_rows(codes, pv_day):
+    """{(stop, hour): tap_in+tap_out} for the newest month that has these stops, from the collector table or the TPR table."""
+    tpr_pv_init()
+    if not codes:
+        return None, {}
+    ph = ",".join("?" * len(codes))
+    for table in ("pv_stop", "tpr_pv"):
+        mm = bb_sql(f"SELECT month, COUNT(*) n FROM {table} WHERE day_type=? AND stop IN ({ph}) GROUP BY month ORDER BY month DESC LIMIT 1", (pv_day, *codes), fetch=True)
+        if mm and mm[0]["n"]:
+            month = mm[0]["month"]
+            rows = bb_sql(f"SELECT stop, hour, tap_in, tap_out FROM {table} WHERE month=? AND day_type=? AND stop IN ({ph})", (month, pv_day, *codes), fetch=True)
+            return month, {(r["stop"], int(r["hour"])): (r["tap_in"] or 0) + (r["tap_out"] or 0) for r in rows}
+    return None, {}
+
+
+def tpr_day_dt(day_type, hour):
+    """a representative datetime of that day type and hour (only used to look up the scheduled headway)."""
+    base = now_sgt().replace(minute=15, second=0, microsecond=0)
+    want = {"Weekday": 2, "Saturday": 5, "Sunday": 6}.get(day_type, 2)
+    return (base + timedelta(days=(want - base.weekday()) % 7)).replace(hour=hour)
+
+
+async def tpr_report(svc, d, day_type, scheme, stops_q, pax, pctl, recovery, wait_pv=False):
+    st = await static()
+    stops = route_stops(st, svc, d)
+    if not stops:
+        return {"ok": False, "error": f"Service {svc} direction {d} was not found in LTA Bus Routes.", "availableDirections": st["dirs"].get(svc, [])}
+    route = await bb_route(svc, d)
+    geom = await route_geometry(svc, d, stops)
+    line = geom["line"]
+    gk = geom_key(svc, d, stops)
+    prep = PREP.get(gk)
+    if prep is None:
+        prep = PREP[gk] = await asyncio.to_thread(headway.prepare, line, stops)
+    ss = prep["stop_s"]
+    tm = headway.TimeModel(route.get("runs", []), ss, headway.CFG) if (route.get("traffic") or {}).get("ok") else None
+    if tm is not None and not tm.ok:
+        tm = None
+    n = len(stops)
+    seg_km, seg_live, seg_free = [], [], []
+    for i in range(n - 1):
+        a, b = stops[i].get("dist"), stops[i + 1].get("dist")
+        km = (b - a) if (a is not None and b is not None and b > a) else max(0.0, ss[i + 1] - ss[i])
+        seg_km.append(km)
+        if tm is not None:
+            geo = max(1e-6, ss[i + 1] - ss[i])
+            scale = km / geo if geo > 0.02 else 1.0            # keep LTA distance, use the line only for the speed mix
+            seg_live.append(tm._span(ss[i], ss[i + 1]) * scale)
+            seg_free.append(tm._span(ss[i], ss[i + 1], free=True) * scale)
+    codes = [s["code"] for s in stops]
+    pv_day = "Weekday" if day_type == "Weekday" else "Weekend/PH"
+    month, vol = tpr_pv_rows(codes, pv_day)
+    pv_note = None
+    if not vol:
+        key = f"{svc}:{d}"
+        if time.time() - TPR_PV_TRY.get(key, 0) > 6 * 3600:
+            TPR_PV_TRY[key] = time.time()
+            task = asyncio.create_task(tpr_fetch_pv(codes))
+            if wait_pv:
+                try:
+                    await asyncio.wait_for(asyncio.shield(task), 150)
+                except Exception:
+                    pass
+            else:
+                try:
+                    await asyncio.wait_for(asyncio.shield(task), 25)
+                except Exception:
+                    pv_note = "Passenger volume is downloading from DataMall - generate again in a minute to use it."
+            month, vol = tpr_pv_rows(codes, pv_day)
+    fq = await freq_table()
+    hw_src, hw_by_h = set(), {}
+    for h in range(24):
+        hw, src = bb_resolve_hw(svc, d, tpr_day_dt(day_type, h), fq)
+        hw_by_h[h] = hw or 10.0
+        hw_src.add(src.split(":")[0] if src else "10 min assumed (no LTA frequency)")
+    ndays = tpr_engine.days_in_month(month, pv_day) if month else None
+
+    def pax_fn(code, h):
+        v = vol.get((code, h))
+        if v is None or not ndays:
+            return None
+        n_svc = max(1, len(st["at_stop"].get(code, ())) or 1)
+        return v / ndays / n_svc / (60.0 / hw_by_h[h])
+
+    picked = [c for c in re.split(r"[,\s]+", stops_q.strip()) if c]
+    now = now_sgt()
+    res = tpr_engine.build(stops=[{"code": s["code"], "name": s.get("name", ""), "seq": s["seq"]} for s in stops], seg_live_min=seg_live or None,
+                           seg_free_min=seg_free or None, seg_km=seg_km, day_type=day_type, now_hour=now.hour, now_day_type=bb_day_type(now),
+                           traffic_live=tm is not None, pax_fn=pax_fn, default_pax=pax, scheme=scheme, picked=picked, pctl=pctl, recovery_min=recovery)
+    sources = {
+        "traffic": (f"live LTA speed bands at {now.strftime('%H:%M')} ({tm.known_pct}% of route with a reading), shaped by hour with the speed profile"
+                    if tm is not None else f"speed bands unavailable - {tpr_engine.FALLBACK_KMH:.0f} km/h off-peak fallback x hourly profile"),
+        "passengers": (f"DataMall passenger volume {month[:4]}-{month[4:]} ({pv_day}), {res['pax_coverage']:.0f}% of stop-hours covered; others use {pax} pax/stop"
+                       if month else f"{pax} passengers per stop (assumption) - DataMall passenger volume not available yet"),
+        "headway": ", ".join(sorted(hw_src)),
+    }
+    return {"ok": True, "service": svc, "direction": d, "day_type": day_type, "scheme": scheme, "availableDirections": st["dirs"].get(svc, []),
+            "stops": [{"code": s["code"], "name": s.get("name", ""), "seq": s["seq"], "km": round(s["dist"], 2) if s.get("dist") is not None else None} for s in stops],
+            "route_km": round(sum(seg_km), 2), "tpr": res, "sources": sources, "pv_note": pv_note, "assumptions": tpr_engine.ASSUMPTIONS,
+            "generated": now.strftime("%d %b %Y %H:%M SGT"), "model": tpr_engine.VERSION,
+            "label": "MODELLED - zero-history engineering TPR (no completed trips used)"}
+
+
+def tpr_args(service, day_type, scheme, pctl, pax, recovery):
+    return (service.strip().upper(), day_type if day_type in tpr_engine.SPEED_PROFILE else "Weekday", scheme if scheme in tpr_engine.SCHEMES else "tpr",
+            in_num(pax, 3.0, 0, 50), int(in_pctl(pctl)), in_num(recovery, 7.0, 0, 60))
+
+
+@app.get("/api/insight/tpr")
+async def api_in_tpr(service: str = "", direction: int = 1, day_type: str = "Weekday", scheme: str = "tpr", stops: str = "", pctl: str = "85",
+                     pax: str = "3", recovery: str = "7"):
+    """Hourly / time-period running time for every stop pair, from the formula - no past trips needed."""
+    svc, dt, sc, px, p, rc = tpr_args(service, day_type, scheme, pctl, pax, recovery)
+    if not svc:
+        return {"ok": False, "error": "Enter a bus service."}
+    return await tpr_report(svc, direction, dt, sc, stops, px, p, rc)
+
+
+@app.get("/api/insight/tpr.xlsx")
+async def api_in_tpr_xlsx(service: str = "", direction: int = 0, day_type: str = "Weekday", scheme: str = "tpr", stops1: str = "", stops2: str = "",
+                          pctl: str = "85", pax: str = "3", recovery: str = "7"):
+    """Excel in the operator TPR layout: one TPR sheet + one graph sheet per direction. direction=0 exports both."""
+    svc, dt, sc, px, p, rc = tpr_args(service, day_type, scheme, pctl, pax, recovery)
+    if not svc:
+        return JSONResponse({"error": "Enter a bus service."}, status_code=400)
+    st = await static()
+    dirs = [direction] if direction in (1, 2) else (st["dirs"].get(svc) or [1])
+    reps = []
+    for d in dirs:
+        r = await tpr_report(svc, d, dt, sc, stops1 if d == 1 else stops2, px, p, rc, wait_pv=True)
+        if r.get("ok"):
+            reps.append(r)
+    if not reps:
+        return JSONResponse({"error": f"Service {svc} was not found in LTA Bus Routes."}, status_code=404)
+    raw = await asyncio.to_thread(tpr_excel.workbook, reps, tpr_engine.ASSUMPTIONS, {k: tpr_engine.SPEED_PROFILE[k] for k in (dt,)})
+    fn = f"Svc{svc}_TPR_{dt}_{'hourly' if sc == 'hourly' else 'periods'}_{now_sgt().strftime('%Y%m%d_%H%M')}.xlsx"
+    return Response(raw, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    headers={"Content-Disposition": f'attachment; filename="{fn}"'})
+
+
 # ----------------------------------------------------------------------------- V13.0 Halfway Deployment Planner (proactive: /planner)
 @app.get("/planner", response_class=HTMLResponse)
 async def planner_page():

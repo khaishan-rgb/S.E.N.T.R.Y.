@@ -603,3 +603,26 @@ Run locally: `pip install -r requirements.txt` then `LTA_ACCOUNT_KEY=... uvicorn
 * Bus positions are LTA's *estimates* for buses approaching the sampled stops; a bus far from any sampled stop may not appear.
 * Traffic is matched by geometry (within ~45 m, same direction preferred). Small roads without LTA links show as blue.
 * Not for operational use.
+
+## V13.8 - Hourly Time Period Report (zero trip history)
+
+Page: **Running Time Analytics** (`/running-time`) - new card "Hourly Time Period Report".
+
+* Pick service, direction, day type, and **TPR periods** (22 operator slots) or **Hourly** (05:00-00:59).
+* **Important bus stops** filter: tick the timing points; first and last stop are always kept. Skipped stops are merged into the pair around them.
+* Output: TPR heat table (travel + dwell per stop pair per period, totals, recommended RT), line graph per stop pair through the day, stop-to-stop bar graph for any one period.
+* **Download Excel (both directions)**: `TPR D1/D2` sheets in the operator layout (Travel time / Dwell Time / Prop RunTime per pair, totals as Excel formulas), `Graph D1/D2` sheets with native Excel line + bar charts, and a `Method & assumptions` sheet.
+
+Formula per stop-to-stop link, per hour (`tpr_engine.py`):
+
+    driving(h) = live LTA speed-band time x speed_profile[now] / speed_profile[h]   (never below free-flow)
+    signals    = km x 2.5 junctions/km x 3 s
+    dwell(h)   = P(stop) x (6.06 s + 8.8 s + 0.085 x 8 s) + 1.52 s x pax per bus,  P(stop) = 1 - exp(-pax)
+    pax per bus = DataMall passenger volume (tap-in + tap-out, stop, hour) / days in month / services at stop / buses of the service in that hour
+
+The hourly speed profile (`SPEED_PROFILE` in `tpr_engine.py`) is an engineering assumption; edit it or replace it with calibrated values once measured trips exist.
+Passenger volume for a service nobody is collecting is downloaded on first use into its own table (`tpr_pv`).
+
+API: `GET /api/insight/tpr?service=54&direction=1&day_type=Weekday&scheme=tpr|hourly&stops=53009,51089,...&pctl=85&recovery=7&pax=3`
+and `GET /api/insight/tpr.xlsx?service=54&direction=0&stops1=...&stops2=...` (direction 0 = both).
+New dependency: `openpyxl`.
