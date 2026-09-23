@@ -1,10 +1,17 @@
-# SG Transport Pulse V13.4 — Route Traffic + Departure Adjustment + Bunching, Gap & Alerts + AI Halfway Optimiser
+# SG Transport Pulse V13.5 — Route Traffic + Departure Adjustment + Bunching, Gap & Alerts + AI Halfway Optimiser
 
 Live bus positions, live LTA traffic drawn directly on the bus route, and next arrivals per stop.
 FastAPI backend + a single-page Leaflet frontend (OneMap basemap, OpenStreetMap fallback).
 
 
 
+
+## V13.5 - the timetable is optional, and 6 months of history
+
+* **Compare against** selector: *Auto* (timetable where entered, otherwise the measured baseline), *Measured off-peak baseline only* - no timetable entry needed anywhere - or *Entered timetable only*. The baseline is each service + direction + day type's own quiet-period P50 (outside 07:00-09:30 and 17:30-19:30, at least 8 trips, else the all-day P50), so "gap" reads as **how much longer than a quiet trip that period needs**. A banner states which basis is in use.
+* **Service can be chosen before any data exists:** with nothing measured, the page shows a "Start measuring this service" box that adds it to the collector immediately, and explains that no back-history exists to load.
+* **Retention raised to 180 days** (`RT_KEEP_DAYS`, default 180). `/api/rt/status` now reports total trips stored and the approximate bytes used (about 400 bytes per trip, so roughly 25-80 MB for six months of a handful of services).
+* **Important:** SQLite lives on the instance disk. On a Render free instance the disk is wiped on every redeploy / restart, so attach a persistent disk (or point `BUNCHING_DB` at one) before relying on six months of history.
 
 ## V13.4 - Running Time Analytics is measured from LTA DataMall (CSV upload removed)
 

@@ -650,3 +650,44 @@ def demo(days=40, seed=11):
                     rows.append(",".join([svc, str(d), day.isoformat(), trip, str(i), f"{40000 + i * 7 + (0 if d == 1 else 3)}", nm,
                                           hm(t_sch), hm(t_act), hm(t_sch), hm(t_act), str(speed), str(dwell), "Y" if works else "N", "Y" if rain else "N", str(int(demand))]))
     return "\n".join(rows)
+
+
+# --------------------------------------------------------------------------- reference running time when no timetable exists
+OFFPEAK = ((0, 7 * 60), (9 * 60 + 30, 17 * 60), (19 * 60 + 30, 24 * 60))
+
+
+def baseline_of(trips, daytype_split=True):
+    """The service's own quiet-period running time (P50 outside the peaks) per service + direction (+ day type).
+    Used as the reference when no timetable running time has been entered: the question becomes
+    'how much longer than a quiet trip does this period need', which is answerable from measured data alone."""
+    groups = {}
+    for t in trips:
+        k = (t["svc"], t["dir"], t["daytype"] if daytype_split else "All")
+        groups.setdefault(k, {"off": [], "all": []})
+        groups[k]["all"].append(t["art"])
+        if t["ss"] is not None and any(a <= (t["ss"] % 1440) < b for a, b in OFFPEAK):
+            groups[k]["off"].append(t["art"])
+    out = {}
+    for k, v in groups.items():
+        base = pct(v["off"], 50) if len(v["off"]) >= 8 else pct(v["all"], 50)
+        if base is not None:
+            out[k] = round(base, 1)
+    return out
+
+
+def apply_reference(trips, mode="auto", daytype_split=True):
+    """mode: timetable | baseline | auto (timetable where entered, otherwise the measured baseline).
+    Returns (trips, basis, baselines) - the reference is written into each trip's scheduled running time."""
+    if mode == "timetable":
+        return trips, "timetable", {}
+    base = baseline_of(trips, daytype_split)
+    used_base = False
+    for t in trips:
+        if mode == "baseline" or t["srt"] is None:
+            b = base.get((t["svc"], t["dir"], t["daytype"] if daytype_split else "All"))
+            if b is not None:
+                t["srt"] = b
+                t["se"] = None if t["ss"] is None else t["ss"] + b
+                used_base = True
+    basis = "baseline" if mode == "baseline" else ("mixed" if used_base and any(t["srt"] is not None for t in trips) else "timetable")
+    return trips, basis, base

@@ -21,7 +21,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 import headway
 import traffic
 
-VERSION = "V13.4"
+VERSION = "V13.5"
 LTA = os.getenv("LTA_BASE", "https://datamall2.mytransport.sg/ltaodataservice").rstrip("/")
 KEY = os.getenv("LTA_ACCOUNT_KEY", "")
 OSRM = os.getenv("OSRM_URL", "https://router.project-osrm.org").rstrip("/")
@@ -2191,7 +2191,7 @@ IN_CACHE = {}          # dataset id -> (trips, info) parsed on demand
 
 RT = {"trk": {}, "saved": 0, "last": None}          # live running-time collection, built from the bunching collector's bus tracks
 RT_MIN_COVER = 0.82                                  # a trip must be observed over at least this share of the route to be stored
-RT_KEEP_DAYS = float(os.getenv("RT_KEEP_DAYS", "120"))
+RT_KEEP_DAYS = float(os.getenv("RT_KEEP_DAYS", "180"))          # six months of measured trips by default
 
 
 def rt_init():
@@ -2327,7 +2327,9 @@ async def api_rt_status():
             "refresh_sec": BB["params"]["refresh_sec"], "saved_this_run": RT["saved"], "keep_days": RT_KEEP_DAYS,
             "services": [{"service": r["service"], "direction": r["direction"], "trips": r["n"], "avg_rt": round(r["avg"], 1),
                           "from": datetime.fromtimestamp(r["a"], SGT).strftime("%d %b %H:%M"), "to": datetime.fromtimestamp(r["b"], SGT).strftime("%d %b %H:%M")} for r in rows],
-            "note": "Running time is measured from live bus positions (LTA DataMall). A trip is stored once a bus has been followed over the route, so the history grows while the collector runs."}
+            "bytes": (bb_sql("SELECT COALESCE(SUM(LENGTH(marks)) + COUNT(*) * 120, 0) b FROM rt_trip", (), fetch=True)[0]["b"] or 0),
+            "total_trips": (bb_sql("SELECT COUNT(*) n FROM rt_trip", (), fetch=True)[0]["n"] or 0),
+            "note": "Running time is measured from live bus positions (LTA DataMall). DataMall and OneMap publish no historical bus running times, so history starts when collection starts."}
 
 
 @app.post("/api/rt/watch")
@@ -2434,11 +2436,18 @@ def in_save(name, kind, text):
     return (r[0]["id"] if r else None), None
 
 
-async def in_get(ds_id):
-    """ds 0 = the live LTA-measured trips; any other id = a stored sample dataset."""
-    if not ds_id:
-        return await in_live()
-    return await asyncio.to_thread(in_load, int(ds_id))
+async def in_get(ds_id, ref="auto"):
+    """ds 0 = the live LTA-measured trips; any other id = a stored sample dataset.
+    `ref` decides what the actual running time is compared with: the entered timetable, or the service's own quiet-period baseline."""
+    trips, info = (await in_live()) if not ds_id else (await asyncio.to_thread(in_load, int(ds_id)))
+    if trips is None:
+        return None, info
+    ref = ref if ref in ("timetable", "baseline", "auto") else "auto"
+    trips = [dict(t) for t in trips]
+    trips, basis, base = await asyncio.to_thread(insight.apply_reference, trips, ref)
+    info = dict(info, basis=basis, reference=ref, baselines={f"{k[0]}:{k[1]}:{k[2]}": v for k, v in base.items()},
+                n_no_ref=sum(1 for t in trips if t["srt"] is None))
+    return trips, info
 
 
 def in_pctl(v, d=85):
@@ -2507,23 +2516,23 @@ def in_filters(trips, daytype, date_from, date_to):
 
 
 @app.get("/api/insight/summary")
-async def api_in_summary(ds: int = 0, pctl: str = "85", band: str = "30", daytype: str = "", date_from: str = "", date_to: str = "", min_n: str = "10"):
-    trips, info = await in_get(ds)
+async def api_in_summary(ds: int = 0, ref: str = "auto", pctl: str = "85", band: str = "30", daytype: str = "", date_from: str = "", date_to: str = "", min_n: str = "10"):
+    trips, info = await in_get(ds, ref)
     if trips is None:
         return {"ok": False, "error": info.get("error", "No data")}
     p, b, mn = in_pctl(pctl), int(in_num(band, 30, 15, 60)), int(in_num(min_n, 10, 1, 500))
     sel = in_filters(trips, daytype, date_from, date_to)
     rows = await asyncio.to_thread(insight.summary, sel, p, b, mn)
-    return {"ok": True, "rows": rows, "pctl": p, "band": b, "min_n": mn, "n_trips": len(sel), "info": info,
+    return {"ok": True, "rows": rows, "pctl": p, "band": b, "min_n": mn, "n_trips": len(sel), "info": info, "basis": info.get("basis"), "reference": info.get("reference"),
             "quality": {"trips_in_file": info.get("trips"), "analysed": len(sel), "outliers_removed": info.get("outliers_removed"),
                         "dropped_incomplete": info.get("dropped_incomplete"), "dates": info.get("dates"), "stop_level": info.get("stop_level"),
                         "conditions": info.get("conditions"), "missing_columns": info.get("columns_missing")}}
 
 
 @app.get("/api/insight/service")
-async def api_in_service(ds: int = 0, service: str = "", pctl: str = "85", band: str = "30", daytype: str = "", date_from: str = "", date_to: str = "",
+async def api_in_service(ds: int = 0, ref: str = "auto", service: str = "", pctl: str = "85", band: str = "30", daytype: str = "", date_from: str = "", date_to: str = "",
                          min_n: str = "5", model: str = "0"):
-    trips, info = await in_get(ds)
+    trips, info = await in_get(ds, ref)
     if trips is None:
         return {"ok": False, "error": info.get("error", "No data")}
     svc = service.strip().upper()
@@ -2532,7 +2541,8 @@ async def api_in_service(ds: int = 0, service: str = "", pctl: str = "85", band:
     g = [t for t in sel if t["svc"] == svc]
     if not g:
         return {"ok": False, "error": f"No trips for service {svc} with these filters."}
-    out = {"ok": True, "service": svc, "pctl": p, "band": b, "min_n": mn, "dirs": {}, "n": len(g),
+    out = {"ok": True, "service": svc, "pctl": p, "band": b, "min_n": mn, "dirs": {}, "n": len(g), "basis": info.get("basis"), "reference": info.get("reference"),
+           "baseline": {d_: info.get("baselines", {}).get(f"{svc}:{d_}:Weekday") for d_ in (1, 2)},
            "dates": [min((t["date"] for t in g if t["date"]), default=None), max((t["date"] for t in g if t["date"]), default=None)],
            "daytypes": sorted({t["daytype"] for t in g}), "info": info}
     for d in (1, 2):
@@ -2556,9 +2566,9 @@ async def api_in_service(ds: int = 0, service: str = "", pctl: str = "85", band:
 
 
 @app.get("/api/insight/sections")
-async def api_in_sections(ds: int = 0, service: str = "", direction: int = 1, stops: str = "", pctl: str = "85", band: str = "30",
+async def api_in_sections(ds: int = 0, ref: str = "auto", service: str = "", direction: int = 1, stops: str = "", pctl: str = "85", band: str = "30",
                           daytype: str = "", date_from: str = "", date_to: str = "", min_n: str = "5"):
-    trips, info = await in_get(ds)
+    trips, info = await in_get(ds, ref)
     if trips is None:
         return {"ok": False, "error": info.get("error", "No data")}
     svc = service.strip().upper()
@@ -2591,10 +2601,10 @@ async def api_in_sections(ds: int = 0, service: str = "", direction: int = 1, st
 
 
 @app.get("/api/insight/cell")
-async def api_in_cell(ds: int = 0, service: str = "", direction: int = 1, section: str = "", stops: str = "", band_start: str = "", band: str = "30",
+async def api_in_cell(ds: int = 0, ref: str = "auto", service: str = "", direction: int = 1, section: str = "", stops: str = "", band_start: str = "", band: str = "30",
                       daytype: str = "", date_from: str = "", date_to: str = "", limit: int = 60):
     """the trips behind one heatmap cell."""
-    trips, info = await in_get(ds)
+    trips, info = await in_get(ds, ref)
     if trips is None:
         return {"ok": False, "error": info.get("error", "No data")}
     svc = service.strip().upper()

@@ -118,6 +118,7 @@ tbody tr.click{cursor:pointer}tbody tr.sel td{background:#1d2a12}
       <div class="fld"><label for="inPctl">Planning percentile</label><select id="inPctl"><option value="50">P50 &ndash; typical</option><option value="85" selected>P85 &ndash; reliable planning</option><option value="90">P90 &ndash; conservative</option><option value="95">P95</option></select></div>
       <div class="fld"><label for="inBand">Time band</label><select id="inBand"><option value="15">15 min</option><option value="30" selected>30 min</option><option value="60">60 min</option></select></div>
       <div class="fld"><label for="inMinN">Minimum sample per period</label><input id="inMinN" class="sel" type="number" min="1" max="200" value="5"></div>
+      <div class="fld"><label for="inRef">Compare against</label><select id="inRef"><option value="auto" selected>Auto &ndash; timetable where entered, else measured baseline</option><option value="baseline">Measured off-peak baseline only (no timetable needed)</option><option value="timetable">Entered timetable only</option></select></div>
       <div class="fld"><label for="inDir">Section direction</label><select id="inDir"><option value="1">Direction 1</option><option value="2">Direction 2</option></select></div>
     </div>
     <div class="ms" id="inImpWrap" style="margin-top:9px">
@@ -168,7 +169,7 @@ async function post(u, body, hdr){ const tok = LS.get("bb.tok", "");
   let r = await go(tok);
   if(r.status === 401){ const t = prompt("Admin token"); if(!t) return {error:"Cancelled"}; LS.set("bb.tok", t); r = await go(t); }
   return r.json().catch(() => ({error:"Server error " + r.status})); }
-const qs = extra => new URLSearchParams(Object.assign({ds:S.ds, pctl:$("inPctl").value, band:$("inBand").value, daytype:$("inDay").value,
+const qs = extra => new URLSearchParams(Object.assign({ds:S.ds, ref:$("inRef").value, pctl:$("inPctl").value, band:$("inBand").value, daytype:$("inDay").value,
   date_from:$("inFrom").value, date_to:$("inTo").value, min_n:$("inMinN").value}, extra || {}));
 
 /* ---------- datasets ---------- */
@@ -215,7 +216,7 @@ $("inSAdd").onclick = async () => {
   const body = {service:$("inSSvc").value.trim(), direction:+$("inSDir").value, day_type:$("inSDay").value, t_from:$("inSFrom").value.trim() || "00:00", t_to:$("inSTo").value.trim() || "23:59", rt_min:$("inSRt").value};
   const j = await post("/api/rt/sched", JSON.stringify(body));
   if(j.error){ alert(j.error); return; } $("inSRt").value = ""; loadSched(); run(); };
-["inPctl", "inBand", "inDay", "inFrom", "inTo", "inMinN"].forEach(id => $(id).onchange = () => run());
+["inPctl", "inBand", "inDay", "inFrom", "inTo", "inMinN", "inRef"].forEach(id => $(id).onchange = () => run());
 $("inSvc").onchange = () => { S.svc = $("inSvc").value; LS.set("in.svc", S.svc); S.imp.clear(); runService(); };
 $("inDir").onchange = () => { S.dir = +$("inDir").value; LS.set("in.dir", S.dir); S.imp.clear(); runService(); };
 
@@ -247,7 +248,14 @@ async function run(){
   $("inBody").innerHTML = `<div class="card"><div class="sk"></div><div class="sk" style="width:80%"></div><div class="sk" style="width:60%"></div></div>`;
   const j = await getJSON("/api/insight/summary?" + qs());
   S.sum = j;
-  if(!j.ok){ $("inBody").innerHTML = `<div class="card"><div class="msg err">${esc(j.error)}</div></div>`; return; }
+  if(!j.ok){ $("inBody").innerHTML = `<div class="card"><h2>No running time measured yet</h2><div class="msg">${esc(j.error)}</div>
+    <div class="row" style="margin-top:10px"><input id="inStartSvc" class="sel" style="max-width:150px" maxlength="6" placeholder="Service e.g. 54"><button class="btn go" id="inStart" type="button">Start measuring this service</button></div>
+    <div class="note">Measurement starts now: a trip is stored each time a bus completes the route (roughly one per bus per trip). DataMall and OneMap publish no historical running times, so there is no back-history to load.
+    You can meanwhile add the modelled sample above to see how the analysis works.</div></div>`;
+    $("inStart").onclick = async () => { const v = $("inStartSvc").value.trim().toUpperCase(); if(!v) return;
+      $("inStart").disabled = true; const r = await post("/api/rt/watch", JSON.stringify({service:v})); $("inStart").disabled = false;
+      if(r.error) alert(r.error); else { loadCollector(); alert(`Now measuring service ${v}. Keep a page open; trips appear as buses complete the route.`); } };
+    $("inSvc").innerHTML = `<option value="">no data yet</option>`; return; }
   const svcs = j.rows.map(r => r.service);
   $("inSvc").innerHTML = svcs.map(s => `<option value="${esc(s)}">Service ${esc(s)}</option>`).join("");
   if(!svcs.includes(S.svc)) S.svc = svcs[0] || "";
@@ -324,8 +332,10 @@ function renderAll(){
   // management summary over all services
   const sorted = [...j.rows].sort((a, b) => { const v = r => S.sort === "service" ? r.service : S.sort === "periods" ? r.periods_short : (r.worst || -99);
     const x = v(a), y = v(b); return (x === y ? 0 : x < y ? -1 : 1) * (S.desc ? -1 : 1); });
+  const baseMode = j.basis === "baseline" || j.basis === "mixed";
   h += `<section class="card"><h2>Which services are lacking running time?</h2>
-    <div class="sub">Every service in the dataset, both directions, at P${f1(j.pctl)} with ${j.band}-min periods. Sorted by the largest shortage.</div>
+    <div class="sub">Every service measured, both directions, at P${f1(j.pctl)} with ${j.band}-min periods. Sorted by the largest shortage.</div>
+    ${baseMode ? `<div class="msg warn" style="margin-bottom:9px">Compared against the <b>measured off-peak baseline</b> of each service and direction${j.basis === "mixed" ? " where no timetable running time has been entered" : ""}, because LTA DataMall does not publish scheduled running times. "Gap" therefore means <b>how much longer than a quiet trip</b> that period needs – no timetable entry required.</div>` : ""}
     <div class="tw"><table><thead><tr><th class="s" data-s="service">Service</th><th>D1 Sch</th><th>D1 P50</th><th>D1 P${f1(j.pctl)}</th><th>D1 gap</th><th>D2 Sch</th><th>D2 P50</th><th>D2 P${f1(j.pctl)}</th><th>D2 gap</th>
       <th class="s" data-s="periods">Periods short</th><th class="s" data-s="worst">Largest shortage</th><th>Direction affected</th><th>Suggested review</th><th>Trips</th></tr></thead><tbody>
       ${sorted.map(r => `<tr class="click" data-svc="${esc(r.service)}"><td><b>${esc(r.service)}</b></td>
