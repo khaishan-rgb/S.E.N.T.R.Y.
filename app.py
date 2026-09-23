@@ -2193,6 +2193,7 @@ async def os_plan(g, res, svc, d, bus, dims):
 
 # ----------------------------------------------------------------------------- V13.3 PROJECT INSIGHT - running time analytics (/insight)
 import insight
+import engineering_rt
 import gzip
 import base64
 
@@ -2822,6 +2823,44 @@ async def api_in_delete(request: Request):
 
 def in_filters(trips, daytype, date_from, date_to):
     return insight.filt(trips, daytype=daytype or None, date_from=(date_from or None), date_to=(date_to or None))
+
+
+@app.get("/api/insight/engineering")
+async def api_in_engineering(service: str = "", direction: int = 1, pctl: int = 85, pax: float = 3.0, recovery: float = 7.0, junctions: int = -1, rain: int = 0, draws: int = 1000):
+    """Day-1 running-time estimate: no completed-trip history required."""
+    svc = service.strip().upper()
+    if not svc:
+        return {"ok": False, "error": "Enter a bus service."}
+    st = await static()
+    stops = route_stops(st, svc, direction)
+    if not stops:
+        return {"ok": False, "error": f"Service {svc} direction {direction} was not found in LTA Bus Routes."}
+    geom = await route_geometry(svc, direction, stops)
+    bands = await bands_state()
+    runs, stats = await asyncio.to_thread(color_route, geom["line"], bands.get("idx"))
+    official = max((x["dist"] for x in stops if x.get("dist") is not None), default=None)
+    route_km = official or sum(stats["km"].values()) or line_len_km(geom["line"])
+    # If live speed bands are unavailable, use a clearly-labelled engineering fallback rather than historical trip data.
+    traffic_live = bool(stats.get("known"))
+    drive_min = stats.get("driveMin") if traffic_live else route_km / 25.0 * 60.0
+    try:
+        inc = (await api_incidents("", 1)).get("incidents", [])
+    except Exception:
+        inc = []
+    try:
+        rw, _ = await tr_roadworks(time.time())
+    except Exception:
+        rw = []
+    sl = offservice.simplify(geom["line"], 200)
+    n_inc = sum(1 for x in inc if x.get("lat") is not None and offservice.dist_to_line_m((x["lat"], x["lon"]), sl) <= 60)
+    n_rw = sum(1 for x in rw if x.get("lat") is not None and offservice.dist_to_line_m((x["lat"], x["lon"]), sl) <= 60)
+    sim = await asyncio.to_thread(engineering_rt.simulate, drive_min=drive_min, stops=len(stops), route_km=route_km, pax_per_stop=pax,
+                                  junctions=None if junctions < 0 else junctions, recovery_min=recovery, incidents=n_inc, roadworks=n_rw,
+                                  rain=bool(rain), pctl=max(50,min(99,pctl)), draws=draws)
+    return {"ok": True, "service":svc, "direction":direction, "availableDirections":st["dirs"].get(svc, []),
+            "traffic":{"live":traffic_live,"basis":"live LTA speed bands" if traffic_live else "25 km/h engineering fallback","drive_min":round(drive_min,1)},
+            "route":{"km":round(route_km,2),"stops":len(stops),"geometry":geom["source"]}, "simulation":sim,
+            "events":{"incidents":n_inc,"roadworks":n_rw}, "model":engineering_rt.VERSION}
 
 
 @app.get("/api/insight/summary")
