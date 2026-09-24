@@ -219,6 +219,71 @@ details.hall{margin-top:10px}details.hall summary{cursor:pointer;color:#9cc4ff;f
 .rvrej{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:3px 10px;font-size:12.3px}.rvrej span{color:#cfe0f3}.rvrej b{color:#ff9aa0;text-align:right}
 .rvstale{background:#3a2a06;border:1px solid #7a5a12;color:#ffe08a;border-radius:10px;padding:8px 12px;font-size:13px;margin-bottom:10px}
 .rvkv.rules{grid-template-columns:minmax(0,1fr) minmax(0,1.1fr)}.rvkv.rules b{text-align:right;font-weight:700}
+/* ===== V13.9 OCC story layout (numbered 1-7) ===== */
+.hx-top{grid-template-columns:330px minmax(0,1fr)!important}.hx-trips{min-width:0}
+.hset{margin:10px 0;border-top:1px solid var(--line2);border-bottom:1px solid var(--line2);padding:2px 0}.hset>summary{cursor:pointer;padding:9px 0;display:flex;flex-direction:column;gap:2px}.hset>summary small{color:var(--mut);font-size:11.8px;font-weight:500}
+.hset h3{font-size:13.5px;margin:10px 0 6px;color:#cfe0f3}
+.ic{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;flex:0 0 auto}.ic.sm{width:14px;height:14px;vertical-align:-2px;margin-right:3px}
+.st-panel,.story .st-sec{background:#0a1a2e;border:1px solid #1d3553;border-radius:14px;padding:12px 14px}
+.st-in{margin-top:12px}.st-in .hx-top{margin-top:10px}.st-in.shut .hx-top{display:none}.st-in.shut{padding-bottom:12px}
+.st-hd{display:flex;align-items:center;gap:12px;margin:-12px -14px 12px;padding:10px 14px;border-bottom:1px solid #1d3553;border-radius:14px 14px 0 0;background:#0d2036}
+.st-hd>div{flex:1;min-width:0}.st-hd b{font-size:16.5px;display:block}.st-hd small{color:var(--mut);font-size:12px}
+.st-in>.st-hd{margin-bottom:0}.st-in.shut>.st-hd{border-bottom:0;margin-bottom:-12px;border-radius:14px}
+.nb{font-style:normal;flex:0 0 auto;width:34px;height:34px;border-radius:50%;display:grid;place-items:center;font-weight:900;font-size:17px;background:#1f7cff;color:#fff;box-shadow:0 0 0 3px rgba(31,124,255,.25)}
+.st-hd.red{background:linear-gradient(90deg,#3a121b,#1a1622)}.st-hd.red .nb{background:#ff3b4a;box-shadow:0 0 0 3px rgba(255,59,74,.25)}
+.st-hd.green{background:linear-gradient(90deg,#0f3320,#0d2036)}.st-hd.green .nb{background:#1fbf5b;box-shadow:0 0 0 3px rgba(31,191,91,.25)}
+.st-in .nb{background:#ff3b4a;box-shadow:0 0 0 3px rgba(255,59,74,.25)}
+.st-at{font-size:12px;color:var(--mut);white-space:nowrap}.st-pill{font-size:11.5px;border:1px solid #2fbf6b;color:#bff3d2;border-radius:999px;padding:3px 10px;white-space:nowrap}
+.story{display:flex;flex-direction:column;gap:14px;margin-top:14px}.story .st-sec[hidden]{display:none}.story.stale .st-sec:not(.st-sum):not(.st-tech){opacity:.55}
+.story .st-sum{border-color:#5a2230}.story .st-rec{border-color:#1f8a4a;background:#0a1d17}
+.st-empty{color:var(--mut);padding:6px 2px}.st-mline{display:none;font-weight:800;font-size:16px;margin:0 0 6px}.st-mline small{color:var(--mut);font-weight:500;font-size:12px}
+@media(max-width:700px){.st-mline{display:block}}.st-note{color:var(--mut);font-size:12.5px;margin-top:8px}
+.story .g,.story b.g{color:#4be38b}.story .a{color:#ffc24d}.story .r{color:#ff6b74}.story .bl{color:#6fb1ff}
+.st-its{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:0}.st-it{display:flex;gap:10px;align-items:flex-start;padding:4px 12px;border-left:1px solid #1d3553}.st-it:first-child{border-left:0;padding-left:2px}
+.st-it .ic{width:28px;height:28px;color:#6fb1ff;margin-top:2px}.st-it .ic.r{color:#ff6b74}.st-it .ic.a{color:#ffc24d}.st-it .ic.g{color:#4be38b}
+.st-it span{display:block;font-size:11.5px;color:var(--mut)}.st-it b{display:block;font-size:19px;line-height:1.2}.st-it small{display:block;font-size:12px}
+.st-opts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}.st-o{border-radius:12px;overflow:hidden;border:1px solid #2a3f58;background:#0c1c30}
+.st-oh{display:flex;gap:8px;align-items:center;padding:9px 12px;background:#2a3a4e}.st-oh>div{flex:1}.st-oh b{display:block}.st-oh small{font-size:11.5px;color:#cfe0f3}
+.o-adjust .st-oh{background:#1d55b8}.o-halfway .st-oh{background:#6a35c9}.st-o.pick{border:2px solid #b07cff;box-shadow:0 0 22px rgba(160,100,255,.25)}.st-o.o-adjust.pick{border-color:#5aa0ff;box-shadow:0 0 22px rgba(60,150,255,.25)}.st-o.o-none.pick{border-color:#9fb0c4}
+.st-rtag{font-size:10px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;background:rgba(255,255,255,.18);border-radius:6px;padding:2px 6px}
+.st-o dl{display:grid;grid-template-columns:1fr auto;margin:0}.st-o dt,.st-o dd{padding:7px 12px;border-top:1px solid #1a2f48;margin:0;font-size:13px}.st-o dd{text-align:right;font-weight:800;font-size:15px;font-variant-numeric:tabular-nums}.st-o dt{color:#cfe0f3}
+.st-hero{display:grid;grid-template-columns:minmax(0,.85fr) minmax(0,1.4fr);gap:14px;align-items:stretch}
+.ai-shell-card[hidden]{display:none!important}.st-title small b{display:inline;font-size:inherit;font-weight:800;color:#fff}.st-kpis .st-k b{font-size:15.5px}
+.st-title{display:flex;gap:12px;align-items:flex-start}.st-star{font-size:34px;line-height:1;color:#ffc93c}.st-hero.none .st-star{color:#4be38b}.st-title b{font-size:23px;font-weight:900;display:block;letter-spacing:.01em}.st-title small{font-size:14.5px;color:#dbe8f7}
+.st-call{margin-top:12px;border-left:3px solid #2fd070;background:#0e2a1b;border-radius:8px;padding:10px 14px}.st-call b{display:block;font-size:21px;color:#fff}.st-call small{display:block;color:#bff3d2;font-size:12.5px}
+.st-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border:1px solid #1d4a33;border-radius:12px;background:#0c1f19}.st-k{display:flex;gap:9px;padding:12px;border-left:1px solid #1d4a33}.st-k:first-child{border-left:0}
+.st-k .ic{color:#cfe0f3;margin-top:2px}.st-k span{display:block;font-size:11.5px;color:var(--mut)}.st-k b{display:block;font-size:16.5px;font-variant-numeric:tabular-nums}.st-k b em{font-style:normal;color:#4be38b}.st-k small{display:block;font-size:12px;color:var(--mut);margin-top:3px}
+.st-why2{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(0,1fr);gap:14px}
+.st-tag{display:inline-block;font-size:12.5px;font-weight:700;border-radius:8px;padding:3px 10px;margin:4px 0 2px}.st-tag.r{background:#3a1520;color:#ff8a92}.st-tag.g{background:#10304a;color:#8cc6ff}
+.st-line2{display:flex;align-items:flex-end;padding:22px 0 6px}.st-b{flex:0 0 auto;display:flex;flex-direction:column;align-items:center;gap:1px;color:#e8f1fb;width:40px}.st-b .ic{width:22px;height:22px}.st-b small{font-size:10px;color:#9fb6cf;white-space:nowrap}
+.st-b.late{color:#ff6b74}.st-b.late small{color:#ff8a92}.st-b.hw{color:#b884ff}.st-b.hw small{color:#cfaaff}
+.st-seg{position:relative;height:4px;border-radius:2px;min-width:20px;flex-basis:0;margin-bottom:22px}.st-seg em{position:absolute;left:50%;top:-18px;transform:translateX(-50%);font-style:normal;font-size:11.5px;font-weight:700;white-space:nowrap}
+.st-seg.g{background:#22c55e}.st-seg.g em{color:#8ff0b5}.st-seg.a{background:#f5b82e}.st-seg.a em{color:#ffd27a}.st-seg.r{background:#ff5a5f;height:5px}.st-seg.r em{color:#ff9aa0}.st-seg.b{background:#b46bff}.st-seg.b em{color:#d6b3ff}
+.st-ref{font-size:11.5px;color:var(--mut);margin-top:4px;display:flex;flex-wrap:wrap;gap:4px 8px;align-items:center}.st-ref i{display:inline-block;width:14px;height:4px;border-radius:2px;margin-left:4px}.st-ref i.g{background:#22c55e}.st-ref i.a{background:#f5b82e}.st-ref i.r{background:#ff5a5f}.st-ref i.b{background:#b46bff}
+.st-ec{border:1px solid #1d3553;border-radius:12px;padding:12px;background:#0c1c30}.st-ec>b{display:block;margin-bottom:8px}
+.st-er{display:grid;grid-template-columns:70px minmax(0,1fr) 54px;gap:8px;align-items:center;margin:8px 0;font-size:13px}.st-er i{display:block;height:16px;border-radius:5px}.st-er i.o-none{background:#ff6b74}.st-er i.o-adjust{background:#4a9dff}.st-er i.o-halfway{background:#2fe07a}.st-er b{text-align:right;font-variant-numeric:tabular-nums}
+.st-ebig{display:flex;gap:10px;align-items:center;margin-top:12px;color:#4be38b}.st-ebig .ic{width:30px;height:30px}.st-ebig b{display:block;font-size:16px}.st-ebig small{color:#cfe0f3}
+.st-ins{margin-bottom:10px}.st-ins>summary{cursor:pointer;font-weight:700;padding:4px 0}.st-ins ul{list-style:none;margin:6px 0;padding:0}.st-ins li{display:grid;grid-template-columns:52px minmax(0,1fr);gap:8px;padding:6px 0;border-bottom:1px solid #12253c;font-size:13.5px}.st-ins time{font-weight:800;font-variant-numeric:tabular-nums;color:#9cc4ff}
+.st-dep #osCard{margin:0;border:0;padding:0;background:none}.st-dep #osCard>header{display:none}.st-dep.nohw #osCard{display:none}
+.st-dep .osban,.st-dep .rvwhy,.st-dep .rvbox:has(.hwviz),.st-dep .osrec>.hd,.st-dep .osrec>.oskv,.st-dep .osrec>.earn{display:none}
+.st-dinst h3{margin:0 0 6px;font-size:15px}.st-di{display:flex;gap:10px;padding:8px 0;border-bottom:1px solid #1a2f48}.st-di .ic{color:#b884ff}.st-di span{display:block;font-size:11.5px;color:var(--mut)}.st-di b{display:block;font-size:15.5px}.st-di small{color:var(--mut);font-size:11.5px}
+.st-more{margin-top:12px;border:1px solid #1d3553;border-radius:10px;padding:0 12px;background:#0c1c30}.st-more>summary{cursor:pointer;padding:10px 0;font-weight:700}.st-more[open]{padding-bottom:12px}
+.st-tbt{width:100%;margin-top:12px;display:flex;justify-content:center;gap:8px;align-items:center}.st-tbt .ic{width:18px;height:18px}#osTl.flash{outline:2px solid #ff9f1c;border-radius:8px}
+.st-tech .tech{border:1px solid #1d3553;border-radius:10px;padding:0 12px;margin-top:8px;background:#0c1c30}.st-tech .tech>summary{cursor:pointer;padding:11px 0;display:flex;flex-wrap:wrap;gap:2px 12px;align-items:baseline}.st-tech .tech>summary small{color:var(--mut);font-size:12px}.st-tech .tech[open]{padding-bottom:12px}
+.st-f{border:1px dashed #2f5d8e;border-radius:10px;padding:10px 12px;background:#0d2039;display:grid;gap:3px;font-size:14px}.st-f small{color:var(--mut);font-size:12px;margin-top:4px}
+.st-h4{margin:14px 0 6px;font-size:14px}.st-h4 span{background:#1f7cff;color:#fff;border-radius:6px;padding:1px 7px;font-size:11.5px;margin-right:6px}
+.st-t{width:100%;border-collapse:collapse;font-size:13px}.st-t th{text-align:left;color:#b9d0e6;font-weight:600;padding:6px;border-bottom:1px solid var(--line2);white-space:nowrap}.st-t td{padding:7px 6px;border-bottom:1px solid #12253c;font-variant-numeric:tabular-nums;white-space:nowrap;vertical-align:top}
+.st-t tr.pick td{background:#15241a}.st-t td.hs{white-space:normal;min-width:180px}.st-t td.hs span{display:inline-block;margin:0 3px 3px 0;padding:0 5px;border-radius:5px;background:#12253c;font-size:12px}
+@media(max-width:700px){.st-t thead{display:none}.st-t,.st-t tbody,.st-t tr,.st-t td{display:block;width:100%}.st-t tr{border:1px solid #1d3553;border-radius:10px;margin:0 0 8px;padding:6px 10px;background:#0b1a2e}.st-t tr.pick{border-color:#1f8a4a}.st-t tr.pick td{background:none}
+  .st-t td{border:0;padding:3px 0;white-space:normal;display:flex;justify-content:space-between;gap:10px}.st-t td.sc{font-size:14px;padding-bottom:5px}.st-t td[data-l]::before{content:attr(data-l);color:var(--mut);flex:0 0 auto}.st-t td.hs{display:block;min-width:0}.st-t td.hs::before{display:block;margin-bottom:3px}
+  .st-t .tw,.tw:has(>.st-t){overflow:visible}}
+.st-ass{margin:4px 0 0;padding-left:18px;display:grid;gap:5px;font-size:13px;color:#dbe8f7}
+@media(max-width:1180px){.hx-top{grid-template-columns:minmax(0,1fr)!important}.st-its{grid-template-columns:repeat(3,minmax(0,1fr))}.st-it:nth-child(4){border-left:0;padding-left:2px}.st-hero,.st-why2{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:700px){.st-panel,.story .st-sec{padding:10px 11px}.st-hd{margin:-10px -11px 10px;padding:9px 11px}.st-hd b{font-size:15.5px}.nb{width:30px;height:30px;font-size:15px}.st-pill{display:none}
+  .st-its{grid-template-columns:repeat(3,minmax(0,1fr))}.st-it{padding:4px 6px}.st-it:nth-child(-n+2){display:none}.st-it:nth-child(3){border-left:0;padding-left:0}.st-it .ic{display:none}.st-it b{font-size:15px}
+  .st-opts{gap:6px}.st-oh{padding:7px 8px}.st-oh small,.st-oh .ic,.st-rtag{display:none}.st-oh b{font-size:13px}.st-o dl{grid-template-columns:1fr}.st-o dt{border:0;padding:6px 8px 0;font-size:11px}.st-o dd{text-align:left;padding:0 8px 6px;border:0}.st-o .m-hide{display:none}
+  .st-title b{font-size:19px}.st-star{font-size:28px}.st-call b{font-size:19px}.st-kpis{grid-template-columns:1fr 1fr}.st-k:nth-child(3){border-left:0}.st-k:nth-child(n+3){border-top:1px solid #1d4a33}
+  .st-b{width:30px}.st-b small{font-size:9px}.st-seg em{font-size:10.5px}}
 /* ===== V13.9 Balance Trips + EWT decision ===== */
 .hobal{background:#0c2440;border:1px solid #2f7bd0;border-radius:12px;padding:9px 10px;margin:8px 0 10px}
 .hobal label{color:#cfe0f3;font-weight:700;font-size:13px}.hobalrow{display:flex;gap:10px;align-items:center}.hobalrow input{width:92px;font-weight:800;font-size:17px;text-align:center}
@@ -302,14 +367,15 @@ details.hall{margin-top:10px}details.hall summary{cursor:pointer;color:#9cc4ff;f
     <nav class="nav" aria-label="Pages"><a href="/">Route Traffic</a><a href="/control">Headway Control</a><a href="/bunching">Bunching &amp; Gap</a><a class="on" href="/halfway" aria-current="page">Halfway Optimiser</a><a href="/traffic">Traffic-Aware</a><a href="/planner">Halfway Planner</a></nav>
     <div class="hdr-right"><div id="clock">&nbsp;</div><div class="live" id="live"><span class="dot"></span><span id="liveText">Connecting&hellip;</span></div></div>
   </header>
-  <section class="module-intro"><h2>Halfway Optimiser</h2><p>Compare full-trip regulation with halfway deployment and recovery trade-offs.</p></section>
-  <section class="ai-shell-card" aria-label="AI Operational Assistant"><div class="ai-shell-icon">✦</div><div><b>AI Operational Assistant</b><span>Context-aware operational interpretation for halfway optimiser; existing calculations remain authoritative.</span></div><div class="ai-shell-badge">AI READY</div></section>
+  <section class="module-intro"><h2>Halfway Optimiser</h2><p>Disruption &rarr; recovery options &rarr; recommended action &rarr; how to deploy.</p></section>
+  <section class="ai-shell-card" aria-label="AI Operational Assistant" hidden><div class="ai-shell-icon">✦</div><div><b>AI Operational Assistant</b><span>Context-aware operational interpretation for halfway optimiser; existing calculations remain authoritative.</span></div><div class="ai-shell-badge">AI READY</div></section>
   <div class="tabs" role="tablist"><button role="tab" id="tabOpt" aria-selected="true">Optimiser</button><button role="tab" id="tabSet" aria-selected="false">Settings</button></div>
 
   <main id="opt">
+    <div class="st-panel st-in" id="stIn"><div class="st-hd"><i class="nb">1</i><div><b>Select scenario (inputs)</b><small>Service, direction, lateness and recovery settings</small></div><button class="btn sm st-tog" id="stInTog" type="button" aria-expanded="true">Hide inputs</button></div>
     <div class="hx-top">
       <section class="card hx-sc">
-        <h2>1. Scenario</h2>
+        <h2>Scenario</h2>
         <div class="fld hobal"><label for="hoBal">Balance Trips <span class="tip" tabindex="0" role="note" title="Number of subsequent trips included in the EWT and recovery assessment." aria-label="Number of subsequent trips included in the EWT and recovery assessment.">i</span></label>
           <div class="hobalrow"><input id="hoBal" class="sel" type="number" min="1" max="16" step="1" value="6" inputmode="numeric" title="Number of subsequent trips included in the EWT and recovery assessment." aria-describedby="hoBalTxt"><span id="hoBalTxt">UP 1 &rarr; DOWN 3</span></div>
           <small class="hobalhint">Number of subsequent trips included in the EWT and recovery assessment. Changing it re-runs every calculation.</small></div>
@@ -328,22 +394,48 @@ details.hall{margin-top:10px}details.hall summary{cursor:pointer;color:#9cc4ff;f
           <div class="fld"><label for="hoDelay">Replacement delay, min</label><input id="hoDelay" class="sel" type="number" min="-30" max="60" step="1" inputmode="decimal"></div></div>
         <div class="fld"><label for="hoExtra">Also test another stop <small>(what-if, code)</small></label><input id="hoExtra" class="sel" list="hoStopsList" maxlength="5" inputmode="numeric" placeholder="optional 5-digit stop code"><datalist id="hoStopsList"></datalist></div>
         <div class="hx-info" id="hoInfo">Enter a service to load its route.</div>
-        <h2>2. Optimisation Preference</h2>
+        <details class="hset" id="hoSetBox"><summary><b>Recovery settings</b><small id="hsetSum">Balanced &middot; terminals regulated &middot; own bus</small></summary>
+        <h3>Recovery priority</h3>
         <div class="hopref" id="hoPref"><label><input type="radio" name="hopref" value="balanced" checked> Balanced</label><label><input type="radio" name="hopref" value="recovery"> Headway focus — Halfway &gt; Adjustment</label><label><input type="radio" name="hopref" value="mileage"> Mileage focus — Adjustment &gt; Halfway</label></div>
         <label class="hx-chk"><input type="checkbox" id="hoTreg" checked> AI also regulates the later trips at the terminals <small>(even spacing, hold &le; 8 &middot; early &le; 3 min, same rule for both scenarios)</small></label>
         <label class="hx-chk"><input type="checkbox" id="hoAdj2"> Allow two back-to-back halfway trips <small>(e.g. T3 + T4 both disrupted; off = never two consecutive trips)</small></label>
         <label class="hx-chk"><input type="checkbox" id="hoReg" checked> AI regulates headway <small>(hold / release trips, re-time the replacement)</small></label>
-        <h2>3. Halfway deployment</h2>
+        <h3>Halfway deployment</h3>
         <div class="hopref" id="hoScope"><label><input type="radio" name="hoscope" value="all" checked> AI tests every stop (timing &amp; headway)</label><label><input type="radio" name="hoscope" value="approved"> Approved stops list only</label></div>
         <div class="hopref" id="hoVeh"><label><input type="radio" name="hoveh" value="own" checked> Bus runs off-service to the stop (timing decides)</label><label><input type="radio" name="hoveh" value="standby"> Spare bus already at the stop (starts on the slot)</label></div>
         <div class="fld"><label>Bus type <small>(route suitability check)</small></label><div class="hopref" id="hoBus"><label><input type="radio" name="hobus" value="sd"> Single deck</label><label><input type="radio" name="hobus" value="dd" checked> Double deck</label><label><input type="radio" name="hobus" value="art"> Articulated</label></div></div>
         <details class="hall" id="hoDims"><summary>Vehicle dimensions (optional &ndash; from your fleet data)</summary><div class="hx-f2" style="margin-top:6px"><div class="fld"><label for="hoVh">Height, m</label><input id="hoVh" class="sel" type="number" step="0.01" min="2" max="5.5" inputmode="decimal" placeholder="not set"></div><div class="fld"><label for="hoVw">Width, m</label><input id="hoVw" class="sel" type="number" step="0.01" min="2" max="3" inputmode="decimal" placeholder="not set"></div></div><div class="fld"><label for="hoVt">Gross weight, t</label><input id="hoVt" class="sel" type="number" step="0.5" min="5" max="40" inputmode="decimal" placeholder="not set"></div><div class="hx-note">Used only to compare against limits recorded in map data. The app never assumes a vehicle size or a bridge height.</div></details>
         <div class="fld"><label for="hoReady">Halfway bus ready at the first stop <small>(HH:MM, optional)</small></label><input id="hoReady" class="sel" type="text" maxlength="5" inputmode="numeric" placeholder="auto: the delayed bus itself"></div>
         <div class="hx-note" style="margin:0 0 6px">The halfway bus runs off-service from the first stop along real roads (road routing for every candidate stop; an estimate only if routing is unavailable). The AI tests the eligible halfway starts and regulates surrounding full trips to minimise the largest headway and overall headway spread. Full trips must receive at least the 7-min minimum layover before departure. A halfway-start trip omits interchange layover because it starts downstream. Halfway vs continuing the full trip is decided on <b>EWT</b> (AWT &minus; SWT) at every evaluation point of the selected <b>Balance Trips</b>, averaged across the points &ndash; the delay is only an input to the simulation. Departure adjustments are capped at &plusmn;8 min to limit the BC welfare impact.</div>
-        <div class="btns"><button class="btn go" id="hoRun" type="button">Run AI Optimisation</button><button class="btn" id="hoEx" type="button">Load example</button></div>
+        </details>
+        <div class="btns"><button class="btn go" id="hoRun" type="button">Compare Recovery Options</button><button class="btn" id="hoEx" type="button">Load example</button></div>
         <div class="hx-note" id="hoMsg"></div>
       </section>
-      <section class="card" id="hoMapCard"><header style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap"><div><h2>How the Halfway Deployment Evens the Headway</h2><div class="sub" id="hoMapSub"></div></div>
+      <section class="card hx-trips">
+        <header><div><h2>Trip sequence at the first stop</h2><div class="sub" id="hoTripSub">Type each trip's arrival lateness, then press <b>Compare Recovery Options</b>: the AI decides whether to tick a trip as Disrupted (halfway) and adjust the others, or to adjust and continue service. Nothing changes until you press Run.</div></div></header>
+        <div class="hodisbar"><label class="hx-chk"><input type="checkbox" id="hoAuto" checked> Whole-trip AI decides which trips to disrupt</label><button class="btn sm" id="hoClearDis" type="button">Clear ticks</button><span id="hoDisMsg"></span></div>
+        <div class="tw"><table id="hoTrips"><thead><tr><th>Trip</th><th>Sch Arr</th><th>Act Arr</th><th>Lateness (min)</th><th>Next trip Sch Dep</th><th>Next trip Act Dep</th><th>Dep HW</th><th class="ai">AI plan: Dep</th><th class="ai">AI plan: HW</th><th>Disrupted</th></tr></thead><tbody></tbody></table></div>
+        <details class="hall"><summary>Departure rules</summary>      <div class="hx-note">Actual departure = the later of the scheduled departure and the actual arrival + the minimum layover. AI must consider BC welfare: an on-time BC should not be made substantially late merely to improve one headway, and artificial adjustment is capped at +8 min. A Disrupted trip does not depart (the trip is lost). <b>AI plan</b> = the departures the selected option would use after holding / releasing trips (green), and where the replacement starts.</div></details>
+      </section>
+    </div>
+    </div>
+    <div class="story" id="story">
+      <section class="st-sec st-sum" id="stSum"><div class="st-empty">Enter the service and the late trips, then press <b>Compare Recovery Options</b>.</div></section>
+      <section class="st-sec st-opt" id="stOpt"></section>
+      <section class="st-sec st-rec" id="stRec"></section>
+      <section class="st-sec st-why" id="stWhy"></section>
+      <section class="st-sec st-dep" id="stDepSec"><div id="stDep"></div>
+    <section class="card hx-row os" id="osCard"><header><div><h2>Deployment route</h2><div class="sub">Where the bus starts service, which roads it takes to get there, whether this bus type can use them, and how much headway it earns.</div></div></header>
+      <div id="osBody"><div class="ho-msg">Press <b>Compare Recovery Options</b>. If a halfway deployment is possible, its off-service route appears here.</div></div></section>
+      </section>
+      <section class="st-sec st-tech" id="stTech"><div class="st-hd"><i class="nb">7</i><div><b>Additional details</b><small>Expand for the calculation and detailed results</small></div></div>
+        <details class="tech" id="techEwt" open><summary><b>EWT calculation</b><small>how the EWT figures above were worked out</small></summary><div id="stEwtCalc"></div></details>
+        <details class="tech" id="techCalc"><summary><b>How was this recommendation calculated?</b><small>every plan &middot; EWT at each point &middot; stress test</small></summary>
+    <section class="card hx-row rv" id="rvCard"><header><div><h2>Full comparison &ndash; every plan, EWT and stress test</h2><div class="sub">Every feasible plan is simulated over the selected <b>Balance Trips</b> and 1,000 possible futures. <b>Continue full trip</b> and <b>Halfway + adjustment</b> are compared on Excess Waiting Time (EWT) at every evaluation point, then averaged.</div></div><a class="btn sm" href="/recovery-guide" target="_blank" rel="noopener">How the AI decides</a></header>
+      <div id="rvBody"><div class="ho-msg">Type the lateness of the late trips, then press <b>Compare Recovery Options</b>.</div></div></section>
+        </details>
+        <details class="tech" id="techSim"><summary><b>Detailed trip sequence</b><small>simulation map &middot; timeline &middot; all options &middot; heatmap &middot; traffic</small></summary>
+      <section class="card" id="hoMapCard"><header style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap"><div><h2>Simulation map &ndash; trips along the route</h2><div class="sub" id="hoMapSub"></div></div>
           <div class="seg" id="hoView" style="width:auto"><button type="button" data-v="simple" aria-pressed="true">Simple view</button><button type="button" data-v="street" aria-pressed="false">Street map</button></div></header>
         <div id="hoSimple"><div class="ho-msg">Enter a service to load its route.</div></div>
         <div id="hoStreet" hidden><div class="hodep" id="hoDep">Enter a service to load its route.</div>
@@ -353,17 +445,6 @@ details.hall{margin-top:10px}details.hall summary{cursor:pointer;color:#9cc4ff;f
         <div class="hopb"><button class="btn sm" id="hoPlay" type="button" aria-label="Play the simulation">&#9654;</button><input id="hoClock" type="range" min="0" max="100" step="1" value="0" aria-label="Simulation clock"><b id="hoClockT">--:--</b></div>
         <div class="hopb2"><label class="hx-chk"><input type="checkbox" id="hoGhost"> Show no-action trips (grey)</label><span id="hoBusCount"></span></div></div></section>
       <section class="card horec" id="hoRec"><div class="ho-msg">Enter a service to load its route.</div></section>
-    </div>
-    <section class="card hx-row">
-      <header><div><h2>Trip sequence at the first stop</h2><div class="sub" id="hoTripSub">Type each trip's arrival lateness, then press <b>Run AI Optimisation</b>: the AI decides whether to tick a trip as Disrupted (halfway) and adjust the others, or to adjust and continue service. Nothing changes until you press Run.</div></div></header>
-      <div class="hodisbar"><label class="hx-chk"><input type="checkbox" id="hoAuto" checked> Whole-trip AI decides which trips to disrupt</label><button class="btn sm" id="hoClearDis" type="button">Clear ticks</button><span id="hoDisMsg"></span></div>
-      <div class="tw"><table id="hoTrips"><thead><tr><th>Trip</th><th>Sch Arr</th><th>Act Arr</th><th>Lateness (min)</th><th>Next trip Sch Dep</th><th>Next trip Act Dep</th><th>Dep HW</th><th class="ai">AI plan: Dep</th><th class="ai">AI plan: HW</th><th>Disrupted</th></tr></thead><tbody></tbody></table></div>
-      <div class="hx-note">Actual departure = the later of the scheduled departure and the actual arrival + the minimum layover. AI must consider BC welfare: an on-time BC should not be made substantially late merely to improve one headway, and artificial adjustment is capped at +8 min. A Disrupted trip does not depart (the trip is lost). <b>AI plan</b> = the departures the selected option would use after holding / releasing trips (green), and where the replacement starts.</div>
-    </section>
-    <section class="card hx-row os" id="osCard"><header><div><h2>Halfway Deployment &amp; Off-Service Route Planner</h2><div class="sub">Where the bus starts service, which roads it takes to get there, whether this bus type can use them, and how much headway it earns.</div></div></header>
-      <div id="osBody"><div class="ho-msg">Press <b>Run AI Optimisation</b>. If a halfway deployment is possible, its off-service route appears here.</div></div></section>
-    <section class="card hx-row rv" id="rvCard"><header><div><h2>AI Recovery Scenario Optimiser &ndash; Full Trip vs Halfway</h2><div class="sub">Every feasible plan is simulated over the selected <b>Balance Trips</b> and 1,000 possible futures. <b>Continue full trip</b> and <b>Halfway + adjustment</b> are compared on Excess Waiting Time (EWT) at every evaluation point, then averaged.</div></div><a class="btn sm" href="/recovery-guide" target="_blank" rel="noopener">How the AI decides</a></header>
-      <div id="rvBody"><div class="ho-msg">Type the lateness of the late trips, then press <b>Run AI Optimisation</b>.</div></div></section>
     <section class="card hx-row" id="hoTsdCard" hidden><header><div><h2>Deployment Timeline &ndash; Trips Running Down the Route</h2><div class="sub">Each line is one trip (top = first stop, bottom = terminal). The horizontal distance between two lines is the headway. The white marker follows the map clock.</div></div></header>
       <div class="hotsdgrid"><div><div class="tw"><svg id="hoTsd" role="img" aria-label="Time versus route position of every trip"></svg></div><div class="hokey2" id="hoTsdKey"></div></div>
         <div id="hoBarsWrap"><div class="seg" id="hoBarsAt"><button type="button" data-at="first" aria-pressed="false">Headway at first stop</button><button type="button" data-at="end" aria-pressed="true">at terminal</button></div><div id="hoBars"></div></div></div></section>
@@ -378,6 +459,10 @@ details.hall{margin-top:10px}details.hall summary{cursor:pointer;color:#9cc4ff;f
       <section class="card"><header><div><h2>Key Takeaways</h2></div></header><ul class="hotake" id="hoTake"></ul></section>
       <section class="card"><header><div><h2>Traffic Condition Along the Route</h2></div></header><div id="hoTraf"></div></section>
     </div>
+        </details>
+        <details class="tech" id="techAss"><summary><b>Optimisation assumptions</b><small>limits and rules used for every plan</small></summary><ul class="st-ass" id="stAss"></ul></details>
+      </section>
+    </div>
   </main>
 
   <main id="settings" hidden>
@@ -387,7 +472,7 @@ details.hall{margin-top:10px}details.hall summary{cursor:pointer;color:#9cc4ff;f
       <div class="tw" id="hoPts"></div>
       <div class="set" style="margin-top:12px;align-items:end"><div><label for="hoAS">Service</label><input id="hoAS" maxlength="6" placeholder="32"></div><div><label for="hoAD">Direction</label><select id="hoAD" style="width:100%"><option>1</option><option>2</option></select></div><div><label for="hoAC">Stop code (5 digits)</label><input id="hoAC" maxlength="5" placeholder="18011"></div><div><label for="hoAQ">or stop sequence</label><input id="hoAQ" maxlength="3" placeholder="18"></div><div><label><input type="checkbox" id="hoAE" checked style="width:auto;height:auto"> Enabled</label><button class="btn sm go" id="hoPAdd" type="button" style="margin-top:6px">Add stop</button></div></div>
       <div class="sub" style="margin-top:8px">CSV columns: service, direction, stop_code, sequence, enabled (a header row is optional; stop_code or sequence is required).</div></section>
-    <section class="card" style="margin-top:12px"><header><div><h2>Simulation audit log</h2><div class="sub">Each time you press <b>Run AI Optimisation</b> the scenario, every option's result, the recommendation, the weights and the model version are stored (live re-simulation while you edit is not).</div></div></header><div class="tw" id="hoRuns"></div></section>
+    <section class="card" style="margin-top:12px"><header><div><h2>Simulation audit log</h2><div class="sub">Each time you press <b>Compare Recovery Options</b> the scenario, every option's result, the recommendation, the weights and the model version are stored (live re-simulation while you edit is not).</div></div></header><div class="tw" id="hoRuns"></div></section>
   </main>
 
   <footer class="foot"><span>Sources: LTA DataMall (Bus Routes/Stops/Services, Traffic Speed Bands, Traffic Incidents) &nbsp;|&nbsp; A scenario simulation from the schedule at the first stop, not live bus data. Decision support only, not for operational use</span><span>SG Transport Pulse V13.6</span></footer>
@@ -503,7 +588,7 @@ function hoRenderTrips(){
 const HO_TEST_LIVE = !!window.__hoTestLive;         // test scaffolding only (set by the browser tests to re-simulate on every edit); the product never runs the AI on an edit
 function hoDirty(){                                 // an edit never runs the AI: it only marks the plan as out of date (the trip table's own columns refresh)
   if(HO_TEST_LIVE){ clearTimeout(HO.timer); HO.timer = setTimeout(() => hoSim(false, false), 350); return; }
-  HO.dirty = true; HO.force = null; if(HO.rec) HO.recStale = true; hoRenderRecovery(); hoMsg("Inputs changed \u2013 press Run AI Optimisation to update the plan."); $("hoRun").classList.add("needrun");
+  HO.dirty = true; HO.force = null; if(HO.rec) HO.recStale = true; hoRenderRecovery(); hoMsg("Inputs changed \u2013 press Compare Recovery Options to update the plan."); $("hoRun").classList.add("needrun");
   clearTimeout(HO.timer); HO.timer = setTimeout(hoPreview, 300); hoRenderTrips();
 }
 function hoTouch(){ HO.selKey = null; HO.pick = ""; hoDirty(); }
@@ -566,7 +651,7 @@ async function hoRun(){
   if(HO.loadingP){ hoMsg("Loading the route\u2026"); await HO.loadingP; }       // the service box was just changed: wait for its route before running
   if(!HO.svc || !HO.setup || HO.setup.error){ hoMsg("Enter a service first.", true); return; }
   if(!hoBal()){ hoMsg("Balance Trips must be a whole number from 1 to 16.", true); $("hoBal").focus(); return; }
-  $("hoRun").disabled = true; hoMsg(`AI Recovery Scenario Optimiser: generating plans, simulating ${hoBal()} balance trips (${balSpan(hoBal())}) and 1,000 futures per plan, then EWT at every evaluation point\u2026`);
+  $("hoRun").disabled = true; hoMsg(`Comparing recovery options over ${hoBal()} balance trips (${balSpan(hoBal())})\u2026`);
   $("rvBody").innerHTML = `<div class="sk"></div><div class="sk" style="width:70%"></div><div class="sk" style="width:85%"></div>`;
   const rj = await getJSON(rvUrl(), 120000);
   HO.rec = rj; HO.recStale = false; HO.force = null; HO.osSel = null; HO.ewtSel = null;
@@ -583,7 +668,7 @@ async function hoRun(){
   $("hoRun").disabled = false;
   await hoSim(true, HO.auto && !HO.force);
   hoRenderRecovery();
-  if(rj.ok) $("rvCard").scrollIntoView({behavior:"smooth", block:"start"}); else hoMsg(rj.error || "Recovery Optimiser failed", true);
+  if(rj.ok) $("story").scrollIntoView({behavior:"smooth", block:"start"}); else hoMsg(rj.error || "Recovery comparison failed", true);
 }
 const RV_LBL = {none:"No action", adjust:"Full trip + adjustment", halfway:"Halfway + regulation", local:"Next-departure-only fix"};
 const RV_SHORT = {none:"No action", adjust:"Full trip", halfway:"Halfway", local:"Next-dep fix"};
@@ -643,9 +728,9 @@ function rvChain(r){
 function hoRenderRecovery(){
   osRender();
   const el = $("rvBody"); if(!el) return; const r = HO.rec;
-  if(!r){ el.innerHTML = `<div class="ho-msg">Type the lateness of the late trips, then press <b>Run AI Optimisation</b>. The AI simulates <b>Continue full trip</b> (no action / + adjustment) and <b>Halfway + adjustment</b> over the selected <b>${hoBal() || "?"} Balance Trips</b> and compares them on <b>EWT</b> at every evaluation point.</div>`; return; }
+  if(!r){ el.innerHTML = `<div class="ho-msg">Type the lateness of the late trips, then press <b>Compare Recovery Options</b>. The AI simulates <b>Continue full trip</b> (no action / + adjustment) and <b>Halfway + adjustment</b> over the selected <b>${hoBal() || "?"} Balance Trips</b> and compares them on <b>EWT</b> at every evaluation point.</div>`; return; }
   if(!r.ok){ el.innerHTML = `<div class="ho-msg hx-err">${esc(r.error || "Recovery Optimiser failed")}</div>`; return; }
-  const stale = HO.recStale ? `<div class="rvstale">Inputs changed since this result \u2013 press <b>Run AI Optimisation</b> to update it.</div>` : "";
+  const stale = HO.recStale ? `<div class="rvstale">Inputs changed since this result \u2013 press <b>Compare Recovery Options</b> to update it.</div>` : "";
   if(!r.plans || !r.plans.none){ el.innerHTML = stale + `<div class="rvdec none"><div class="ic">\u2713</div><b>No intervention needed</b><small>${esc((r.why || [])[0] || r.message || "")}</small></div>`; return; }
   const P = r.plans, ch = P[r.decision], N = P.none, A = P.adjust, Hw = P.halfway, g = r.generated || {};
   const title = r.decision === "halfway" ? `Halfway + regulation${r.needs_standby ? " (standby bus)" : ""}` : r.decision === "adjust" ? "Keep every trip in full \u2013 adjust departures" : "No intervention \u2013 keep the natural departures";
@@ -803,6 +888,149 @@ function hoBalSync(){ const v = hoBal(); $("hoBalTxt").textContent = v ? balSpan
 $("hoBal").value = LS.get("ho.bal", 6); hoBalSync();
 $("hoBal").oninput = () => { hoBalSync(); clearTimeout(HO.balT); const v = hoBal(); if(!v) return; HO.balT = setTimeout(() => { LS.set("ho.bal", v); HO.ewtSel = null;
   if(HO.rec && HO.rec.ok && HO.svc && HO.setup && !HO.setup.error){ hoMsg(`Balance Trips = ${v}: recalculating every scenario, headway and EWT\u2026`); hoRun(); } else hoRenderRecovery(); }, 650); };
+/* ===================== V13.9 OCC story (numbered 1-7): disruption -> options -> recommended action -> why -> deploy -> details ===================== */
+const ST_IC = {
+  bus:'<rect x="4" y="3" width="16" height="15" rx="3"/><path d="M4 11h16M8 21v-3M16 21v-3"/><circle cx="8" cy="14.5" r=".8"/><circle cx="16" cy="14.5" r=".8"/>',
+  dir:'<path d="M7 20V4M3 8l4-4 4 4M17 4v16M13 16l4 4 4-4"/>', warn:'<path d="M12 3l10 18H2z"/><path d="M12 10v5M12 18v.4"/>',
+  pulse:'<path d="M2 12h5l3-7 4 14 3-7h5"/>', bars:'<path d="M5 20v-7M12 20V5M19 20v-10"/>', clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+  pin:'<path d="M12 22s7-6.5 7-12a7 7 0 10-14 0c0 5.5 7 12 7 12z"/><circle cx="12" cy="10" r="2.5"/>', doc:'<rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 8h6M9 12h6M9 16h4"/>',
+  road:'<path d="M8 3L4 21M16 3l4 18M12 5v3M12 11v3M12 17v3"/>', nav:'<path d="M3 11l18-8-8 18-2-8z"/>', off:'<path d="M4 20c4-2 4-8 8-8s4-6 8-8"/><circle cx="4" cy="20" r="1.5"/><circle cx="20" cy="4" r="1.5"/>',
+  down:'<path d="M12 4v16M5 13l7 7 7-7"/>', half:'<circle cx="12" cy="12" r="9"/><path d="M12 3v18"/><path d="M12 3a9 9 0 010 18z" fill="currentColor"/>'};
+const stI = (k, c) => `<svg class="ic ${c || ""}" viewBox="0 0 24 24" aria-hidden="true">${ST_IC[k]}</svg>`;
+const ST_LBL = {none:"No action", adjust:"Full trip adjustment", halfway:"Halfway deployment"};
+const ST_SUB = {none:"Continue as planned", adjust:"Adjust upcoming departures", halfway:"Deploy bus to halfway point"};
+function stTripsToRecover(p, H){ const c = p.chain || []; let k = c.length; for(let L = c.length - 1; L >= 0; L--){ if((c[L].max || 0) > 1.25 * H) break; k = L; } return k; }
+function stRecTxt(k, n){ return k >= n ? `> ${n}` : k === 0 ? "\u2013" : String(k); }
+function stGapCls(g, H, bm){ const d = Math.abs(g - H) / H; return g < bm ? "b" : d > 0.5 ? "r" : d > 0.2 ? "a" : "g"; }
+function stHd(n, title, sub, cls, right){ return `<div class="st-hd ${cls || ""}"><i class="nb">${n}</i><div><b>${title}</b>${sub ? `<small>${sub}</small>` : ""}</div>${right || ""}</div>`; }
+const sgn = x => x == null ? "\u2013" : (x >= 0 ? "+" : "\u2212") + Math.abs(+x).toFixed(2);
+function stLine(list, H, bm, lo, hi, hwT, lateT, mark){
+  const L = (list || []).filter(([b]) => b >= lo && b <= hi); if(!L.length) return `<div class="st-empty">No headway data.</div>`;
+  const bus = b => { const c = hwT.includes(b) ? "hw" : (mark && lateT.includes(b) ? "late" : ""); return `<span class="st-b ${c}">${stI("bus")}<small>${hwT.includes(b) ? "Halfway T" + b : "T" + b}${mark && lateT.includes(b) && !hwT.includes(b) ? " (late)" : ""}</small></span>`; };
+  let h = `<div class="st-line2">`;
+  L.forEach(([b, g], i) => { h += `<span class="st-seg ${stGapCls(g, H, bm)}" style="flex-grow:${Math.max(g, 2).toFixed(1)}"><em>${Math.round(g)} min</em></span>${bus(b)}`; });
+  return h + `</div>`;
+}
+function stPickPoint(r){                        // the stop used for the worked EWT example: the displayed / halfway stop on UP 1, else the worst no-action point
+  const pts = (r.plans.none.ewt || {}).points || []; if(!pts.length) return null;
+  const nm = r.disp_name || ""; const q = pts.find(q => q.L === 0 && nm && q.label.replace(/ \((dep|arr)\.\)$/, "") === nm && q.ewt != null);
+  return q || pts.filter(q => q.ewt != null).sort((a, b) => b.ewt - a.ewt)[0] || null;
+}
+function stEwtCalc(r){
+  const P = r.plans, keys = ["none", "adjust", "halfway"].filter(k => P[k] && P[k].ewt), E = r.ewt || {}, H = r.H;
+  const q0 = stPickPoint(r); if(!q0) return `<div class="st-empty">No EWT points.</div>`;
+  const at = k => P[k].ewt.points.find(q => q.L === q0.L && q.p === q0.p);
+  const basis = E.swt_basis === "individual" ? "individual scheduled headways from the timetable" : `constant scheduled headway H = ${f1(H)} min, so SWT = H \u00f7 2 = ${f2(H / 2)} min`;
+  let h = `<div class="st-f"><div><b>EWT</b> = AWT \u2212 SWT</div><div><b>AWT</b> (actual) = \u03a3h\u00b2 \u00f7 (2 \u00d7 \u03a3h)</div><div><b>SWT</b> (scheduled) = \u03a3h<sub>s</sub>\u00b2 \u00f7 (2 \u00d7 \u03a3h<sub>s</sub>)</div><small>h = headway between consecutive buses passing one stop. Scheduled basis: ${basis}.</small></div>`;
+  h += `<h4 class="st-h4"><span>Step 1</span> EWT at one stop \u2013 ${esc(q0.leg)} \u00b7 ${esc(q0.label)}</h4><div class="tw"><table class="st-t"><thead><tr><th>Scenario</th><th>Headways h (min)</th><th>\u03a3h</th><th>\u03a3h\u00b2</th><th>AWT</th><th>SWT</th><th>EWT</th></tr></thead><tbody>`;
+  keys.forEach(k => { const q = at(k); if(!q) return; const hs = q.h.map(x => x[1]);
+    h += `<tr class="${k === r.decision ? "pick" : ""}"><td class="sc"><b>${esc(ST_LBL[k])}</b></td><td class="hs" data-l="Headways h">${hs.map(v => `<span class="${stGapCls(v, H, 3)}">${f1(v)}</span>`).join("")}</td><td data-l="\u03a3h">${q.sum_h ?? "\u2013"}</td><td data-l="\u03a3h\u00b2">${q.sum_h2 ?? "\u2013"}</td>
+      <td data-l="AWT">${q.awt == null ? "\u2013" : `${q.sum_h2} \u00f7 (2\u00d7${q.sum_h}) = <b>${f2(q.awt)}</b>`}</td><td data-l="SWT">${f2(q.swt)}</td><td data-l="EWT = AWT \u2212 SWT"><b>${sgn(q.ewt)}</b></td></tr>`; });
+  h += `</tbody></table></div>`;
+  h += `<h4 class="st-h4"><span>Step 2</span> Average across every evaluation stop and balance trip</h4><div class="tw"><table class="st-t"><thead><tr><th>Scenario</th><th>Stops assessed</th><th>\u03a3 EWT<sub>stop</sub></th><th>Average EWT = \u03a3 \u00f7 stops</th></tr></thead><tbody>`;
+  keys.forEach(k => { const v = P[k].ewt.points.filter(q => q.ewt != null), sm = v.reduce((a, q) => a + q.ewt, 0);
+    h += `<tr class="${k === r.decision ? "pick" : ""}"><td class="sc"><b>${esc(ST_LBL[k])}</b></td><td data-l="Stops assessed">${v.length}</td><td data-l="\u03a3 EWT per stop">${sm.toFixed(2)}</td><td data-l="Average EWT">${sm.toFixed(2)} \u00f7 ${v.length} = <b>${sgn(P[k].ewt.avg)}</b></td></tr>`; });
+  h += `</tbody></table></div><div class="st-note">Stops assessed: ${E.aitp && E.aitp.on ? `your AITP stops only (${E.aitp.up} UP, ${E.aitp.dn} DOWN)` : "every evaluation stop"} on each of the ${E.balance_trips} balance trips (${esc(balSpan(E.balance_trips))}). Headways of different stops are never mixed. The point-by-point table is under \u201cHow was this recommendation calculated?\u201d.</div>`;
+  return h;
+}
+function stAssumptions(r){
+  const p = r.params || {}, E = r.ewt || {};
+  return [`Horizon: ${E.balance_trips} balance trips (${esc(balSpan(E.balance_trips))}); ${Number(r.sims || 1000).toLocaleString()} stress-test futures per plan.`,
+    `Departures at the first stop: hold or release up to \u00b1${f1(p.adj_max)} min, never below ${f1(p.min_layover_min)} min layover; trips ${p.horizon_side} before / after the late trips may be adjusted.`,
+    p.term_reg ? `Later trips: terminal even-spacing d = (d before + d after) \u00f7 2, hold \u2264 ${f1(p.term_hold_max)}, early \u2264 ${f1(p.term_early_max)} min, \u2264 ${f1(p.term_total_max)} min total hold per BC.` : "Later trips: not regulated (leave at max(schedule, arrival + layover)).",
+    `Halfway only if Average EWT is lower by \u2265 ${p.ewt_gain_min} min and \u2265 ${p.ewt_gain_pct}%${r.mode === "headway" ? " (halved: headway priority)" : ""} and the stress test agrees${r.mode === "mileage" ? `; \u2265 ${p.ewt_gain_per_km} min per km lost` : ""}.`,
+    `Two back-to-back halfway trips: ${p.allow_adjacent_halfway ? "allowed" : "not allowed"}.`,
+    `SWT basis: ${E.swt_basis === "individual" ? "individual timetable headways" : "constant headway H"}. Delay is an input, never a decision threshold.`].map(x => `<li>${x}</li>`).join("");
+}
+function storyRender(){
+  const S = $("story"); if(!S) return; const r = HO.rec;
+  const put = (id, html) => { const e = $(id); if(e){ e.innerHTML = html; e.hidden = !html; } };
+  const clear = () => ["stOpt", "stRec", "stWhy", "stDep"].forEach(x => put(x, ""));
+  const tech = on => { $("stTech").hidden = !on; };
+  if(!r){ put("stSum", stHd(2, "Disruption summary", "What is happening to the service?", "red") + `<div class="st-empty">Enter the service and the late trips, then press <b>Compare Recovery Options</b>.</div>`); clear(); tech(false); $("stDepSec").hidden = true; return; }
+  if(!r.ok){ put("stSum", stHd(2, "Disruption summary", "", "red") + `<div class="st-empty hx-err">${esc(r.error || "The comparison failed.")}</div>`); clear(); tech(false); $("stDepSec").hidden = true; return; }
+  if(HO._recRef !== r){ HO._recRef = r; HO.recAt = new Date(); }
+  S.classList.toggle("stale", !!HO.recStale); tech(true); $("stDepSec").hidden = false;
+  const H = r.H, bm = (r.params && r.params.bunch_min) || 3, P = r.plans || {}, N = P.none, dec = r.decision, ch = P[dec], nb = r.balance_trips || (r.legs || []).length;
+  const late = (HO.late || []).map(Number), lmax = Math.max(0, ...late), lTrip = late.indexOf(lmax) + 1, lateT = late.map((v, i) => v > 0 ? i + 1 : 0).filter(Boolean);
+  const asAt = HO.recAt ? `<span class="st-at">As at ${String(HO.recAt.getHours()).padStart(2, "0")}:${String(HO.recAt.getMinutes()).padStart(2, "0")}</span>` : "";
+  const stale = HO.recStale ? `<div class="rvstale">Inputs changed \u2013 press <b>Compare Recovery Options</b> to update.</div>` : "";
+  const dirTxt = HO.setup && HO.setup.last ? `to ${esc(HO.setup.last)}` : "";
+  if(!N){ put("stSum", stHd(2, "Disruption summary", "What is happening to the service?", "red", asAt) + stale + `<div class="st-empty">${esc((r.why || [])[0] || r.message || "Every trip is on time \u2013 no recovery required.")}</div>`); clear(); $("stDepSec").hidden = true; $("stEwtCalc").innerHTML = ""; $("stAss").innerHTML = ""; return; }
+  // 2 DISRUPTION SUMMARY
+  const nMax = N.det.max, reg = nMax >= 1.5 * H || (N.det.bunch_pct || 0) > 0 ? ["Deteriorating", "r"] : nMax >= 1.2 * H ? ["Disturbed", "a"] : ["Stable", "g"];
+  const it = (ic, k, v, sub, c) => `<div class="st-it">${stI(ic, c)}<div><span>${k}</span><b class="${c || ""}">${v}</b>${sub ? `<small class="${c || ""}">${sub}</small>` : ""}</div></div>`;
+  put("stSum", stHd(2, "Disruption summary", "What is happening to the service?", "red", asAt) + stale + `<div class="st-mline">${esc(HO.svc)} \u00b7 Dir ${HO.dir} <small>every ${f1(H)} min</small></div><div class="st-its">
+    ${it("bus", "Service", esc(HO.svc), `every ${f1(H)} min`)}${it("dir", "Direction", "Dir " + HO.dir, dirTxt)}
+    ${it("warn", "Disrupted bus", lmax > 0 ? "Trip " + lTrip : "\u2013", lmax > 0 ? `+${Math.round(lmax)} min late` : "", "r")}
+    ${it("pulse", "Projected maximum gap", Math.round(nMax) + " min", nMax >= 2 * H ? "> 2\u00d7 headway" : nMax >= 1.5 * H ? "> 1.5\u00d7 headway" : "", nMax > 1.5 * H ? "r" : nMax > 1.2 * H ? "a" : "g")}
+    ${it("bars", "Service regularity", reg[0], dec === "none" ? "No recovery required" : "Recovery required", reg[1])}</div>`);
+  // 3 COMPARE RECOVERY OPTIONS
+  const keys = ["none", "adjust", "halfway"].filter(k => P[k]);
+  const ec = k => k === "none" ? "r" : k === "adjust" ? "bl" : "g";
+  put("stOpt", stHd(3, "Compare recovery options", `Expected outcome of each strategy over ${nb} balance trip${nb > 1 ? "s" : ""}`) + `<div class="st-opts">${keys.map(k => { const p = P[k], kk = stTripsToRecover(p, H);
+      return `<div class="st-o o-${k} ${k === dec ? "pick" : ""}"><div class="st-oh">${k === "halfway" ? stI("down") : ""}<div><b>${ST_LBL[k]}</b><small>${ST_SUB[k]}</small></div>${k === dec ? `<span class="st-rtag">Recommended</span>` : ""}</div>
+        <dl><dt>EWT</dt><dd class="${ec(k)}">${p.ewt ? sgn(p.ewt.avg) : "\u2013"}</dd><dt>Maximum gap</dt><dd class="${ec(k)}">${Math.round(p.det.max)} min</dd>
+        <dt class="m-hide">Recovery trips</dt><dd class="m-hide">${stRecTxt(kk, nb)}</dd><dt class="m-hide">Mileage loss</dt><dd class="m-hide">${f1(p.det.km || 0)} km</dd></dl></div>`; }).join("")}</div>`);
+  // 4 RECOMMENDED ACTION
+  const hwRow = dec === "halfway" ? ch.rows.find(x => x.type === "halfway") : null;
+  const hwT = P.halfway ? P.halfway.rows.filter(x => x.type === "halfway").map(x => x.n) : [];
+  const nAdj = (ch.rows || []).filter(x => x.type === "full" && Math.abs(x.shift || 0) >= 0.5).length;
+  const eN = N.ewt ? N.ewt.avg : null, eC = ch.ewt ? ch.ewt.avg : null, kC = stTripsToRecover(ch, H);
+  const pE = eN > 0 ? Math.round(100 * (eN - eC) / eN) : null, pG = nMax > 0 ? Math.round(100 * (nMax - ch.det.max) / nMax) : null;
+  const title = dec === "halfway" ? "HALFWAY DEPLOYMENT" : dec === "adjust" ? "FULL TRIP ADJUSTMENT" : "NO INTERVENTION";
+  const line = hwRow ? `Deploy Trip ${hwRow.n}${r.needs_standby ? " (standby bus)" : ""} to halfway point <b>${esc(hwRow.code || "")} ${esc(hwRow.stop || "")}</b>, start ${esc(hwRow.start_clock || "")}`
+    : dec === "adjust" ? `Every trip runs in full; ${nAdj} departure${nAdj !== 1 ? "s" : ""} held or released` : "Keep the natural departures";
+  const kpi = (ic, k, v, sub, good) => `<div class="st-k">${stI(ic)}<div><span>${k}</span><b>${v}</b>${sub ? `<small class="${good ? "g" : ""}">${good ? stI("down", "sm") : ""}${sub}</small>` : ""}</div></div>`;
+  put("stRec", stHd(4, "Recommended action", "Best option to restore headway and minimise EWT", "green", `<span class="st-pill">Based on EWT &amp; headway</span>`) + `<div class="st-hero ${dec}">
+    <div class="st-hl"><div class="st-title"><span class="st-star">${dec === "none" ? "\u2713" : "\u2605"}</span><div><b>${title}</b><small>${line}</small></div></div>
+      ${dec !== "none" ? `<div class="st-call"><small>Reduces maximum gap</small><b>${Math.round(nMax)} min \u2192 ${Math.round(ch.det.max)} min</b><small>and lowers EWT ${dec === "halfway" ? "faster than continuing the full trip" : "without losing mileage"}</small></div>` : `<div class="st-call"><small>${esc((r.why || [])[0] || "The service recovers on its own.")}</small></div>`}</div>
+    <div class="st-kpis">${kpi("clock", "EWT", `${sgn(eN)} \u2192 <em>${sgn(eC)}</em>`, pE != null && pE > 0 ? `${pE}% improvement` : "", pE > 0)}${kpi("bars", "Max gap", `${Math.round(nMax)} \u2192 <em>${Math.round(ch.det.max)} min</em>`, pG > 0 ? `${pG}% improvement` : "", pG > 0)}
+      ${kpi("doc", "Recovery", kC >= nb ? `> ${nb} trips` : kC === 0 ? "immediate" : `${kC} trip${kC > 1 ? "s" : ""}`, "")}${kpi("road", "Mileage loss", `${f1(ch.det.km || 0)} km`, dec === "halfway" ? "not operated" : "full mileage kept")}</div></div>`);
+  // 5 WHY THIS ACTION?
+  if(dec === "none") put("stWhy", "");
+  else {
+    const lo = Math.max(1, Math.min(...(lateT.length ? lateT : [1])) - 2), hi = Math.max(...(lateT.length ? lateT : [1])) + 2;
+    const eMax = Math.max(0.01, ...keys.map(k => Math.abs(P[k].ewt ? P[k].ewt.avg : 0)));
+    put("stWhy", stHd(5, "Why this action?", `Headway sequence at ${esc(r.disp_name || "the key stop")}, before vs after intervention`) + `<div class="st-why2"><div>
+      <div class="st-tag r">Without intervention (no action)</div>${stLine(N.down_hw, H, bm, lo, hi, [], lateT, true)}
+      <div class="st-tag g">With ${dec === "halfway" ? "halfway deployment" : "full trip adjustment"}</div>${stLine(ch.down_hw, H, bm, lo, hi, dec === "halfway" ? hwT : [], lateT, false)}
+      <div class="st-ref">Scheduled ${f1(H)} min \u00b7 <i class="g"></i>\u00b120% <i class="a"></i>20\u201350% <i class="r"></i>&gt;50% off <i class="b"></i>bunched</div></div>
+      <div class="st-ec"><b>EWT comparison</b>${keys.map(k => { const v = P[k].ewt ? P[k].ewt.avg : 0; return `<div class="st-er"><span>${k === "none" ? "No action" : k === "adjust" ? "Full trip" : "Halfway"}</span><i class="o-${k}" style="width:${Math.max(4, 100 * Math.abs(v) / eMax).toFixed(0)}%"></i><b>${sgn(v)}</b></div>`; }).join("")}
+        ${pE != null && pE > 0 ? `<div class="st-ebig">${stI("down")}<div><b>${pE}% lower EWT</b><small>compared to no action</small></div></div>` : ""}</div></div>`);
+  }
+  // 6 DEPLOYMENT ROUTE / INSTRUCTIONS
+  const p = osPlanner(), o = osOpt(), showOs = dec === "halfway" && p && p.ok && o;
+  const ins = (r.instructions || []), act_ = i => ["halfway", "hold", "release", "standby"].includes(i.kind), now_ = ins.filter(i => !i.later && act_(i)), same_ = ins.filter(i => !i.later && !act_(i)), later = ins.filter(i => i.later);
+  const li = i => `<li><time>${esc(i.time || "")}</time><span>${esc(i.text || "")}</span></li>`;
+  put("stDep", stHd(6, showOs ? "Halfway deployment route" : "Departure instructions", showOs ? "Off-service route to the halfway point" : "What to tell the bus captains", "blue")
+    + `<details class="st-ins" ${showOs ? "" : "open"}><summary>Departure instructions (${now_.length} change${now_.length !== 1 ? "s" : ""}${later.length ? ` + ${later.length} later` : ""})</summary>${now_.length ? `<ul>${now_.map(li).join("")}</ul>` : `<div class="st-note">No departure changes at ${esc(r.first_stop || "the first stop")}.</div>`}${same_.length ? `<details class="hall"><summary>Unchanged departures (${same_.length})</summary><ul>${same_.map(li).join("")}</ul></details>` : ""}${later.length ? `<div class="st-note">Later trips at the terminals</div><ul>${later.map(li).join("")}</ul>` : ""}</details>`);
+  $("stDepSec").classList.toggle("nohw", !showOs);
+  stInjectDeploy();
+  // 7 DETAILS
+  $("stEwtCalc").innerHTML = stEwtCalc(r); $("stAss").innerHTML = stAssumptions(r);
+}
+function stInjectDeploy(){                      // the compact deployment instruction sits beside the route map
+  const r = HO.rec, p = osPlanner(), o = osOpt(), box = document.querySelector("#osCard .osrec"); if(!box || !r || r.decision !== "halfway" || !p || !p.ok || !o) return;
+  const B = (o.benefit || {}).B || {}, A = (o.benefit || {}).A || {};
+  const row = (ic, k, v, sub) => `<div class="st-di">${stI(ic)}<div><span>${k}</span><b>${v}</b>${sub ? `<small>${sub}</small>` : ""}</div></div>`;
+  const html = `<div class="st-dinst"><h3>Deployment instruction</h3>${row("pin", "Deploy to", `${esc(p.stop.code)} ${esc(p.stop.name)}`, `Trip ${p.trip} \u00b7 leave ${esc(p.origin.name)} ${esc(p.leave_clock)}`)}${row("off", "Off-service distance", `${f1(o.km)} km`)}
+    ${row("bus", "Est. travel time", `${Math.round(o.time_min)} min`, esc(o.time_src || ""))}${row("clock", "Expected re-entry", esc(o.insert_clock))}${row("pulse", "Expected headway after entry", `${f1(B.max)} min`, `was ${f1(A.max)} min`)}
+    <button class="btn go st-tbt" type="button" id="stTbt">${stI("nav")} View turn-by-turn route</button></div>`;
+  let d = box.querySelector(".st-dinst"); if(d) d.outerHTML = html; else box.insertAdjacentHTML("afterbegin", html);
+  const body = $("osBody"), grid = body && body.querySelector(".osgrid");            // everything after the map + instruction folds into one block
+  if(grid && !body.querySelector(".st-more")){ const det = document.createElement("details"); det.className = "st-more"; det.innerHTML = "<summary>Route options, turn-by-turn, suitability &amp; approval</summary>";
+    let n = grid.nextElementSibling; while(n){ const nx = n.nextElementSibling; det.appendChild(n); n = nx; } body.appendChild(det); }
+  $("stTbt").onclick = () => { const m = body && body.querySelector(".st-more"); if(m) m.open = true; const t = $("osTl"); if(t){ t.scrollIntoView({behavior:"smooth", block:"center"}); t.classList.add("flash"); setTimeout(() => t.classList.remove("flash"), 1600); } };
+}
+(function(){ const f = hoRenderRecovery; hoRenderRecovery = function(){ f.apply(this, arguments); try{ storyRender(); }catch(e){ console.error(e); } }; })();
+(function(){ const f = osRender; osRender = function(){ f.apply(this, arguments); try{ stInjectDeploy(); }catch(e){ console.error(e); } }; })();
+$("techSim").addEventListener("toggle", () => { if($("techSim").open && HO.view === "street") setTimeout(() => { hoInitMap(); if(HO.map){ HO.map.invalidateSize(); hoRenderMap(); } }, 80); });
+$("techCalc").addEventListener("toggle", () => { if($("techCalc").open) window.dispatchEvent(new Event("resize")); });
+$("stInTog").onclick = () => { const hid = !$("stIn").classList.contains("shut"); $("stIn").classList.toggle("shut", hid); $("stInTog").textContent = hid ? "Show inputs" : "Hide inputs"; $("stInTog").setAttribute("aria-expanded", String(!hid)); };
+function hsetSync(){ const pr = (document.querySelector("input[name=hopref]:checked") || {}).value, vh = (document.querySelector("input[name=hoveh]:checked") || {}).value;
+  $("hsetSum").textContent = [{balanced:"Balanced", recovery:"Headway focus", mileage:"Mileage focus"}[pr] || "Balanced", $("hoTreg").checked ? "terminals regulated" : "terminals not regulated", vh === "standby" ? "standby bus" : "own bus", $("hoAdj2").checked ? "back-to-back halfway allowed" : ""].filter(Boolean).join(" \u00b7 "); }
+$("hoSetBox").addEventListener("change", hsetSync); hsetSync();
 /* ===================== V12.9 Halfway Deployment & Off-Service Route Planner ===================== */
 const OS_TAG = {A:"Fastest", B:"Shortest", C:"Preferred"};
 const OS_BAND = b => b == null ? "#6f8bb0" : b >= 5 ? "#22c55e" : b >= 3 ? "#f5b82e" : "#e0474f";
@@ -865,8 +1093,8 @@ function osAxis(title, sub, pts, hwBus, keys){          // passengers' view at t
 }
 function osRender(){
   const el = $("osBody"); if(!el) return; const r = HO.rec, p = osPlanner();
-  if(!r){ el.innerHTML = `<div class="ho-msg">Press <b>Run AI Optimisation</b>. If a halfway deployment is possible, its off-service route appears here.</div>`; return; }
-  if(HO.recStale){ el.innerHTML = `<div class="rvstale">Inputs changed \u2013 press <b>Run AI Optimisation</b> to update the route plan.</div>`; return; }
+  if(!r){ el.innerHTML = `<div class="ho-msg">Press <b>Compare Recovery Options</b>. If a halfway deployment is possible, its off-service route appears here.</div>`; return; }
+  if(HO.recStale){ el.innerHTML = `<div class="rvstale">Inputs changed \u2013 press <b>Compare Recovery Options</b> to update the route plan.</div>`; return; }
   if(!r.ok || !p){ el.innerHTML = `<div class="ho-msg">${esc((r && r.error) || "No route plan.")}</div>`; return; }
   if(!p.ok){ el.innerHTML = `<div class="osban no"><b>No off-service route to plan</b><small>${esc(p.reason || "")}</small></div>`; return; }
   const o = osOpt(), rec = p.options[p.recommended], b = o.benefit, A = b.A, B = b.B, pick = p.recommended_by_ai;
@@ -1010,7 +1238,7 @@ function hoRenderRec(){
   const legacy = el.innerHTML;
   const title = r.decision === "halfway" ? "Halfway + regulation" : r.decision === "adjust" ? "Full trip + adjustment" : "No action";
   const top = (r.instructions || []).filter(i => i.kind === "halfway" || i.kind === "hold" || i.kind === "release").slice(0, 6);
-  el.innerHTML = `<header style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:0"><h2>AI Recommendation</h2><span class="pill g">AI Recovery Optimiser</span></header>
+  el.innerHTML = `<header style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:0"><h2>Trip-level check</h2><span class="pill g">AI Recovery Optimiser</span></header>
     <div class="ttl"><span class="star" style="color:#ff9f1c">\u2605</span><div><h3>${title}</h3><div class="sub2">P85 max headway ${Math.round(r.plans.none.mc.max_p85)} \u2192 ${Math.round(ch.mc.max_p85)} min \u00b7 ${f1(ch.det.km)} km lost \u00b7 BC finish +${Math.round(ch.mc.bc_p85)} min (P85)</div></div></div>
     ${top.length ? `<div class="hoplan"><b>Key actions</b><ol class="hosteps">${top.map(i => `<li><time>${esc(i.time)}</time><span>${esc(i.text.replace(/^Trip \d+ \u2014 /, "Trip " + i.n + ": "))}</span></li>`).join("")}</ol></div>` : ""}
     <div class="btns"><button class="btn sm go" type="button" id="rvGo">Full comparison: full trip vs halfway</button></div>
@@ -1021,15 +1249,15 @@ function hoRenderRec(){
 }
 function hoRenderRec0(){
   const r = HO.res, el = $("hoRec"), o = hoSelC();
-  if(!r){ el.innerHTML = `<header><h2>AI Recommendation</h2></header><div class="ho-msg">${HO.setup && !HO.setup.error ? "Type the lateness of the late trips, then press <b>Run AI Optimisation</b>. The AI decides whether to tick a trip as Disrupted (halfway) and adjust the others, or to adjust and continue service." : "Enter a service to load its route."}</div>`; return; }
+  if(!r){ el.innerHTML = `<header><h2>Trip-level check</h2></header><div class="ho-msg">${HO.setup && !HO.setup.error ? "Type the lateness of the late trips, then press <b>Compare Recovery Options</b>. The AI decides whether to tick a trip as Disrupted (halfway) and adjust the others, or to adjust and continue service." : "Enter a service to load its route."}</div>`; return; }
   if(!r.ok){ el.innerHTML = `<div class="ho-msg hx-err">${esc(r.error)}</div>`; return; }
-  if(!hasPlan(r)){ el.innerHTML = `<header><h2>AI Recommendation</h2></header>${hoAiBlock(r, null)}<div class="ho-msg">${esc(r.message)}</div>`; return; }
-  if(!o){ el.innerHTML = `<header><h2>AI Recommendation</h2></header>${hoAiBlock(r, null)}<div class="ho-msg">${esc(r.message)} Try a bus-ready time under <b>3. Halfway deployment</b>, switch to <b>Spare bus already at the stop</b>, or turn on <b>AI regulates headway</b>.</div>`; return; }
+  if(!hasPlan(r)){ el.innerHTML = `<header><h2>Trip-level check</h2></header>${hoAiBlock(r, null)}<div class="ho-msg">${esc(r.message)}</div>`; return; }
+  if(!o){ el.innerHTML = `<header><h2>Trip-level check</h2></header>${hoAiBlock(r, null)}<div class="ho-msg">${esc(r.message)} Try a bus-ready time under <b>3. Halfway deployment</b>, switch to <b>Spare bus already at the stop</b>, or turn on <b>AI regulates headway</b>.</div>`; return; }
   const best = r.recommended === HO.sel, ma = o.metrics_a, mb = o.metrics, imp = o.improvement, ew = x => (x >= 0 ? "+" : "") + f1(Math.round(x * 100) / 100);
   const pill = best ? `<span class="pill g">Recommended \u2013 ${r.ai ? "AI Decision" : "Highest Simulation Score"}</span>` : o.ref_only ? `<span class="pill a">Reference \u2013 leaves the interchange gap</span>` : r.recommended == null ? `<span class="pill a">No option recommended</span>` : `<span class="pill n">Selected option (not the top score)</span>`;
   const title = o.kind === "regulate" ? (r.mode === "continue" ? "Adjust the trips and continue service" : "Regulate the headway (no halfway)") : `${best ? "Start Halfway at " : "Halfway at "}${esc(o.name)}${o.regulated ? " + regulation" : ""}`;
   const steps = hoSteps(r, o);
-  el.innerHTML = `<header style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:0"><h2>AI Recommendation</h2>${pill}</header>
+  el.innerHTML = `<header style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:0"><h2>Trip-level check</h2>${pill}</header>
     ${hoAiBlock(r, o)}${r.recommended == null && !r.ai ? `<div class="hoverdict w">${esc(r.message)}</div>` : ""}
     <div class="ttl"><span class="star">${best ? "\u2605" : "\u25C6"}</span><div><h3>${title}</h3><div class="sub2">${o.j != null ? `Stop ${esc(o.code)} \u00b7 replacement starts at ${hm(o.start_time)}` : `Trips ${(r.window || []).join(", ")} may be held / released`} \u00b7 score ${hoF(o.score)}</div></div></div>
     ${steps.length ? `<div class="hoplan"><b>${o.j != null ? "AI Halfway Deployment Plan" : "AI Headway Regulation Plan"}</b><ol class="hosteps">${steps.map(x => `<li><time>${hm(x[0])}</time><span>${x[1]}</span></li>`).join("")}</ol>${o.start_window ? `<div class="hosw">Start window at this stop: <b>${hm(o.start_window.from)}\u2013${hm(o.start_window.to)}</b> (the lost trip's slot is ${hm(o.start_window.sched)}). Outside it the gap is not filled or a bunch is created.</div>` : ""}${r.ready_note && o.j != null ? `<div class="hosw">${esc(r.ready_note)}</div>` : ""}</div>` : ""}
@@ -1210,7 +1438,7 @@ function hoRenderDep(){
   const r = HO.res, el = $("hoDep"), o = hoSelC();
   if(!r) { el.textContent = "Enter a service to load its route."; return; }
   if(!r.ok){ el.textContent = r.error || ""; return; }
-  if(!hasPlan(r) || !o){ el.textContent = r.message || "Press Run AI Optimisation."; return; }
+  if(!hasPlan(r) || !o){ el.textContent = r.message || "Press Compare Recovery Options."; return; }
   if(r.disrupted == null){ el.innerHTML = `<b>Continue service:</b> nothing is disrupted and no halfway bus is deployed. The AI holds / releases <b>${o.reg_trips}</b> trip${o.reg_trips === 1 ? "" : "s"} at the first stop (${esc(r.route.first)}) so the late trips fit in. Press play to watch the trips.`; return; }
   const d = r.trips[r.disrupted - 1], rl = o.repl || [];
   if(o.j != null && rl.length > 1){
@@ -1298,7 +1526,7 @@ function hoRenderSimple(){
   if(!r){ el.innerHTML = `<div class="ho-msg">Enter a service to load its route.</div>`; return; }
   if(!r.ok){ el.innerHTML = `<div class="ho-msg hx-err">${esc(r.error)}</div>`; return; }
   const o = hoSelC();
-  if(!hasPlan(r) || !o || !o.tsd || !r.baseline || !r.baseline.tsd || !r.span){ el.innerHTML = `<div class="ho-msg">${esc(r.message || "Press Run AI Optimisation.")}</div>`; return; }
+  if(!hasPlan(r) || !o || !o.tsd || !r.baseline || !r.baseline.tsd || !r.span){ el.innerHTML = `<div class="ho-msg">${esc(r.message || "Press Compare Recovery Options.")}</div>`; return; }
   const D = dis_(r), Bk = D.length ? D : (r.block || []), d = Bk[0], dl = Bk[Bk.length - 1], H = r.sched_hw, bm = r.bunch_min, j = o.j != null ? o.j : 0, sp = r.span, refName = j === 0 ? r.route.first : r.map.stops[j][3];
   const ids = []; for(let i = d - sp.show_up; i <= dl + sp.show_dn; i++) if(i >= 1 && i <= r.n_trips && !D.includes(i)) ids.push(String(i));
   const shift = {}; (o.deps || []).forEach(x => shift[x.n] = x.shift);
@@ -1421,7 +1649,7 @@ document.querySelectorAll("input[name=hopref]").forEach(x => x.onchange = () => 
 $("hoRun").onclick = () => hoRun();
 document.querySelectorAll("input[name=hobus]").forEach(x => { x.checked = x.value === HO.bus; x.onchange = () => { HO.bus = x.value; LS.set("ho.bus", HO.bus); rvRefresh(); }; });
 ["hoVh", "hoVw", "hoVt"].forEach(id => { $(id).value = LS.get("os." + id, ""); $(id).onchange = () => { LS.set("os." + id, $(id).value.trim()); rvRefresh(); }; });          // the AI (decide: which trips to disrupt, halfway, adjust - or just adjust and continue) runs only here
-$("hoEx").onclick = () => { $("hoRef").value = "08:10"; $("hoLay").value = 10; HO.late = [2, 3, 22, 5, 4, 3, 2, 4, 3, 2]; HO.dis = []; HO.auto = true; LS.set("ho.auto", true); $("hoAuto").checked = true; hoBuildTrips(); hoDirty(); toast("Example loaded: trip 3 arrives +22 min. Press Run AI Optimisation"); };
+$("hoEx").onclick = () => { $("hoRef").value = "08:10"; $("hoLay").value = 10; HO.late = [2, 3, 22, 5, 4, 3, 2, 4, 3, 2]; HO.dis = []; HO.auto = true; LS.set("ho.auto", true); $("hoAuto").checked = true; hoBuildTrips(); hoDirty(); toast("Example loaded: trip 3 arrives +22 min. Press Compare Recovery Options"); };
 /* ---- Settings */
 const HLAB = {n_trips:["Trips simulated", "trips at the first stop"], layover_min:["Scheduled layover at the first stop", "min (default; editable per run)"], min_layover_min:["Minimum layover", "min: a trip leaves no earlier than its arrival + this"],
   start_delay_min:["Replacement start delay", "min after the disrupted trip's scheduled time at the halfway stop (plain halfway option)"], reg_hold_max:["Regulation: max hold", "min a trip may be held beyond its scheduled departure"],
@@ -1434,7 +1662,7 @@ const HLAB = {n_trips:["Trips simulated", "trips at the first stop"], layover_mi
   reg_even_share:["Share the lost slot evenly at the interchange", "1 = the regulated trips get equal headways (7 slots x headway / 6 trips) and the halfway bus is placed on top; 0 = the older joint calculation"],
   reg_min_side:["Regulate at least this many trips each side", "trips before AND after the gap regulated at the interchange (3 + 3 = 6). With fewer trips above the gap, more future trips are used (0 = off)"], reg_early_future:["Future trips may leave early by up to", "min, when the trips above the gap are too few (never before arrival + minimum layover)"],
   max_disrupted:["Trips AI may compare", "AI will compare selected delayed trips, but normally deploy only one halfway trip while the others continue full route"],
-  auto_late_min:["AI looks at trips leaving at least this late", "min late when it would leave on its own (Run AI Optimisation decides which of them, if any, to disrupt + halfway, and adjusts the rest)"],
+  auto_late_min:["AI looks at trips leaving at least this late", "min late when it would leave on its own (Compare Recovery Options decides which of them, if any, to disrupt + halfway, and adjusts the rest)"],
   balance_trips:["Balance Trips (default)", "subsequent trips of every bus in the EWT and recovery assessment (UP 1, DOWN 1, UP 2 \u2026); 6 = the former 3 UP + 3 DOWN. The field at the top of the Optimiser overrides it per run"],
   term_reg:["AI regulates later trips at the terminals (default)", "1 = every terminal departure after UP 1 is regulated towards even spacing, d = (d before + d after) / 2, in both scenarios; 0 = off. The tick box on the Optimiser overrides it per run"],
   term_hold_max:["Terminal: max hold per departure", "min beyond the natural departure"], term_early_max:["Terminal: max early release", "min before the natural departure (never before arrival + minimum layover)"],
@@ -1452,7 +1680,7 @@ async function loadHoSettings(){
   const p = j.points; $("hoPts").innerHTML = p.length ? `<table><thead><tr><th>Service</th><th>Dir</th><th>Stop code</th><th>Stop name</th><th>Seq</th><th>Enabled</th><th></th></tr></thead><tbody>${p.map(x => `<tr><td class="svc">${esc(x.service)}</td><td>${x.direction}</td><td>${esc(x.stop_code || "\u2013")}</td><td>${esc(x.name || "\u2013")}</td><td>${x.seq == null ? "\u2013" : x.seq}</td><td>${x.enabled ? "Yes" : "No"}</td><td><button class="btn sm" data-del="${x.id}" type="button">Remove</button></td></tr>`).join("")}</tbody></table>` : `<div class="empty">No approved halfway stops yet. Upload a CSV or add one below.</div>`;
   $("hoPts").querySelectorAll("[data-del]").forEach(b => b.onclick = async () => { const r = await post("/api/halfway/points/delete", JSON.stringify({id:+b.dataset.del})); if(r.error){ toast(r.error); return; } loadHoSettings(); });
   const rn = await getJSON("/api/halfway/runs?limit=20", 20000), full = ts => ts ? sgt({day:"2-digit", month:"short", hour:"2-digit", minute:"2-digit", second:"2-digit"}).format(new Date(ts * 1000)) : "\u2013", runs = rn.runs || [];
-  $("hoRuns").innerHTML = runs.length ? `<table><thead><tr><th>Run</th><th>Time</th><th>Service</th><th>Dir</th><th>First dep.</th><th>Headway</th><th>Disrupted trip</th><th>Preference</th><th>Recommended option</th><th>Score</th><th>Holding</th><th>Model</th></tr></thead><tbody>${runs.map(r => `<tr><td>#${r.id}</td><td>${full(r.ts)}</td><td class="svc">${esc(r.service)}</td><td>${r.direction}</td><td>${esc(r.ref_time)}</td><td>${f1(r.sched_hw)} min</td><td>${r.disrupted}</td><td>${esc(r.pref || "")}</td><td>${esc(r.rec_label || "none")}</td><td>${r.score == null ? "\u2013" : f1(r.score)}</td><td>${r.hold_min == null ? "\u2013" : f1(r.hold_min) + " min"}</td><td>${esc(r.model_version)}</td></tr>`).join("")}</tbody></table>` : `<div class="empty">No optimisations stored yet. Press <b>Run AI Optimisation</b> on the Optimiser page.</div>`;
+  $("hoRuns").innerHTML = runs.length ? `<table><thead><tr><th>Run</th><th>Time</th><th>Service</th><th>Dir</th><th>First dep.</th><th>Headway</th><th>Disrupted trip</th><th>Preference</th><th>Recommended option</th><th>Score</th><th>Holding</th><th>Model</th></tr></thead><tbody>${runs.map(r => `<tr><td>#${r.id}</td><td>${full(r.ts)}</td><td class="svc">${esc(r.service)}</td><td>${r.direction}</td><td>${esc(r.ref_time)}</td><td>${f1(r.sched_hw)} min</td><td>${r.disrupted}</td><td>${esc(r.pref || "")}</td><td>${esc(r.rec_label || "none")}</td><td>${r.score == null ? "\u2013" : f1(r.score)}</td><td>${r.hold_min == null ? "\u2013" : f1(r.hold_min) + " min"}</td><td>${esc(r.model_version)}</td></tr>`).join("")}</tbody></table>` : `<div class="empty">No optimisations stored yet. Press <b>Compare Recovery Options</b> on the Optimiser page.</div>`;
 }
 $("hoParSave").onclick = async () => { const params = {}; document.querySelectorAll("#hoParams input").forEach(i => params[i.dataset.k] = i.value); const j = await post("/api/halfway/config", JSON.stringify({params})); if(j.error){ toast(j.error); return; } toast("Parameters saved"); loadHoSettings(); };
 $("hoParReset").onclick = async () => { const j = await post("/api/halfway/config", JSON.stringify({reset:true})); if(j.error){ toast(j.error); return; } toast("Parameters reset to defaults"); loadHoSettings(); };
