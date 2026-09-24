@@ -6,6 +6,21 @@ FastAPI backend + a single-page Leaflet frontend (OneMap basemap, OpenStreetMap 
 
 
 
+## V13.9 - Route Traffic page upgraded to OCC operational traffic intelligence
+
+Detect -> locate -> impact -> affected buses -> consider action -> acknowledge. Frontend only (index.html); every figure comes from existing endpoints - `/api/route`, `/api/buses`, `/api/traffic/overview`, `/api/traffic/detail`, `POST /api/traffic/ack` - so no values are invented and the Traffic-Aware engine stays the single source of events, priority, delay estimates, headway prediction, cameras and acknowledgements.
+
+* **Empty state:** one line until a service is chosen; the old empty cards are hidden. Picking a service from the list loads it automatically (Show still works; stop-only lookup unchanged).
+* **Status strip:** Route status (Smooth / Moderate / Congested / Severe from the LTA speed-band km on the route plus event priority), Affected buses (inside or within 5 km of an event / live buses), Worst traffic impact (largest estimated delay; "Not available" when no speed-based estimate exists), Key issues (congestion / incident / roadwork / heavy rain), Live buses (observed; "~N expected" only when a scheduled headway is known).
+* **Map:** 4-colour route traffic (Smooth >= 40, Moderate 30-39, Slow 20-29, Congested < 20 km/h); numbered event markers coloured by priority; the selected event's stretch is outlined on the route.
+* **Selected event panel** (beside the map on desktop, bottom sheet on phones): type, priority, NEW / ACKNOWLEDGED / CLEARED, location, direction, source, latest update, affected route segment (stop to stop, km), observed condition, affected buses, estimated impact, headway now -> after traffic effect, the nearest real LTA camera (image, ID, distance, Refresh, View) or "No relevant LTA traffic camera available", View on map, Acknowledge (optional name; acknowledged is not resolved).
+* **Operational impact:** one numbered card per event (same numbers as the map), priority LOW / MEDIUM / HIGH / CRITICAL from the engine's score (speed, length, buses, headway, duration), quiet when normal.
+* **Suggested operational consideration:** the engine's recommendations plus bus-based notes (several buses in one stretch, buses approaching); links to Headway Control and Halfway Optimiser; nothing is dispatched.
+* **Live bus impact table:** each live bus with its order, last update, location, IN AFFECTED STRETCH / APPROACHING / CLEAR / NOT PLACED and the estimated impact; tap to find it on the map; cards on phones.
+* **Route traffic timeline:** the route as one coloured bar with key stops, event annotations (+min / type) and live buses.
+* **Data labels:** LIVE, OBSERVED, CALCULATED, ESTIMATED / PREDICTED, SYSTEM INTERPRETATION on every figure.
+* Refresh: buses every 20 s and route traffic every 5 min (unchanged); events every 60 s; camera only on Refresh.
+
 ## V13.9 - Halfway Analyzer decides on EWT over a user-set Balance Trips horizon
 
 The fixed "3 UP + 3 DOWN" assessment is gone. Works for any service and direction; nothing is service-specific.

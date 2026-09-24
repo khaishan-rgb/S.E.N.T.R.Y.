@@ -178,6 +178,52 @@ table.tb{width:100%;border-collapse:collapse;font-size:14px}
 @media(max-width:999px){body{padding-bottom:78px}.desktop-shell{display:none}.top{position:sticky!important;top:0;z-index:9000;background:rgba(5,18,33,.96);backdrop-filter:blur(12px);padding:9px 4px!important;min-height:56px;flex-wrap:nowrap!important}.top .brand{min-width:0;flex:1}.top .brand h1{font-size:18px!important;white-space:nowrap}.top .brand p,.top .view{display:none!important}.top .logo{width:36px!important;height:36px!important;min-width:36px!important}.top nav.nav,.top nav.navl{display:none!important}.hdr-right{gap:6px!important}.clock{font-size:10px!important}.live{font-size:11px!important}.mobile-menu-btn{display:grid;width:38px;height:38px;place-items:center;border:1px solid #244766;border-radius:10px;background:#0a2036;color:#fff;font-size:20px;cursor:pointer;order:-1}.mobile-bottom-nav{display:grid;grid-template-columns:repeat(4,1fr);position:fixed;left:0;right:0;bottom:0;z-index:12000;background:rgba(5,18,33,.98);border-top:1px solid #21415e;padding:7px max(6px,env(safe-area-inset-right)) calc(7px + env(safe-area-inset-bottom)) max(6px,env(safe-area-inset-left));box-shadow:0 -8px 24px rgba(0,0,0,.22)}.mbn{color:#829db5;text-decoration:none;text-align:center;font-size:10px;font-weight:650;padding:3px 2px;border-radius:9px}.mbn .mi{display:block;font-size:19px;line-height:22px}.mbn.active{color:#4bc7ff;background:#0a2945}.mobile-more{display:none;position:fixed;left:10px;right:10px;bottom:74px;z-index:13000;background:#091c30;border:1px solid #275176;border-radius:16px;padding:8px;box-shadow:0 18px 50px rgba(0,0,0,.5)}.mobile-more.open{display:block}.mobile-more a{display:flex;align-items:center;gap:12px;color:#d7e7f5;text-decoration:none;padding:13px;border-radius:10px;font-weight:650}.mobile-more a.active{background:#0d3559;color:#55c7ff}.mobile-top-menu{display:none;position:fixed;top:calc(56px + env(safe-area-inset-top) + 8px);left:8px;z-index:13000;min-width:230px;max-width:82vw;background:#091c30;border:1px solid #275176;border-radius:16px;padding:8px;box-shadow:0 18px 50px rgba(0,0,0,.5)}.mobile-top-menu.open{display:block}.mobile-top-menu a{display:flex;align-items:center;gap:12px;color:#d7e7f5;text-decoration:none;padding:13px;border-radius:10px;font-weight:650;white-space:nowrap}.mobile-top-menu a.active{background:#0d3559;color:#55c7ff}.module-intro{display:block}.module-intro h2{font-size:20px}.ai-shell-card{margin:10px 0;padding:11px 12px}.ai-shell-badge{display:none}.search,.filters{scroll-margin-top:70px}#map,.mapcard{max-width:100%}table{max-width:100%}}
 @media(max-width:600px){.app{padding-left:10px!important;padding-right:10px!important}.module-intro{margin:11px 2px 8px}.module-intro p{line-height:1.4}.ai-shell-card span{line-height:1.35}.top .hdr-right>div:first-child .clock{display:none}.top .brand h1{font-size:17px!important}}
 
+/* ===================== V13.9 OCC operational traffic intelligence ===================== */
+:root{--orange:#ff8a1f;--crit:#ff2d55}
+.occ-empty{margin:12px 0;padding:14px 16px;border:1px dashed var(--line2);border-radius:14px;color:var(--mut);background:var(--panel)}
+.occ-strip{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;margin:12px 0}
+.oc{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 12px;min-width:0}.oc>span{display:flex;justify-content:space-between;gap:6px;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--mut)}
+.oc>b{display:block;font-size:21px;margin-top:3px;font-variant-numeric:tabular-nums}.oc>small{display:block;color:var(--mut);font-size:12px;margin-top:1px}
+.oc.warn{border-color:#6b5a1a}.oc.bad{border-color:#7a2a33;background:linear-gradient(180deg,#2a1219,var(--panel))}.oc.crit{border-color:var(--crit);background:linear-gradient(180deg,#3a0e1a,var(--panel));box-shadow:0 0 0 1px rgba(255,45,85,.3)}
+.oc b.g{color:var(--green)}.oc b.y{color:var(--amber)}.oc b.o{color:var(--orange)}.oc b.r{color:var(--red)}.oc b.na{color:var(--mut);font-size:15px;font-weight:600}
+.oc .iss{display:grid;grid-template-columns:auto auto;gap:0 10px;font-size:12.5px;margin-top:4px}.oc .iss i{font-style:normal;color:var(--mut)}.oc .iss em{font-style:normal;font-weight:800;text-align:right}.oc .iss em.on{color:#fff}
+.ev .eg .dtag{font-size:8.5px;padding:0 4px;margin-left:2px}.dtag{display:inline-block;font-size:9.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;border-radius:5px;padding:1px 5px;vertical-align:1px;white-space:nowrap;border:1px solid}
+.dtag.live{color:#7df0a8;border-color:#1f6b40}.dtag.obs{color:#8cc6ff;border-color:#24507c}.dtag.calc{color:#c9b8ff;border-color:#4a3c85}.dtag.est{color:#ffd27a;border-color:#7a5d1a}.dtag.ai{color:#ff9fd0;border-color:#7a2a58}
+.occ-mapgrid{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:12px}.occ-mapgrid.noside{grid-template-columns:minmax(0,1fr)}
+.occ-side{background:var(--panel);border:1px solid var(--line2);border-radius:14px;padding:12px 14px;overflow-y:auto;max-height:min(64vh,640px);min-height:420px}
+.occ-side .sh{display:flex;align-items:flex-start;gap:10px}.occ-side .sh>div{flex:1;min-width:0}.occ-side h3{margin:0;font-size:16px}.occ-side .x{background:none;border:0;color:var(--mut);font-size:22px;cursor:pointer;line-height:1}
+.kv{display:grid;grid-template-columns:auto minmax(0,1fr);gap:6px 12px;font-size:13px;margin:10px 0}.kv>span{color:var(--mut)}.kv>b{font-weight:600;text-align:right;overflow-wrap:anywhere}
+.occ-btns{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}.ob{border:1px solid var(--line2);background:#0f2744;color:var(--text);border-radius:9px;padding:8px 12px;font:inherit;font-size:13px;font-weight:700;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px}
+.ob.pri{background:var(--blue);border-color:var(--blue)}.ob:disabled{opacity:.55;cursor:default}
+.lvl{display:inline-block;font-size:11px;font-weight:900;letter-spacing:.06em;border-radius:6px;padding:2px 8px}.lvl.low{background:#1b3148;color:#9fb6cf}.lvl.medium{background:#4a3a0c;color:#ffd35a}.lvl.high{background:#5a1c22;color:#ff8a92}.lvl.critical{background:var(--crit);color:#fff}
+.st{display:inline-block;font-size:11px;font-weight:800;border-radius:6px;padding:2px 7px}.st.new{background:#ff4d55;color:#fff}.st.acknowledged{background:#17385c;color:#8cc6ff}.st.cleared{background:#123a24;color:#7df0a8}
+.ev-no{display:inline-grid;place-items:center;width:24px;height:24px;border-radius:50%;font-weight:900;font-size:13px;color:#fff;border:2px solid #fff;flex:0 0 auto}
+.ev-no.low{background:#4f6b88}.ev-no.medium{background:#c99400}.ev-no.high{background:#e0353f}.ev-no.critical{background:var(--crit)}
+.evm{background:none;border:0}.evm .ev-no{box-shadow:0 2px 8px rgba(0,0,0,.45);width:28px;height:28px;font-size:14px}
+.cam{margin-top:10px;border:1px solid var(--line2);border-radius:10px;padding:10px;background:#08172a}.cam img{width:100%;border-radius:8px;display:block;margin:6px 0;background:#000;min-height:60px}
+.occ-main{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:12px;margin-top:12px}.occ-main .card h2{margin:0 0 2px;font-size:17px}.occ-main .card>p.s{margin:0 0 10px;color:var(--mut);font-size:12.5px}
+#occTimeline{grid-column:1/-1}
+.ev{border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-top:8px;background:#0a1a2e;cursor:pointer}.ev:hover{border-color:var(--line2)}.ev.sel{border-color:var(--blue);box-shadow:0 0 0 1px var(--blue)}
+.ev.high{border-left:4px solid #e0353f}.ev.critical{border-left:4px solid var(--crit);background:linear-gradient(90deg,#2a0c16,#0a1a2e 40%)}.ev.medium{border-left:4px solid #c99400}.ev.low,.ev.cl{opacity:.75}
+.ev .eh{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.ev .eh b{font-size:14.5px}.ev .eg{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px 12px;margin-top:8px;font-size:12.5px}.ev .eg span{display:block;color:var(--mut);font-size:11px}.ev .eg b{font-variant-numeric:tabular-nums}
+.hwbox{display:flex;align-items:center;gap:10px;margin-top:8px;padding:8px 10px;border-radius:9px;background:#0d2039;font-size:13px}.hwbox b{font-size:17px}.hwbox .arr{color:var(--mut)}
+.sug li{margin:6px 0;line-height:1.4}.sug small{display:block;color:var(--mut)}
+.btab{width:100%;border-collapse:collapse;font-size:13px}.btab th{text-align:left;color:var(--mut);font-weight:600;padding:6px;border-bottom:1px solid var(--line2)}.btab td{padding:7px 6px;border-bottom:1px solid var(--line)}.btab tr{cursor:pointer}.btab tr:hover td{background:#0f2744}
+.bst{font-size:11px;font-weight:800;border-radius:6px;padding:2px 7px;white-space:nowrap}.bst.inside{background:#5a1c22;color:#ff8a92}.bst.approaching{background:#4a3a0c;color:#ffd35a}.bst.cleared,.bst.clear{background:#123a24;color:#7df0a8}.bst.unk{background:#1b3148;color:#9fb6cf}
+.tl{position:relative;padding:34px 8px 44px}.tl .bar2{display:flex;height:10px;border-radius:5px;overflow:hidden;background:#1b3148}.tl .bar2 i{display:block;height:100%}
+.tl .stp{position:absolute;top:47px;transform:translateX(-50%);font-size:11px;color:#cfe0f3;text-align:center;white-space:nowrap;max-width:110px;overflow:hidden;text-overflow:ellipsis}.tl .stp::before{content:"";display:block;width:9px;height:9px;border-radius:50%;background:#fff;border:2px solid #06111f;margin:-12px auto 3px}
+.tl .ann{position:absolute;top:4px;transform:translateX(-50%);display:flex;align-items:center;gap:3px;font-size:11px;font-weight:700;white-space:nowrap}.tl .ann .ev-no{width:18px;height:18px;font-size:10px;border-width:1px}
+.tl .bus{position:absolute;top:30px;transform:translateX(-50%);width:8px;height:8px;border-radius:2px;background:#fff;box-shadow:0 0 0 2px #1785ff}
+.tl-key{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:11.5px;color:var(--mut)}.tl-key i{display:inline-block;width:14px;height:6px;border-radius:3px;margin-right:4px;vertical-align:1px}
+.occ-note{font-size:11.5px;color:var(--mut);margin-top:8px}
+@media(max-width:1100px){.occ-strip{grid-template-columns:repeat(3,minmax(0,1fr))}.occ-main{grid-template-columns:minmax(0,1fr)}.occ-mapgrid{grid-template-columns:minmax(0,1fr)}
+  .occ-side{position:fixed;left:0;right:0;bottom:0;z-index:9500;max-height:72vh;min-height:0;border-radius:16px 16px 0 0;box-shadow:0 -10px 30px rgba(0,0,0,.55);padding-bottom:calc(14px + env(safe-area-inset-bottom,0px))}
+  .occ-side::before{content:"";display:block;width:44px;height:4px;border-radius:2px;background:#39536e;margin:0 auto 10px}}
+@media(max-width:999px){.occ-side{bottom:calc(72px + env(safe-area-inset-bottom,0px));max-height:calc(100vh - 150px);padding-bottom:14px}}
+@media(max-width:640px){.occ-strip{grid-template-columns:1fr 1fr;gap:8px}.occ-strip .oc:first-child{grid-column:1/-1}.oc>b{font-size:18px}
+  .ev .eg{grid-template-columns:1fr 1fr}.btab thead{display:none}.btab,.btab tbody,.btab tr,.btab td{display:block;width:100%}.btab tr{border:1px solid var(--line);border-radius:10px;margin-bottom:8px;padding:6px 10px}.btab td{border:0;padding:2px 0;display:flex;justify-content:space-between;gap:10px}.btab td::before{content:attr(data-l);color:var(--mut)}
+  .tl .stp{font-size:10px;max-width:70px}}
+.ai-shell-card[hidden]{display:none!important}.panels[hidden]{display:none!important}
 </style>
 </head>
 <body>
@@ -211,8 +257,8 @@ table.tb{width:100%;border-collapse:collapse;font-size:14px}
       <div class="view"><b>Singapore</b><span>OneMap View</span></div>
     </div>
   </header>
-  <section class="module-intro"><h2>Route Traffic</h2><p>Live route conditions, buses and operational risks.</p></section>
-  <section class="ai-shell-card" aria-label="AI Operational Assistant"><div class="ai-shell-icon">✦</div><div><b>AI Operational Assistant</b><span>Context-aware operational interpretation for route traffic; existing calculations remain authoritative.</span></div><div class="ai-shell-badge">AI READY</div></section>
+  <section class="module-intro"><h2>Route Traffic</h2><p>Detect &rarr; locate &rarr; impact on buses &amp; headway &rarr; consider action &rarr; acknowledge.</p></section>
+  <section class="ai-shell-card" aria-label="AI Operational Assistant" hidden><div class="ai-shell-icon">✦</div><div><b>AI Operational Assistant</b><span>Context-aware operational interpretation for route traffic; existing calculations remain authoritative.</span></div><div class="ai-shell-badge">AI READY</div></section>
 
   <form class="search" id="form" autocomplete="off">
     <div class="fld"><label for="opSel">Transport Operator</label>
@@ -227,7 +273,10 @@ table.tb{width:100%;border-collapse:collapse;font-size:14px}
     <button class="btn go" id="go" type="submit">Show</button>
     <button class="btn clr" id="clear" type="button">Clear</button>
   </form>
+  <section class="occ-empty" id="occEmpty">Select a service and direction to analyse live traffic conditions and potential operational impact.</section>
+  <section class="occ-strip" id="occStrip" hidden aria-label="Route status"></section>
 
+  <div class="occ-mapgrid noside">
   <section class="mapcard" aria-label="Map">
     <div id="map"></div>
     <div class="ov svc-card"><div class="bb"><svg class="i"><use href="#i-bus"/></svg></div>
@@ -243,16 +292,25 @@ table.tb{width:100%;border-collapse:collapse;font-size:14px}
       </div>
     </div>
     <div class="ov legend"><h3>Traffic on Route (LTA)</h3>
-      <div class="row"><span class="sw" style="background:var(--green)"></span><span>Smooth <small>(≥ 40 km/h)</small></span></div>
-      <div class="row"><span class="sw" style="background:var(--amber)"></span><span>Moderate <small>(20 – 39 km/h)</small></span></div>
-      <div class="row"><span class="sw" style="background:var(--red)"></span><span>Slow / Congested <small>(&lt; 20 km/h)</small></span></div>
+      <div class="row"><span class="sw" style="background:#22d36a"></span><span>Smooth <small>(≥ 40 km/h)</small></span></div>
+      <div class="row"><span class="sw" style="background:#ffc21a"></span><span>Moderate <small>(30 – 39 km/h)</small></span></div>
+      <div class="row"><span class="sw" style="background:#ff8a1f"></span><span>Slow <small>(20 – 29 km/h)</small></span></div>
+      <div class="row"><span class="sw" style="background:#ff4d55"></span><span>Congested <small>(&lt; 20 km/h)</small></span></div>
       <div class="row" title="Blue means the route has no LTA traffic reading on that stretch"><span class="sw rt"></span><span>Bus route &amp; stops</span></div>
     </div>
     <button class="ov compass" id="recenter" type="button" title="Fit map to route" aria-label="Fit map to route"><span><svg class="i"><use href="#i-north"/></svg>N</span></button>
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
   </section>
+  <aside class="occ-side" id="occSide" hidden aria-label="Selected event"></aside>
+  </div>
+  <section class="occ-main" id="occMain" hidden>
+    <article class="card" id="occImpact"></article>
+    <article class="card" id="occSuggest"></article>
+    <article class="card" id="occBuses" style="grid-column:1/-1"></article>
+    <article class="card" id="occTimeline"></article>
+  </section>
 
-  <section class="panels">
+  <section class="panels" hidden>
     <article class="card" id="pSummary">
       <header><div class="ic"><svg class="i"><use href="#i-bus"/></svg></div>
         <div><h2>Route Traffic Summary</h2><p id="sumSub">Traffic bands along the selected route</p></div></header>
@@ -372,7 +430,7 @@ function drawRoute(r){
   r.runs.forEach(run => {
     all.push(...run.pts);
     L.polyline(run.pts, {pane:"casing", color:"#04101f", weight:10, opacity:.5, lineCap:"round", lineJoin:"round", interactive:false}).addTo(gCasing);
-    L.polyline(run.pts, {pane:"route", color:COL[bandCls(run.b)], weight:6, opacity:.97, lineCap:"round", lineJoin:"round"}).bindPopup(`<h4>${esc(run.road || "Route")}</h4>${speedText(run)}`, POP).addTo(gRoute);
+    L.polyline(run.pts, {pane:"route", color:(typeof COL4 !== "undefined" ? COL4[band4(run.b)] : COL[bandCls(run.b)]), weight:7, opacity:.97, lineCap:"round", lineJoin:"round"}).bindPopup(`<h4>${esc(run.road || "Route")}</h4>${speedText(run)}`, POP).addTo(gRoute);
     L.polyline(run.pts, {pane:"route", color:COL.none, weight:5, opacity:.95, lineCap:"round", lineJoin:"round", interactive:false}).addTo(gBase);
   });
   r.stops.forEach((s, i) => {
@@ -612,6 +670,235 @@ setInterval(async () => {
   S.route = r; const keep = S.sel; drawRoute(r); syncLayers(); renderSummary(r); if(keep) markSelected(r.stops.find(s => s.code === keep));
   setLive(r.traffic.ok ? "ok" : "warn", r.traffic.ok ? "Live Data (LTA/NEA)" : "Traffic feed unavailable", r.traffic.error || "");
 }, 300000);
+
+/* ===================== V13.9 OCC operational traffic intelligence =====================
+   DETECT -> LOCATE -> IMPACT -> AFFECTED BUSES -> CONSIDER ACTION -> ACKNOWLEDGE.
+   Everything comes from the existing traffic-event engine (/api/traffic/overview, /detail, /ack) and the route / bus feeds; nothing is invented. */
+const OCC = {ov:null, rows:[], det:{}, sel:null, tok:0, timer:null, geo:null, g:L.layerGroup().addTo(map), gSeg:L.layerGroup().addTo(map), busUpd:null};
+const COL4 = {smooth:"#22d36a", moderate:"#ffc21a", slow:"#ff8a1f", congested:"#ff4d55", none:"#2f7dff"};
+const band4 = b => b == null ? "none" : b >= 5 ? "smooth" : b === 4 ? "moderate" : b === 3 ? "slow" : "congested";
+const LV = {normal:["low", "LOW"], monitor:["medium", "MEDIUM"], high:["high", "HIGH"], critical:["critical", "CRITICAL"]};
+const KIND = {congestion:"Congestion", incident:"Incident", roadworks:"Roadwork", weather:"Rain"};
+const SRC = {congestion:"LTA DataMall \u00b7 Traffic Speed Bands", incident:"LTA DataMall \u00b7 Traffic Incidents", roadworks:"LTA DataMall \u00b7 Road works", weather:"NEA rainfall (data.gov.sg)"};
+const TAG = {live:"LIVE", obs:"OBSERVED", calc:"CALCULATED", est:"ESTIMATED", ai:"SYSTEM INTERPRETATION"};
+const TS = {obs:"OBS", est:"EST", pred:"PRED"};
+const tgs = k => `<span class="dtag ${k === "pred" ? "est" : k}" title="${k === "obs" ? "Observed (live LTA reading)" : k === "est" ? "Estimated by the system" : "Predicted by the system"}">${TS[k]}</span>`;
+const tg = (k, extra) => `<span class="dtag ${k}">${TAG[k]}${extra ? " \u00b7 " + extra : ""}</span>`;
+const f1o = x => x == null ? "\u2013" : (Math.round(x * 10) / 10).toString();
+const NA = `<b class="na">Not available</b>`;
+const APPROACH_KM = 5;                                                     // a bus counts as "approaching" within this distance of the stretch
+function occNo(r){ return `<span class="ev-no ${LV[r.level][0]}">${r.n}</span>`; }
+function occKind(r){ const e = occEv(r); return r.kind === "incident" ? (e && e.type) || "Incident" : r.kind === "weather" ? (r.level_detail === "heavy" ? "Heavy rain" : "Rain") : KIND[r.kind] || r.kind; }
+function occEv(r){ return ((OCC.ov && OCC.ov.events) || []).find(e => e.id === r.event) || null; }
+/* ---- route geometry: km along the drawn route, stop km, sub-lines */
+function occGeo(){
+  if(!S.route) return null; if(OCC.geo && OCC.geo.route === S.route) return OCC.geo;
+  const pts = []; S.route.runs.forEach(run => run.pts.forEach(p => { const l = pts[pts.length - 1]; if(!l || l[0] !== p[0] || l[1] !== p[1]) pts.push(p); }));
+  const hv = (a, b) => { const R = 6371, dLa = (b[0] - a[0]) * Math.PI / 180, dLo = (b[1] - a[1]) * Math.PI / 180, x = Math.sin(dLa / 2) ** 2 + Math.cos(a[0] * Math.PI / 180) * Math.cos(b[0] * Math.PI / 180) * Math.sin(dLo / 2) ** 2; return 2 * R * Math.asin(Math.sqrt(x)); };
+  const cum = [0]; for(let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + hv(pts[i - 1], pts[i]));
+  let j0 = 0; const stopKm = S.route.stops.map(s => { let best = j0, bd = 1e9; for(let j = j0; j < pts.length; j++){ const d = hv(pts[j], [s.lat, s.lon]); if(d < bd){ bd = d; best = j; } if(d > bd + 1.5 && j > best + 50) break; } j0 = best; return cum[best] || 0; });
+  OCC.geo = {route:S.route, pts, cum, total:cum[cum.length - 1] || 0, stopKm, hv}; return OCC.geo;
+}
+function occSub(a, b){ const G = occGeo(); if(!G) return []; const out = []; G.pts.forEach((p, i) => { if(G.cum[i] >= a && G.cum[i] <= b) out.push(p); }); return out.length >= 2 ? out : []; }
+function occAtKm(k){ const G = occGeo(); if(!G || !G.pts.length) return null; let i = G.cum.findIndex(c => c >= k); if(i < 0) i = G.pts.length - 1; return G.pts[i]; }
+function occStopAt(k){ const G = occGeo(); if(!G) return null; let bi = 0, bd = 1e9; G.stopKm.forEach((x, i) => { const d = Math.abs(x - k); if(d < bd){ bd = d; bi = i; } }); return S.route.stops[bi]; }
+function occBusKm(b){ const G = occGeo(); return G && b.progress != null ? G.stopKm[Math.min(b.progress, G.stopKm.length - 1)] : null; }
+/* ---- data */
+async function occLoad(keepSel){
+  if(!S.svc || !S.route) return; const tok = ++OCC.tok;
+  const ov = await api(`/api/traffic/overview?${q({services:S.svc, direction:S.dir, status:"unacknowledged,acknowledged,cleared"})}`, 30000);
+  if(tok !== OCC.tok || !S.route) return;
+  OCC.ov = ov;
+  if(ov.loading){ occRender(); clearTimeout(OCC.retry); OCC.retry = setTimeout(() => occLoad(true), 20000); return; }
+  const rank = {critical:0, high:1, monitor:2, normal:3};
+  const rows = (ov.rows || []).filter(r => r.svc === S.svc && +r.dir === +S.dir)
+    .sort((a, b) => ((a.status === "cleared") - (b.status === "cleared")) || (rank[a.level] - rank[b.level]) || ((b.score || 0) - (a.score || 0)));
+  rows.forEach((r, i) => r.n = i + 1);
+  OCC.rows = rows;
+  const act = rows.filter(r => r.status !== "cleared").slice(0, 3);
+  const dd = await Promise.all(act.map(r => api(`/api/traffic/detail?${q({alert:r.id})}`, 45000)));
+  if(tok !== OCC.tok) return;
+  OCC.det = {}; act.forEach((r, i) => { OCC.det[r.id] = dd[i]; });
+  if(!keepSel || !rows.find(r => r.id === OCC.sel)) OCC.sel = (window.innerWidth > 1100 && act[0] && act[0].level !== "normal") ? act[0].id : null;
+  occRender();
+}
+async function occDetail(id){ if(!OCC.det[id]){ OCC.det[id] = await api(`/api/traffic/detail?${q({alert:id})}`, 45000); } return OCC.det[id]; }
+/* bus state vs every loaded event: worst of inside > approaching (within APPROACH_KM) > clear */
+function occBusStates(){
+  const out = {}; const G = occGeo();
+  (S.buses || []).forEach(b => { out[b.id] = {state:OCC.rows.some(r => r.status !== "cleared") ? "unk" : "clear", delay:null, ev:null}; });
+  const rk = {inside:3, approaching:2, cleared:1, clear:1, unk:0};
+  OCC.rows.filter(r => r.status !== "cleared").forEach(r => {
+    const d = OCC.det[r.id]; if(!d || d.error || !(d.buses || []).length) return;
+    (S.buses || []).forEach(b => {
+      const m = d.buses.map(x => [x, G ? G.hv([x.lat, x.lon], [b.lat, b.lon]) : 9]).sort((x, y) => x[1] - y[1])[0];
+      if(!m || m[1] > 0.2) return;
+      let st = m[0].state; if(st === "approaching" && (m[0].dist_to_km == null || m[0].dist_to_km > APPROACH_KM)) st = "clear";
+      if(st === "cleared") st = "clear";
+      const cur = out[b.id];
+      if(rk[st] > rk[cur.state] || (cur.state === "unk")){ out[b.id] = {state:st, delay:st === "clear" ? 0 : m[0].delay_min, ev:st === "clear" ? null : r, tti:m[0].tti_min, dist:m[0].dist_to_km}; }
+    });
+  });
+  return out;
+}
+/* ---- render everything */
+function occRender(){
+  const has = !!(S.svc && S.route);
+  $("occEmpty").hidden = has || !!S.stopOnly; $("occStrip").hidden = !has; $("occMain").hidden = !has;
+  document.querySelector(".panels").hidden = !has && !S.stopOnly;
+  if(!has){ OCC.g.clearLayers(); OCC.gSeg.clearLayers(); occSide(null); return; }
+  occStrip(); occMarkers(); occImpact(); occSuggest(); occBusTable(); occTimeline(); occSide(OCC.sel);
+}
+function occStrip(){
+  const r = S.route, ov = OCC.ov, act = OCC.rows.filter(x => x.status !== "cleared"), bs = occBusStates();
+  const km = r.summary.km || {}, tot = (km.smooth || 0) + (km.moderate || 0) + (km.slow || 0), slowShare = tot ? km.slow / tot : 0, modShare = tot ? km.moderate / tot : 0;
+  let rs = null;
+  if(r.traffic.ok && tot > 0){ rs = act.some(x => x.level === "critical") ? ["Severe", "r", "crit"] : (slowShare >= 0.2 || act.some(x => x.level === "high")) ? ["Congested", "r", "bad"] : (slowShare >= 0.05 || modShare >= 0.25) ? ["Moderate", "y", "warn"] : ["Smooth", "g", ""]; }
+  const nb = (S.buses || []).length, aff = Object.values(bs).filter(x => x.state === "inside" || x.state === "approaching").length, detOk = act.length === 0 || act.some(x => OCC.det[x.id] && !OCC.det[x.id].error);
+  const delays = act.map(x => x.delay_min).filter(v => v != null), worst = delays.length ? Math.max(...delays) : null;
+  const cnt = k => act.filter(x => x.kind === k).length, heavy = act.filter(x => x.kind === "weather" && x.level_detail === "heavy").length;
+  const d0 = act.map(x => OCC.det[x.id]).find(d => d && !d.error && d.sched_hw && !/unknown/i.test(d.sched_hw_src || ""));
+  const exp = d0 && r.summary.etaMin ? Math.round(r.summary.etaMin / d0.sched_hw) : null;
+  const card = (t, tag, body, sub, cls) => `<div class="oc ${cls || ""}"><span>${t}${tag}</span>${body}${sub ? `<small>${sub}</small>` : ""}</div>`;
+  $("occStrip").innerHTML =
+    card("Route status", tg("live", "LTA"), rs ? `<b class="${rs[1]}">${rs[0]}</b>` : NA, tot ? `${Math.round(100 * slowShare)}% of route slow (&lt; 20 km/h)` : "", rs ? rs[2] : "")
+  + card("Affected buses", tg("calc"), ov && ov.loading ? NA : act.length === 0 ? `<b class="g">0 / ${nb}</b>` : detOk ? `<b class="${aff ? "o" : "g"}">${aff} / ${nb}</b>` : NA, `inside or within ${APPROACH_KM} km of an event`, aff >= 3 ? "bad" : aff ? "warn" : "")
+  + card("Worst traffic impact", tg("est"), worst != null ? `<b class="${worst >= 5 ? "r" : worst >= 2 ? "o" : "y"}">+${f1o(worst)} min</b>` : act.length ? NA : `<b class="g">None detected</b>`, worst != null ? "extra running time on the stretch" : act.length ? "no speed-based estimate for these events" : "", worst >= 5 ? "bad" : worst >= 2 ? "warn" : "")
+  + card("Key issues", tg("live", "LTA/NEA"), `<div class="iss"><i>Congestion</i><em class="${cnt("congestion") ? "on" : ""}">${cnt("congestion")}</em><i>Incident</i><em class="${cnt("incident") ? "on" : ""}">${cnt("incident")}</em><i>Roadwork</i><em class="${cnt("roadworks") ? "on" : ""}">${cnt("roadworks")}</em><i>Heavy rain</i><em class="${heavy ? "on" : ""}">${heavy}</em></div>`, "", act.some(x => x.level === "critical") ? "crit" : act.some(x => x.level === "high") ? "bad" : "")
+  + card("Live buses", tg("obs", "LTA"), `<b>${nb}${exp ? ` <small style="font-size:13px;color:var(--mut)">/ ~${exp} expected</small>` : ""}</b>`, exp ? `expected = run time \u00f7 scheduled headway ${tg("est")}` : "currently observed on this direction", "");
+}
+function occMarkers(){
+  OCC.g.clearLayers();
+  OCC.rows.forEach(r => {
+    const e = occEv(r); let pt = e && (e.center || (e.lat != null ? [e.lat, e.lon] : null)); if(!pt) pt = occAtKm(((r.a_km || 0) + (r.b_km || 0)) / 2); if(!pt) return;
+    const m = L.marker(pt, {icon:L.divIcon({className:"evm", html:`<span class="ev-no ${LV[r.level][0]}" style="${r.status === "cleared" ? "opacity:.5" : ""}">${r.n}</span>`, iconSize:[28, 28], iconAnchor:[14, 14]}), zIndexOffset:900, keyboard:false, title:`${r.n}. ${occKind(r)}`});
+    m.on("click", () => occSelect(r.id, true)); m.addTo(OCC.g);
+  });
+}
+function occHw(d){ const im = d && !d.error && d.impact; return im && im.max_now != null && im.max_pred != null ? im : null; }
+function occImpact(){
+  const ov = OCC.ov;
+  let h = `<h2>Operational impact</h2><p class="s">Events on Service ${esc(S.svc)} Dir ${S.dir}, most serious first. Numbers match the map. ${ov && ov.updated ? `Traffic engine updated ${esc(ov.updated)}.` : ""}</p>`;
+  if(ov && ov.error && !ov.rows){ $("occImpact").innerHTML = h + `<div class="warn">Traffic events unavailable: ${esc(ov.error)}</div>`; return; }
+  if(ov && ov.loading){ $("occImpact").innerHTML = h + `<div class="empty">The traffic event engine is starting up \u2013 checking again shortly.</div>`; return; }
+  if(!OCC.rows.length){ $("occImpact").innerHTML = h + `<div class="empty">No congestion, incident, road work or rain event is affecting this route right now.</div>`; return; }
+  h += OCC.rows.map(r => {
+    const d = OCC.det[r.id], im = occHw(d), bs = d && !d.error ? (d.buses || []) : null, lv = LV[r.level];
+    const inside = bs ? bs.filter(b => b.state === "inside").length : null, appr = bs ? bs.filter(b => b.state === "approaching" && b.dist_to_km != null && b.dist_to_km <= APPROACH_KM).length : null;
+    const a = occStopAt(r.a_km || 0), b = occStopAt(r.b_km || 0);
+    return `<div class="ev ${r.status === "cleared" ? "cl" : lv[0]} ${OCC.sel === r.id ? "sel" : ""}" data-id="${esc(r.id)}" tabindex="0">
+      <div class="eh">${occNo(r)}<b>${esc(occKind(r))}</b><span class="lvl ${lv[0]}">${lv[1]}</span><span class="st ${r.status === "new" ? "new" : r.status}">${r.status === "new" ? "NEW" : r.status.toUpperCase()}</span>${r.planned ? `<span class="st acknowledged">PLANNED${r.starts_in_min != null ? ` \u00b7 in ${Math.round(r.starts_in_min)} min` : ""}</span>` : ""}</div>
+      <div style="font-size:13px;margin-top:4px">${a && b && a !== b ? `${esc(a.name)} \u2192 ${esc(b.name)}` : esc(r.location || "")}</div>
+      <div class="eg"><div><span>Length on route</span><b>${r.overlap_km ? f1o(r.overlap_km) + " km" : "\u2013"}</b></div><div><span>Traffic ${tgs("obs")}</span><b>${r.speed_kmh != null ? Math.round(r.speed_kmh) + " km/h" : "\u2013"}</b></div>
+        <div><span>Buses in / approaching</span><b>${bs ? `${inside} / ${appr}` : d && d.error ? "\u2013" : "tap to load"}</b></div>
+        <div><span>Extra running time ${tgs("est")}</span><b>${r.delay_min != null ? "+" + f1o(r.delay_min) + " min" : "Not available"}</b></div>
+        <div><span>Max headway now \u2192 ${tgs("pred")}</span><b>${im ? `${Math.round(im.max_now)} \u2192 ${Math.round(im.max_pred)} min` : "\u2013"}</b></div><div><span>Since</span><b>${esc(r.start_hhmm || "\u2013")}${r.duration_min != null ? ` (${Math.round(r.duration_min)} min)` : ""}</b></div></div>
+      ${im && im.deterioration ? `<div class="occ-note">\u26a0 Traffic condition may contribute to headway deterioration ${tg("ai")}</div>` : ""}</div>`; }).join("");
+  $("occImpact").innerHTML = h;
+  $("occImpact").querySelectorAll(".ev").forEach(el => { const go = () => occSelect(el.dataset.id, true); el.onclick = go; el.onkeydown = e => { if(e.key === "Enter"){ e.preventDefault(); go(); } }; });
+}
+function occSuggest(){
+  const act = OCC.rows.filter(r => r.status !== "cleared"), top = act[0], d = top && OCC.det[top.id], bs = occBusStates();
+  const items = [];
+  if(!act.length) items.push({t:"No traffic event is affecting this route. No action needed \u2013 keep monitoring.", b:"Re-checked with every traffic update."});
+  act.forEach(r => { const dd = OCC.det[r.id]; if(!dd || dd.error) return; const ins = (dd.buses || []).filter(b => b.state === "inside").length, ap = (dd.buses || []).filter(b => b.state === "approaching" && b.dist_to_km != null && b.dist_to_km <= APPROACH_KM).length;
+    if(ins >= 2) items.push({t:`Multiple buses (${ins}) are currently within the same affected stretch (event ${r.n}).`, b:"Buses placed on the route from live LTA positions."});
+    else if(ap) items.push({t:`Monitor the next ${ap} bus${ap > 1 ? "es" : ""} approaching event ${r.n}.`, b:`Within ${APPROACH_KM} km of the stretch.`}); });
+  if(d && !d.error) (d.recommendations || []).forEach(x => items.push({t:x.text, b:x.basis, k:x.key}));
+  const hw = act.map(r => occHw(OCC.det[r.id])).find(x => x && x.deterioration);
+  if(hw) items.push({t:`Headway deterioration may occur if the condition persists (largest headway ${Math.round(hw.max_now)} \u2192 ${Math.round(hw.max_pred)} min, scheduled ${Math.round(hw.sched_hw)}).`, b:"Predicted arrivals with the estimated traffic delay added."});
+  const seen = new Set(), list = items.filter(x => !seen.has(x.t) && seen.add(x.t)).slice(0, 5);
+  const svcQ = `svc=${encodeURIComponent(S.svc)}&dir=${S.dir}`;
+  $("occSuggest").innerHTML = `<h2>\ud83d\udca1 Suggested operational consideration</h2><p class="s">Decision support only \u2013 nothing is dispatched. The controller decides. ${tg("ai")}</p>
+    <ul class="sug" style="margin:0;padding-left:18px">${list.map(x => `<li>${esc(x.t)}${x.b ? `<small>${esc(x.b)}</small>` : ""}</li>`).join("")}</ul>
+    <div class="occ-btns">${top ? `<button class="ob pri" type="button" id="occAn">Analyse impact</button>` : ""}<a class="ob" href="/control?${svcQ}">Go to Headway Control</a><a class="ob" href="/halfway?${svcQ}">Go to Halfway Optimiser</a></div>`;
+  if($("occAn")) $("occAn").onclick = () => occSelect(top.id, true);
+}
+function occBusTable(){
+  const bs = occBusStates(), n = (S.buses || []).length;
+  const lab = {inside:"IN AFFECTED STRETCH", approaching:"APPROACHING", clear:"CLEAR", unk:"NOT PLACED"};
+  let h = `<h2>Live buses \u2013 Service ${esc(S.svc)}</h2><p class="s">${n} bus${n !== 1 ? "es" : ""} observed ${tg("live", "LTA")} \u00b7 tap a bus to show it on the map. Duty / bus plate numbers are not published by DataMall.</p>`;
+  if(!n){ $("occBuses").innerHTML = h + `<div class="empty">No live bus positions for this direction right now.</div>`; return; }
+  h += `<div class="tw" style="overflow-x:auto"><table class="btab"><thead><tr><th>Bus</th><th>Order</th><th>Last seen</th><th>Near</th><th>Traffic status</th><th>Impact ${tg("est")}</th></tr></thead><tbody>`;
+  h += S.buses.slice().sort((a, b) => b.progress - a.progress).map((b, i) => { const s = bs[b.id] || {state:"unk"};
+    return `<tr data-id="${b.id}"><td data-l="Bus"><b>#${b.id}</b></td><td data-l="Order">${i + 1} of ${n} <small style="color:var(--mut)">(front first)</small></td><td data-l="Last seen">${esc(OCC.busUpd || "live")}</td><td data-l="Near">${esc((b.near || {}).name || "")}</td>
+      <td data-l="Traffic status"><span class="bst ${s.state}">${lab[s.state]}${s.ev ? " \u00b7 " + s.ev.n : ""}</span>${s.state === "approaching" && s.dist != null ? ` <small style="color:var(--mut)">${f1o(s.dist)} km</small>` : ""}</td>
+      <td data-l="Impact">${s.state === "clear" ? "0 min" : s.delay != null && s.state !== "unk" ? "+" + f1o(s.delay) + " min" : "\u2013"}</td></tr>`; }).join("");
+  $("occBuses").innerHTML = h + `</tbody></table></div>${Object.values(bs).some(x => x.state === "unk") ? `<div class="occ-note">NOT PLACED = the bus could not be matched to the event's route position (no live GPS or off the route line).</div>` : ""}`;
+  $("occBuses").querySelectorAll("tr[data-id]").forEach(tr => tr.onclick = () => { const b = S.buses.find(x => String(x.id) === tr.dataset.id), m = S.busMarkers[tr.dataset.id]; if(!b) return;
+    document.querySelector(".mapcard").scrollIntoView({behavior:"smooth", block:"center"}); map.flyTo([b.lat, b.lon], Math.max(map.getZoom(), 15), {duration:.6}); if(m) setTimeout(() => m.openPopup(), 700); });
+}
+function occTimeline(){
+  const G = occGeo(); if(!G || !G.total){ $("occTimeline").innerHTML = ""; return; }
+  const T = G.total, pc = k => Math.max(0, Math.min(100, 100 * k / T));
+  let bar = S.route.runs.map(run => `<i style="width:${(100 * run.km / Math.max(T, 0.01)).toFixed(2)}%;background:${COL4[band4(run.b)]}" title="${esc(run.road || "")} ${esc(speedText(run).replace(/<[^>]+>/g, ""))}"></i>`).join("");
+  const n = S.route.stops.length, pick = [...new Set([0, Math.round(n * .2), Math.round(n * .4), Math.round(n * .6), Math.round(n * .8), n - 1].map(i => Math.min(n - 1, i)))];
+  const stops = pick.map(i => `<span class="stp" style="left:${pc(G.stopKm[i])}%">${esc(S.route.stops[i].name)}</span>`).join("");
+  const ann = OCC.rows.filter(r => r.status !== "cleared").map(r => `<span class="ann" style="left:${pc(((r.a_km || 0) + (r.b_km || r.a_km || 0)) / 2)}%">${occNo(r)}${r.delay_min != null ? `+${f1o(r.delay_min)} min` : esc(occKind(r))}</span>`).join("");
+  const buses = (S.buses || []).map(b => { const k = occBusKm(b); return k == null ? "" : `<span class="bus" style="left:${pc(k)}%" title="Bus #${b.id}"></span>`; }).join("");
+  $("occTimeline").innerHTML = `<h2>Route traffic timeline</h2><p class="s">${esc(S.route.stops[0].name)} \u2192 ${esc(S.route.stops[n - 1].name)} \u00b7 ${f1o(T)} km ${tg("live", "LTA speed bands")} \u00b7 \u25a1 = live bus</p>
+    <div class="tw" style="overflow-x:auto"><div class="tl" style="min-width:560px"><div class="bar2">${bar}</div>${ann}${buses}${stops}</div></div>
+    <div class="tl-key"><span><i style="background:${COL4.smooth}"></i>Smooth \u2265 40 km/h</span><span><i style="background:${COL4.moderate}"></i>Moderate 30\u201339</span><span><i style="background:${COL4.slow}"></i>Slow 20\u201329</span><span><i style="background:${COL4.congested}"></i>Congested &lt; 20</span><span><i style="background:${COL4.none}"></i>No reading</span></div>`;
+}
+/* ---- the selected event: side panel (desktop) / bottom sheet (mobile) */
+async function occSelect(id, focus){
+  OCC.sel = id; occImpact(); occSide(id);
+  const r = OCC.rows.find(x => x.id === id); if(!r) return;
+  if(focus) occFocus(r);
+  if(!OCC.det[id]){ await occDetail(id); if(OCC.sel === id){ occSide(id); occImpact(); occBusTable(); occStrip(); occSuggest(); } }
+}
+function occFocus(r, noFly){
+  OCC.gSeg.clearLayers(); if(!r || !r.id) return;
+  const seg = r.kind === "congestion" || (r.b_km - r.a_km) > 0.05 ? occSub(r.a_km, r.b_km) : [];
+  if(seg.length){ L.polyline(seg, {color:"#fff", weight:14, opacity:.35, interactive:false}).addTo(OCC.gSeg); L.polyline(seg, {color:"#fff", weight:3, dashArray:"6 6", opacity:.9, interactive:false}).addTo(OCC.gSeg); if(!noFly) map.flyToBounds(L.latLngBounds(seg), {padding:[50, 50], maxZoom:16, duration:.6}); }
+  else if(!noFly){ const e = occEv(r), pt = e && (e.center || (e.lat != null ? [e.lat, e.lon] : null)); if(pt) map.flyTo(pt, Math.max(map.getZoom(), 15), {duration:.6}); }
+  if(!noFly && window.innerWidth <= 1100) document.querySelector(".mapcard").scrollIntoView({behavior:"smooth", block:"start"});
+}
+function occSide(id){
+  const el = $("occSide"), grid = document.querySelector(".occ-mapgrid"), r = id && OCC.rows.find(x => x.id === id);
+  if(!r){ el.hidden = true; grid.classList.add("noside"); OCC.gSeg.clearLayers(); setTimeout(() => map.invalidateSize(), 50); return; }
+  const wasHidden = el.hidden; el.hidden = false; grid.classList.remove("noside"); if(wasHidden) setTimeout(() => map.invalidateSize(), 50);
+  const d = OCC.det[r.id], e = occEv(r) || {}, lv = LV[r.level], im = occHw(d), bs = d && !d.error ? (d.buses || []) : null;
+  const a = occStopAt(r.a_km || 0), b = occStopAt(r.b_km || 0), lastStop = S.route.stops[S.route.stops.length - 1];
+  const inside = bs ? bs.filter(x => x.state === "inside").length : null, appr = bs ? bs.filter(x => x.state === "approaching" && x.dist_to_km != null && x.dist_to_km <= APPROACH_KM).length : null;
+  const ack = r.status === "acknowledged" ? `\u2713 Acknowledged${r.acked_by && r.acked_by !== "controller" ? " by " + esc(r.acked_by) : ""} ${esc(r.acked_hhmm || "")}` : r.status === "cleared" ? "Cleared \u2013 condition no longer detected" : "";
+  let h = `<div class="sh">${occNo(r)}<div><h3>${esc(occKind(r))}</h3><div style="margin-top:3px"><span class="lvl ${lv[0]}">${lv[1]}</span> <span class="st ${r.status}">${r.status === "new" ? "NEW" : r.status.toUpperCase()}</span>${r.worsened ? ` <span class="st new">WORSENED</span>` : ""}</div></div><button class="x" type="button" id="occX" aria-label="Close">\u00d7</button></div>
+    <div class="kv"><span>Location</span><b>${esc(r.location || "")}</b><span>Direction</span><b>Dir ${r.dir} \u2192 ${esc(lastStop.name)}</b><span>Source</span><b>${esc(SRC[r.kind] || "")}</b>
+      <span>Latest update</span><b>${esc((OCC.ov && OCC.ov.updated) || "\u2013")} ${tg("live")}</b><span>First detected</span><b>${esc(r.start_hhmm || "\u2013")}${r.duration_min != null ? ` \u00b7 ${Math.round(r.duration_min)} min` : ""}</b>
+      <span>Affected route segment</span><b>${a && b && a !== b ? `${esc(a.name)} \u2192 ${esc(b.name)}` : a ? "near " + esc(a.name) : "\u2013"}${r.overlap_km ? ` \u00b7 ${f1o(r.overlap_km)} km` : ""}</b>
+      <span>Observed condition</span><b>${r.kind === "congestion" && r.speed_kmh != null ? `${Math.round(r.speed_kmh)} km/h (normal ~${Math.round(r.ref_kmh || 0)}) ${tg("obs")}` : r.kind === "incident" ? esc(e.message || e.type || "Reported by LTA") + " " + tg("obs") : r.kind === "roadworks" ? `${esc(e.road || "")}${e.start_date ? ` \u00b7 ${esc(e.start_date)}${e.end_date ? " \u2013 " + esc(e.end_date) : ""}` : ""}` : r.kind === "weather" ? `${e.max_mm != null ? e.max_mm + " mm / 5 min" : ""} ${tg("obs", "NEA")}` : "\u2013"}</b>
+      <span>Affected buses</span><b>${bs ? `${inside} inside \u00b7 ${appr} approaching (\u2264 ${APPROACH_KM} km)` : d && d.error ? esc(d.error) : "loading\u2026"}</b>
+      <span>Estimated impact</span><b>${r.delay_min != null ? `+${f1o(r.delay_min)} min running time ${tg("est")}` : "Not available"}</b>
+      <span>Priority basis</span><b>score ${Math.round(r.score || 0)} / 100 ${tg("calc")}</b></div>`;
+  if(im) h += `<div class="hwbox"><div><small style="color:var(--mut)">Largest headway now ${tg("est")}</small><br><b>${Math.round(im.max_now)} min</b></div><span class="arr">\u2192</span><div><small style="color:var(--mut)">After traffic effect ${tg("est", "predicted")}</small><br><b style="color:${im.max_pred > im.max_now + 1 ? "var(--red)" : "var(--green)"}">${Math.round(im.max_pred)} min</b></div><div><small style="color:var(--mut)">Change</small><br><b>${im.max_pred - im.max_now >= 0 ? "+" : ""}${Math.round(im.max_pred - im.max_now)} min</b></div></div>
+    <div class="occ-note">${im.deterioration ? "Traffic condition may contribute to headway deterioration." : "No headway deterioration predicted from this event yet."} Scheduled ${Math.round(im.sched_hw)} min. ${tg("ai")}</div>`;
+  if(d && !d.error){
+    if(d.camera) h += `<div class="cam"><b>\ud83d\udcf7 Traffic camera available</b><div class="kv" style="margin:6px 0"><span>Camera ID</span><b>${esc(d.camera.id)}</b><span>Distance from event</span><b>${f1o(d.camera.dist_km)} km</b><span>Image fetched</span><b id="camT">${esc(OCC.camAt || (OCC.ov && OCC.ov.now) || "")}</b><span>Source</span><b>LTA DataMall \u00b7 Traffic Images</b></div>
+      <img id="camImg" src="${esc(d.camera.image)}" alt="LTA traffic camera ${esc(d.camera.id)}" loading="lazy" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'occ-note',textContent:'The camera image could not be loaded right now.'}))">
+      <div class="occ-btns" style="margin-top:4px"><button class="ob" type="button" id="camRef">Refresh</button><a class="ob" href="${esc(d.camera.image)}" target="_blank" rel="noopener">View camera</a></div><div class="occ-note">Direction of view is not published by LTA.</div></div>`;
+    else h += `<div class="occ-note">No relevant LTA traffic camera available.</div>`;
+  }
+  h += `<div class="occ-btns"><button class="ob" type="button" id="occView">View on map</button>${ack ? `<span class="st ${r.status === "cleared" ? "cleared" : "acknowledged"}" style="padding:8px 10px">${ack}</span>` : `<input id="occBy" class="sel" placeholder="Your name (optional)" maxlength="40" value="${esc(localStorage.getItem("rt.by") || "")}" style="flex:1 1 120px;min-width:0;height:36px;border-radius:9px;border:1px solid var(--line2);background:#08172a;color:var(--text);padding:0 10px"><button class="ob pri" type="button" id="occAck">Acknowledge</button>`}</div>
+    <div class="occ-note">Acknowledging means the issue has been seen; it is not marked as resolved. It is raised again if the condition worsens.</div>`;
+  el.innerHTML = h;
+  $("occX").onclick = () => { OCC.sel = null; occSide(null); occImpact(); };
+  $("occView").onclick = () => occFocus(r);
+  if($("occAck")) $("occAck").onclick = async () => { const by = ($("occBy").value || "").trim(); try{ localStorage.setItem("rt.by", by); }catch(e){}
+    $("occAck").disabled = true; const res = await fetch("/api/traffic/ack", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({alerts:[r.id], by})}).then(x => x.json()).catch(() => ({error:"Network error"}));
+    if(res.error){ toast("Could not acknowledge: " + res.error); $("occAck").disabled = false; return; } toast("Acknowledged"); await occLoad(true); };
+  if($("camRef")) $("camRef").onclick = async () => { $("camRef").disabled = true; delete OCC.det[r.id]; await occDetail(r.id); const n = new Date(); OCC.camAt = sgTime(n); if(OCC.sel === r.id) occSide(r.id); };
+}
+/* ---- wiring into the existing page */
+(function(){
+  const fDraw = drawRoute; drawRoute = function(r){ fDraw(r); OCC.geo = null; S.route = r; if(S.svc && OCC.ov) setTimeout(() => { occMarkers(); occTimeline(); const sr = OCC.rows.find(x => x.id === OCC.sel); if(sr) occFocus(sr, true); }, 0); };
+  const fLoad = loadBuses; loadBuses = async function(tok){ await fLoad(tok); OCC.busUpd = sgTime(new Date()); if(S.route && S.svc) { occStrip(); occBusTable(); occTimeline(); } };
+  const fApply = apply; apply = async function(o){ S.stopOnly = !$("svc").value.trim() && !!$("stop").value.trim(); OCC.rows = []; OCC.det = {}; OCC.ov = null; OCC.sel = null; OCC.g.clearLayers(); OCC.gSeg.clearLayers();
+    await fApply(o); OCC.busUpd = sgTime(new Date()); occRender(); if(S.svc && S.route) occLoad(false); };
+  const fClear = clearAll; clearAll = function(){ fClear(); S.stopOnly = false; OCC.rows = []; OCC.det = {}; OCC.ov = null; OCC.sel = null; occRender(); };
+})();
+setInterval(() => { if(!document.hidden && S.svc && S.route) occLoad(true); }, 60000);
+$("svc").addEventListener("change", () => { clearTimeout(OCC.chT); OCC.chT = setTimeout(() => { const v = $("svc").value.trim().toUpperCase(); if(/^[0-9A-Z]{1,6}$/.test(v) && v !== S.svc && !$("go").disabled) apply(); }, 120); });
+occRender();
 
 /* start */
 function fillSvcList(){
