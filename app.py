@@ -3949,6 +3949,50 @@ async def tr_hw_map(rows, now_dt):
     return out
 
 
+@app.get("/api/cameras")
+async def api_cameras(service: str = "", direction: int = 1, km: float = 0.35, refresh: int = 0):
+    """LTA DataMall Traffic Images: still photos (LTA publishes no video), refreshed by LTA every few minutes.
+    With a service: only the cameras within `km` of that route, in route order, each with its nearest bus stop. refresh=1 asks for a
+    fresh list (the image links are short-lived signed URLs) but never more often than every 30 s, to protect the LTA quota."""
+    if refresh:
+        hit = CACHE.get("cameras")
+        if hit and time.time() - hit[1] > 30:
+            CACHE.pop("cameras", None)
+    cs = await cameras_state()
+    cams = cs.get("cams") or []
+    hit = CACHE.get("cameras")
+    fetched = hit[1] if hit else None
+    st = await static()
+    svc = service.strip().upper()
+    km = max(0.1, min(1.0, km))
+    out = []
+    if svc:
+        stops = route_stops(st, svc, direction) if st["stops"] else []
+        if not stops:
+            return {"cameras": [], "error": "Route not available", "total": len(cams), "fetched": tr_hhmm(fetched) if fetched else None}
+        line = cached_line(svc, direction, stops)
+        cum = [0.0]
+        for a, b in zip(line, line[1:]):
+            cum.append(cum[-1] + hav_km(a[0], a[1], b[0], b[1]))
+        for c in cams:
+            d = min_dist_km(c["lat"], c["lon"], line)
+            if d > km:
+                continue
+            k = min(range(len(line)), key=lambda i: (line[i][0] - c["lat"]) ** 2 + (line[i][1] - c["lon"]) ** 2)
+            ns = min(stops, key=lambda x: hav_km(c["lat"], c["lon"], x["lat"], x["lon"]))
+            out.append({"id": c["id"], "lat": c["lat"], "lon": c["lon"], "image": c["link"], "dist_km": round(d, 2), "route_km": round(cum[k], 2),
+                        "near": {"code": ns["code"], "name": ns["name"], "road": ns["road"], "km": round(hav_km(c["lat"], c["lon"], ns["lat"], ns["lon"]), 2)}})
+        out.sort(key=lambda x: x["route_km"])
+    else:
+        allst = list(st["stops"].values()) if st["stops"] else []
+        for c in cams:
+            ns = min(allst, key=lambda x: hav_km(c["lat"], c["lon"], x["lat"], x["lon"])) if allst else None
+            out.append({"id": c["id"], "lat": c["lat"], "lon": c["lon"], "image": c["link"], "near": {"code": ns["code"], "name": ns["name"], "road": ns["road"],
+                        "km": round(hav_km(c["lat"], c["lon"], ns["lat"], ns["lon"]), 2)} if ns else None})
+    return {"cameras": out, "total": len(cams), "fetched": tr_hhmm(fetched) if fetched else None, "fetched_epoch": fetched, "source": "LTA DataMall \u00b7 Traffic Images",
+            "error": cs.get("error") if not cams else None, "note": "Still photos only: LTA publishes no traffic video. Images are updated by LTA about every 1-5 minutes."}
+
+
 @app.get("/api/traffic/overview")
 async def api_tr_overview(services: str = "", direction: int = 0, horizon: int = 0, types: str = "", status: str = "", operators: str = "", min_delay: str = "", refresh: int = 0):
     await tr_ensure_fresh(bool(refresh))

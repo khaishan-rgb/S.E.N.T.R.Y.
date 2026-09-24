@@ -20,6 +20,7 @@ Detect -> locate -> impact -> affected buses -> consider action -> acknowledge. 
 * **Route traffic timeline:** the route as one coloured bar with key stops, event annotations (+min / type) and live buses.
 * **Data labels:** LIVE, OBSERVED, CALCULATED, ESTIMATED / PREDICTED, SYSTEM INTERPRETATION on every figure.
 * Refresh: buses every 20 s and route traffic every 5 min (unchanged); events every 60 s; camera only on Refresh.
+* **LTA traffic cameras (photos - LTA publishes no video).** New `GET /api/cameras?service=&direction=&km=0.35&refresh=0|1`: every LTA Traffic Images camera within 350 m of the route, in route order, with its nearest bus stop, distance off route and km along the route (without a service: all cameras). The list is cached 2 min; refresh=1 forces a new list at most every 30 s (the photo links are short-lived signed URLs). Route Traffic shows camera markers on the map (Layers: Traffic cameras), a photo gallery under the timeline, and a viewer with Previous / Next, Refresh, "Live view" (re-fetches the latest photo every 60 s only while open), Show on map. Honest labels: fetch time (LTA gives no capture time), camera direction "not published by LTA", a fallback when a photo fails, and "No LTA traffic camera within 350 m" when none exists. Photo links are renewed every 4 min in the background.
 
 ## V13.9 - Halfway Analyzer decides on EWT over a user-set Balance Trips horizon
 
