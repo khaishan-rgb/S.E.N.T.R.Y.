@@ -97,7 +97,7 @@ def _tpr_sheet(wb, r):
             x.number_format = "0.0"
             if rr != 13:
                 x.font = F(size=9, bold=(rr == 12))
-    ws.cell(14, 2, "Blue = model output; black = Excel formulas. Recommended RT comes from a 1,000-draw Monte Carlo on the route total.").font = F(size=8, italic=True, color="595959")
+    ws.cell(14, 2, "Blue = model output; black = Excel formulas. Recommended RT = planning percentile of the route total, allowing for day-to-day variation, plus recovery.").font = F(size=8, italic=True, color="595959")
     ws.column_dimensions["A"].width = 4
     ws.column_dimensions["B"].width = 16
     ws.column_dimensions["C"].width = 10
@@ -173,7 +173,7 @@ def _assumptions(wb, reports, assumptions, profile_by_day):
         ("Signals", f"{assumptions['junctions_per_km']} junctions per km x {assumptions['signal_s_per_junction']} s"),
         ("Dwell per stop", f"P(stop) x ({assumptions['dwell_base_s']} s base + {assumptions['decel_s']} s deceleration + {assumptions['queue_prob']} x {assumptions['queue_s']} s queue) + {assumptions['dwell_per_pax_s']} s x passengers; P(stop) = 1 - exp(-passengers)"),
         ("Passengers per bus", "DataMall Passenger Volume (tap-in + tap-out) of the stop and hour / days of that day type in the month / services at the stop / buses of this service in the hour"),
-        ("Recommended RT", "P-level of 1,000 draws: driving x N(1, 7.5%) + dwell x N(1, 18%) + recovery x N(1, 10%)"),
+        ("Recommended RT", "Planning percentile of the route total, allowing driving to vary about 7.5%, dwell about 18% and recovery about 10% day to day"),
         ("Fallback speed", f"{assumptions['fallback_kmh']} km/h off-peak when live speed bands are unavailable"),
     ]
     for rep in reports:

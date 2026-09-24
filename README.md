@@ -31,7 +31,7 @@ Everything runs on the server by itself; no uploads and no manual timetable are 
 
 ## V13.4 - Running Time Analytics is measured from LTA DataMall (CSV upload removed)
 
-Renamed from "Project Insight" to **Running Time Analytics** (`/running-time`, `/insight` still works). There is no historical file to upload, so the page now builds its own data.
+Page: **Running Time Analytics** (`/running-time`, `/insight` still works). There is no historical file to upload, so the page now builds its own data.
 
 * **Actual running time is measured, not imported.** The bunching collector already tracks every bus along the route; it now also records each tracked bus's position, and when a bus completes the route the trip is stored in `rt_trip` with its crossing time at **every stop** (interpolated between polls, extrapolated up to 0.45 km at the terminals). A trip is kept only if it was observed over at least 82% of the route and started near the origin; partial trips are scaled and flagged by their coverage. History therefore grows while any page is open, or continuously with `BUNCHING_ALWAYS_ON`. `RT_KEEP_DAYS` (default 120) prunes old trips.
 * **Collection panel** on the page: add a service to the collector, see trips measured per service and direction, the average measured RT, the period covered and the collector state.
@@ -40,7 +40,7 @@ Renamed from "Project Insight" to **Running Time Analytics** (`/running-time`, `
 * **CSV upload removed** (`/api/insight/upload` deleted). A clearly labelled **modelled sample** dataset can still be added for training and is marked MODELLED SAMPLE - TRAINING ONLY.
 * New endpoints: `GET /api/rt/status`, `POST /api/rt/watch`, `GET|POST /api/rt/sched`. Everything else (percentile filters, management summary, D1/D2 charts and period reports, important-stop auto-paired sections, waterfall, heatmap with drill-down, contributors, RT options, bootstrap scenarios, quantile model, data quality) is unchanged.
 
-## V13.3 - PROJECT INSIGHT: running time analytics (`/insight`)
+## V13.3 - Running Time Analytics (`/insight`)
 
 "Smarter Planning, Better Journeys" - a separate page answering which services lack running time, which direction, at what time of day, on which section of the route, and how much time should reasonably be provided.
 
@@ -51,7 +51,7 @@ Renamed from "Project Insight" to **Running Time Analytics** (`/running-time`, `
 * **Important bus stops -> sections.** Every stop of the service + direction is listed in route sequence with its 5-digit code in a searchable tick-box multi-select. Selected stops are **auto-paired along the sequence** (1>5, 5>10, 10>16 ...), never 1>5, 6>10, and never reversed. Each section gets the same distribution treatment plus its share of the route shortage, a **waterfall** of where the time accumulates, and a **section x time-period heatmap**; tapping a cell lists the trips behind it.
 * **Contributors** for the worst section: the slowest trips (at or above the planning percentile) compared with the rest on whatever condition columns exist (traffic speed, dwell, road works, incident, rain, demand, events). Always worded as associations, never as proven causes.
 * **Recommendation:** Keep current / Option A (P50) / Option B (P85) / Option C (P90), each with the measured share of trips that would finish within it - management decides.
-* **Supporting analyses:** historical **bootstrap** scenarios (normal weekday, AM peak, PM peak, rain, road works, heavy traffic, high demand) with a 90% interval on the percentile, and a small **linear quantile regression** (pinball loss, numpy) reported with its pinball loss and achieved coverage and labelled MODELLED - Monte Carlo is deliberately not the main engine.
+* **Supporting analyses:** historical **bootstrap** scenarios (normal weekday, AM peak, PM peak, rain, road works, heavy traffic, high demand) with a 90% interval on the percentile, and a small **linear quantile regression** (pinball loss, numpy) reported with its pinball loss and achieved coverage and labelled MODELLED - stress test is deliberately not the main engine.
 * **Data quality** always on screen: trips analysed vs trips in the file, date range, dropped rows, outliers removed, missing columns, configurable minimum sample per period with small samples flagged.
 * Works on desktop and mobile (stacked cards, horizontally scrolling tables, touch-friendly multi-select). Added to the left launcher and to every menu.
 
@@ -71,7 +71,7 @@ Until now halfway information only appeared after the optimiser decided a halfwa
 
 **V13.1:** the candidate list carries an **AI recommendation** panel (the pick, plus why it beats the quickest-to-reach point, the largest-gain point and any point that keeps every important stop) and is **sortable** - AI rank, headway gain, off-service time, distance, stops remaining or omitted, important stops served, or stop sequence - ascending or descending, from the dropdown or by tapping a column heading. The AI pick is starred and selected automatically.
 
-**Note:** the headway figure here is a quick estimate for one delayed trip. The full Monte Carlo comparison of No action / Full trip + adjustment / Halfway + regulation stays on the Halfway Optimiser page.
+**Note:** the headway figure here is a quick estimate for one delayed trip. The full stress test comparison of No action / Full trip + adjustment / Halfway + regulation stays on the Halfway Optimiser page.
 
 ## V12.9 - Halfway Deployment & Off-Service Route Planner
 
@@ -96,11 +96,11 @@ Answers, for the best halfway deployment: **where** the bus starts service, **wh
 * **Generate** ~2,000-3,000 plans: no intervention, adjust one trip, spread departures, adjust several trips (+/-8 min), full trip + regulation, halfway one trip + regulate the others, halfway one trip while others run full, two halfway starts (both >= 20 min late).
 * **Reject** automatically: BC layover < 7 min, adjustment > +/-8 min, altering a departed trip (trips whose departure is before "now" are locked), simultaneous departures, worse downstream headway without enough benefit. Counts are shown.
 * **Simulate the chain** UP 1 -> DOWN 1 -> UP 2 -> DOWN 2 -> UP 3 -> DOWN 3 for every bus: at each terminal a bus leaves at max(schedule, arrival + 7 min), so a full trip's lateness is carried into the BC's later trips (BC finishing delay). Buses may leave the interchange out of timetable order (a ready bus runs ahead of a very late one); no overtaking along the route; a bus with a long gap ahead runs slower (load sensitivity).
-* **Refine** the best plans by coordinate search (whole minutes), then **Monte Carlo**: 1,000 futures per short-listed plan (traffic per trip, bus-to-bus running time, dwell / load, incidents, arrival-prediction error, off-service time) -> P50 / P85 / P90 max headway, chance of settling, bunching risk, BC finishing delay.
+* **Refine** the best plans by coordinate search (whole minutes), then **stress test**: 1,000 futures per short-listed plan (traffic per trip, bus-to-bus running time, dwell / load, incidents, arrival-prediction error, off-service time) -> P50 / P85 / P90 max headway, chance of settling, bunching risk, BC finishing delay.
 * **Decide:** Headway priority (delay > 20: Halfway -> Adjustment -> Regulation), Mileage priority (< 30: adjust; >= 30: halfway only if >= 0.25 min of P85 headway per km lost), Balanced (lowest expected cost). Halfway must beat adjustment by >= 2 min P85 max headway, >= 10 min recovery or >= 30 pp bunching risk. If the late bus cannot reach any stop in time, a standby bus is proposed.
 * **Halfway page:** new panel "AI Recovery Scenario Optimiser - Full Trip vs Halfway" (instructions per trip, No action / Full trip + adjustment / Halfway + regulation cards with headway patterns, BC finishing delay and trade-off bars, whole-chain table incl. a "next-departure-only fix" for comparison, 1,000-future distribution, why the AI chose it, plans generated / rejected). The trip table's AI plan columns now show this plan; the earlier per-stop engine is kept (collapsed) for the map and heatmap and is re-run on the same decision.
 * **New page `/recovery-guide`:** management infographic "How AI optimisation makes trip adjustment & halfway deployment decisions" (7 stages); shows the last run from the same browser when available.
-* **Assumptions to validate:** DOWN running time = UP running time; halfway bus runs off-service at 0.7 x running time and skips the interchange layover; Monte Carlo spreads are starting values (see `recovery.PARAMS`). `numpy` added to requirements.
+* **Assumptions to validate:** DOWN running time = UP running time; halfway bus runs off-service at 0.7 x running time and skips the interchange layover; stress test spreads are starting values (see `recovery.PARAMS`). `numpy` added to requirements.
 
 ## V11.3 - Standardized filters across every page: Transport Operator, consistently placed and labelled
 

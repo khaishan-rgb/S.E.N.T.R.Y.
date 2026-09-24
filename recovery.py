@@ -1,7 +1,7 @@
 """AI Recovery Scenario Optimiser (V12.7) - trip adjustment vs halfway deployment, decided on the whole trip chain.
 
 What it does (the controller's thinking, made explicit):
-    current situation -> generate feasible actions -> simulate the whole 3 UP + 3 DOWN chain -> Monte Carlo under uncertainty
+    current situation -> generate feasible actions -> simulate the whole 3 UP + 3 DOWN chain -> stress test under uncertainty
     -> compare No action / Full trip + adjustment / Halfway + regulation -> recommend an operational instruction + explain the trade-off.
 
 Model
@@ -15,7 +15,7 @@ Model
   * Buses may leave the interchange in a different order from the timetable (a bus that is ready runs ahead of a very late one); along the route no
     bus overtakes another; a bus with a longer gap ahead picks up more passengers and runs slower (load sensitivity).
   * The trips just outside the simulated block (0 and n+1) run on schedule and bound the headways.
-  * Monte Carlo: every short-listed plan is re-run under `sims` sampled futures (traffic per leg, bus-to-bus running time, dwell / load
+  * stress test: every short-listed plan is re-run under `sims` sampled futures (traffic per leg, bus-to-bus running time, dwell / load
     sensitivity, a random incident, uncertainty of predicted arrivals, off-service running time) giving P50 / P85 / P90 distributions.
 
 Pure computation (numpy), no I/O. Decision support only.
@@ -61,7 +61,7 @@ PARAMS = {
 }
 
 MODES = ("balanced", "headway", "mileage")
-WEIGHTS = {  # deterministic cost used to search; the final choice uses the Monte Carlo numbers
+WEIGHTS = {  # deterministic cost used to search; the final choice uses the stress test numbers
     "balanced": dict(mx=1.0, wmx=2.0, rms=1.5, bunch=1.5, rec=0.5, km=0.6, bc=0.25, bcsum=0.2, adj=0.05),
     "headway":  dict(mx=1.5, wmx=3.0, rms=2.0, bunch=2.0, rec=0.8, km=0.2, bc=0.10, bcsum=0.1, adj=0.03),
     "mileage":  dict(mx=1.0, wmx=2.0, rms=1.5, bunch=1.5, rec=0.4, km=2.0, bc=0.20, bcsum=0.2, adj=0.05),
@@ -87,7 +87,7 @@ def _pct(a, q):
     return _r(np.percentile(a, q), 1)
 
 
-# ============================================================================ the chain simulator (vectorised over rows = plans or Monte Carlo draws)
+# ============================================================================ the chain simulator (vectorised over rows = plans or stress test draws)
 class Chain:
     def __init__(self, ctx, P):
         self.P = P
@@ -235,7 +235,7 @@ class Chain:
     def run(self, dep1, halfway=None, nz=None, keep=False):
         """dep1: (S, B) planned interchange departures for UP 1 (anchors / halfway columns ignored).
         halfway: list of (trip b, stop j, start (S,)) - start = the time the halfway bus starts at stop j.
-        nz: Monte Carlo noise (see noise()), None = deterministic."""
+        nz: stress test noise (see noise()), None = deterministic."""
         P, H = self.P, self.H
         Sn = dep1.shape[0]
         D = dep1.astype(float).copy()
@@ -287,7 +287,7 @@ class Chain:
             out["legs"] = legs
         return out
 
-    # ---------------------------------------------------------------- Monte Carlo noise
+    # ---------------------------------------------------------------- stress test noise
     def noise(self, Sn, rng):
         P = self.P
         nz = {"leg": np.clip(rng.normal(1.0, P["mc_traffic_sd"], (Sn, self.NL)), 0.8, 1.3),
@@ -686,7 +686,7 @@ class Optimiser:
             if c < ch:
                 best_h, ch = r, c
         local, _ = self.refine(none_plan, objective="local", sweeps=2)
-        # ---- Monte Carlo
+        # ---- stress test
         rng = np.random.default_rng(int(P["seed"]))
         sims = int(max(50, min(5000, P["sims"])))
         nz = C.noise(sims, rng)
@@ -779,7 +779,7 @@ class Optimiser:
                 rule = f"Mileage priority, delay {delay:.0f} min \u2265 {P['severe_mileage_min']:.0f}: halfway only if its headway benefit is worth its mileage cost (\u2265 {P['mileage_gain_per_km']:g} min per km)."
                 choice = "halfway" if (Hw is not None and h_ok and (per_km >= P["mileage_gain_per_km"] - EPS or unacceptable)) else full
         else:
-            rule = "Balanced: lowest expected cost over the Monte Carlo runs (headway, recovery, bunching, BC finishing time, mileage, holding); halfway must show a measurable network benefit."
+            rule = "Balanced: lowest expected cost over the stress test runs (headway, recovery, bunching, BC finishing time, mileage, holding); halfway must show a measurable network benefit."
             choice = full
             if Hw is not None and h_ok and Hw["mc"]["cost_mean"] < F["mc"]["cost_mean"] - EPS:
                 choice = "halfway"

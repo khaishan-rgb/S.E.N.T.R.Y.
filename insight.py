@@ -1,4 +1,4 @@
-"""PROJECT INSIGHT - bus running time analytics (V13.3). Pure computation, no I/O.
+"""Running Time Analytics - bus running time analytics (V13.3). Pure computation, no I/O.
 
 Answers, for one service: which direction lacks running time, when, on which section of the route, by how many minutes,
 how often, what conditions it is associated with, and what running times management could consider instead.

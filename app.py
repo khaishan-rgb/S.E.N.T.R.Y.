@@ -2191,7 +2191,7 @@ async def os_plan(g, res, svc, d, bus, dims):
             "sources": {"routing": OSRM, "restrictions": "OpenStreetMap (Overpass) - community data, not an authoritative clearance register", "traffic": "LTA speed bands, incidents, road works"}}
 
 
-# ----------------------------------------------------------------------------- V13.3 PROJECT INSIGHT - running time analytics (/insight)
+# ----------------------------------------------------------------------------- V13.3 Running Time Analytics (/insight)
 import insight
 import engineering_rt
 import gzip
@@ -3428,7 +3428,7 @@ async def api_os_records(service: str = "", limit: int = 30):
 @app.get("/api/halfway/recovery")
 async def api_ho_recovery(service: str = "", direction: int = 1, ref: str = "", hw: str = "", layover: str = "", late: str = "", mode: str = "balanced",
                           veh: str = "own", sims: str = "", scope: str = "all", bus: str = "dd", vh: str = "", vw: str = "", vt: str = ""):
-    """Trip adjustment vs halfway deployment on the whole 3 UP + 3 DOWN chain, with Monte Carlo. Decision support only."""
+    """Trip adjustment vs halfway deployment on the whole 3 UP + 3 DOWN chain, with stress test. Decision support only."""
     svc = service.strip().upper()
     g = await ho_route(svc, direction)
     if g.get("error"):

@@ -1,8 +1,8 @@
-"""Zero-history engineering running-time simulator.
+"""Zero-history engineering running-time estimate.
 
 This engine does not require completed historical trips. It builds a trip time from
 route geometry + live road speed + explicit engineering assumptions, then applies
-Monte Carlo uncertainty. Observed trips remain useful later for calibration only.
+day-to-day variation. Observed trips remain useful later for calibration only.
 """
 import math, random
 
@@ -18,7 +18,7 @@ def percentile(values, p):
 def simulate(*, drive_min, stops, route_km, pax_per_stop=3.0, junctions=None,
              recovery_min=7.0, incidents=0, roadworks=0, rain=False,
              pctl=85, draws=1000, seed=202646):
-    """Component model inspired by Project INSIGHT's published slide structure.
+    """Component model: driving + dwell + signals + road friction + recovery.
 
     Parameters intentionally stay explicit/editable. Defaults are engineering assumptions,
     not claims of measured local truth. Traffic speed is expected to come from live LTA bands.
@@ -33,7 +33,7 @@ def simulate(*, drive_min, stops, route_km, pax_per_stop=3.0, junctions=None,
     for _ in range(max(100, min(10000, int(draws)))):
         # Live driving time is the centre; +/- variability represents day-to-day traffic uncertainty.
         drive = drive_min * max(.72, rnd.normalvariate(1.0, .075))
-        # Deck parameters: base dwell 5.6/6.52 sec, 1.52 sec/pax, deceleration about 8.8 sec, queue probability 8-9%.
+        # Engineering parameters: base dwell 5.6/6.52 sec, 1.52 sec/pax, deceleration about 8.8 sec, queue probability 8-9%.
         base_sec = rnd.uniform(5.6, 6.52)
         pax_sec = max(0., rnd.normalvariate(1.52, .12)) * max(0., rnd.normalvariate(pax, max(.5, pax*.18)))
         decel_sec = max(0., rnd.normalvariate(8.8, .8))
@@ -55,6 +55,6 @@ def simulate(*, drive_min, stops, route_km, pax_per_stop=3.0, junctions=None,
         "components_p50": {"driving":cp(0),"dwell":cp(1),"signals":cp(2),"road_friction":cp(3),"recovery":cp(4)},
         "inputs": {"route_km":round(route_km,2),"stops":stops,"pax_per_stop":round(pax,1),"junctions":junctions,
                    "junctions_estimated":j_est,"recovery_min":round(recovery,1),"incidents":int(incidents),"roadworks":int(roadworks),"rain":bool(rain)},
-        "label":"MODELLED - zero-history engineering simulation",
+        "label":"MODELLED - zero-history engineering estimate",
         "note":"Initial planning estimate only. No completed-trip history is required; measured trips should later be used for calibration/validation."
     }

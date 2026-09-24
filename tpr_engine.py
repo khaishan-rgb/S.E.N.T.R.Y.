@@ -5,7 +5,7 @@ Builds an operator-style Time Period Report (stop pair x time period) WITHOUT co
     section time(h) = driving(h) + signals + dwell(h)
     driving(h)  = live LTA speed-band time for the section, re-scaled to hour h with an hourly speed profile
                   (never faster than free-flow)
-    signals     = junctions x 3 s   (junctions ~ 2.5 per km, same estimate as the Day-1 simulator)
+    signals     = junctions x 3 s   (junctions ~ 2.5 per km, same estimate as the Day-1 estimate)
     dwell(h)    = for every intermediate stop:  P(stop) x (base 6.06 s + deceleration 8.8 s + queue 0.085 x 8 s)
                                                + 1.52 s x passengers boarding/alighting per bus
                   passengers per bus = DataMall passenger volume of that stop and hour / days in month
@@ -140,7 +140,7 @@ def build(*, stops, seg_live_min, seg_free_min, seg_km, day_type, now_hour, now_
                       "travel": [round(x, 1) for x in t_s], "dwell": [round(x, 1) for x in d_s],
                       "prop": [round(x + y, 1) for x, y in zip(t_s, d_s)]})
     total = {k: [round(sum(p[k][j] for p in pairs), 1) for j in range(len(labels))] for k in ("travel", "dwell", "prop")}
-    # recommended scheduled running time per slot: Monte Carlo on the route total (same variability as the Day-1 simulator)
+    # recommended scheduled running time per slot: route total with day-to-day variation (same spread as the Day-1 estimate)
     rnd = random.Random(202646)
     rec = []
     for j in range(len(labels)):

@@ -106,12 +106,12 @@ tbody tr.click{cursor:pointer}tbody tr.sel td{background:#1d2a12}
 <a class="shell-link active" href="/running-time"><span class="si">&#9201;</span><span>Running Time Analytics</span></a>
 <div class="shell-foot">&#9679; Running time analytics</div></aside>
 <header class="top"><button class="mobile-menu-btn" type="button" aria-label="Open navigation" onclick="document.getElementById('inMenu').classList.toggle('open')">&#9776;</button>
-<div class="logo">&#9201;</div><h1>RUNNING TIME ANALYTICS<small>Zero-history simulation + live calibration &middot; Smarter Planning, Better Journeys</small></h1><div class="sp"></div><div class="clk" id="clk"></div></header>
+<div class="logo">&#9201;</div><h1>RUNNING TIME ANALYTICS<small>Zero-history model + live calibration &middot; Smarter Planning, Better Journeys</small></h1><div class="sp"></div><div class="clk" id="clk"></div></header>
 <div class="mobile-top-menu" id="inMenu"><a href="/">&#9648; Route</a><a href="/control">&#8596; Headway</a><a href="/bunching">&#8776; Bunching</a><a href="/halfway">&frac12; Halfway Optimiser</a><a href="/traffic">&#9888; Traffic-Aware</a><a href="/planner">&#9673; Halfway Planner</a><a class="active" href="/running-time">&#9201; Running Time</a></div>
 <div class="wrap">
   <section class="card" style="border-color:#8a5a16">
-    <h2>Day-1 Running Time Simulator <span class="tag-model">NO PAST TRIPS REQUIRED</span></h2>
-    <div class="sub">Builds running time from route + live LTA traffic + engineering components, then runs Monte Carlo scenarios. Historical completed trips are optional and used later only to calibrate the model.</div>
+    <h2>Day-1 Running Time Estimate <span class="tag-model">NO PAST TRIPS REQUIRED</span></h2>
+    <div class="sub">Builds running time from route + live LTA traffic + engineering components, then tests it across normal day-to-day variation in traffic and passengers. Historical completed trips are optional and used later only to calibrate the model.</div>
     <div class="flt">
       <div class="fld"><label>Service</label><input id="zhSvc" class="sel" maxlength="6" placeholder="e.g. 156"></div>
       <div class="fld"><label>Direction</label><select id="zhDir"><option value="1">Direction 1</option><option value="2">Direction 2</option></select></div>
@@ -120,7 +120,7 @@ tbody tr.click{cursor:pointer}tbody tr.sel td{background:#1d2a12}
       <div class="fld"><label>Terminus recovery (min)</label><input id="zhRec" class="sel" type="number" min="0" max="60" step="0.5" value="7"></div>
       <div class="fld"><label>Junctions</label><input id="zhJun" class="sel" type="number" min="0" max="300" placeholder="Auto engineering estimate"></div>
       <div class="fld"><label>Weather scenario</label><select id="zhRain"><option value="0">Normal / dry</option><option value="1">Rain</option></select></div>
-      <div class="fld"><label>&nbsp;</label><button class="btn go" id="zhRun" type="button">Run 1,000 simulations</button></div>
+      <div class="fld"><label>&nbsp;</label><button class="btn go" id="zhRun" type="button">Calculate running time</button></div>
     </div>
     <div id="zhOut" style="margin-top:10px"><div class="msg">Enter a service and run the model. This works before any historical trip has been collected.</div></div>
   </section>
@@ -282,7 +282,7 @@ $("inSAdd").onclick = async () => {
 $("inSvc").onchange = () => { S.svc = $("inSvc").value; LS.set("in.svc", S.svc); S.imp.clear(); runService(); };
 $("inDir").onchange = () => { S.dir = +$("inDir").value; LS.set("in.dir", S.dir); S.imp.clear(); runService(); };
 
-/* ---------- zero-history engineering simulator ---------- */
+/* ---------- zero-history engineering estimate ---------- */
 async function runZeroHistory(){
   const svc=$('zhSvc').value.trim().toUpperCase(); if(!svc){ $('zhOut').innerHTML='<div class="msg warn">Enter a service first.</div>'; return; }
   $('zhRun').disabled=true; $('zhOut').innerHTML='<div class="sk"></div><div class="sk" style="width:72%"></div>';
@@ -303,8 +303,8 @@ async function runZeroHistory(){
       <tr><td><b>Passenger dwell</b></td><td>${f1(c.dwell)} min</td><td>5.6–6.52 s base + 1.52 s × pax + ~8.8 s deceleration + 8–9% queue probability</td></tr>
       <tr><td><b>Traffic lights</b></td><td>${f1(c.signals)} min</td><td>~3 s × ${i.junctions} junctions${i.junctions_estimated?' (engineering estimate)':' (user entered)'}</td></tr>
       <tr><td><b>Road friction</b></td><td>${f1(c.road_friction)} min</td><td>${j.events.incidents} live incident(s), ${j.events.roadworks} live roadwork(s)${i.rain?' + rain scenario':''}</td></tr>
-      <tr><td><b>Terminus recovery</b></td><td>${f1(c.recovery)} min</td><td>${f1(i.recovery_min)} min planning input with simulation variability</td></tr></tbody></table></div>
-    <div class="msg" style="margin-top:9px"><b>${esc(x.label)}</b><br>1,000 simulated journeys: P50 ${f1(x.p50)} · P85 ${f1(x.p85)} · P90 ${f1(x.p90)} · P95 ${f1(x.p95)} min. <b>No completed-trip history was used.</b></div>
+      <tr><td><b>Terminus recovery</b></td><td>${f1(c.recovery)} min</td><td>${f1(i.recovery_min)} min planning input with normal variation</td></tr></tbody></table></div>
+    <div class="msg" style="margin-top:9px"><b>${esc(x.label)}</b><br>Running time range: P50 ${f1(x.p50)} · P85 ${f1(x.p85)} · P90 ${f1(x.p90)} · P95 ${f1(x.p95)} min. <b>No completed-trip history was used.</b></div>
     <div class="note">${esc(x.note)} Current traffic can represent conditions now; it is not historical traffic for another hour. Assumptions are deliberately visible so planners can challenge or override them.</div>`;
 }
 $('zhRun').onclick=runZeroHistory;
