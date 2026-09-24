@@ -225,6 +225,13 @@ details.hall{margin-top:10px}details.hall summary{cursor:pointer;color:#9cc4ff;f
 .hobalrow span{color:#9cc4ff;font-weight:700;font-size:13px}.hobalhint{display:block;color:var(--mut);font-size:11.8px;margin-top:5px;line-height:1.35}
 .tip{display:inline-grid;place-items:center;width:16px;height:16px;border-radius:50%;background:#1f4468;color:#cfe0f3;font-size:10.5px;font-weight:800;font-style:italic;cursor:help;margin-left:4px;vertical-align:1px}
 .hobal.bad input{border-color:var(--red)}
+.aitp{margin:0 0 10px;border:1px solid #2f7bd0;border-radius:12px;padding:0 10px;background:#0b1a2e}.aitp>summary{cursor:pointer;padding:9px 0;display:flex;flex-wrap:wrap;gap:2px 10px;align-items:baseline;font-weight:700;font-size:13px}
+.aitp>summary small{color:#9cc4ff;font-weight:600;font-size:12px}.aitp[open]{padding-bottom:10px}
+.aitptabs{height:auto;margin-bottom:6px}.aitptabs button{flex:1;display:flex;flex-direction:column;align-items:center;padding:5px 4px;line-height:1.15}.aitptabs small{font-size:11px;font-weight:600;opacity:.85}
+.aitpbar{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px}.aitpbar input{flex:1 1 150px;min-width:0;height:36px}.aitpbar .btn{height:36px}
+.aitplist{max-height:280px;overflow-y:auto;border:1px solid var(--line2);border-radius:10px;background:#08172a}
+.aitpr{display:grid;grid-template-columns:22px 26px 52px minmax(0,1fr);gap:6px;align-items:center;padding:7px 8px;border-bottom:1px solid #12253c;font-size:12.8px;cursor:pointer}
+.aitpr:last-child{border-bottom:0}.aitpr input{width:18px;height:18px}.aitpr .sq{color:#7f97b0;font-size:11px;text-align:right}.aitpr b{font-variant-numeric:tabular-nums}.aitpr .nm{color:#cfe0f3;overflow-wrap:anywhere}
 .ewt{border:1px solid #2f7bd0;border-radius:12px;background:#08182c;padding:12px;margin:0 0 12px}
 .ewthd{display:flex;flex-wrap:wrap;justify-content:space-between;gap:6px 12px;align-items:baseline;margin-bottom:8px}.ewthd h3{margin:0;font-size:16px}
 .ewtbal{background:#12253c;border:1px solid var(--line2);border-radius:8px;padding:3px 9px;font-size:12.5px;color:#cfe0f3}.ewtbal b{color:#fff}
@@ -306,6 +313,11 @@ details.hall{margin-top:10px}details.hall summary{cursor:pointer;color:#9cc4ff;f
         <div class="fld hobal"><label for="hoBal">Balance Trips <span class="tip" tabindex="0" role="note" title="Number of subsequent trips included in the EWT and recovery assessment." aria-label="Number of subsequent trips included in the EWT and recovery assessment.">i</span></label>
           <div class="hobalrow"><input id="hoBal" class="sel" type="number" min="1" max="16" step="1" value="6" inputmode="numeric" title="Number of subsequent trips included in the EWT and recovery assessment." aria-describedby="hoBalTxt"><span id="hoBalTxt">UP 1 &rarr; DOWN 3</span></div>
           <small class="hobalhint">Number of subsequent trips included in the EWT and recovery assessment. Changing it re-runs every calculation.</small></div>
+        <details class="hall aitp" id="aitpBox"><summary><span>AITP &ndash; bus stops for the EWT</span><small id="aitpSum">No AITP ticked</small></summary>
+          <div class="ho-note" style="margin:6px 0">Tick the stops (Dir 1 and Dir 2) where the EWT should be calculated. UP trips use the direction you are optimising, DOWN trips the return direction. Nothing ticked = every evaluation point. Saved on this device per service.</div>
+          <div class="seg aitptabs" id="aitpTabs"></div>
+          <div class="aitpbar"><input id="aitpQ" class="sel" placeholder="Search code or name" autocomplete="off"><button class="btn sm" id="aitpAll" type="button">Tick shown</button><button class="btn sm" id="aitpClr" type="button">Clear dir</button><button class="btn sm" id="aitpClrAll" type="button">Clear all</button></div>
+          <div class="aitplist" id="aitpList"></div></details>
         <div class="fld"><label for="hoOp">Transport Operator</label>
           <select id="hoOp"><option value="">All operators</option><option value="SBST">SBS Transit</option><option value="SMRT">SMRT</option><option value="TTS">Tower Transit</option><option value="GAS">Go-Ahead</option></select></div>
         <div class="hx-f2"><div class="fld"><label for="hoSvc">Service</label><input id="hoSvc" class="sel" list="hoSvcList" maxlength="6" autocapitalize="characters" placeholder="e.g. 32"><datalist id="hoSvcList"></datalist></div>
@@ -440,6 +452,7 @@ async function hoLoad0(){
   $("hoHw").value = j.sched_hw != null ? j.sched_hw : ""; $("hoHw").placeholder = j.sched_hw != null ? "" : "enter it";
   $("hoLay").value = j.params.layover_min; $("hoDelay").value = j.params.start_delay_min;
   HO.n = j.params.n_trips; hoBuildTrips();
+  HO.aitpDir = +HO.dir; aitpRender();
   if(LS.get("ho.treg", null) == null){ $("hoTreg").checked = j.params.term_reg == null ? true : !!j.params.term_reg; }
   if(LS.get("ho.adj2", null) == null){ $("hoAdj2").checked = !!j.params.allow_adjacent_halfway; }
   if(LS.get("ho.bal", null) == null && j.params.balance_trips){ $("hoBal").value = j.params.balance_trips; hoBalSync(); }      // the Settings default until the user picks a value
@@ -539,7 +552,7 @@ function hoRender(){ hoRenderTrips(); hoRenderRecovery(); hoRenderRec(); hoRende
 const RV_MODE = {balanced:"balanced", recovery:"headway", mileage:"mileage"};
 function rvUrl(){
   const hw = $("hoHw").value.trim(), std = HO.setup && HO.setup.sched_hw != null && Math.abs(+hw - HO.setup.sched_hw) < 1e-9, pref = (document.querySelector("input[name=hopref]:checked") || {}).value || "balanced";
-  return "/api/halfway/recovery?" + new URLSearchParams({treg:$("hoTreg").checked ? "1" : "0", adj2:hoAdj2() ? "1" : "0", balance:String(hoBal() || ""), service:HO.svc, direction:HO.dir, ref:$("hoRef").value.trim(), hw:std ? "" : hw, layover:$("hoLay").value.trim(), late:HO.late.join(","), mode:RV_MODE[pref] || "balanced", veh:HO.veh, scope:HO.scope === "approved" ? "approved" : "all", sims:"1000", bus:HO.bus, vh:$("hoVh").value.trim(), vw:$("hoVw").value.trim(), vt:$("hoVt").value.trim()});
+  return "/api/halfway/recovery?" + new URLSearchParams({aitp_up:aitpSel(HO.dir).join(","), aitp_dn:aitpSel(HO.setup && HO.setup.ret_dir ? HO.setup.ret_dir : (HO.dir === 1 ? 2 : 1)).join(","), treg:$("hoTreg").checked ? "1" : "0", adj2:hoAdj2() ? "1" : "0", balance:String(hoBal() || ""), service:HO.svc, direction:HO.dir, ref:$("hoRef").value.trim(), hw:std ? "" : hw, layover:$("hoLay").value.trim(), late:HO.late.join(","), mode:RV_MODE[pref] || "balanced", veh:HO.veh, scope:HO.scope === "approved" ? "approved" : "all", sims:"1000", bus:HO.bus, vh:$("hoVh").value.trim(), vw:$("hoVw").value.trim(), vt:$("hoVt").value.trim()});
 }
 function rvChosen(){ const r = HO.rec; return r && r.ok && r.plans && r.plans[r.decision] ? r.plans[r.decision] : null; }
 function rvRows(){                                 // {trip: row of the chosen plan} with the interchange headway in departure order
@@ -694,7 +707,9 @@ function rvEwt(r){
   const E = r.ewt; if(!E || !E.continue) return "";
   const C = E.continue, W = E.halfway, hw = !!W, H = E.H, pick = r.decision === "halfway";
   const imp = E.improvement_pct;
-  let h = `<div class="ewt" id="ewtBox"><div class="ewthd"><h3>EWT assessment \u2013 ${esc(E.continue_label)} vs Halfway + adjustment</h3><span class="ewtbal">Balance Trips: <b>${E.balance_trips}</b> \u00b7 ${esc(balSpan(E.balance_trips))}</span></div>`;
+  const warnA = E.aitp && E.aitp.on ? ((C.n_points ? "" : `<div class="rvstale">None of the ticked AITP falls on these ${E.balance_trips} balance trip${E.balance_trips > 1 ? "s" : ""} (e.g. only Dir ${HO.setup && HO.setup.ret_dir} stops with 1 balance trip), so there is no EWT to compare. Tick AITP in this direction or add balance trips.</div>`)
+    + (E.aitp.missing && E.aitp.missing.length ? `<div class="rvstale">Ticked AITP not on this route, ignored: ${esc(E.aitp.missing.join(", "))}</div>` : "")) : "";
+  let h = warnA + `<div class="ewt" id="ewtBox"><div class="ewthd"><h3>EWT assessment \u2013 ${esc(E.continue_label)} vs Halfway + adjustment</h3><span class="ewtbal">Balance Trips: <b>${E.balance_trips}</b> \u00b7 ${esc(balSpan(E.balance_trips))}</span></div>`;
   h += `<div class="ewtsum"><div class="c ${pick ? "" : "pick"}"><small>${esc(E.continue_label.toUpperCase())}</small><span>Average EWT</span><b>${f2(C.avg)} min</b><em>stress test P50 ${f2(C.p50)} \u00b7 P85 ${f2(C.p85)}</em></div>
     <div class="h ${pick ? "pick" : ""}"><small>HALFWAY + ADJUSTMENT</small><span>Average EWT</span><b>${hw ? f2(W.avg) + " min" : "not feasible"}</b><em>${hw ? `stress test P50 ${f2(W.p50)} \u00b7 P85 ${f2(W.p85)}` : "no halfway start can be reached in time"}</em></div>
     <div><small>EWT DIFFERENCE</small><span>Halfway \u2212 Continue</span><b class="${hw ? (E.diff < 0 ? "g" : E.diff > 0 ? "r" : "") : ""}">${hw ? sg2(E.diff) + " min" : "\u2013"}</b><em>negative = halfway lowers EWT</em></div>
@@ -702,7 +717,7 @@ function rvEwt(r){
   const wst = w => w && w.worst ? `${esc(w.worst.label)} \u00b7 ${esc(w.worst.leg)} (${f2(w.worst.ewt)})` : "\u2013";
   h += `<div class="ewtkv"><div class="rvkv"><span>Maximum EWT \u2013 Continue</span><b>${f2(C.max)} min</b><span>Maximum EWT \u2013 Halfway</span><b>${hw ? f2(W.max) + " min" : "\u2013"}</b>
       <span>Worst point \u2013 Continue</span><b>${wst(C)}</b><span>Worst point \u2013 Halfway</span><b>${hw ? wst(W) : "\u2013"}</b></div>
-    <div class="rvkv"><span>Evaluation points assessed</span><b>${C.n_points}${hw && W.n_points !== C.n_points ? ` / ${W.n_points}` : ""}</b><span>Balance trips assessed</span><b>${E.balance_trips} (${esc(balSpan(E.balance_trips))})</b>
+    <div class="rvkv"><span>Evaluation stops</span><b>${E.aitp && E.aitp.on ? `AITP only: ${E.aitp.up} UP \u00b7 ${E.aitp.dn} DOWN stop${E.aitp.up + E.aitp.dn > 1 ? "s" : ""}` : "every evaluation point (no AITP ticked)"}</b><span>Evaluation points assessed</span><b>${C.n_points}${hw && W.n_points !== C.n_points ? ` / ${W.n_points}` : ""}</b><span>Balance trips assessed</span><b>${E.balance_trips} (${esc(balSpan(E.balance_trips))})</b>
       <span>Scheduled waiting time basis</span><b>${E.swt_basis === "individual" ? "individual scheduled headways" : `constant H = ${f1(H)} min \u2192 SWT = H/2 = ${f2(H / 2)}`}</b><span>Delay (input only)</span><b>${f1(r.delay)} min</b></div></div>`;
   if(r.tests && r.tests.length) h += `<ul class="ewttest">${r.tests.map(t => `<li class="${t.pass ? "p" : "f"}"><i>${t.pass ? "\u2713" : "\u2717"}</i><span>${esc(t.test)}</span><b>${esc(t.value)}</b></li>`).join("")}</ul><div class="ho-note">Halfway is recommended only when every test passes; otherwise the full trip continues. ${pick ? "All tests passed." : hw ? "At least one test failed." : ""}</div>`;
   // per balance trip
@@ -745,6 +760,35 @@ function rvEwtWire(r){
       .concat((E.rows || []).map(q => [r.service || HO.svc, r.direction || HO.dir, E.balance_trips, q.leg, q.label, q.code || "", q.cont, q.half, q.diff]))
       .concat([["", "", "", "Average (Level 2)", `${E.continue.n_points} valid points`, "", E.continue.avg, E.halfway ? E.halfway.avg : "", E.diff == null ? "" : E.diff]])); };
 }
+/* ---- AITP: the bus stops (Dir 1 and Dir 2) where the EWT is calculated. None ticked = every evaluation point */
+function aitpKey(){ return "ho.aitp." + (HO.svc || ""); }
+function aitpGet(){ const v = LS.get(aitpKey(), null); return v && typeof v === "object" ? v : {}; }
+function aitpSel(d){ return (aitpGet()[String(d)] || []).slice(); }
+function aitpSet(d, codes){ const v = aitpGet(); v[String(d)] = Array.from(new Set(codes)); LS.set(aitpKey(), v); }
+function aitpList(d){ const j = HO.setup; if(!j || j.error) return []; return (+d === +HO.dir ? j.stops : j.ret_stops) || []; }
+function aitpDirs(){ const j = HO.setup; const other = j && j.ret_dir ? j.ret_dir : (HO.dir === 1 ? 2 : 1); return [1, 2].map(d => ({d, up:d === +HO.dir, has:d === +HO.dir || (j && j.ret_stops && j.ret_stops.length > 0), other})); }
+function aitpSummary(){
+  const a = aitpSel(1).length, b = aitpSel(2).length, tot = a + b;
+  $("aitpSum").innerHTML = tot ? `AITP: <b>D1 ${a}</b> \u00b7 <b>D2 ${b}</b> stop${tot > 1 ? "s" : ""} ticked \u2013 EWT at these stops only` : "No AITP ticked \u2013 EWT at every evaluation point";
+}
+function aitpRender(){
+  if(!$("aitpBox")) return; aitpSummary();
+  const j = HO.setup; if(!j || j.error){ $("aitpList").innerHTML = `<div class="ho-note">Load a service first.</div>`; return; }
+  const d = HO.aitpDir || +HO.dir, dirs = aitpDirs();
+  $("aitpTabs").innerHTML = dirs.map(x => `<button type="button" data-d="${x.d}" aria-pressed="${x.d === d}">Dir ${x.d} <small>${x.up ? "UP trips" : "DOWN trips"} \u00b7 ${aitpSel(x.d).length}</small></button>`).join("");
+  $("aitpTabs").querySelectorAll("button").forEach(bt => bt.onclick = () => { HO.aitpDir = +bt.dataset.d; aitpRender(); });
+  const list = aitpList(d), sel = new Set(aitpSel(d)), q = ($("aitpQ").value || "").trim().toLowerCase();
+  if(!list.length){ $("aitpList").innerHTML = `<div class="ho-note">No Dir ${d} route for this service (loop service or data unavailable). The DOWN trips then use points along the route.</div>`; return; }
+  $("aitpList").innerHTML = list.map((s, k) => [s, k]).filter(([s]) => !q || s[0].includes(q) || String(s[1]).toLowerCase().includes(q))
+    .map(([s, k]) => `<label class="aitpr"><input type="checkbox" value="${esc(s[0])}" ${sel.has(s[0]) ? "checked" : ""}><span class="sq">${k + 1}</span><b>${esc(s[0])}</b><span class="nm">${esc(s[1])}${k === 0 ? " (first)" : k === list.length - 1 ? " (last)" : ""}</span></label>`).join("") || `<div class="ho-note">No stop matches.</div>`;
+  $("aitpList").querySelectorAll("input").forEach(x => x.onchange = () => { const cur = new Set(aitpSel(d)); x.checked ? cur.add(x.value) : cur.delete(x.value); aitpSet(d, Array.from(cur)); aitpChanged(); });
+}
+function aitpChanged(){ aitpSummary(); $("aitpTabs").querySelectorAll("button").forEach(bt => { const s_ = bt.querySelector("small"); if(s_) s_.textContent = s_.textContent.replace(/\d+$/, aitpSel(+bt.dataset.d).length); });
+  clearTimeout(HO.aitpT); HO.aitpT = setTimeout(() => { HO.ewtSel = null; if(HO.rec && HO.rec.ok && HO.svc && HO.setup && !HO.setup.error){ hoMsg("AITP changed: recalculating the EWT at the ticked stops\u2026"); hoRun(); } }, 900); }
+$("aitpQ").oninput = () => aitpRender();
+$("aitpAll").onclick = () => { const d = HO.aitpDir || +HO.dir, q = ($("aitpQ").value || "").trim().toLowerCase(); const vis = aitpList(d).filter(s => !q || s[0].includes(q) || String(s[1]).toLowerCase().includes(q)).map(s => s[0]); aitpSet(d, aitpSel(d).concat(vis)); aitpRender(); aitpChanged(); };
+$("aitpClr").onclick = () => { const d = HO.aitpDir || +HO.dir; aitpSet(d, []); aitpRender(); aitpChanged(); };
+$("aitpClrAll").onclick = () => { LS.set(aitpKey(), {}); aitpRender(); aitpChanged(); };
 /* ---- later-trip terminal regulation: on by default (Settings), chosen per run */
 $("hoTreg").checked = LS.get("ho.treg", true);
 $("hoTreg").onchange = () => { LS.set("ho.treg", $("hoTreg").checked); hoTouch(); };

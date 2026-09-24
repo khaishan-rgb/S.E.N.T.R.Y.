@@ -1860,7 +1860,12 @@ async def api_ho_setup(service: str = "", direction: int = 1):
     now = g["now"]
     ref = ((now.hour * 60 + now.minute) // 5 + 1) * 5                    # next 5-minute mark: the first simulated departure
     cands, unresolved, cinfo = ho_candidates(svc, direction, g["stops"], "", "auto", g["prep"], P)
-    return {"service": svc, "direction": direction, "sched_hw": g["H"], "hw_src": g["H_src"], "ref": ho_hhmm(ref), "params": P, "n_stops": len(g["stops"]),
+    ret = []
+    try:                                                                         # the return direction's stops: AITP filter for the DOWN trips
+        ret = [[s_["code"], s_["name"]] for s_ in route_stops(await static(), svc, 2 if direction == 1 else 1)]
+    except Exception:
+        ret = []
+    return {"ret_stops": ret, "ret_dir": 2 if direction == 1 else 1, "service": svc, "direction": direction, "sched_hw": g["H"], "hw_src": g["H_src"], "ref": ho_hhmm(ref), "params": P, "n_stops": len(g["stops"]),
             "first": g["stops"][0]["name"], "last": g["stops"][-1]["name"], "route_km": round(g["prep"]["km"], 1), "run_min": round(g["tau"][-1], 1), "traffic_ok": g["traffic_ok"],
             "stops": [[s["code"], s["name"]] for s in g["stops"]], "points": [{"code": c["code"], "name": c["name"], "seq": c["seq"]} for c in cands if c.get("approved")], "n_approved": cinfo["approved"], "n_scan": len(cands) if cinfo["scanned"] else 0, "unresolved": unresolved,
             "updated": now.isoformat(timespec="seconds")}
@@ -3436,7 +3441,7 @@ async def api_os_records(service: str = "", limit: int = 30):
 @app.get("/api/halfway/recovery")
 async def api_ho_recovery(service: str = "", direction: int = 1, ref: str = "", hw: str = "", layover: str = "", late: str = "", mode: str = "balanced",
                           veh: str = "own", sims: str = "", scope: str = "all", bus: str = "dd", vh: str = "", vw: str = "", vt: str = "",
-                          balance: str = "", sched: str = "", adj2: str = "", treg: str = ""):
+                          balance: str = "", sched: str = "", adj2: str = "", treg: str = "", aitp_up: str = "", aitp_dn: str = ""):
     """Continue full trip (+ adjustment) vs halfway deployment (+ adjustment), decided on EWT over the selected BALANCE TRIPS, with stress test.
     balance = number of subsequent trips assessed (1..16, default the Settings value, 6); sched = optional comma list of HH:MM scheduled departures
     of trips 1..n (individual scheduled headways for SWT; otherwise the constant headway). Decision support only."""
@@ -3514,8 +3519,12 @@ async def api_ho_recovery(service: str = "", direction: int = 1, ref: str = "", 
         ctx["sched_dep"] = sched_dep
     if down_stops:
         ctx["down_stops"] = down_stops
+    a_up = [c for c in re.split(r"[,\s]+", aitp_up.strip()) if re.fullmatch(r"\d{5}", c)] if aitp_up.strip() else []
+    a_dn = [c for c in re.split(r"[,\s]+", aitp_dn.strip()) if re.fullmatch(r"\d{5}", c)] if aitp_dn.strip() else []
+    if a_up or a_dn:                                                              # AITP ticked: the EWT is calculated at these stops only
+        ctx["aitp_up"], ctx["aitp_dn"] = a_up, a_dn
     ckey = json.dumps([svc, direction, t0, H, lay, lates, mode, veh, ns, scope, now.hour * 60 + now.minute, nbal, sched_dep,
-                       [P[k_] for k_ in ("ewt_gain_min", "ewt_gain_pct", "ewt_gain_per_km", "ewt_adjust_min", "term_hold_max", "term_early_max", "term_tol_pct", "term_zone", "term_total_max")], adj_ok, t_reg], default=str)
+                       [P[k_] for k_ in ("ewt_gain_min", "ewt_gain_pct", "ewt_gain_per_km", "ewt_adjust_min", "term_hold_max", "term_early_max", "term_tol_pct", "term_zone", "term_total_max")], adj_ok, t_reg, sorted(a_up), sorted(a_dn)], default=str)
     hit = RV_CACHE.get(ckey)
     if hit and time.time() - hit[0] < 300:
         res = json.loads(hit[1])

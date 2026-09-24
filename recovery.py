@@ -183,16 +183,33 @@ class Chain:
         # timing points
         self.cand_j = sorted({int(c["j"]) for c in (ctx.get("candidates") or []) if 0 < int(c["j"]) < self.n_st - 1})
         base = {0, self.n_st - 1} | {int(round(i * (self.n_st - 1) / 8)) for i in range(9)}
-        self.pts_up = sorted(base | set(self.cand_j))
+        # AITP: the stops the user ticked for the EWT (codes of this direction = UP trips, of the return direction = DOWN trips)
+        code_j = {c: j for j, c in enumerate(self.codes) if c}
+        a_up = [str(c) for c in (ctx.get("aitp_up") or [])]
+        a_dn = [str(c) for c in (ctx.get("aitp_dn") or [])]
+        self.aitp_on = bool(a_up or a_dn)
+        self.aitp_up_j = sorted({code_j[c] for c in a_up if c in code_j})
+        self.aitp_missing = [c for c in a_up if c not in code_j]
+        self.pts_up = sorted(base | set(self.cand_j) | set(self.aitp_up_j))
         self.prof_up = np.array([self.tau[j] for j in self.pts_up])
         cnt = [0] * len(self.pts_up)
         for s in range(self.n_st):                               # each stop counts for its nearest timing point
             k = min(range(len(self.pts_up)), key=lambda q: (abs(self.pts_up[q] - s), q))
             cnt[k] += 1
         self.w_up = np.array(cnt, float)
-        self.frac_dn = [float(f) for f in np.linspace(0, 1, 7)]
+        dn = ctx.get("down_stops") or []                          # [(name, code, km)] of the return direction: labels + AITP positions
+        km_dn = (dn[-1][2] or 0.0) if dn else 0.0
+        dn_code = {x[1]: k for k, x in enumerate(dn)}
+        aitp_f = set()
+        for c in a_dn:
+            if c in dn_code:
+                k = dn_code[c]
+                aitp_f.add(round((dn[k][2] or 0.0) / km_dn if km_dn > 0 else k / max(1, len(dn) - 1), 6))
+            else:
+                self.aitp_missing.append(c)
+        self.frac_dn = sorted({round(float(f), 6) for f in np.linspace(0, 1, 7)} | aitp_f)   # DOWN running time assumed proportional to distance
+        self.aitp_dn_f = aitp_f
         self.prof_dn = np.array([R_dn * f for f in self.frac_dn])
-        dn = ctx.get("down_stops") or []                          # [(name, code, km)] of the return direction, for labels only
         self.dn_lbl = []
         for f in self.frac_dn:
             if dn:
@@ -203,6 +220,13 @@ class Chain:
                 self.dn_lbl.append((None, None))
         self.w_dn = np.ones(len(self.prof_dn))
         self.pidx = {j: k for k, j in enumerate(self.pts_up)}
+        # which points count for the EWT: every point, or only the AITP stops when any are ticked
+        if self.aitp_on:
+            self.ewt_mask_up = np.array([j in self.aitp_up_j for j in self.pts_up])
+            self.ewt_mask_dn = np.array([f in aitp_f for f in self.frac_dn])
+        else:
+            self.ewt_mask_up = np.ones(len(self.pts_up), bool)
+            self.ewt_mask_dn = np.ones(len(self.frac_dn), bool)
         self.offsvc = {int(k): float(v) for k, v in (ctx.get("offsvc_min") or {}).items() if v is not None}
         self.chain_len = self.off[-1] + self.R[-1] + (self.S[-1] - self.ref)
 
@@ -304,6 +328,7 @@ class Chain:
                 pts_store.append((T[0].copy(), order[0].copy(), g[0].copy()))
         A = np.empty_like(T)
         A[rows, order] = T
+        ewt[:, ~(self.ewt_mask_up if up else self.ewt_mask_dn)] = np.nan          # not an AITP: simulated, but not an EWT evaluation point
         return {"end": A, "maxg": maxg, "ming": ming, "sq": sq, "cnt": cnt, "rec": rec, "w": w,
                 "dep_T": first_T, "dep_order": first_order, "dep_g": first_g, "pts": pts_store,
                 "ewt": ewt, "awt": awt_, "swt": swt_, "sch_h": sch_h}
@@ -796,6 +821,8 @@ class Optimiser:
             up = L % 2 == 0
             sch_h = [float(x) for x in lg["sch_h"]]
             for p, (T_, o_, g_) in enumerate(lg["pts"]):
+                if not (C.ewt_mask_up if up else C.ewt_mask_dn)[p]:
+                    continue
                 if up:
                     j = C.pts_up[p]
                     nm, cd, pct = C.names[j], C.codes[j], 100.0 * (C.stop_s[j] / C.route_km if C.route_km else j / max(1, C.n_st - 1))
@@ -1042,7 +1069,8 @@ class Optimiser:
                     "per_trip": [{"leg": c["leg"], "avg": c.get("ewt_avg"), "max": c.get("ewt_max")} for c in pl["chain"]]}
         out = {"continue_key": ck, "continue_label": "Continue full trip" + (" + adjustment" if ck == "adjust" else " (no action)"), "continue": blk(Cn),
                "halfway": blk(Hw) if Hw is not None else None, "balance_trips": C.NL, "horizon": horizon_text(C.NL),
-               "swt_basis": C.sched_basis, "H": C.H, "none": blk(res["none"]) if ck != "none" else None}
+               "swt_basis": C.sched_basis, "H": C.H,
+               "aitp": {"on": C.aitp_on, "up": len(C.aitp_up_j), "dn": len(C.aitp_dn_f), "missing": C.aitp_missing}, "none": blk(res["none"]) if ck != "none" else None}
         if Hw is not None:
             he = Hw["ewt"]
             d = (ce["avg"] or 0) - (he["avg"] or 0)
