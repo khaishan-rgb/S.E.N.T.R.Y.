@@ -1,12 +1,25 @@
 """AI Recovery Scenario Optimiser (V12.7) - trip adjustment vs halfway deployment, decided on the whole trip chain.
 
 What it does (the controller's thinking, made explicit):
-    current situation -> generate feasible actions -> simulate the whole 3 UP + 3 DOWN chain -> stress test under uncertainty
-    -> compare No action / Full trip + adjustment / Halfway + regulation -> recommend an operational instruction + explain the trade-off.
+    current situation -> generate feasible actions -> simulate the chain over the selected BALANCE TRIPS -> stress test under uncertainty
+    -> compare Continue full trip (no action / + adjustment) against Halfway + necessary adjustment ON EWT -> recommend + explain.
+
+V13.9 - EWT-based decision over a user-selected Balance Trips horizon
+  * Balance Trips (N, `balance_trips`, default 6) replaces the fixed "3 UP + 3 DOWN" chain: every bus runs N subsequent trips
+    (UP 1, DOWN 1, UP 2, ... alternating) and every one of them is assessed. N = 6 reproduces the old horizon; any N from 1 to 16 works.
+  * Evaluation points = the timing points of every balance trip (the UP stops, including every halfway candidate, and 7 points along each DOWN trip).
+  * LEVEL 1 - EWT at ONE evaluation point, from the consecutive headways of the simulated buses passing that point on that balance trip:
+        AWT = sum(h_actual^2) / (2 sum(h_actual)),  SWT = sum(h_sched^2) / (2 sum(h_sched)),  EWT = AWT - SWT.
+    Scheduled headways are taken individually from the scheduled passing times (ctx["sched_dep"] when a timetable is given); only when every
+    scheduled headway equals H does SWT reduce to H / 2 - the result says which basis was used. Headways of different points are never pooled.
+  * LEVEL 2 - route / scenario figure: Average EWT = sum(EWT_point) / number of valid points (simple mean), plus the maximum and the worst point.
+  * Decision: Halfway is recommended only when its Average EWT beats the Continue scenario by at least `ewt_gain_min` min AND `ewt_gain_pct` %,
+    the stress test does not reverse that (P85 of the average EWT), and - under mileage priority - the gain is worth the km lost
+    (`ewt_gain_per_km`). Delay is only an INPUT to the simulation; no delay threshold decides.
 
 Model
   * Trips 1..n leave the interchange (first stop) on the scheduled headway H. Each trip's bus then runs its own chain:
-      UP 1 -> (far terminal, layover) -> DOWN 1 -> (interchange, layover) -> UP 2 -> DOWN 2 -> UP 3 -> DOWN 3.
+      UP 1 -> (far terminal, layover) -> DOWN 1 -> (interchange, layover) -> UP 2 -> DOWN 2 -> ... for N balance trips.
     At every terminal a bus leaves at max(scheduled departure, arrival + minimum layover). So lateness that a full trip keeps is carried into the
     BC's later trips (only the layover slack above the minimum absorbs it) - this is the BC finishing-time impact.
   * The AI only intervenes at the next departure point (UP 1 at the interchange): hold / release full trips (artificial adjustment capped at +/-8 min
@@ -23,7 +36,7 @@ Pure computation (numpy), no I/O. Decision support only.
 import math
 import numpy as np
 
-MODEL_VERSION = "recovery-1.1"
+MODEL_VERSION = "recovery-2.0-ewt"
 EPS = 1e-6
 
 PARAMS = {
@@ -33,9 +46,13 @@ PARAMS = {
     "adj_max": 8.0,               # HARD: artificial adjustment of a departure, +/- this many min against its natural time
     "min_dep_gap": 2.0,           # two departures closer than this at the interchange = simultaneous departure
     "horizon_side": 3,            # regulate at least 3 trips before + 3 after the late trips
-    "legs": 6,                    # UP1 DOWN1 UP2 DOWN2 UP3 DOWN3
+    "balance_trips": 6,           # BALANCE TRIPS: subsequent trips of every bus assessed (UP 1, DOWN 1, UP 2 ...); user-editable 1..16
+    "ewt_gain_min": 0.10,         # halfway must cut the Average EWT by at least this many min ...
+    "ewt_gain_pct": 5.0,          # ... and by at least this % of the Continue scenario's Average EWT
+    "ewt_gain_per_km": 0.02,      # mileage priority: min of Average EWT saved per km not operated
+    "ewt_adjust_min": 0.05,       # a departure adjustment is used (instead of no action) only if it cuts the Average EWT by at least this
     "down_run_factor": 1.0,       # DOWN running time = UP running time x this
-    "halfway_min_late": 10.0,     # a trip is considered for a halfway start from this lateness
+    "halfway_min_late": 1.0,      # V13.9: every trip that would leave late gets a Halfway scenario simulated (EWT decides, not the delay)
     "halfway_skip_layover": 1.0,  # 1 = the halfway bus leaves the interchange straight away (starts downstream, no interchange layover)
     "offsvc_factor": 0.7,         # off-service running = this x in-service running time (only when no road-routed time is available)
     "prep_min": 2.0,              # operational preparation at the halfway stop before entering passenger service
@@ -52,21 +69,36 @@ PARAMS = {
     "sims": 1000, "seed": 20260922,
     "mc_traffic_sd": 0.03, "mc_bus_sd": 0.015, "mc_beta_lo": 0.01, "mc_beta_hi": 0.04,
     "mc_incident_p": 0.05, "mc_incident_lo": 3.0, "mc_incident_hi": 8.0, "mc_eta_sd": 1.0,
-    "gain_min": 2.0,              # a halfway plan must cut the P85 max headway by at least this (min) against adjustment ...
-    "gain_rec_min": 10.0,         # ... or recover this much faster (P50) ...
-    "gain_bunch_pp": 30.0,        # ... or cut the bunching probability by this many percentage points
-    "mileage_gain_per_km": 0.25,  # mileage priority, severe delay: min of P85 max headway saved per km sacrificed
-    "severe_headway_min": 20.0,   # headway priority: halfway is evaluated first above this delay
-    "severe_mileage_min": 30.0,   # mileage priority: halfway is evaluated only at / above this delay
 }
 
 MODES = ("balanced", "headway", "mileage")
-WEIGHTS = {  # deterministic cost used to search; the final choice uses the stress test numbers
-    "balanced": dict(mx=1.0, wmx=2.0, rms=1.5, bunch=1.5, rec=0.5, km=0.6, bc=0.25, bcsum=0.2, adj=0.05),
-    "headway":  dict(mx=1.5, wmx=3.0, rms=2.0, bunch=2.0, rec=0.8, km=0.2, bc=0.10, bcsum=0.1, adj=0.03),
-    "mileage":  dict(mx=1.0, wmx=2.0, rms=1.5, bunch=1.5, rec=0.4, km=2.0, bc=0.20, bcsum=0.2, adj=0.05),
+WEIGHTS = {  # deterministic cost used to SEARCH each scenario's best adjustment; the Halfway vs Continue choice itself is made on EWT (decide)
+    "balanced": dict(ewt=8.0, mx=1.0, wmx=2.0, rms=1.0, bunch=1.5, rec=0.4, km=0.6, bc=0.25, bcsum=0.2, adj=0.05),
+    "headway":  dict(ewt=10.0, mx=1.5, wmx=3.0, rms=1.5, bunch=2.0, rec=0.6, km=0.2, bc=0.10, bcsum=0.1, adj=0.03),
+    "mileage":  dict(ewt=6.0, mx=1.0, wmx=2.0, rms=1.0, bunch=1.5, rec=0.3, km=2.0, bc=0.20, bcsum=0.2, adj=0.05),
 }
-LEG_NAMES = ["UP 1", "DOWN 1", "UP 2", "DOWN 2", "UP 3", "DOWN 3", "UP 4", "DOWN 4"]
+MAX_BALANCE = 16
+
+
+def leg_name(L):
+    """balance trip L (0-based) -> 'UP 1', 'DOWN 1', 'UP 2' ..."""
+    return f"{'UP' if L % 2 == 0 else 'DOWN'} {L // 2 + 1}"
+
+
+def horizon_text(n):
+    span = leg_name(0) + (" \u2192 " + leg_name(n - 1) if n > 1 else "")
+    return f"{n} balance trip{'s' if n != 1 else ''} ({span})"
+
+
+def ewt_parts(h_act, h_sch):
+    """LEVEL 1: EWT at one evaluation point from its own headways. Returns dict or None when fewer than 2 headways."""
+    a = [float(x) for x in h_act if x is not None and not math.isnan(x)]
+    s_ = [float(x) for x in h_sch if x is not None and not math.isnan(x)]
+    if len(a) < 2 or len(s_) < 2 or sum(a) <= 0 or sum(s_) <= 0:
+        return None
+    awt = sum(x * x for x in a) / (2.0 * sum(a))
+    swt = sum(x * x for x in s_) / (2.0 * sum(s_))
+    return {"awt": awt, "swt": swt, "ewt": awt - swt, "n": len(a), "sum_h": sum(a), "sum_h2": sum(x * x for x in a), "sum_hs": sum(s_), "sum_hs2": sum(x * x for x in s_)}
 
 
 def hm(m):
@@ -107,6 +139,16 @@ class Chain:
         self.late = late[:n]
         self.B = n + 2                                             # bus 0 and n+1 = on-schedule neighbours
         self.S = np.array([self.t0 + (b - 1) * H for b in range(self.B)])
+        # individual scheduled departures (timetable) when given; otherwise the constant target headway H
+        sd = [float(x) for x in (ctx.get("sched_dep") or []) if x is not None]
+        self.sched_basis = "constant"
+        if len(sd) >= n and all(sd[i + 1] > sd[i] for i in range(n - 1)):
+            self.S[1:n + 1] = sd[:n]
+            self.S[0] = self.S[1] - ((self.S[2] - self.S[1]) if n > 1 else H)
+            self.S[n + 1] = self.S[n] + ((self.S[n] - self.S[n - 1]) if n > 1 else H)
+            hs = np.diff(self.S)
+            self.sched_basis = "individual" if float(hs.max() - hs.min()) > 0.01 else "constant"
+            self.t0 = float(self.S[1])
         self.act_arr = np.array([self.S[b] - lay + (self.late[b - 1] if 1 <= b <= n else 0.0) for b in range(self.B)])
         self.ready = self.act_arr + ml
         self.nat = np.maximum(self.S, self.ready)
@@ -126,7 +168,7 @@ class Chain:
         self.ref = self.now if self.now is not None else self.t0
         R_up = self.tau[-1]
         R_dn = R_up * float(P["down_run_factor"])
-        self.NL = int(P["legs"])
+        self.NL = int(max(1, min(MAX_BALANCE, round(float(P.get("balance_trips") or 6)))))
         self.R = [R_up if L % 2 == 0 else R_dn for L in range(self.NL)]
         self.off = [sum(self.R[l] + lay for l in range(L)) for L in range(self.NL)]
         # timing points
@@ -139,7 +181,17 @@ class Chain:
             k = min(range(len(self.pts_up)), key=lambda q: (abs(self.pts_up[q] - s), q))
             cnt[k] += 1
         self.w_up = np.array(cnt, float)
-        self.prof_dn = np.array([R_dn * f for f in np.linspace(0, 1, 7)])
+        self.frac_dn = [float(f) for f in np.linspace(0, 1, 7)]
+        self.prof_dn = np.array([R_dn * f for f in self.frac_dn])
+        dn = ctx.get("down_stops") or []                          # [(name, code, km)] of the return direction, for labels only
+        self.dn_lbl = []
+        for f in self.frac_dn:
+            if dn:
+                km_tot = dn[-1][2] or 0.0
+                k = min(range(len(dn)), key=lambda q: abs((dn[q][2] or 0.0) - f * km_tot)) if km_tot > 0 else int(round(f * (len(dn) - 1)))
+                self.dn_lbl.append((dn[k][0], dn[k][1]))
+            else:
+                self.dn_lbl.append((None, None))
         self.w_dn = np.ones(len(self.prof_dn))
         self.pidx = {j: k for k, j in enumerate(self.pts_up)}
         self.offsvc = {int(k): float(v) for k, v in (ctx.get("offsvc_min") or {}).items() if v is not None}
@@ -166,6 +218,12 @@ class Chain:
         legf = nz["leg"][:, L][:, None] if nz else 1.0
         idx = np.arange(B)[None, :]
         pts_store = []
+        # scheduled passing times of every bus at every point of this balance trip (the halfway / lost trip keeps its scheduled slot)
+        sch_T = np.sort(self.S + self.off[L])
+        ewt = np.full((Sn, m), np.nan)
+        awt_ = np.full((Sn, m), np.nan)
+        swt_ = np.zeros(m)
+        sch_h = np.diff(sch_T)
 
         def gaps(T_):
             act = ~np.isnan(T_)
@@ -215,6 +273,15 @@ class Chain:
                     warnings.simplefilter("ignore")
                     maxg[:, p] = np.nanmax(g, axis=1)
                     ming[:, p] = np.nanmin(g, axis=1)
+            # LEVEL 1 EWT at this point: AWT from the simulated headways, SWT from the scheduled headways (never pooled with other points)
+            gs = np.where(np.isnan(g), 0.0, g)
+            n_h = (~np.isnan(g)).sum(1)
+            s1, s2 = gs.sum(1), (gs * gs).sum(1)
+            swt_[p] = float((sch_h ** 2).sum() / (2.0 * sch_h.sum())) if sch_h.sum() > 0 else 0.0
+            with np.errstate(all="ignore"):
+                aw = np.where((n_h >= 2) & (s1 > 0), s2 / (2.0 * np.maximum(s1, EPS)), np.nan)
+            awt_[:, p] = aw
+            ewt[:, p] = aw - swt_[p]
             dev = np.where(np.isnan(g), 0.0, (g - H) ** 2)
             sq += w[p] * dev.sum(1)
             cnt += w[p] * (~np.isnan(g)).sum(1)
@@ -229,7 +296,8 @@ class Chain:
         A = np.empty_like(T)
         A[rows, order] = T
         return {"end": A, "maxg": maxg, "ming": ming, "sq": sq, "cnt": cnt, "rec": rec, "w": w,
-                "dep_T": first_T, "dep_order": first_order, "dep_g": first_g, "pts": pts_store}
+                "dep_T": first_T, "dep_order": first_order, "dep_g": first_g, "pts": pts_store,
+                "ewt": ewt, "awt": awt_, "swt": swt_, "sch_h": sch_h}
 
     # ---------------------------------------------------------------- full chain
     def run(self, dep1, halfway=None, nz=None, keep=False):
@@ -274,6 +342,13 @@ class Chain:
             leg_max = np.stack([np.nanmax(lg["maxg"], 1) for lg in legs], 1)
             leg_wmax = np.stack([wsum(lg) for lg in legs], 1)
             leg_min = np.stack([np.nanmin(lg["ming"], 1) for lg in legs], 1)
+        # LEVEL 2: Average EWT = simple mean of the valid point EWTs over every balance trip; also the maximum
+        E = np.concatenate([lg["ewt"] for lg in legs], axis=1)
+        ok_ = ~np.isnan(E)
+        n_ok = ok_.sum(1)
+        ewt_avg = np.where(n_ok > 0, np.where(ok_, E, 0.0).sum(1) / np.maximum(n_ok, 1), 0.0)
+        ewt_max = np.where(ok_, E, -np.inf).max(1)
+        ewt_max = np.where(np.isfinite(ewt_max), ewt_max, 0.0)
         sq = sum(lg["sq"] for lg in legs); cnt = sum(lg["cnt"] for lg in legs)
         bunch_pts = sum(((lg["ming"] < P["bunch_min"] - EPS) * lg["w"][None, :]).sum(1) for lg in legs)
         bunch_tot = sum(lg["w"].sum() for lg in legs)
@@ -282,7 +357,7 @@ class Chain:
         out = {"ic_short": ic_short, "leg_min": leg_min, "max": np.nanmax(leg_max, 1), "ic_max": np.nanmax(g0, 1), "ic_sq": np.nansum((g0 - H) ** 2, 1), "wmax": leg_wmax.mean(1), "leg_max": leg_max, "leg_wmax": leg_wmax,
                "rms": np.sqrt(sq / np.maximum(cnt, 1)), "bunch": bunch_pts / bunch_tot, "any_bunch": (leg_min < P["bunch_min"] - EPS).any(1),
                "rec": np.where(np.isinf(rec), 0.0, np.maximum(0.0, rec - self.ref)), "unrec": late_irr, "bc": bc, "bc_max": np.maximum(bc, 0).max(1),
-               "bc_sum": np.maximum(bc, 0).sum(1), "up1_late": up1_late, "D": D}
+               "bc_sum": np.maximum(bc, 0).sum(1), "up1_late": up1_late, "D": D, "ewt_avg": ewt_avg, "ewt_max": ewt_max, "ewt_n": n_ok}
         if keep:
             out["legs"] = legs
         return out
@@ -315,7 +390,7 @@ class Chain:
 
 # ============================================================================ plans
 def _cost(m, w, H, km, adj, w_short=1.5):
-    return (w_short * m["ic_short"] + w["mx"] * np.maximum(0.0, m["max"] - H) + w["wmx"] * np.maximum(0.0, m["wmax"] - H) + w["rms"] * m["rms"] + w["bunch"] * 10.0 * m["bunch"]
+    return (w.get("ewt", 0.0) * m["ewt_avg"] + w_short * m["ic_short"] + w["mx"] * np.maximum(0.0, m["max"] - H) + w["wmx"] * np.maximum(0.0, m["wmax"] - H) + w["rms"] * m["rms"] + w["bunch"] * 10.0 * m["bunch"]
             + w["rec"] * m["rec"] / H + w["km"] * km + w["bc"] * m["bc_max"] + w["bcsum"] * m["bc_sum"] / 10.0 + w["adj"] * adj)
 
 
@@ -603,8 +678,13 @@ class Optimiser:
             g = lg["dep_g"][0]
             o = lg["dep_order"][0]
             pat = [(int(o[k]), _r(g[k], 1)) for k in range(len(o)) if not math.isnan(g[k])]
-            chain.append({"leg": LEG_NAMES[L], "max": _r(det["leg_max"][0, L], 1), "wmax": _r(det["leg_wmax"][0, L], 1),
+            chain.append({"leg": leg_name(L), "max": _r(det["leg_max"][0, L], 1), "wmax": _r(det["leg_wmax"][0, L], 1),
                           "dep_hw": [x for x in pat if 1 <= x[0] <= C.n or True]})
+        for L, lg in enumerate(legs):                           # per balance trip: average EWT of its points
+            e = lg["ewt"][0]
+            v = e[~np.isnan(e)]
+            chain[L]["ewt_avg"] = _r(float(v.mean()), 2) if len(v) else None
+            chain[L]["ewt_max"] = _r(float(v.max()), 2) if len(v) else None
         ic = chain[0]["dep_hw"]
         down, at_j = None, None
         if disp_j is not None and disp_j in C.pidx:
@@ -615,7 +695,12 @@ class Optimiser:
         for (T_, o_, g_) in legs[0]["pts"]:
             for k in range(len(o_)):
                 up1.setdefault(int(o_[k]), []).append(None if math.isnan(T_[k]) else _r(T_[k], 2))
-        out = {"key": key, "label": label, "fam": plan.get("fam"), "rows": rows, "chain": chain,
+        ewt_pts = self.ewt_points(det)
+        valid = [q for q in ewt_pts if q["ewt"] is not None]
+        worst = max(valid, key=lambda q: q["ewt"]) if valid else None
+        ewt_blk = {"avg": _r(det["ewt_avg"][0], 3), "max": _r(det["ewt_max"][0], 2), "n_points": len(valid), "n_points_all": len(ewt_pts),
+                   "worst": {"label": worst["label"], "leg": worst["leg"], "ewt": worst["ewt"]} if worst else None, "points": ewt_pts}
+        out = {"key": key, "label": label, "fam": plan.get("fam"), "rows": rows, "chain": chain, "ewt": ewt_blk,
                "det": {"max": _r(det["max"][0]), "ic_max": _r(det["ic_max"][0]), "wmax": _r(det["wmax"][0]), "rms": _r(det["rms"][0], 2),
                        "bunch_pct": _r(100 * det["bunch"][0], 0), "rec": _r(det["rec"][0], 0), "recovered": bool(not det["unrec"][0]), "min_hw": _r(float(np.nanmin(det["leg_min"][0])) if "leg_min" in det else None, 1), "km": _r(det["km"][0], 2), "adj": _r(det["adj"][0], 0),
                        "bc_max": _r(det["bc_max"][0], 1), "bc_sum": _r(det["bc_sum"][0], 1), "cost": _r(det["cost"][0], 1),
@@ -628,7 +713,39 @@ class Optimiser:
                          "rec_p50": _pct(mc["rec"], 50), "rec_p85": _pct(mc["rec"], 85), "p_recovered": _r(100.0 * (~mc["unrec"]).mean(), 0), "p_bunch": _r(100.0 * mc["any_bunch"].mean(), 0),
                          "bc_p50": _pct(mc["bc_max"], 50), "bc_p85": _pct(mc["bc_max"], 85), "km": _r(det["km"][0], 2),
                          "cost_mean": _r(mc["cost"].mean(), 1),
+                         "ewt_mean": _r(float(mc["ewt_avg"].mean()), 3), "ewt_p50": _r(float(np.percentile(mc["ewt_avg"], 50)), 3),
+                         "ewt_p85": _r(float(np.percentile(mc["ewt_avg"], 85)), 3), "ewt_p90": _r(float(np.percentile(mc["ewt_avg"], 90)), 3),
                          "hist": _hist(mc["max"])}
+        return out
+
+    # -------------------------------------------------- LEVEL 1 table: EWT at every evaluation point of every balance trip (deterministic run)
+    def ewt_points(self, det):
+        C = self.C
+        out = []
+        for L, lg in enumerate(det["legs"]):
+            up = L % 2 == 0
+            sch_h = [float(x) for x in lg["sch_h"]]
+            for p, (T_, o_, g_) in enumerate(lg["pts"]):
+                if up:
+                    j = C.pts_up[p]
+                    nm, cd, pct = C.names[j], C.codes[j], 100.0 * (C.stop_s[j] / C.route_km if C.route_km else j / max(1, C.n_st - 1))
+                    kind = "dep" if p == 0 else ("arr" if p == len(C.pts_up) - 1 else "")
+                else:
+                    f = C.frac_dn[p]
+                    nm, cd = C.dn_lbl[p]
+                    pct = 100.0 * f
+                    if nm is None:
+                        nm = "Far terminal" if p == 0 else (C.names[0] if p == len(C.frac_dn) - 1 else f"{pct:.0f}% along the return trip")
+                    kind = "dep" if p == 0 else ("arr" if p == len(C.frac_dn) - 1 else "")
+                h = [(int(o_[k]), float(g_[k])) for k in range(len(o_)) if not math.isnan(g_[k])]
+                prt = ewt_parts([x[1] for x in h], sch_h)
+                e = lg["ewt"][0, p]
+                out.append({"L": L, "leg": leg_name(L), "p": p, "label": nm + (" (dep.)" if kind == "dep" else " (arr.)" if kind == "arr" else ""), "code": cd,
+                            "pct": _r(pct, 0), "ewt": None if math.isnan(e) else _r(float(e), 3),
+                            "awt": _r(prt["awt"], 3) if prt else None, "swt": _r(prt["swt"], 3) if prt else None, "n_hw": len(h),
+                            "sum_h": _r(prt["sum_h"], 2) if prt else None, "sum_h2": _r(prt["sum_h2"], 1) if prt else None,
+                            "sum_hs": _r(prt["sum_hs"], 2) if prt else None, "sum_hs2": _r(prt["sum_hs2"], 1) if prt else None,
+                            "h": [[b, _r(g, 2)] for b, g in h], "hs": [_r(x, 2) for x in sch_h]})
         return out
 
     # -------------------------------------------------- the whole run
@@ -742,49 +859,51 @@ class Optimiser:
         m["cost"] = _cost(m, self.W, C.H, km, adj, self.P["w_ic_short"])
         return m
 
-    # -------------------------------------------------- the decision (priority modes + measurable benefit)
+    # -------------------------------------------------- the decision: EWT over the Balance Trips horizon
     def decide(self, res):
+        """A = CONTINUE FULL TRIP (no action, or + departure adjustment when that lowers the Average EWT) vs B = HALFWAY + necessary adjustment.
+        Compared on Average EWT across every evaluation point of the N balance trips. The delay is an input only: no delay threshold decides."""
         C, P = self.C, self.P
         N, A, Hw = res["none"], res["adjust"], res.get("halfway")
         delay = max(C.late) if C.late else 0.0
-        mn, ma = N["mc"], A["mc"]
-        why = []
-        # adjustment vs no action
-        a_gain = mn["max_p85"] - ma["max_p85"]
-        a_useful = a_gain >= 1.0 or (mn["p_bunch"] - ma["p_bunch"]) >= 10 or (mn["rec_p50"] - ma["rec_p50"]) >= 5 or A["det"]["cost"] < N["det"]["cost"] - 1.0
+        e_n, e_a = N["ewt"]["avg"], A["ewt"]["avg"]
+        a_gain = (e_n or 0.0) - (e_a or 0.0)
+        a_useful = a_gain >= P["ewt_adjust_min"] - EPS
         full = "adjust" if (a_useful and A["n_adjusted"] > 0) else "none"
         F = res[full]
-        fm = F["mc"]
-        h_ok, benefit = False, {}
+        e_c = F["ewt"]["avg"] or 0.0
+        h_ok, benefit, tests = False, {}, []
         if Hw is not None:
-            hm_ = Hw["mc"]
-            benefit = {"max_p85": _r(fm["max_p85"] - hm_["max_p85"]), "rec_p50": _r(fm["rec_p50"] - hm_["rec_p50"]), "bunch_pp": _r(fm["p_bunch"] - hm_["p_bunch"]),
+            e_h = Hw["ewt"]["avg"] or 0.0
+            diff = e_c - e_h                                              # + = halfway lowers the Average EWT
+            pct = 100.0 * diff / e_c if e_c > 0.005 else (0.0 if abs(diff) < 1e-9 else (100.0 if diff > 0 else -100.0))
+            km = Hw["det"]["km"] or 0.0
+            p85_c, p85_h = F["mc"]["ewt_p85"], Hw["mc"]["ewt_p85"]
+            fm, hm_ = F["mc"], Hw["mc"]
+            benefit = {"ewt": _r(diff, 3), "ewt_pct": _r(pct, 1), "ewt_p85": _r((p85_c or 0) - (p85_h or 0), 3), "ewt_per_km": _r(diff / max(km, 0.1), 3) if km else None,
+                       "max_p85": _r(fm["max_p85"] - hm_["max_p85"]), "rec_p50": _r(fm["rec_p50"] - hm_["rec_p50"]), "bunch_pp": _r(fm["p_bunch"] - hm_["p_bunch"]),
                        "bc_p85": _r(fm["bc_p85"] - hm_["bc_p85"]), "km": Hw["det"]["km"]}
-            h_ok = (benefit["max_p85"] >= P["gain_min"] - EPS or benefit["rec_p50"] >= P["gain_rec_min"] - EPS or benefit["bunch_pp"] >= P["gain_bunch_pp"] - EPS)
-        unacceptable = fm["max_p85"] >= max(30.0, 2.0 * C.H) - EPS
-        rule = ""
-        if self.mode == "headway":
-            if delay > P["severe_headway_min"] + EPS:
-                rule = f"Headway priority, delay {delay:.0f} min > {P['severe_headway_min']:.0f}: evaluate Halfway \u2192 Adjustment \u2192 Regulation; take the strongest headway recovery that shows a measurable benefit."
-                choice = "halfway" if (Hw is not None and h_ok and Hw["mc"]["max_p85"] <= fm["max_p85"] + EPS) else full
-            else:
-                rule = f"Headway priority, delay {delay:.0f} min \u2264 {P['severe_headway_min']:.0f}: adjustment / regulation first; halfway only if adjustment cannot give an acceptable headway."
-                choice = "halfway" if (Hw is not None and unacceptable and h_ok) else full
-        elif self.mode == "mileage":
-            if delay < P["severe_mileage_min"] - EPS:
-                rule = f"Mileage priority, delay {delay:.0f} min < {P['severe_mileage_min']:.0f}: balance the next 3 UP + 3 DOWN trips by adjustment / regulation; keep the full trip."
-                choice = "halfway" if (Hw is not None and unacceptable and h_ok) else full
-            else:
-                per_km = (benefit.get("max_p85") or 0.0) / max(Hw["det"]["km"], 0.1) if Hw is not None else 0.0
-                rule = f"Mileage priority, delay {delay:.0f} min \u2265 {P['severe_mileage_min']:.0f}: halfway only if its headway benefit is worth its mileage cost (\u2265 {P['mileage_gain_per_km']:g} min per km)."
-                choice = "halfway" if (Hw is not None and h_ok and (per_km >= P["mileage_gain_per_km"] - EPS or unacceptable)) else full
-        else:
-            rule = "Balanced: lowest expected cost over the stress test runs (headway, recovery, bunching, BC finishing time, mileage, holding); halfway must show a measurable network benefit."
-            choice = full
-            if Hw is not None and h_ok and Hw["mc"]["cost_mean"] < F["mc"]["cost_mean"] - EPS:
-                choice = "halfway"
+            pct_need = P["ewt_gain_pct"] * (0.5 if self.mode == "headway" else 1.0)
+            tests = [
+                {"test": f"Average EWT lower by \u2265 {P['ewt_gain_min']:g} min", "value": f"{diff:+.2f} min", "pass": diff >= P["ewt_gain_min"] - EPS},
+                {"test": f"Average EWT lower by \u2265 {pct_need:g}%", "value": f"{pct:+.1f}%", "pass": pct >= pct_need - EPS},
+                {"test": "Stress test does not reverse it (P85 of Average EWT)", "value": f"{p85_c:.2f} \u2192 {p85_h:.2f} min", "pass": (p85_h or 0) <= (p85_c or 0) + EPS},
+            ]
+            if self.mode == "mileage":
+                tests.append({"test": f"Worth the mileage: \u2265 {P['ewt_gain_per_km']:g} min EWT per km not operated", "value": f"{diff / max(km, 0.1):.3f} min/km",
+                              "pass": diff / max(km, 0.1) >= P["ewt_gain_per_km"] - EPS})
+            h_ok = all(t["pass"] for t in tests)
+        prio = {"headway": "Headway priority (EWT gain threshold halved)", "mileage": "Mileage priority (EWT gain must also be worth the km lost)"}.get(self.mode, "Balanced")
+        rule = (f"{prio}: Continue full trip vs Halfway compared on Average EWT across {self._npts(F)} evaluation points over {horizon_text(C.NL)}. "
+                f"Halfway only if it lowers the Average EWT by \u2265 {P['ewt_gain_min']:g} min and \u2265 {P['ewt_gain_pct'] * (0.5 if self.mode == 'headway' else 1.0):g}% and the stress test agrees. "
+                f"Delay ({delay:.0f} min) is an input to the simulation, not a decision threshold.")
+        choice = "halfway" if (Hw is not None and h_ok) else full
         return {"choice": choice, "full_choice": full, "halfway_ok": h_ok, "benefit": benefit, "rule": rule, "delay": delay, "adjust_useful": a_useful,
-                "adjust_unacceptable": bool(unacceptable)}
+                "adjust_unacceptable": bool(F["mc"]["max_p85"] >= max(30.0, 2.0 * C.H) - EPS), "tests": tests}
+
+    @staticmethod
+    def _npts(pl):
+        return (pl.get("ewt") or {}).get("n_points", 0)
 
     # -------------------------------------------------- output for the page
     def package(self, res, dec, sims):
@@ -826,12 +945,43 @@ class Optimiser:
         disp_j = self.disp_j
         return {"ok": True, "model": MODEL_VERSION, "mode": self.mode, "H": C.H, "decision": dec["choice"], "full_choice": dec["full_choice"], "rule": dec["rule"],
                 "benefit": dec["benefit"], "halfway_ok": dec["halfway_ok"], "adjust_unacceptable": dec["adjust_unacceptable"], "delay": dec["delay"],
-                "instructions": instr, "why": why, "plans": res, "sims": sims, "legs": LEG_NAMES[:C.NL], "focus": self.focus, "late_trips": self.lateb,
+                "instructions": instr, "why": why, "plans": res, "sims": sims, "legs": [leg_name(L) for L in range(C.NL)], "balance_trips": C.NL, "horizon": horizon_text(C.NL), "ewt": self.ewt_summary(res, dec), "tests": dec.get("tests") or [], "focus": self.focus, "late_trips": self.lateb,
                 "halfway_trips_tested": self.hk, "stops_tested": [{"j": j, "name": C.names[j], "code": C.codes[j]} for j in self.js],
                 "generated": self._gen_info(), "live": C.live, "veh": self.veh, "needs_standby": self.needs_standby, "not_recovered_min": _r(C.chain_len, 0), "now": _r(C.now, 1), "now_clock": hm(C.now) if C.now is not None else None,
                 "locked": [b for b in range(1, C.n + 1) if C.locked[b]], "first_stop": C.names[0], "pts_up": C.pts_up, "pts_km": [_r(C.stop_s[j], 3) for j in C.pts_up], "prep_min": P["prep_min"], "disp_j": disp_j, "disp_name": C.names[disp_j] if disp_j is not None else None,
                 "trips": [{"n": b, "sch": hm(C.S[b]), "act_arr": hm(C.act_arr[b]), "late": C.late[b - 1], "ready": hm(C.ready[b]), "nat": hm(C.nat[b])} for b in range(1, C.n + 1)],
-                "params": {k: P[k] for k in ("bunch_min", "adj_max", "min_layover_min", "legs", "sims", "gain_min", "halfway_min_late", "severe_headway_min", "severe_mileage_min", "offsvc_factor", "prep_min")}}
+                "params": {k: P[k] for k in ("bunch_min", "adj_max", "min_layover_min", "balance_trips", "horizon_side", "sims", "halfway_min_late", "offsvc_factor", "prep_min",
+                                                   "ewt_gain_min", "ewt_gain_pct", "ewt_gain_per_km", "ewt_adjust_min")}}
+
+    def ewt_summary(self, res, dec):
+        """Management view: Continue full trip vs Halfway on EWT, point by point, per balance trip, and averaged (LEVEL 2)."""
+        C = self.C
+        ck = dec["full_choice"]
+        Cn, Hw = res[ck], res.get("halfway")
+        ce = Cn["ewt"]
+
+        def blk(pl):
+            e = pl["ewt"]
+            return {"avg": e["avg"], "max": e["max"], "worst": e["worst"], "n_points": e["n_points"], "p50": pl["mc"]["ewt_p50"], "p85": pl["mc"]["ewt_p85"],
+                    "per_trip": [{"leg": c["leg"], "avg": c.get("ewt_avg"), "max": c.get("ewt_max")} for c in pl["chain"]]}
+        out = {"continue_key": ck, "continue_label": "Continue full trip" + (" + adjustment" if ck == "adjust" else " (no action)"), "continue": blk(Cn),
+               "halfway": blk(Hw) if Hw is not None else None, "balance_trips": C.NL, "horizon": horizon_text(C.NL),
+               "swt_basis": C.sched_basis, "H": C.H, "none": blk(res["none"]) if ck != "none" else None}
+        if Hw is not None:
+            he = Hw["ewt"]
+            d = (ce["avg"] or 0) - (he["avg"] or 0)
+            out["diff"] = _r(-d, 3)                                           # Halfway - Continue (negative = halfway better), as in the management table
+            out["improvement_pct"] = _r(100.0 * d / ce["avg"], 1) if (ce["avg"] or 0) > 0.005 else None
+            hp = {(q["L"], q["p"]): q for q in he["points"]}
+            rows = []
+            for q in ce["points"]:
+                h = hp.get((q["L"], q["p"]))
+                rows.append({"L": q["L"], "leg": q["leg"], "p": q["p"], "label": q["label"], "code": q["code"], "pct": q["pct"], "cont": q["ewt"], "half": h["ewt"] if h else None,
+                             "diff": _r(h["ewt"] - q["ewt"], 3) if h and h["ewt"] is not None and q["ewt"] is not None else None})
+            out["rows"] = rows
+        else:
+            out["rows"] = [{"L": q["L"], "leg": q["leg"], "p": q["p"], "label": q["label"], "code": q["code"], "pct": q["pct"], "cont": q["ewt"], "half": None, "diff": None} for q in ce["points"]]
+        return out
 
     def _gen_info(self):
         return {"generated": self.generated, "rejected": dict(sorted(self.reject.items(), key=lambda x: -x[1])), "families": self.families,
@@ -843,50 +993,46 @@ class Optimiser:
         N, A = res["none"], res["adjust"]
         Hw = res.get("halfway")
         n_, a_ = N["mc"], A["mc"]
+        hz = horizon_text(C.NL)
         out = []
+        full_ref = res[dec["full_choice"]]
+        fe = full_ref["ewt"]
+        cont_lbl = "departure adjustment" if dec["full_choice"] == "adjust" else "running every trip in full"
         if ch == "halfway":
             h = Hw["mc"]
+            he = Hw["ewt"]
+            b = dec["benefit"]
             r = next(r for r in Hw["rows"] if r["type"] == "halfway")
-            full_ref = res[dec["full_choice"]]
             f = full_ref["mc"]
-            out.append(f"Halfway deployment was selected because {'departure adjustment' if dec['full_choice'] == 'adjust' else 'running every trip in full'} leaves a P85 maximum headway of "
-                       f"{f['max_p85']:.0f} min over the next 3 UP + 3 DOWN trips; halfway + regulation brings it to {h['max_p85']:.0f} min.")
+            out.append(f"Halfway was selected on EWT: over {hz}, {cont_lbl} gives an Average EWT of {fe['avg']:.2f} min across {fe['n_points']} evaluation points; "
+                       f"halfway + adjustment gives {he['avg']:.2f} min ({b['ewt']:+.2f} min saved, {b['ewt_pct']:.1f}% better). In the stress test the P85 Average EWT is {f['ewt_p85']:.2f} \u2192 {h['ewt_p85']:.2f} min.")
+            if fe.get("worst") and he.get("worst"):
+                out.append(f"Worst point: {fe['worst']['label']} on {fe['worst']['leg']} at {fe['worst']['ewt']:.2f} min EWT when continuing, "
+                           f"against {he['worst']['label']} on {he['worst']['leg']} at {he['worst']['ewt']:.2f} min with halfway.")
             off = r["shift"] or 0.0
             slot_txt = "on its slot" if abs(off) < 0.5 else f"{abs(off):.0f} min {'after' if off > 0 else 'before'} its slot"
             out.append(f"Starting Trip {r['n']} halfway at {r['stop']} ({r['start_clock']}, {slot_txt}) gets that bus back into its timetable while the other trips complete the full route; "
-                       f"the remaining departures are spread so a second large gap does not form.")
-            fd, hd = full_ref["det"], Hw["det"]
-            if fd["recovered"] and hd["recovered"]:
-                rec_txt = f"restores normal headways about {max(0, (fd['rec'] or 0) - (hd['rec'] or 0)):.0f} min earlier"
-            elif hd["recovered"]:
-                rec_txt = (f"settles to normal headways {('within ' + format(hd['rec'], '.0f') + ' min') if hd['rec'] else 'straight away'} "
-                           f"(and in {h['p_recovered']:.0f}% of the {h['n']:,} simulated futures, against {f['p_recovered']:.0f}% for the full-trip plan, which does not settle within the 3 UP + 3 DOWN trips)")
-            else:
-                fl = max((c["max"] or 0) for c in full_ref["chain"][1:]); hl = max((c["max"] or 0) for c in Hw["chain"][1:])
-                rec_txt = f"keeps the largest headway on the later trips (DOWN 1 to DOWN 3) at {hl:.0f} min instead of {fl:.0f} min"
-            out.append(f"It sacrifices {r['km_lost']:.1f} km of operated mileage but {rec_txt}, "
-                       f"and cuts the late BC's finishing delay from +{f['bc_p85']:.0f} to +{h['bc_p85']:.0f} min (P85).")
+                       f"the stops before {r['stop']} lose that trip on UP 1, which is already inside the EWT figures above.")
+            out.append(f"It sacrifices {r['km_lost']:.1f} km of operated mileage; the late BC's finishing delay goes from +{f['bc_p85']:.0f} to +{h['bc_p85']:.0f} min (P85).")
             if self.needs_standby:
                 out.append(f"Trip {r['n']}'s own bus cannot reach any halfway stop in time, so this needs a STANDBY bus at {r['stop']}; the late bus becomes the spare when it arrives.")
         else:
             F = res[ch]
             f = F["mc"]
-            if Hw is not None:
-                h = Hw["mc"]
-                b = dec["benefit"]
-                if ch == "adjust":
-                    out.append(f"The full trip is kept: adjusting departures already brings the P85 maximum headway from {n_['max_p85']:.0f} to {f['max_p85']:.0f} min without losing mileage.")
-                else:
-                    out.append(f"No intervention is needed: the natural departures keep the P85 maximum headway at {f['max_p85']:.0f} min.")
-                if not dec["halfway_ok"]:
-                    out.append(f"Halfway + regulation was tested but only changes the P85 maximum headway by {b.get('max_p85', 0):+.0f} min and recovery by {b.get('rec_p50', 0):+.0f} min "
-                               f"- not enough network benefit to justify losing {Hw['det']['km']:.1f} km.")
-                else:
-                    out.append(f"Halfway would improve the P85 maximum headway by {b.get('max_p85', 0):.0f} min, but under the {self.mode} priority its {Hw['det']['km']:.1f} km mileage cost is not justified.")
-                if (f["bc_p85"] or 0) > (h["bc_p85"] or 0) + 2:
-                    out.append(f"Trade-off: the late BC finishes about +{f['bc_p85']:.0f} min late (P85) with the full trip, against +{h['bc_p85']:.0f} min with halfway.")
+            if ch == "adjust":
+                out.append(f"The full trip is kept: adjusting departures lowers the Average EWT over {hz} from {N['ewt']['avg']:.2f} to {F['ewt']['avg']:.2f} min without losing mileage.")
             else:
-                out.append(f"No halfway start is feasible here (no stop can be reached inside the slot window, even with a standby bus), so the AI balances the trips around the late bus: P85 maximum headway {n_['max_p85']:.0f} \u2192 {f['max_p85']:.0f} min.")
+                out.append(f"No intervention: the natural departures give an Average EWT of {F['ewt']['avg']:.2f} min over {hz}; no departure adjustment lowers it by the "
+                           f"{self.P['ewt_adjust_min']:g} min needed to be worth making.")
+            if Hw is not None:
+                b = dec["benefit"]
+                failed = [t for t in (dec.get("tests") or []) if not t["pass"]]
+                out.append(f"Halfway + adjustment was simulated too: Average EWT {Hw['ewt']['avg']:.2f} min ({b['ewt']:+.2f} min, {b['ewt_pct']:+.1f}% against continuing). "
+                           + ("Not recommended because: " + "; ".join(f"{t['test'].lower()} ({t['value']})" for t in failed) + "." if failed else ""))
+                if (f["bc_p85"] or 0) > (Hw["mc"]["bc_p85"] or 0) + 2:
+                    out.append(f"Trade-off: the late BC finishes about +{f['bc_p85']:.0f} min late (P85) with the full trip, against +{Hw['mc']['bc_p85']:.0f} min with halfway.")
+            else:
+                out.append(f"No halfway start is feasible here (no stop can be reached inside the slot window, even with a standby bus), so the AI balances the trips around the late bus.")
         # is the biggest interchange gap physically unavoidable? (bus before it already held to the cap, bus after it leaves as soon as it is ready)
         best = res[ch]
         full = sorted([r for r in best["rows"] if r["type"] != "halfway"], key=lambda r: r["dep"])
@@ -904,8 +1050,8 @@ class Optimiser:
         if loc is not None:
             best = res[ch]
             l1, b1 = loc["chain"][0]["max"], best["chain"][0]["max"]
-            ld = max((c["max"] or 0) for c in loc["chain"][1:]) if len(loc["chain"]) > 1 else 0
-            bd = max((c["max"] or 0) for c in best["chain"][1:]) if len(best["chain"]) > 1 else 0
+            ld = max(((c["max"] or 0) for c in loc["chain"][1:]), default=0)
+            bd = max(((c["max"] or 0) for c in best["chain"][1:]), default=0)
             if ld > bd + 1:
                 out.append(f"Fixing only the next departure looks good at UP 1 ({l1:.0f} min) but pushes the later trips to a {ld:.0f} min headway; the chosen plan keeps them at {bd:.0f} min.")
         return out

@@ -219,6 +219,38 @@ details.hall{margin-top:10px}details.hall summary{cursor:pointer;color:#9cc4ff;f
 .rvrej{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:3px 10px;font-size:12.3px}.rvrej span{color:#cfe0f3}.rvrej b{color:#ff9aa0;text-align:right}
 .rvstale{background:#3a2a06;border:1px solid #7a5a12;color:#ffe08a;border-radius:10px;padding:8px 12px;font-size:13px;margin-bottom:10px}
 .rvkv.rules{grid-template-columns:minmax(0,1fr) minmax(0,1.1fr)}.rvkv.rules b{text-align:right;font-weight:700}
+/* ===== V13.9 Balance Trips + EWT decision ===== */
+.hobal{background:#0c2440;border:1px solid #2f7bd0;border-radius:12px;padding:9px 10px;margin:8px 0 10px}
+.hobal label{color:#cfe0f3;font-weight:700;font-size:13px}.hobalrow{display:flex;gap:10px;align-items:center}.hobalrow input{width:92px;font-weight:800;font-size:17px;text-align:center}
+.hobalrow span{color:#9cc4ff;font-weight:700;font-size:13px}.hobalhint{display:block;color:var(--mut);font-size:11.8px;margin-top:5px;line-height:1.35}
+.tip{display:inline-grid;place-items:center;width:16px;height:16px;border-radius:50%;background:#1f4468;color:#cfe0f3;font-size:10.5px;font-weight:800;font-style:italic;cursor:help;margin-left:4px;vertical-align:1px}
+.hobal.bad input{border-color:var(--red)}
+.ewt{border:1px solid #2f7bd0;border-radius:12px;background:#08182c;padding:12px;margin:0 0 12px}
+.ewthd{display:flex;flex-wrap:wrap;justify-content:space-between;gap:6px 12px;align-items:baseline;margin-bottom:8px}.ewthd h3{margin:0;font-size:16px}
+.ewtbal{background:#12253c;border:1px solid var(--line2);border-radius:8px;padding:3px 9px;font-size:12.5px;color:#cfe0f3}.ewtbal b{color:#fff}
+.ewtsum{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.ewtsum>div{background:#0c2440;border:1px solid var(--line2);border-radius:10px;padding:9px 11px;min-width:0}
+.ewtsum small{display:block;font-size:11px;font-weight:800;letter-spacing:.05em;color:#9cc4ff}.ewtsum span{display:block;color:var(--mut);font-size:11.5px}
+.ewtsum b{display:block;font-size:22px;font-weight:800;font-variant-numeric:tabular-nums;margin:2px 0}.ewtsum em{display:block;font-style:normal;color:#a9c2da;font-size:11.5px}
+.ewtsum .c small{color:#7fb6ff}.ewtsum .h small{color:#ffb54d}.ewtsum .pick{border:2px solid #ff9f1c;background:#1d1a10}.ewtsum b.g{color:#7be7a5}.ewtsum b.r{color:#ff8a90}
+.ewtkv{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:8px}
+.ewtkv .rvkv b{min-width:0;overflow-wrap:anywhere}.ewtkv .rvkv{grid-template-columns:minmax(0,1fr) minmax(0,1.25fr);margin-top:0;background:#0b1a2e;border:1px solid var(--line2);border-radius:10px;padding:8px 10px}
+.ewttest{list-style:none;margin:8px 0 0;padding:0;display:grid;gap:4px;font-size:12.8px}.ewttest li{display:grid;grid-template-columns:22px minmax(0,1fr) auto;gap:8px;align-items:center;background:#0b1a2e;border:1px solid var(--line2);border-radius:8px;padding:5px 9px}
+.ewttest li i{font-style:normal;font-weight:800;text-align:center}.ewttest li.p i{color:#7be7a5}.ewttest li.f i{color:#ff8a90}.ewttest li b{font-variant-numeric:tabular-nums}
+.ewtf{margin-top:10px;border-radius:10px;padding:9px 11px;background:#0d2039;border:1px dashed #2f5d8e;font-size:12.6px;line-height:1.5;color:#cfe0f3}.ewtf code{font-family:ui-monospace,Menlo,Consolas,monospace;color:#fff;background:#12253c;border-radius:5px;padding:1px 5px;font-size:12px}
+.ewtt{width:100%;border-collapse:collapse;font-size:12.8px}.ewtt th{color:#b9d0e6;font-weight:600;text-align:right;padding:5px 6px;border-bottom:1px solid var(--line2);white-space:nowrap}.ewtt th:first-child,.ewtt td:first-child{text-align:left}
+.ewtt td{padding:5px 6px;border-bottom:1px solid #12253c;text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}.ewtt td:first-child{white-space:normal;min-width:150px}
+.ewtt tr.pt{cursor:pointer}.ewtt tr.pt:hover td{background:#0f2744}.ewtt tr.sel td{background:#173a63}.ewtt td.dg{color:#7be7a5;font-weight:700}.ewtt td.dr{color:#ff8a90;font-weight:700}
+.ewtt td .cd{color:#7f97b0;font-size:11px;margin-left:4px}.ewtt tfoot td{font-weight:800;border-top:1px solid var(--line2);border-bottom:0}
+.ewtleg{border:1px solid var(--line2);border-radius:10px;margin-top:6px;background:#0b1a2e}.ewtleg>summary{cursor:pointer;padding:7px 10px;font-weight:700;font-size:13px;display:flex;flex-wrap:wrap;gap:4px 12px}
+.ewtleg>summary span{color:var(--mut);font-weight:600;font-size:12px}.ewtleg[open]>summary{border-bottom:1px solid var(--line2)}
+.ewtdet{margin-top:8px;border:1px solid #2f7bd0;border-radius:10px;padding:10px;background:#0b1a2e;font-size:12.8px}.ewtdet h4{margin:0 0 6px;font-size:13.5px}
+.ewtdet .g2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.ewtdet .hl{display:flex;flex-wrap:wrap;gap:3px;margin:4px 0 6px}
+.ewtdet .hl span{background:#12253c;border:1px solid var(--line2);border-radius:6px;padding:1px 6px;font-size:11.5px;font-variant-numeric:tabular-nums}.ewtdet .hl span.x{border-color:#a8661a;color:#ffc46b}
+.ewtdet .calc{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11.8px;color:#dbe8f7;line-height:1.55}
+.ewtchart{margin-top:6px}.ewtbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;margin-top:10px}
+@media(max-width:900px){.ewtsum{grid-template-columns:repeat(2,minmax(0,1fr))}.ewtkv,.ewtdet .g2{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:420px){.ewtsum b{font-size:19px}}
 .rvmore{background:none;border:1px dashed var(--line2);color:#9cc4ff;border-radius:9px;padding:7px;cursor:pointer;font-weight:600;font-size:12.5px}
 @media(max-width:1100px){.rvcards{grid-template-columns:minmax(0,1fr)}.rvgrid2{grid-template-columns:minmax(0,1fr)}.rvhead{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:560px){.rvhead{grid-template-columns:repeat(2,minmax(0,1fr))}.rvhead b{font-size:18px}.rvdec b{font-size:16px}}
@@ -271,6 +303,9 @@ details.hall{margin-top:10px}details.hall summary{cursor:pointer;color:#9cc4ff;f
     <div class="hx-top">
       <section class="card hx-sc">
         <h2>1. Scenario</h2>
+        <div class="fld hobal"><label for="hoBal">Balance Trips <span class="tip" tabindex="0" role="note" title="Number of subsequent trips included in the EWT and recovery assessment." aria-label="Number of subsequent trips included in the EWT and recovery assessment.">i</span></label>
+          <div class="hobalrow"><input id="hoBal" class="sel" type="number" min="1" max="16" step="1" value="6" inputmode="numeric" title="Number of subsequent trips included in the EWT and recovery assessment." aria-describedby="hoBalTxt"><span id="hoBalTxt">UP 1 &rarr; DOWN 3</span></div>
+          <small class="hobalhint">Number of subsequent trips included in the EWT and recovery assessment. Changing it re-runs every calculation.</small></div>
         <div class="fld"><label for="hoOp">Transport Operator</label>
           <select id="hoOp"><option value="">All operators</option><option value="SBST">SBS Transit</option><option value="SMRT">SMRT</option><option value="TTS">Tower Transit</option><option value="GAS">Go-Ahead</option></select></div>
         <div class="hx-f2"><div class="fld"><label for="hoSvc">Service</label><input id="hoSvc" class="sel" list="hoSvcList" maxlength="6" autocapitalize="characters" placeholder="e.g. 32"><datalist id="hoSvcList"></datalist></div>
@@ -290,7 +325,7 @@ details.hall{margin-top:10px}details.hall summary{cursor:pointer;color:#9cc4ff;f
         <div class="fld"><label>Bus type <small>(route suitability check)</small></label><div class="hopref" id="hoBus"><label><input type="radio" name="hobus" value="sd"> Single deck</label><label><input type="radio" name="hobus" value="dd" checked> Double deck</label><label><input type="radio" name="hobus" value="art"> Articulated</label></div></div>
         <details class="hall" id="hoDims"><summary>Vehicle dimensions (optional &ndash; from your fleet data)</summary><div class="hx-f2" style="margin-top:6px"><div class="fld"><label for="hoVh">Height, m</label><input id="hoVh" class="sel" type="number" step="0.01" min="2" max="5.5" inputmode="decimal" placeholder="not set"></div><div class="fld"><label for="hoVw">Width, m</label><input id="hoVw" class="sel" type="number" step="0.01" min="2" max="3" inputmode="decimal" placeholder="not set"></div></div><div class="fld"><label for="hoVt">Gross weight, t</label><input id="hoVt" class="sel" type="number" step="0.5" min="5" max="40" inputmode="decimal" placeholder="not set"></div><div class="hx-note">Used only to compare against limits recorded in map data. The app never assumes a vehicle size or a bridge height.</div></details>
         <div class="fld"><label for="hoReady">Halfway bus ready at the first stop <small>(HH:MM, optional)</small></label><input id="hoReady" class="sel" type="text" maxlength="5" inputmode="numeric" placeholder="auto: the delayed bus itself"></div>
-        <div class="hx-note" style="margin:0 0 6px">The halfway bus runs off-service from the first stop along real roads (road routing for every candidate stop; an estimate only if routing is unavailable). The AI tests the eligible halfway starts and regulates surrounding full trips to minimise the largest headway and overall headway spread. Full trips must receive at least the 7-min minimum layover before departure. A halfway-start trip omits interchange layover because it starts downstream. AI uses a minimum 6-trip regulation horizon (3 before + 3 after) and caps artificial departure adjustment at +8 min to reduce BC welfare impact.</div>
+        <div class="hx-note" style="margin:0 0 6px">The halfway bus runs off-service from the first stop along real roads (road routing for every candidate stop; an estimate only if routing is unavailable). The AI tests the eligible halfway starts and regulates surrounding full trips to minimise the largest headway and overall headway spread. Full trips must receive at least the 7-min minimum layover before departure. A halfway-start trip omits interchange layover because it starts downstream. Halfway vs continuing the full trip is decided on <b>EWT</b> (AWT &minus; SWT) at every evaluation point of the selected <b>Balance Trips</b>, averaged across the points &ndash; the delay is only an input to the simulation. Departure adjustments are capped at &plusmn;8 min to limit the BC welfare impact.</div>
         <div class="btns"><button class="btn go" id="hoRun" type="button">Run AI Optimisation</button><button class="btn" id="hoEx" type="button">Load example</button></div>
         <div class="hx-note" id="hoMsg"></div>
       </section>
@@ -313,7 +348,7 @@ details.hall{margin-top:10px}details.hall summary{cursor:pointer;color:#9cc4ff;f
     </section>
     <section class="card hx-row os" id="osCard"><header><div><h2>Halfway Deployment &amp; Off-Service Route Planner</h2><div class="sub">Where the bus starts service, which roads it takes to get there, whether this bus type can use them, and how much headway it earns.</div></div></header>
       <div id="osBody"><div class="ho-msg">Press <b>Run AI Optimisation</b>. If a halfway deployment is possible, its off-service route appears here.</div></div></section>
-    <section class="card hx-row rv" id="rvCard"><header><div><h2>AI Recovery Scenario Optimiser &ndash; Full Trip vs Halfway</h2><div class="sub">Every feasible plan is simulated over the next 3 UP + 3 DOWN trips and 1,000 possible futures. Full trip keeps mileage but can leave the BC late; halfway recovers the BC and the headway but loses mileage.</div></div><a class="btn sm" href="/recovery-guide" target="_blank" rel="noopener">How the AI decides</a></header>
+    <section class="card hx-row rv" id="rvCard"><header><div><h2>AI Recovery Scenario Optimiser &ndash; Full Trip vs Halfway</h2><div class="sub">Every feasible plan is simulated over the selected <b>Balance Trips</b> and 1,000 possible futures. <b>Continue full trip</b> and <b>Halfway + adjustment</b> are compared on Excess Waiting Time (EWT) at every evaluation point, then averaged.</div></div><a class="btn sm" href="/recovery-guide" target="_blank" rel="noopener">How the AI decides</a></header>
       <div id="rvBody"><div class="ho-msg">Type the lateness of the late trips, then press <b>Run AI Optimisation</b>.</div></div></section>
     <section class="card hx-row" id="hoTsdCard" hidden><header><div><h2>Deployment Timeline &ndash; Trips Running Down the Route</h2><div class="sub">Each line is one trip (top = first stop, bottom = terminal). The horizontal distance between two lines is the headway. The white marker follows the map clock.</div></div></header>
       <div class="hotsdgrid"><div><div class="tw"><svg id="hoTsd" role="img" aria-label="Time versus route position of every trip"></svg></div><div class="hokey2" id="hoTsdKey"></div></div>
@@ -403,6 +438,7 @@ async function hoLoad0(){
   $("hoHw").value = j.sched_hw != null ? j.sched_hw : ""; $("hoHw").placeholder = j.sched_hw != null ? "" : "enter it";
   $("hoLay").value = j.params.layover_min; $("hoDelay").value = j.params.start_delay_min;
   HO.n = j.params.n_trips; hoBuildTrips();
+  if(LS.get("ho.bal", null) == null && j.params.balance_trips){ $("hoBal").value = j.params.balance_trips; hoBalSync(); }      // the Settings default until the user picks a value
   $("hoStopsList").innerHTML = j.stops.map(s => `<option value="${esc(s[0])}">${esc(s[1])}</option>`).join("");
   $("hoInfo").innerHTML = `<b>Svc ${esc(j.service)} Dir ${HO.dir}</b>: ${esc(j.first)} \u2192 ${esc(j.last)}<br>${j.n_stops} stops \u00b7 ${f1(j.route_km)} km \u00b7 ${Math.round(j.run_min)} min running ${j.traffic_ok ? "(current traffic)" : "(fallback speed: no traffic data)"}<br>` +
     (j.sched_hw != null ? `Scheduled headway ${f1(j.sched_hw)} min (${esc(j.hw_src)})` : `<span class="hx-err">Scheduled headway unknown - enter it in the Headway box.</span>`) +
@@ -498,7 +534,7 @@ function hoRender(){ hoRenderTrips(); hoRenderRecovery(); hoRenderRec(); hoRende
 const RV_MODE = {balanced:"balanced", recovery:"headway", mileage:"mileage"};
 function rvUrl(){
   const hw = $("hoHw").value.trim(), std = HO.setup && HO.setup.sched_hw != null && Math.abs(+hw - HO.setup.sched_hw) < 1e-9, pref = (document.querySelector("input[name=hopref]:checked") || {}).value || "balanced";
-  return "/api/halfway/recovery?" + new URLSearchParams({service:HO.svc, direction:HO.dir, ref:$("hoRef").value.trim(), hw:std ? "" : hw, layover:$("hoLay").value.trim(), late:HO.late.join(","), mode:RV_MODE[pref] || "balanced", veh:HO.veh, scope:HO.scope === "approved" ? "approved" : "all", sims:"1000", bus:HO.bus, vh:$("hoVh").value.trim(), vw:$("hoVw").value.trim(), vt:$("hoVt").value.trim()});
+  return "/api/halfway/recovery?" + new URLSearchParams({balance:String(hoBal() || ""), service:HO.svc, direction:HO.dir, ref:$("hoRef").value.trim(), hw:std ? "" : hw, layover:$("hoLay").value.trim(), late:HO.late.join(","), mode:RV_MODE[pref] || "balanced", veh:HO.veh, scope:HO.scope === "approved" ? "approved" : "all", sims:"1000", bus:HO.bus, vh:$("hoVh").value.trim(), vw:$("hoVw").value.trim(), vt:$("hoVt").value.trim()});
 }
 function rvChosen(){ const r = HO.rec; return r && r.ok && r.plans && r.plans[r.decision] ? r.plans[r.decision] : null; }
 function rvRows(){                                 // {trip: row of the chosen plan} with the interchange headway in departure order
@@ -511,12 +547,13 @@ function rvRows(){                                 // {trip: row of the chosen p
 async function hoRun(){
   if(HO.loadingP){ hoMsg("Loading the route\u2026"); await HO.loadingP; }       // the service box was just changed: wait for its route before running
   if(!HO.svc || !HO.setup || HO.setup.error){ hoMsg("Enter a service first.", true); return; }
-  $("hoRun").disabled = true; hoMsg("AI Recovery Scenario Optimiser: generating plans, simulating the 3 UP + 3 DOWN chain and 1,000 futures per plan\u2026");
+  if(!hoBal()){ hoMsg("Balance Trips must be a whole number from 1 to 16.", true); $("hoBal").focus(); return; }
+  $("hoRun").disabled = true; hoMsg(`AI Recovery Scenario Optimiser: generating plans, simulating ${hoBal()} balance trips (${balSpan(hoBal())}) and 1,000 futures per plan, then EWT at every evaluation point\u2026`);
   $("rvBody").innerHTML = `<div class="sk"></div><div class="sk" style="width:70%"></div><div class="sk" style="width:85%"></div>`;
   const rj = await getJSON(rvUrl(), 120000);
-  HO.rec = rj; HO.recStale = false; HO.force = null; HO.osSel = null;
+  HO.rec = rj; HO.recStale = false; HO.force = null; HO.osSel = null; HO.ewtSel = null;
   if(rj.ok && rj.plans && rj.plans.none){ try{ const P_ = rj.plans, ch_ = P_[rj.decision]; localStorage.setItem("rv.last", JSON.stringify({ts:Date.now(), svc:HO.svc, dir:HO.dir, decision:rj.decision, H:rj.H, sims:rj.sims,
-    ins:(rj.instructions || []).filter(i => i.kind === "halfway" || i.kind === "hold" || i.kind === "release").slice(0, 7).map(i => i.text), why:rj.why, none:P_.none.mc.max_p85, adjust:P_.adjust.mc.max_p85, ai:ch_.mc.max_p85,
+    ins:(rj.instructions || []).filter(i => i.kind === "halfway" || i.kind === "hold" || i.kind === "release").slice(0, 7).map(i => i.text), why:rj.why, ewt:rj.ewt ? {bal:rj.ewt.balance_trips, cont:rj.ewt.continue.avg, half:rj.ewt.halfway ? rj.ewt.halfway.avg : null, pct:rj.ewt.improvement_pct, pts:rj.ewt.continue.n_points} : null, none:P_.none.mc.max_p85, adjust:P_.adjust.mc.max_p85, ai:ch_.mc.max_p85,
     rec:[rvRec(P_.none), rvRec(ch_)], km:ch_.det.km, bc:[P_[rj.full_choice === "none" ? "none" : "adjust"].mc.bc_p85, ch_.mc.bc_p85]})); }catch(e){} }
   if(rj.ok && HO.auto && rj.plans && Object.keys(rj.plans).length){               // align the stop-level view below with the Recovery Optimiser's decision
     const hw = rj.decision === "halfway" ? rj.plans.halfway.rows.filter(x => x.type === "halfway") : [];
@@ -539,17 +576,19 @@ function rvPat(list, H, bm, n, hwTrips){
   return `<div class="rvpat">${list.map(([b, g]) => { const c = g < bm || g >= 2 * H - 1e-9 ? "#e0474f" : g >= 1.5 * H - 1e-9 ? "#ee8a2a" : Math.abs(g - H) <= .2 * H + 1e-9 ? "#22b567" : "#e4c63c";
     return `<div title="headway ${f1(g)} min before ${b > n ? "the next scheduled trip" : "trip " + b}"><span style="color:${c}">${Math.round(g)}</span><i style="height:${Math.max(4, 52 * g / mx)}px;background:${c}"></i><em>${b > n ? "next" : (hwTrips.includes(b) ? "H" : "T") + b}</em></div>`; }).join("")}</div>`;
 }
-function rvRec(p){ const d = p.det; return !d.recovered ? "not in 3 UP+3 DOWN" : d.rec < 1 ? "immediately" : Math.round(d.rec) + " min"; }
+function rvRec(p){ const d = p.det, nb = HO.rec && HO.rec.balance_trips; return !d.recovered ? `not within ${nb || ""} balance trips` : d.rec < 1 ? "immediately" : Math.round(d.rec) + " min"; }
 function rvCard(k, p, r){
   const H = r.H, bm = (r.params && r.params.bunch_min) || 3, m = p.mc, d = p.det, pick = r.decision === k, n = (r.trips || []).length || 10;
   const hwT = p.rows.filter(x => x.type === "halfway").map(x => x.n);
-  const tl = k === "none" ? "Every bus leaves when it is ready (arrival + 7 min). Nothing is held, nothing is lost." : k === "adjust" ? "Every trip runs the full route. Departures are spread (\u00b18 min, \u2265 7 min layover); the late BC stays late." : `Trip ${hwT.join(", ")} starts halfway, the others run in full and are regulated. The late BC gets back on time.`;
+  const tl = (k === r.ewt?.continue_key ? "CONTINUE scenario \u2013 " : k === "halfway" ? "HALFWAY scenario \u2013 " : "Reference \u2013 ") + (k === "none" ? "Every bus leaves when it is ready (arrival + 7 min). Nothing is held, nothing is lost." : k === "adjust" ? "Every trip runs the full route. Departures are spread (\u00b18 min, \u2265 7 min layover); the late BC stays late." : `Trip ${hwT.join(", ")} starts halfway, the others run in full and are adjusted. The late BC gets back on time.`);
   const cls = (v, good, bad) => v == null ? "" : v <= good ? "ok" : v >= bad ? "bad" : "amb";
   const tr = p.trade || {};
   return `<div class="rvc ${pick ? "pick" : ""}">${pick ? `<span class="tagp">AI PLAN</span>` : ""}<h3>${RV_LBL[k]}</h3><div class="tl">${tl}</div>
     <h4>Departure headways at ${esc(r.first_stop || "the interchange")} (UP 1)</h4>${rvPat(p.ic_hw, H, bm, n, hwT)}
     ${p.down_hw ? `<h4>Headways passengers see at ${esc(r.disp_name || "mid-route")}</h4>${rvPat(p.down_hw, H, bm, n, hwT)}` : ""}
-    <div class="rvkv"><span>Max headway, expected</span><b class="${cls(d.max, 1.2 * H, 2 * H)}">${f1(d.max)} min</b>
+    <div class="rvkv"><span>Average EWT (${r.balance_trips} balance trips)</span><b class="${cls(p.ewt && p.ewt.avg, .5, 2)}">${p.ewt ? f2(p.ewt.avg) : "\u2013"} min</b>
+      <span>EWT P50 / P85 (stress test)</span><b>${f2(m.ewt_p50)} / ${f2(m.ewt_p85)}</b>
+      <span>Max headway, expected</span><b class="${cls(d.max, 1.2 * H, 2 * H)}">${f1(d.max)} min</b>
       <span>Max headway P50 / P85 / P90</span><b>${f1(m.max_p50)} / <span style="color:#fff">${f1(m.max_p85)}</span> / ${f1(m.max_p90)}</b>
       <span>Normal headway restored</span><b class="${d.recovered ? "ok" : "bad"}">${rvRec(p)}</b>
       <span>Settles in (of ${m.n.toLocaleString()} futures)</span><b class="${cls(100 - m.p_recovered, 20, 60)}">${f1(m.p_recovered)}%</b>
@@ -573,7 +612,7 @@ function rvHist(r){
   ks.forEach(k => { const pts = D[k].flatMap(b => [`${x(b[0]).toFixed(1)},${y(b[2]).toFixed(1)}`, `${x(b[1]).toFixed(1)},${y(b[2]).toFixed(1)}`]);
     s += `<polyline points="${x(D[k][0][0]).toFixed(1)},${y(0)} ${pts.join(" ")} ${x(D[k].slice(-1)[0][1]).toFixed(1)},${y(0)}" fill="${RV_COL[k]}22" stroke="${RV_COL[k]}" stroke-width="2"/>`;
     const p85 = r.plans[k].mc.max_p85; s += `<line x1="${x(p85)}" x2="${x(p85)}" y1="${pt}" y2="${Ht - pb}" stroke="${RV_COL[k]}" stroke-width="1.5" stroke-dasharray="5 3"/>`; });
-  s += `<text x="${(W + pl) / 2}" y="${Ht - 4}" text-anchor="middle" font-size="12" fill="#8ba3bd">Max headway, next 3 UP + 3 DOWN (min) \u00b7 dashed = P85</text></svg>`;
+  s += `<text x="${(W + pl) / 2}" y="${Ht - 4}" text-anchor="middle" font-size="12" fill="#8ba3bd">Max headway over ${r.balance_trips} balance trips (min) \u00b7 dashed = P85</text></svg>`;
   return s + `<div class="hokey">${ks.map(k => `<span><i style="background:${RV_COL[k]}"></i>${RV_LBL[k]}: P50 ${f1(r.plans[k].mc.max_p50)} \u00b7 P85 ${f1(r.plans[k].mc.max_p85)} \u00b7 P90 ${f1(r.plans[k].mc.max_p90)}</span>`).join("")}</div>`;
 }
 function rvChain(r){
@@ -586,7 +625,7 @@ function rvChain(r){
 function hoRenderRecovery(){
   osRender();
   const el = $("rvBody"); if(!el) return; const r = HO.rec;
-  if(!r){ el.innerHTML = `<div class="ho-msg">Type the lateness of the late trips, then press <b>Run AI Optimisation</b>. The AI compares <b>No action</b>, <b>Full trip + adjustment</b> and <b>Halfway + regulation</b> on the next 3 UP + 3 DOWN trips.</div>`; return; }
+  if(!r){ el.innerHTML = `<div class="ho-msg">Type the lateness of the late trips, then press <b>Run AI Optimisation</b>. The AI simulates <b>Continue full trip</b> (no action / + adjustment) and <b>Halfway + adjustment</b> over the selected <b>${hoBal() || "?"} Balance Trips</b> and compares them on <b>EWT</b> at every evaluation point.</div>`; return; }
   if(!r.ok){ el.innerHTML = `<div class="ho-msg hx-err">${esc(r.error || "Recovery Optimiser failed")}</div>`; return; }
   const stale = HO.recStale ? `<div class="rvstale">Inputs changed since this result \u2013 press <b>Run AI Optimisation</b> to update it.</div>` : "";
   if(!r.plans || !r.plans.none){ el.innerHTML = stale + `<div class="rvdec none"><div class="ic">\u2713</div><b>No intervention needed</b><small>${esc((r.why || [])[0] || r.message || "")}</small></div>`; return; }
@@ -599,6 +638,7 @@ function hoRenderRecovery(){
   const li = i => `<li class="${i.kind}"><time>${esc(i.time)}</time><div><b>${esc(i.text)}</b>${i.sub ? `<small>${esc(i.sub)}</small>` : ""}</div></li>`;
   const main = ins.filter(key), rest = ins.filter(i => !key(i));
   h += `<ul class="rvins">${(HO.rvAll ? ins : main).map(li).join("")}</ul>${rest.length ? `<button class="rvmore" type="button" id="rvMore" style="width:100%;margin:-4px 0 10px">${HO.rvAll ? "Show only the trips that change" : `+ ${rest.length} trip${rest.length > 1 ? "s" : ""} unchanged (on time, departed) \u2013 show all`}</button>` : ""}`;
+  h += rvEwt(r);
   const bcFull = (Hw && r.decision === "halfway") ? P[r.full_choice] : ch;
   h += `<div class="rvhead"><div><small>Without intervention<br>max HW (P85)</small><b>${Math.round(N.mc.max_p85)} min</b></div><div><small>Adjustment only<br>max HW (P85)</small><b>${Math.round(A.mc.max_p85)} min</b></div>
     <div class="ai"><small>AI plan<br>max HW (P85)</small><b>${Math.round(ch.mc.max_p85)} min</b></div><div><small>Normal headway<br>no action \u2192 AI</small><b style="font-size:15px">${rvRec(N)} \u2192 ${rvRec(ch)}</b></div>
@@ -606,17 +646,103 @@ function hoRenderRecovery(){
   h += `<div class="rvcards">${["none", "adjust", "halfway"].filter(k => P[k]).map(k => rvCard(k, P[k], r)).join("")}${!Hw ? `<div class="rvc"><h3>Halfway + regulation</h3><div class="tl">No feasible halfway start: no tested stop can be reached inside the slot window${r.halfway_trips_tested && r.halfway_trips_tested.length ? "" : " (no trip is late enough to be considered)"}.</div></div>` : ""}</div>`;
   h += `<div class="rvwhy"><h3>Why the AI chose this</h3><ol>${(r.why || []).map(w => `<li>${esc(w)}</li>`).join("")}</ol>
     <div class="rvtrade"><span>Passenger headway</span><i>\u2194</i><span>Mileage preservation</span><i>\u2194</i><span>BC welfare</span><i>\u2194</i><span>Recovery speed</span></div></div>`;
-  h += `<div class="rvgrid2"><div class="rvbox"><h3>Whole trip chain \u2013 largest headway per trip (min)</h3><div class="sub">A plan that looks good at the next departure can still create a bad headway one or two trips later. The chain shows every plan through UP 1 \u2192 DOWN 3.</div><div class="tw">${rvChain(r)}</div></div>
+  h += `<div class="rvgrid2"><div class="rvbox"><h3>Whole trip chain \u2013 largest headway per trip (min)</h3><div class="sub">A plan that looks good at the next departure can still create a bad headway one or two trips later. The chain shows every plan through ${esc(balSpan(r.balance_trips))}.</div><div class="tw">${rvChain(r)}</div></div>
     <div class="rvbox"><h3>What happens under 1,000 possible futures</h3><div class="sub">Each plan re-run with varying traffic, running time, dwell, junction delay, incidents and arrival predictions.</div>${rvHist(r)}</div></div>`;
   const rej = Object.entries(g.rejected || {});
   h += `<div class="rvgrid2"><div class="rvbox"><h3>Plans the AI generated</h3><div class="rvflow"><span>${(g.generated || 0).toLocaleString()} candidate plans</span><i>\u2192</i><span>${(g.rejected_total || 0).toLocaleString()} rejection hits</span><i>\u2192</i><span>best of each family refined</span><i>\u2192</i><span>4 plans \u00d7 ${(r.sims || 0).toLocaleString()} futures</span></div>
       <div class="rvrej">${rej.map(([k, v]) => `<span>${esc(k)}</span><b>${v.toLocaleString()}</b>`).join("")}</div><div class="ho-note">Families tested: ${Object.entries(g.families || {}).map(([k, v]) => esc(k) + " " + v).join(" \u00b7 ")}. A plan can fail several checks at once.</div></div>
-    <div class="rvbox"><h3>Hard rules applied</h3><div class="rvkv rules" style="margin-top:0"><span>BC minimum layover (full trip)</span><b>${f1(r.params.min_layover_min)} min</b><span>Artificial adjustment cap</span><b>\u00b1${f1(r.params.adj_max)} min</b><span>Already-departed trips</span><b>locked${r.locked && r.locked.length ? " (T" + r.locked.join(", T") + ")" : ""}</b><span>Horizon</span><b>3 before + 3 after, 3 UP + 3 DOWN</b><span>Halfway considered from</span><b>${f1(r.params.halfway_min_late)} min late</b><span>Halfway bus</span><b>${r.veh === "standby" ? "standby bus at the stop" : "late bus, off-service, no interchange layover"}</b><span>Halfway must beat adjustment by</span><b>\u2265 ${f1(r.params.gain_min)} min P85 max HW (or faster recovery)</b></div>
+    <div class="rvbox"><h3>Hard rules applied</h3><div class="rvkv rules" style="margin-top:0"><span>BC minimum layover (full trip)</span><b>${f1(r.params.min_layover_min)} min</b><span>Artificial adjustment cap</span><b>\u00b1${f1(r.params.adj_max)} min</b><span>Already-departed trips</span><b>locked${r.locked && r.locked.length ? " (T" + r.locked.join(", T") + ")" : ""}</b><span>Assessment horizon</span><b>${esc(r.horizon || "")}</b><span>Regulation window</span><b>${r.params.horizon_side} before + ${r.params.horizon_side} after the late trips</b><span>Halfway simulated for</span><b>every trip leaving \u2265 ${f1(r.params.halfway_min_late)} min late</b><span>Halfway bus</span><b>${r.veh === "standby" ? "standby bus at the stop" : "late bus, off-service, no interchange layover"}</b><span>Halfway must beat Continue by</span><b>Avg EWT \u2265 ${r.params.ewt_gain_min} min and \u2265 ${r.params.ewt_gain_pct}%${r.mode === "headway" ? " (halved: headway priority)" : ""}, not reversed by the stress test${r.mode === "mileage" ? `, \u2265 ${r.params.ewt_gain_per_km} min per km` : ""}</b></div>
       <div class="ho-note">Model ${esc(r.model || "")}. Running times from ${r.traffic_ok ? "current traffic" : "a fallback speed"}; DOWN running assumed equal to UP. Simulation of the entered scenario, not live bus data. Decision support only.</div></div></div>`;
   el.innerHTML = h;
   if($("rvMore")) $("rvMore").onclick = () => { HO.rvAll = !HO.rvAll; hoRenderRecovery(); };
+  rvEwtWire(r);
 }
 
+/* ===================== V13.9 EWT decision: Continue full trip vs Halfway over the selected Balance Trips ===================== */
+const f2 = x => x == null ? "\u2013" : (+x).toFixed(2);
+const sg2 = x => x == null ? "\u2013" : (x > 0 ? "+" : x < 0 ? "\u2212" : "") + Math.abs(+x).toFixed(2);
+function hoBal(){ const v = +$("hoBal").value; return Number.isInteger(v) && v >= 1 && v <= 16 ? v : null; }
+function legNm(L){ return (L % 2 ? "DOWN " : "UP ") + (Math.floor(L / 2) + 1); }
+function balSpan(n){ return !n ? "enter 1\u201316" : n > 1 ? legNm(0) + " \u2192 " + legNm(n - 1) : legNm(0); }
+function ewtCls(v){ return v == null ? "hc-n" : v <= .5 ? "hc-g" : v <= 1 ? "hc-y" : v <= 2 ? "hc-o" : "hc-r"; }
+function rvEwtChart(E){                              // EWT at every evaluation point, balance trip by balance trip
+  const R = E.rows || []; if(R.length < 2) return "";
+  const hw = !!E.halfway, W = 760, Ht = 230, pl = 40, pr = 10, pt = 22, pb = 30, n = R.length;
+  const vals = R.flatMap(q => [q.cont, hw ? q.half : null]).filter(v => v != null);
+  const lo = Math.min(0, ...vals), hi = Math.max(.5, ...vals) * 1.08;
+  const x = i => pl + (W - pl - pr) * (n === 1 ? .5 : i / (n - 1)), y = v => pt + (Ht - pt - pb) * (1 - (v - lo) / (hi - lo));
+  let s = `<svg viewBox="0 0 ${W} ${Ht}" style="width:100%;height:auto;min-width:520px" role="img" aria-label="EWT at every evaluation point for the continue and halfway scenarios">`;
+  const step = hi - lo > 4 ? 1 : hi - lo > 2 ? .5 : .25;
+  for(let v = Math.ceil(lo / step) * step; v <= hi; v += step) s += `<line x1="${pl}" x2="${W - pr}" y1="${y(v)}" y2="${y(v)}" stroke="#163250"/><text x="${pl - 5}" y="${y(v) + 4}" text-anchor="end" font-size="11" fill="#8ba3bd">${v.toFixed(step < 1 ? 2 : 0)}</text>`;
+  if(lo < 0) s += `<line x1="${pl}" x2="${W - pr}" y1="${y(0)}" y2="${y(0)}" stroke="#39536e" stroke-width="1.4"/>`;
+  let prevL = -1;
+  R.forEach((q, i) => { if(q.L !== prevL){ prevL = q.L; const xs = x(i) - (i ? (x(1) - x(0)) / 2 : 0);
+    s += `<line x1="${xs}" x2="${xs}" y1="${pt - 6}" y2="${Ht - pb}" stroke="#2f5d8e" stroke-dasharray="3 3"/><text x="${xs + 3}" y="${pt - 9}" font-size="11" fill="#9cc4ff" font-weight="700">${esc(q.leg)}</text>`; } });
+  const line = (k, col) => { let d = "", on = false; R.forEach((q, i) => { const v = q[k]; if(v == null){ on = false; return; } d += (on ? " L" : " M") + x(i).toFixed(1) + "," + y(v).toFixed(1); on = true; });
+    return `<path d="${d}" fill="none" stroke="${col}" stroke-width="2"/>` + R.map((q, i) => q[k] == null ? "" : `<circle cx="${x(i).toFixed(1)}" cy="${y(q[k]).toFixed(1)}" r="2.6" fill="${col}"><title>${esc(q.leg)} \u00b7 ${esc(q.label)}: ${k === "cont" ? "Continue" : "Halfway"} EWT ${f2(q[k])} min</title></circle>`).join(""); };
+  s += line("cont", RV_COL[E.continue_key] || "#3c96ff"); if(hw) s += line("half", RV_COL.halfway);
+  s += `<text x="${(W + pl) / 2}" y="${Ht - 6}" text-anchor="middle" font-size="11.5" fill="#8ba3bd">Evaluation points in route order, balance trip by balance trip \u00b7 EWT (min)</text></svg>`;
+  return `<div class="tw ewtchart">${s}</div><div class="hokey"><span><i style="background:${RV_COL[E.continue_key] || "#3c96ff"}"></i>${esc(E.continue_label)}</span>${hw ? `<span><i style="background:${RV_COL.halfway}"></i>Halfway + adjustment</span>` : ""}<span>Tap a point in the table below to see its headways and the calculation.</span></div>`;
+}
+function rvEwt(r){
+  const E = r.ewt; if(!E || !E.continue) return "";
+  const C = E.continue, W = E.halfway, hw = !!W, H = E.H, pick = r.decision === "halfway";
+  const imp = E.improvement_pct;
+  let h = `<div class="ewt" id="ewtBox"><div class="ewthd"><h3>EWT assessment \u2013 ${esc(E.continue_label)} vs Halfway + adjustment</h3><span class="ewtbal">Balance Trips: <b>${E.balance_trips}</b> \u00b7 ${esc(balSpan(E.balance_trips))}</span></div>`;
+  h += `<div class="ewtsum"><div class="c ${pick ? "" : "pick"}"><small>${esc(E.continue_label.toUpperCase())}</small><span>Average EWT</span><b>${f2(C.avg)} min</b><em>stress test P50 ${f2(C.p50)} \u00b7 P85 ${f2(C.p85)}</em></div>
+    <div class="h ${pick ? "pick" : ""}"><small>HALFWAY + ADJUSTMENT</small><span>Average EWT</span><b>${hw ? f2(W.avg) + " min" : "not feasible"}</b><em>${hw ? `stress test P50 ${f2(W.p50)} \u00b7 P85 ${f2(W.p85)}` : "no halfway start can be reached in time"}</em></div>
+    <div><small>EWT DIFFERENCE</small><span>Halfway \u2212 Continue</span><b class="${hw ? (E.diff < 0 ? "g" : E.diff > 0 ? "r" : "") : ""}">${hw ? sg2(E.diff) + " min" : "\u2013"}</b><em>negative = halfway lowers EWT</em></div>
+    <div><small>EWT IMPROVEMENT</small><span>by Halfway, % of Continue</span><b class="${hw && imp != null ? (imp > 0 ? "g" : imp < 0 ? "r" : "") : ""}">${hw && imp != null ? (imp > 0 ? "+" : "") + imp.toFixed(1) + "%" : "\u2013"}</b><em>${pick ? "Halfway recommended" : "Continue recommended"}</em></div></div>`;
+  const wst = w => w && w.worst ? `${esc(w.worst.label)} \u00b7 ${esc(w.worst.leg)} (${f2(w.worst.ewt)})` : "\u2013";
+  h += `<div class="ewtkv"><div class="rvkv"><span>Maximum EWT \u2013 Continue</span><b>${f2(C.max)} min</b><span>Maximum EWT \u2013 Halfway</span><b>${hw ? f2(W.max) + " min" : "\u2013"}</b>
+      <span>Worst point \u2013 Continue</span><b>${wst(C)}</b><span>Worst point \u2013 Halfway</span><b>${hw ? wst(W) : "\u2013"}</b></div>
+    <div class="rvkv"><span>Evaluation points assessed</span><b>${C.n_points}${hw && W.n_points !== C.n_points ? ` / ${W.n_points}` : ""}</b><span>Balance trips assessed</span><b>${E.balance_trips} (${esc(balSpan(E.balance_trips))})</b>
+      <span>Scheduled waiting time basis</span><b>${E.swt_basis === "individual" ? "individual scheduled headways" : `constant H = ${f1(H)} min \u2192 SWT = H/2 = ${f2(H / 2)}`}</b><span>Delay (input only)</span><b>${f1(r.delay)} min</b></div></div>`;
+  if(r.tests && r.tests.length) h += `<ul class="ewttest">${r.tests.map(t => `<li class="${t.pass ? "p" : "f"}"><i>${t.pass ? "\u2713" : "\u2717"}</i><span>${esc(t.test)}</span><b>${esc(t.value)}</b></li>`).join("")}</ul><div class="ho-note">Halfway is recommended only when every test passes; otherwise the full trip continues. ${pick ? "All tests passed." : hw ? "At least one test failed." : ""}</div>`;
+  // per balance trip
+  const pc = C.per_trip || [], ph = hw ? W.per_trip : [];
+  h += `<div class="rvgrid2"><div class="rvbox"><h3>Average EWT per balance trip</h3><div class="sub">Mean of the point EWTs on that trip (for reading only &ndash; the decision uses the average across every point).</div><div class="tw"><table class="ewtt"><thead><tr><th>Balance trip</th><th>Continue</th><th>Halfway</th><th>Difference</th></tr></thead><tbody>${pc.map((q, L) => { const a = q.avg, b = hw && ph[L] ? ph[L].avg : null, d = a != null && b != null ? b - a : null;
+      return `<tr><td>${esc(q.leg)}</td><td class="${ewtCls(a)}">${f2(a)}</td><td class="${ewtCls(b)}">${f2(b)}</td><td class="${d == null ? "" : d < -0.005 ? "dg" : d > 0.005 ? "dr" : ""}">${sg2(d)}</td></tr>`; }).join("")}</tbody></table></div></div>
+    <div class="rvbox"><h3>EWT along the route</h3><div class="sub">How each intervention affects passengers as the buses progress through every balance trip.</div>${rvEwtChart(E)}</div></div>`;
+  // LEVEL 1 table, grouped by balance trip
+  const byL = {}; (E.rows || []).forEach(q => (byL[q.L] = byL[q.L] || []).push(q));
+  h += `<div class="rvbox" style="margin-top:12px"><h3>EWT at each evaluation point</h3><div class="sub">Level 1: one EWT per point, from the headways of the buses passing that point on that balance trip. Green &le; 0.5 \u00b7 yellow &le; 1 \u00b7 orange &le; 2 \u00b7 red &gt; 2 min.</div>`;
+  Object.keys(byL).forEach(L => { const rows = byL[L], v = k => rows.map(q => q[k]).filter(x => x != null), m = a => a.length ? a.reduce((s_, x) => s_ + x, 0) / a.length : null;
+    h += `<details class="ewtleg" ${+L === 0 ? "open" : ""}><summary>${esc(rows[0].leg)}<span>${rows.length} points \u00b7 Continue ${f2(m(v("cont")))} \u00b7 Halfway ${hw ? f2(m(v("half"))) : "\u2013"}</span></summary><div class="tw"><table class="ewtt"><thead><tr><th>Evaluation point</th><th>Continue EWT</th><th>Halfway EWT</th><th>EWT Difference</th></tr></thead><tbody>${rows.map(q => `<tr class="pt${HO.ewtSel === q.L + ":" + q.p ? " sel" : ""}" data-k="${q.L}:${q.p}" tabindex="0"><td>${esc(q.label)}${q.code ? `<span class="cd">${esc(q.code)}</span>` : ""}</td><td class="${ewtCls(q.cont)}">${f2(q.cont)}</td><td class="${ewtCls(q.half)}">${f2(q.half)}</td><td class="${q.diff == null ? "" : q.diff < -0.005 ? "dg" : q.diff > 0.005 ? "dr" : ""}">${sg2(q.diff)}</td></tr>`).join("")}</tbody></table></div></details>`; });
+  h += `<table class="ewtt" style="margin-top:6px"><tfoot><tr><td>Level 2 \u2013 Average EWT across ${C.n_points} valid points</td><td>${f2(C.avg)}</td><td>${hw ? f2(W.avg) : "\u2013"}</td><td class="${hw ? (E.diff < 0 ? "dg" : E.diff > 0 ? "dr" : "") : ""}">${hw ? sg2(E.diff) : "\u2013"}</td></tr></tfoot></table>`;
+  h += `<div class="ewtdet" id="ewtDet">${rvEwtDet(r, HO.ewtSel)}</div>`;
+  h += `<div class="ewtbar"><span class="ho-note">Columns: Continue = ${esc(E.continue_label)}; Halfway = halfway start + necessary adjustment of the other trips.</span><button class="btn sm" type="button" id="ewtCsv">Download EWT table (CSV)</button></div></div>`;
+  h += `<div class="ewtf"><b>How the EWT is calculated</b><br><b>Level 1 \u2013 at each evaluation point</b> (never pooling headways from different stops): <code>EWT_point = \u03a3h_actual\u00b2 / (2\u03a3h_actual) \u2212 \u03a3h_sched\u00b2 / (2\u03a3h_sched)</code> = AWT \u2212 SWT, where h are the headways between consecutive buses passing that point on that balance trip (the simulated block of ${(r.trips || []).length} trips plus the on-schedule trip before and after it).
+    ${E.swt_basis === "individual" ? "SWT uses the individual scheduled headways you entered." : `No individual timetable was entered, so every scheduled headway is the constant target H = ${f1(H)} min and SWT reduces to H/2 = ${f2(H / 2)} min (the engine still computes it from the scheduled headways).`}
+    A point with fewer than two headways is not valid. <br><b>Level 2 \u2013 per scenario</b>: <code>Average EWT = \u03a3 EWT_point / number of valid points</code> over every point of the ${E.balance_trips} balance trips. A halfway bus is absent from the stops before its start, so those stops keep the larger gap in the Halfway figures.</div>`;
+  return h + `</div>`;
+}
+function rvEwtPt(r, key, k){ const pl = r.plans[k]; if(!pl || !pl.ewt) return null; const [L, p] = key.split(":").map(Number); return pl.ewt.points.find(q => q.L === L && q.p === p) || null; }
+function rvEwtDet(r, key){
+  const E = r.ewt; if(!key) return `<div class="ho-note">Tap any evaluation point above to see the headways behind its EWT and the calculation, for both scenarios.</div>`;
+  const n = (r.trips || []).length, hwT = r.plans.halfway ? r.plans.halfway.rows.filter(x => x.type === "halfway").map(x => x.n) : [];
+  const one = (k, lbl) => { const q = rvEwtPt(r, key, k); if(!q) return `<div><b>${esc(lbl)}</b><div class="ho-note">not simulated</div></div>`;
+    const tag = b => b === 0 ? "prev" : b > n ? "next" : (k === "halfway" && hwT.includes(b) ? "H" : "T") + b;
+    return `<div><b>${esc(lbl)}</b><div class="hl">${q.h.map(([b, g]) => `<span class="${g >= 1.5 * r.H || g < ((r.params && r.params.bunch_min) || 3) ? "x" : ""}" title="headway before ${tag(b)}">${tag(b)} ${f1(g)}</span>`).join("")}</div>
+      <div class="calc">${q.ewt == null ? "fewer than 2 headways: not a valid point" : `AWT = \u03a3h\u00b2/(2\u03a3h) = ${q.sum_h2} / (2 \u00d7 ${q.sum_h}) = ${f2(q.awt)} min<br>SWT = \u03a3hs\u00b2/(2\u03a3hs) = ${q.sum_hs2} / (2 \u00d7 ${q.sum_hs}) = ${f2(q.swt)} min<br><b>EWT = ${f2(q.awt)} \u2212 ${f2(q.swt)} = ${f2(q.ewt)} min</b> (${q.n_hw} headways)`}</div></div>`; };
+  const q0 = rvEwtPt(r, key, E.continue_key);
+  return `<h4>${q0 ? esc(q0.leg) + " \u00b7 " + esc(q0.label) : "Evaluation point"}</h4><div class="ho-note" style="margin-bottom:6px">Scheduled headways here: ${q0 ? q0.hs.map(f1).join(", ") : "\u2013"} min. Chip = headway before that bus (T = full trip, H = halfway bus, prev / next = the on-schedule trips around the block); amber = long gap or bunching.</div>
+    <div class="g2">${one(E.continue_key, E.continue_label)}${one("halfway", "Halfway + adjustment")}</div>`;
+}
+function rvEwtWire(r){
+  if(!$("ewtBox")) return;
+  document.querySelectorAll("#ewtBox tr.pt").forEach(tr => { const go = () => { HO.ewtSel = tr.dataset.k; document.querySelectorAll("#ewtBox tr.pt.sel").forEach(x => x.classList.remove("sel")); tr.classList.add("sel"); $("ewtDet").innerHTML = rvEwtDet(r, HO.ewtSel); };
+    tr.onclick = go; tr.onkeydown = e => { if(e.key === "Enter" || e.key === " "){ e.preventDefault(); go(); } }; });
+  if($("ewtCsv")) $("ewtCsv").onclick = () => { const E = r.ewt;
+    csvDownload(`ewt_${r.service || HO.svc}_d${r.direction || HO.dir}_${E.balance_trips}bal.csv`, [["Service", "Direction", "Balance trips", "Balance trip", "Evaluation point", "Stop code", "Continue EWT (min)", "Halfway EWT (min)", "EWT difference (min)"]]
+      .concat((E.rows || []).map(q => [r.service || HO.svc, r.direction || HO.dir, E.balance_trips, q.leg, q.label, q.code || "", q.cont, q.half, q.diff]))
+      .concat([["", "", "", "Average (Level 2)", `${E.continue.n_points} valid points`, "", E.continue.avg, E.halfway ? E.halfway.avg : "", E.diff == null ? "" : E.diff]])); };
+}
+/* ---- the Balance Trips field: every calculation refreshes when it changes */
+function hoBalSync(){ const v = hoBal(); $("hoBalTxt").textContent = v ? balSpan(v) : "whole number 1\u201316"; $("hoBal").closest(".hobal").classList.toggle("bad", !v); }
+$("hoBal").value = LS.get("ho.bal", 6); hoBalSync();
+$("hoBal").oninput = () => { hoBalSync(); clearTimeout(HO.balT); const v = hoBal(); if(!v) return; HO.balT = setTimeout(() => { LS.set("ho.bal", v); HO.ewtSel = null;
+  if(HO.rec && HO.rec.ok && HO.svc && HO.setup && !HO.setup.error){ hoMsg(`Balance Trips = ${v}: recalculating every scenario, headway and EWT\u2026`); hoRun(); } else hoRenderRecovery(); }, 650); };
 /* ===================== V12.9 Halfway Deployment & Off-Service Route Planner ===================== */
 const OS_TAG = {A:"Fastest", B:"Shortest", C:"Preferred"};
 const OS_BAND = b => b == null ? "#6f8bb0" : b >= 5 ? "#22c55e" : b >= 3 ? "#f5b82e" : "#e0474f";
@@ -1249,6 +1375,9 @@ const HLAB = {n_trips:["Trips simulated", "trips at the first stop"], layover_mi
   reg_min_side:["Regulate at least this many trips each side", "trips before AND after the gap regulated at the interchange (3 + 3 = 6). With fewer trips above the gap, more future trips are used (0 = off)"], reg_early_future:["Future trips may leave early by up to", "min, when the trips above the gap are too few (never before arrival + minimum layover)"],
   max_disrupted:["Trips AI may compare", "AI will compare selected delayed trips, but normally deploy only one halfway trip while the others continue full route"],
   auto_late_min:["AI looks at trips leaving at least this late", "min late when it would leave on its own (Run AI Optimisation decides which of them, if any, to disrupt + halfway, and adjusts the rest)"],
+  balance_trips:["Balance Trips (default)", "subsequent trips of every bus in the EWT and recovery assessment (UP 1, DOWN 1, UP 2 \u2026); 6 = the former 3 UP + 3 DOWN. The field at the top of the Optimiser overrides it per run"],
+  ewt_gain_min:["Halfway: minimum Average EWT saving", "min lower than Continue full trip, to recommend halfway"], ewt_gain_pct:["Halfway: minimum Average EWT saving (%)", "% of the Continue scenario's Average EWT (halved under headway priority)"],
+  ewt_gain_per_km:["Mileage priority: EWT saving per km", "min of Average EWT that each km not operated must buy"], ewt_adjust_min:["Adjustment worth making from", "min of Average EWT saved against no action"],
   offsvc_factor:["Off-service run time factor", "the halfway bus runs to the halfway stop in this fraction of the in-service running time (no dwell, no stopping). Unvalidated: 1 = same as in service"]};
 async function loadHoSettings(){
   const j = await getJSON("/api/halfway/config", 20000); if(j.error){ $("hoParams").innerHTML = `<div class="msg bad">${esc(j.error)}</div>`; return; }

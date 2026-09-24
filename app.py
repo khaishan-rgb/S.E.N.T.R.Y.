@@ -21,7 +21,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 import headway
 import traffic
 
-VERSION = "V13.6"
+VERSION = "V13.9"
 LTA = os.getenv("LTA_BASE", "https://datamall2.mytransport.sg/ltaodataservice").rstrip("/")
 KEY = os.getenv("LTA_ACCOUNT_KEY", "")
 OSRM = os.getenv("OSRM_URL", "https://router.project-osrm.org").rstrip("/")
@@ -1581,11 +1581,12 @@ import halfway
 import bisect
 
 HO = {"params": dict(halfway.PARAMS), "points": []}
-HO_INT = ("n_trips", "reg_window", "recover_points", "reg_min_side", "reg_even_share", "max_disrupted")
+HO_INT = ("n_trips", "reg_window", "recover_points", "reg_min_side", "reg_even_share", "max_disrupted", "balance_trips")
 HO_RANGES = {"n_trips": (5, 20), "layover_min": (0, 60), "min_layover_min": (0, 30), "start_delay_min": (-30, 60), "reg_hold_max": (0, 8), "reg_early_max": (0, 30), "reg_window": (1, 9), "reg_min_side": (0, 5), "auto_late_min": (0, 120), "reg_even_share": (0, 1), "max_disrupted": (1, 6), "reg_early_future": (0, 30),
              "min_dep_gap": (0, 10), "start_early_max": (0, 30), "start_late_max": (0, 60), "min_remaining_pct": (0, 90), "min_improve_pct": (0, 100), "max_mileage_km": (0.5, 100),
              "recover_tol_pct": (5, 100), "recover_points": (1, 8), "w_regularity": (0, 100), "w_maxgap": (0, 100), "w_recovery": (0, 100), "w_holding": (0, 100), "w_mileage": (0, 100),
-             "w_bunching": (0, 100), "pref_recovery_boost": (1, 5), "pref_mileage_boost": (1, 10), "load_sens": (0, 0.3), "fallback_kmh": (5, 60), "offsvc_factor": (0.3, 1.0)}
+             "w_bunching": (0, 100), "pref_recovery_boost": (1, 5), "pref_mileage_boost": (1, 10), "load_sens": (0, 0.3), "fallback_kmh": (5, 60), "offsvc_factor": (0.3, 1.0),
+             "balance_trips": (1, 16), "ewt_gain_min": (0, 5), "ewt_gain_pct": (0, 100), "ewt_gain_per_km": (0, 1), "ewt_adjust_min": (0, 5)}
 HO_MAX_CANDIDATES = 12
 HO_MAX_SCAN = 60                                                             # stops the AI tests when it searches the whole route (a stride is used on longer routes)
 
@@ -3427,8 +3428,11 @@ async def api_os_records(service: str = "", limit: int = 30):
 
 @app.get("/api/halfway/recovery")
 async def api_ho_recovery(service: str = "", direction: int = 1, ref: str = "", hw: str = "", layover: str = "", late: str = "", mode: str = "balanced",
-                          veh: str = "own", sims: str = "", scope: str = "all", bus: str = "dd", vh: str = "", vw: str = "", vt: str = ""):
-    """Trip adjustment vs halfway deployment on the whole 3 UP + 3 DOWN chain, with stress test. Decision support only."""
+                          veh: str = "own", sims: str = "", scope: str = "all", bus: str = "dd", vh: str = "", vw: str = "", vt: str = "",
+                          balance: str = "", sched: str = ""):
+    """Continue full trip (+ adjustment) vs halfway deployment (+ adjustment), decided on EWT over the selected BALANCE TRIPS, with stress test.
+    balance = number of subsequent trips assessed (1..16, default the Settings value, 6); sched = optional comma list of HH:MM scheduled departures
+    of trips 1..n (individual scheduled headways for SWT; otherwise the constant headway). Decision support only."""
     svc = service.strip().upper()
     g = await ho_route(svc, direction)
     if g.get("error"):
@@ -3447,9 +3451,36 @@ async def api_ho_recovery(service: str = "", direction: int = 1, ref: str = "", 
         return {"ok": False, "error": "Headway, layover, lateness and simulations must be numbers."}
     if not H or H <= 0:
         return {"ok": False, "error": "Scheduled headway unknown for this service - enter it in the Headway box."}
+    try:
+        nbal = int(round(float(balance))) if balance.strip() else int(P.get("balance_trips", 6))
+    except ValueError:
+        return {"ok": False, "error": "Balance Trips must be a whole number."}
+    if not 1 <= nbal <= 16:
+        return {"ok": False, "error": "Balance Trips must be between 1 and 16."}
     n = int(P["n_trips"])
     lates = (lates + [0.0] * n)[:n]
+    sched_dep = None
+    if sched.strip():
+        sd_ = [ho_parse_hhmm(x) for x in sched.split(",") if x.strip()]
+        if any(x is None for x in sd_):
+            return {"ok": False, "error": "Scheduled departures must be times like 08:10, separated by commas."}
+        for k_ in range(1, len(sd_)):
+            while sd_[k_] <= sd_[k_ - 1]:
+                sd_[k_] += 1440                                                  # past midnight
+        if len(sd_) < n:
+            return {"ok": False, "error": f"Give a scheduled departure for each of the {n} trips (or leave it empty to use the constant headway)."}
+        sched_dep = sd_[:n]
+        t0 = sched_dep[0]
     stops = g["stops"]
+    down_stops = []
+    try:                                                                          # the return direction's stops: labels for the DOWN evaluation points only
+        st_ = await static()
+        ds_ = route_stops(st_, svc, 2 if direction == 1 else 1)
+        if len(ds_) >= 2:
+            d0 = ds_[0].get("dist") or 0.0
+            down_stops = [(x["name"], x["code"], max(0.0, (x.get("dist") or 0.0) - d0)) for x in ds_]
+    except Exception:
+        down_stops = []
     cands, _unres, _info = ho_candidates(svc, direction, stops, "", scope if scope in ("auto", "all", "approved") else "all", g["prep"], P)
     mode = {"recovery": "headway", "pref": "balanced"}.get(mode, mode)
     bus = bus if bus in offservice.BUS_TYPES else "dd"
@@ -3466,8 +3497,15 @@ async def api_ho_recovery(service: str = "", direction: int = 1, ref: str = "", 
            "stop_codes": [s_["code"] for s_ in stops], "candidates": cands, "now": now.hour * 60 + now.minute, "mode": mode, "veh": veh, "offsvc_min": offsvc,
            "params": {"n_trips": n, "layover_min": lay, "min_layover_min": P["min_layover_min"], "adj_max": min(8.0, P["reg_hold_max"]), "offsvc_factor": P["offsvc_factor"],
                       "start_early_max": P["start_early_max"], "start_late_max": P["start_late_max"], "max_mileage_km": P["max_mileage_km"],
-                      "min_remaining_pct": P["min_remaining_pct"], "sims": max(100, min(3000, ns)), "bunch_min": BB["params"]["bunch_min"]}}
-    ckey = json.dumps([svc, direction, t0, H, lay, lates, mode, veh, ns, scope, now.hour * 60 + now.minute], default=str)
+                      "min_remaining_pct": P["min_remaining_pct"], "sims": max(100, min(3000, ns)), "bunch_min": BB["params"]["bunch_min"],
+                      "balance_trips": nbal, "ewt_gain_min": P["ewt_gain_min"], "ewt_gain_pct": P["ewt_gain_pct"], "ewt_gain_per_km": P["ewt_gain_per_km"],
+                      "ewt_adjust_min": P["ewt_adjust_min"]}}
+    if sched_dep:
+        ctx["sched_dep"] = sched_dep
+    if down_stops:
+        ctx["down_stops"] = down_stops
+    ckey = json.dumps([svc, direction, t0, H, lay, lates, mode, veh, ns, scope, now.hour * 60 + now.minute, nbal, sched_dep,
+                       [P[k_] for k_ in ("ewt_gain_min", "ewt_gain_pct", "ewt_gain_per_km", "ewt_adjust_min")]], default=str)
     hit = RV_CACHE.get(ckey)
     if hit and time.time() - hit[0] < 300:
         res = json.loads(hit[1])

@@ -1,10 +1,24 @@
-# SG Transport Pulse V13.6 — Route Traffic + Departure Adjustment + Bunching, Gap & Alerts + AI Halfway Optimiser
+# SG Transport Pulse V13.9 — Route Traffic + Departure Adjustment + Bunching, Gap & Alerts + AI Halfway Optimiser
 
 Live bus positions, live LTA traffic drawn directly on the bus route, and next arrivals per stop.
 FastAPI backend + a single-page Leaflet frontend (OneMap basemap, OpenStreetMap fallback).
 
 
 
+
+## V13.9 - Halfway Analyzer decides on EWT over a user-set Balance Trips horizon
+
+The fixed "3 UP + 3 DOWN" assessment is gone. Works for any service and direction; nothing is service-specific.
+
+* **Balance Trips** (field at the top of the Optimiser, 1-16, default 6 from Settings): the number of subsequent trips of every bus that are assessed - UP 1, DOWN 1, UP 2 ... alternating. 6 = the old UP 1 -> DOWN 3. Changing it re-runs every calculation. The interchange regulation window (3 trips before + 3 after the late trips) is a separate setting and is unchanged.
+* **Two scenarios, always both simulated:** A = Continue full trip (no action, or + departure adjustment when that lowers the Average EWT by >= `ewt_adjust_min`); B = Halfway start + necessary adjustment of the other trips. A halfway scenario is now simulated for every trip leaving late (was: 10+ min).
+* **Level 1 - EWT at each evaluation point** (every UP timing point incl. every halfway candidate, and 7 points along each DOWN trip, on every balance trip): `EWT = sum(h_act^2)/(2 sum h_act) - sum(h_sch^2)/(2 sum h_sch)`, from the headways of the buses passing that point on that trip. Headways from different points are never pooled. A halfway bus is absent from the stops before its start, so those stops keep the larger gap.
+* **SWT basis:** computed from the individual scheduled headways. With no timetable they all equal H, so SWT = H/2; the result states which basis was used. `GET /api/halfway/recovery?sched=08:10,08:22,...` supplies individual scheduled departures (API only for now).
+* **Level 2 - Average EWT** = mean of the valid point EWTs (a point needs >= 2 headways). Also reported: maximum EWT, worst point, points assessed, balance trips assessed, stress-test P50 / P85 of the Average EWT.
+* **Decision:** Halfway only if the Average EWT is lower by >= `ewt_gain_min` (0.10 min) AND >= `ewt_gain_pct` (5 %; halved under headway priority), the stress-test P85 does not reverse it, and under mileage priority the saving is >= `ewt_gain_per_km` (0.02 min per km not operated). Otherwise the full trip continues. The old delay thresholds (20 / 30 min) and the max-headway gain rules are removed; delay is an input only. The plan search itself now also weights Average EWT.
+* **Page:** EWT panel in the Recovery Optimiser card - summary cards, pass / fail tests, EWT per balance trip, EWT-along-the-route chart, point-by-point table grouped by balance trip (tap a point for its headways and the AWT / SWT / EWT arithmetic for both scenarios), Level 1 / Level 2 explanation, CSV export. Plan cards show Average EWT and its P50 / P85. The detailed trip table, map, timeline, heatmap and route planner are unchanged.
+* **Settings:** `balance_trips`, `ewt_gain_min`, `ewt_gain_pct`, `ewt_gain_per_km`, `ewt_adjust_min`. API: `/api/halfway/recovery` takes `balance` and `sched`; results carry `ewt`, `tests`, `balance_trips`, `horizon`. Model `recovery-2.0-ewt`.
+* **Runtime:** about 3 s for 6 balance trips and 1,000 futures, 8 s for 16 (local test).
 
 ## V13.6 - Running Time Analytics fully automated from open data
 

@@ -63,6 +63,12 @@ PARAMS = {
     "max_disrupted": 4,          # how many trips may be disrupted (lost) at once
     "fallback_kmh": 20.0,        # running speed if no traffic model is available
     "offsvc_factor": 0.7,        # the halfway bus runs the section to the halfway stop OFF-SERVICE (no dwell, no stopping) in this fraction of the in-service running time. UNVALIDATED assumption
+    # ---- V13.9 EWT-based Halfway vs Continue decision (used by the Recovery Optimiser, recovery.py)
+    "balance_trips": 6,          # BALANCE TRIPS: subsequent trips of every bus assessed (UP 1, DOWN 1, UP 2 ...); 6 = the old 3 UP + 3 DOWN. Editable per run on the page
+    "ewt_gain_min": 0.10,        # halfway must lower the Average EWT (across every evaluation point) by at least this many min ...
+    "ewt_gain_pct": 5.0,         # ... and by at least this % of the Continue scenario's Average EWT
+    "ewt_gain_per_km": 0.02,     # "Minimise mileage": the EWT saved must also be worth at least this many min per km not operated
+    "ewt_adjust_min": 0.05,      # a departure adjustment replaces "no action" only if it lowers the Average EWT by at least this
 }
 PREFS = ("balanced", "recovery", "mileage")
 
@@ -824,7 +830,7 @@ def decide(ctx):
     decision = "halfway" if S else ("adjust" if best_i is not None else "none")
     final["ai"] = {"mode": "auto", "decision": decision, "suggest": list(S), "candidates": cand, "alternatives": alts, "pref": pref,
                    "constraints": {"max_adjustment_min": 8, "min_layover_min": 7, "halfway_layover_omitted": True,
-                                   "min_horizon": "3 UP + 3 DOWN", "departed_locked": True, "headway_lt_min": max_hw_limit},
+                                   "min_horizon": f"{int(P.get('balance_trips', 6))} balance trips", "departed_locked": True, "headway_lt_min": max_hw_limit},
                    "headway_constraint_met": constraint_met, "best_achievable_max_headway": top["max"],
                    "observed_max_delay_min": _r(max_input_delay, 1),
                    "priority_rule": ("delay>20: halfway>adjustment>regulate" if pref == "recovery" else
