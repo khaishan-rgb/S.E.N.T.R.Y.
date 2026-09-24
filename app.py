@@ -1581,12 +1581,13 @@ import halfway
 import bisect
 
 HO = {"params": dict(halfway.PARAMS), "points": []}
-HO_INT = ("n_trips", "reg_window", "recover_points", "reg_min_side", "reg_even_share", "max_disrupted", "balance_trips")
+HO_INT = ("n_trips", "reg_window", "recover_points", "reg_min_side", "reg_even_share", "max_disrupted", "balance_trips", "allow_adjacent_halfway", "term_reg", "term_zone")
 HO_RANGES = {"n_trips": (5, 20), "layover_min": (0, 60), "min_layover_min": (0, 30), "start_delay_min": (-30, 60), "reg_hold_max": (0, 8), "reg_early_max": (0, 30), "reg_window": (1, 9), "reg_min_side": (0, 5), "auto_late_min": (0, 120), "reg_even_share": (0, 1), "max_disrupted": (1, 6), "reg_early_future": (0, 30),
              "min_dep_gap": (0, 10), "start_early_max": (0, 30), "start_late_max": (0, 60), "min_remaining_pct": (0, 90), "min_improve_pct": (0, 100), "max_mileage_km": (0.5, 100),
              "recover_tol_pct": (5, 100), "recover_points": (1, 8), "w_regularity": (0, 100), "w_maxgap": (0, 100), "w_recovery": (0, 100), "w_holding": (0, 100), "w_mileage": (0, 100),
              "w_bunching": (0, 100), "pref_recovery_boost": (1, 5), "pref_mileage_boost": (1, 10), "load_sens": (0, 0.3), "fallback_kmh": (5, 60), "offsvc_factor": (0.3, 1.0),
-             "balance_trips": (1, 16), "ewt_gain_min": (0, 5), "ewt_gain_pct": (0, 100), "ewt_gain_per_km": (0, 1), "ewt_adjust_min": (0, 5)}
+             "balance_trips": (1, 16), "ewt_gain_min": (0, 5), "ewt_gain_pct": (0, 100), "ewt_gain_per_km": (0, 1), "ewt_adjust_min": (0, 5), "allow_adjacent_halfway": (0, 1),
+             "term_reg": (0, 1), "term_hold_max": (0, 8), "term_early_max": (0, 8), "term_tol_pct": (5, 100), "term_zone": (1, 9), "term_total_max": (0, 20)}
 HO_MAX_CANDIDATES = 12
 HO_MAX_SCAN = 60                                                             # stops the AI tests when it searches the whole route (a stride is used on longer routes)
 
@@ -1867,7 +1868,7 @@ async def api_ho_setup(service: str = "", direction: int = 1):
 
 @app.get("/api/halfway/simulate")
 async def api_ho_simulate(service: str = "", direction: int = 1, ref: str = "", hw: str = "", layover: str = "", delay: str = "", late: str = "", disrupted: str = "", stop: str = "", save: str = "",
-                          pref: str = "balanced", reg: str = "1", scope: str = "auto", veh: str = "own", ready: str = "", pick: str = "", preview: str = ""):
+                          pref: str = "balanced", reg: str = "1", scope: str = "auto", veh: str = "own", ready: str = "", pick: str = "", preview: str = "", adj2: str = ""):
     svc = service.strip().upper()
     g = await ho_route(svc, direction)
     if g.get("error"):
@@ -1912,6 +1913,12 @@ async def api_ho_simulate(service: str = "", direction: int = 1, ref: str = "", 
         except ValueError:
             return {"ok": False, "error": "Disrupted trip must be a trip number (or a list like 3,4)."}
         dis = dis or None
+        adj_ok = adj2.strip() in ("1", "true", "yes", "on") if adj2.strip() else bool(P.get("allow_adjacent_halfway", 0))
+        if dis and not adj_ok:
+            pair = next(((a_, b_) for a_, b_ in zip(dis, dis[1:]) if b_ - a_ == 1), None)
+            if pair:
+                return {"ok": False, "error": f"Trips {pair[0]} and {pair[1]} are back to back: two consecutive trips may not both be disrupted / start halfway "
+                                              f"(tick \"Allow two back-to-back halfway trips\" to permit it)."}
     stops = g["stops"]
     scope = scope if scope in ("auto", "all", "approved") else "auto"
     veh = veh if veh in ("own", "standby") else "own"
@@ -3429,7 +3436,7 @@ async def api_os_records(service: str = "", limit: int = 30):
 @app.get("/api/halfway/recovery")
 async def api_ho_recovery(service: str = "", direction: int = 1, ref: str = "", hw: str = "", layover: str = "", late: str = "", mode: str = "balanced",
                           veh: str = "own", sims: str = "", scope: str = "all", bus: str = "dd", vh: str = "", vw: str = "", vt: str = "",
-                          balance: str = "", sched: str = ""):
+                          balance: str = "", sched: str = "", adj2: str = "", treg: str = ""):
     """Continue full trip (+ adjustment) vs halfway deployment (+ adjustment), decided on EWT over the selected BALANCE TRIPS, with stress test.
     balance = number of subsequent trips assessed (1..16, default the Settings value, 6); sched = optional comma list of HH:MM scheduled departures
     of trips 1..n (individual scheduled headways for SWT; otherwise the constant headway). Decision support only."""
@@ -3457,6 +3464,8 @@ async def api_ho_recovery(service: str = "", direction: int = 1, ref: str = "", 
         return {"ok": False, "error": "Balance Trips must be a whole number."}
     if not 1 <= nbal <= 16:
         return {"ok": False, "error": "Balance Trips must be between 1 and 16."}
+    adj_ok = int(adj2.strip() in ("1", "true", "yes", "on")) if adj2.strip() else int(P.get("allow_adjacent_halfway", 0))     # two back-to-back halfway trips allowed?
+    t_reg = int(treg.strip() in ("1", "true", "yes", "on")) if treg.strip() else int(P.get("term_reg", 1))                   # AI regulates the later trips at the terminals?
     n = int(P["n_trips"])
     lates = (lates + [0.0] * n)[:n]
     sched_dep = None
@@ -3499,13 +3508,14 @@ async def api_ho_recovery(service: str = "", direction: int = 1, ref: str = "", 
                       "start_early_max": P["start_early_max"], "start_late_max": P["start_late_max"], "max_mileage_km": P["max_mileage_km"],
                       "min_remaining_pct": P["min_remaining_pct"], "sims": max(100, min(3000, ns)), "bunch_min": BB["params"]["bunch_min"],
                       "balance_trips": nbal, "ewt_gain_min": P["ewt_gain_min"], "ewt_gain_pct": P["ewt_gain_pct"], "ewt_gain_per_km": P["ewt_gain_per_km"],
-                      "ewt_adjust_min": P["ewt_adjust_min"]}}
+                      "ewt_adjust_min": P["ewt_adjust_min"], "allow_adjacent_halfway": adj_ok, "term_reg": t_reg,
+                      **{k_: P[k_] for k_ in ("term_hold_max", "term_early_max", "term_tol_pct", "term_zone", "term_total_max")}}}
     if sched_dep:
         ctx["sched_dep"] = sched_dep
     if down_stops:
         ctx["down_stops"] = down_stops
     ckey = json.dumps([svc, direction, t0, H, lay, lates, mode, veh, ns, scope, now.hour * 60 + now.minute, nbal, sched_dep,
-                       [P[k_] for k_ in ("ewt_gain_min", "ewt_gain_pct", "ewt_gain_per_km", "ewt_adjust_min")]], default=str)
+                       [P[k_] for k_ in ("ewt_gain_min", "ewt_gain_pct", "ewt_gain_per_km", "ewt_adjust_min", "term_hold_max", "term_early_max", "term_tol_pct", "term_zone", "term_total_max")], adj_ok, t_reg], default=str)
     hit = RV_CACHE.get(ckey)
     if hit and time.time() - hit[0] < 300:
         res = json.loads(hit[1])

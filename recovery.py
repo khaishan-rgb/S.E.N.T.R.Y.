@@ -50,7 +50,16 @@ PARAMS = {
     "ewt_gain_min": 0.10,         # halfway must cut the Average EWT by at least this many min ...
     "ewt_gain_pct": 5.0,          # ... and by at least this % of the Continue scenario's Average EWT
     "ewt_gain_per_km": 0.02,      # mileage priority: min of Average EWT saved per km not operated
-    "ewt_adjust_min": 0.05,       # a departure adjustment is used (instead of no action) only if it cuts the Average EWT by at least this
+    "ewt_adjust_min": 0.05,
+    "allow_adjacent_halfway": 0,
+    # ---- V13.9 terminal regulation on the later balance trips (two-way / even-spacing holding)
+    "term_reg": 1,                # 1 = the AI also regulates every terminal departure after UP 1 (both scenarios); 0 = buses just leave at max(schedule, arrival + 7)
+    "term_hold_max": 8.0,         # HARD: hold at a terminal at most this many min beyond the natural departure
+    "term_early_max": 3.0,        # a bus may leave at most this many min before its natural departure (never before arrival + minimum layover)
+    "term_min_adj": 1.0,          # dead band: changes smaller than this are not instructed (the bus keeps its natural time)
+    "term_tol_pct": 20.0,         # a terminal headway within +/- this % of scheduled is normal: only buses near an abnormal headway are regulated
+    "term_zone": 2,               # ... and at most this many buses either side of an abnormal headway take part
+    "term_total_max": 8.0,        # HARD (BC welfare): total artificial hold per BC over the whole horizon, UP 1 included  # 0 = two back-to-back trips (e.g. T3 + T4) may NOT both start halfway; 1 = allowed       # a departure adjustment is used (instead of no action) only if it cuts the Average EWT by at least this
     "down_run_factor": 1.0,       # DOWN running time = UP running time x this
     "halfway_min_late": 1.0,      # V13.9: every trip that would leave late gets a Halfway scenario simulated (EWT decides, not the delay)
     "halfway_skip_layover": 1.0,  # 1 = the halfway bus leaves the interchange straight away (starts downstream, no interchange layover)
@@ -319,6 +328,8 @@ class Chain:
             D[:, b] = np.nan
             joins.append((b, self.pidx[j], np.asarray(st, float) + self.tau[j]))
         legs = []
+        term = []
+        used = np.maximum(0.0, np.nan_to_num(D - np.maximum(self.nat[None, :], ready)))     # artificial hold already given at UP 1
         rec = np.full(Sn, -np.inf)
         late_irr = np.zeros(Sn, bool)
         cur = D
@@ -330,8 +341,15 @@ class Chain:
             legs.append(lg)
             if L + 1 < self.NL:
                 sched = self.S + self.off[L + 1]
-                nxt = np.maximum(sched[None, :], lg["end"] + self.ml)
+                rdy = lg["end"] + self.ml
+                nxt = np.maximum(sched[None, :], rdy)
                 nxt[:, 0], nxt[:, -1] = sched[0], sched[-1]
+                if P.get("term_reg"):
+                    reg = self.term_regulate(nxt, rdy, used)
+                    used = used + np.maximum(0.0, reg - nxt)
+                    if keep:
+                        term.append((L + 1, nxt[0].copy(), reg[0].copy()))
+                    nxt = reg
                 cur = nxt
         sched_end = self.S + self.off[-1] + self.R[-1]
         bc = legs[-1]["end"][:, 1:-1] - sched_end[None, 1:-1]
@@ -360,7 +378,47 @@ class Chain:
                "bc_sum": np.maximum(bc, 0).sum(1), "up1_late": up1_late, "D": D, "ewt_avg": ewt_avg, "ewt_max": ewt_max, "ewt_n": n_ok}
         if keep:
             out["legs"] = legs
+            out["term"] = term
         return out
+
+    # ---------------------------------------------------------------- terminal regulation (later balance trips)
+    def term_regulate(self, N, R, used=None, iters=40, alpha=0.5):
+        """Two-way even-spacing holding at a terminal. N: natural departures (Sn, B), R: arrival + minimum layover.
+        Each bus moves towards the midpoint of its neighbours, d_i* = (d_(i-1) + d_(i+1)) / 2, inside
+        max(R_i, N_i - early) <= d_i <= N_i + hold; the on-schedule buses 0 and n+1 stay fixed; no overtaking;
+        a change under the dead band is dropped. The same rule runs in every scenario and every stress-test future."""
+        P = self.P
+        Sn, B = N.shape
+        R = np.where(np.isnan(R), N, R)
+        lo = np.maximum(R, N - P["term_early_max"])
+        room = P["term_hold_max"] if used is None else np.clip(P["term_total_max"] - used, 0.0, P["term_hold_max"])
+        hi = N + room
+        lo[:, 0], hi[:, 0], lo[:, -1], hi[:, -1] = N[:, 0], N[:, 0], N[:, -1], N[:, -1]
+        order = np.argsort(N, axis=1, kind="stable")
+        T = np.take_along_axis(N, order, 1)
+        lo_s, hi_s = np.take_along_axis(lo, order, 1), np.take_along_axis(hi, order, 1)
+        # only buses within `term_zone` of an abnormal headway (outside +/- tol of H) take part; the rest keep their natural time
+        g = np.diff(T, axis=1)
+        bad = np.abs(g - self.H) > P["term_tol_pct"] / 100.0 * self.H + EPS
+        M = np.arange(B - 1)
+        dist = np.full(T.shape, 99)
+        for k in range(B):                                               # headway m touches positions m and m+1 (distance 0)
+            d = np.where(M >= k, M - k, k - 1 - M)
+            dist[:, k] = np.where(bad, d[None, :], 99).min(1)
+        zone = dist <= int(P["term_zone"])
+        lo_s = np.where(zone, lo_s, T)
+        hi_s = np.where(zone, hi_s, T)
+        for _ in range(iters):
+            mid = 0.5 * (T[:, :-2] + T[:, 2:])
+            T[:, 1:-1] = np.clip(T[:, 1:-1] + alpha * (mid - T[:, 1:-1]), lo_s[:, 1:-1], hi_s[:, 1:-1])
+            T = np.maximum.accumulate(T, axis=1)                          # no overtaking at the terminal
+            T = np.minimum(T, hi_s)
+        D = np.empty_like(T)
+        D[np.arange(Sn)[:, None], order] = T
+        D = np.where(np.abs(D - N) >= P["term_min_adj"] - EPS, np.round(D), N)
+        D = np.clip(D, lo, hi)
+        D[:, 0], D[:, -1] = N[:, 0], N[:, -1]
+        return D
 
     # ---------------------------------------------------------------- stress test noise
     def noise(self, Sn, rng):
@@ -574,6 +632,10 @@ class Optimiser:
         sev = [b for b in hk if C.late[b - 1] >= 20.0 - EPS]
         for x in range(len(sev)):
             for y in range(x + 1, len(sev)):
+                if abs(sev[x] - sev[y]) == 1 and not P.get("allow_adjacent_halfway"):
+                    k_ = "Two back-to-back trips halfway (not allowed)"
+                    self.reject[k_] = self.reject.get(k_, 0) + 1
+                    continue
                 combos.append((sev[x], sev[y]))
         for combo in combos:
             regs = [{}] + [self._project(d, combo) for d in self._spreads(focus, combo)[:12]]
@@ -695,12 +757,20 @@ class Optimiser:
         for (T_, o_, g_) in legs[0]["pts"]:
             for k in range(len(o_)):
                 up1.setdefault(int(o_[k]), []).append(None if math.isnan(T_[k]) else _r(T_[k], 2))
+        term_adj = []
+        for (L, nat, reg) in det.get("term") or []:
+            where = C.names[-1] if L % 2 == 1 else C.names[0]
+            for b in range(1, C.n + 1):
+                sh = float(reg[b] - nat[b])
+                if abs(sh) >= 0.5:
+                    term_adj.append({"n": b, "L": L, "leg": leg_name(L), "where": where, "nat_clock": hm(nat[b]), "dep_clock": hm(reg[b]), "dep": _r(float(reg[b]), 1),
+                                     "shift": _r(sh, 1), "halfway_bus": b in hwb})
         ewt_pts = self.ewt_points(det)
         valid = [q for q in ewt_pts if q["ewt"] is not None]
         worst = max(valid, key=lambda q: q["ewt"]) if valid else None
         ewt_blk = {"avg": _r(det["ewt_avg"][0], 3), "max": _r(det["ewt_max"][0], 2), "n_points": len(valid), "n_points_all": len(ewt_pts),
                    "worst": {"label": worst["label"], "leg": worst["leg"], "ewt": worst["ewt"]} if worst else None, "points": ewt_pts}
-        out = {"key": key, "label": label, "fam": plan.get("fam"), "rows": rows, "chain": chain, "ewt": ewt_blk,
+        out = {"key": key, "label": label, "fam": plan.get("fam"), "rows": rows, "chain": chain, "ewt": ewt_blk, "term_adj": term_adj,
                "det": {"max": _r(det["max"][0]), "ic_max": _r(det["ic_max"][0]), "wmax": _r(det["wmax"][0]), "rms": _r(det["rms"][0], 2),
                        "bunch_pct": _r(100 * det["bunch"][0], 0), "rec": _r(det["rec"][0], 0), "recovered": bool(not det["unrec"][0]), "min_hw": _r(float(np.nanmin(det["leg_min"][0])) if "leg_min" in det else None, 1), "km": _r(det["km"][0], 2), "adj": _r(det["adj"][0], 0),
                        "bc_max": _r(det["bc_max"][0], 1), "bc_sum": _r(det["bc_sum"][0], 1), "cost": _r(det["cost"][0], 1),
@@ -931,6 +1001,11 @@ class Optimiser:
                 sub += f" \u00b7 runs ahead of late Trip {', '.join(str(q['n']) for q in swap)}"
             instr.append({"n": r["n"], "kind": "hold" if sh >= 0.5 else ("release" if sh <= -0.5 else "full"), "time": r["dep_clock"],
                           "text": f"Trip {r['n']} \u2014 Full trip | {act}Depart {r['dep_clock']}", "sub": sub})
+        for a in sorted(ch.get("term_adj") or [], key=lambda a: (a["dep"], a["n"])):
+            act = f"Hold {round(a['shift']):d} min" if a["shift"] > 0 else f"Release {round(-a['shift']):d} min early"
+            instr.append({"n": a["n"], "kind": "hold" if a["shift"] > 0 else "release", "time": a["dep_clock"], "later": True,
+                          "text": f"Trip {a['n']}'s bus \u2014 {a['leg']} from {a['where']} | {act} | Depart {a['dep_clock']}",
+                          "sub": f"Later trip \u00b7 natural departure {a['nat_clock']} \u00b7 even-spacing regulation at the terminal"})
         why = self.explain(res, dec)
         for k in res:
             res[k].pop("_mc", None)
@@ -951,7 +1026,8 @@ class Optimiser:
                 "locked": [b for b in range(1, C.n + 1) if C.locked[b]], "first_stop": C.names[0], "pts_up": C.pts_up, "pts_km": [_r(C.stop_s[j], 3) for j in C.pts_up], "prep_min": P["prep_min"], "disp_j": disp_j, "disp_name": C.names[disp_j] if disp_j is not None else None,
                 "trips": [{"n": b, "sch": hm(C.S[b]), "act_arr": hm(C.act_arr[b]), "late": C.late[b - 1], "ready": hm(C.ready[b]), "nat": hm(C.nat[b])} for b in range(1, C.n + 1)],
                 "params": {k: P[k] for k in ("bunch_min", "adj_max", "min_layover_min", "balance_trips", "horizon_side", "sims", "halfway_min_late", "offsvc_factor", "prep_min",
-                                                   "ewt_gain_min", "ewt_gain_pct", "ewt_gain_per_km", "ewt_adjust_min")}}
+                                                   "ewt_gain_min", "ewt_gain_pct", "ewt_gain_per_km", "ewt_adjust_min", "allow_adjacent_halfway",
+                                                   "term_reg", "term_hold_max", "term_early_max", "term_min_adj", "term_tol_pct", "term_zone", "term_total_max")}}
 
     def ewt_summary(self, res, dec):
         """Management view: Continue full trip vs Halfway on EWT, point by point, per balance trip, and averaged (LEVEL 2)."""
@@ -1033,6 +1109,11 @@ class Optimiser:
                     out.append(f"Trade-off: the late BC finishes about +{f['bc_p85']:.0f} min late (P85) with the full trip, against +{Hw['mc']['bc_p85']:.0f} min with halfway.")
             else:
                 out.append(f"No halfway start is feasible here (no stop can be reached inside the slot window, even with a standby bus), so the AI balances the trips around the late bus.")
+        if self.P.get("term_reg"):
+            n_l = sum(1 for a in (res[ch].get("term_adj") or []))
+            out.append(f"On the later balance trips both scenarios get the same terminal regulation (each bus moves towards the midpoint of the buses either side, "
+                       f"hold \u2264 {self.P['term_hold_max']:g} min, early \u2264 {self.P['term_early_max']:g} min, \u2265 {self.P['min_layover_min']:g} min layover, "
+                       f"\u2264 {self.P['term_total_max']:g} min total hold per BC); the chosen plan needs {n_l} such terminal instruction{'s' if n_l != 1 else ''}.")
         # is the biggest interchange gap physically unavoidable? (bus before it already held to the cap, bus after it leaves as soon as it is ready)
         best = res[ch]
         full = sorted([r for r in best["rows"] if r["type"] != "halfway"], key=lambda r: r["dep"])

@@ -318,6 +318,8 @@ details.hall{margin-top:10px}details.hall summary{cursor:pointer;color:#9cc4ff;f
         <div class="hx-info" id="hoInfo">Enter a service to load its route.</div>
         <h2>2. Optimisation Preference</h2>
         <div class="hopref" id="hoPref"><label><input type="radio" name="hopref" value="balanced" checked> Balanced</label><label><input type="radio" name="hopref" value="recovery"> Headway focus — Halfway &gt; Adjustment</label><label><input type="radio" name="hopref" value="mileage"> Mileage focus — Adjustment &gt; Halfway</label></div>
+        <label class="hx-chk"><input type="checkbox" id="hoTreg" checked> AI also regulates the later trips at the terminals <small>(even spacing, hold &le; 8 &middot; early &le; 3 min, same rule for both scenarios)</small></label>
+        <label class="hx-chk"><input type="checkbox" id="hoAdj2"> Allow two back-to-back halfway trips <small>(e.g. T3 + T4 both disrupted; off = never two consecutive trips)</small></label>
         <label class="hx-chk"><input type="checkbox" id="hoReg" checked> AI regulates headway <small>(hold / release trips, re-time the replacement)</small></label>
         <h2>3. Halfway deployment</h2>
         <div class="hopref" id="hoScope"><label><input type="radio" name="hoscope" value="all" checked> AI tests every stop (timing &amp; headway)</label><label><input type="radio" name="hoscope" value="approved"> Approved stops list only</label></div>
@@ -438,6 +440,8 @@ async function hoLoad0(){
   $("hoHw").value = j.sched_hw != null ? j.sched_hw : ""; $("hoHw").placeholder = j.sched_hw != null ? "" : "enter it";
   $("hoLay").value = j.params.layover_min; $("hoDelay").value = j.params.start_delay_min;
   HO.n = j.params.n_trips; hoBuildTrips();
+  if(LS.get("ho.treg", null) == null){ $("hoTreg").checked = j.params.term_reg == null ? true : !!j.params.term_reg; }
+  if(LS.get("ho.adj2", null) == null){ $("hoAdj2").checked = !!j.params.allow_adjacent_halfway; }
   if(LS.get("ho.bal", null) == null && j.params.balance_trips){ $("hoBal").value = j.params.balance_trips; hoBalSync(); }      // the Settings default until the user picks a value
   $("hoStopsList").innerHTML = j.stops.map(s => `<option value="${esc(s[0])}">${esc(s[1])}</option>`).join("");
   $("hoInfo").innerHTML = `<b>Svc ${esc(j.service)} Dir ${HO.dir}</b>: ${esc(j.first)} \u2192 ${esc(j.last)}<br>${j.n_stops} stops \u00b7 ${f1(j.route_km)} km \u00b7 ${Math.round(j.run_min)} min running ${j.traffic_ok ? "(current traffic)" : "(fallback speed: no traffic data)"}<br>` +
@@ -454,6 +458,7 @@ function hoBuildTrips(){
   document.querySelectorAll("#hoTrips input[name=hodis]").forEach(x => x.onchange = () => {
     const mx = (HO.setup && HO.setup.params && HO.setup.params.max_disrupted) || 4, sel = Array.from(document.querySelectorAll("#hoTrips input[name=hodis]:checked")).map(e => +e.value);
     if(sel.length > mx){ x.checked = false; toast(`At most ${mx} trips can be disrupted at once (Settings: Most trips disrupted at once)`); return; }
+    if(!hoAdj2() && sel.some((v, k) => k && v - sel[k - 1] === 1)){ x.checked = false; toast("Two back-to-back trips cannot both be disrupted \u2013 tick \u201cAllow two back-to-back halfway trips\u201d to permit it"); return; }
     HO.dis = sel; HO.auto = false; LS.set("ho.auto", false); if($("hoAuto")) $("hoAuto").checked = false; hoTouch();
   });
 }
@@ -491,7 +496,7 @@ function hoDirty(){                                 // an edit never runs the AI
 function hoTouch(){ HO.selKey = null; HO.pick = ""; hoDirty(); }
 function hoUrl(save, decide, preview){
   const hw = $("hoHw").value.trim(), std = HO.setup && HO.setup.sched_hw != null && Math.abs(+hw - HO.setup.sched_hw) < 1e-9, pref = (document.querySelector("input[name=hopref]:checked") || {}).value || "balanced";
-  return "/api/halfway/simulate?" + new URLSearchParams({service:HO.svc, direction:HO.dir, ref:$("hoRef").value.trim(), hw:std ? "" : hw, layover:$("hoLay").value.trim(), delay:$("hoDelay").value.trim(), late:HO.late.join(","), disrupted:HO.force && !preview ? HO.force.dis : decide ? "auto" : (HO.dis || []).join(","), stop:HO.force && HO.force.stop && !preview ? HO.force.stop : $("hoExtra").value.trim(), save:save ? "1" : "", pref, reg:$("hoReg").checked ? "1" : "0", scope:HO.scope, veh:HO.veh, ready:$("hoReady").value.trim(), pick:HO.pick || (HO.force && HO.force.stop) || "", preview:preview ? "1" : ""});
+  return "/api/halfway/simulate?" + new URLSearchParams({adj2:hoAdj2() ? "1" : "0", service:HO.svc, direction:HO.dir, ref:$("hoRef").value.trim(), hw:std ? "" : hw, layover:$("hoLay").value.trim(), delay:$("hoDelay").value.trim(), late:HO.late.join(","), disrupted:HO.force && !preview ? HO.force.dis : decide ? "auto" : (HO.dis || []).join(","), stop:HO.force && HO.force.stop && !preview ? HO.force.stop : $("hoExtra").value.trim(), save:save ? "1" : "", pref, reg:$("hoReg").checked ? "1" : "0", scope:HO.scope, veh:HO.veh, ready:$("hoReady").value.trim(), pick:HO.pick || (HO.force && HO.force.stop) || "", preview:preview ? "1" : ""});
 }
 async function hoPreview(){                         // the trip table only (schedule, actual arrival / departure): no AI, nothing stored
   if(!HO.svc || !HO.setup || HO.setup.error) return; const tok = ++HO.ptok;
@@ -534,7 +539,7 @@ function hoRender(){ hoRenderTrips(); hoRenderRecovery(); hoRenderRec(); hoRende
 const RV_MODE = {balanced:"balanced", recovery:"headway", mileage:"mileage"};
 function rvUrl(){
   const hw = $("hoHw").value.trim(), std = HO.setup && HO.setup.sched_hw != null && Math.abs(+hw - HO.setup.sched_hw) < 1e-9, pref = (document.querySelector("input[name=hopref]:checked") || {}).value || "balanced";
-  return "/api/halfway/recovery?" + new URLSearchParams({balance:String(hoBal() || ""), service:HO.svc, direction:HO.dir, ref:$("hoRef").value.trim(), hw:std ? "" : hw, layover:$("hoLay").value.trim(), late:HO.late.join(","), mode:RV_MODE[pref] || "balanced", veh:HO.veh, scope:HO.scope === "approved" ? "approved" : "all", sims:"1000", bus:HO.bus, vh:$("hoVh").value.trim(), vw:$("hoVw").value.trim(), vt:$("hoVt").value.trim()});
+  return "/api/halfway/recovery?" + new URLSearchParams({treg:$("hoTreg").checked ? "1" : "0", adj2:hoAdj2() ? "1" : "0", balance:String(hoBal() || ""), service:HO.svc, direction:HO.dir, ref:$("hoRef").value.trim(), hw:std ? "" : hw, layover:$("hoLay").value.trim(), late:HO.late.join(","), mode:RV_MODE[pref] || "balanced", veh:HO.veh, scope:HO.scope === "approved" ? "approved" : "all", sims:"1000", bus:HO.bus, vh:$("hoVh").value.trim(), vw:$("hoVw").value.trim(), vt:$("hoVt").value.trim()});
 }
 function rvChosen(){ const r = HO.rec; return r && r.ok && r.plans && r.plans[r.decision] ? r.plans[r.decision] : null; }
 function rvRows(){                                 // {trip: row of the chosen plan} with the interchange headway in departure order
@@ -636,8 +641,9 @@ function hoRenderRecovery(){
   const ins = r.instructions || [], rowOf = n => (ch.rows || []).find(x => x.n === n) || {};
   const key = i => i.kind === "halfway" || i.kind === "hold" || i.kind === "release" || (i.kind === "full" && (rowOf(i.n).vs_sch || 0) >= .5);
   const li = i => `<li class="${i.kind}"><time>${esc(i.time)}</time><div><b>${esc(i.text)}</b>${i.sub ? `<small>${esc(i.sub)}</small>` : ""}</div></li>`;
-  const main = ins.filter(key), rest = ins.filter(i => !key(i));
-  h += `<ul class="rvins">${(HO.rvAll ? ins : main).map(li).join("")}</ul>${rest.length ? `<button class="rvmore" type="button" id="rvMore" style="width:100%;margin:-4px 0 10px">${HO.rvAll ? "Show only the trips that change" : `+ ${rest.length} trip${rest.length > 1 ? "s" : ""} unchanged (on time, departed) \u2013 show all`}</button>` : ""}`;
+  const later = ins.filter(i => i.later), now_ = ins.filter(i => !i.later);
+  const main = now_.filter(key), rest = now_.filter(i => !key(i));
+  h += `<ul class="rvins">${(HO.rvAll ? now_ : main).map(li).join("")}</ul>${later.length ? `<details class="hall" style="margin:-2px 0 10px"><summary>Later trips \u2013 ${later.length} terminal instruction${later.length > 1 ? "s" : ""} (even-spacing regulation)</summary><ul class="rvins" style="margin-top:8px">${later.map(li).join("")}</ul></details>` : ""}${rest.length ? `<button class="rvmore" type="button" id="rvMore" style="width:100%;margin:-4px 0 10px">${HO.rvAll ? "Show only the trips that change" : `+ ${rest.length} trip${rest.length > 1 ? "s" : ""} unchanged (on time, departed) \u2013 show all`}</button>` : ""}`;
   h += rvEwt(r);
   const bcFull = (Hw && r.decision === "halfway") ? P[r.full_choice] : ch;
   h += `<div class="rvhead"><div><small>Without intervention<br>max HW (P85)</small><b>${Math.round(N.mc.max_p85)} min</b></div><div><small>Adjustment only<br>max HW (P85)</small><b>${Math.round(A.mc.max_p85)} min</b></div>
@@ -651,7 +657,7 @@ function hoRenderRecovery(){
   const rej = Object.entries(g.rejected || {});
   h += `<div class="rvgrid2"><div class="rvbox"><h3>Plans the AI generated</h3><div class="rvflow"><span>${(g.generated || 0).toLocaleString()} candidate plans</span><i>\u2192</i><span>${(g.rejected_total || 0).toLocaleString()} rejection hits</span><i>\u2192</i><span>best of each family refined</span><i>\u2192</i><span>4 plans \u00d7 ${(r.sims || 0).toLocaleString()} futures</span></div>
       <div class="rvrej">${rej.map(([k, v]) => `<span>${esc(k)}</span><b>${v.toLocaleString()}</b>`).join("")}</div><div class="ho-note">Families tested: ${Object.entries(g.families || {}).map(([k, v]) => esc(k) + " " + v).join(" \u00b7 ")}. A plan can fail several checks at once.</div></div>
-    <div class="rvbox"><h3>Hard rules applied</h3><div class="rvkv rules" style="margin-top:0"><span>BC minimum layover (full trip)</span><b>${f1(r.params.min_layover_min)} min</b><span>Artificial adjustment cap</span><b>\u00b1${f1(r.params.adj_max)} min</b><span>Already-departed trips</span><b>locked${r.locked && r.locked.length ? " (T" + r.locked.join(", T") + ")" : ""}</b><span>Assessment horizon</span><b>${esc(r.horizon || "")}</b><span>Regulation window</span><b>${r.params.horizon_side} before + ${r.params.horizon_side} after the late trips</b><span>Halfway simulated for</span><b>every trip leaving \u2265 ${f1(r.params.halfway_min_late)} min late</b><span>Halfway bus</span><b>${r.veh === "standby" ? "standby bus at the stop" : "late bus, off-service, no interchange layover"}</b><span>Halfway must beat Continue by</span><b>Avg EWT \u2265 ${r.params.ewt_gain_min} min and \u2265 ${r.params.ewt_gain_pct}%${r.mode === "headway" ? " (halved: headway priority)" : ""}, not reversed by the stress test${r.mode === "mileage" ? `, \u2265 ${r.params.ewt_gain_per_km} min per km` : ""}</b></div>
+    <div class="rvbox"><h3>Hard rules applied</h3><div class="rvkv rules" style="margin-top:0"><span>BC minimum layover (full trip)</span><b>${f1(r.params.min_layover_min)} min</b><span>Artificial adjustment cap</span><b>\u00b1${f1(r.params.adj_max)} min</b><span>Already-departed trips</span><b>locked${r.locked && r.locked.length ? " (T" + r.locked.join(", T") + ")" : ""}</b><span>Assessment horizon</span><b>${esc(r.horizon || "")}</b><span>Regulation window</span><b>${r.params.horizon_side} before + ${r.params.horizon_side} after the late trips</b><span>Halfway simulated for</span><b>every trip leaving \u2265 ${f1(r.params.halfway_min_late)} min late</b><span>Halfway bus</span><b>${r.veh === "standby" ? "standby bus at the stop" : "late bus, off-service, no interchange layover"}</b><span>Later trips at the terminals</span><b>${r.params.term_reg ? `even-spacing regulation: hold \u2264 ${f1(r.params.term_hold_max)}, early \u2264 ${f1(r.params.term_early_max)} min, only within ${r.params.term_zone} buses of a headway outside \u00b1${f1(r.params.term_tol_pct)}%, \u2264 ${f1(r.params.term_total_max)} min total hold per BC` : "not regulated (leave at max(schedule, arrival + layover))"}</b><span>Two back-to-back halfway trips</span><b>${r.params.allow_adjacent_halfway ? "allowed" : "not allowed"}</b><span>Halfway must beat Continue by</span><b>Avg EWT \u2265 ${r.params.ewt_gain_min} min and \u2265 ${r.params.ewt_gain_pct}%${r.mode === "headway" ? " (halved: headway priority)" : ""}, not reversed by the stress test${r.mode === "mileage" ? `, \u2265 ${r.params.ewt_gain_per_km} min per km` : ""}</b></div>
       <div class="ho-note">Model ${esc(r.model || "")}. Running times from ${r.traffic_ok ? "current traffic" : "a fallback speed"}; DOWN running assumed equal to UP. Simulation of the entered scenario, not live bus data. Decision support only.</div></div></div>`;
   el.innerHTML = h;
   if($("rvMore")) $("rvMore").onclick = () => { HO.rvAll = !HO.rvAll; hoRenderRecovery(); };
@@ -714,7 +720,8 @@ function rvEwt(r){
   h += `<div class="ewtbar"><span class="ho-note">Columns: Continue = ${esc(E.continue_label)}; Halfway = halfway start + necessary adjustment of the other trips.</span><button class="btn sm" type="button" id="ewtCsv">Download EWT table (CSV)</button></div></div>`;
   h += `<div class="ewtf"><b>How the EWT is calculated</b><br><b>Level 1 \u2013 at each evaluation point</b> (never pooling headways from different stops): <code>EWT_point = \u03a3h_actual\u00b2 / (2\u03a3h_actual) \u2212 \u03a3h_sched\u00b2 / (2\u03a3h_sched)</code> = AWT \u2212 SWT, where h are the headways between consecutive buses passing that point on that balance trip (the simulated block of ${(r.trips || []).length} trips plus the on-schedule trip before and after it).
     ${E.swt_basis === "individual" ? "SWT uses the individual scheduled headways you entered." : `No individual timetable was entered, so every scheduled headway is the constant target H = ${f1(H)} min and SWT reduces to H/2 = ${f2(H / 2)} min (the engine still computes it from the scheduled headways).`}
-    A point with fewer than two headways is not valid. <br><b>Level 2 \u2013 per scenario</b>: <code>Average EWT = \u03a3 EWT_point / number of valid points</code> over every point of the ${E.balance_trips} balance trips. A halfway bus is absent from the stops before its start, so those stops keep the larger gap in the Halfway figures.</div>`;
+    A point with fewer than two headways is not valid. <br><b>Level 2 \u2013 per scenario</b>: <code>Average EWT = \u03a3 EWT_point / number of valid points</code> over every point of the ${E.balance_trips} balance trips. A halfway bus is absent from the stops before its start, so those stops keep the larger gap in the Halfway figures.
+    ${r.params.term_reg ? `<br><b>Later trips:</b> at every terminal after UP 1 the AI applies the same rule to both scenarios: natural departure <code>N = max(scheduled, arrival + ${f1(r.params.min_layover_min)})</code>, target <code>d* = (d before + d after) / 2</code>, kept within <code>max(arrival + ${f1(r.params.min_layover_min)}, N \u2212 ${f1(r.params.term_early_max)}) \u2264 d \u2264 N + ${f1(r.params.term_hold_max)}</code>, only for buses within ${r.params.term_zone} of a headway outside \u00b1${f1(r.params.term_tol_pct)}%, changes under 1 min dropped, \u2264 ${f1(r.params.term_total_max)} min total hold per BC.` : ""}</div>`;
   return h + `</div>`;
 }
 function rvEwtPt(r, key, k){ const pl = r.plans[k]; if(!pl || !pl.ewt) return null; const [L, p] = key.split(":").map(Number); return pl.ewt.points.find(q => q.L === L && q.p === p) || null; }
@@ -738,6 +745,15 @@ function rvEwtWire(r){
       .concat((E.rows || []).map(q => [r.service || HO.svc, r.direction || HO.dir, E.balance_trips, q.leg, q.label, q.code || "", q.cont, q.half, q.diff]))
       .concat([["", "", "", "Average (Level 2)", `${E.continue.n_points} valid points`, "", E.continue.avg, E.halfway ? E.halfway.avg : "", E.diff == null ? "" : E.diff]])); };
 }
+/* ---- later-trip terminal regulation: on by default (Settings), chosen per run */
+$("hoTreg").checked = LS.get("ho.treg", true);
+$("hoTreg").onchange = () => { LS.set("ho.treg", $("hoTreg").checked); hoTouch(); };
+/* ---- two back-to-back halfway trips: off by default (Settings), chosen per run */
+function hoAdj2(){ return !!($("hoAdj2") && $("hoAdj2").checked); }
+$("hoAdj2").checked = !!LS.get("ho.adj2", false);
+$("hoAdj2").onchange = () => { LS.set("ho.adj2", $("hoAdj2").checked);
+  if(!$("hoAdj2").checked && HO.dis.some((v, k) => k && v - HO.dis[k - 1] === 1)){ HO.dis = []; hoBuildTrips(); toast("Back-to-back ticks cleared: two consecutive trips are no longer allowed to start halfway"); }
+  hoTouch(); };
 /* ---- the Balance Trips field: every calculation refreshes when it changes */
 function hoBalSync(){ const v = hoBal(); $("hoBalTxt").textContent = v ? balSpan(v) : "whole number 1\u201316"; $("hoBal").closest(".hobal").classList.toggle("bad", !v); }
 $("hoBal").value = LS.get("ho.bal", 6); hoBalSync();
@@ -1376,6 +1392,11 @@ const HLAB = {n_trips:["Trips simulated", "trips at the first stop"], layover_mi
   max_disrupted:["Trips AI may compare", "AI will compare selected delayed trips, but normally deploy only one halfway trip while the others continue full route"],
   auto_late_min:["AI looks at trips leaving at least this late", "min late when it would leave on its own (Run AI Optimisation decides which of them, if any, to disrupt + halfway, and adjusts the rest)"],
   balance_trips:["Balance Trips (default)", "subsequent trips of every bus in the EWT and recovery assessment (UP 1, DOWN 1, UP 2 \u2026); 6 = the former 3 UP + 3 DOWN. The field at the top of the Optimiser overrides it per run"],
+  term_reg:["AI regulates later trips at the terminals (default)", "1 = every terminal departure after UP 1 is regulated towards even spacing, d = (d before + d after) / 2, in both scenarios; 0 = off. The tick box on the Optimiser overrides it per run"],
+  term_hold_max:["Terminal: max hold per departure", "min beyond the natural departure"], term_early_max:["Terminal: max early release", "min before the natural departure (never before arrival + minimum layover)"],
+  term_tol_pct:["Terminal: normal headway band", "\u00b1% of scheduled; only buses near a headway outside it are regulated"], term_zone:["Terminal: buses either side that take part", "buses each side of an abnormal headway"],
+  term_total_max:["BC welfare: total hold per BC", "min of artificial holding over the whole horizon, UP 1 included"],
+  allow_adjacent_halfway:["Allow two back-to-back halfway trips (default)", "0 = two consecutive trips (e.g. T3 + T4) may never both be disrupted / start halfway; 1 = allowed. The tick box on the Optimiser overrides it per run"],
   ewt_gain_min:["Halfway: minimum Average EWT saving", "min lower than Continue full trip, to recommend halfway"], ewt_gain_pct:["Halfway: minimum Average EWT saving (%)", "% of the Continue scenario's Average EWT (halved under headway priority)"],
   ewt_gain_per_km:["Mileage priority: EWT saving per km", "min of Average EWT that each km not operated must buy"], ewt_adjust_min:["Adjustment worth making from", "min of Average EWT saved against no action"],
   offsvc_factor:["Off-service run time factor", "the halfway bus runs to the halfway stop in this fraction of the in-service running time (no dwell, no stopping). Unvalidated: 1 = same as in service"]};

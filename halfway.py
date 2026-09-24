@@ -68,7 +68,14 @@ PARAMS = {
     "ewt_gain_min": 0.10,        # halfway must lower the Average EWT (across every evaluation point) by at least this many min ...
     "ewt_gain_pct": 5.0,         # ... and by at least this % of the Continue scenario's Average EWT
     "ewt_gain_per_km": 0.02,     # "Minimise mileage": the EWT saved must also be worth at least this many min per km not operated
-    "ewt_adjust_min": 0.05,      # a departure adjustment replaces "no action" only if it lowers the Average EWT by at least this
+    "ewt_adjust_min": 0.05,
+    "term_reg": 1,               # 1 = AI also regulates every terminal departure on the later balance trips (two-way even spacing); editable per run on the page
+    "term_hold_max": 8.0,        # terminal hold cap per departure, min
+    "term_early_max": 3.0,       # terminal early release cap, min (never before arrival + minimum layover)
+    "term_tol_pct": 20.0,        # terminal headway within +/- this % of scheduled = normal (not regulated)
+    "term_zone": 2,              # buses either side of an abnormal terminal headway that take part
+    "term_total_max": 8.0,       # total artificial hold per BC over the horizon (UP 1 included), min
+    "allow_adjacent_halfway": 0, # 0 = two back-to-back trips may NOT both be disrupted / start halfway (AI and manual ticks); 1 = allowed. Editable per run on the page      # a departure adjustment replaces "no action" only if it lowers the Average EWT by at least this
 }
 PREFS = ("balanced", "recovery", "mileage")
 
