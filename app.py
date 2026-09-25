@@ -3368,7 +3368,7 @@ async def api_pl_search(service: str = "", direction: int = 1, frm: str = "", im
              "stops_total": n, "stops_omitted": j, "stops_remaining": n - j, "km_lost": round(ss[j], 2),
              "important_total": len(imp), "important_served": len(imp) - len(missed), "important_missed": len(missed),
              "missed": [{"code": c_, "name": next((x["name"] for x in stops if x["code"] == c_), c_)} for c_ in missed],
-             "gain": q["gain"], "hw": q, "after_next": q["after_next"], "dev_half": q["dev_half"]}
+             "gain": q["gain"], "hw": q, "after_next": q["after_next"], "dev_half": q["dev_half"], "target_hw": H}
         if mx_min is not None and off_min > mx_min + 1e-6:
             skipped["time"] += 1
             continue
