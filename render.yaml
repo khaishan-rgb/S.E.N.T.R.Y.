@@ -27,3 +27,7 @@ services:
         sync: false
       - key: DATAGOV_API_KEY      # optional: data.gov.sg API key for higher rate limits
         sync: false
+      - key: ONEMAP_EMAIL         # optional: OneMap account, used to draw a bus route when busrouter.sg has no matching line
+        sync: false
+      - key: ONEMAP_PASSWORD      # optional: OneMap account password
+        sync: false

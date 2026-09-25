@@ -639,7 +639,7 @@ async function apply(o){
     $("svcSub").innerHTML = `${route.summary.stops} stops<br>${route.traffic.ok ? "Showing traffic along bus route" : "Traffic feed unavailable"}`;
     renderSummary(route);
     setLive(route.traffic.ok ? "ok" : "warn", route.traffic.ok ? "Live Data (LTA/NEA)" : "Traffic feed unavailable", route.traffic.error || "");
-    if(route.geometry !== "osrm") toast(route.geometry === "stops" ? "Road snapping unavailable: route is drawn stop to stop, so traffic matching is approximate." : "Part of the route is drawn stop to stop.", 7000);
+    if(route.geometry === "stops" || route.geometry === "partial") toast(route.geometry === "stops" ? "Road snapping unavailable: route is drawn stop to stop, so traffic matching is approximate." : "Part of the route is drawn stop to stop.", 7000);
     const buses = await busesP;
     if(tok !== S.token) return;
     S.buses = buses.buses || []; drawBuses(buses); renderBuses(buses);

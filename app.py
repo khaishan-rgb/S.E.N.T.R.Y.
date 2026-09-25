@@ -19,9 +19,10 @@ from fastapi import FastAPI, Query, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 
 import headway
+import routegeom
 import traffic
 
-VERSION = "V13.9"
+VERSION = "V13.11"
 LTA = os.getenv("LTA_BASE", "https://datamall2.mytransport.sg/ltaodataservice").rstrip("/")
 KEY = os.getenv("LTA_ACCOUNT_KEY", "")
 OSRM = os.getenv("OSRM_URL", "https://router.project-osrm.org").rstrip("/")
@@ -386,7 +387,17 @@ def geom_key(svc, direction, stops):
 
 
 async def route_geometry(svc, direction, stops):
+    """V13.11: busrouter.sg line (checked against LTA stops) -> OneMap legs -> OSRM -> straight stop-to-stop lines."""
     async def factory():
+        notes = []
+        line, info = await routegeom.busrouter_line(client(), svc, stops)
+        if line:
+            return {"line": line, "source": "busrouter", "detail": info}, TTL_GEOM, True
+        notes.append(info)
+        line, info = await routegeom.onemap_line(client(), stops)
+        if line:
+            return {"line": line, "source": "onemap", "detail": info + " | " + notes[0]}, TTL_GEOM, True
+        notes.append(info)
         pts = [(s["lat"], s["lon"]) for s in stops]
         line, bad = [], 0
         step = 39
@@ -403,7 +414,7 @@ async def route_geometry(svc, direction, stops):
             line = pts
             bad += 1
         source = "osrm" if bad == 0 else ("stops" if len(line) == len(pts) else "partial")
-        return {"line": line, "source": source}, (TTL_GEOM if bad == 0 else 600), True
+        return {"line": line, "source": source, "detail": " | ".join(notes)}, (TTL_GEOM if bad == 0 else 600), True
     return await cached(geom_key(svc, direction, stops), factory)
 
 
@@ -607,7 +618,7 @@ async def api_route(service: str = "", direction: int = 1):
     return {
         "service": svc, "direction": direction, "availableDirections": dirs,
         "stops": [{"seq": s["seq"], "code": s["code"], "name": s["name"], "road": s["road"], "lat": s["lat"], "lon": s["lon"]} for s in stops],
-        "runs": runs, "geometry": geom["source"],
+        "runs": runs, "geometry": geom["source"], "geometryDetail": geom.get("detail"),
         "summary": {
             "lengthKm": round(official if official else total, 1), "stops": len(stops), "etaMin": eta,
             "etaBasis": "current traffic" if stats["known"] else "traffic feed unavailable",
