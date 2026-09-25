@@ -3789,10 +3789,57 @@ ANNEX_G = {
 }
 
 
+# V13.10.3: expressway grouping for the /cameras page (like trafficiti.com/aye/). Based on the Annex G description and
+# LTA's ID series (27xx BKE, 37xx ECP, 47xx AYE, 57xx/67xx PIE, 77xx TPE, 87xx KJE, 97xx SLE, 17xx CTE). Checkpoint
+# cameras are pulled out into their own group because that is what most people open the page for.
+CAMERA_ROADS = [("CHECKPOINTS", "Woodlands & Tuas Checkpoints"), ("AYE", "Ayer Rajah Expressway (AYE)"), ("BKE", "Bukit Timah Expressway (BKE)"),
+                ("CTE", "Central Expressway (CTE)"), ("ECP", "East Coast Parkway (ECP)"), ("KJE", "Kranji Expressway (KJE)"),
+                ("PIE", "Pan-Island Expressway (PIE)"), ("SLE", "Seletar Expressway (SLE)"), ("TPE", "Tampines Expressway (TPE)"),
+                ("SENTOSA", "Sentosa Gateway"), ("OTHER", "Other cameras")]
+_CP = {"2701", "2702", "4703", "4713"}
+_ROAD_BY_PREFIX = {"17": "CTE", "27": "BKE", "37": "ECP", "47": "AYE", "57": "PIE", "67": "PIE", "77": "TPE", "87": "KJE", "97": "SLE"}
+_ROAD_FIXED = {"1111": "TPE", "1112": "TPE", "1113": "ECP", "4798": "SENTOSA", "4799": "SENTOSA"}
+
+
+def camera_road(cid):
+    cid = str(cid).strip()
+    if cid in _CP:
+        return "CHECKPOINTS"
+    return _ROAD_FIXED.get(cid) or _ROAD_BY_PREFIX.get(cid[:2], "OTHER")
+
+
 def annex_g_lookup(cid):
     return ANNEX_G.get(str(cid).strip())
 TTL_CAMERAS = 120      # LTA's ImageLink is a short-lived signed URL, so this list is not cached long
 TR = {"params": dict(traffic.PARAMS), "book": traffic.new_book(), "last": 0.0, "ridx": None, "ridx_key": None, "feeds": {}, "lock": None, "rw": [], "stretch_cache": None}
+
+
+@app.get("/cameras", response_class=HTMLResponse)
+async def page_cameras():
+    return HTMLResponse((HERE / "cameras.html").read_text(encoding="utf-8"))
+
+
+@app.get("/api/cameras/gallery")
+async def api_cameras_gallery(refresh: int = 0):
+    """All LTA traffic cameras grouped by expressway, in Annex G order. Annex G IDs that are not in the live feed are
+    listed with live=False so the page can say so instead of silently dropping them."""
+    if refresh:
+        hit = CACHE.get("cameras")
+        if hit and time.time() - hit[1] > 30:
+            CACHE.pop("cameras", None)
+    cs = await cameras_state()
+    cams = {c["id"]: c for c in (cs.get("cams") or [])}
+    hit = CACHE.get("cameras")
+    fetched = hit[1] if hit else None
+    groups = {k: [] for k, _ in CAMERA_ROADS}
+    for cid in list(ANNEX_G) + sorted(set(cams) - set(ANNEX_G)):
+        c = cams.get(cid)
+        groups[camera_road(cid)].append({"id": cid, "desc": ANNEX_G.get(cid) or (c or {}).get("desc") or "Location description unavailable",
+                                          "live": bool(c), "image": c["link"] if c else None, "taken": c.get("taken") if c else None,
+                                          "lat": c["lat"] if c else None, "lon": c["lon"] if c else None})
+    return {"roads": [{"key": k, "name": n, "cameras": groups[k]} for k, n in CAMERA_ROADS if groups[k]],
+            "total_live": len(cams), "annex_listed": len(ANNEX_G), "fetched": tr_hhmm(fetched) if fetched else None, "fetched_epoch": fetched,
+            "source": cs.get("source") or "LTA DataMall \u00b7 Traffic Images", "error": cs.get("error") if not cams else None}
 
 
 @app.get("/traffic", response_class=HTMLResponse)
@@ -3922,7 +3969,7 @@ def norm_camera(x):
         return None
     desc = annex_g_lookup(cid)
     return {"id": cid, "lat": lat, "lon": lon, "link": str(link), "taken": x.get("Timestamp") or None,
-            "desc": desc or "Location description unavailable", "desc_known": bool(desc)}
+            "desc": desc or "Location description unavailable", "desc_known": bool(desc), "road": camera_road(cid)}
 
 
 async def fetch_cameras_datagov():
@@ -4131,13 +4178,13 @@ async def api_cameras(service: str = "", direction: int = 1, km: float = 0.35, r
                 if d <= 5.0:
                     ns = min(stops, key=lambda x: hav_km(c["lat"], c["lon"], x["lat"], x["lon"]))
                     nearby.append({"id": c["id"], "lat": c["lat"], "lon": c["lon"], "image": c["link"], "taken": c.get("taken"), "dist_km": round(d, 2),
-                                   "desc": c.get("desc"), "desc_known": c.get("desc_known"),
+                                   "desc": c.get("desc"), "desc_known": c.get("desc_known"), "road": c.get("road"),
                                    "near": {"code": ns["code"], "name": ns["name"], "road": ns["road"], "km": round(hav_km(c["lat"], c["lon"], ns["lat"], ns["lon"]), 2)}})
                 continue
             k = min(range(len(line)), key=lambda i: (line[i][0] - c["lat"]) ** 2 + (line[i][1] - c["lon"]) ** 2)
             ns = min(stops, key=lambda x: hav_km(c["lat"], c["lon"], x["lat"], x["lon"]))
             out.append({"id": c["id"], "lat": c["lat"], "lon": c["lon"], "image": c["link"], "taken": c.get("taken"), "dist_km": round(d, 2), "route_km": round(cum[k], 2),
-                        "desc": c.get("desc"), "desc_known": c.get("desc_known"),
+                        "desc": c.get("desc"), "desc_known": c.get("desc_known"), "road": c.get("road"),
                         "near": {"code": ns["code"], "name": ns["name"], "road": ns["road"], "km": round(hav_km(c["lat"], c["lon"], ns["lat"], ns["lon"]), 2)}})
         out.sort(key=lambda x: x["route_km"])
         nearby = sorted(nearby, key=lambda x: x["dist_km"])[:4]
@@ -4145,7 +4192,7 @@ async def api_cameras(service: str = "", direction: int = 1, km: float = 0.35, r
         allst = list(st["stops"].values()) if st["stops"] else []
         for c in cams:
             ns = min(allst, key=lambda x: hav_km(c["lat"], c["lon"], x["lat"], x["lon"])) if allst else None
-            out.append({"id": c["id"], "lat": c["lat"], "lon": c["lon"], "image": c["link"], "taken": c.get("taken"), "desc": c.get("desc"), "desc_known": c.get("desc_known"),
+            out.append({"id": c["id"], "lat": c["lat"], "lon": c["lon"], "image": c["link"], "taken": c.get("taken"), "desc": c.get("desc"), "desc_known": c.get("desc_known"), "road": c.get("road"),
                         "near": {"code": ns["code"], "name": ns["name"], "road": ns["road"],
                         "km": round(hav_km(c["lat"], c["lon"], ns["lat"], ns["lon"]), 2)} if ns else None})
     live_ids = {c["id"] for c in cams}

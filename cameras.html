@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#050d1a">
+<title>Traffic Cameras · SG Transport Pulse</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#050d1a; --panel:#0a1a2e; --panel2:#0d2039; --line:#163250; --line2:#1f4468;
+  --text:#eaf3ff; --mut:#8ba3bd; --blue:#1785ff; --cyan:#3cc8ff; --green:#20d16a; --amber:#ffc21a; --red:#ff4d55;
+  --font:Inter,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:radial-gradient(1200px 500px at 20% -10%,#0b2140 0%,var(--bg) 60%);color:var(--text);font-family:var(--font);font-size:14px;line-height:1.4;min-height:100vh;
+  padding:env(safe-area-inset-top,0) env(safe-area-inset-right,0) env(safe-area-inset-bottom,0) env(safe-area-inset-left,0)}
+button{font:inherit;color:inherit;cursor:pointer}
+:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+a{color:var(--cyan)}
+.app{max-width:1360px;margin:0 auto;padding:0 14px 28px}
+
+.top{display:flex;align-items:center;gap:12px;padding:14px 2px 12px;border-bottom:1px solid var(--line)}
+.back{display:grid;place-items:center;width:40px;height:40px;border-radius:11px;border:1px solid var(--line2);background:var(--panel);text-decoration:none;color:var(--text);font-size:20px;flex:none}
+.top h1{margin:0;font-size:22px;font-weight:800;letter-spacing:-.3px}
+.top p{margin:2px 0 0;color:var(--mut);font-size:13px}
+.top .sp{flex:1}
+.rf{border:1px solid var(--line2);background:var(--panel);border-radius:10px;padding:8px 12px;font-weight:600;white-space:nowrap}
+.rf[disabled]{opacity:.55}
+
+/* road selector: sticky, scrolls sideways on phones */
+.roads{position:sticky;top:0;z-index:5;margin:0 -14px;padding:10px 14px;background:rgba(5,13,26,.92);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+  display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;border-bottom:1px solid var(--line)}
+.roads::-webkit-scrollbar{display:none}
+.chip{flex:none;border:1px solid var(--line2);background:var(--panel);border-radius:999px;padding:7px 13px;font-weight:600;color:#b9d0e6;white-space:nowrap}
+.chip b{font-weight:600;color:var(--mut);margin-left:6px;font-variant-numeric:tabular-nums}
+.chip[aria-pressed="true"]{background:var(--blue);border-color:var(--blue);color:#fff}
+.chip[aria-pressed="true"] b{color:#d6e9ff}
+
+.status{display:flex;flex-wrap:wrap;gap:6px 14px;color:var(--mut);font-size:13px;margin:12px 2px 4px}
+.status .live{color:var(--green);font-weight:600}
+.status .live::before{content:"";display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--green);margin-right:6px;vertical-align:1px;animation:pulse 2s infinite}
+@keyframes pulse{50%{opacity:.35}}
+@media (prefers-reduced-motion:reduce){.status .live::before{animation:none}}
+
+h2{font-size:17px;margin:22px 2px 10px;font-weight:700}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}
+@media (max-width:640px){.grid{grid-template-columns:1fr}}
+.tile{position:relative;display:block;width:100%;padding:0;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--panel2);text-align:left}
+.tile .ph{position:relative;aspect-ratio:16/9;background:#07111f;display:grid;place-items:center}
+.tile img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
+.tile .ph em{font-style:normal;color:var(--mut);font-size:13px;padding:0 16px;text-align:center}
+.tile .cap{padding:9px 12px 11px}
+.tile .cap b{display:block;font-size:14px;font-weight:600;line-height:1.3}
+.tile .cap small{display:block;color:var(--mut);font-size:12px;margin-top:3px;font-variant-numeric:tabular-nums}
+.age{position:absolute;top:8px;right:8px;background:rgba(5,13,26,.8);border-radius:6px;padding:3px 7px;font-size:12px;font-weight:600;font-variant-numeric:tabular-nums}
+.age.stale{color:var(--amber)}
+.tile.off{opacity:.6;cursor:default}
+.note{color:var(--mut);font-size:12.5px;margin:18px 2px 0;max-width:72ch}
+.err{border:1px solid #6b2a2e;background:#2a0f14;border-radius:12px;padding:14px;margin-top:14px}
+
+/* full-screen viewer */
+.vw{position:fixed;inset:0;z-index:50;background:rgba(2,6,14,.96);display:flex;flex-direction:column;
+  padding:env(safe-area-inset-top,0) env(safe-area-inset-right,0) env(safe-area-inset-bottom,0) env(safe-area-inset-left,0)}
+.vw[hidden]{display:none}
+.vw header{display:flex;align-items:center;gap:10px;padding:12px 14px}
+.vw header div{flex:1;min-width:0}
+.vw header b{display:block;font-size:16px}
+.vw header small{color:var(--mut);font-variant-numeric:tabular-nums}
+.vw .x{border:1px solid var(--line2);background:var(--panel);border-radius:10px;width:40px;height:40px;font-size:18px}
+.vw .img{flex:1;display:grid;place-items:center;min-height:0;padding:0 8px}
+.vw .img img{max-width:100%;max-height:100%;object-fit:contain;border-radius:8px}
+.vw footer{display:flex;gap:10px;justify-content:center;padding:12px 14px 16px}
+.vw footer button{border:1px solid var(--line2);background:var(--panel);border-radius:10px;padding:10px 16px;font-weight:600;min-width:96px}
+.vw footer button[disabled]{opacity:.4}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="top">
+    <a class="back" href="/" aria-label="Back to Route Traffic">&#8249;</a>
+    <div><h1>Traffic cameras</h1><p id="sub">LTA expressway and checkpoint cameras</p></div>
+    <span class="sp"></span>
+    <button class="rf" id="rf" type="button">Refresh</button>
+  </div>
+  <nav class="roads" id="roads" aria-label="Choose an expressway"></nav>
+  <div class="status" id="status"></div>
+  <main id="main"><p class="note">Loading cameras…</p></main>
+  <p class="note">Still photos from LTA DataMall Traffic Images. LTA does not publish video; each camera updates about every 1–5 minutes, and this page fetches new photos every 60 seconds. Camera names are from Annex G of the LTA DataMall API User Guide.</p>
+</div>
+
+<div class="vw" id="vw" hidden role="dialog" aria-modal="true" aria-labelledby="vwT">
+  <header><div><b id="vwT"></b><small id="vwS"></small></div><button class="x" id="vwX" type="button" aria-label="Close">&#10005;</button></header>
+  <div class="img"><img id="vwI" alt=""></div>
+  <footer><button id="vwP" type="button">Previous</button><button id="vwN" type="button">Next</button></footer>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const ST = {data:null, road:null, list:[], idx:-1, timer:null};
+
+function initialRoad(){
+  const u = new URLSearchParams(location.search).get("road");
+  if(u) return u.toUpperCase();
+  try{ return localStorage.getItem("cams.road") || "CHECKPOINTS"; }catch(e){ return "CHECKPOINTS"; }
+}
+function ageText(iso){
+  if(!iso) return null;
+  const t = new Date(iso); if(isNaN(t)) return null;
+  const m = Math.max(0, Math.round((Date.now() - t) / 60000));
+  return {txt: m < 1 ? "just now" : m < 60 ? `${m} min ago` : `${Math.floor(m / 60)} h ago`, stale: m > 10,
+          clock: t.toLocaleTimeString("en-SG", {hour:"2-digit", minute:"2-digit", hour12:false, timeZone:"Asia/Singapore"})};
+}
+function roadsList(){
+  const d = ST.data; if(!d) return [];
+  const all = d.roads.flatMap(r => r.cameras);
+  return [...d.roads, {key:"ALL", name:"All cameras", cameras:all}];
+}
+function renderRoads(){
+  $("roads").innerHTML = roadsList().map(r => {
+    const live = r.cameras.filter(c => c.live).length;
+    const short = r.key === "CHECKPOINTS" ? "Checkpoints" : r.key === "SENTOSA" ? "Sentosa" : r.key === "ALL" ? "All" : r.key === "OTHER" ? "Other" : r.key;
+    return `<button class="chip" type="button" data-k="${r.key}" aria-pressed="${r.key === ST.road}" title="${esc(r.name)}">${short}<b>${live}</b></button>`;
+  }).join("");
+  $("roads").querySelectorAll(".chip").forEach(b => b.onclick = () => pick(b.dataset.k));
+  const on = $("roads").querySelector('[aria-pressed="true"]'); if(on) on.scrollIntoView({inline:"center", block:"nearest"});
+}
+function pick(k){
+  ST.road = k;
+  try{ localStorage.setItem("cams.road", k); }catch(e){}
+  const u = new URL(location.href); u.searchParams.set("road", k.toLowerCase()); history.replaceState(null, "", u);
+  renderRoads(); renderMain(); window.scrollTo({top:0});
+}
+function renderMain(){
+  const d = ST.data, el = $("main");
+  if(!d) return;
+  if(d.error && !d.total_live){
+    el.innerHTML = `<div class="err"><b>No camera photos received.</b> ${esc(d.error)}<br><small>Check LTA_ACCOUNT_KEY on the server, then press Refresh.</small></div>`;
+    return;
+  }
+  const road = roadsList().find(r => r.key === ST.road) || roadsList()[0];
+  ST.road = road.key;
+  ST.list = road.cameras.filter(c => c.live);
+  const off = road.cameras.filter(c => !c.live);
+  const tile = (c, i) => {
+    const a = ageText(c.taken);
+    return `<button class="tile" type="button" data-i="${i}"><span class="ph"><em>Photo not available</em><img src="${esc(c.image)}" alt="Traffic camera ${esc(c.id)}, ${esc(c.desc)}" loading="lazy" onerror="this.remove()">${a ? `<span class="age${a.stale ? " stale" : ""}">${a.txt}</span>` : ""}</span>
+      <span class="cap"><b>${esc(c.desc)}</b><small>Camera ${esc(c.id)}${a ? ` \u00b7 photo ${a.clock}` : ""}</small></span></button>`;
+  };
+  let h = `<h2>${esc(road.name)}</h2>`;
+  h += ST.list.length ? `<div class="grid">${ST.list.map(tile).join("")}</div>` : `<p class="note">None of these cameras is in LTA's feed right now. Try Refresh in a few minutes.</p>`;
+  if(off.length) h += `<h2>Not in LTA's feed right now</h2><div class="grid">${off.map(c => `<div class="tile off"><span class="cap"><b>${esc(c.desc)}</b><small>Camera ${esc(c.id)} \u00b7 listed in Annex G, no photo published at the moment</small></span></div>`).join("")}</div>`;
+  el.innerHTML = h;
+  el.querySelectorAll("button.tile").forEach(b => b.onclick = () => openV(+b.dataset.i));
+}
+function renderStatus(){
+  const d = ST.data; if(!d) return;
+  $("status").innerHTML = `<span class="live">${d.total_live} cameras live</span><span>${esc(d.source)}</span>${d.fetched ? `<span>Updated ${esc(d.fetched)}</span>` : ""}`;
+}
+async function load(fresh){
+  $("rf").disabled = true;
+  try{
+    const r = await fetch(`/api/cameras/gallery?refresh=${fresh ? 1 : 0}`, {cache:"no-store"});
+    if(!r.ok) throw new Error(`Server returned ${r.status}`);
+    ST.data = await r.json();
+  }catch(e){
+    if(!ST.data){ $("main").innerHTML = `<div class="err"><b>Could not load cameras.</b> ${esc(e.message)}. Press Refresh to try again.</div>`; }
+    $("rf").disabled = false; return;
+  }
+  if(!ST.road) ST.road = initialRoad();
+  if(!roadsList().some(r => r.key === ST.road)) ST.road = "CHECKPOINTS";
+  renderRoads(); renderStatus(); renderMain();
+  if(ST.idx >= 0) showV();
+  $("rf").disabled = false;
+}
+
+/* viewer */
+function openV(i){ ST.idx = i; $("vw").hidden = false; document.body.style.overflow = "hidden"; showV(); $("vwX").focus(); }
+function closeV(){ ST.idx = -1; $("vw").hidden = true; document.body.style.overflow = ""; }
+function showV(){
+  const c = ST.list[ST.idx]; if(!c){ closeV(); return; }
+  const a = ageText(c.taken);
+  $("vwT").textContent = c.desc;
+  $("vwS").textContent = `Camera ${c.id} \u00b7 ${ST.idx + 1} of ${ST.list.length}${a ? ` \u00b7 photo ${a.clock} (${a.txt})` : ""}`;
+  $("vwI").src = c.image; $("vwI").alt = `Traffic camera ${c.id}, ${c.desc}`;
+  $("vwP").disabled = ST.idx <= 0; $("vwN").disabled = ST.idx >= ST.list.length - 1;
+}
+$("vwX").onclick = closeV;
+$("vwP").onclick = () => { if(ST.idx > 0){ ST.idx--; showV(); } };
+$("vwN").onclick = () => { if(ST.idx < ST.list.length - 1){ ST.idx++; showV(); } };
+document.addEventListener("keydown", e => {
+  if($("vw").hidden) return;
+  if(e.key === "Escape") closeV(); else if(e.key === "ArrowLeft") $("vwP").click(); else if(e.key === "ArrowRight") $("vwN").click();
+});
+let tx = null;
+$("vw").addEventListener("touchstart", e => { tx = e.touches[0].clientX; }, {passive:true});
+$("vw").addEventListener("touchend", e => { if(tx == null) return; const dx = e.changedTouches[0].clientX - tx; tx = null; if(Math.abs(dx) > 50) (dx < 0 ? $("vwN") : $("vwP")).click(); });
+
+$("rf").onclick = () => load(true);
+load(false);
+ST.timer = setInterval(() => { if(!document.hidden) load(false); }, 60000);   // LTA photo links are signed and expire after a few minutes
+document.addEventListener("visibilitychange", () => { if(!document.hidden) load(false); });
+</script>
+</body>
+</html>

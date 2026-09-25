@@ -1,4 +1,4 @@
-# SG Transport Pulse V13.10.2 — Route Traffic + Departure Adjustment + Bunching, Gap & Alerts + AI Halfway Optimiser
+# SG Transport Pulse V13.10.3 — Route Traffic + Departure Adjustment + Bunching, Gap & Alerts + AI Halfway Optimiser
 
 ## V13.10 — Route Traffic works as a whole-island traffic map before any bus service is picked
 
@@ -10,6 +10,13 @@ Route Traffic (`index.html`) no longer requires a service to be useful. It now h
 * **New backend endpoints:** `GET /api/speedbands` (whole-island LTA Traffic Speed Bands, optional `bbox=`) and `GET /api/roadworks` (whole-island Approved Road Works). Both work with no `service` parameter and are what Mode A draws from; `/api/incidents`, `/api/rain` and `/api/cameras` already supported a no-service (whole-island) query and now feed Mode A directly.
 * **Traffic cameras:** `/api/cameras` now joins the live `Traffic-Imagesv2` response to a static `ANNEX_G` CameraID→location-description table by CameraID, per the DataMall User Guide's Annex G (79 entries, supplied by the user from the guide text — TPE, CTE, BKE, ECP, AYE/Tuas, PIEE/PIEW, KJE, SLE, Woodlands Causeway/Checkpoint and Sentosa groups). A camera the live feed returns but `ANNEX_G` doesn't cover is still shown on the map (live data is never discarded for a missing static description) labelled "Location description unavailable" — that only applies now if a future Annex G edition adds IDs beyond this table. Camera markers are clustered (Leaflet.markercluster) at whole-island zoom and split apart on zoom-in; each marker's popup shows Camera ID, Annex G description (or the fallback text), the live image, coordinates, last-refreshed time, source, and Refresh Image / Centre on Map buttons. Image links are re-fetched on Refresh rather than stored, since LTA's links are short-lived signed URLs.
 * Not yet done: automatically dimming off-route incidents/cameras/roadworks when a service *is* selected (Mode B currently shows them at full emphasis alongside the route), and linking each incident to its nearest camera with a distance ("nearby camera, 350 m").
+
+## V13.10.3 — Traffic camera wall by expressway (/cameras)
+- New page `/cameras` (📷 Traffic Cameras in every menu): live LTA photos grouped as Checkpoints, AYE, BKE, CTE, ECP, KJE, PIE, SLE, TPE, Sentosa, All. Deep links work, e.g. `/cameras?road=aye`.
+- Names come from Annex G; grouping uses the Annex G description and LTA's ID series. Annex G cameras missing from the live feed are listed separately instead of being hidden.
+- Each photo shows how old it is (amber after 10 min); tap to open full screen, swipe or use arrow keys for next/previous. The page refreshes every 60 s because LTA's image links are signed and expire.
+- New API `/api/cameras/gallery`; `/api/cameras` rows now carry `road`. Map popups link to "All cameras on this road".
+- Not included: Johor Bahru (MBJB) and Malaysian highway cameras — these are not in LTA DataMall.
 
 ## V13.10.2 — All LTA Annex G traffic cameras plotted on the map
 - **Bug fixed (the "502" camera bubble):** `Traffic-Imagesv2` returns every camera in one call and ignores `$skip`, so the old paging loop re-downloaded the same ~80–90 cameras again and again and stacked the duplicates on identical coordinates. The fetch now makes one call, de-duplicates by `CameraID`, and only pages further if a page is full *and* brings new IDs.
