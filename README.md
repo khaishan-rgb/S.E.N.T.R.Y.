@@ -1,4 +1,19 @@
-# SG Transport Pulse V13.12 — Route Traffic + Departure Adjustment + Bunching, Gap & Alerts + AI Halfway Optimiser
+# SG Transport Pulse V13.13 — Route Traffic + Departure Adjustment + Bunching, Gap & Alerts + AI Halfway Optimiser
+
+## V13.13 — Route Traffic desktop OCC layout (UI only)
+
+Layout and presentation changes to `index.html` only. No backend, API, calculation or data change; every figure still comes from `/api/incidents`, `/api/cameras`, `/api/roadworks`, `/api/traffic/overview`, `/api/traffic/detail` and `POST /api/traffic/ack`.
+
+* **Desktop (≥ 1000 px):** navigation | workspace | *Items need attention* panel (about 30 % of the screen, sticky, scrolls on its own). The map is the main element and fills the screen height.
+* **Compact top controls:** Operator | Service | Direction | Bus stop | Show | Clear in one row. Four compact counters: Incidents, Congestion, Cameras, Road works. With a service selected each counter also shows the share on/near the route (e.g. "1 on route", "2 within 350 m").
+* **"Congested Segments" removed.** It counted raw speed-band segments (hundreds, not meaningful to a controller). Replaced by **Congestion** = congestion *events* the traffic engine has matched to bus routes (`/api/traffic/overview` cards). The speed-band layer on the map is unchanged.
+* **Layer chips above the map:** Live traffic, Incidents, Road works, Cameras, Rainfall, Bus stops, Live buses, Service route (new toggle: hides the route line only).
+* **Items need attention:** network view (no service) lists the engine's events across all routes, filtered by the Transport Operator, with the affected services as chips (tap one to open that service), the nearest LTA camera within 3 km, View on map / View camera / Acknowledge. Service view lists that route's events with estimated delay, affected buses, largest headway now → predicted (only when the engine calculated them), camera thumbnail, and the same actions. Tap an item for the full detail (the existing event panel), with a back link.
+* **Map:** event markers open a compact popup (location, type, priority, estimated delay, affected buses, View details). With a service selected, road works more than 300 m from the route and cameras not near the route are dimmed.
+* **Below the map:** *Impact on Service X* (the existing status cards plus Largest headway now → predicted) and *Affected bus stops* (stops inside each event's stretch of the route, with that event's estimated delay). Live buses, timeline, cameras, summary and arrivals stay below.
+* **OCC suggestion:** the existing engine recommendations, shown in the right panel. Nothing new is generated.
+* **Phones:** filters → status → map → attention items → details; bottom navigation unchanged.
+* **Fixed:** the Clear button called the original clear function directly, so the event, camera and island-view resets never ran; it now runs all of them.
 
 ## V13.10 — Route Traffic works as a whole-island traffic map before any bus service is picked
 
