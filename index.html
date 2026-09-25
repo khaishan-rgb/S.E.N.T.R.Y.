@@ -382,7 +382,20 @@ table.tb{width:100%;border-collapse:collapse;font-size:14px}
   .islandcards .ic-card b{font-size:19px}
   .rt-imp-l .occ-strip .oc:first-child{grid-column:auto}
 }
+/* V13.14: desktop navigation can be hidden to give the workspace more room (remembered per browser) */
+.shell-hide,.shell-show{display:none}
+@media(min-width:1000px){
+  .shell-brand{position:relative;padding-right:40px!important}
+  .shell-hide{display:grid;place-items:center;position:absolute;right:0;top:4px;width:30px;height:30px;border-radius:8px;border:1px solid #17324d;background:#0a2036;color:#9eb6cc;font-size:17px;line-height:1;cursor:pointer;padding:0}
+  .shell-hide:hover,.shell-show:hover{background:#0c3154;color:#fff}
+  html.shell-off body{padding-left:0!important}
+  html.shell-off .desktop-shell{display:none!important}
+  html.shell-off .shell-show{display:grid;place-items:center;flex:none;width:36px;height:36px;border-radius:10px;border:1px solid #244766;background:#0a2036;color:#fff;font-size:18px;line-height:1;cursor:pointer;padding:0}
+  html.shell-off .shell-show + .brand{margin-right:auto}
+  html.shell-off .shell-show.floating{position:absolute;left:10px;top:12px;z-index:10001}
+}
 </style>
+<script>try{if(localStorage.getItem("shell.off")==="1")document.documentElement.classList.add("shell-off")}catch(e){}</script>
 </head>
 <body>
 <aside class="desktop-shell" aria-label="Primary navigation"><div class="shell-brand"><strong>SG Transport Pulse</strong><small>Operations Intelligence</small></div><div class="shell-label">ANALYSIS TOOLS</div><a class="shell-link active" href="/"><span class="si">▰</span><span>Route Traffic</span></a><a class="shell-link " href="/control"><span class="si">↔</span><span>Headway Control</span></a><a class="shell-link " href="/bunching"><span class="si">≋</span><span>Bunching & Gap</span></a><a class="shell-link " href="/halfway"><span class="si">½</span><span>Halfway Optimiser</span></a><a class="shell-link " href="/traffic"><span class="si">⚠</span><span>Traffic-Aware</span></a><a class="shell-link " href="/planner"><span class="si">◉</span><span>Halfway Planner</span></a><a class="shell-link " href="/running-time"><span class="si">⏱</span><span>Running Time Analytics</span></a><a class="shell-link " href="/cameras"><span class="si">📷</span><span>Traffic Cameras</span></a><div class="shell-foot">● Live operational workspace</div></aside>
@@ -513,7 +526,7 @@ table.tb{width:100%;border-collapse:collapse;font-size:14px}
 
   <footer class="foot">
     <span>Sources: LTA DataMall (Bus, Traffic), OneMap, NEA &nbsp;|&nbsp; Not for operational use</span>
-    <span>SG Transport Pulse V13.13 &nbsp;|&nbsp; Built for a smarter Singapore</span>
+    <span>SG Transport Pulse V13.14 &nbsp;|&nbsp; Built for a smarter Singapore</span>
   </footer>
 </div>
 
@@ -1486,6 +1499,25 @@ document.addEventListener("click", function(e){
   if(topMenu && topMenu.classList.contains("open") && !topMenu.contains(e.target) && !e.target.closest(".mobile-menu-btn")) topMenu.classList.remove("open");
   if(moreMenu && moreMenu.classList.contains("open") && !moreMenu.contains(e.target) && !e.target.closest(".mbn")) moreMenu.classList.remove("open");
 }, true);
+</script>
+<script>
+/* V13.14: hide / show the desktop navigation; the choice is remembered in this browser */
+(function(){
+  var h = document.documentElement, shell = document.querySelector(".desktop-shell"); if(!shell) return;
+  function set(off){ h.classList.toggle("shell-off", off); try{ localStorage.setItem("shell.off", off ? "1" : "0"); }catch(e){} setTimeout(function(){ window.dispatchEvent(new Event("resize")); }, 60); }
+  var hide = document.createElement("button"); hide.type = "button"; hide.className = "shell-hide"; hide.innerHTML = "&laquo;";
+  hide.title = "Hide menu"; hide.setAttribute("aria-label", "Hide navigation menu");
+  var show = document.createElement("button"); show.type = "button"; show.className = "shell-show"; show.innerHTML = "&#9776;";
+  show.title = "Show menu"; show.setAttribute("aria-label", "Show navigation menu");
+  hide.onclick = function(){ set(true); show.focus(); };
+  show.onclick = function(){ set(false); hide.focus(); };
+  (shell.querySelector(".shell-brand") || shell).appendChild(hide);
+  var top = document.querySelector("header.top"), brand = top && top.querySelector(".brand"), mbtn = top && top.querySelector(".mobile-menu-btn");
+  if(brand) brand.parentNode.insertBefore(show, brand);
+  else if(mbtn) mbtn.parentNode.insertBefore(show, mbtn.nextSibling);
+  else if(top) top.insertBefore(show, top.firstChild);
+  else { show.classList.add("floating"); document.body.appendChild(show); }
+})();
 </script>
 </body>
 </html>

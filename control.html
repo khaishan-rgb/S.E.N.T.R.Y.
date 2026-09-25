@@ -183,7 +183,20 @@ details.rules summary{cursor:pointer;font-weight:700;font-size:16px}
 @media(max-width:999px){body{padding-bottom:78px}.desktop-shell{display:none}.top{position:sticky!important;top:0;z-index:9000;background:rgba(5,18,33,.96);backdrop-filter:blur(12px);padding:9px 4px!important;min-height:56px;flex-wrap:nowrap!important}.top .brand{min-width:0;flex:1}.top .brand h1{font-size:18px!important;white-space:nowrap}.top .brand p,.top .view{display:none!important}.top .logo{width:36px!important;height:36px!important;min-width:36px!important}.top nav.nav,.top nav.navl{display:none!important}.hdr-right{gap:6px!important}.clock{font-size:10px!important}.live{font-size:11px!important}.mobile-menu-btn{display:grid;width:38px;height:38px;place-items:center;border:1px solid #244766;border-radius:10px;background:#0a2036;color:#fff;font-size:20px;cursor:pointer;order:-1}.mobile-bottom-nav{display:grid;grid-template-columns:repeat(4,1fr);position:fixed;left:0;right:0;bottom:0;z-index:12000;background:rgba(5,18,33,.98);border-top:1px solid #21415e;padding:7px max(6px,env(safe-area-inset-right)) calc(7px + env(safe-area-inset-bottom)) max(6px,env(safe-area-inset-left));box-shadow:0 -8px 24px rgba(0,0,0,.22)}.mbn{color:#829db5;text-decoration:none;text-align:center;font-size:10px;font-weight:650;padding:3px 2px;border-radius:9px}.mbn .mi{display:block;font-size:19px;line-height:22px}.mbn.active{color:#4bc7ff;background:#0a2945}.mobile-more{display:none;position:fixed;left:10px;right:10px;bottom:74px;z-index:13000;background:#091c30;border:1px solid #275176;border-radius:16px;padding:8px;box-shadow:0 18px 50px rgba(0,0,0,.5)}.mobile-more.open{display:block}.mobile-more a{display:flex;align-items:center;gap:12px;color:#d7e7f5;text-decoration:none;padding:13px;border-radius:10px;font-weight:650}.mobile-more a.active{background:#0d3559;color:#55c7ff}.mobile-top-menu{display:none;position:fixed;top:calc(56px + env(safe-area-inset-top) + 8px);left:8px;z-index:13000;min-width:230px;max-width:82vw;background:#091c30;border:1px solid #275176;border-radius:16px;padding:8px;box-shadow:0 18px 50px rgba(0,0,0,.5)}.mobile-top-menu.open{display:block}.mobile-top-menu a{display:flex;align-items:center;gap:12px;color:#d7e7f5;text-decoration:none;padding:13px;border-radius:10px;font-weight:650;white-space:nowrap}.mobile-top-menu a.active{background:#0d3559;color:#55c7ff}.module-intro{display:block}.module-intro h2{font-size:20px}.ai-shell-card{margin:10px 0;padding:11px 12px}.ai-shell-badge{display:none}.search,.filters{scroll-margin-top:70px}#map,.mapcard{max-width:100%}table{max-width:100%}}
 @media(max-width:600px){.app{padding-left:10px!important;padding-right:10px!important}.module-intro{margin:11px 2px 8px}.module-intro p{line-height:1.4}.ai-shell-card span{line-height:1.35}.top .hdr-right>div:first-child .clock{display:none}.top .brand h1{font-size:17px!important}}
 
+/* V13.14: desktop navigation can be hidden to give the workspace more room (remembered per browser) */
+.shell-hide,.shell-show{display:none}
+@media(min-width:1000px){
+  .shell-brand{position:relative;padding-right:40px!important}
+  .shell-hide{display:grid;place-items:center;position:absolute;right:0;top:4px;width:30px;height:30px;border-radius:8px;border:1px solid #17324d;background:#0a2036;color:#9eb6cc;font-size:17px;line-height:1;cursor:pointer;padding:0}
+  .shell-hide:hover,.shell-show:hover{background:#0c3154;color:#fff}
+  html.shell-off body{padding-left:0!important}
+  html.shell-off .desktop-shell{display:none!important}
+  html.shell-off .shell-show{display:grid;place-items:center;flex:none;width:36px;height:36px;border-radius:10px;border:1px solid #244766;background:#0a2036;color:#fff;font-size:18px;line-height:1;cursor:pointer;padding:0}
+  html.shell-off .shell-show + .brand{margin-right:auto}
+  html.shell-off .shell-show.floating{position:absolute;left:10px;top:12px;z-index:10001}
+}
 </style>
+<script>try{if(localStorage.getItem("shell.off")==="1")document.documentElement.classList.add("shell-off")}catch(e){}</script>
 </head>
 <body>
 <aside class="desktop-shell" aria-label="Primary navigation"><div class="shell-brand"><strong>SG Transport Pulse</strong><small>Operations Intelligence</small></div><div class="shell-label">ANALYSIS TOOLS</div><a class="shell-link " href="/"><span class="si">▰</span><span>Route Traffic</span></a><a class="shell-link active" href="/control"><span class="si">↔</span><span>Headway Control</span></a><a class="shell-link " href="/bunching"><span class="si">≋</span><span>Bunching & Gap</span></a><a class="shell-link " href="/halfway"><span class="si">½</span><span>Halfway Optimiser</span></a><a class="shell-link " href="/traffic"><span class="si">⚠</span><span>Traffic-Aware</span></a><a class="shell-link " href="/planner"><span class="si">◉</span><span>Halfway Planner</span></a><a class="shell-link " href="/running-time"><span class="si">⏱</span><span>Running Time Analytics</span></a><a class="shell-link " href="/cameras"><span class="si">📷</span><span>Traffic Cameras</span></a><div class="shell-foot">● Live operational workspace</div></aside>
@@ -655,6 +668,25 @@ document.addEventListener("click", function(e){
   if(topMenu && topMenu.classList.contains("open") && !topMenu.contains(e.target) && !e.target.closest(".mobile-menu-btn")) topMenu.classList.remove("open");
   if(moreMenu && moreMenu.classList.contains("open") && !moreMenu.contains(e.target) && !e.target.closest(".mbn")) moreMenu.classList.remove("open");
 }, true);
+</script>
+<script>
+/* V13.14: hide / show the desktop navigation; the choice is remembered in this browser */
+(function(){
+  var h = document.documentElement, shell = document.querySelector(".desktop-shell"); if(!shell) return;
+  function set(off){ h.classList.toggle("shell-off", off); try{ localStorage.setItem("shell.off", off ? "1" : "0"); }catch(e){} setTimeout(function(){ window.dispatchEvent(new Event("resize")); }, 60); }
+  var hide = document.createElement("button"); hide.type = "button"; hide.className = "shell-hide"; hide.innerHTML = "&laquo;";
+  hide.title = "Hide menu"; hide.setAttribute("aria-label", "Hide navigation menu");
+  var show = document.createElement("button"); show.type = "button"; show.className = "shell-show"; show.innerHTML = "&#9776;";
+  show.title = "Show menu"; show.setAttribute("aria-label", "Show navigation menu");
+  hide.onclick = function(){ set(true); show.focus(); };
+  show.onclick = function(){ set(false); hide.focus(); };
+  (shell.querySelector(".shell-brand") || shell).appendChild(hide);
+  var top = document.querySelector("header.top"), brand = top && top.querySelector(".brand"), mbtn = top && top.querySelector(".mobile-menu-btn");
+  if(brand) brand.parentNode.insertBefore(show, brand);
+  else if(mbtn) mbtn.parentNode.insertBefore(show, mbtn.nextSibling);
+  else if(top) top.insertBefore(show, top.firstChild);
+  else { show.classList.add("floating"); document.body.appendChild(show); }
+})();
 </script>
 </body>
 </html>

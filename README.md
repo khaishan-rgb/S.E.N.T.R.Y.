@@ -1,4 +1,9 @@
-# SG Transport Pulse V13.13 — Route Traffic + Departure Adjustment + Bunching, Gap & Alerts + AI Halfway Optimiser
+# SG Transport Pulse V13.14 — Route Traffic + Departure Adjustment + Bunching, Gap & Alerts + AI Halfway Optimiser
+
+## V13.14 — Hideable desktop menu + phone-friendly time entry
+
+* **Desktop menu can be hidden.** A « button at the top of the left menu hides it; a ☰ button next to the page title brings it back. The choice is remembered in the browser and applies on every page (Route Traffic, Headway, Bunching, Halfway Optimiser, Traffic-Aware, Halfway Planner, Running Time). Maps resize to use the freed space. Phones are unchanged (they use the bottom bar).
+* **Time fields on phones (Halfway Optimiser: First departure, Halfway bus ready; Halfway Planner: Trip scheduled departure, Bus free to move from).** The number keypad has no ":" key, so the colon is now added automatically: type 0810 or 810 and the field shows 08:10; a single hour such as 8 becomes 08:00 when you leave the field. Times outside 00:00–23:59 are outlined in red. A typed ":" still works on a keyboard. The value sent to the server is the same HH:MM as before.
 
 ## V13.13 — Route Traffic desktop OCC layout (UI only)
 

@@ -356,7 +356,21 @@ details.hall{margin-top:10px}details.hall summary{cursor:pointer;color:#9cc4ff;f
 @media(max-width:1100px){.osgrid{grid-template-columns:minmax(0,1fr)}#osMap{height:360px}}
 @media(max-width:700px){.ostab{display:none}.oscards{display:grid}}
 
+/* V13.14: desktop navigation can be hidden to give the workspace more room (remembered per browser) */
+.shell-hide,.shell-show{display:none}
+@media(min-width:1000px){
+  .shell-brand{position:relative;padding-right:40px!important}
+  .shell-hide{display:grid;place-items:center;position:absolute;right:0;top:4px;width:30px;height:30px;border-radius:8px;border:1px solid #17324d;background:#0a2036;color:#9eb6cc;font-size:17px;line-height:1;cursor:pointer;padding:0}
+  .shell-hide:hover,.shell-show:hover{background:#0c3154;color:#fff}
+  html.shell-off body{padding-left:0!important}
+  html.shell-off .desktop-shell{display:none!important}
+  html.shell-off .shell-show{display:grid;place-items:center;flex:none;width:36px;height:36px;border-radius:10px;border:1px solid #244766;background:#0a2036;color:#fff;font-size:18px;line-height:1;cursor:pointer;padding:0}
+  html.shell-off .shell-show + .brand{margin-right:auto}
+  html.shell-off .shell-show.floating{position:absolute;left:10px;top:12px;z-index:10001}
+}
+input.bad-time{border-color:#ff4d55!important;box-shadow:0 0 0 1px #ff4d55}
 </style>
+<script>try{if(localStorage.getItem("shell.off")==="1")document.documentElement.classList.add("shell-off")}catch(e){}</script>
 </head>
 <body>
 <aside class="desktop-shell" aria-label="Primary navigation"><div class="shell-brand"><strong>SG Transport Pulse</strong><small>Operations Intelligence</small></div><div class="shell-label">ANALYSIS TOOLS</div><a class="shell-link " href="/"><span class="si">▰</span><span>Route Traffic</span></a><a class="shell-link " href="/control"><span class="si">↔</span><span>Headway Control</span></a><a class="shell-link " href="/bunching"><span class="si">≋</span><span>Bunching & Gap</span></a><a class="shell-link active" href="/halfway"><span class="si">½</span><span>Halfway Optimiser</span></a><a class="shell-link " href="/traffic"><span class="si">⚠</span><span>Traffic-Aware</span></a><a class="shell-link " href="/planner"><span class="si">◉</span><span>Halfway Planner</span></a><a class="shell-link " href="/running-time"><span class="si">⏱</span><span>Running Time Analytics</span></a><a class="shell-link " href="/cameras"><span class="si">📷</span><span>Traffic Cameras</span></a><div class="shell-foot">● Live operational workspace</div></aside>
@@ -388,7 +402,7 @@ details.hall{margin-top:10px}details.hall summary{cursor:pointer;color:#9cc4ff;f
           <select id="hoOp"><option value="">All operators</option><option value="SBST">SBS Transit</option><option value="SMRT">SMRT</option><option value="TTS">Tower Transit</option><option value="GAS">Go-Ahead</option></select></div>
         <div class="hx-f2"><div class="fld"><label for="hoSvc">Service</label><input id="hoSvc" class="sel" list="hoSvcList" maxlength="6" autocapitalize="characters" placeholder="e.g. 32"><datalist id="hoSvcList"></datalist></div>
           <div class="fld"><label>Direction</label><div class="seg" id="hoDir"><button type="button" data-d="1" aria-pressed="true">Dir 1</button><button type="button" data-d="2" aria-pressed="false">Dir 2</button></div></div></div>
-        <div class="hx-f2"><div class="fld"><label for="hoRef">First departure</label><input id="hoRef" class="sel" type="text" maxlength="5" inputmode="numeric" placeholder="08:10" aria-label="Scheduled departure of trip 1 at the first stop (HH:MM)"></div>
+        <div class="hx-f2"><div class="fld"><label for="hoRef">First departure</label><input id="hoRef" data-time class="sel" type="text" maxlength="5" inputmode="numeric" placeholder="08:10" aria-label="Scheduled departure of trip 1 at the first stop (HH:MM)"></div>
           <div class="fld"><label for="hoHw">Headway, min</label><input id="hoHw" class="sel" type="number" min="1" max="120" step="0.5" inputmode="decimal"></div></div>
         <div class="hx-f2"><div class="fld"><label for="hoLay">Layover, min</label><input id="hoLay" class="sel" type="number" min="0" max="60" step="1" inputmode="decimal"></div>
           <div class="fld"><label for="hoDelay">Replacement delay, min</label><input id="hoDelay" class="sel" type="number" min="-30" max="60" step="1" inputmode="decimal"></div></div>
@@ -405,7 +419,7 @@ details.hall{margin-top:10px}details.hall summary{cursor:pointer;color:#9cc4ff;f
         <div class="hopref" id="hoVeh"><label><input type="radio" name="hoveh" value="own" checked> Bus runs off-service to the stop (timing decides)</label><label><input type="radio" name="hoveh" value="standby"> Spare bus already at the stop (starts on the slot)</label></div>
         <div class="fld"><label>Bus type <small>(route suitability check)</small></label><div class="hopref" id="hoBus"><label><input type="radio" name="hobus" value="sd"> Single deck</label><label><input type="radio" name="hobus" value="dd" checked> Double deck</label><label><input type="radio" name="hobus" value="art"> Articulated</label></div></div>
         <details class="hall" id="hoDims"><summary>Vehicle dimensions (optional &ndash; from your fleet data)</summary><div class="hx-f2" style="margin-top:6px"><div class="fld"><label for="hoVh">Height, m</label><input id="hoVh" class="sel" type="number" step="0.01" min="2" max="5.5" inputmode="decimal" placeholder="not set"></div><div class="fld"><label for="hoVw">Width, m</label><input id="hoVw" class="sel" type="number" step="0.01" min="2" max="3" inputmode="decimal" placeholder="not set"></div></div><div class="fld"><label for="hoVt">Gross weight, t</label><input id="hoVt" class="sel" type="number" step="0.5" min="5" max="40" inputmode="decimal" placeholder="not set"></div><div class="hx-note">Used only to compare against limits recorded in map data. The app never assumes a vehicle size or a bridge height.</div></details>
-        <div class="fld"><label for="hoReady">Halfway bus ready at the first stop <small>(HH:MM, optional)</small></label><input id="hoReady" class="sel" type="text" maxlength="5" inputmode="numeric" placeholder="auto: the delayed bus itself"></div>
+        <div class="fld"><label for="hoReady">Halfway bus ready at the first stop <small>(HH:MM, optional)</small></label><input id="hoReady" data-time class="sel" type="text" maxlength="5" inputmode="numeric" placeholder="auto: the delayed bus itself"></div>
         <div class="hx-note" style="margin:0 0 6px">The halfway bus runs off-service from the first stop along real roads (road routing for every candidate stop; an estimate only if routing is unavailable). The AI tests the eligible halfway starts and regulates surrounding full trips to minimise the largest headway and overall headway spread. Full trips must receive at least the 7-min minimum layover before departure. A halfway-start trip omits interchange layover because it starts downstream. Halfway vs continuing the full trip is decided on <b>EWT</b> (AWT &minus; SWT) at every evaluation point of the selected <b>Balance Trips</b>, averaged across the points &ndash; the delay is only an input to the simulation. Departure adjustments are capped at &plusmn;8 min to limit the BC welfare impact.</div>
         </details>
         <div class="btns"><button class="btn go" id="hoRun" type="button">Compare Recovery Options</button><button class="btn" id="hoEx" type="button">Load example</button></div>
@@ -1717,6 +1731,58 @@ document.addEventListener("click", function(e){
   if(topMenu && topMenu.classList.contains("open") && !topMenu.contains(e.target) && !e.target.closest(".mobile-menu-btn")) topMenu.classList.remove("open");
   if(moreMenu && moreMenu.classList.contains("open") && !moreMenu.contains(e.target) && !e.target.closest(".mbn")) moreMenu.classList.remove("open");
 }, true);
+</script>
+<script>
+/* V13.14: hide / show the desktop navigation; the choice is remembered in this browser */
+(function(){
+  var h = document.documentElement, shell = document.querySelector(".desktop-shell"); if(!shell) return;
+  function set(off){ h.classList.toggle("shell-off", off); try{ localStorage.setItem("shell.off", off ? "1" : "0"); }catch(e){} setTimeout(function(){ window.dispatchEvent(new Event("resize")); }, 60); }
+  var hide = document.createElement("button"); hide.type = "button"; hide.className = "shell-hide"; hide.innerHTML = "&laquo;";
+  hide.title = "Hide menu"; hide.setAttribute("aria-label", "Hide navigation menu");
+  var show = document.createElement("button"); show.type = "button"; show.className = "shell-show"; show.innerHTML = "&#9776;";
+  show.title = "Show menu"; show.setAttribute("aria-label", "Show navigation menu");
+  hide.onclick = function(){ set(true); show.focus(); };
+  show.onclick = function(){ set(false); hide.focus(); };
+  (shell.querySelector(".shell-brand") || shell).appendChild(hide);
+  var top = document.querySelector("header.top"), brand = top && top.querySelector(".brand"), mbtn = top && top.querySelector(".mobile-menu-btn");
+  if(brand) brand.parentNode.insertBefore(show, brand);
+  else if(mbtn) mbtn.parentNode.insertBefore(show, mbtn.nextSibling);
+  else if(top) top.insertBefore(show, top.firstChild);
+  else { show.classList.add("floating"); document.body.appendChild(show); }
+})();
+</script>
+<script>
+/* V13.14: HH:MM fields. Phones show a number keypad with no ":" key, so the colon is added automatically:
+   type 0810 (or 810) and the field shows 08:10. A typed ":" still works on a keyboard. */
+(function(){
+  function fmt(v){
+    var d = String(v).replace(/\D/g, "");
+    if(!d) return "";
+    if(+d[0] > 2 || (/:/.test(v) && v.indexOf(":") === 1)) d = "0" + d;       // 8 -> 08, "8:1" -> 08:1
+    d = d.slice(0, 4);
+    return d.length > 2 ? d.slice(0, 2) + ":" + d.slice(2) : d;
+  }
+  function done(v){                                                             // on leaving the field: 8 -> 08:00, 810 -> 08:10
+    var d = String(v).replace(/\D/g, ""); if(!d) return "";
+    if(d.length <= 2) d = ("0" + d).slice(-2) + "00"; else if(d.length === 3) d = "0" + d;
+    return d.slice(0, 2) + ":" + d.slice(2, 4);
+  }
+  function valid(v){ var m = /^(\d\d):(\d\d)$/.exec(v); return !v || (m && +m[1] <= 23 && +m[2] <= 59); }
+  document.querySelectorAll("input[data-time]").forEach(function(el){
+    el.setAttribute("autocomplete", "off"); el.setAttribute("enterkeyhint", "done");
+    el.addEventListener("input", function(e){
+      if(e.inputType && e.inputType.indexOf("delete") === 0) return;           // let backspace work normally
+      var v = fmt(el.value); if(v !== el.value) el.value = v;
+      el.classList.toggle("bad-time", el.value.length === 5 && !valid(el.value));
+    });
+    el.addEventListener("blur", function(){
+      var v = done(el.value);
+      if(v !== el.value){ el.value = v; el.dispatchEvent(new Event("input")); }
+      var ok = valid(el.value); el.classList.toggle("bad-time", !ok);
+      el.title = ok ? "" : "Enter a time between 00:00 and 23:59";
+    });
+  });
+})();
 </script>
 </body>
 </html>

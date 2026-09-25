@@ -92,7 +92,20 @@ tbody tr.click{cursor:pointer}tbody tr.sel td{background:#1d2a12}
 .tpr-tab tr.tot td{background:#10223a;font-weight:700}.tpr-tab tr.rec td{background:#2a1d08;color:#ffd79a;font-weight:800}
 .tpr-tab td.l{position:sticky;left:0;background:var(--card);z-index:1}
 @media(max-width:560px){.tpr-tab td.l{white-space:normal;min-width:112px;max-width:128px;font-size:11.5px}}
+/* V13.14: desktop navigation can be hidden to give the workspace more room (remembered per browser) */
+.shell-hide,.shell-show{display:none}
+@media(min-width:1000px){
+  .shell-brand{position:relative;padding-right:40px!important}
+  .shell-hide{display:grid;place-items:center;position:absolute;right:0;top:4px;width:30px;height:30px;border-radius:8px;border:1px solid #17324d;background:#0a2036;color:#9eb6cc;font-size:17px;line-height:1;cursor:pointer;padding:0}
+  .shell-hide:hover,.shell-show:hover{background:#0c3154;color:#fff}
+  html.shell-off body{padding-left:0!important}
+  html.shell-off .desktop-shell{display:none!important}
+  html.shell-off .shell-show{display:grid;place-items:center;flex:none;width:36px;height:36px;border-radius:10px;border:1px solid #244766;background:#0a2036;color:#fff;font-size:18px;line-height:1;cursor:pointer;padding:0}
+  html.shell-off .shell-show + .brand{margin-right:auto}
+  html.shell-off .shell-show.floating{position:absolute;left:10px;top:12px;z-index:10001}
+}
 </style>
+<script>try{if(localStorage.getItem("shell.off")==="1")document.documentElement.classList.add("shell-off")}catch(e){}</script>
 </head>
 <body>
 <aside class="desktop-shell" aria-label="Primary navigation"><div class="shell-brand"><strong>SG Transport Pulse</strong><small>Operations Intelligence</small></div>
@@ -625,6 +638,25 @@ async function showCell(section, bandStart){
     </tbody></table></div></div>`;
 }
 loadDatasets();
+</script>
+<script>
+/* V13.14: hide / show the desktop navigation; the choice is remembered in this browser */
+(function(){
+  var h = document.documentElement, shell = document.querySelector(".desktop-shell"); if(!shell) return;
+  function set(off){ h.classList.toggle("shell-off", off); try{ localStorage.setItem("shell.off", off ? "1" : "0"); }catch(e){} setTimeout(function(){ window.dispatchEvent(new Event("resize")); }, 60); }
+  var hide = document.createElement("button"); hide.type = "button"; hide.className = "shell-hide"; hide.innerHTML = "&laquo;";
+  hide.title = "Hide menu"; hide.setAttribute("aria-label", "Hide navigation menu");
+  var show = document.createElement("button"); show.type = "button"; show.className = "shell-show"; show.innerHTML = "&#9776;";
+  show.title = "Show menu"; show.setAttribute("aria-label", "Show navigation menu");
+  hide.onclick = function(){ set(true); show.focus(); };
+  show.onclick = function(){ set(false); hide.focus(); };
+  (shell.querySelector(".shell-brand") || shell).appendChild(hide);
+  var top = document.querySelector("header.top"), brand = top && top.querySelector(".brand"), mbtn = top && top.querySelector(".mobile-menu-btn");
+  if(brand) brand.parentNode.insertBefore(show, brand);
+  else if(mbtn) mbtn.parentNode.insertBefore(show, mbtn.nextSibling);
+  else if(top) top.insertBefore(show, top.firstChild);
+  else { show.classList.add("floating"); document.body.appendChild(show); }
+})();
 </script>
 </body>
 </html>
