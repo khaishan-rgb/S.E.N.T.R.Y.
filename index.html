@@ -226,7 +226,7 @@ table.tb{width:100%;border-collapse:collapse;font-size:14px}
   .ev .eg{grid-template-columns:1fr 1fr}.btab thead{display:none}.btab,.btab tbody,.btab tr,.btab td{display:block;width:100%}.btab tr{border:1px solid var(--line);border-radius:10px;margin-bottom:8px;padding:6px 10px}.btab td{border:0;padding:2px 0;display:flex;justify-content:space-between;gap:10px}.btab td::before{content:attr(data-l);color:var(--mut)}
   .tl .stp{font-size:10px;max-width:70px}}
 .ai-shell-card[hidden]{display:none!important}.panels[hidden]{display:none!important}
-.camm{background:none;border:0}.camm span{display:grid;place-items:center;width:26px;height:26px;border-radius:50%;background:#0a1a2e;border:2px solid #fff;font-size:13px;box-shadow:0 2px 6px rgba(0,0,0,.45)}
+.camm{background:none;border:0}.camm.camm-on span{background:#1785ff;border-color:#fff;box-shadow:0 0 0 3px rgba(23,133,255,.45),0 2px 6px rgba(0,0,0,.45)}.camm span{display:grid;place-items:center;width:26px;height:26px;border-radius:50%;background:#0a1a2e;border:2px solid #fff;font-size:13px;box-shadow:0 2px 6px rgba(0,0,0,.45)}
 .rwm{background:none;border:0}.rwm span{display:grid;place-items:center;width:24px;height:24px;border-radius:7px;background:#8a5a12;border:2px solid #fff;font-size:12px;box-shadow:0 2px 6px rgba(0,0,0,.45)}
 .marker-cluster-cam{background:rgba(23,133,255,.35)}.marker-cluster-cam div{background:#1785ff;color:#fff;font-weight:700}
 .marker-cluster-inc{background:rgba(255,77,85,.35)}.marker-cluster-inc div{background:var(--red);color:#fff;font-weight:700}
@@ -934,11 +934,11 @@ occRender();
 
 /* ===================== V13.9 LTA traffic cameras (photos; LTA publishes no video) ===================== */
 const CAM = {list:[], all:[], near:false, res:null, island:false,
-  gl:(typeof L.markerClusterGroup === "function" ? L.markerClusterGroup({maxClusterRadius:55, iconCreateFunction:c => L.divIcon({html:`<div>${c.getChildCount()}</div>`, className:"marker-cluster marker-cluster-cam", iconSize:[34,34]})}) : L.layerGroup()),
+  gl:L.layerGroup(),   // V13.10.2: no clustering - every LTA Annex G camera is its own marker at its own LTA coordinates
   idx:-1, live:null, liveOn:false, t:null, km:(function(){ try{ return +localStorage.getItem("rt.camkm") || 0.35; }catch(e){ return 0.35; } })()};
 const camTaken = c => { if(!c || !c.taken) return null; const d = new Date(c.taken); return isNaN(d) ? null : sgTime(d); };
 const fSync = syncLayers; syncLayers = function(){ fSync(); const on = !!S.layers.cams; if(on && !map.hasLayer(CAM.gl)) map.addLayer(CAM.gl); if(!on && map.hasLayer(CAM.gl)) map.removeLayer(CAM.gl); };
-const camIcon = () => L.divIcon({className:"camm", html:`<span>\ud83d\udcf7</span>`, iconSize:[26, 26], iconAnchor:[13, 13]});
+const camIcon = (onRoute) => L.divIcon({className:"camm" + (onRoute ? " camm-on" : ""), html:`<span>\ud83d\udcf7</span>`, iconSize:[26, 26], iconAnchor:[13, 13]});
 function camPopupHtml(c){
   return `<h4>\ud83d\udcf7 LTA TRAFFIC CAMERA</h4><b>Camera ID:</b> ${esc(c.id)}<br><b>Location:</b> ${esc(c.desc || (c.near ? c.near.name : "Location description unavailable"))}<br>
     <img src="${esc(c.image)}" alt="LTA traffic camera ${esc(c.id)}" style="width:100%;max-width:230px;border-radius:8px;margin:6px 0" loading="lazy" onerror="this.style.display='none'">
@@ -951,7 +951,7 @@ async function camLoad(fresh){
     if(!S.layers.cams){ return; }
     const r = await api(`/api/cameras?${q({refresh:fresh ? 1 : 0})}`, 30000);
     if(S.svc || !S.layers.cams) return;                                    // a service was picked (or the layer was turned off) while this was loading
-    CAM.res = r; CAM.near = false; CAM.list = r.cameras || [];
+    CAM.res = r; CAM.near = false; CAM.list = r.cameras || []; CAM.all = CAM.list;
     CAM.gl.clearLayers();
     CAM.list.forEach(c => L.marker([c.lat, c.lon], {icon:camIcon(), keyboard:false, title:`Camera ${c.id}`}).bindPopup(camPopupHtml(c), POP).addTo(CAM.gl));
     if(r.error && !CAM.list.length) toast("Traffic cameras unavailable: " + r.error);
@@ -964,7 +964,18 @@ async function camLoad(fresh){
   if(svc !== S.svc || dir !== S.dir) return;
   CAM.res = r; CAM.near = !(r.cameras || []).length && (r.nearby || []).length > 0; CAM.list = CAM.near ? r.nearby : (r.cameras || []);
   CAM.gl.clearLayers();
-  CAM.list.forEach((c, i) => L.marker([c.lat, c.lon], {icon:camIcon(), keyboard:false, zIndexOffset:500, opacity:CAM.near ? .75 : 1, title:`Camera ${c.id}`}).on("click", () => camOpen(i)).addTo(CAM.gl));
+  // V13.10.2: plot every camera LTA returns (Annex G, islandwide), not only the ones near this route.
+  // Cameras in the route list open the photo viewer; all others open the standard popup.
+  const all = await api(`/api/cameras?${q({refresh:0})}`, 30000);
+  if(svc !== S.svc || dir !== S.dir) return;
+  CAM.all = all.cameras || [];
+  const onRoute = new Map(CAM.list.map((c, i) => [String(c.id), i]));
+  CAM.all.forEach(c => {
+    const i = onRoute.get(String(c.id)), hit = i != null && !CAM.near;
+    const m = L.marker([c.lat, c.lon], {icon:camIcon(hit), keyboard:false, zIndexOffset:hit ? 500 : 0, title:`Camera ${c.id} \u00b7 ${c.desc || ""}`});
+    if(i != null) m.on("click", () => camOpen(i)); else m.bindPopup(camPopupHtml(c), POP);
+    m.addTo(CAM.gl);
+  });
   syncLayers(); camRender();
   if(CAM.idx >= 0) camShow();                                               // a refresh while the viewer is open: new signed image link
 }
@@ -973,7 +984,7 @@ async function islandCamRefresh(id){
   CAM.res = r; const c = (r.cameras || []).find(x => String(x.id) === String(id));
   if(c){ const m = CAM.list.find(x => String(x.id) === String(id)); if(m) Object.assign(m, c); CAM.gl.eachLayer(l => { if(l.getPopup() && l.getLatLng().lat === c.lat && l.getLatLng().lng === c.lon) l.setPopupContent(camPopupHtml(c)); }); }
 }
-function camTitle(c){ return c.near ? `${esc(c.near.name)}${c.near.road ? ` \u00b7 ${esc(c.near.road)}` : ""}` : `Camera ${esc(c.id)}`; }
+function camTitle(c){ return c.desc_known ? esc(c.desc) : c.near ? `${esc(c.near.name)}${c.near.road ? ` \u00b7 ${esc(c.near.road)}` : ""}` : `Camera ${esc(c.id)}`; }
 function camRender(){
   const el = $("occCams"); if(!el) return;
   const r = CAM.res; if(!S.svc || !S.route){ el.innerHTML = ""; return; }
@@ -987,6 +998,7 @@ function camRender(){
       <b>${camTitle(c)}</b><small>Camera ${esc(c.id)}${c.route_km != null && !CAM.near ? ` \u00b7 ${c.route_km} km along route` : ""}${c.dist_km != null ? ` \u00b7 ${c.dist_km >= 1 ? c.dist_km.toFixed(1) + " km" : Math.round(c.dist_km * 1000) + " m"} ${CAM.near ? "from the route" : "off route"}` : ""}${camTaken(c) ? ` \u00b7 photo ${camTaken(c)}` : ""}</small></button>`;
   if(!CAM.list.length){ el.innerHTML = h + `<div class="empty">No traffic camera within ${CAM.km >= 1 ? CAM.km + " km" : Math.round(CAM.km * 1000) + " m"} of Service ${esc(S.svc)} Dir ${S.dir}, and none within 5 km either. The feed has ${r.total} cameras in Singapore, mostly on expressways and at the checkpoints.</div>`; wire(); return; }
   if(CAM.near) h += `<div class="warn" style="margin-bottom:10px">No camera within ${CAM.km >= 1 ? CAM.km + " km" : Math.round(CAM.km * 1000) + " m"} of this route. The nearest ${CAM.list.length} camera${CAM.list.length > 1 ? "s are" : " is"} shown below \u2013 they show nearby roads, not the bus route itself. Try a larger search distance.</div>`;
+  const ag = r.annex_g; if(ag) h += `<div class="occ-note" style="margin:0 0 8px">Map shows all ${r.total} live LTA cameras (Annex G: ${ag.live} of ${ag.listed} listed IDs live now${ag.missing.length ? `; not in today\u2019s feed: ${ag.missing.map(esc).join(", ")}` : ""}). Blue = near this route.</div>`;
   h += `<div class="camg">${CAM.list.map(card).join("")}</div><div class="occ-btns"><button class="ob" type="button" id="camAll">Refresh photos</button></div>${r.line_approx ? `<div class="occ-note">The route line is drawn stop to stop right now (road snapping unavailable), so distances to cameras are approximate.</div>` : ""}`;
   el.innerHTML = h; wire();
 }

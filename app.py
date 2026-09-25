@@ -3862,25 +3862,34 @@ async def tr_roadworks(now):
 
 
 async def fetch_cameras():
+    """LTA DataMall Traffic-Imagesv2 returns ALL cameras in one call (guide v6.9 changelog: "Traffic Images API now returns
+    all records per call") and does not honour $skip. The old loop kept asking for $skip=N, got the same ~90 cameras back
+    every time and stacked hundreds of duplicates on identical coordinates (the "502" cluster on the map). Now: one call,
+    rows de-duplicated by CameraID, and a further page is only requested if the first one was full (500 rows) AND the next
+    page actually brings camera IDs we have not seen."""
     global GOOD_CAMERA_PATH
     paths = [GOOD_CAMERA_PATH] if GOOD_CAMERA_PATH else CAMERA_PATHS
     errors = []
     for path in paths:
-        rows, skip, err = [], 0, None
+        by_id, skip, err, d = {}, 0, None, {}
         while True:
-            d = await get_lta(path, {"$skip": skip})
+            d = await get_lta(path, {"$skip": skip}) if skip else await get_lta(path)
             if d.get("_error"):
                 err = d["_error"]
                 break
-            batch = d.get("value", [])
-            if not batch:
+            batch = d.get("value", []) or []
+            new = 0
+            for x in batch:
+                cid = str(x.get("CameraID") or x.get("CameraId") or "").strip()
+                if cid and cid not in by_id:
+                    by_id[cid] = x
+                    new += 1
+            if len(batch) < 500 or new == 0 or skip >= 2000:   # not a full page, or the API ignored $skip: done
                 break
-            rows += batch
             skip += len(batch)
-            if skip > 2000:                          # sanity stop; Traffic Images never has anywhere near this many cameras
-                break
+        rows = list(by_id.values())
         if err:
-            if rows:                                 # partial success (later page failed): keep what we have rather than discarding it
+            if rows:
                 GOOD_CAMERA_PATH = path
                 return rows, None
             errors.append(err)
@@ -3892,6 +3901,17 @@ async def fetch_cameras():
         GOOD_CAMERA_PATH = path
         return rows, None
     return [], " | ".join(errors[-3:])
+
+
+def dedupe_cams(cams):
+    """One marker per CameraID, whatever the source returned."""
+    seen, out = set(), []
+    for c in cams:
+        if c["id"] in seen:
+            continue
+        seen.add(c["id"])
+        out.append(c)
+    return out
 
 
 def norm_camera(x):
@@ -3923,7 +3943,7 @@ async def cameras_state():
     async def factory():
         rows, err = await fetch_cameras()
         src, err2 = "LTA DataMall \u00b7 Traffic Images", None
-        cams = [c for c in (norm_camera(x) for x in rows) if c]
+        cams = dedupe_cams([c for c in (norm_camera(x) for x in rows) if c])
         raw1 = len(rows)
         # LTA normally has ~80-90 cameras live at once. If nothing came back, OR a suspiciously small slice did (a
         # schema mismatch / partial response can silently pass norm_camera's filter for only a handful of rows),
@@ -3932,7 +3952,7 @@ async def cameras_state():
         rows2, cams2, raw2 = [], [], 0
         if len(cams) < 15:
             rows2, err2 = await fetch_cameras_datagov()
-            cams2 = [c for c in (norm_camera(x) for x in rows2) if c]
+            cams2 = dedupe_cams([c for c in (norm_camera(x) for x in rows2) if c])
             raw2 = len(rows2)
         if len(cams2) > len(cams):
             cams, src = cams2, "data.gov.sg \u00b7 LTA traffic cameras (fallback)"
@@ -4128,7 +4148,10 @@ async def api_cameras(service: str = "", direction: int = 1, km: float = 0.35, r
             out.append({"id": c["id"], "lat": c["lat"], "lon": c["lon"], "image": c["link"], "taken": c.get("taken"), "desc": c.get("desc"), "desc_known": c.get("desc_known"),
                         "near": {"code": ns["code"], "name": ns["name"], "road": ns["road"],
                         "km": round(hav_km(c["lat"], c["lon"], ns["lat"], ns["lon"]), 2)} if ns else None})
-    return {"cameras": out, "nearby": nearby, "km": km, "total": len(cams), "fetched": tr_hhmm(fetched) if fetched else None, "fetched_epoch": fetched,
+    live_ids = {c["id"] for c in cams}
+    annex = {"listed": len(ANNEX_G), "live": len(live_ids & set(ANNEX_G)),
+             "missing": sorted(set(ANNEX_G) - live_ids), "not_in_annex": sorted(live_ids - set(ANNEX_G))}
+    return {"cameras": out, "nearby": nearby, "km": km, "total": len(cams), "annex_g": annex, "fetched": tr_hhmm(fetched) if fetched else None, "fetched_epoch": fetched,
             "source": cs.get("source") or "LTA DataMall \u00b7 Traffic Images", "error": cs.get("error") if not cams else None, "lta_error": cs.get("raw_error"),
             "diag": cs.get("diag"),
             "line_approx": bool(svc) and not CACHE.get(geom_key(svc, direction, route_stops(st, svc, direction))) if st["stops"] else None, "note": "Still photos only: LTA publishes no traffic video. Images are updated by LTA about every 1-5 minutes."}
