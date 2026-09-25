@@ -1,4 +1,4 @@
-# SG Transport Pulse V13.11 — Route Traffic + Departure Adjustment + Bunching, Gap & Alerts + AI Halfway Optimiser
+# SG Transport Pulse V13.12 — Route Traffic + Departure Adjustment + Bunching, Gap & Alerts + AI Halfway Optimiser
 
 ## V13.10 — Route Traffic works as a whole-island traffic map before any bus service is picked
 
@@ -10,6 +10,11 @@ Route Traffic (`index.html`) no longer requires a service to be useful. It now h
 * **New backend endpoints:** `GET /api/speedbands` (whole-island LTA Traffic Speed Bands, optional `bbox=`) and `GET /api/roadworks` (whole-island Approved Road Works). Both work with no `service` parameter and are what Mode A draws from; `/api/incidents`, `/api/rain` and `/api/cameras` already supported a no-service (whole-island) query and now feed Mode A directly.
 * **Traffic cameras:** `/api/cameras` now joins the live `Traffic-Imagesv2` response to a static `ANNEX_G` CameraID→location-description table by CameraID, per the DataMall User Guide's Annex G (79 entries, supplied by the user from the guide text — TPE, CTE, BKE, ECP, AYE/Tuas, PIEE/PIEW, KJE, SLE, Woodlands Causeway/Checkpoint and Sentosa groups). A camera the live feed returns but `ANNEX_G` doesn't cover is still shown on the map (live data is never discarded for a missing static description) labelled "Location description unavailable" — that only applies now if a future Annex G edition adds IDs beyond this table. Camera markers are clustered (Leaflet.markercluster) at whole-island zoom and split apart on zoom-in; each marker's popup shows Camera ID, Annex G description (or the fallback text), the live image, coordinates, last-refreshed time, source, and Refresh Image / Centre on Map buttons. Image links are re-fetched on Refresh rather than stored, since LTA's links are short-lived signed URLs.
 * Not yet done: automatically dimming off-route incidents/cameras/roadworks when a service *is* selected (Mode B currently shows them at full emphasis alongside the route), and linking each incident to its nearest camera with a distance ("nearby camera, 350 m").
+
+## V13.12 — Traffic cameras from both LTA DataMall and data.gov.sg
+- The data.gov.sg Traffic Images API (dataset `d_6cdb6b405b25aaaacbaf7689bcc6fae0`, `api.data.gov.sg/v1/transport/traffic-images`) is now read on every refresh together with LTA DataMall, not only as a fallback. Cameras are merged by CameraID, so a camera missing from one feed still appears if the other has it. Where both have it, LTA's photo is used and data.gov.sg's capture time is attached if it is under 15 min old.
+- `/api/cameras` and `/api/cameras/gallery` return `sources` (count per feed, data.gov.sg feed time, `datagov_stale` when older than 30 min) and a `diag` line; the Cameras page shows the per-feed counts on screen.
+- Fixed: the data.gov.sg key was read from two different variable names in different parts of the app. `DATAGOV_API_KEY` and `DATA_GOV_SG_KEY` now both work everywhere. data.gov.sg enforces rate limits since 31 Dec 2025, so setting a key is recommended; a 429 is reported as "rate limited - set DATAGOV_API_KEY".
 
 ## V13.11 — Accurate bus route lines
 - **Why routes looked wrong:** LTA DataMall `BusRoutes` only lists the stops in order; it has no road path. The app used the public OSRM demo router to join stops, which follows car rules, sometimes snaps a stop to the opposite carriageway (U-turn loops), is rate-limited, and falls back to straight lines.

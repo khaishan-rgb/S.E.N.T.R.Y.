@@ -26,7 +26,7 @@ VERSION = "V13.11"
 LTA = os.getenv("LTA_BASE", "https://datamall2.mytransport.sg/ltaodataservice").rstrip("/")
 KEY = os.getenv("LTA_ACCOUNT_KEY", "")
 OSRM = os.getenv("OSRM_URL", "https://router.project-osrm.org").rstrip("/")
-DATAGOV_KEY = os.getenv("DATA_GOV_SG_KEY", "")  # optional, only raises data.gov.sg rate limits
+DATAGOV_KEY = (os.getenv("DATAGOV_API_KEY") or os.getenv("DATA_GOV_SG_KEY") or "").strip()  # optional, raises data.gov.sg rate limits (either name works)
 SGT = timezone(timedelta(hours=8))
 HERE = Path(__file__).resolve().parent
 
@@ -2273,7 +2273,7 @@ import rtdata
 RT = {"trk": {}, "saved": 0, "last": None, "src": {}}   # live running-time collection, built from the bunching collector's bus tracks
 RT_POLL_SEC = float(os.getenv("RT_POLL_SEC", "60"))       # polling interval when nobody has a page open (always-on services only)
 RT_MAX_SERVICES = int(os.getenv("RT_MAX_SERVICES", "8"))   # services measured round the clock (each = 2 directions x ~15 cached Bus Arrival calls)
-DATAGOV_KEY = os.getenv("DATAGOV_API_KEY", "").strip()    # optional: higher data.gov.sg rate limits
+DATAGOV_KEY = (os.getenv("DATAGOV_API_KEY") or os.getenv("DATA_GOV_SG_KEY") or "").strip()    # optional: higher data.gov.sg rate limits
 RT_MIN_COVER = 0.82                                  # a trip must be observed over at least this share of the route to be stored
 RT_KEEP_DAYS = float(os.getenv("RT_KEEP_DAYS", "180"))          # six months of measured trips by default
 
@@ -3850,7 +3850,8 @@ async def api_cameras_gallery(refresh: int = 0):
                                           "lat": c["lat"] if c else None, "lon": c["lon"] if c else None})
     return {"roads": [{"key": k, "name": n, "cameras": groups[k]} for k, n in CAMERA_ROADS if groups[k]],
             "total_live": len(cams), "annex_listed": len(ANNEX_G), "fetched": tr_hhmm(fetched) if fetched else None, "fetched_epoch": fetched,
-            "source": cs.get("source") or "LTA DataMall \u00b7 Traffic Images", "error": cs.get("error") if not cams else None}
+            "source": cs.get("source") or "LTA DataMall \u00b7 Traffic Images", "error": cs.get("error") if not cams else None,
+            "sources": cs.get("sources"), "diag": cs.get("diag")}
 
 
 @app.get("/traffic", response_class=HTMLResponse)
@@ -3984,41 +3985,68 @@ def norm_camera(x):
 
 
 async def fetch_cameras_datagov():
-    """Fallback: data.gov.sg republishes the same LTA traffic cameras without an LTA key, with the time each photo was taken."""
+    """data.gov.sg Traffic Images (dataset d_6cdb6b405b25aaaacbaf7689bcc6fae0): the same LTA cameras, keyless (a
+    DATAGOV_API_KEY raises the rate limit), with the time each photo was taken. -> (rows, error, feed_timestamp)"""
     try:
         r = await client().get("https://api.data.gov.sg/v1/transport/traffic-images", headers={"x-api-key": DATAGOV_KEY} if DATAGOV_KEY else None)
+        if r.status_code == 429:
+            return [], "data.gov.sg traffic-images: rate limited (HTTP 429) - set DATAGOV_API_KEY", None
         r.raise_for_status()
         items = (r.json() or {}).get("items") or []
         cams = (items[0].get("cameras") if items else None) or []
         rows = [{"CameraID": c.get("camera_id"), "Latitude": (c.get("location") or {}).get("latitude"), "Longitude": (c.get("location") or {}).get("longitude"),
                  "ImageLink": c.get("image"), "Timestamp": c.get("timestamp")} for c in cams]
-        return rows, (None if rows else "data.gov.sg traffic-images: no cameras in response")
+        return rows, (None if rows else "data.gov.sg traffic-images: no cameras in response"), (items[0].get("timestamp") if items else None)
     except Exception as e:
-        return [], f"data.gov.sg traffic-images: {type(e).__name__}"
+        return [], f"data.gov.sg traffic-images: {type(e).__name__}", None
+
+
+def _age_min(iso):
+    try:
+        t = datetime.fromisoformat(str(iso).replace("Z", "+00:00"))
+        return (datetime.now(timezone.utc) - t).total_seconds() / 60
+    except Exception:
+        return None
 
 
 async def cameras_state():
+    """V13.12: LTA DataMall and data.gov.sg are both read every time and merged by CameraID, so a camera missing from one
+    feed still shows if the other has it. Where both have a camera, LTA's photo link is used (official, keyed) and the
+    data.gov.sg capture time is attached when it is recent."""
     async def factory():
-        rows, err = await fetch_cameras()
-        src, err2 = "LTA DataMall \u00b7 Traffic Images", None
-        cams = dedupe_cams([c for c in (norm_camera(x) for x in rows) if c])
-        raw1 = len(rows)
-        # LTA normally has ~80-90 cameras live at once. If nothing came back, OR a suspiciously small slice did (a
-        # schema mismatch / partial response can silently pass norm_camera's filter for only a handful of rows),
-        # try data.gov.sg too and keep whichever source actually returned more usable cameras - never just the first
-        # non-empty one, or a bad partial LTA response gets cached as if it were the whole island.
-        rows2, cams2, raw2 = [], [], 0
-        if len(cams) < 15:
-            rows2, err2 = await fetch_cameras_datagov()
-            cams2 = dedupe_cams([c for c in (norm_camera(x) for x in rows2) if c])
-            raw2 = len(rows2)
-        if len(cams2) > len(cams):
-            cams, src = cams2, "data.gov.sg \u00b7 LTA traffic cameras (fallback)"
+        (rows, err), (rows2, err2, feed_ts) = await asyncio.gather(fetch_cameras(), fetch_cameras_datagov())
+        lta = {c["id"]: c for c in dedupe_cams([c for c in (norm_camera(x) for x in rows) if c])}
+        dg = {c["id"]: c for c in dedupe_cams([c for c in (norm_camera(x) for x in rows2) if c])}
+        feed_age = _age_min(feed_ts)
+        dg_stale = feed_age is not None and feed_age > 30
+        merged = {}
+        for cid in list(lta) + [k for k in dg if k not in lta]:
+            c = dict(lta.get(cid) or dg[cid])
+            d = dg.get(cid)
+            if cid in lta:
+                c["src"] = "lta"
+                if d and d.get("taken") and (_age_min(d["taken"]) or 1e9) <= 15:
+                    c["taken"] = d["taken"]
+            else:
+                c["src"] = "datagov"
+            merged[cid] = c
+        cams = list(merged.values())
+        both, only_lta, only_dg = len(set(lta) & set(dg)), len(set(lta) - set(dg)), len(set(dg) - set(lta))
+        if lta and dg:
+            src = "LTA DataMall + data.gov.sg \u00b7 Traffic Images"
+        elif lta:
+            src = "LTA DataMall \u00b7 Traffic Images"
+        elif dg:
+            src = "data.gov.sg \u00b7 LTA Traffic Images"
+        else:
+            src = "none"
         error = None if cams else " | ".join(e for e in (err or "LTA returned no cameras", err2) if e)
-        diag = f"LTA raw={raw1} valid={len(cams) if src.startswith('LTA') else '-'} | data.gov.sg raw={raw2} valid={len(cams2)}"
-        return {"cams": cams, "error": error, "raw_error": err, "fallback_error": err2, "source": src, "diag": diag}, TTL_CAMERAS, bool(cams)
+        diag = (f"LTA raw={len(rows)} valid={len(lta)}{(' err=' + err) if err else ''} | data.gov.sg raw={len(rows2)} valid={len(dg)}"
+                f"{(' err=' + err2) if err2 else ''}{f' feed_age={round(feed_age)}min' if feed_age is not None else ''}{' STALE' if dg_stale else ''}"
+                f" | merged={len(cams)} (both={both}, LTA only={only_lta}, data.gov.sg only={only_dg})")
+        return {"cams": cams, "error": error, "raw_error": err, "fallback_error": err2, "source": src, "diag": diag,
+                "sources": {"lta": len(lta), "datagov": len(dg), "datagov_feed_time": feed_ts, "datagov_stale": dg_stale}}, TTL_CAMERAS, bool(cams)
     return await cached("cameras", factory)
-
 
 
 def nearest_camera(cams, lat, lon, max_km):
@@ -4211,7 +4239,7 @@ async def api_cameras(service: str = "", direction: int = 1, km: float = 0.35, r
              "missing": sorted(set(ANNEX_G) - live_ids), "not_in_annex": sorted(live_ids - set(ANNEX_G))}
     return {"cameras": out, "nearby": nearby, "km": km, "total": len(cams), "annex_g": annex, "fetched": tr_hhmm(fetched) if fetched else None, "fetched_epoch": fetched,
             "source": cs.get("source") or "LTA DataMall \u00b7 Traffic Images", "error": cs.get("error") if not cams else None, "lta_error": cs.get("raw_error"),
-            "diag": cs.get("diag"),
+            "diag": cs.get("diag"), "sources": cs.get("sources"),
             "line_approx": bool(svc) and not CACHE.get(geom_key(svc, direction, route_stops(st, svc, direction))) if st["stops"] else None, "note": "Still photos only: LTA publishes no traffic video. Images are updated by LTA about every 1-5 minutes."}
 
 

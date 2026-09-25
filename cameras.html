@@ -159,7 +159,10 @@ function renderMain(){
 }
 function renderStatus(){
   const d = ST.data; if(!d) return;
-  $("status").innerHTML = `<span class="live">${d.total_live} cameras live</span><span>${esc(d.source)}</span>${d.fetched ? `<span>Updated ${esc(d.fetched)}</span>` : ""}`;
+  const so = d.sources || {};
+  const dgAge = so.datagov_feed_time ? ageText(so.datagov_feed_time) : null;
+  $("status").innerHTML = `<span class="live">${d.total_live} cameras live</span>${d.fetched ? `<span>Updated ${esc(d.fetched)}</span>` : ""}
+    <span>LTA DataMall: ${so.lta ?? "\u2013"} \u00b7 data.gov.sg: ${so.datagov ?? "\u2013"}${dgAge ? ` (feed ${dgAge.txt})` : ""}</span>${so.datagov_stale ? `<span style="color:var(--amber)">data.gov.sg feed has not updated recently</span>` : ""}`;
 }
 async function load(fresh){
   $("rf").disabled = true;
