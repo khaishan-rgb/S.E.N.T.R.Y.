@@ -3866,16 +3866,31 @@ async def fetch_cameras():
     paths = [GOOD_CAMERA_PATH] if GOOD_CAMERA_PATH else CAMERA_PATHS
     errors = []
     for path in paths:
-        d = await get_lta(path, {"$skip": 0})
-        if d.get("_error"):
-            errors.append(d["_error"])
+        rows, skip, err = [], 0, None
+        while True:
+            d = await get_lta(path, {"$skip": skip})
+            if d.get("_error"):
+                err = d["_error"]
+                break
+            batch = d.get("value", [])
+            if not batch:
+                break
+            rows += batch
+            skip += len(batch)
+            if skip > 2000:                          # sanity stop; Traffic Images never has anywhere near this many cameras
+                break
+        if err:
+            if rows:                                 # partial success (later page failed): keep what we have rather than discarding it
+                GOOD_CAMERA_PATH = path
+                return rows, None
+            errors.append(err)
             if d.get("_status") == 404:
                 if path == GOOD_CAMERA_PATH:
                     GOOD_CAMERA_PATH = None
                 continue
             break  # auth / network / rate limit problem: other paths will not help
         GOOD_CAMERA_PATH = path
-        return list(d.get("value", [])), None
+        return rows, None
     return [], " | ".join(errors[-3:])
 
 
@@ -3909,14 +3924,23 @@ async def cameras_state():
         rows, err = await fetch_cameras()
         src, err2 = "LTA DataMall \u00b7 Traffic Images", None
         cams = [c for c in (norm_camera(x) for x in rows) if c]
-        if not cams:                                                   # LTA failed or returned nothing: same cameras via data.gov.sg
+        raw1 = len(rows)
+        # LTA normally has ~80-90 cameras live at once. If nothing came back, OR a suspiciously small slice did (a
+        # schema mismatch / partial response can silently pass norm_camera's filter for only a handful of rows),
+        # try data.gov.sg too and keep whichever source actually returned more usable cameras - never just the first
+        # non-empty one, or a bad partial LTA response gets cached as if it were the whole island.
+        rows2, cams2, raw2 = [], [], 0
+        if len(cams) < 15:
             rows2, err2 = await fetch_cameras_datagov()
-            cams = [c for c in (norm_camera(x) for x in rows2) if c]
-            if cams:
-                src = "data.gov.sg \u00b7 LTA traffic cameras (fallback)"
+            cams2 = [c for c in (norm_camera(x) for x in rows2) if c]
+            raw2 = len(rows2)
+        if len(cams2) > len(cams):
+            cams, src = cams2, "data.gov.sg \u00b7 LTA traffic cameras (fallback)"
         error = None if cams else " | ".join(e for e in (err or "LTA returned no cameras", err2) if e)
-        return {"cams": cams, "error": error, "raw_error": err, "fallback_error": err2, "source": src}, TTL_CAMERAS, bool(cams)
+        diag = f"LTA raw={raw1} valid={len(cams) if src.startswith('LTA') else '-'} | data.gov.sg raw={raw2} valid={len(cams2)}"
+        return {"cams": cams, "error": error, "raw_error": err, "fallback_error": err2, "source": src, "diag": diag}, TTL_CAMERAS, bool(cams)
     return await cached("cameras", factory)
+
 
 
 def nearest_camera(cams, lat, lon, max_km):
@@ -4106,6 +4130,7 @@ async def api_cameras(service: str = "", direction: int = 1, km: float = 0.35, r
                         "km": round(hav_km(c["lat"], c["lon"], ns["lat"], ns["lon"]), 2)} if ns else None})
     return {"cameras": out, "nearby": nearby, "km": km, "total": len(cams), "fetched": tr_hhmm(fetched) if fetched else None, "fetched_epoch": fetched,
             "source": cs.get("source") or "LTA DataMall \u00b7 Traffic Images", "error": cs.get("error") if not cams else None, "lta_error": cs.get("raw_error"),
+            "diag": cs.get("diag"),
             "line_approx": bool(svc) and not CACHE.get(geom_key(svc, direction, route_stops(st, svc, direction))) if st["stops"] else None, "note": "Still photos only: LTA publishes no traffic video. Images are updated by LTA about every 1-5 minutes."}
 
 

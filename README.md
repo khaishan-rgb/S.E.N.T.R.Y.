@@ -11,6 +11,14 @@ Route Traffic (`index.html`) no longer requires a service to be useful. It now h
 * **Traffic cameras:** `/api/cameras` now joins the live `Traffic-Imagesv2` response to a static `ANNEX_G` CameraID→location-description table by CameraID, per the DataMall User Guide's Annex G (79 entries, supplied by the user from the guide text — TPE, CTE, BKE, ECP, AYE/Tuas, PIEE/PIEW, KJE, SLE, Woodlands Causeway/Checkpoint and Sentosa groups). A camera the live feed returns but `ANNEX_G` doesn't cover is still shown on the map (live data is never discarded for a missing static description) labelled "Location description unavailable" — that only applies now if a future Annex G edition adds IDs beyond this table. Camera markers are clustered (Leaflet.markercluster) at whole-island zoom and split apart on zoom-in; each marker's popup shows Camera ID, Annex G description (or the fallback text), the live image, coordinates, last-refreshed time, source, and Refresh Image / Centre on Map buttons. Image links are re-fetched on Refresh rather than stored, since LTA's links are short-lived signed URLs.
 * Not yet done: automatically dimming off-route incidents/cameras/roadworks when a service *is* selected (Mode B currently shows them at full emphasis alongside the route), and linking each incident to its nearest camera with a distance ("nearby camera, 350 m").
 
+## V13.10.1 — Camera-count diagnostics + defensive pagination
+
+If Route Traffic ever shows far fewer cameras than Singapore actually has (~80–90) with Cameras toggled on:
+
+* `fetch_cameras()` now pages through `$skip` until LTA returns an empty page (previously it only fetched `$skip=0`, so a paginated response would have silently returned just the first page).
+* `cameras_state()` no longer trusts the first source that returns *any* cameras. If LTA DataMall returns fewer than 15 valid cameras, it also tries the data.gov.sg fallback and keeps whichever source returned more — a partial/malformed LTA response can no longer get cached as if it were the whole island.
+* `/api/cameras` now returns a `diag` field (`"LTA raw=N valid=N | data.gov.sg raw=N valid=N"`) — visible by hovering the "Cameras Available" card on the whole-island view — so a low count can be diagnosed (raw count from the feed vs. how many parsed as valid cameras) instead of guessed at. The app also toasts a warning when the camera count looks unusually low.
+
 
 
 Live bus positions, live LTA traffic drawn directly on the bus route, and next arrivals per stop.

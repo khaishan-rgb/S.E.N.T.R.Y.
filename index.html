@@ -1068,10 +1068,11 @@ async function islandCardsLoad(){
   const nInc = (inc.incidents || []).length, nCam = (cam.total || (cam.cameras || []).length) || 0,
         nCong = (sb.segments || []).filter(s => s[5] === "congested").length, nRw = rw.with_location != null ? rw.with_location : (rw.roadworks || []).length;
   el.innerHTML = `<div class="ic-card${nInc ? " warn2" : ""}"><b>${nInc}</b><span>Incidents</span></div>
-    <div class="ic-card"><b>${nCam}</b><span>Cameras Available</span></div>
+    <div class="ic-card" title="${esc(cam.diag || cam.source || "")}"><b>${nCam}</b><span>Cameras Available</span></div>
     <div class="ic-card${nCong ? " warn2" : ""}"><b>${nCong}</b><span>Congested Segments</span></div>
     <div class="ic-card"><b>${nRw}</b><span>Road Works</span></div>
     <div class="ic-card" style="grid-column:1/-1"><span>Last updated ${sgTime(new Date(), true)} \u00b7 LTA DataMall / NEA</span></div>`;
+  if(nCam > 0 && nCam < 15) toast(`Only ${nCam} cameras returned right now (${cam.source || "LTA"}) \u2013 hover the Cameras card for details.`, 8000);
 }
 (function(){ const fA2 = apply; apply = async function(o){ await fA2(o); if(!S.svc){ loadIslandSpeed(true); loadRoadworksLayer(); } };
   const fC2 = clearAll; clearAll = function(){ fC2(); loadIslandSpeed(true); loadRoadworksLayer(); islandCardsLoad(); };
