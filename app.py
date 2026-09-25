@@ -766,6 +766,50 @@ async def api_rain():
     return {"stations": [s for s in d["stations"] if s["mm"] > 0], "total": len(d["stations"]), "error": d["error"]}
 
 
+def band_level(b):
+    """Whole-island speed layer classes, matching the existing route legend (index.html band4): smooth (LTA band >=5),
+    moderate (4), slow (3), congested (<=2)."""
+    if b is None:
+        return "none"
+    b = int(b)
+    return "smooth" if b >= 5 else "moderate" if b == 4 else "slow" if b == 3 else "congested"
+
+
+@app.get("/api/speedbands")
+async def api_speedbands(bbox: str = ""):
+    """Whole-island LTA Traffic Speed Bands, independent of any bus service (Route Traffic Mode A).
+    Optional bbox=south,west,north,east limits the segments returned to what the map is currently showing."""
+    bs = await bands_state()
+    idx = bs.get("idx")
+    if idx is None:
+        return {"segments": [], "error": bs.get("error") or "Traffic speed bands unavailable", "total": 0}
+    box = None
+    if bbox:
+        try:
+            s, w, n, e = [float(v) for v in bbox.split(",")]
+            box = (s, w, n, e)
+        except ValueError:
+            box = None
+    out = []
+    for s in idx.segs:
+        alat, alon, blat, blon, band, road, mn, mx, cat = s
+        if box and not (box[0] - 0.02 <= alat <= box[2] + 0.02 and box[1] - 0.02 <= alon <= box[3] + 0.02) and not (box[0] - 0.02 <= blat <= box[2] + 0.02 and box[1] - 0.02 <= blon <= box[3] + 0.02):
+            continue
+        out.append([round(alat, 5), round(alon, 5), round(blat, 5), round(blon, 5), band, band_level(band)])
+    return {"segments": out, "total": len(idx.segs), "shown": len(out), "path": bs.get("path"), "error": bs.get("error")}
+
+
+@app.get("/api/roadworks")
+async def api_roadworks():
+    """Whole-island LTA Road Works (Approved Road Works), independent of any bus service (Route Traffic Mode A)."""
+    items, err = await tr_roadworks(time.time())
+    out = [{"key": x["key"], "road": x["road"], "lat": x["lat"], "lon": x["lon"],
+             "start": tr_hhmm(x["start_epoch"]) and datetime.fromtimestamp(x["start_epoch"], SGT).strftime("%d %b %H:%M"),
+             "end": (datetime.fromtimestamp(x["end_epoch"], SGT).strftime("%d %b %H:%M") if x.get("end_epoch") else None),
+             "other": x.get("other")} for x in items if x["lat"] is not None]
+    return {"roadworks": out, "total": len(items), "with_location": len(out), "error": err}
+
+
 # --------------------------------------------------------------------------- pre-emptive departure adjustment
 EP_SERVICES = "BusServices"      # carries the scheduled dispatch frequency bands (AM/PM peak / off-peak)
 MAX_COMBOS = 16                  # service+direction pairs evaluated per request (protects the LTA quota)
@@ -3707,6 +3751,25 @@ TTL_ROADWORKS = 600
 CAMERA_PATHS = [p for p in [os.getenv("LTA_CAMERAS_PATH", "").strip("/ "), "Traffic-Imagesv2", "v3/Traffic-Images", "TrafficImages"] if p]
 CAMERA_PATHS = list(dict.fromkeys(CAMERA_PATHS))     # verify against the current DataMall user guide (Traffic Images / traffic camera snapshots)
 GOOD_CAMERA_PATH = None
+
+# Annex G (LTA DataMall API User Guide v6.9, 3 Aug 2026) - CameraID -> location description, static reference data.
+# This table only carries the entries confirmed from the supplied guide text plus a small set of well-known IDs;
+# it is NOT a complete transcription of Annex G (that PDF's full camera list was not provided to this build).
+# The join is by CameraID against the LIVE Traffic-Imagesv2 response (see api_cameras): a camera the live feed
+# returns but this table does not cover is still shown, labelled "Location description unavailable" - live data
+# is never discarded for a missing static description. To complete the table, add more "id: description" lines
+# below, copied from Annex G.
+ANNEX_G = {
+    "1111": "TPE(PIE) - Exit 2 to Loyang Ave", "1112": "TPE(PIE) - Tampines Viaduct", "1113": "Tanah Merah Coast Road towards Changi",
+    "1701": "CTE (AYE) - Moulmein Flyover LP448F", "1702": "CTE (AYE) - Braddell Flyover LP274F", "1703": "CTE (SLE) - Blk 22 St George's Road",
+    "1704": "CTE (AYE) - Entrance from Chin Swee Road", "1705": "CTE (AYE) - Ang Mo Kio Ave 5 Flyover", "1706": "CTE (AYE) - Yio Chu Kang Flyover",
+    "1707": "CTE (AYE) - Bukit Merah Flyover", "1709": "CTE (AYE) - Exit 6 to Bukit Timah Road", "1711": "CTE (AYE) - Ang Mo Kio Flyover",
+    "2701": "Woodlands Causeway (Towards Johor)", "2702": "Woodlands Checkpoint",
+}
+
+
+def annex_g_lookup(cid):
+    return ANNEX_G.get(str(cid).strip())
 TTL_CAMERAS = 120      # LTA's ImageLink is a short-lived signed URL, so this list is not cached long
 TR = {"params": dict(traffic.PARAMS), "book": traffic.new_book(), "last": 0.0, "ridx": None, "ridx_key": None, "feeds": {}, "lock": None, "rw": [], "stretch_cache": None}
 
@@ -3801,14 +3864,37 @@ def norm_camera(x):
     cid = str(x.get("CameraID") or x.get("CameraId") or x.get("ID") or x.get("id") or "").strip()
     if not (in_sg(lat, lon) and link and cid):
         return None
-    return {"id": cid, "lat": lat, "lon": lon, "link": str(link)}
+    desc = annex_g_lookup(cid)
+    return {"id": cid, "lat": lat, "lon": lon, "link": str(link), "taken": x.get("Timestamp") or None,
+            "desc": desc or "Location description unavailable", "desc_known": bool(desc)}
+
+
+async def fetch_cameras_datagov():
+    """Fallback: data.gov.sg republishes the same LTA traffic cameras without an LTA key, with the time each photo was taken."""
+    try:
+        r = await client().get("https://api.data.gov.sg/v1/transport/traffic-images", headers={"x-api-key": DATAGOV_KEY} if DATAGOV_KEY else None)
+        r.raise_for_status()
+        items = (r.json() or {}).get("items") or []
+        cams = (items[0].get("cameras") if items else None) or []
+        rows = [{"CameraID": c.get("camera_id"), "Latitude": (c.get("location") or {}).get("latitude"), "Longitude": (c.get("location") or {}).get("longitude"),
+                 "ImageLink": c.get("image"), "Timestamp": c.get("timestamp")} for c in cams]
+        return rows, (None if rows else "data.gov.sg traffic-images: no cameras in response")
+    except Exception as e:
+        return [], f"data.gov.sg traffic-images: {type(e).__name__}"
 
 
 async def cameras_state():
     async def factory():
         rows, err = await fetch_cameras()
+        src, err2 = "LTA DataMall \u00b7 Traffic Images", None
         cams = [c for c in (norm_camera(x) for x in rows) if c]
-        return {"cams": cams, "error": err if not cams else None, "raw_error": err}, TTL_CAMERAS, bool(cams) or not err
+        if not cams:                                                   # LTA failed or returned nothing: same cameras via data.gov.sg
+            rows2, err2 = await fetch_cameras_datagov()
+            cams = [c for c in (norm_camera(x) for x in rows2) if c]
+            if cams:
+                src = "data.gov.sg \u00b7 LTA traffic cameras (fallback)"
+        error = None if cams else " | ".join(e for e in (err or "LTA returned no cameras", err2) if e)
+        return {"cams": cams, "error": error, "raw_error": err, "fallback_error": err2, "source": src}, TTL_CAMERAS, bool(cams)
     return await cached("cameras", factory)
 
 
@@ -3964,8 +4050,8 @@ async def api_cameras(service: str = "", direction: int = 1, km: float = 0.35, r
     fetched = hit[1] if hit else None
     st = await static()
     svc = service.strip().upper()
-    km = max(0.1, min(1.0, km))
-    out = []
+    km = max(0.1, min(3.0, km))
+    out, nearby = [], []
     if svc:
         stops = route_stops(st, svc, direction) if st["stops"] else []
         if not stops:
@@ -3977,20 +4063,29 @@ async def api_cameras(service: str = "", direction: int = 1, km: float = 0.35, r
         for c in cams:
             d = min_dist_km(c["lat"], c["lon"], line)
             if d > km:
+                if d <= 5.0:
+                    ns = min(stops, key=lambda x: hav_km(c["lat"], c["lon"], x["lat"], x["lon"]))
+                    nearby.append({"id": c["id"], "lat": c["lat"], "lon": c["lon"], "image": c["link"], "taken": c.get("taken"), "dist_km": round(d, 2),
+                                   "desc": c.get("desc"), "desc_known": c.get("desc_known"),
+                                   "near": {"code": ns["code"], "name": ns["name"], "road": ns["road"], "km": round(hav_km(c["lat"], c["lon"], ns["lat"], ns["lon"]), 2)}})
                 continue
             k = min(range(len(line)), key=lambda i: (line[i][0] - c["lat"]) ** 2 + (line[i][1] - c["lon"]) ** 2)
             ns = min(stops, key=lambda x: hav_km(c["lat"], c["lon"], x["lat"], x["lon"]))
-            out.append({"id": c["id"], "lat": c["lat"], "lon": c["lon"], "image": c["link"], "dist_km": round(d, 2), "route_km": round(cum[k], 2),
+            out.append({"id": c["id"], "lat": c["lat"], "lon": c["lon"], "image": c["link"], "taken": c.get("taken"), "dist_km": round(d, 2), "route_km": round(cum[k], 2),
+                        "desc": c.get("desc"), "desc_known": c.get("desc_known"),
                         "near": {"code": ns["code"], "name": ns["name"], "road": ns["road"], "km": round(hav_km(c["lat"], c["lon"], ns["lat"], ns["lon"]), 2)}})
         out.sort(key=lambda x: x["route_km"])
+        nearby = sorted(nearby, key=lambda x: x["dist_km"])[:4]
     else:
         allst = list(st["stops"].values()) if st["stops"] else []
         for c in cams:
             ns = min(allst, key=lambda x: hav_km(c["lat"], c["lon"], x["lat"], x["lon"])) if allst else None
-            out.append({"id": c["id"], "lat": c["lat"], "lon": c["lon"], "image": c["link"], "near": {"code": ns["code"], "name": ns["name"], "road": ns["road"],
+            out.append({"id": c["id"], "lat": c["lat"], "lon": c["lon"], "image": c["link"], "taken": c.get("taken"), "desc": c.get("desc"), "desc_known": c.get("desc_known"),
+                        "near": {"code": ns["code"], "name": ns["name"], "road": ns["road"],
                         "km": round(hav_km(c["lat"], c["lon"], ns["lat"], ns["lon"]), 2)} if ns else None})
-    return {"cameras": out, "total": len(cams), "fetched": tr_hhmm(fetched) if fetched else None, "fetched_epoch": fetched, "source": "LTA DataMall \u00b7 Traffic Images",
-            "error": cs.get("error") if not cams else None, "note": "Still photos only: LTA publishes no traffic video. Images are updated by LTA about every 1-5 minutes."}
+    return {"cameras": out, "nearby": nearby, "km": km, "total": len(cams), "fetched": tr_hhmm(fetched) if fetched else None, "fetched_epoch": fetched,
+            "source": cs.get("source") or "LTA DataMall \u00b7 Traffic Images", "error": cs.get("error") if not cams else None, "lta_error": cs.get("raw_error"),
+            "line_approx": bool(svc) and not CACHE.get(geom_key(svc, direction, route_stops(st, svc, direction))) if st["stops"] else None, "note": "Still photos only: LTA publishes no traffic video. Images are updated by LTA about every 1-5 minutes."}
 
 
 @app.get("/api/traffic/overview")

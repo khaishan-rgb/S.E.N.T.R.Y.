@@ -9,6 +9,8 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css">
 <style>
 :root{
   --bg:#050d1a; --bg2:#081426; --panel:#0a1a2e; --panel2:#0d2039; --line:#163250; --line2:#1f4468;
@@ -225,12 +227,25 @@ table.tb{width:100%;border-collapse:collapse;font-size:14px}
   .tl .stp{font-size:10px;max-width:70px}}
 .ai-shell-card[hidden]{display:none!important}.panels[hidden]{display:none!important}
 .camm{background:none;border:0}.camm span{display:grid;place-items:center;width:26px;height:26px;border-radius:50%;background:#0a1a2e;border:2px solid #fff;font-size:13px;box-shadow:0 2px 6px rgba(0,0,0,.45)}
+.rwm{background:none;border:0}.rwm span{display:grid;place-items:center;width:24px;height:24px;border-radius:7px;background:#8a5a12;border:2px solid #fff;font-size:12px;box-shadow:0 2px 6px rgba(0,0,0,.45)}
+.marker-cluster-cam{background:rgba(23,133,255,.35)}.marker-cluster-cam div{background:#1785ff;color:#fff;font-weight:700}
+.marker-cluster-inc{background:rgba(255,77,85,.35)}.marker-cluster-inc div{background:var(--red);color:#fff;font-weight:700}
+.marker-cluster{background-clip:padding-box;border-radius:50%}.marker-cluster div{width:32px;height:32px;margin-left:4px;margin-top:4px;text-align:center;border-radius:50%;line-height:32px;font-size:13px}
+.dim-layer{opacity:.35}
+.islandcards[hidden]{display:none!important}
+.islandcards{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:10px 2px 0}
+.islandcards .ic-card{background:linear-gradient(180deg,var(--panel),#08172a);border:1px solid var(--line2);border-radius:12px;padding:12px 14px}
+.islandcards .ic-card b{display:block;font-size:24px;font-weight:800;line-height:1.1}
+.islandcards .ic-card span{color:var(--mut);font-size:12.5px}
+.islandcards .ic-card.warn2 b{color:var(--red)}
+@media (max-width:760px){.islandcards{grid-template-columns:1fr 1fr}}
 .camg{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px}.camc{background:#0a1a2e;border:1px solid var(--line);border-radius:12px;padding:0 0 8px;color:var(--text);text-align:left;cursor:pointer;overflow:hidden;font:inherit}.camc:hover{border-color:var(--line2)}
 .camc b{display:block;font-size:13px;padding:6px 10px 0}.camc small{display:block;font-size:11.5px;color:var(--mut);padding:1px 10px 0}
 .camim{position:relative;display:block;aspect-ratio:16/9;background:#04101f;overflow:hidden}.camim img{width:100%;height:100%;object-fit:cover;display:block}.camim em{display:none;position:absolute;inset:0;place-items:center;color:var(--mut);font-style:normal;font-size:12px;text-align:center;padding:10px}
 .camim.bad img{display:none}.camim.bad em{display:grid}.camim.big{border-radius:10px;margin:8px 0;aspect-ratio:auto;min-height:180px}.camim.big img{object-fit:contain;height:auto;max-height:62vh}
 .camv{position:fixed;inset:0;z-index:2147483000;background:rgba(2,8,16,.82);display:grid;place-items:center;padding:14px}.camv[hidden]{display:none}.camvb{width:min(920px,100%);max-height:calc(100vh - 28px);overflow-y:auto;background:var(--panel);border:1px solid var(--line2);border-radius:16px;padding:14px 16px}
 .camvh{display:flex;gap:10px;align-items:flex-start}.camvh>div{flex:1;min-width:0}.camvh b{font-size:16px;display:block}.camvh small{color:var(--mut);font-size:12px}.camvb .x{background:none;border:0;color:var(--mut);font-size:26px;cursor:pointer;line-height:1}
+.camkm{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;color:var(--mut);margin:0 0 10px}.camkm select{background:#08172a;color:var(--text);border:1px solid var(--line2);border-radius:8px;padding:4px 8px;font:inherit}
 #camLive[aria-pressed="true"]{background:#123a24;border-color:#1f6b40;color:#7df0a8}body.camopen{overflow:hidden}
 @media(max-width:640px){.camg{grid-template-columns:1fr 1fr;gap:8px}.camc b{font-size:12px}.camv{padding:0;place-items:end stretch}.camvb{border-radius:16px 16px 0 0;max-height:92vh}}
 </style>
@@ -282,7 +297,7 @@ table.tb{width:100%;border-collapse:collapse;font-size:14px}
     <button class="btn go" id="go" type="submit">Show</button>
     <button class="btn clr" id="clear" type="button">Clear</button>
   </form>
-  <section class="occ-empty" id="occEmpty">Select a service and direction to analyse live traffic conditions and potential operational impact.</section>
+  <section class="islandcards" id="islandCards" aria-label="Whole-island live traffic summary"></section>
   <section class="occ-strip" id="occStrip" hidden aria-label="Route status"></section>
 
   <div class="occ-mapgrid noside">
@@ -295,18 +310,20 @@ table.tb{width:100%;border-collapse:collapse;font-size:14px}
       <div class="lay-list">
         <label><input type="checkbox" data-l="stops" checked>Bus Stops</label>
         <label><input type="checkbox" data-l="buses" checked>Live Buses</label>
-        <label><input type="checkbox" data-l="traffic" checked>Traffic (on route)</label>
-        <label><input type="checkbox" data-l="incidents">Incidents (nearby)</label>
-        <label><input type="checkbox" data-l="rain">Rain (NEA)</label>
-        <label><input type="checkbox" data-l="cams" checked>Traffic cameras (LTA)</label>
+        <label><input type="checkbox" data-l="traffic" checked>Traffic Speed</label>
+        <label><input type="checkbox" data-l="incidents">Traffic Incidents</label>
+        <label><input type="checkbox" data-l="cams">Traffic Cameras</label>
+        <label><input type="checkbox" data-l="roadworks">Road Works</label>
+        <label><input type="checkbox" data-l="rain">Rain / Weather</label>
       </div>
     </div>
-    <div class="ov legend"><h3>Traffic on Route (LTA)</h3>
+    <div class="ov legend"><h3 id="legendTitle">Traffic Speed (LTA)</h3>
       <div class="row"><span class="sw" style="background:#22d36a"></span><span>Smooth <small>(≥ 40 km/h)</small></span></div>
       <div class="row"><span class="sw" style="background:#ffc21a"></span><span>Moderate <small>(30 – 39 km/h)</small></span></div>
       <div class="row"><span class="sw" style="background:#ff8a1f"></span><span>Slow <small>(20 – 29 km/h)</small></span></div>
       <div class="row"><span class="sw" style="background:#ff4d55"></span><span>Congested <small>(&lt; 20 km/h)</small></span></div>
       <div class="row" title="Blue means the route has no LTA traffic reading on that stretch"><span class="sw rt"></span><span>Bus route &amp; stops</span></div>
+      <div id="legendExtra"></div>
     </div>
     <button class="ov compass" id="recenter" type="button" title="Fit map to route" aria-label="Fit map to route"><span><svg class="i"><use href="#i-north"/></svg>N</span></button>
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
@@ -346,6 +363,7 @@ table.tb{width:100%;border-collapse:collapse;font-size:14px}
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
 <script>
 "use strict";
 const $ = id => document.getElementById(id);
@@ -361,7 +379,7 @@ const dur = m => m == null ? "--" : m >= 60 ? `${Math.floor(m/60)} h ${String(m%
 const sgTime = (d, sec) => new Intl.DateTimeFormat("en-GB", {timeZone:"Asia/Singapore", hour:"2-digit", minute:"2-digit", ...(sec ? {second:"2-digit"} : {}), hour12:false}).format(d);
 
 /* ---------- state ---------- */
-const S = {svc:"", dir:1, op:(function(){ try{ return localStorage.getItem("rt.op") || ""; }catch(e){ return ""; } })(), svcAll:null, route:null, buses:[], sel:null, token:0, bounds:null, busMarkers:{}, stopMarkers:{}, layers:{stops:true, buses:true, traffic:true, incidents:false, rain:false}, auto:false};
+const S = {svc:"", dir:1, op:(function(){ try{ return localStorage.getItem("rt.op") || ""; }catch(e){ return ""; } })(), svcAll:null, route:null, buses:[], sel:null, token:0, bounds:null, busMarkers:{}, stopMarkers:{}, layers:{stops:true, buses:true, traffic:true, incidents:false, rain:false, cams:false, roadworks:false}, auto:false};
 
 /* ---------- header ---------- */
 function tickClock(){
@@ -651,11 +669,14 @@ $("busBody").addEventListener("click", e => {
   if(!b) return;
   map.flyTo([b.lat, b.lon], Math.max(map.getZoom(), 15), {duration:.6}); if(m) setTimeout(() => m.openPopup(), 650);
 });
-document.querySelectorAll("#layers input[data-l]").forEach(cb => cb.addEventListener("change", () => {
+document.querySelectorAll("#layers input[data-l]").forEach(cb => { cb.checked = !!S.layers[cb.dataset.l]; cb.addEventListener("change", () => {
   const k = cb.dataset.l; S.layers[k] = cb.checked; syncLayers();
   if(cb.checked && k === "incidents") loadIncidents();
   if(cb.checked && k === "rain") loadRain();
-}));
+  if(k === "cams"){ if(cb.checked && typeof camLoad === "function") camLoad(false); else { CAM.list = []; CAM.gl.clearLayers(); if(typeof camRender === "function") camRender(); } }
+  if(cb.checked && k === "roadworks" && typeof loadRoadworksLayer === "function") loadRoadworksLayer();
+  if(k === "traffic" && typeof loadIslandSpeed === "function") loadIslandSpeed();
+}); });
 $("layH").addEventListener("click", () => { const l = $("layers"); const o = l.classList.toggle("open"); $("layH").setAttribute("aria-expanded", o); });
 let sugT;
 $("stop").addEventListener("input", () => {
@@ -755,9 +776,9 @@ function occBusStates(){
 /* ---- render everything */
 function occRender(){
   const has = !!(S.svc && S.route);
-  $("occEmpty").hidden = has || !!S.stopOnly; $("occStrip").hidden = !has; $("occMain").hidden = !has;
+  $("islandCards").hidden = has || !!S.stopOnly; $("occStrip").hidden = !has; $("occMain").hidden = !has;
   document.querySelector(".panels").hidden = !has && !S.stopOnly;
-  if(!has){ OCC.g.clearLayers(); OCC.gSeg.clearLayers(); occSide(null); return; }
+  if(!has){ OCC.g.clearLayers(); OCC.gSeg.clearLayers(); occSide(null); if(!S.stopOnly && typeof islandCardsLoad === "function") islandCardsLoad(); return; }
   occStrip(); occMarkers(); occImpact(); occSuggest(); occBusTable(); occTimeline(); occSide(OCC.sel);
 }
 function occStrip(){
@@ -912,35 +933,62 @@ $("svc").addEventListener("change", () => { clearTimeout(OCC.chT); OCC.chT = set
 occRender();
 
 /* ===================== V13.9 LTA traffic cameras (photos; LTA publishes no video) ===================== */
-const CAM = {list:[], res:null, gl:L.layerGroup(), idx:-1, live:null, liveOn:false, t:null};
-S.layers.cams = true;
-const fSync = syncLayers; syncLayers = function(){ fSync(); const on = !!(S.layers.cams && S.svc); if(on && !map.hasLayer(CAM.gl)) map.addLayer(CAM.gl); if(!on && map.hasLayer(CAM.gl)) map.removeLayer(CAM.gl); };
+const CAM = {list:[], all:[], near:false, res:null, island:false,
+  gl:(typeof L.markerClusterGroup === "function" ? L.markerClusterGroup({maxClusterRadius:55, iconCreateFunction:c => L.divIcon({html:`<div>${c.getChildCount()}</div>`, className:"marker-cluster marker-cluster-cam", iconSize:[34,34]})}) : L.layerGroup()),
+  idx:-1, live:null, liveOn:false, t:null, km:(function(){ try{ return +localStorage.getItem("rt.camkm") || 0.35; }catch(e){ return 0.35; } })()};
+const camTaken = c => { if(!c || !c.taken) return null; const d = new Date(c.taken); return isNaN(d) ? null : sgTime(d); };
+const fSync = syncLayers; syncLayers = function(){ fSync(); const on = !!S.layers.cams; if(on && !map.hasLayer(CAM.gl)) map.addLayer(CAM.gl); if(!on && map.hasLayer(CAM.gl)) map.removeLayer(CAM.gl); };
 const camIcon = () => L.divIcon({className:"camm", html:`<span>\ud83d\udcf7</span>`, iconSize:[26, 26], iconAnchor:[13, 13]});
+function camPopupHtml(c){
+  return `<h4>\ud83d\udcf7 LTA TRAFFIC CAMERA</h4><b>Camera ID:</b> ${esc(c.id)}<br><b>Location:</b> ${esc(c.desc || (c.near ? c.near.name : "Location description unavailable"))}<br>
+    <img src="${esc(c.image)}" alt="LTA traffic camera ${esc(c.id)}" style="width:100%;max-width:230px;border-radius:8px;margin:6px 0" loading="lazy" onerror="this.style.display='none'">
+    <b>Coordinates:</b> ${c.lat.toFixed(5)}, ${c.lon.toFixed(5)}<br><b>Last refreshed:</b> ${esc((CAM.res && CAM.res.fetched) || "\u2013")}<br><b>Source:</b> LTA DataMall \u00b7 Traffic Images
+    <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap"><button type="button" onclick="islandCamRefresh('${esc(c.id)}')" style="cursor:pointer">Refresh Image</button><button type="button" onclick="map.flyTo([${c.lat},${c.lon}],16,{duration:.5})" style="cursor:pointer">Centre on Map</button></div>`;
+}
 async function camLoad(fresh){
-  if(!S.svc || !S.route){ CAM.list = []; CAM.gl.clearLayers(); camRender(); return; }
+  if(!S.svc || !S.route){
+    CAM.island = true;
+    if(!S.layers.cams){ return; }
+    const r = await api(`/api/cameras?${q({refresh:fresh ? 1 : 0})}`, 30000);
+    if(S.svc || !S.layers.cams) return;                                    // a service was picked (or the layer was turned off) while this was loading
+    CAM.res = r; CAM.near = false; CAM.list = r.cameras || [];
+    CAM.gl.clearLayers();
+    CAM.list.forEach(c => L.marker([c.lat, c.lon], {icon:camIcon(), keyboard:false, title:`Camera ${c.id}`}).bindPopup(camPopupHtml(c), POP).addTo(CAM.gl));
+    if(r.error && !CAM.list.length) toast("Traffic cameras unavailable: " + r.error);
+    return;
+  }
+  CAM.island = false;
+  if(!S.layers.cams){ return; }
   const svc = S.svc, dir = S.dir;
-  const r = await api(`/api/cameras?${q({service:svc, direction:dir, refresh:fresh ? 1 : 0})}`, 30000);
+  const r = await api(`/api/cameras?${q({service:svc, direction:dir, km:CAM.km, refresh:fresh ? 1 : 0})}`, 30000);
   if(svc !== S.svc || dir !== S.dir) return;
-  CAM.res = r; CAM.list = r.cameras || [];
+  CAM.res = r; CAM.near = !(r.cameras || []).length && (r.nearby || []).length > 0; CAM.list = CAM.near ? r.nearby : (r.cameras || []);
   CAM.gl.clearLayers();
-  CAM.list.forEach((c, i) => L.marker([c.lat, c.lon], {icon:camIcon(), keyboard:false, zIndexOffset:500, title:`Camera ${c.id}`}).on("click", () => camOpen(i)).addTo(CAM.gl));
+  CAM.list.forEach((c, i) => L.marker([c.lat, c.lon], {icon:camIcon(), keyboard:false, zIndexOffset:500, opacity:CAM.near ? .75 : 1, title:`Camera ${c.id}`}).on("click", () => camOpen(i)).addTo(CAM.gl));
   syncLayers(); camRender();
   if(CAM.idx >= 0) camShow();                                               // a refresh while the viewer is open: new signed image link
+}
+async function islandCamRefresh(id){
+  const r = await api(`/api/cameras?${q({refresh:1})}`, 30000);
+  CAM.res = r; const c = (r.cameras || []).find(x => String(x.id) === String(id));
+  if(c){ const m = CAM.list.find(x => String(x.id) === String(id)); if(m) Object.assign(m, c); CAM.gl.eachLayer(l => { if(l.getPopup() && l.getLatLng().lat === c.lat && l.getLatLng().lng === c.lon) l.setPopupContent(camPopupHtml(c)); }); }
 }
 function camTitle(c){ return c.near ? `${esc(c.near.name)}${c.near.road ? ` \u00b7 ${esc(c.near.road)}` : ""}` : `Camera ${esc(c.id)}`; }
 function camRender(){
   const el = $("occCams"); if(!el) return;
   const r = CAM.res; if(!S.svc || !S.route){ el.innerHTML = ""; return; }
-  let h = `<h2>\ud83d\udcf7 Traffic cameras on this route</h2><p class="s">Still photos from ${tg("live", "LTA DataMall \u00b7 Traffic Images")} ${r && r.fetched ? `\u00b7 list fetched ${esc(r.fetched)}` : ""}. LTA publishes no video; each camera's photo is updated by LTA about every 1\u20135 min. Tap a photo to enlarge.</p>`;
-  if(!r){ el.innerHTML = h + `<div class="empty">Loading cameras\u2026</div>`; return; }
-  if(r.error && !CAM.list.length){ el.innerHTML = h + `<div class="warn">Traffic cameras unavailable: ${esc(r.error)}</div>`; return; }
-  if(!CAM.list.length){ el.innerHTML = h + `<div class="empty">No LTA traffic camera within 350 m of this route (LTA has about ${r.total || 90} cameras, mostly on expressways and major roads).</div>`; return; }
-  h += `<div class="camg">${CAM.list.map((c, i) => `<button class="camc" type="button" data-i="${i}"><span class="camim"><img src="${esc(c.image)}" alt="LTA camera ${esc(c.id)}" loading="lazy" onerror="this.parentNode.classList.add('bad')"><em>Image not available</em></span>
-      <b>${camTitle(c)}</b><small>Camera ${esc(c.id)} \u00b7 ${c.route_km != null ? `${c.route_km} km along route` : ""}${c.dist_km != null ? ` \u00b7 ${Math.round(c.dist_km * 1000)} m off route` : ""}</small></button>`).join("")}</div>
-    <div class="occ-btns"><button class="ob" type="button" id="camAll">Refresh photos</button></div>`;
-  el.innerHTML = h;
-  el.querySelectorAll(".camc").forEach(b => b.onclick = () => camOpen(+b.dataset.i));
-  $("camAll").onclick = async () => { $("camAll").disabled = true; await camLoad(true); };
+  const kmSel = `<label class="camkm">Search within <select id="camKm">${[[0.35, "350 m"], [1, "1 km"], [3, "3 km"]].map(([v, t]) => `<option value="${v}" ${Math.abs(CAM.km - v) < 0.01 ? "selected" : ""}>${t}</option>`).join("")}</select> of the route</label>`;
+  let h = `<h2>\ud83d\udcf7 Traffic cameras on this route</h2><p class="s">Still photos from ${tg("live", esc((r && r.source) || "LTA DataMall \u00b7 Traffic Images"))} ${r && r.fetched ? `\u00b7 list fetched ${esc(r.fetched)}` : ""}. LTA publishes no video; each photo is updated by LTA about every 1\u20135 min. Tap a photo to enlarge.</p>${kmSel}`;
+  const wire = () => { if($("camKm")) $("camKm").onchange = () => { CAM.km = +$("camKm").value; try{ localStorage.setItem("rt.camkm", CAM.km); }catch(e){} camLoad(false); };
+    el.querySelectorAll(".camc").forEach(b => b.onclick = () => camOpen(+b.dataset.i)); if($("camAll")) $("camAll").onclick = async () => { $("camAll").disabled = true; await camLoad(true); }; };
+  if(!r){ el.innerHTML = h + `<div class="empty">Loading cameras\u2026</div>`; wire(); return; }
+  if(r.error && !r.total){ el.innerHTML = h + `<div class="warn"><b>No camera feed received.</b> ${esc(r.error)}<br><small>The app tried LTA DataMall (Traffic Images) and the public data.gov.sg copy. Check the LTA_ACCOUNT_KEY on the server and that the server can reach the internet, then press Retry.</small></div><div class="occ-btns"><button class="ob" type="button" id="camAll">Retry</button></div>`; wire(); return; }
+  const card = (c, i) => `<button class="camc" type="button" data-i="${i}"><span class="camim"><img src="${esc(c.image)}" alt="LTA camera ${esc(c.id)}" loading="lazy" onerror="this.parentNode.classList.add('bad')"><em>Image not available</em></span>
+      <b>${camTitle(c)}</b><small>Camera ${esc(c.id)}${c.route_km != null && !CAM.near ? ` \u00b7 ${c.route_km} km along route` : ""}${c.dist_km != null ? ` \u00b7 ${c.dist_km >= 1 ? c.dist_km.toFixed(1) + " km" : Math.round(c.dist_km * 1000) + " m"} ${CAM.near ? "from the route" : "off route"}` : ""}${camTaken(c) ? ` \u00b7 photo ${camTaken(c)}` : ""}</small></button>`;
+  if(!CAM.list.length){ el.innerHTML = h + `<div class="empty">No traffic camera within ${CAM.km >= 1 ? CAM.km + " km" : Math.round(CAM.km * 1000) + " m"} of Service ${esc(S.svc)} Dir ${S.dir}, and none within 5 km either. The feed has ${r.total} cameras in Singapore, mostly on expressways and at the checkpoints.</div>`; wire(); return; }
+  if(CAM.near) h += `<div class="warn" style="margin-bottom:10px">No camera within ${CAM.km >= 1 ? CAM.km + " km" : Math.round(CAM.km * 1000) + " m"} of this route. The nearest ${CAM.list.length} camera${CAM.list.length > 1 ? "s are" : " is"} shown below \u2013 they show nearby roads, not the bus route itself. Try a larger search distance.</div>`;
+  h += `<div class="camg">${CAM.list.map(card).join("")}</div><div class="occ-btns"><button class="ob" type="button" id="camAll">Refresh photos</button></div>${r.line_approx ? `<div class="occ-note">The route line is drawn stop to stop right now (road snapping unavailable), so distances to cameras are approximate.</div>` : ""}`;
+  el.innerHTML = h; wire();
 }
 function camOpen(i){ CAM.idx = i; $("camV").hidden = false; document.body.classList.add("camopen"); camShow(); }
 function camClose(){ CAM.idx = -1; $("camV").hidden = true; document.body.classList.remove("camopen"); camLive(false); }
@@ -948,7 +996,7 @@ function camShow(){
   const c = CAM.list[CAM.idx]; if(!c){ camClose(); return; }
   $("camVT").innerHTML = camTitle(c); $("camVS").innerHTML = `Camera ${esc(c.id)} \u00b7 ${CAM.idx + 1} of ${CAM.list.length}${c.route_km != null ? ` \u00b7 ${c.route_km} km along Service ${esc(S.svc)}` : ""}`;
   const img = $("camVI"); img.parentNode.classList.remove("bad"); img.src = c.image; img.alt = `LTA traffic camera ${c.id}`;
-  $("camVK").innerHTML = `<span>Source</span><b>LTA DataMall \u00b7 Traffic Images</b><span>Photo link fetched</span><b>${esc((CAM.res && CAM.res.fetched) || "\u2013")}</b><span>Nearest bus stop</span><b>${c.near ? `${esc(c.near.code)} ${esc(c.near.name)} (${Math.round(c.near.km * 1000)} m)` : "\u2013"}</b><span>Location</span><b>${c.lat.toFixed(5)}, ${c.lon.toFixed(5)}</b><span>Camera direction</span><b>not published by LTA</b>`;
+  $("camVK").innerHTML = `<span>Source</span><b>${esc((CAM.res && CAM.res.source) || "LTA DataMall \u00b7 Traffic Images")}</b>${CAM.near ? `<span>On this route?</span><b>No \u2013 ${c.dist_km} km from the route</b>` : ""}<span>Photo taken</span><b>${camTaken(c) || "not published by LTA"}</b><span>Photo link fetched</span><b>${esc((CAM.res && CAM.res.fetched) || "\u2013")}</b><span>Nearest bus stop</span><b>${c.near ? `${esc(c.near.code)} ${esc(c.near.name)} (${Math.round(c.near.km * 1000)} m)` : "\u2013"}</b><span>Location</span><b>${c.lat.toFixed(5)}, ${c.lon.toFixed(5)}</b><span>Camera direction</span><b>not published by LTA</b>`;
   $("camPrev").disabled = CAM.idx <= 0; $("camNext").disabled = CAM.idx >= CAM.list.length - 1;
 }
 function camLive(on){ CAM.liveOn = on; $("camLive").setAttribute("aria-pressed", String(on)); $("camLive").textContent = on ? "\u25cf Live view on (every 60 s)" : "Live view (auto-refresh)"; clearInterval(CAM.live); if(on) CAM.live = setInterval(() => { if(!document.hidden && CAM.idx >= 0) camLoad(true); }, 60000); }
@@ -964,9 +1012,75 @@ $("camVRef").onclick = async () => { $("camVRef").disabled = true; await camLoad
 $("camLive").onclick = () => camLive(!CAM.liveOn);
 $("camMap").onclick = () => { const c = CAM.list[CAM.idx]; if(!c) return; camClose(); document.querySelector(".mapcard").scrollIntoView({behavior:"smooth", block:"center"}); map.flyTo([c.lat, c.lon], 16, {duration:.6}); };
 (function(){ const fA = apply; apply = async function(o){ CAM.list = []; CAM.res = null; CAM.gl.clearLayers(); await fA(o); if(S.svc && S.route) camLoad(false); else camRender(); };
-  const fC = clearAll; clearAll = function(){ fC(); CAM.list = []; CAM.res = null; CAM.gl.clearLayers(); camClose(); camRender(); };
+  const fC = clearAll; clearAll = function(){ fC(); CAM.list = []; CAM.res = null; CAM.gl.clearLayers(); camClose(); camRender(); if(S.layers.cams) camLoad(false); };
   const fR = occRender; occRender = function(){ fR(); camRender(); }; })();
+function legendSync(){
+  const t = $("legendTitle"); if(t) t.textContent = S.svc && S.route ? "Traffic on Route (LTA)" : "Island Traffic Speed (LTA)";
+  const ex = $("legendExtra"); if(!ex) return;
+  const rows = [];
+  if(S.layers.incidents) rows.push(`<div class="row"><span class="im" style="width:16px;height:16px;font-size:10px;position:static">!</span><span>Traffic incident</span></div>`);
+  if(S.layers.cams) rows.push(`<div class="row"><span class="camm" style="position:static"><span style="width:16px;height:16px;font-size:10px">\ud83d\udcf7</span></span><span>Traffic camera</span></div>`);
+  if(S.layers.roadworks) rows.push(`<div class="row"><span class="rwm" style="position:static"><span style="width:16px;height:16px;font-size:10px">\ud83d\udea7</span></span><span>Road works</span></div>`);
+  ex.innerHTML = rows.join("");
+}
+(function(){ const fSync3 = syncLayers; syncLayers = function(){ fSync3(); legendSync(); }; legendSync(); })();
 setInterval(() => { if(!document.hidden && S.svc && S.route && CAM.idx < 0 && CAM.list.length) camLoad(true); }, 240000);   // signed photo links expire: renew every 4 min
+
+/* ===================== Whole-island Route Traffic (Mode A: no service selected) ===================== */
+map.createPane("rw").style.zIndex = 415;
+map.createPane("island").style.zIndex = 403;
+const gIslandSpeed = L.layerGroup(), gRW = L.layerGroup();
+const canvasR = L.canvas({padding:0.4});
+const rwIcon = () => L.divIcon({className:"rwm", html:`<span>\ud83d\udea7</span>`, iconSize:[24, 24], iconAnchor:[12, 12]});
+(function(){ const fSync2 = syncLayers; syncLayers = function(){ fSync2();
+  const on = (g, v) => { if(v && !map.hasLayer(g)) map.addLayer(g); if(!v && map.hasLayer(g)) map.removeLayer(g); };
+  on(gIslandSpeed, S.layers.traffic && !S.svc); on(gRW, S.layers.roadworks);
+}; })();
+let islandSpeedLoaded = false;
+async function loadIslandSpeed(force){
+  if(!S.layers.traffic || S.svc) return;
+  if(islandSpeedLoaded && !force) { syncLayers(); return; }
+  const r = await api("/api/speedbands", 30000);
+  if(S.svc) return;                                                      // a service was picked while this was loading
+  gIslandSpeed.clearLayers();
+  if(r.error && !(r.segments || []).length){ toast("Traffic speed bands unavailable: " + r.error); return; }
+  (r.segments || []).forEach(s => {
+    const [alat, alon, blat, blon, band, cls] = s;
+    L.polyline([[alat, alon], [blat, blon]], {renderer:canvasR, pane:"island", color:COL4[cls] || COL4.none, weight:cls === "congested" ? 3 : 2, opacity:.75, interactive:false}).addTo(gIslandSpeed);
+  });
+  islandSpeedLoaded = true; syncLayers();
+}
+async function loadRoadworksLayer(){
+  if(!S.layers.roadworks) return;
+  const r = await api("/api/roadworks", 30000);
+  gRW.clearLayers();
+  if(r.error && !(r.roadworks || []).length){ toast("Road works unavailable: " + r.error); return; }
+  (r.roadworks || []).forEach(x => L.marker([x.lat, x.lon], {icon:rwIcon(), pane:"rw", keyboard:false, title:x.road})
+    .bindPopup(`<h4>\ud83d\udea7 Road Works</h4><b>Road:</b> ${esc(x.road)}<br><b>Start:</b> ${esc(x.start || "\u2013")}<br><b>Expected end:</b> ${x.end ? esc(x.end) : "End time unavailable"}<br>${x.other ? esc(x.other) + "<br>" : ""}<span class="m">Source: LTA Road Works</span>`, POP)
+    .addTo(gRW));
+  if(!(r.roadworks || []).length) toast("No road works with a usable location right now.");
+}
+async function islandCardsLoad(){
+  const el = $("islandCards"); if(!el || el.hidden) return;
+  el.innerHTML = `<div class="ic-card"><b>\u2026</b><span>Incidents</span></div><div class="ic-card"><b>\u2026</b><span>Cameras Available</span></div><div class="ic-card"><b>\u2026</b><span>Congested Segments</span></div><div class="ic-card"><b>\u2026</b><span>Road Works</span></div>`;
+  const [inc, cam, sb, rw] = await Promise.all([api("/api/incidents", 20000), api("/api/cameras", 20000), api("/api/speedbands", 20000), api("/api/roadworks", 20000)]);
+  if(S.svc || $("islandCards").hidden) return;
+  const nInc = (inc.incidents || []).length, nCam = (cam.total || (cam.cameras || []).length) || 0,
+        nCong = (sb.segments || []).filter(s => s[5] === "congested").length, nRw = rw.with_location != null ? rw.with_location : (rw.roadworks || []).length;
+  el.innerHTML = `<div class="ic-card${nInc ? " warn2" : ""}"><b>${nInc}</b><span>Incidents</span></div>
+    <div class="ic-card"><b>${nCam}</b><span>Cameras Available</span></div>
+    <div class="ic-card${nCong ? " warn2" : ""}"><b>${nCong}</b><span>Congested Segments</span></div>
+    <div class="ic-card"><b>${nRw}</b><span>Road Works</span></div>
+    <div class="ic-card" style="grid-column:1/-1"><span>Last updated ${sgTime(new Date(), true)} \u00b7 LTA DataMall / NEA</span></div>`;
+}
+(function(){ const fA2 = apply; apply = async function(o){ await fA2(o); if(!S.svc){ loadIslandSpeed(true); loadRoadworksLayer(); } };
+  const fC2 = clearAll; clearAll = function(){ fC2(); loadIslandSpeed(true); loadRoadworksLayer(); islandCardsLoad(); };
+  const fR2 = occRender; occRender = function(){ fR2(); if(!S.svc) syncLayers(); }; })();
+if(S.layers.traffic) loadIslandSpeed(true);
+if(S.layers.roadworks) loadRoadworksLayer();
+if(S.layers.cams) camLoad(false);
+islandCardsLoad();
+setInterval(() => { if(!document.hidden && !S.svc){ if(S.layers.traffic) loadIslandSpeed(false); if(S.layers.roadworks) loadRoadworksLayer(); if(S.layers.incidents) loadIncidents(); if(S.layers.cams) camLoad(true); islandCardsLoad(); } }, 90000);
 
 /* start */
 function fillSvcList(){
