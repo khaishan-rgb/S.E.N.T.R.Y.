@@ -1,4 +1,11 @@
-# SG Transport Pulse V15.3 — Route Traffic + Departure Adjustment + Bunching, Gap & Alerts + AI Halfway Optimiser
+# SG Transport Pulse V15.4 — Route Traffic + Departure Adjustment + Bunching, Gap & Alerts + AI Halfway Optimiser
+
+## V15.4 — OS bus option (Live and Test)
+
+* Header **Recover with: Bus C halfway | OS bus**. With **OS bus**, an extra bus + Bus Captain is the halfway bus: set where it starts (**OS from**: empty = the next direction's interchange, or a 5-digit bus stop code) and when it is available (**OS available**, default the reference / test time). Bus C completes its trip and runs its next trip in full (late).
+* Same method: at every stop the OS bus aims at the middle of the prolonged headway, reached by real road from its start point (first stop where it can get there = recommended; it stands by if early). A/B later / D/E earlier interchange re-spacing is used only when it lowers the EWT for that plan (per plan now, also for Bus C halfway).
+* The plan shows the OS chain (available → stand by → off-service → enter), stops served, and **OS bus vs Bus C halfway** EWT side by side (`compare_c`), plus the OS row in the downstream table, the OS badge in the visuals and an OS step in the action plan. Map route starts at the OS bus's start point.
+* API: `/api/hplan/plan?...&mode=os&os_from=&os_time=HH:MM`.
 
 ## V15.3 — Test mode: fleet-edge gaps ignored
 

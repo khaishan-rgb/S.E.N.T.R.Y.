@@ -3838,7 +3838,8 @@ import hwplan
 
 
 @app.get("/api/hplan/plan")
-async def api_hp_plan(snap: str = "", bus: str = "", delay: str = "20", brk: str = "", stop_min: str = "", layover: str = ""):
+async def api_hp_plan(snap: str = "", bus: str = "", delay: str = "20", brk: str = "", stop_min: str = "", layover: str = "",
+                      mode: str = "late", os_from: str = "", os_time: str = ""):
     """Late bus completes its trip; its NEXT trip starts halfway. Every stop of the next direction is tested with real-road off-service
     time from the interchange; front bus hold / rear bus advance chosen per stop; ranked by downstream EWT. Live data unchanged."""
     S = HP_SNAP.get(snap)
@@ -3865,19 +3866,45 @@ async def api_hp_plan(snap: str = "", bus: str = "", delay: str = "20", brk: str
     st = gn["stops"]
     ic = st[0]
     js = list(range(1, len(st) - 1))
-    offs, off_err = await os_table((ic["lat"], ic["lon"]), [(st[j]["lat"], st[j]["lon"]) for j in js])
     fac = float(offservice.PARAMS["bus_time_factor"])
-    reach = {}
-    for i, j in enumerate(js):
-        om = offs.get(i)
-        if om:
-            reach[j] = (om["min"] * fac, om.get("km"), f"real road routing (OSRM) x {fac:g} bus factor")
-        else:
-            km = hplan.hav_km((ic["lat"], ic["lon"]), (st[j]["lat"], st[j]["lon"])) * 1.35
-            reach[j] = (km / 25.0 * 60.0, km, "estimate - road routing unavailable")
+
+    async def reach_from(org):
+        offs_, err_ = await os_table(org, [(st[j]["lat"], st[j]["lon"]) for j in js])
+        out = {}
+        for i, j in enumerate(js):
+            om = offs_.get(i)
+            if om:
+                out[j] = (om["min"] * fac, om.get("km"), f"real road routing (OSRM) x {fac:g} bus factor")
+            else:
+                km = hplan.hav_km(org, (st[j]["lat"], st[j]["lon"])) * 1.35
+                out[j] = (km / 25.0 * 60.0, km, "estimate - road routing unavailable")
+        return out, offs_, err_
+    reach, offs, off_err = await reach_from((ic["lat"], ic["lon"]))
     if S.get("test"):
         Pp["edge_trim"] = True                                          # test fleet: ignore the gap in front of its first bus
-    res = await asyncio.to_thread(hwplan.plan, {"now": S["now_min"], "late": {"bus": int(bus), "delay": D}, "T": T, "O": O, "P": Pp}, reach)
+    base_ctx = {"now": S["now_min"], "late": {"bus": int(bus), "delay": D}, "T": T, "O": O, "P": Pp}
+    if mode == "os":                                                   # V15.4: an extra OS bus + Bus Captain goes halfway; Bus C runs its next trip late
+        frm = (os_from or "").strip()
+        if not frm or frm.lower() in ("ic", "interchange", "first"):
+            org, olabel = (ic["lat"], ic["lon"]), f"{ic['name']} ({ic['code']}, interchange)"
+        else:
+            org, olabel, oerr = await pl_origin(frm, st)
+            if oerr:
+                return {"ok": False, "error": f"OS start: {oerr}"}
+        t0 = ho_parse_hhmm(os_time) if str(os_time).strip() else None
+        if t0 is None:
+            t0 = S["now_min"]
+        elif t0 < S["now_min"] - 720:
+            t0 += 1440
+        oreach = reach if org == (ic["lat"], ic["lon"]) else (await reach_from(org))[0]
+        res = await asyncio.to_thread(hwplan.plan, {**base_ctx, "mode": "os", "os": {"t0": t0, "label": olabel, "lat": org[0], "lon": org[1]}}, oreach)
+        if res.get("ok"):
+            rc = await asyncio.to_thread(hwplan.plan, base_ctx, reach)       # the same situation recovered by Bus C going halfway, for comparison
+            bc = next((x for x in rc.get("candidates") or [] if x["code"] == rc.get("best")), None) if rc.get("ok") else None
+            res["compare_c"] = {"ewt": bc["ewt"], "no": bc["no"], "code": bc["code"], "split": bc["gap"]["split"]} if bc else None
+            res["os"].update(lat=org[0], lon=org[1])
+    else:
+        res = await asyncio.to_thread(hwplan.plan, base_ctx, reach)
     res.update(snap=snap, service=S["svc"], routing="real road routing (OSRM)" if offs else f"estimate ({off_err or 'road routing unavailable'})")
     return res
 
