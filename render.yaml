@@ -17,6 +17,8 @@ services:
         sync: false
       - key: BUNCHING_ALWAYS_ON   # optional: 1 = keep collecting when nobody has the page open (needed for an unattended event log; uses more LTA quota)
         sync: false
+      - key: CARTO_API_KEY        # CARTO basemap key (tiles). Optional: the app has a built-in default; set your own here to rotate it without a code change
+        sync: false
       - key: OVERPASS_URL         # optional: road-restriction data for the off-service route check (default public overpass-api.de)
         sync: false
       - key: RT_POLL_SEC          # optional: running-time polling interval when unattended (default 60)

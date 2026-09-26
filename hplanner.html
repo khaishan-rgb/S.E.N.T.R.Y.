@@ -434,15 +434,16 @@ body.navmode .chips,body.navmode .legend{display:none}
   </section>
   <div class="sticky-cta t-res" id="mCta"></div>
 
-  <p class="foot">Live: LTA DataMall Bus Arrival &amp; speed bands (unchanged). Simulated: injected delays and virtual OS buses exist only in this planner. Predicted: running times, headways and EWT from the route model. SG Transport Pulse V14.0</p>
+  <p class="foot">Live: LTA DataMall Bus Arrival &amp; speed bands (unchanged). Simulated: injected delays and virtual OS buses exist only in this planner. Predicted: running times, headways and EWT from the route model. SG Transport Pulse V14.1</p>
 </div>
 
 <nav class="mobile-bottom-nav" aria-label="Mobile primary navigation"><a class="mbn" href="/"><span class="mi">▰</span>Route</a><a class="mbn" href="/control"><span class="mi">↔</span>Headway</a><a class="mbn active" href="/halfway"><span class="mi">½</span>Halfway</a><button class="mbn" type="button" style="border:0;background:transparent;font-family:inherit" onclick="document.getElementById('mobileMore').classList.toggle('open')"><span class="mi">•••</span>More</button></nav><div class="mobile-more" id="mobileMore"><a href="/bunching">≋ Bunching</a><a href="/traffic">⚠ Traffic-Aware Regulation</a><a href="/halfway/timetable">▤ Timetable Optimiser</a><a href="/planner">◉ Off-service Route Planner</a><a href="/running-time">⏱ Running Time</a><a href="/cameras">📷 Traffic Cameras</a></div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="/basemap.js"></script>
 <script>
 "use strict";
-/* ===================== SG Transport Pulse V14.0 · Halfway Planner =====================
+/* ===================== SG Transport Pulse V14.1 · Halfway Planner =====================
    LIVE      = LTA DataMall observations (buses, arrivals, speed bands, incidents, road works) - never modified here.
    SIMULATED = injected delays and the virtual OS bus - they exist only in this page's scenario.
    PREDICTED = running times, headways and EWT from the route model (api/hplan/*, engine hplan.py). */
@@ -471,11 +472,7 @@ const ST = {mode:"late", svc:"", dir:1, op:"", snap:null, bus:null, delay:20, de
 
 /* ---------------------------------------------------------------- map */
 const map = L.map("map", {zoomControl:true, attributionControl:true}).setView([1.3521, 103.8198], 12);
-let tileErr = 0, fell = false;
-const night = L.tileLayer("https://www.onemap.gov.sg/maps/tiles/Night/{z}/{x}/{y}.png", {minZoom:11, maxZoom:19, detectRetina:true,
-  attribution:'<a href="https://www.onemap.gov.sg/" target="_blank" rel="noopener">OneMap</a> &copy; contributors &#124; Singapore Land Authority'}).addTo(map);
-night.on("tileerror", () => { if(fell || ++tileErr < 4) return; fell = true; map.removeLayer(night);
-  L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {maxZoom:19, attribution:"&copy; OpenStreetMap contributors &copy; CARTO"}).addTo(map); });
+(window.SGBasemap ? SGBasemap.add(map, {minZoom:11, maxZoom:19, style:"dark"}) : L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {minZoom:11, maxZoom:19, attribution:"\u00a9 OpenStreetMap contributors"}).addTo(map));
 map.createPane("routeP").style.zIndex = 410; map.createPane("hiP").style.zIndex = 430;
 const G = {}; ["route", "traffic", "stops", "inc", "rw", "gap", "cands", "buses", "os", "nav", "after", "pin"].forEach(k => G[k] = L.layerGroup().addTo(map));
 const toast = (t, ms) => { const el = $("maptoast"); el.textContent = t; el.style.display = "block"; clearTimeout(toast.t); toast.t = setTimeout(() => el.style.display = "none", ms || 3500); };

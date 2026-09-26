@@ -1,4 +1,12 @@
-# SG Transport Pulse V14.0 — Route Traffic + Departure Adjustment + Bunching, Gap & Alerts + AI Halfway Optimiser
+# SG Transport Pulse V14.1 — Route Traffic + Departure Adjustment + Bunching, Gap & Alerts + AI Halfway Optimiser
+
+## V14.1 — CARTO basemaps
+
+* All map pages (Route Traffic, Bunching, Halfway Planner, Traffic-Aware, Timetable Optimiser, Off-service Route Planner) now load their basemap from one shared script, **`/basemap.js`**, served by the backend.
+* Default basemap: **CARTO Voyager** raster tiles (`basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png?key=…`, sharp @2x tiles on high-resolution screens). The Halfway Planner defaults to **CARTO Dark**.
+* A map button under the zoom buttons cycles **Voyager → Dark → Light → OneMap**; the choice is remembered in the browser for every page.
+* If CARTO tiles never load, the map falls back automatically to OneMap, then OpenStreetMap, so it is never blank.
+* The key comes from the **`CARTO_API_KEY`** environment variable (default built in). Tile URLs are visible in the browser, so restrict the key to your domain in the CARTO dashboard.
 
 ## V14.0 — Halfway Planner (live simulation: Recover Late Duty / Deploy OS Bus)
 

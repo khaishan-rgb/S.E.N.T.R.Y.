@@ -183,6 +183,7 @@ td{padding:8px;border-bottom:1px solid #12304d;vertical-align:middle}
 <div class="ov" id="ov" hidden><div class="modal" role="dialog" aria-modal="true" aria-labelledby="mTitle"><h3 id="mTitle">Acknowledge</h3><div id="mBody"></div><div class="fl" style="margin-top:10px"><label for="mBy">Acknowledged by</label><input class="inp" id="mBy" maxlength="40" placeholder="Your name / ID"></div><div class="btns"><button class="btn" id="mNo" type="button">Cancel</button><button class="btn go" id="mYes" type="button">Acknowledge</button></div></div></div>
 <div id="toast" role="status" aria-live="polite"></div>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="/basemap.js"></script>
 <script>
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -345,8 +346,7 @@ function initMap(){
   if(M.map || typeof L === "undefined") return;
   M.map = L.map("trMap", {zoomControl:true, attributionControl:false, minZoom:10, maxZoom:19}).setView([1.3521, 103.8198], 12);
   const AO = `<a href="https://www.onemap.gov.sg/" target="_blank" rel="noopener">OneMap</a> | \u00a9 ${new Date().getFullYear()} Singapore Land Authority`, AS = "Basemap \u00a9 OpenStreetMap contributors (OneMap unavailable)", m = M.map;
-  const om = L.tileLayer("https://www.onemap.gov.sg/maps/tiles/Default/{z}/{x}/{y}.png", {minZoom:10, maxZoom:19, attribution:AO}).addTo(m); let ok = 0, bad = 0, sw = false;
-  om.on("tileload", () => { ok++; }); om.on("tileerror", () => { bad++; if(!sw && ok === 0 && bad >= 4){ sw = true; m.removeLayer(om); L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {minZoom:10, maxZoom:19, attribution:AS}).addTo(m); } });
+  (window.SGBasemap ? SGBasemap.add(m, {minZoom:10, maxZoom:19}) : L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {minZoom:10, maxZoom:19, attribution:"\u00a9 OpenStreetMap contributors"}).addTo(m));
   L.control.attribution({position:"bottomleft", prefix:false}).addTo(m);
   [["wx", 405], ["cong", 410], ["route", 420], ["pts", 440], ["bus", 450]].forEach(([n, z]) => { m.createPane(n).style.zIndex = z; });      // custom panes must exist before a layer uses them
   M.g = {wx:L.layerGroup(), cong:L.layerGroup(), route:L.layerGroup(), pts:L.layerGroup(), bus:L.layerGroup()};

@@ -1454,6 +1454,18 @@ async def bunching_page():
     return HTMLResponse((HERE / "bunching.html").read_text(encoding="utf-8"))
 
 
+# ---- V14.1 shared basemap: CARTO raster tiles (keyed) with OneMap / OpenStreetMap fallback. The key is read from the environment;
+# it is visible in the browser anyway (every tile URL carries it), so restrict it to your domain in the CARTO dashboard.
+CARTO_API_KEY = os.getenv("CARTO_API_KEY", "cb1_3yrv_1_668b3534c1ae1cf8528fb415").strip()
+
+
+@app.get("/basemap.js")
+async def basemap_js():
+    from fastapi.responses import Response
+    js = (HERE / "basemap.js").read_text(encoding="utf-8").replace("__CARTO_KEY__", re.sub(r"[^A-Za-z0-9_\-]", "", CARTO_API_KEY))
+    return Response(js, media_type="application/javascript", headers={"Cache-Control": "public, max-age=600"})
+
+
 @app.get("/halfway", response_class=HTMLResponse)
 async def halfway_page():
     """V14.0: Halfway Planner (live simulation: Recover Late Duty / Deploy OS Bus)."""

@@ -193,6 +193,7 @@ tbody tr{cursor:pointer}tbody tr:hover{background:#0d2440}tbody tr.sel{backgroun
 </div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="/basemap.js"></script>
 <script>
 "use strict";
 const $ = id => document.getElementById(id);
@@ -396,8 +397,7 @@ function initMap(){
   if(map || typeof L === "undefined") return;
   map = L.map("map", {zoomControl:true, attributionControl:false, minZoom:11, maxZoom:19}).setView([1.3521, 103.8198], 11);
   const AO = `<a href="https://www.onemap.gov.sg/" target="_blank" rel="noopener">OneMap</a> | \u00a9 ${new Date().getFullYear()} Singapore Land Authority`, AS = `Basemap \u00a9 OpenStreetMap contributors (OneMap unavailable)`;
-  const om = L.tileLayer("https://www.onemap.gov.sg/maps/tiles/Default/{z}/{x}/{y}.png", {minZoom:11, maxZoom:19, attribution:AO}).addTo(map); let ok = 0, bad = 0, sw = false;
-  om.on("tileload", () => { ok++; }); om.on("tileerror", () => { bad++; if(!sw && ok === 0 && bad >= 4){ sw = true; map.removeLayer(om); L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {minZoom:11, maxZoom:19, attribution:AS}).addTo(map); } });
+  (window.SGBasemap ? SGBasemap.add(map, {minZoom:11, maxZoom:19}) : L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {minZoom:11, maxZoom:19, attribution:"\u00a9 OpenStreetMap contributors"}).addTo(map));
   L.control.attribution({position:"bottomleft", prefix:false}).addTo(map);
   gRoute = L.layerGroup().addTo(map); gStop = L.layerGroup().addTo(map); gGrp = L.layerGroup().addTo(map); gBus = L.layerGroup().addTo(map);
 }

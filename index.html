@@ -526,11 +526,12 @@ table.tb{width:100%;border-collapse:collapse;font-size:14px}
 
   <footer class="foot">
     <span>Sources: LTA DataMall (Bus, Traffic), OneMap, NEA &nbsp;|&nbsp; Not for operational use</span>
-    <span>SG Transport Pulse V14.0 &nbsp;|&nbsp; Built for a smarter Singapore</span>
+    <span>SG Transport Pulse V14.1 &nbsp;|&nbsp; Built for a smarter Singapore</span>
   </footer>
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="/basemap.js"></script>
 <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
 <script>
 "use strict";
@@ -575,22 +576,8 @@ const q = o => Object.entries(o).map(([k, v]) => `${k}=${encodeURIComponent(v)}`
 /* ---------- map ---------- */
 if(typeof L === "undefined"){ document.getElementById("map").innerHTML = '<div style="padding:24px;color:#0a1a2e">The map library could not be loaded. Check your internet connection and reload.</div>'; throw new Error("Leaflet missing"); }
 const map = L.map("map", {zoomControl:false, attributionControl:false, minZoom:11, maxZoom:19, maxBounds:[[1.10,103.50],[1.55,104.20]], maxBoundsViscosity:.8}).setView([1.3521,103.8198], 11);
-const ATTR_OM = `<a href="https://www.onemap.gov.sg/" target="_blank" rel="noopener">OneMap</a> | © ${new Date().getFullYear()} Singapore Land Authority`;
-const ATTR_OSM = `Basemap © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors (OneMap tiles unavailable)`;
-const baseOM = L.tileLayer("https://www.onemap.gov.sg/maps/tiles/Default/{z}/{x}/{y}.png", {minZoom:11, maxZoom:19, attribution:ATTR_OM}).addTo(map);
-/* If OneMap tiles never load (blocked, moved, offline), quietly switch to OpenStreetMap so the map is never blank. */
-(function(){
-  let ok = 0, bad = 0, swapped = false;
-  baseOM.on("tileload", () => { ok++; });
-  baseOM.on("tileerror", () => {
-    bad++;
-    if(!swapped && ok === 0 && bad >= 4){
-      swapped = true; map.removeLayer(baseOM);
-      L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {minZoom:11, maxZoom:19, attribution:ATTR_OSM}).addTo(map);
-    }
-  });
-})();
 L.control.zoom({position:"topleft"}).addTo(map);
+(window.SGBasemap ? SGBasemap.add(map, {minZoom:11, maxZoom:19}) : L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {minZoom:11, maxZoom:19, attribution:"\u00a9 OpenStreetMap contributors"}).addTo(map));
 L.control.attribution({position:"bottomleft", prefix:false}).addTo(map);
 L.control.scale({position:"bottomright", imperial:false}).addTo(map);
 [["rain",402],["casing",405],["route",410],["stops",430]].forEach(([n, z]) => { map.createPane(n).style.zIndex = z; });
