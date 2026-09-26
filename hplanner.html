@@ -225,6 +225,25 @@ body.navmode .chips,body.navmode .legend{display:none}
 .chain{display:flex;flex-direction:column;gap:2px;margin-top:10px;font-size:12.5px}
 .chain div{padding:3px 10px;border-left:3px solid #2b6b45}.chain div.a{border-color:var(--cyan);font-weight:700}.chain div.z{border-color:var(--green);font-weight:800;color:#7df0a8}
 .find{font-size:12px;margin-top:6px;display:grid;gap:4px}.find div{padding:5px 8px;border-radius:7px;background:#0b1c31;border:1px solid var(--line)}
+.tlbar .d.reg{position:relative;width:14px;height:14px;background:var(--orange);border:2px solid #fff;cursor:pointer;padding:0}
+.tlbar .d.reg::after{content:"\1F422";position:absolute;left:50%;bottom:14px;transform:translateX(-50%);font-size:14px;line-height:1}
+.tlbar .rk{width:3px;height:26px;border-radius:2px;background:var(--cyan);flex:none;margin:0 3px;position:relative}
+.tlbar .rk::after{content:"recovery";position:absolute;top:27px;left:50%;transform:translateX(-50%);font-size:9px;color:var(--cyan);font-weight:800;letter-spacing:.05em;white-space:nowrap}
+.tlr{padding-top:14px;padding-bottom:8px}
+.plan{display:grid;gap:6px;margin-top:10px}
+.plan button{display:flex;align-items:center;gap:10px;width:100%;min-height:44px;text-align:left;border:1px solid #7a4a1a;background:#2a1a0a;border-radius:10px;padding:7px 10px;cursor:pointer}
+.plan button b{color:#ffb47a}.plan button small{display:block;color:#d8b99a;font-size:11.5px}
+.plan .ti{font-size:20px}
+.pats{margin-top:10px;display:grid;gap:4px;font-size:12.5px}
+.pats div{display:grid;grid-template-columns:118px minmax(0,1fr);gap:8px;align-items:baseline}
+.pats span{color:var(--mut);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em}
+.pats code{font:700 13px/1.3 ui-monospace,SFMono-Regular,Menlo,monospace;color:#eaf3ff;overflow-wrap:anywhere}
+.pats code i{color:var(--cyan);font-style:normal}
+.regpop:empty{display:none}
+.regpop{margin-top:10px;border:1px solid var(--orange);background:#2a1a0a;border-radius:12px;padding:10px 12px}
+.regpop .k{font-size:11px;font-weight:800;letter-spacing:.1em;color:#ffb47a}
+.regpop dl{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;margin:6px 0 0;font-size:13px}.regpop dt{color:#d8b99a}.regpop dd{margin:0;font-weight:700;text-align:right}
+.bm.held{background:var(--orange)}.bm-tag.reg{background:var(--orange)}
 .foot{color:#5f7a94;font-size:11.5px;margin:16px 2px 0}
 
 /* ---------- shell (same as the other pages) ---------- */
@@ -291,6 +310,8 @@ body.navmode .chips,body.navmode .legend{display:none}
   .ct-wrap{display:none}
   .clist{display:block}
   .tlr{grid-template-columns:1fr}.tlr .lab small{display:inline;margin-left:6px}
+  .tlbar{max-width:100%}.tlbar .h{min-width:15px}.tlbar .h span{padding:0 2px;font-size:10.5px}.tlbar .d{width:8px;height:8px}.tlbar .d.reg{width:12px;height:12px}.tlbar .rk{margin:0 1px}
+  .tl{overflow:hidden}
   body:not(.tab-res) #mCta{display:none!important}
   .sticky-cta-l{position:sticky;bottom:calc(74px + env(safe-area-inset-bottom,0px));z-index:700;padding:8px 0 4px;background:linear-gradient(180deg,rgba(10,26,46,0),var(--panel) 35%)}
   .live #liveText{display:none}
@@ -377,7 +398,12 @@ body.navmode .chips,body.navmode .legend{display:none}
           <div class="fld"><label for="scope">Entry points</label><select class="inp" id="scope"><option value="auto">Auto</option><option value="approved">Approved only</option><option value="all">Every stop</option></select></div>
           <div class="fld"><label for="maxReach">Max reach, min</label><input class="inp num" id="maxReach" value="45" inputmode="numeric" maxlength="2"></div>
         </div>
-        <p class="note">Approved halfway points are managed in the <a href="/halfway/timetable">Timetable Optimiser</a> settings.</p>
+        <div class="row2" style="margin-top:8px">
+          <div class="fld"><label for="bal">Balance trips</label><input class="inp num" id="bal" value="6" inputmode="numeric" maxlength="2" title="Buses behind the inserted bus that may be regulated"></div>
+          <div class="fld"><label for="regMax">Max slow-down / bus</label><input class="inp num" id="regMax" value="8" inputmode="numeric" maxlength="2" title="Minutes; applied progressively, at most 1 min per stop"></div>
+        </div>
+        <div class="fld" id="minSkipF" hidden style="margin-top:8px"><label for="minSkip">OS must skip at least, % of route</label><input class="inp num" id="minSkip" value="15" inputmode="numeric" maxlength="2"></div>
+        <p class="note">Every entry point is tested with the buses behind it regulated (slowed progressively, max 1 min per stop). Approved halfway points are managed in the <a href="/halfway/timetable">Timetable Optimiser</a> settings.</p>
       </div>
       <div class="sticky-cta-l"><button type="button" class="btn go big" id="run" disabled>Run Simulation</button></div>
       <div id="cfgMsg"></div>
@@ -434,7 +460,7 @@ body.navmode .chips,body.navmode .legend{display:none}
   </section>
   <div class="sticky-cta t-res" id="mCta"></div>
 
-  <p class="foot">Live: LTA DataMall Bus Arrival &amp; speed bands (unchanged). Simulated: injected delays and virtual OS buses exist only in this planner. Predicted: running times, headways and EWT from the route model. SG Transport Pulse V14.1</p>
+  <p class="foot">Live: LTA DataMall Bus Arrival &amp; speed bands (unchanged). Simulated: injected delays and virtual OS buses exist only in this planner. Predicted: running times, headways and EWT from the route model. SG Transport Pulse V14.2</p>
 </div>
 
 <nav class="mobile-bottom-nav" aria-label="Mobile primary navigation"><a class="mbn" href="/"><span class="mi">▰</span>Route</a><a class="mbn" href="/control"><span class="mi">↔</span>Headway</a><a class="mbn active" href="/halfway"><span class="mi">½</span>Halfway</a><button class="mbn" type="button" style="border:0;background:transparent;font-family:inherit" onclick="document.getElementById('mobileMore').classList.toggle('open')"><span class="mi">•••</span>More</button></nav><div class="mobile-more" id="mobileMore"><a href="/bunching">≋ Bunching</a><a href="/traffic">⚠ Traffic-Aware Regulation</a><a href="/halfway/timetable">▤ Timetable Optimiser</a><a href="/planner">◉ Off-service Route Planner</a><a href="/running-time">⏱ Running Time</a><a href="/cameras">📷 Traffic Cameras</a></div>
@@ -510,18 +536,25 @@ function drawBase(){
 }
 
 function simBusId(){ return (ST.mode === "late" || ST.osWithDelay) && ST.delayOn && ST.bus != null ? ST.bus : null; }
-function heldIds(){ const o = ST.res && ST.sel === "regulate" ? (ST.res.options || []).find(x => x.key === "regulate") : null; return o && o.held ? o.held.map(h => +h.split(" ")[1]) : []; }
+function heldIds(){                                              // bus id -> minutes of regulation in the selected plan
+  const out = {}; if(!ST.res) return out;
+  const o = ST.sel === "regulate" ? (ST.res.options || []).find(x => x.key === "regulate") : null;
+  if(o && o.held) o.held.forEach(h => { const m = /Bus (\d+) \+([\d.]+)/.exec(h); if(m) out[+m[1]] = +m[2]; });
+  regsOf(ST.sel).forEach(r => out[r.bus] = r.hold);
+  return out;
+}
 function drawBuses(){
   G.buses.clearLayers(); const sn = ST.snap; if(!sn) return;
   const sim = simBusId(), held = heldIds();
   sn.buses.forEach(b => {
-    const isSim = b.id === sim, cls = isSim ? "sim" : held.includes(b.id) ? "held" : "live";
-    const icon = L.divIcon({className:"", html:`<div class="bm ${cls}">${b.id}</div>${isSim ? `<span class="bm-tag">+${ST.delay}\u2032 SIM</span>` : ""}`, iconSize:[28, 28], iconAnchor:[14, 14]});
+    const isSim = b.id === sim, hx = held[b.id], cls = isSim ? "sim" : hx ? "held" : "live";
+    const icon = L.divIcon({className:"", html:`<div class="bm ${cls}">${b.id}</div>${isSim ? `<span class="bm-tag">+${ST.delay}\u2032 SIM</span>` : hx ? `<span class="bm-tag reg">\u{1F422} +${f0(hx)}\u2032</span>` : ""}`, iconSize:[28, 28], iconAnchor:[14, 14]});
     const nx = b.next;
     const pop = `<b>Bus ${b.id}</b> ${tag("live")}<br>Near ${esc(b.near ? b.near.name : "")}` +
       (nx ? `<br>DataMall: ${esc(nx.name)} at <b>${esc(nx.clock)}</b>` + (isSim ? `<br><span style="color:#ff9aa0">Simulated: <b>${addMin(nx.clock, ST.delay)}</b> (+${ST.delay} min)</span>` : "") : "") +
       ((ST.mode === "late" || ST.osWithDelay) ? `<br><button type="button" class="btn sm" data-bus="${b.id}" style="margin-top:6px">${isSim ? "Selected" : "Delay this bus"}</button>` : "");
-    L.marker([b.lat, b.lon], {icon, zIndexOffset:isSim ? 900 : 500}).bindPopup(pop).addTo(G.buses);
+    const rg = regsOf(ST.sel).find(r => r.bus === b.id);
+    L.marker([b.lat, b.lon], {icon, zIndexOffset:isSim ? 900 : hx ? 800 : 500}).bindPopup(pop + (rg ? `<div style="margin-top:6px;color:#ffb47a"><b>\u{1F422} REGULATE / SLOW DOWN +${f0(rg.hold)} min</b><br>over ${rg.stops} stop(s), ${esc(rg.from_name)} \u2192 ${esc(rg.to_name)}</div>` : "")).addTo(G.buses);
   });
 }
 map.on("popupopen", e => { const b = e.popup.getElement() && e.popup.getElement().querySelector("[data-bus]"); if(b) b.onclick = () => { map.closePopup(); pickBus(+b.dataset.bus); }; });
@@ -540,6 +573,8 @@ function drawOs(){
     .bindPopup(`<b>OS bus</b> ${tag("sim")}<br>Available ${esc($("osTime").value || "now")}<br><small>Virtual bus: exists only in this simulation.</small>`).addTo(G.os);
 }
 
+function planCand(k){ const o = optByKey(k); return !o ? null : o.kind === "only" ? candByKey(o.cand) : o.code ? o : null; }
+function regsOf(k){ const o = optByKey(k); return o && (o.kind === "halfway" || o.kind === "os") ? (o.regs || []) : []; }
 function candByKey(k){ return ST.res ? (ST.res.candidates || []).find(c => c.key === k) : null; }
 function optByKey(k){ return ST.res ? ((ST.res.options || []).find(o => o.key === k) || candByKey(k)) : null; }
 function drawResult(){
@@ -563,12 +598,12 @@ function drawResult(){
       .bindTooltip(`#${c.rank} BS ${esc(c.code)} \u00b7 EWT ${f1(c.ewt)}`).on("click", () => selectOpt(c.key, true)).addTo(G.cands);
   });
   r.top.map(candByKey).filter(Boolean).forEach(c => {
-    const cls = (c.key === r.recommended ? "rec" : "alt") + (c.key === ST.sel ? " sel" : "");
+    const pc = planCand(ST.sel), cls = (c.key === r.recommended ? "rec" : "alt") + (pc && c.key === pc.key ? " sel" : "");
     L.marker([c.lat, c.lon], {icon:L.divIcon({className:"", html:`<div class="cm ${cls}">${c.rank}</div>`, iconSize:[30, 30], iconAnchor:[15, 15]}), zIndexOffset:c.key === r.recommended ? 1200 : 1000})
       .bindTooltip(`#${c.rank} BS ${esc(c.code)} ${esc(c.name)} \u00b7 EWT ${f1(c.ewt)} min`).on("click", () => selectOpt(c.key, true)).addTo(G.cands);
   });
   // indicative link from the bus / OS to the selected point (the road path comes with "View deployment route")
-  const c = candByKey(ST.sel);
+  const c = planCand(ST.sel);
   if(c && r.origin) L.polyline([[r.origin.lat, r.origin.lon], [c.lat, c.lon]], {color:c.key === r.recommended ? "#20d16a" : "#a78bfa", weight:2.5, dashArray:"4 7", opacity:.9, interactive:false}).addTo(G.pin);
   syncLayers();
 }
@@ -665,7 +700,7 @@ document.querySelectorAll("#presets button").forEach(b => b.onclick = () => setD
 $("delayOn").onchange = () => { ST.delayOn = $("delayOn").checked; invalidateResult(); renderPred(); drawBuses(); updRun(); };
 function setMode(m){
   ST.mode = m; $("mLate").setAttribute("aria-pressed", String(m === "late")); $("mOs").setAttribute("aria-pressed", String(m === "os"));
-  $("cfgLate").hidden = m !== "late"; $("cfgOs").hidden = m !== "os"; $("delaySec").hidden = m === "os" && !ST.osWithDelay;
+  $("cfgLate").hidden = m !== "late"; $("cfgOs").hidden = m !== "os"; $("minSkipF").hidden = m !== "os"; $("delaySec").hidden = m === "os" && !ST.osWithDelay;
   if(m === "os" && !ST.osWithDelay) ST.bus = ST.bus;               // keep the pick; it only counts when the box is ticked
   invalidateResult(true); renderBusLists(); renderPred(); drawAll(); updRun(); setPill();
   if(ST.snap) history.replaceState(null, "", `?${q({svc:ST.svc, dir:ST.dir, mode:m === "os" ? "os" : ""})}`);
@@ -676,7 +711,7 @@ $("osStop").oninput = () => { invalidateResult(); drawOs(); updRun(); };
 $("osTime").addEventListener("input", () => invalidateResult());
 $("osPick").onclick = () => { ST.picking = true; if(isM()) setTab("map"); const t = $("maptoast"); t.classList.add("pickhint"); toast("Tap the map where the OS bus is available.", 8000); };
 $("osWithDelay").onchange = () => { ST.osWithDelay = $("osWithDelay").checked; $("osBusWrap").hidden = !ST.osWithDelay; $("delaySec").hidden = !ST.osWithDelay; invalidateResult(); renderPred(); drawBuses(); updRun(); setPill(); };
-["scope", "maxReach"].forEach(id => $(id).onchange = () => invalidateResult());
+["scope", "maxReach", "bal", "regMax", "minSkip"].forEach(id => $(id).onchange = () => invalidateResult());
 function syncDir(){ $("d1").setAttribute("aria-pressed", String(ST.dir === 1)); $("d2").setAttribute("aria-pressed", String(ST.dir === 2)); }
 $("d1").onclick = () => { if(ST.dir !== 1){ ST.dir = 1; syncDir(); if(ST.snap) loadSnap(); } };
 $("d2").onclick = () => { if(ST.dir !== 2){ ST.dir = 2; syncDir(); if(ST.snap) loadSnap(); } };
@@ -699,7 +734,8 @@ function invalidateResult(silent){
 /* ---------------------------------------------------------------- run the simulation */
 async function run(){
   if(!readyToRun()) return;
-  const p = {snap:ST.snap.snap, mode:ST.mode, scope:$("scope").value, max_reach:$("maxReach").value.trim()};
+  const p = {snap:ST.snap.snap, mode:ST.mode, scope:$("scope").value, max_reach:$("maxReach").value.trim(), balance:$("bal").value.trim(), reg_max:$("regMax").value.trim()};
+  if(ST.mode === "os") p.min_skip = $("minSkip").value.trim();
   if(ST.mode === "late" || ST.osWithDelay){ p.bus = ST.bus; p.delay = ST.delayOn ? ST.delay : 0; }
   if(ST.mode === "os"){ p.os_from = osFromParam(); p.os_time = $("osTime").value.trim(); }
   setBusy(true, "run"); cfgMsg("", "");
@@ -722,6 +758,17 @@ function selectOpt(key, focus){
   if(c && focus){ map.flyTo([c.lat, c.lon], Math.max(map.getZoom(), 15), {duration:.5}); if(isM() && !document.body.classList.contains("tab-map")) setTab("map"); }
 }
 const optName = o => o.kind === "none" ? o.label : o.kind === "regulate" ? "Regulate" : `BS ${o.code} \u2014 ${o.name}`;
+const who = () => ST.res && ST.res.mode === "os" ? "OS" : "Halfway";
+function planTitle(o){
+  if(o.kind === "none") return o.label; if(o.kind === "regulate") return "Regulate";
+  const n = o.kind === "only" ? 0 : (o.regs || []).length;
+  return `${ST.res.mode === "os" ? "OS HALFWAY" : "HALFWAY RE-ENTRY"}${n ? ` + ${n} REGULATION${n > 1 ? "S" : ""}` : o.kind === "only" ? " ONLY" : ""}`;
+}
+function patHtml(t){                                              // "15-12 | 6-9-6" with the recovery marker
+  if(!t) return "\u2013";
+  const ix = t.recovery_hw;
+  return t.hw.map((h, i) => (ix != null && i === ix ? (i > 0 ? " <i>|</i> " : "<i>|</i> ") : i > 0 ? "-" : "") + f0(h)).join("").replace(/ ?<i>\|<\/i> /g, " <i>|</i> ");
+}
 function renderResults(){
   const r = ST.res;
   $("bottom").hidden = !r || !r.ok;
@@ -739,93 +786,131 @@ function renderRec(){
   if(ST.route && document.body.classList.contains("navmode")) return renderNavPanel();
   if(!r || !r.ok){
     el.innerHTML = `<div><div class="sec-t"><span>Recommended deployment</span></div><div class="empty">${!ST.snap ? "Enter a service and load the live buses." :
-      ST.mode === "late" ? "1 Select the observed bus \u2192 2 inject a delay \u2192 3 Run Simulation." : "1 Set where and when the OS bus is available \u2192 2 Run Simulation."}<br><br>The recommendation comes from the simulated EWT of every option \u2013 never from a fixed rule.</div></div>`;
+      ST.mode === "late" ? "1 Select the observed bus \u2192 2 inject a delay \u2192 3 Run Simulation." : "1 Set where and when the OS bus is available \u2192 2 Run Simulation."}<br><br>Every entry point is simulated with the buses behind it regulated; the plan with the lowest projected EWT is recommended \u2013 never a fixed rule.</div></div>`;
     return;
   }
   const o = optByKey(ST.sel) || optByKey(r.recommended), none = r.options[0], isRec = o.key === r.recommended;
+  const c = planCand(o.key), regs = regsOf(o.key), isPlan = !!c;
   const box = o.kind === "none" ? "none" : isRec ? "" : "alt";
   const simline = r.sim_bus ? `<div class="simban" style="margin:0 0 10px"><span>\u26a0</span><div><b>SIMULATION MODE</b>Bus ${r.sim_bus.bus} artificially delayed +${r.sim_bus.delay} min${r.mode === "os" ? "; the OS bus is virtual" : ""}. Live DataMall information has NOT been modified.</div></div>`
     : r.mode === "os" ? `<div class="simban" style="margin:0 0 10px;border-color:#5b4a9e;background:#1c1640;color:#e3dbff"><span>\u2795</span><div><b style="color:#cbbcff">SIMULATION MODE</b>The OS bus is a virtual additional bus. Live DataMall information has NOT been modified.</div></div>` : "";
+  const head = isRec ? `<div class="rb-k">\u2714 RECOMMENDED \u00b7 ${esc(planTitle(o))}</div>` : `<div class="rb-k">${o.kind === "none" ? "OPTION" : "ALTERNATIVE"} \u00b7 ${esc(planTitle(o))}</div>`;
   let body = "";
-  if(o.kind === "halfway" || o.kind === "os"){
-    const between = `${busLabel(o.between[0])} and ${busLabel(o.between[1])}`;
-    body = `<div class="rb-t">Bus Stop ${esc(o.code)} \u2014 ${esc(o.name)}</div>
-      <div class="rb-s">${o.kind === "os" ? "Insert the OS bus" : `Bus ${r.sim_bus ? r.sim_bus.bus : ""} re-enters service`} between ${esc(between)}${o.approved ? " \u00b7 approved halfway point" : ""}</div>
+  if(isPlan){
+    const ha = o.hw_after || [null, null], between = o.between ? `between ${esc(busLabel(o.between[0]))} and ${esc(busLabel(o.between[1]))}` : "";
+    body = `<div class="rb-t">${r.mode === "os" ? "OS entry" : "Re-entry"}: BS ${esc(o.code)} \u2014 ${esc(o.name)}</div>
+      <div class="rb-s">${esc(between)}${c.approved ? " \u00b7 approved halfway point" : ""}</div>
       <div class="kv">
-        <div><span>To reach</span><b class="num">${f0(o.reach_min)} min</b></div><div><span>Distance</span><b class="num">${fkm(o.reach_km)}</b></div>
-        <div><span>${o.kind === "os" ? "Recommended departure" : "Leave route"}</span><b class="num">${esc(o.leave_clock)}</b></div><div><span>Enter service</span><b class="num" style="color:#7df0a8">${esc(o.entry_clock)}</b></div>
-        <div><span>Gap before ${tag("pred")}</span><b class="num" style="color:#ff8a92">${f1(o.gap_before)} min</b></div><div><span>Gap after ${tag("pred")}</span><b class="num" style="color:#7df0a8">${f1(o.hw_after[0])} / ${f1(o.hw_after[1])}</b></div>
-      </div>`;
+        <div><span>${r.mode === "os" ? "OS travel" : "Off-service"}</span><b class="num">${f0(o.reach_min)} min \u00b7 ${fkm(o.reach_km)}</b></div>
+        <div><span>Route skipped</span><b class="num">${o.pct_skipped != null ? `${o.pct_skipped}%` : "\u2013"}</b><span style="text-transform:none;letter-spacing:0;font-weight:500">${o.skipped_stops} stops \u00b7 ${f1(o.km_skipped)} km</span></div>
+        <div><span>${r.mode === "os" ? "Depart" : "Leave route"}</span><b class="num">${esc(o.leave_clock)}</b></div><div><span>Enter service</span><b class="num" style="color:#7df0a8">${esc(o.entry_clock)}</b></div>
+        ${o.gap_before != null ? `<div><span>Gap before ${tag("pred")}</span><b class="num" style="color:#ff8a92">${f1(o.gap_before)} min</b></div>` : ""}
+        <div><span>Headways either side ${tag("pred")}</span><b class="num" style="color:#7df0a8">${f1(ha[0])} / ${f1(ha[1])}</b></div>
+      </div>
+      ${regs.length ? `<div class="sec-t" style="margin:12px 0 0"><span>\u{1F422} Regulate the buses behind</span>${tag("sim", "PLAN")}</div><div class="plan">${regs.map(g => `<button type="button" data-reg="${g.bus}"><span class="ti">\u{1F422}</span><span><b>Bus ${g.bus} \u2192 SLOW +${f0(g.hold)} min</b><small>progressively over ${g.stops} stop${g.stops > 1 ? "s" : ""}: ${esc(g.from_name)} \u2192 ${esc(g.to_name)}</small></span></button>`).join("")}</div>`
+        : o.kind !== "only" ? `<p class="note">No regulation needed behind it \u2013 slowing the following buses would not lower the EWT.</p>` : `<p class="note">Insert only \u2013 the buses behind it are not regulated.</p>`}
+      <div class="regpop" id="regPopR"></div>`;
   } else if(o.kind === "regulate"){
     body = `<div class="rb-t">Regulate</div><div class="rb-s">${esc(o.hold_text || o.na || "")}</div>`;
   } else {
     body = `<div class="rb-t">${esc(o.label)}</div><div class="rb-s">${esc(r.rec_reason || "")}</div>`;
   }
-  const ewt = `<div class="ewt3"><div class="n"><span>${esc(none.label.toUpperCase())}</span><b class="num">${f1(none.ewt)}</b><span>min EWT</span></div>
-    ${o.kind !== "none" && o.ewt != null ? `<div class="w"><span>WITH ${o.kind === "regulate" ? "REGULATION" : "DEPLOYMENT"}</span><b class="num">${f1(o.ewt)}</b><span>min EWT</span></div>
-    <div class="g"><span>IMPROVEMENT</span><b class="num" style="color:${o.gain >= 0.05 ? "#7df0a8" : o.gain <= -0.05 ? "#ff8a92" : "#cfe0f3"}">${gainTxt(o.gain)}</b><span>min</span></div>` : `<div style="grid-column:span 2;display:grid;place-items:center;color:var(--mut);font-size:12px">Max headway ${f0(none.max_hw)} min</div>`}</div>`;
-  const cta = (o.kind === "halfway" || o.kind === "os") ? `<button type="button" class="btn ${isRec ? "rec" : "go"} big d-only" style="margin-top:12px" id="viewRoute">View Deployment Route</button>` : "";
-  const why = o.why && o.why.length ? `<div class="why"><h4>Why ${o.kind === "halfway" || o.kind === "os" ? `BS ${esc(o.code)}` : o.kind === "regulate" ? "regulate" : "no action"}?</h4><ul>${o.why.map(w => `<li>${esc(w)}</li>`).join("")}</ul></div>` : "";
-  el.innerHTML = `<div>${simline}<div class="recbox ${box}">${recHead(o, r)}${body}${ewt}${cta}</div></div>
-    <div>${why}<p class="note">EWT = excess waiting time over the scheduled headway (${f0(r.H)} min, ${esc(r.H_src)}); below 0 means shorter waits than scheduled. Reach: ${esc(o.reach_src || r.routing)}. ${(r.notes || []).map(esc).join(" ")}</p>
-    ${!isRec ? `<button type="button" class="btn sm" id="backRec" style="margin-top:6px">Show the recommended option</button>` : ""}</div>`;
+  const onlyE = c && o.kind !== "only" ? c.only.ewt : null;
+  const ewt = o.kind === "none" || o.ewt == null ? `<div class="ewt3"><div class="n"><span>${esc(none.label.toUpperCase())}</span><b class="num">${f1(none.ewt)}</b><span>min EWT</span></div><div style="grid-column:span 2;display:grid;place-items:center;color:var(--mut);font-size:12px">Max headway ${f0(none.max_hw)} min</div></div>`
+    : `<div class="ewt3"><div class="n"><span>${esc(none.label.toUpperCase())}</span><b class="num">${f1(none.ewt)}</b><span>max HW ${f0(none.max_hw)}</span></div>
+      ${onlyE != null && regs.length ? `<div><span>${who().toUpperCase()} ONLY</span><b class="num" style="color:#cfe0f3">${f1(onlyE)}</b><span>max HW ${f0(c.only.max_hw)}</span></div>` : ""}
+      <div class="w"><span>${o.kind === "regulate" ? "REGULATE" : regs.length ? "+ REGULATION" : who().toUpperCase()}</span><b class="num">${f1(o.ewt)}</b><span>max HW ${f0(o.max_hw)}</span></div>
+      ${onlyE != null && regs.length ? "" : `<div class="g"><span>IMPROVEMENT</span><b class="num">${gainTxt(o.gain)}</b><span>min EWT</span></div>`}</div>
+      ${onlyE != null && regs.length ? `<p class="note" style="margin-top:6px">EWT ${f1(none.ewt)} \u2192 <b style="color:#7df0a8">${f1(o.ewt)}</b> min (${gainTxt(o.gain)}); regulation adds ${gainTxt(onlyE - o.ewt)} on top of the ${who()} alone.</p>` : ""}`;
+  const pats = isPlan || o.kind === "regulate" ? `<div class="pats"><div><span>Before</span><code>${patHtml(none.timeline)}</code></div>
+      ${c && o.kind !== "only" && regs.length ? `<div><span>${who()} only</span><code>${patHtml(c.timeline_only)}</code></div>` : ""}
+      <div><span>After</span><code>${patHtml(o.timeline)}</code></div><p class="note" style="margin:0">Headways (min) at BS ${esc(r.focus.code)} ${esc(r.focus.name)}; <b style="color:var(--cyan)">|</b> recovery starts at the inserted bus.</p></div>` : "";
+  const cta = isPlan ? `<button type="button" class="btn ${isRec ? "rec" : "go"} big d-only" style="margin-top:12px" id="viewRoute">View Deployment Route</button>` : "";
+  const why = o.why && o.why.length ? `<div class="why"><h4>Why ${isPlan ? `BS ${esc(o.code)}` : o.kind === "regulate" ? "regulate" : "no action"}?</h4><ul>${o.why.map(w => `<li>${esc(w)}</li>`).join("")}</ul></div>` : "";
+  el.innerHTML = `<div>${simline}<div class="recbox ${box}">${head}${body}${ewt}${pats}${cta}</div></div>
+    <div>${why}<p class="note">EWT = excess waiting time over the scheduled headway (${f0(r.H)} min, ${esc(r.H_src)}); below 0 means shorter waits than scheduled. Regulation = the Bus Captain runs slower / dwells longer, at most ${f1(r.regulation.per_stop)} min per stop, max ${f0(r.regulation.per_bus_max)} min per bus, up to ${r.regulation.balance_trips} buses behind. Reach: ${esc(o.reach_src || r.routing)}. ${(r.notes || []).map(esc).join(" ")}</p>
+    ${!isRec ? `<button type="button" class="btn sm" id="backRec" style="margin-top:6px">Show the recommended plan</button>` : ""}</div>`;
   const vr = $("viewRoute"); if(vr) vr.onclick = () => viewRoute(o.key);
   const br = $("backRec"); if(br) br.onclick = () => selectOpt(r.recommended, true);
+  el.querySelectorAll("[data-reg]").forEach(b => b.onclick = () => showReg(+b.dataset.reg));
+}
+function showReg(bus){
+  const g = regsOf(ST.sel).find(r => r.bus === bus); if(!g) return;
+  const h = `<div class="k">\u{1F422} REGULATE / SLOW DOWN \u00b7 BUS ${g.bus}</div><dl>
+    <dt>Current HW</dt><dd class="num">${f1(g.current_hw)} min</dd><dt>Target HW</dt><dd class="num">${f1(g.target_hw)} min</dd>
+    <dt>Required regulation</dt><dd class="num">+${f0(g.hold)} min</dd><dt>Apply progressively</dt><dd>over the next ${g.stops} stop${g.stops > 1 ? "s" : ""}<br><small style="font-weight:500;color:#d8b99a">${esc(g.from_name)} \u2192 ${esc(g.to_name)}</small></dd>
+    <dt>Expected HW</dt><dd class="num" style="color:#7df0a8">${f1(g.expected_hw)} min</dd></dl>
+    <p class="note" style="margin:6px 0 0">Headways ahead of Bus ${g.bus} at BS ${esc(g.at)} (simulated). Slow driving / longer dwell, never a single long hold.</p>`;
+  document.querySelectorAll(".regpop").forEach(x => x.innerHTML = h);
+  const tgt = document.querySelector(isM() ? "#recPanel .regpop" : "#regPopT");
+  if(tgt && isM()) tgt.scrollIntoView({behavior:"smooth", block:"nearest"});
 }
 function renderOpts(){
   const r = ST.res, letters = "ABCDEFG";
   const list = [...r.options, ...r.top.map(candByKey).filter(Boolean)];
-  $("opts").innerHTML = list.map((o, i) => {
-    const na = o.ewt == null, rec = o.key === r.recommended, k = o.kind === "none" ? o.label : o.kind === "regulate" ? "Regulate" : `${o.kind === "os" ? "OS" : "Halfway"} ${letters[(o.rank || 1) - 1] || o.rank}`;
+  $("opts").innerHTML = list.map(o => {
+    const na = o.ewt == null, rec = o.key === r.recommended, nreg = o.kind === "only" ? 0 : (o.regs || []).length;
+    const k = o.kind === "none" ? o.label : o.kind === "regulate" ? "Regulate" : o.kind === "only" ? `${who()} only` : `${who()} ${letters[(o.rank || 1) - 1] || o.rank}${nreg ? ` + ${nreg} \u{1F422}` : ""}`;
+    const sub = o.code ? `BS ${esc(o.code)} ${esc(o.name)}` : o.kind === "regulate" ? esc(o.hold_text || o.na || "") : "Continue as predicted";
     return `<button type="button" class="opt${rec ? " rec" : ""}${o.key === ST.sel ? " sel" : ""}${na ? " na" : ""}" data-k="${esc(o.key)}" ${na ? "disabled" : ""}>
-      <div class="k">${esc(k)}</div><div class="n">${o.code ? `BS ${esc(o.code)} ${esc(o.name)}` : o.kind === "regulate" ? esc(o.hold_text || o.na || "") : "Continue as predicted"}</div>
+      <div class="k">${esc(k)}</div><div class="n">${sub}</div>
       <div class="e num">${na ? "\u2013" : f1(o.ewt)}<small>EWT</small></div>
-      <div class="m num">${na ? esc(o.na || "") : `Max HW ${f0(o.max_hw)} min${o.kind !== "none" ? ` \u00b7 ${gainTxt(o.gain)}` : ""}`}</div>
+      <div class="m num">${na ? esc(o.na || "") : `Max HW ${f0(o.max_hw)}${o.pct_skipped != null ? ` \u00b7 skip ${o.pct_skipped}%` : ""}${o.kind !== "none" ? ` \u00b7 ${gainTxt(o.gain)}` : ""}`}</div>
       ${rec ? `<span class="badge">${tag("rec")}</span>` : ""}</button>`;
   }).join("");
   document.querySelectorAll("#opts .opt[data-k]").forEach(b => b.onclick = () => selectOpt(b.dataset.k, true));
-  $("optsNote").textContent = `${r.n_tested} entry points tested (${r.scope === "approved" ? "approved halfway points" : "every eligible stop"}); ${Object.entries(r.skipped || {}).filter(([, v]) => v).map(([k, v]) => `${v} ${({behind:"behind the bus", reach:"too far to reach", remaining:"too close to the end", later:"no earlier than continuing"})[k]}`).join(", ") || "none excluded"}. Recommendation needs \u2265 ${f1(r.min_gain)} min EWT improvement.`;
+  $("optsNote").textContent = `${r.n_tested} entry points tested, each with up to ${r.regulation.balance_trips} buses behind it regulated; ${Object.entries(r.skipped || {}).filter(([, v]) => v).map(([k, v]) => `${v} ${({behind:"behind the bus", reach:"too far to reach", remaining:"too close to the end", later:"no earlier than continuing", near_start:"too close to the start (a full trip, not a halfway)"})[k]}`).join(", ") || "none excluded"}. Recommendation needs \u2265 ${f1(r.min_gain)} min EWT improvement.`;
 }
 function hwCls(h, H, base){
   if(h >= 1.5 * H) return "bad";
   if(h >= 1.2 * H || h < 0.5 * H) return "mod";
   return base ? "nrm" : "ok";
 }
-function tlRow(label, sub, o, base, r){
-  const t = o && o.timeline; if(!t) return "";
-  const simId = r.sim_bus ? r.sim_bus.bus : null;
+function tlRow(label, sub, t, base, r){
+  if(!t) return "";
+  const simId = r.sim_bus ? r.sim_bus.bus : null, rh = t.recovery_hw;
   let h = `<div class="tlbar">`;
   t.arr.forEach((a, i) => {
     const d = a.bus === "OS" ? "os" : a.bus === simId ? "sim" : typeof a.bus === "string" && a.bus[0] === "S" ? "v" : "";
-    h += `<i class="d ${d}" title="${esc(busLabel(a.bus))} ${esc(a.clock)}"></i>`;
+    if(a.reg) h += `<button type="button" class="d reg" data-reg="${a.bus}" title="${esc(busLabel(a.bus))}: slow +${f0(a.reg)} min \u2013 tap for details" aria-label="${esc(busLabel(a.bus))} regulate +${f0(a.reg)} minutes"></button>`;
+    else h += `<i class="d ${d}" title="${esc(busLabel(a.bus))} ${esc(a.clock)}"></i>`;
+    if(rh != null && i === rh) h += `<i class="rk" title="Recovery starts: the headways from here on are changed by the plan"></i>`;
     if(i < t.hw.length){ const v = t.hw[i]; h += `<div class="h ${hwCls(v, r.H, base)}" style="--w:${Math.max(1, v)}"><span class="num">${f0(v)}</span></div>`; }
   });
   return `<div class="tlr"><div class="lab">${esc(label)}<small>${esc(sub)}</small></div>${h}</div></div>`;
 }
 function renderTimeline(){
-  const r = ST.res, fk = r.focus, none = r.options[0], reg = r.options.find(o => o.kind === "regulate" && o.ewt != null), sel = optByKey(ST.sel);
+  const r = ST.res, fk = r.focus, none = r.options[0], reg = r.options.find(o => o.kind === "regulate" && o.ewt != null), sel = optByKey(ST.sel), c = planCand(ST.sel);
   $("tlTitle").textContent = `Headway at BS ${fk.code} ${fk.name} \u2013 before / after`;
-  let h = tlRow(none.label, `EWT ${f1(none.ewt)}`, none, true, r);
-  if(reg && reg.key !== ST.sel) h += tlRow("Regulate", `EWT ${f1(reg.ewt)}`, reg, false, r);
-  if(sel && sel.kind !== "none") h += tlRow(sel.kind === "regulate" ? "Regulate" : `${sel.kind === "os" ? "OS" : "Halfway"} BS ${sel.code}`, `EWT ${f1(sel.ewt)}${sel.key === r.recommended ? " \u00b7 recommended" : ""}`, sel, false, r);
-  $("tl").innerHTML = h + `<p class="note" style="margin:0">Each dot is a bus passing the stop (red = the delayed bus, purple = OS bus, dashed = next scheduled departure). Numbers are headways in minutes; scheduled ${f0(r.H)}.</p>`;
+  let h = tlRow("BEFORE \u00b7 " + none.label, `EWT ${f1(none.ewt)}`, none.timeline, true, r);
+  if(reg && reg.key !== ST.sel) h += tlRow("Regulate", `EWT ${f1(reg.ewt)}`, reg.timeline, false, r);
+  if(c){
+    const regs = regsOf(ST.sel);
+    h += tlRow(`${who()} only \u00b7 BS ${c.code}`, `EWT ${f1(c.only.ewt)}`, c.timeline_only, false, r);
+    if(sel.kind !== "only" && regs.length) h += tlRow(`AFTER \u00b7 ${who()} + regulation`, `EWT ${f1(c.ewt)}${c.key === r.recommended ? " \u00b7 recommended" : ""}`, c.timeline, false, r);
+  } else if(sel && sel.kind === "regulate") h += tlRow("AFTER \u00b7 Regulate", `EWT ${f1(sel.ewt)}`, sel.timeline, false, r);
+  $("tl").innerHTML = h + `<div class="regpop" id="regPopT"></div><p class="note" style="margin:0">Each dot is a bus passing the stop (red = delayed bus, purple = OS bus, dashed = next scheduled departure, \u{1F422} = regulated \u2013 tap it). <b style="color:var(--cyan)">|</b> = recovery starts: headways before it can no longer be changed. Scheduled headway ${f0(r.H)} min.</p>`;
+  document.querySelectorAll("#tl [data-reg]").forEach(b => b.onclick = () => showReg(+b.dataset.reg));
 }
 function renderTable(){
   const r = ST.res;
-  $("ctH").innerHTML = `<tr><th>#</th><th>Entry stop</th><th>EWT</th><th>vs none</th><th>Max HW</th><th>Reach</th><th>Distance</th><th>${r.mode === "os" ? "Depart" : "Leave"}</th><th>Enter</th><th>Headways after</th></tr>`;
-  $("ctB").innerHTML = (r.candidates || []).map(c => `<tr data-k="${esc(c.key)}" class="${c.key === ST.sel ? "sel" : ""}"><td>${c.rank}${c.key === r.recommended ? " \u2714" : ""}</td>
-    <td class="w">BS ${esc(c.code)} ${esc(c.name)}${c.approved ? " \u2605" : ""}</td><td class="num"><b>${f1(c.ewt)}</b></td>
+  $("ctH").innerHTML = `<tr><th>#</th><th>Entry stop</th><th>EWT plan</th><th>${who()} only</th><th>vs none</th><th>Max HW</th><th>\u{1F422} Regs</th><th>Skipped</th><th>Reach</th><th>${r.mode === "os" ? "Depart" : "Leave"}</th><th>Enter</th></tr>`;
+  const pc = planCand(ST.sel);
+  $("ctB").innerHTML = (r.candidates || []).map(c => `<tr data-k="${esc(c.key)}" class="${pc && c.key === pc.key ? "sel" : ""}"><td>${c.rank}${c.key === r.recommended ? " \u2714" : ""}</td>
+    <td class="w">BS ${esc(c.code)} ${esc(c.name)}${c.approved ? " \u2605" : ""}</td><td class="num"><b>${f1(c.ewt)}</b></td><td class="num">${f1(c.only.ewt)}</td>
     <td class="num ${c.gain >= 0.05 ? "gd" : c.gain <= -0.05 ? "bd" : ""}">${gainTxt(c.gain)}</td><td class="num">${f0(c.max_hw)}</td>
-    <td class="num">${f0(c.reach_min)} min</td><td class="num">${fkm(c.reach_km)}</td><td class="num">${esc(c.leave_clock)}</td><td class="num">${esc(c.entry_clock)}</td>
-    <td class="num">${f1(c.hw_after[0])} / ${f1(c.hw_after[1])}</td></tr>`).join("") || `<tr><td colspan="10" class="note">No feasible entry point \u2013 see the reasons above.</td></tr>`;
-  $("ctNote").textContent = "\u2605 approved halfway point \u00b7 tap a row to inspect it on the map";
+    <td class="num">${c.n_reg ? c.regs.map(g => `B${g.bus} +${f0(g.hold)}`).join(", ") : "\u2013"}</td><td class="num">${c.pct_skipped != null ? c.pct_skipped + "%" : "\u2013"}</td>
+    <td class="num">${f0(c.reach_min)} min \u00b7 ${fkm(c.reach_km)}</td><td class="num">${esc(c.leave_clock)}</td><td class="num">${esc(c.entry_clock)}</td></tr>`).join("") || `<tr><td colspan="11" class="note">No feasible entry point \u2013 see the reasons above.</td></tr>`;
+  $("ctNote").textContent = "EWT plan = with regulation of the buses behind \u00b7 \u2605 approved halfway point \u00b7 tap a row to inspect it";
   document.querySelectorAll("#ctB tr[data-k]").forEach(tr => tr.onclick = () => selectOpt(tr.dataset.k, true));
 }
 function renderCList(){
   const r = ST.res;
   $("clist").innerHTML = (r.candidates || []).slice(0, 12).map(c => `<button type="button" class="cc${c.key === r.recommended ? " rec" : ""}" data-k="${esc(c.key)}">
     <div class="t"><span class="no">${c.rank}</span><span style="min-width:0">BS ${esc(c.code)} \u2014 ${esc(c.name)}</span>${c.key === r.recommended ? `<span style="margin-left:auto">${tag("rec")}</span>` : ""}</div>
-    <dl><dt>EWT</dt><dd class="num">${f1(c.ewt)} min</dd><dt>Reach</dt><dd class="num">${f0(c.reach_min)} min</dd><dt>Distance</dt><dd class="num">${fkm(c.reach_km)}</dd><dt>Enter service</dt><dd class="num">${esc(c.entry_clock)}</dd></dl></button>`).join("")
+    <dl><dt>EWT</dt><dd class="num">${f1(c.ewt)} min${c.n_reg ? ` <small style="color:var(--mut);font-weight:500">(only ${f1(c.only.ewt)})</small>` : ""}</dd>
+    <dt>Regulation</dt><dd>${c.n_reg ? `\u{1F422} ${c.n_reg} bus${c.n_reg > 1 ? "es" : ""}` : "none"}</dd>
+    <dt>Reach</dt><dd class="num">${f0(c.reach_min)} min \u00b7 ${fkm(c.reach_km)}</dd><dt>Route skipped</dt><dd class="num">${c.pct_skipped != null ? c.pct_skipped + "%" : "\u2013"}</dd><dt>Enter service</dt><dd class="num">${esc(c.entry_clock)}</dd></dl></button>`).join("")
     || `<div class="empty">No feasible entry point.</div>`;
   document.querySelectorAll("#clist .cc").forEach(b => b.onclick = () => selectOpt(b.dataset.k, true));
 }
@@ -839,28 +924,28 @@ function renderSheet(){
     return;
   }
   const o = optByKey(ST.sel) || optByKey(r.recommended), none = r.options[0];
-  const isC = o.kind === "halfway" || o.kind === "os";
+  const isC = !!planCand(o.key), nreg = regsOf(o.key).length;
   el.innerHTML = `<div style="display:flex;align-items:flex-start;gap:10px"><div style="min-width:0">${o.key === r.recommended ? tag("rec") : tag("alt", o.rank ? `#${o.rank}` : "OPTION")}
-      <div style="font-weight:800;font-size:16px;margin-top:3px">${esc(optName(o))}</div>
+      <div style="font-weight:800;font-size:16px;margin-top:3px">${esc(optName(o))}</div>${nreg ? `<div style="color:#ffb47a;font-size:12.5px;font-weight:700">+ \u{1F422} ${nreg} regulation${nreg > 1 ? "s" : ""} behind it</div>` : ""}
       <div class="note" style="margin:2px 0 0">EWT ${f1(none.ewt)} \u2192 <b style="color:#7df0a8">${f1(o.ewt)}</b> min${isC ? ` \u00b7 reach ${f0(o.reach_min)} min \u00b7 ${fkm(o.reach_km)} \u00b7 enter ${esc(o.entry_clock)}` : ""}</div>
       <div class="note" style="margin:2px 0 0">Largest gap without action: ${f0(r.gap.minutes)} min</div></div></div>
     <div class="row2" style="margin-top:8px"><button type="button" class="btn" onclick="setTab('res')">Results</button>${isC ? `<button type="button" class="btn rec" onclick="viewRoute('${esc(o.key)}')">Route</button>` : `<button type="button" class="btn" onclick="setTab('sim')">Options</button>`}</div>`;
 }
 function renderCta(){
   const r = ST.res, o = r && r.ok ? optByKey(ST.sel) : null;
-  $("mCta").innerHTML = o && (o.kind === "halfway" || o.kind === "os") ? `<button type="button" class="btn rec big" onclick="viewRoute('${esc(o.key)}')">VIEW DEPLOYMENT ROUTE</button>` : "";
+  $("mCta").innerHTML = o && planCand(o.key) ? `<button type="button" class="btn rec big" onclick="viewRoute('${esc(o.key)}')">VIEW DEPLOYMENT ROUTE</button>` : "";
 }
 
 /* ---------------------------------------------------------------- deployment route (navigation view) */
 async function viewRoute(key){
-  const c = candByKey(key); if(!c) return;
+  const c = planCand(key), o = optByKey(key); if(!c) return;
   const b = $("viewRoute"); if(b){ b.disabled = true; b.textContent = "Calculating the road route\u2026"; }
   toast("Calculating the off-service road route\u2026", 8000);
-  const r = await api(`/api/hplan/route?${q({snap:ST.res.snap, stop:c.code, mode:ST.res.mode, bus:ST.bus, os_from:ST.res.mode === "os" ? osFromParam() : "", leave:c.leave_clock})}`, 90000);
+  const r = await api(`/api/hplan/route?${q({snap:ST.res.snap, stop:c.code, mode:ST.res.mode, bus:ST.bus, os_from:ST.res.mode === "os" ? osFromParam() : "", leave:(o || c).leave_clock})}`, 90000);
   if(b){ b.disabled = false; b.textContent = "View Deployment Route"; }
   if(!r.ok){ toast(r.error || "No road route available.", 6000); if(r.expired) cfgMsg("warn", "The live snapshot expired \u2013 refresh the live buses and run again."); return; }
   $("maptoast").style.display = "none";
-  ST.route = {...r, key}; ST.navI = 0;
+  ST.route = {...r, key:c.key}; ST.navI = 0;
   document.body.classList.add("navmode"); syncLayers();
   if(isM()){ document.body.classList.remove("tab-sim", "tab-res"); document.body.classList.add("tab-map"); }
   drawNav(); renderNavPanel(); showStep(0, true); invalidate();

@@ -3562,7 +3562,8 @@ async def hp_origin(snap, mode, bus, os_from):
 
 
 @app.get("/api/hplan/simulate")
-async def api_hp_simulate(snap: str = "", mode: str = "late", bus: str = "", delay: str = "0", os_from: str = "", os_time: str = "", scope: str = "auto", max_reach: str = ""):
+async def api_hp_simulate(snap: str = "", mode: str = "late", bus: str = "", delay: str = "0", os_from: str = "", os_time: str = "", scope: str = "auto", max_reach: str = "",
+                          balance: str = "", reg_max: str = "", min_skip: str = ""):
     """SIMULATION on top of one live snapshot: No action / Regulate / halfway re-entry (late) or No deployment / OS insertion (os), ranked by projected EWT."""
     S = HP_SNAP.get(snap)
     if not S:
@@ -3588,11 +3589,13 @@ async def api_hp_simulate(snap: str = "", mode: str = "late", bus: str = "", del
         t0 = max(t0, S["now_min"])
     cands, _unres, cinfo = ho_candidates(S["svc"], S["d"], stops, "", scope if scope in ("auto", "approved", "all") else "auto", g["prep"], P)
     HP = dict(hplan.PARAMS)
-    try:
-        if max_reach.strip():
-            HP["max_reach_min"] = max(5.0, min(90.0, float(max_reach)))
-    except ValueError:
-        pass
+    for val, key, lo, hi in ((max_reach, "max_reach_min", 5.0, 90.0), (balance, "balance_trips", 0, 12), (reg_max, "reg_bus_max", 0.0, 15.0), (min_skip, "os_min_skip_pct", 0.0, 60.0)):
+        try:
+            if str(val).strip():
+                HP[key] = max(lo, min(hi, float(val)))
+        except ValueError:
+            pass
+    HP["balance_trips"] = int(HP["balance_trips"])
     offs, off_err = await os_table(origin, [(c["lat"], c["lon"]) for c in cands])
     fac = float(offservice.PARAMS["bus_time_factor"])
     cl = []

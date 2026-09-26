@@ -1,4 +1,18 @@
-# SG Transport Pulse V14.1 — Route Traffic + Departure Adjustment + Bunching, Gap & Alerts + AI Halfway Optimiser
+# SG Transport Pulse V14.2 — Route Traffic + Departure Adjustment + Bunching, Gap & Alerts + AI Halfway Optimiser
+
+## V14.2 — Halfway Planner: OS / halfway deployment + downstream regulation
+
+The planner now answers: **where should the OS (or late) bus enter, and how should the buses behind it be regulated so the service returns to even headways with the lowest EWT?** This is a change to the optimisation engine (`hplan.py`), not only the display.
+
+* **Every entry point is planned in two stages:**
+  1. insert the bus at its best entry time (as before);
+  2. **regulate the buses behind it** (up to *Balance trips*, default 6): each may be slowed 0–8 min, **applied progressively** (at most 1 min per stop — slower running / longer dwell, never one long hold). The entry time and all slow-downs are optimised jointly — seeded with forward-headway regulation (each follower runs a target headway behind the bus ahead), then refined bus by bus.
+* **Objective:** lowest projected EWT across the monitoring points, + a small cost per minute of regulation (a bus is only slowed if it helps), + a penalty if the largest headway grows (never fix one gap by opening another). Slow-downs under 1 min are not instructed; a final pass drops any that add nothing.
+* **OS entry selection:** the entry stop must skip at least **15 % of the route** (editable) — entering at stop 2 is a full trip, not a halfway. Each plan reports stops / km / % of route skipped, travel time / km, position in the gap and headways either side.
+* **Results compare** *No action* · *OS only* (best insert without regulation) · *OS + regulation* (and the other ranked plans). The recommendation, e.g. **OS HALFWAY + 3 REGULATIONS**, lists each bus: *Bus 6 → SLOW +5 min, progressively over 5 stops (Stop 36 → Stop 40)*, with Before / OS only / After headway patterns.
+* **Headway visual:** 🐢 on every regulated bus and a **|** where recovery starts (headways before it can no longer be changed). Tap a 🐢 (or a plan line) for: current HW, target HW, required regulation, stops it is spread over, expected HW. Regulated buses are also orange with 🐢 on the map.
+* Late-duty mode uses the same machinery (halfway re-entry + regulation of the buses behind).
+* New simulate parameters: `balance`, `reg_max`, `min_skip`.
 
 ## V14.1 — CARTO basemaps
 
