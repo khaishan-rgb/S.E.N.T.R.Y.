@@ -1,4 +1,8 @@
-# SG Transport Pulse V15.2 — Route Traffic + Departure Adjustment + Bunching, Gap & Alerts + AI Halfway Optimiser
+# SG Transport Pulse V15.3 — Route Traffic + Departure Adjustment + Bunching, Gap & Alerts + AI Halfway Optimiser
+
+## V15.3 — Test mode: fleet-edge gaps ignored
+
+* In Test mode, gaps longer than 2.5 × the headway that do not touch Bus B, C, D or E are the edge of the entered test fleet (e.g. 6 buses on a route that fits 9), not real headways. They are shown blank (e.g. Bus A's "hw") and left out of the EWT, max headway and interchange headways, so the EWT reflects the late-bus scenario. The late-bus gap itself is always kept. Live mode is unchanged.
 
 ## V15.2 — Interchange regulation by headway + Test mode
 

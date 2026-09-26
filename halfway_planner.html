@@ -286,7 +286,7 @@ tr.sel .radio{border-color:var(--ai);background:radial-gradient(circle,var(--ai)
     <section class="card s-visual o9" aria-labelledby="h9"><h2 id="h9"><span class="n">8</span> EWT comparison</h2><div id="chart"><div class="empty">EWT of no action vs the halfway options.</div></div></section>
     <section class="card s-plan o9" aria-labelledby="h10"><h2 id="h10"><span class="n">9</span> Controller action plan</h2><div id="acts"><div class="empty">Numbered instructions for the selected plan.</div></div></section>
   </div>
-  <p class="note foot" style="margin:0 2px">Live: LTA DataMall bus positions (unchanged). Simulated: the lateness you enter. Forecast: 2 min between stops in service; off-service by real road routing; interchange departures on the target headway. Deploying an OS bus is in the <a href="/halfway/os">previous planner</a>. SG Transport Pulse V15.2</p>
+  <p class="note foot" style="margin:0 2px">Live: LTA DataMall bus positions (unchanged). Simulated: the lateness you enter. Forecast: 2 min between stops in service; off-service by real road routing; interchange departures on the target headway. Deploying an OS bus is in the <a href="/halfway/os">previous planner</a>. SG Transport Pulse V15.3</p>
 </main>
 <nav class="mobile-bottom-nav" aria-label="Mobile primary navigation"><a class="mbn" href="/"><span class="mi">▰</span>Route</a><a class="mbn" href="/control"><span class="mi">↔</span>Headway</a><a class="mbn active" href="/halfway"><span class="mi">½</span>Halfway</a><button class="mbn" type="button" style="border:0;background:transparent;font-family:inherit" onclick="document.getElementById('mobileMore').classList.toggle('open')"><span class="mi">•••</span>More</button></nav><div class="mobile-more" id="mobileMore"><a href="/bunching">≋ Bunching</a><a href="/traffic">⚠ Traffic-Aware Regulation</a><a href="/halfway/timetable">▤ Timetable Optimiser</a><a href="/planner">◉ Off-service Route Planner</a><a href="/running-time">⏱ Running Time</a><a href="/cameras">📷 Traffic Cameras</a></div>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -565,7 +565,7 @@ function renderDown(){
     <tbody>${d.rows.map(row => `<tr style="cursor:default"><td class="l"><span class="bb ${row.role}">${row.role}</span> ${esc(row.role === "C" ? `Bus C (${row.num}) halfway` : busName(row.role, row.num, (r.roles[row.role] || {}).kind))}</td>
       <td class="num">${row.halfway ? "\u2014" : esc(row.dep || "")}${row.adj ? ` <span class="pill ${row.adj > 0 ? "hold" : ""}" style="${row.adj < 0 ? "background:var(--okBg);color:var(--ok)" : ""}">${row.slow ? `\u{1F422} slow ${sgn(row.adj)}` : sgn(row.adj)}</span>` : ""}</td>
       ${row.pass.map((p, i) => `<td class="num ${row.halfway ? "cH" : ""}">${p ? `<b>${esc(p)}</b>` : "\u2013"}${hv(row.hw[i])}</td>`).join("")}<td class="num"><b>${f0(row.max_hw)} min</b></td></tr>`).join("")}</tbody>`;
-  $("dnNote").textContent = `hw = headway to the bus ahead at that stop (all buses on D${r.next_dir}, ${r.stop_min} min between stops). The EWT also counts the stops before Stop ${x.no}, which Bus C skips.`;
+  $("dnNote").textContent = `hw = headway to the bus ahead at that stop (all buses on D${r.next_dir}, ${r.stop_min} min between stops). The EWT also counts the stops before Stop ${x.no}, which Bus C skips.` + (r.test ? " Test mode: blank = the edge of the entered test fleet (no real bus ahead), left out of the EWT and max headway." : "");
 }
 
 function renderChart(){

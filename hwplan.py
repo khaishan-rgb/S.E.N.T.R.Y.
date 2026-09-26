@@ -107,6 +107,10 @@ def plan(ctx, reach):
     if nO - 1 not in points:
         points.append(nO - 1)
 
+    TRIM = bool(P.get("edge_trim"))                                # TEST MODE: gaps at the edge of the entered fleet are not real
+    EDGE = 2.5 * H
+    RS = {roles[r]["uid"] for r in ("B", "C", "D", "E") if r in roles}
+
     def evaluate(tab):
         """tab: {uid: {k: t}} -> (EWT, max headway, min headway, per-point headways)"""
         vals, mx, mn, perk = [], 0.0, 1e9, {}
@@ -116,6 +120,9 @@ def plan(ctx, reach):
             fut = [x for x in seq if x[0] > now]
             sq = ([past[-1]] if past else []) + fut
             gaps = [b[0] - a[0] for a, b in zip(sq, sq[1:])]
+            if TRIM:                                                 # drop fleet-edge gaps that do not touch the scenario (B, C, D, E)
+                keep = [i for i, g in enumerate(gaps) if not (g > EDGE and sq[i][1] not in RS and sq[i + 1][1] not in RS)]
+                gaps = [gaps[i] for i in keep]
             if len(gaps) < 1:
                 continue
             e = ewt(gaps, H)
@@ -201,6 +208,7 @@ def plan(ctx, reach):
     for uid, d_ in dep_adj.items():
         baseA[uid] = times(U[uid], dep=U[uid]["dep"] + d_)
     ic_hw0 = [dep0[seq_ids[i + 1]] - dep0[seq_ids[i]] for i in range(max(0, first - 1), min(len(seq_ids) - 1, last + 1))] if win else []
+    ic_first = max(0, first - 1) if win else 0
     ic_hw1 = [(dep0[seq_ids[i + 1]] + dep_adj.get(seq_ids[i + 1], 0)) - (dep0[seq_ids[i]] + dep_adj.get(seq_ids[i], 0))
               for i in range(max(0, first - 1), min(len(seq_ids) - 1, last + 1))] if win else []
 
@@ -308,7 +316,12 @@ def plan(ctx, reach):
         hwcol = []
         for k in cols:
             sq = sorted((tt[k], uid) for uid, tt in tab.items() if k in tt)
-            hwcol.append({uid: (t - sq[i - 1][0]) if i > 0 else None for i, (t, uid) in enumerate(sq)})
+            hw_ = {uid: (t - sq[i - 1][0]) if i > 0 else None for i, (t, uid) in enumerate(sq)}
+            if TRIM:
+                for i in range(1, len(sq)):
+                    if (sq[i][0] - sq[i - 1][0]) > EDGE and sq[i][1] not in RS and sq[i - 1][1] not in RS:
+                        hw_[sq[i][1]] = None                         # blank: edge of the entered test fleet, not a real headway
+            hwcol.append(hw_)
         for row, u in zip(rows, ring):
             hws = [hwcol[ci_].get(u["uid"]) for ci_ in range(len(cols))]
             row["hw"] = [_r(h) for h in hws]
@@ -392,7 +405,9 @@ def plan(ctx, reach):
             "roles": {r: {"num": u["num"], "label": u["label"], "kind": u["kind"]} for r, u in roles.items()},
             "no_action": noaction, "candidates": [strip(x) for x in cands], "best": best["code"] if best else None,
             "best_ewt": best_ewt["code"] if best_ewt else None, "even_tol": TOL,
-            "dep_adj": adj_list, "ic_hw_before": [_r(h) for h in ic_hw0], "ic_hw_after": [_r(h) for h in ic_hw1],
+            "dep_adj": adj_list, "test": TRIM,
+            "ic_hw_before": [_r(h) for i, h in enumerate(ic_hw0) if not (TRIM and i == 0 and h > EDGE)],
+            "ic_hw_after": [_r(h) for i, h in enumerate(ic_hw1) if not (TRIM and i == 0 and h > EDGE)],
             "infeasible": infeasible, "n_stops": nO, "points": [{"no": k + 1, "code": O["stops"][k]["code"]} for k in points]}
 
 

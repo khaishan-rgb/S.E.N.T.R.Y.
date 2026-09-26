@@ -3875,6 +3875,8 @@ async def api_hp_plan(snap: str = "", bus: str = "", delay: str = "20", brk: str
         else:
             km = hplan.hav_km((ic["lat"], ic["lon"]), (st[j]["lat"], st[j]["lon"])) * 1.35
             reach[j] = (km / 25.0 * 60.0, km, "estimate - road routing unavailable")
+    if S.get("test"):
+        Pp["edge_trim"] = True                                          # test fleet: ignore the gap in front of its first bus
     res = await asyncio.to_thread(hwplan.plan, {"now": S["now_min"], "late": {"bus": int(bus), "delay": D}, "T": T, "O": O, "P": Pp}, reach)
     res.update(snap=snap, service=S["svc"], routing="real road routing (OSRM)" if offs else f"estimate ({off_err or 'road routing unavailable'})")
     return res
