@@ -610,3 +610,376 @@ def instructions(steps, stop_code, stop_name):
     for x in out:
         x["km"] = round(x["km"], 2)
     return out
+
+
+# ============================================================================================= V14.3 RECOVER LATE DUTY (cross-direction)
+# A duty is late in the target direction T (e.g. D1). The late bus stays in service with its (simulated) delay - it is NOT the
+# halfway bus, and nothing is held. A RECOVERY bus is taken from the circulation of BOTH directions:
+#   A  "after_trip"      an opposite-direction (D2) bus finishes its D2 trip; instead of starting its next D1 trip at the first stop,
+#                        it runs off-service to a D1 halfway stop and starts there.                       (D2 unaffected)
+#   B  "instead_of_trip" a D1 bus ahead of the late bus reaches the D1 end; instead of its next D2 trip it runs off-service
+#                        back to a D1 halfway stop.                                                       (D2 loses that trip)
+#   C  "leave_now"       a D2 bus in service leaves D2 now and runs off-service to a D1 halfway stop.     (D2 loses the rest of its trip)
+# Loop services (one direction): the next loop of a bus is its "next trip"; only A applies.
+# Circulation forecast: a bus reaching the end of its trip starts its next trip in the other direction after the terminal layover.
+# Score = projected EWT in D1 + projected EWT in D2 (both directions count, so taking a D2 trip is paid for).
+
+PARAMS.update({
+    "layover_min": 3.0,          # minimum terminal layover before the next trip / before a deployment (Bus Captain rest)
+    "avail_horizon_min": 90.0,   # recovery buses that only become available later than this are not considered
+    "instruct_min": 1.0,         # time to instruct a bus in service to leave its trip (type C)
+    "late_max_wait_min": 10.0,   # the recovery bus may enter up to this long after it could, to land mid-gap
+    "o_points": 8,               # monitoring points in the opposite direction
+    "max_sources": 24,           # recovery options tested at most (earliest availability first)
+})
+
+
+def _dirlab(d):
+    return f"D{d}"
+
+
+def cross_sources(ctx):
+    """Circulation forecast -> the buses that could recover the late duty, with where and when each becomes available.
+    ctx: now, late {bus, delay}, T / O = {dir, stops, ss, tt, buses[{id, s, lat, lon, offset, near}], H}  (O None = loop service)"""
+    P = {**PARAMS, **(ctx.get("P") or {})}
+    now, T, O = ctx["now"], ctx["T"], ctx.get("O")
+    loop, lay = O is None, float(P["layover_min"])
+    nT = len(T["ss"])
+    Lnum, D = ctx["late"]["bus"], float(ctx["late"]["delay"])
+    Tb = [{**b, "id": f"T{b['id']}", "num": b["id"]} for b in T["buses"]]
+    futT, _ = base_arrivals(Tb, T["ss"], T["tt"], now)
+    endT = {b["id"]: (futT[b["id"]].get(nT - 1, now) + (D if b["num"] == Lnum else 0.0)) for b in Tb}
+    L = f"T{Lnum}"
+    if L not in endT:
+        return None, "The selected bus is no longer in the live snapshot - refresh the live buses."
+    sL = next(b["s"] for b in Tb if b["id"] == L)
+    tl, ol = _dirlab(T["dir"]), (_dirlab(O["dir"]) if O else _dirlab(T["dir"]))
+    src = []
+    if loop:
+        for b in Tb:
+            if b["id"] == L:
+                continue
+            src.append({"rid": f"A:{b['id']}", "type": "after_trip", "bus": b["id"], "num": b["num"], "dir_now": T["dir"], "t_end": endT[b["id"]],
+                        "t_avail": endT[b["id"]] + lay, "origin_key": "T_end", "origin": (T["stops"][-1]["lat"], T["stops"][-1]["lon"]),
+                        "origin_label": f"{T['stops'][-1]['name']} (end of loop)", "near": b.get("near"),
+                        "text": f"{tl} Bus {b['num']} finishes its loop at {T['stops'][-1]['name']}; its next loop starts halfway instead of at the first stop."})
+    else:
+        nO = len(O["ss"])
+        Ob = [{**b, "id": f"O{b['id']}", "num": b["id"]} for b in O["buses"]]
+        futO, _ = base_arrivals(Ob, O["ss"], O["tt"], now)
+        endO = {b["id"]: futO[b["id"]].get(nO - 1, now) for b in Ob}
+        tend = (O["stops"][-1]["lat"], O["stops"][-1]["lon"])
+        for b in Ob:                                             # A: after finishing the D2 trip
+            src.append({"rid": f"A:{b['id']}", "type": "after_trip", "bus": b["id"], "num": b["num"], "dir_now": O["dir"], "t_end": endO[b["id"]],
+                        "t_avail": endO[b["id"]] + lay, "origin_key": "O_end", "origin": tend, "origin_label": O["stops"][-1]["name"], "near": b.get("near"),
+                        "text": f"{ol} Bus {b['num']} finishes its {ol} trip at {O['stops'][-1]['name']}; instead of starting {tl} at the first stop it starts halfway. {ol} is not affected."})
+        for b in Tb:                                             # B: a D1 bus ahead of the late bus, instead of its next D2 trip
+            if b["s"] <= sL + 1e-6:
+                continue
+            src.append({"rid": f"B:{b['id']}", "type": "instead_of_trip", "bus": b["id"], "num": b["num"], "dir_now": T["dir"], "t_end": endT[b["id"]],
+                        "t_avail": endT[b["id"]] + lay, "origin_key": "T_end", "origin": (T["stops"][-1]["lat"], T["stops"][-1]["lon"]),
+                        "origin_label": T["stops"][-1]["name"], "near": b.get("near"),
+                        "text": f"{tl} Bus {b['num']} reaches {T['stops'][-1]['name']}; instead of its next {ol} trip it runs back off-service into {tl}. {ol} loses that trip."})
+        rel = cross_release_map(ctx)                             # D1 entry stop j -> the D2 stop opposite it
+        for b in Ob:                                             # C: short-turn - continue D2 service to the stop opposite the entry, then cross
+            ahead = [r for r in set(rel.values()) if r in futO[b["id"]]]
+            if not ahead:
+                continue
+            first = min(futO[b["id"]][r] for r in ahead)
+            src.append({"rid": f"C:{b['id']}", "type": "short_turn", "bus": b["id"], "num": b["num"], "dir_now": O["dir"], "t_end": None,
+                        "t_avail": first + float(P["instruct_min"]), "origin_key": None, "origin": (b["lat"], b["lon"]), "rel": rel,
+                        "origin_label": f"{ol} Bus {b['num']}", "near": b.get("near"), "text": ""})
+    src = [s for s in src if s["t_avail"] - now <= float(P["avail_horizon_min"])]
+    src.sort(key=lambda s: s["t_avail"])
+    return src[:int(P["max_sources"])], None
+
+
+def cross_release_map(ctx):
+    """for every candidate entry stop j on the target direction: the opposite-direction stop nearest to it (where a short-turn crosses)."""
+    O = ctx.get("O")
+    if not O:
+        return {}
+    ost = O["stops"]
+    out = {}
+    for c in ctx["cands"]:
+        r = min(range(1, len(ost) - 1), key=lambda i: hav_km((c["lat"], c["lon"]), (ost[i]["lat"], ost[i]["lon"])), default=None)
+        if r is not None and hav_km((c["lat"], c["lon"]), (ost[r]["lat"], ost[r]["lon"])) <= 1.0:
+            out[c["j"]] = r
+    return out
+
+
+def cross_origins(ctx, sources):
+    """every place a recovery bus starts its off-service run from: {origin_key: (lat, lon)} - the terminals and the short-turn stops."""
+    out = {}
+    for s in sources:
+        if s["type"] == "short_turn":
+            for j, r in s["rel"].items():
+                st = ctx["O"]["stops"][r]
+                out[f"Ostop:{r}"] = (st["lat"], st["lon"])
+        else:
+            out[s["origin_key"]] = s["origin"]
+    return out
+
+
+def simulate_cross(ctx, reach):
+    """reach: {origin_key: {stop index j: (minutes, km, source text)}} off-service travel from each origin to each target stop."""
+    P = {**PARAMS, **(ctx.get("P") or {})}
+    _PASS.clear()
+    now, T, O = ctx["now"], ctx["T"], ctx.get("O")
+    loop, lay, prep = O is None, float(P["layover_min"]), float(P["prep_min"])
+    stops, ss, tt, nT = T["stops"], T["ss"], T["tt"], len(T["ss"])
+    Lnum, D = ctx["late"]["bus"], float(ctx["late"]["delay"])
+    L = f"T{Lnum}"
+    sources, err = cross_sources(ctx)
+    if err:
+        return {"ok": False, "error": err}
+    tl, ol = _dirlab(T["dir"]), (_dirlab(O["dir"]) if O else _dirlab(T["dir"]))
+    HT = float(T.get("H") or 10.0)
+    # ---- circulation: current trips + the next trip of every bus in the other direction
+    Tb = [{**b, "id": f"T{b['id']}", "num": b["id"]} for b in T["buses"]]
+    fT0, _ = base_arrivals(Tb, ss, tt, now)
+    endT = {b["id"]: fT0[b["id"]].get(nT - 1, now) + (D if b["id"] == L else 0.0) for b in Tb}
+    if loop:
+        nextT = [{"id": f"N{b['num']}", "src": b["id"], "s": ss[0] - 1e-6, "t0": endT[b["id"]] + lay, "virtual": True} for b in Tb]
+        Ob, nextO = [], []
+    else:
+        nO = len(O["ss"])
+        Ob = [{**b, "id": f"O{b['id']}", "num": b["id"]} for b in O["buses"]]
+        fO0, _ = base_arrivals(Ob, O["ss"], O["tt"], now)
+        endO = {b["id"]: fO0[b["id"]].get(nO - 1, now) for b in Ob}
+        nextT = [{"id": f"N{b['num']}", "src": b["id"], "s": ss[0] - 1e-6, "t0": endO[b["id"]] + lay, "virtual": True} for b in Ob]
+        nextO = [{"id": f"M{b['num']}", "src": b["id"], "s": O["ss"][0] - 1e-6, "t0": endT[b["id"]] + lay, "virtual": True} for b in Tb]
+    busesT = Tb + nextT
+    futT, pastT = base_arrivals(busesT, ss, tt, now)
+    base_overT = {L: {k: t + D for k, t in futT[L].items()}}
+    pointsT = monitoring_points(ss, -1e-3, int(P["n_points"]), nT)
+    e0T, mx0T, per0T = evaluate(pointsT, busesT, futT, pastT, base_overT, HT)
+    if e0T is None:
+        return {"ok": False, "error": f"Not enough buses on {tl} to calculate headways."}
+    validT = set(per0T)
+    e0O, mx0O, validO = 0.0, 0.0, set()
+    if not loop:
+        busesO = Ob + nextO
+        futO, pastO = base_arrivals(busesO, O["ss"], O["tt"], now)
+        pointsO = monitoring_points(O["ss"], -1e-3, int(P["o_points"]), len(O["ss"]))
+        e0O_, mx0O, per0O = evaluate(pointsO, busesO, futO, pastO, {}, float(O.get("H") or HT))
+        if e0O_ is not None:
+            e0O, validO = e0O_, set(per0O)
+    route_km = ss[-1] if ss else 0.0
+    src_of_next = {v["src"]: v["id"] for v in nextT}          # bus -> its next T trip id
+    src_of_nextO = {v["src"]: v["id"] for v in nextO}
+
+    o_cache = {}
+
+    def o_effect(s, r=None):
+        """EWT in the opposite direction with this recovery source (B drops a D2 trip, C drops the rest of one after stop r)."""
+        if loop or not validO or s["type"] == "after_trip":
+            return e0O, mx0O
+        key = (s["rid"], r)
+        if key not in o_cache:
+            if s["type"] == "instead_of_trip":
+                ov = {src_of_nextO[s["bus"]]: {k: None for k in range(len(O["ss"]))}}
+            else:
+                ov = {s["bus"]: {k: None for k in futO[s["bus"]] if k > r}}
+            e, mx, _ = evaluate(pointsO, busesO, futO, pastO, ov, float(O.get("H") or HT), validO)
+            o_cache[key] = ((e if e is not None else e0O), mx)
+        return o_cache[key]
+
+    plans, skipped = [], {"reach": 0, "near_start": 0, "remaining": 0, "later": 0, "unreachable": 0}
+    waits = [float(w) for w in range(0, int(P["late_max_wait_min"]) + 1)]
+    for s in sources:
+        vid = src_of_next.get(s["bus"]) if s["type"] in ("after_trip", "short_turn") else "H"
+        for c in ctx["cands"]:
+            j = c["j"]
+            r = None
+            if s["type"] == "short_turn":
+                r = s["rel"].get(j)
+                if r is None or r not in futO[s["bus"]]:
+                    skipped["passed"] = skipped.get("passed", 0) + 1     # this bus has already passed the crossing point
+                    continue
+                t_avail = futO[s["bus"]][r] + float(P["instruct_min"])
+                R = reach.get(f"Ostop:{r}") or {}
+                ost = O["stops"][r]
+                origin = {"label": f"{ol} BS {ost['code']} {ost['name']}", "lat": ost["lat"], "lon": ost["lon"]}
+                lost = sum(1 for k in futO[s["bus"]] if k > r)
+                rtext = f"{ol} Bus {s['num']} stays in {ol} service to BS {ost['code']} {ost['name']} and crosses over there at {hhmm(t_avail)}; {ol} loses the rest of that trip ({lost} stops)."
+            else:
+                t_avail, R = s["t_avail"], reach.get(s["origin_key"]) or {}
+                origin = {"label": s["origin_label"], "lat": s["origin"][0], "lon": s["origin"][1]}
+                rtext = s["text"]
+            eO, mxO = o_effect(s, r)
+            if j < 1:
+                continue
+            if route_km and 100.0 * ss[j] / route_km < float(P["os_min_skip_pct"]) - 1e-9:
+                skipped["near_start"] += 1
+                continue
+            if route_km and 100.0 * (route_km - ss[j]) / route_km < float(P["min_remaining_pct"]) - 1e-9:
+                skipped["remaining"] += 1
+                continue
+            rr = R.get(j)
+            if not rr:
+                skipped["unreachable"] += 1
+                continue
+            rmin, rkm, rsrc = rr
+            if rmin > float(P["max_reach_min"]) + 1e-9:
+                skipped["reach"] += 1
+                continue
+            if t_avail - now > float(P["avail_horizon_min"]):
+                continue
+            earliest = t_avail + rmin + prep
+            if vid != "H" and vid in futT and earliest >= futT[vid].get(j, 1e9) - 0.5:
+                skipped["later"] += 1          # the bus's normal full trip would reach this stop sooner - no halfway benefit
+                continue
+            after = {k: tt(ss[j], ss[k]) for k in range(j, nT)}
+            best = None
+            for w in waits:
+                te = earliest + w
+                ov = dict(base_overT)
+                ov[vid] = {k: (te + after[k] if k >= j else None) for k in range(nT)}
+                e, mx, per = evaluate(pointsT, busesT, futT, pastT, ov, HT, validT)
+                if e is None:
+                    continue
+                if best is None or e + eO < best["score"] - 1e-9:
+                    best = {"score": e + eO, "e": e, "mx": mx, "per": per, "ov": ov, "te": te, "w": w}
+            if not best:
+                continue
+            te = best["te"]
+            prev, nxt = _gap_around(j, te, busesT, futT, pastT, best["ov"], vid)
+            prev0, nxt0 = _gap_around(j, te, busesT, futT, pastT, base_overT, None)
+            plans.append({"key": f"plan:{s['rid']}:{c['code']}", "kind": "halfway_x", "rid": s["rid"], "rtype": s["type"], "rbus": s["bus"], "rnum": s["num"],
+                          "rdir": s["dir_now"], "rlabel": f"{_dirlab(s['dir_now'])} Bus {s['num']}", "rtext": rtext, "vid": vid,
+                          "origin": origin, "t_end_clock": hhmm(s["t_end"]) if s["t_end"] is not None else hhmm(t_avail), "release_stop": r,
+                          "avail": _r(t_avail), "avail_clock": hhmm(t_avail), "j": j, "code": c["code"], "name": c["name"], "lat": c["lat"], "lon": c["lon"],
+                          "approved": bool(c.get("approved")), "reach_min": _r(rmin), "reach_km": _r(rkm, 2), "reach_src": rsrc,
+                          "leave": _r(te - prep - rmin), "leave_clock": hhmm(te - prep - rmin), "entry": _r(te), "entry_clock": hhmm(te), "wait": _r(best["w"]),
+                          "skipped_stops": j, "km_skipped": _r(ss[j], 2), "pct_skipped": round(100.0 * ss[j] / route_km) if route_km else None,
+                          "gap_before": _r(nxt0[0] - prev0[0]) if prev0 and nxt0 else None,
+                          "hw_after": [_r(te - prev[0]) if prev else None, _r(nxt[0] - te) if nxt else None], "between": [prev[1] if prev else None, nxt[1] if nxt else None],
+                          "ewt": _r(best["e"], 2), "max_hw": _r(best["mx"]), "ewt_o": _r(eO, 2), "ewt_o0": _r(e0O, 2), "max_hw_o": _r(mxO),
+                          "gain_t": _r(e0T - best["e"], 2), "gain_o": _r(e0O - eO, 2), "gain": _r((e0T + e0O) - best["score"], 2), "score": round(best["score"], 4),
+                          "per": best["per"], "over": best["ov"]})
+    plans.sort(key=lambda p: (p["score"], p["reach_min"] or 0))
+    for i, p in enumerate(plans, 1):
+        p["rank"] = i
+    # best plan per recovery bus
+    by_bus, seen = [], set()
+    for p in plans:
+        if p["rid"] not in seen:
+            seen.add(p["rid"]); by_bus.append(p)
+    need = max(float(P["ewt_gain_min"]), (e0T + e0O) * float(P["ewt_gain_pct"]) / 100.0)
+    best = plans[0] if plans else None
+    rec = best["key"] if best and best["gain"] >= need - 1e-9 else "none"
+    none = {"key": "none", "kind": "none", "label": "No halfway", "ewt": _r(e0T, 2), "max_hw": _r(mx0T), "gain": 0.0, "ewt_o": _r(e0O, 2), "ewt_o0": _r(e0O, 2),
+            "gain_t": 0.0, "gain_o": 0.0, "score": round(e0T + e0O, 4), "per": per0T, "over": base_overT}
+    rec_reason = None if rec != "none" else (
+        f"No halfway deployment lowers the projected EWT by at least {need:.2f} min (best: {best['rlabel']} to BS {best['code']}, {best['gain']:+.2f})." if best
+        else "No recovery bus can reach a useful halfway point in time.")
+    # focus point and the D1 gap
+    gk = max(per0T, key=lambda k: max(per0T[k][1]))
+    fk = gk
+    if best and rec != "none":
+        aft = [k for k in per0T if k >= best["j"]]
+        if aft:
+            fk = max(aft, key=lambda k: max(per0T[k][1]))
+    sq0 = per0T[gk][2]
+    gi = max(range(len(sq0) - 1), key=lambda i: sq0[i + 1][0] - sq0[i][0])
+    gap = {"k": gk, "code": stops[gk]["code"], "name": stops[gk]["name"], "minutes": _r(max(per0T[gk][1])), "between": [sq0[gi][1], sq0[gi + 1][1]],
+           "from_clock": hhmm(sq0[gi][0]), "to_clock": hhmm(sq0[gi + 1][0])}
+
+    def seq_out(o):
+        per = o["per"]
+        k = fk if fk in per else (next(iter(per)) if per else None)
+        if k is None:
+            return None
+        sq = per[k][2]
+        arr = [{"bus": b, "t": _r(t), "clock": hhmm(t)} for t, b in sq]
+        hw = [_r(b[0] - a[0]) for a, b in zip(sq, sq[1:])]
+        out = {"k": k, "code": stops[k]["code"], "name": stops[k]["name"], "arr": arr, "hw": hw, "pattern": "-".join(str(int(round(h))) for h in hw)}
+        ix = next((i for i, a in enumerate(arr) if a["bus"] == o.get("vid")), None) if o.get("vid") else None
+        if ix is not None:
+            out["recovery_from"], out["recovery_hw"] = ix, max(0, ix - 1)
+        return out
+
+    none["timeline"] = seq_out(none)
+    for p in plans:
+        p["timeline"] = seq_out(p)
+        p["between_label"] = [_bus_name(b, tl, ol) for b in p["between"]]
+        p["how"] = {"after_trip": f"after its {_dirlab(p['rdir'])} trip", "instead_of_trip": f"instead of its next {ol} trip",
+                    "short_turn": f"short-turn from {ol}"}[p["rtype"]]
+        p["chain"] = _chain(p, tl, ol, T, O)
+        p["why"] = _why_cross(p, none, plans, gap, HT, tl, ol, loop)
+    none["why"] = [f"{tl} Bus {Lnum} runs {D:g} min late (simulated) and stays in service.",
+                   f"Projected {tl} EWT {e0T:.1f} min; largest predicted gap {gap['minutes']:.0f} min at {gap['name']}."] + \
+                  ([f"{ol} EWT {e0O:.1f} min (unchanged)."] if not loop else [])
+    strip = lambda o: {k: v for k, v in o.items() if k not in ("per", "over")}
+    lab = lambda b: _bus_name(b, tl, ol)
+    for o in [none, *plans]:
+        if o.get("timeline"):
+            for a in o["timeline"]["arr"]:
+                a["label"] = lab(a["bus"])
+    return {"ok": True, "model": MODEL_VERSION + "+cross", "mode": "late", "cross": True, "loop": loop, "H": _r(HT), "H_src": T.get("H_src"), "now": hhmm(now),
+            "target_dir": T["dir"], "opp_dir": None if loop else O["dir"], "late_bus": Lnum, "delay": D,
+            "options": [strip(none)], "candidates": [strip(p) for p in plans[:120]], "by_bus": [p["key"] for p in by_bus],
+            "top": [p["key"] for p in plans[:int(P["top_n"])]], "recommended": rec, "rec_reason": rec_reason, "min_gain": _r(need, 2),
+            "gap": {**gap, "between_label": [lab(b) for b in gap["between"]]}, "focus": {"k": fk, "code": stops[fk]["code"], "name": stops[fk]["name"]},
+            "sim_bus": {"bus": Lnum, "delay": D, "where": "here"}, "n_tested": len(plans), "n_sources": len(sources), "skipped": skipped,
+            "ewt0": {"t": _r(e0T, 2), "o": _r(e0O, 2)},
+            "sources": [{"rid": s["rid"], "type": s["type"], "num": s["num"], "dir_now": s["dir_now"], "label": f"{_dirlab(s['dir_now'])} Bus {s['num']}",
+                         "avail_clock": hhmm(s["t_avail"]), "t_end_clock": hhmm(s["t_end"]) if s["t_end"] is not None else None} for s in sources],
+            "notes": [f"Circulation forecast: a bus reaching the end of its trip starts the other direction after a {lay:g}-min layover (derived, not live).",
+                      "Late duty mode tests halfway deployment only - no bus is held."],
+            "regulation": {"balance_trips": 0, "per_bus_max": 0, "per_stop": 0}}
+
+
+def _bus_name(b, tl, ol):
+    if b is None:
+        return "\u2013"
+    b = str(b)
+    if b == "H":
+        return "recovery bus"
+    if b[0] == "T":
+        return f"{tl} Bus {b[1:]}"
+    if b[0] == "N":
+        return f"next {tl} trip (Bus {b[1:]})"
+    if b[0] == "O":
+        return f"{ol} Bus {b[1:]}"
+    if b[0] == "M":
+        return f"next {ol} trip (Bus {b[1:]})"
+    return b
+
+
+def _chain(p, tl, ol, T, O):
+    """the recovery bus's movement: in service -> terminal / crossing point -> OFF SERVICE -> halfway entry (the page adds the headings)."""
+    rb, rd = f"{_dirlab(p['rdir'])} Bus {p['rnum']}", _dirlab(p["rdir"])
+    out = [{"k": "svc", "text": f"{rb} on {rd}"}]
+    if p["rtype"] == "after_trip":
+        out.append({"k": "term", "text": f"completes {rd} at {p['origin']['label']} {p['t_end_clock']}, free {p['avail_clock']}"})
+    elif p["rtype"] == "instead_of_trip":
+        out.append({"k": "term", "text": f"reaches {p['origin']['label']} {p['t_end_clock']}; next {ol} trip not run"})
+    else:
+        out.append({"k": "term", "text": f"at {p['origin']['label']} {p['avail_clock']}"})
+    out.append({"k": "off", "text": f"{p['reach_min']:.0f} min" + (f" / {p['reach_km']:.1f} km" if p.get("reach_km") is not None else "")})
+    out.append({"k": "enter", "text": f"BS {p['code']} {p['name']} {p['entry_clock']}"})
+    return out
+
+
+def _why_cross(p, none, plans, gap, H, tl, ol, loop):
+    out = [p["rtext"]]
+    if p["rtype"] != "short_turn":
+        out.append(f"Forecast: it reaches {p['origin']['label']} at {p['t_end_clock']} and is available at {p['avail_clock']} (after the terminal layover).")
+    out.append(f"Off-service {p['reach_min']:.0f} min" + (f" / {p['reach_km']:.1f} km" if p.get("reach_km") is not None else "") +
+               f" to BS {p['code']}; enters {tl} at {p['entry_clock']}" + (f" (waits {p['wait']:.0f} min to land mid-gap)." if p.get("wait") else "."))
+    gb, ha = p.get("gap_before"), p.get("hw_after") or [None, None]
+    if gb and ha[0] is not None and ha[1] is not None:
+        frac = ha[0] / gb if gb else 0.5
+        pos = "near the centre of" if 0.35 <= frac <= 0.65 else "early in" if frac < 0.35 else "late in"
+        out.append(f"Lands {pos} the predicted {gb:.0f}-min gap at BS {p['code']} (between {_bus_name(p['between'][0], tl, ol)} and "
+                   f"{_bus_name(p['between'][1], tl, ol)}); headways either side about {ha[0]:.1f} / {ha[1]:.1f} min.")
+    out.append(f"Skips {p['skipped_stops']} stop(s), {p['km_skipped']:.1f} km ({p['pct_skipped']}% of {tl}) \u2014 a real halfway, not a full trip.")
+    out.append(f"{tl} EWT {none['ewt']:.1f} \u2192 {p['ewt']:.1f} min." + ("" if loop else
+               (f" {ol} EWT {p['ewt_o0']:.1f} \u2192 {p['ewt_o']:.1f} min." if abs(p["gain_o"] or 0) >= 0.005 else f" {ol} unchanged.")))
+    if p.get("rank") == 1:
+        out.append(f"Lowest combined EWT of {len(plans)} plans tested ({len({q['rid'] for q in plans})} recovery buses \u00d7 entry points).")
+    else:
+        out.append(f"Ranked {p['rank']} of {len(plans)}.")
+    return out

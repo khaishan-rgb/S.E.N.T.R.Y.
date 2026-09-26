@@ -1,4 +1,21 @@
-# SG Transport Pulse V14.2 — Route Traffic + Departure Adjustment + Bunching, Gap & Alerts + AI Halfway Optimiser
+# SG Transport Pulse V14.3 — Route Traffic + Departure Adjustment + Bunching, Gap & Alerts + AI Halfway Optimiser
+
+## V14.3 — Recover Late Duty: cross-direction halfway deployment (no holds)
+
+The late-duty mode now answers: **a duty is late in one direction – looking ahead at bus circulation in BOTH directions, which bus should be used, where should it enter halfway, and when?**
+
+* **The late bus stays in service** with its simulated delay. It is not the halfway bus, and **no bus is held** in this mode (the Regulate option and follower regulation are gone from late duty).
+* **Circulation forecast (both directions):** every bus is projected to the end of its trip; after the terminal layover (3 min, editable in code) it starts its next trip in the other direction. The snapshot now loads the live buses of both directions.
+* **Recovery options tested:**
+  * **after its D2 trip** – a D2 bus finishes D2 and, instead of starting D1 at the first stop, runs off-service to a D1 halfway stop (D2 unaffected);
+  * **short-turn from D2** – a D2 bus stays in D2 service to the stop opposite the D1 entry, then crosses over (D2 loses the rest of that trip);
+  * **instead of its next D2 trip** – a D1 bus ahead of the late bus reaches the D1 end and runs back off-service into D1 (D2 loses that trip);
+  * loop services: a bus's next loop starts halfway.
+* **For every recovery bus × entry stop:** time available, deadhead time/km (one OSRM matrix request for all start points × all entry stops, × 1.25 bus factor), the earliest entry and up to 10 min wait to land mid-gap, headways either side, stops/km/% skipped, D1 EWT and D2 EWT.
+* **Ranking:** lowest combined EWT of both directions, so taking a trip from D2 is paid for. Entry stops must skip ≥ 15 % of the route (editable) and leave ≥ 20 %. If nothing improves the net EWT by the minimum, the result is **No halfway**.
+* **Result card:** RECOVER LATE DUTY · D1 Bus 3 +20 min → **Use D2 Bus X** (how) → **Deploy to D1: BS … ** · Available · Reach halfway · Deadhead · Stops skipped · EWT no halfway / with halfway / improvement · D2 impact · net · bus movement (in service → end of trip / crossing → OFF SERVICE → ENTER D1) · best plan per recovery bus.
+* **Map:** opposite-direction buses shown (purple ring), the recovery bus highlighted green, its in-service leg and off-service leg drawn; View Deployment Route starts from the recovery bus's release point.
+* Deploy OS Bus mode is unchanged (it still includes regulation of the buses behind the OS bus).
 
 ## V14.2 — Halfway Planner: OS / halfway deployment + downstream regulation
 

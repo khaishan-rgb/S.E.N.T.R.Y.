@@ -2126,6 +2126,37 @@ async def os_table(origin, dests):
     return out, None
 
 
+async def os_matrix(origins, dests):
+    """V14.3: off-service car minutes / km from each origin to each destination in one OSRM table request. {(i, j): {min, km}}"""
+    if not origins or not dests:
+        return {}, None
+    pts = list(origins) + list(dests)
+    path = ";".join(f"{lon:.5f},{lat:.5f}" for lat, lon in pts)
+    srcs = ";".join(str(i) for i in range(len(origins)))
+    dsts = ";".join(str(len(origins) + i) for i in range(len(dests)))
+
+    async def factory():
+        try:
+            r = await client().get(f"{OSRM}/table/v1/driving/{path}", params={"sources": srcs, "destinations": dsts, "annotations": "duration,distance"}, timeout=30)
+            r.raise_for_status()
+            j = r.json()
+            if j.get("code") != "Ok":
+                return {"dur": None, "error": j.get("code")}, 120, False
+            return {"dur": j.get("durations"), "dist": j.get("distances"), "error": None}, 900, True
+        except Exception as e:
+            return {"dur": None, "error": f"routing service unavailable ({type(e).__name__})"}, 60, False
+    d = await cached(f"osrmmx:{path}|{srcs}", factory)
+    if not d.get("dur"):
+        return {}, d.get("error")
+    out = {}
+    for i, row in enumerate(d["dur"]):
+        drow = (d.get("dist") or [[]] * len(d["dur"]))[i] or []
+        for j, v in enumerate(row or []):
+            if v is not None:
+                out[(i, j)] = {"min": v / 60.0, "km": (drow[j] / 1000.0) if len(drow) > j and drow[j] is not None else None}
+    return out, None
+
+
 async def os_overpass(line):
     """ways along a route that carry restriction / structure tags (OpenStreetMap via Overpass). Cached 1 day."""
     pts = offservice.simplify(line, 120)
@@ -3514,8 +3545,36 @@ async def api_hp_snapshot(service: str = "", direction: int = 1):
         return {"ok": False, "error": g["error"]}
     st = await static()
     dirs = [d_ for d_ in (1, 2) if route_stops(st, svc, d_)]
-    bj = await api_buses(svc, direction)
     P = {**halfway.PARAMS, **HO["params"]}
+    buses, off_route, bus_err = await hp_live_buses(svc, direction, g, P)
+    stops, ss, line, now = g["stops"], g["prep"]["stop_s"], g["line"], g["now"]
+    now_min = now.hour * 60 + now.minute + now.second / 60.0
+    opp = None                                                      # V14.3: the opposite direction, for the cross-direction circulation
+    od = next((d_ for d_ in dirs if d_ != direction), None)
+    if od is not None:
+        g2 = await ho_route(svc, od)
+        if not g2.get("error"):
+            b2, _, _ = await hp_live_buses(svc, od, g2, P)
+            opp = {"g": g2, "buses": b2, "dir": od}
+    sid = hashlib.sha1(f"{svc}|{direction}|{time.time()}".encode()).hexdigest()[:12]
+    hp_prune()
+    HP_SNAP[sid] = {"created": time.time(), "svc": svc, "d": direction, "g": g, "buses": buses, "now_min": now_min, "P": P, "opp": opp}
+    cands, unresolved, cinfo = ho_candidates(svc, direction, stops, "", "auto", g["prep"], P)
+    strip_b = lambda bs: [{k: v for k, v in b.items() if k not in ("s", "offset")} for b in bs]
+    return {"ok": True, "snap": sid, "service": svc, "direction": direction, "directions": dirs, "now": now.strftime("%H:%M:%S"), "now_min": round(now_min, 2),
+            "H": g["H"], "H_src": g["H_src"], "traffic_ok": g["traffic_ok"],
+            "route": {"km": round(g["prep"]["km"], 2), "run_min": round(g["tau"][-1], 1), "first": stops[0]["name"], "last": stops[-1]["name"], "n_stops": len(stops)},
+            "stops": [{"j": i, "code": s_["code"], "name": s_["name"], "lat": s_["lat"], "lon": s_["lon"], "km": round(ss[i], 2)} for i, s_ in enumerate(stops)],
+            "line": ho_simplify(line, 500), "buses": strip_b(buses), "bus_error": bus_err, "off_route": off_route,
+            "opp": ({"direction": opp["dir"], "line": ho_simplify(opp["g"]["line"], 400), "buses": strip_b(opp["buses"]), "km": round(opp["g"]["prep"]["km"], 2),
+                     "first": opp["g"]["stops"][0]["name"], "last": opp["g"]["stops"][-1]["name"], "H": opp["g"]["H"]} if opp else None),
+            "candidates": {"scope": cinfo.get("scope_used"), "approved": cinfo.get("approved"), "tested": len(cands), "unresolved": unresolved},
+            "source": "LTA DataMall Bus Arrival (live) \u00b7 route running times from LTA speed bands" if g["traffic_ok"] else "LTA DataMall Bus Arrival (live) \u00b7 running times at the fallback speed (no speed bands)"}
+
+
+async def hp_live_buses(svc, direction, g, P):
+    """LIVE buses of one direction, projected on its route and calibrated to DataMall's own next-stop arrival."""
+    bj = await api_buses(svc, direction)
     stops, ss, line, cum, now = g["stops"], g["prep"]["stop_s"], g["line"], g["prep"]["cum"], g["now"]
     tt = hp_tt(g, P)
     now_min = now.hour * 60 + now.minute + now.second / 60.0
@@ -3534,20 +3593,10 @@ async def api_hp_snapshot(service: str = "", direction: int = 1):
             i0, e0 = ahead[0]
             off = max(-5.0, min(15.0, e0 - tt(s, ss[i0])))
             calib = {"code": stops[i0]["code"], "name": stops[i0]["name"], "eta_min": round(e0, 1), "clock": hplan.hhmm(now_min + e0)}
-        buses.append({"id": b["id"], "lat": b["lat"], "lon": b["lon"], "s": s, "offset": off, "km": round(s, 2), "near": b.get("near"), "load": b.get("load"),
-                      "type": b.get("type"), "monitored": b.get("monitored"), "next": calib})
-    sid = hashlib.sha1(f"{svc}|{direction}|{time.time()}".encode()).hexdigest()[:12]
-    hp_prune()
-    HP_SNAP[sid] = {"created": time.time(), "svc": svc, "d": direction, "g": g, "buses": buses, "now_min": now_min, "P": P}
-    cands, unresolved, cinfo = ho_candidates(svc, direction, stops, "", "auto", g["prep"], P)
-    return {"ok": True, "snap": sid, "service": svc, "direction": direction, "directions": dirs, "now": now.strftime("%H:%M:%S"), "now_min": round(now_min, 2),
-            "H": g["H"], "H_src": g["H_src"], "traffic_ok": g["traffic_ok"],
-            "route": {"km": round(g["prep"]["km"], 2), "run_min": round(g["tau"][-1], 1), "first": stops[0]["name"], "last": stops[-1]["name"], "n_stops": len(stops)},
-            "stops": [{"j": i, "code": s_["code"], "name": s_["name"], "lat": s_["lat"], "lon": s_["lon"], "km": round(ss[i], 2)} for i, s_ in enumerate(stops)],
-            "line": ho_simplify(line, 500), "buses": [{k: v for k, v in b.items() if k not in ("s", "offset")} for b in buses],
-            "bus_error": bj.get("error"), "off_route": off_route,
-            "candidates": {"scope": cinfo.get("scope_used"), "approved": cinfo.get("approved"), "tested": len(cands), "unresolved": unresolved},
-            "source": "LTA DataMall Bus Arrival (live) \u00b7 route running times from LTA speed bands" if g["traffic_ok"] else "LTA DataMall Bus Arrival (live) \u00b7 running times at the fallback speed (no speed bands)"}
+        near = b.get("near") or {}
+        buses.append({"id": b["id"], "lat": b["lat"], "lon": b["lon"], "s": s, "offset": off, "km": round(s, 2), "near": near, "near_name": near.get("name") if isinstance(near, dict) else None,
+                      "load": b.get("load"), "type": b.get("type"), "monitored": b.get("monitored"), "next": calib})
+    return buses, off_route, bj.get("error")
 
 
 async def hp_origin(snap, mode, bus, os_from):
@@ -3577,6 +3626,8 @@ async def api_hp_simulate(snap: str = "", mode: str = "late", bus: str = "", del
         return {"ok": False, "error": "Delay must be a number of minutes."}
     if mode == "late" and D <= 0:
         return {"ok": False, "error": "Inject a delay (minutes) for the selected bus."}
+    if mode == "late":
+        return await hp_simulate_cross(S, snap, bus, D, scope, max_reach, min_skip)
     origin, origin_label, err = await hp_origin(S, mode, bus, os_from)
     if err:
         return {"ok": False, "error": err}
@@ -3617,8 +3668,52 @@ async def api_hp_simulate(snap: str = "", mode: str = "late", bus: str = "", del
     return res
 
 
+async def hp_simulate_cross(S, snap, bus, D, scope, max_reach, min_skip):
+    """V14.3 RECOVER LATE DUTY: which opposite-direction (or next-trip) bus to deploy halfway, where and when - from the circulation of both directions."""
+    g, P = S["g"], S["P"]
+    if not str(bus).isdigit() or not any(b["id"] == int(bus) for b in S["buses"]):
+        return {"ok": False, "error": "Select one of the live buses as the late duty."}
+    HP = dict(hplan.PARAMS)
+    for val, key, lo, hi in ((max_reach, "max_reach_min", 5.0, 90.0), (min_skip, "os_min_skip_pct", 0.0, 60.0)):
+        try:
+            if str(val).strip():
+                HP[key] = max(lo, min(hi, float(val)))
+        except ValueError:
+            pass
+    mk = lambda gg, bs, d_: {"dir": d_, "stops": gg["stops"], "ss": gg["prep"]["stop_s"], "tt": hp_tt(gg, P), "H": gg["H"], "H_src": gg["H_src"],
+                             "buses": [{**b, "near": b.get("near_name")} for b in bs]}
+    T = mk(g, S["buses"], S["d"])
+    O = mk(S["opp"]["g"], S["opp"]["buses"], S["opp"]["dir"]) if S.get("opp") else None
+    cands, _u, cinfo = ho_candidates(S["svc"], S["d"], g["stops"], "", scope if scope in ("auto", "approved", "all") else "auto", g["prep"], P)
+    ctx = {"now": S["now_min"], "late": {"bus": int(bus), "delay": D}, "T": T, "O": O, "cands": cands, "P": HP}
+    sources, err = hplan.cross_sources(ctx)
+    if err:
+        return {"ok": False, "error": err}
+    origins = hplan.cross_origins(ctx, sources)
+    keys = list(origins)
+    dests = [(c["lat"], c["lon"]) for c in cands]
+    fac = float(offservice.PARAMS["bus_time_factor"])
+    mx, merr = await os_matrix([origins[k] for k in keys], dests)
+    reach = {}
+    for oi, k in enumerate(keys):
+        reach[k] = {}
+        for ci, c in enumerate(cands):
+            m = mx.get((oi, ci))
+            if m:
+                reach[k][c["j"]] = (m["min"] * fac, m["km"], f"road routing time x {fac:g}")
+            else:
+                km = hplan.hav_km(origins[k], (c["lat"], c["lon"])) * HP["detour"]
+                extra = 3.0 if k.startswith("Ostop") else 0.0          # crossing to the other side of the road: allow a turn-around
+                reach[k][c["j"]] = (km / HP["offsvc_kmh"] * 60.0 + extra, km, "straight-line estimate (routing unavailable)")
+    res = await asyncio.to_thread(hplan.simulate_cross, ctx, reach)
+    res.update(snap=snap, service=S["svc"], direction=S["d"], scope=cinfo.get("scope_used"), n_candidates=len(cands),
+               routing="road routing (OSRM matrix) x bus factor" if mx else f"straight-line estimate ({merr or 'routing unavailable'})",
+               origin=None, labels={"live": "LTA DataMall observations (unchanged)", "sim": "Simulation layer: injected delay", "derived": "Circulation and headways predicted from the running-time model"})
+    return res
+
+
 @app.get("/api/hplan/route")
-async def api_hp_route(snap: str = "", stop: str = "", mode: str = "late", bus: str = "", os_from: str = "", leave: str = ""):
+async def api_hp_route(snap: str = "", stop: str = "", mode: str = "late", bus: str = "", os_from: str = "", leave: str = "", from_pt: str = "", from_label: str = ""):
     """Off-service deployment route from the bus / OS location to the entry stop, with turn-by-turn guidance, traffic, incidents and road works."""
     S = HP_SNAP.get(snap)
     if not S:
@@ -3628,9 +3723,13 @@ async def api_hp_route(snap: str = "", stop: str = "", mode: str = "late", bus: 
     j = next((i for i, s_ in enumerate(stops) if s_["code"] == re.sub(r"\D", "", stop)), None)
     if j is None:
         return {"ok": False, "error": "Choose an entry stop on this route."}
-    origin, origin_label, err = await hp_origin(S, "os" if mode == "os" else "late", bus, os_from)
-    if err:
-        return {"ok": False, "error": err}
+    m_ = re.match(r"^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$", from_pt or "")
+    if m_:
+        origin, origin_label = (float(m_.group(1)), float(m_.group(2))), (from_label.strip()[:80] or "Recovery bus")
+    else:
+        origin, origin_label, err = await hp_origin(S, "os" if mode == "os" else "late", bus, os_from)
+        if err:
+            return {"ok": False, "error": err}
     lv = ho_parse_hhmm(leave) if leave.strip() else None
     lv = lv if lv is not None else S["now_min"]
     prep = float(hplan.PARAMS["prep_min"])
