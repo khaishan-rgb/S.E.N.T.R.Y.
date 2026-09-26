@@ -1,4 +1,13 @@
-# SG Transport Pulse V15.0 — Route Traffic + Departure Adjustment + Bunching, Gap & Alerts + AI Halfway Optimiser
+# SG Transport Pulse V15.1 — Route Traffic + Departure Adjustment + Bunching, Gap & Alerts + AI Halfway Optimiser
+
+## V15.1 — Halfway point chosen by the prolonged headway (gap ÷ 2), Bus D / E slow-down
+
+* **New selection rule:** at every stop the planner finds the **prolonged headway** Bus C has to fill (the bus ahead of Bus C's slot → the next bus after it, without Bus C) and aims Bus C at its **middle** (gap ÷ 2), not at the earliest time it can arrive. The **AI recommended** stop is the first stop where Bus C can be there by the middle of the gap (within 2 min), so it skips the fewest stops while splitting the gap evenly. If Bus C would arrive early, it leaves the interchange later (extended break) instead. If no stop allows an even split, the most even one is recommended.
+* The **lowest whole-route EWT** stop is still shown (tag "Lowest EWT", sort option, chart) with the trade-off explained: it usually enters earlier, serving more stops but splitting the gap unevenly.
+* **Bus ahead:** a hold at the interchange is kept only if it also lowers the EWT without spoiling the split (the gap quoted is then the gap after the hold).
+* **Bus D and Bus E (behind Bus C):** slow down progressively (longer dwell / easy running, up to 8 min, reaching full effect at the entry stop) so the headways behind Bus C even out towards Bus C → D → E → next; each slow-down is kept only if it does not worsen the EWT. The action plan always gives D and E an instruction: slow down +X min (and why) or keep normal running (with the forecast spacing).
+* Page: options table has "Prolonged gap → split" and entry time (with later interchange departure), plan chain shows the extended break, the key result states the gap and the split, before/after and downstream table show 🐢 slow-downs.
+* The "advance departure" of the bus behind (V15.0) is replaced by the slow-down of Bus D / E.
 
 ## V15.0 — Halfway Planner rebuilt (next-trip halfway + front/rear regulation, lowest downstream EWT)
 
