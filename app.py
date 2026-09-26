@@ -1469,6 +1469,12 @@ async def basemap_js():
 @app.get("/halfway", response_class=HTMLResponse)
 async def halfway_page():
     """V14.0: Halfway Planner (live simulation: Recover Late Duty / Deploy OS Bus)."""
+    return HTMLResponse((HERE / "halfway_planner.html").read_text(encoding="utf-8"))
+
+
+@app.get("/halfway/os", response_class=HTMLResponse)
+async def halfway_os_page():
+    """the V14 planner (Recover Late Duty cross-direction + Deploy OS Bus), unchanged."""
     return HTMLResponse((HERE / "hplanner.html").read_text(encoding="utf-8"))
 
 
@@ -3748,6 +3754,51 @@ async def hp_simulate_cross(S, snap, bus, D, scope, max_reach, min_skip):
     res.update(snap=snap, service=S["svc"], direction=S["d"], scope=cinfo.get("scope_used"), n_candidates=len(cands),
                routing="road routing (OSRM matrix) x bus factor" if mx else f"straight-line estimate ({merr or 'routing unavailable'})",
                origin=None, labels={"live": "LTA DataMall observations (unchanged)", "sim": "Simulation layer: injected delay", "derived": "Circulation and headways predicted from the running-time model"})
+    return res
+
+
+# =========================================================================== V15.0 Halfway Planner (next-trip halfway + front/rear regulation)
+import hwplan
+
+
+@app.get("/api/hplan/plan")
+async def api_hp_plan(snap: str = "", bus: str = "", delay: str = "20", brk: str = "", stop_min: str = ""):
+    """Late bus completes its trip; its NEXT trip starts halfway. Every stop of the next direction is tested with real-road off-service
+    time from the interchange; front bus hold / rear bus advance chosen per stop; ranked by downstream EWT. Live data unchanged."""
+    S = HP_SNAP.get(snap)
+    if not S:
+        return {"ok": False, "error": "The live snapshot has expired. Load the live buses again.", "expired": True}
+    if not str(bus).isdigit() or not any(b["id"] == int(bus) for b in S["buses"]):
+        return {"ok": False, "error": "Select the late bus."}
+    try:
+        D = max(0.0, min(120.0, float(delay or 0)))
+        Pp = {}
+        if str(brk).strip():
+            Pp["break_min"] = max(0.0, min(30.0, float(brk)))
+        if str(stop_min).strip():
+            Pp["stop_min"] = max(0.5, min(6.0, float(stop_min)))
+    except ValueError:
+        return {"ok": False, "error": "Lateness, break and stop-to-stop time must be numbers."}
+    g = S["g"]
+    mk = lambda gg, bs, d_: {"dir": d_, "stops": gg["stops"], "ss": gg["prep"]["stop_s"], "buses": bs, "H": gg["H"], "H_src": gg["H_src"]}
+    T = mk(g, S["buses"], S["d"])
+    O = mk(S["opp"]["g"], S["opp"]["buses"], S["opp"]["dir"]) if S.get("opp") else None
+    gn = S["opp"]["g"] if S.get("opp") else g
+    st = gn["stops"]
+    ic = st[0]
+    js = list(range(1, len(st) - 1))
+    offs, off_err = await os_table((ic["lat"], ic["lon"]), [(st[j]["lat"], st[j]["lon"]) for j in js])
+    fac = float(offservice.PARAMS["bus_time_factor"])
+    reach = {}
+    for i, j in enumerate(js):
+        om = offs.get(i)
+        if om:
+            reach[j] = (om["min"] * fac, om.get("km"), f"real road routing (OSRM) x {fac:g} bus factor")
+        else:
+            km = hplan.hav_km((ic["lat"], ic["lon"]), (st[j]["lat"], st[j]["lon"])) * 1.35
+            reach[j] = (km / 25.0 * 60.0, km, "estimate - road routing unavailable")
+    res = await asyncio.to_thread(hwplan.plan, {"now": S["now_min"], "late": {"bus": int(bus), "delay": D}, "T": T, "O": O, "P": Pp}, reach)
+    res.update(snap=snap, service=S["svc"], routing="real road routing (OSRM)" if offs else f"estimate ({off_err or 'road routing unavailable'})")
     return res
 
 

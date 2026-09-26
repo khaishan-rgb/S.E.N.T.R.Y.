@@ -1,0 +1,631 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0b2545">
+<title>Halfway Planner &middot; SG Transport Pulse</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script>try{if(localStorage.getItem("shell.off")==="1")document.documentElement.classList.add("shell-off")}catch(e){}</script>
+<style>
+:root{
+  --navy:#0b2545; --navy2:#13315c; --bg:#eef2f6; --surface:#fff; --line:#dde3ea; --line2:#c9d3de; --ink:#13233a; --mut:#5b6b7f; --faint:#8a98a9;
+  --bA:#1e6fd9; --bB:#f08c00; --bC:#d7263d; --bD:#1f9d55; --bE:#7c4dff; --bx:#8a98a9;
+  --risk:#c8102e; --hold:#e8590c; --ok:#0f9d58; --ai:#1565d8; --aiBg:#eaf2ff; --okBg:#e8f6ee; --riskBg:#fdecee; --holdBg:#fff1e6;
+  --font:Inter,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font);font-size:14px;line-height:1.4}
+button,input,select{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--ai);outline-offset:2px}
+.num{font-variant-numeric:tabular-nums}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+
+/* ---------- navy header with the only inputs the controller has to give ---------- */
+.hdr{background:var(--navy);color:#fff;padding:12px 18px 14px;display:flex;align-items:flex-end;gap:10px 14px;flex-wrap:wrap}
+.hdr .ttl{display:flex;align-items:center;gap:12px;margin-right:auto;min-width:240px;flex:1 1 100%}
+@media(min-width:1700px){.hdr .ttl{flex:0 1 auto}}
+.hdr .ttl .ic{width:40px;height:40px;border-radius:10px;background:#1b3f73;display:grid;place-items:center;font-size:22px;flex:none}
+.hdr h1{margin:0;font-size:21px;font-weight:800;letter-spacing:-.01em}
+.hdr p{margin:2px 0 0;color:#b8c7da;font-size:12.5px}
+.f{display:flex;flex-direction:column;gap:4px;min-width:0}
+.f>label,.f>.lb{font-size:11.5px;color:#b8c7da;font-weight:600}
+.in{height:38px;border-radius:8px;border:1px solid #2c4a74;background:#12305a;color:#fff;padding:0 10px;font-size:14px;min-width:0}
+.in::placeholder{color:#8ea3bd}
+select.in{padding-right:26px;appearance:none;background-image:linear-gradient(45deg,transparent 50%,#b8c7da 50%),linear-gradient(135deg,#b8c7da 50%,transparent 50%);background-position:calc(100% - 15px) 16px,calc(100% - 10px) 16px;background-size:5px 5px;background-repeat:no-repeat}
+.ro{height:38px;display:flex;align-items:center;gap:6px;padding:0 10px;border-radius:8px;border:1px solid #2c4a74;background:#0f2a50;white-space:nowrap;font-size:13.5px}
+.seg{display:flex;height:38px;border-radius:8px;border:1px solid #2c4a74;background:#0f2a50;padding:3px;gap:3px}
+.seg button{border:0;background:transparent;color:#b8c7da;padding:0 16px;border-radius:6px;font-weight:700;cursor:pointer;min-width:52px}
+.seg button[aria-pressed="true"]{background:var(--ai);color:#fff}
+.seg button[disabled]{opacity:.35;cursor:not-allowed}
+.w-svc{width:96px}.w-op{width:130px}.w-bus{width:210px}.w-late{width:84px}
+.stat{font-size:12px;color:#b8c7da;align-self:center;max-width:260px}
+.stat b{color:#fff}
+
+/* ---------- page grid ---------- */
+.page{padding:14px 18px 24px;display:grid;gap:12px}
+.row{display:grid;gap:12px;align-items:stretch}
+.r1{grid-template-columns:minmax(290px,.9fr) minmax(0,1.6fr) minmax(200px,.55fr)}
+.r2{grid-template-columns:minmax(0,1.7fr) minmax(340px,1fr)}
+.r3{grid-template-columns:minmax(0,1.25fr) minmax(0,1fr)}
+.r4{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.r4 .c7{grid-column:1/-1}
+@media(min-width:1760px){.r4{grid-template-columns:minmax(0,1.35fr) minmax(0,.9fr) minmax(0,.9fr)}.r4 .c7{grid-column:auto}}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px 16px;min-width:0}
+.card>h2{margin:0 0 10px;font-size:15.5px;font-weight:800;display:flex;align-items:center;gap:8px}
+.card>h2 .n{color:var(--faint);font-weight:700}
+.card>h2 .sp{margin-left:auto}
+.pill{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:700;border-radius:999px;padding:2px 9px;white-space:nowrap}
+.pill.ai{background:var(--ok);color:#fff}.pill.sel{background:var(--ai);color:#fff}.pill.risk{background:var(--riskBg);color:var(--risk)}.pill.hold{background:var(--holdBg);color:var(--hold)}.pill.grey{background:#eef1f5;color:var(--mut)}
+.empty{color:var(--mut);font-size:13.5px;padding:18px;border:1px dashed var(--line2);border-radius:10px;text-align:center}
+.err{background:var(--riskBg);color:var(--risk);border-radius:9px;padding:9px 12px;font-size:13px}
+.note{color:var(--mut);font-size:12px;margin:8px 0 0}
+
+/* bus identity badges (same everywhere) */
+.bb{display:inline-grid;place-items:center;width:22px;height:22px;border-radius:6px;color:#fff;font-weight:800;font-size:12px;flex:none}
+.bb.A{background:var(--bA)}.bb.B{background:var(--bB)}.bb.C{background:var(--bC)}.bb.D{background:var(--bD)}.bb.E{background:var(--bE)}.bb.x{background:var(--bx)}
+.bb.lg{width:28px;height:28px;font-size:14px;border-radius:7px}
+
+/* 1 setup */
+.kv{display:grid;grid-template-columns:1fr;column-gap:18px}
+.kv div{display:flex;justify-content:space-between;align-items:baseline;gap:10px;padding:6px 0;border-bottom:1px solid #eef1f5;font-size:13px}
+.kv div:last-child{border-bottom:0}
+.kv span{color:var(--mut)}.kv b{font-weight:700;text-align:right}
+.kv b.late{color:var(--risk);font-size:16px}
+.kv input{width:52px;height:28px;border:1px solid var(--line2);border-radius:6px;text-align:right;padding:0 6px;font-weight:700}
+
+/* 2 / 5 timelines */
+.tl svg{display:block;width:100%;height:auto;overflow:visible}
+.tl .t-ax{stroke:#9aa7b6;stroke-width:1.2}
+.tl text{font-family:var(--font);fill:var(--ink)}
+.tl .tick{font-size:11px;fill:var(--mut)}
+.tl .blab{font-size:11.5px;font-weight:700}
+.tl .btim{font-size:11.5px;font-weight:600;fill:var(--mut)}
+.impact{background:var(--riskBg);border-color:#f4c7cd}
+.impact h2{color:var(--risk)}
+.imp{display:grid;gap:10px}
+.imp div{display:flex;align-items:center;gap:10px;font-size:13px;color:#5b2a33}
+.imp b{margin-left:auto;font-size:20px;color:var(--risk)}
+.imp .ic{width:26px;text-align:center;font-size:17px}
+
+/* 3 options */
+.opt-tools{display:flex;gap:8px;align-items:center;margin-left:auto}
+.opt-tools select{height:30px;border:1px solid var(--line2);border-radius:7px;padding:0 8px;background:#fff;font-size:12.5px}
+.tw{overflow:auto;max-height:340px;border:1px solid var(--line);border-radius:9px}
+table.t{border-collapse:collapse;width:100%;font-size:12.5px}
+.t th{position:sticky;top:0;background:#f5f7fa;color:var(--mut);font-weight:700;font-size:11.5px;text-align:center;padding:7px 6px;border-bottom:1px solid var(--line);white-space:nowrap}
+.t td{padding:7px 6px;border-bottom:1px solid #eef1f5;text-align:center;white-space:nowrap}
+.t td.l,.t th.l{text-align:left}
+.t tbody tr{cursor:pointer}
+.t tbody tr:hover td{background:#f7faff}
+.t tr.sel td{background:var(--aiBg);font-weight:700}
+.t tr.sel td:first-child{box-shadow:inset 3px 0 0 var(--ai)}
+.t .ewt{font-weight:700}
+.t .best{color:var(--ok)}
+.radio{width:15px;height:15px;border-radius:50%;border:2px solid var(--line2);display:inline-block;vertical-align:middle}
+tr.sel .radio{border-color:var(--ai);background:radial-gradient(circle,var(--ai) 45%,transparent 50%)}
+.cards{display:none}
+
+/* 4 selected plan chain */
+.chain{display:grid;grid-template-columns:1fr auto 1fr auto 1fr auto 1fr;align-items:start;gap:4px;text-align:center}
+.chain .st{display:flex;flex-direction:column;align-items:center;gap:4px;font-size:12.5px}
+.chain .st .ic{width:44px;height:44px;border-radius:11px;display:grid;place-items:center;font-size:22px}
+.chain .st b{font-size:13px}
+.chain .st .tm{font-size:15px;font-weight:800}
+.chain .ar{color:var(--ai);font-size:22px;padding-top:10px}
+.ic.c1{background:var(--riskBg)}.ic.c2{background:#eef1f5}.ic.c3{background:var(--aiBg)}.ic.c4{background:var(--okBg)}
+.kr{margin-top:12px;border:1px solid #cdebd9;background:var(--okBg);border-radius:10px;padding:10px 12px}
+.kr h3{margin:0 0 8px;font-size:13.5px;color:#0b6b3c;display:flex;align-items:center;gap:6px}
+.kr .g{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;text-align:center}
+.kr .g span{display:block;font-size:12px;color:var(--mut)}.kr .g b{font-size:21px;color:#0b6b3c}
+.kr .g b.neg{color:var(--risk)}
+.why{margin-top:10px;font-size:13px;line-height:1.5;color:#2a3b52;background:#f5f8fc;border-radius:10px;padding:10px 12px}
+.why b{color:var(--ink)}
+
+/* 5 before / after */
+.ba .lane{border-radius:10px;padding:8px 10px 2px;margin-bottom:10px}
+.ba .lane.before{background:#fdf5f6;border:1px solid #f4d9dd}
+.ba .lane.after{background:#f3fbf6;border:1px solid #cdebd9}
+.ba .lane h3{margin:0;font-size:12.5px;font-weight:800;display:inline-block;padding:2px 9px;border-radius:6px}
+.ba .before h3{background:#fbdfe3;color:var(--risk)}.ba .after h3{background:#d4f0de;color:#0b6b3c}
+.ba .meta{float:right;font-size:12px;color:var(--mut);padding-top:3px}
+.ba .meta b{color:var(--ink)}
+
+/* 6 map */
+.mapbox{position:relative;height:340px;border-radius:10px;overflow:hidden;border:1px solid var(--line)}
+#map{position:absolute;inset:0}
+.leaflet-container{font-family:var(--font)}
+.rinfo{position:absolute;right:10px;top:10px;z-index:500;background:rgba(255,255,255,.96);border:1px solid var(--line);border-radius:10px;padding:8px 12px;font-size:12.5px;display:grid;grid-template-columns:auto auto;gap:3px 14px;box-shadow:0 2px 10px rgba(11,37,69,.12)}
+.rinfo span{color:var(--mut)}.rinfo b{text-align:right}
+.mk{display:flex;flex-direction:column;align-items:flex-start}
+.mk .p{background:#fff;border:1.5px solid var(--navy);border-radius:8px;padding:3px 8px;font-size:11.5px;font-weight:700;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,.15)}
+.mk .p.g{border-color:var(--bC);color:var(--bC)}
+.steps{margin-top:10px;display:grid;gap:0;max-height:180px;overflow:auto}
+.steps div{display:grid;grid-template-columns:22px 1fr auto;gap:8px;padding:6px 2px;border-bottom:1px solid #eef1f5;font-size:12.5px;align-items:center}
+.steps i{font-style:normal;text-align:center;color:var(--ai);font-weight:800}
+.steps span{color:var(--mut);white-space:nowrap}
+
+/* 7 downstream */
+.t td.cH{background:#fff1f3}
+.hwv{display:block;font-size:10.5px;color:var(--mut);font-weight:600}
+.hwv.bad{color:var(--risk)}.hwv.good{color:var(--ok)}
+
+/* 8 chart */
+.chart{display:flex;align-items:flex-end;gap:10px;height:190px;padding:18px 4px 0;border-bottom:1px solid var(--line2);position:relative}
+.bar{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;min-width:0;cursor:pointer;border:0;background:none;padding:0}
+.bar i{display:block;width:100%;max-width:54px;border-radius:5px 5px 0 0;background:#b5c0cc}
+.bar b{font-size:12px;margin-bottom:4px}
+.bar.na i{background:#f0a3ad}.bar.best i{background:var(--ok)}.bar.cur{outline:2px solid var(--ai);outline-offset:3px;border-radius:6px}
+.blabs{display:flex;gap:10px;padding:6px 4px 0}
+.blabs span{flex:1;text-align:center;font-size:11.5px;color:var(--mut);min-width:0;line-height:1.2}
+.imprv{margin-top:12px;display:flex;align-items:center;justify-content:space-between;background:var(--okBg);border-radius:10px;padding:9px 12px;font-weight:700;color:#0b6b3c}
+.imprv b{font-size:22px}
+
+/* 9 actions */
+.acts{display:grid;gap:10px;counter-reset:a}
+.act{display:grid;grid-template-columns:28px 1fr;gap:10px;align-items:start;font-size:13px}
+.act .no{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;color:#fff;font-weight:800;font-size:13px}
+.act b{display:block}
+.act .tm{color:var(--ai);font-weight:700}
+.act.hold b{color:var(--hold)}.act.advance b{color:var(--ok)}.act.halfway b{color:var(--bC)}
+.copy{margin-top:12px;width:100%;min-height:44px;border-radius:10px;border:0;background:var(--ok);color:#fff;font-weight:800;font-size:14.5px;cursor:pointer}
+
+/* shell (shared with the other pages) */
+.desktop-shell{display:none}.mobile-bottom-nav{display:none}.mobile-more{display:none}
+@media(min-width:1000px){body{padding-left:232px}.desktop-shell{display:flex;position:fixed;left:0;top:0;bottom:0;width:232px;background:#061425;border-right:1px solid #17324d;z-index:10000;flex-direction:column;padding:18px 12px}.shell-brand{padding:7px 40px 18px 10px;border-bottom:1px solid #17324d;position:relative}.shell-brand strong{font-size:16px;color:#f3f8ff}.shell-brand small{display:block;color:#718da7;margin-top:4px}.shell-label{padding:20px 10px 8px;color:#607d98;font-size:10px;font-weight:800;letter-spacing:.12em}.shell-link{display:flex;align-items:center;gap:10px;color:#9eb6cc;text-decoration:none;padding:11px 12px;margin:2px 0;border-radius:10px;font-size:13px;font-weight:650;position:relative}.shell-link .si{width:24px;text-align:center;font-size:16px}.shell-link:hover{background:#0c2238;color:#fff}.shell-link.active{background:#0c3154;color:#fff}.shell-link.active:before{content:'';position:absolute;left:-12px;top:8px;bottom:8px;width:3px;border-radius:4px;background:#35bfff}.shell-foot{margin-top:auto;padding:12px 10px;color:#64819b;font-size:11px}
+  .shell-hide{display:grid;place-items:center;position:absolute;right:0;top:4px;width:30px;height:30px;border-radius:8px;border:1px solid #17324d;background:#0a2036;color:#9eb6cc;font-size:17px;cursor:pointer;padding:0}
+  html.shell-off body{padding-left:0!important}html.shell-off .desktop-shell{display:none!important}
+  html.shell-off .shell-show{display:grid;place-items:center;width:36px;height:36px;border-radius:10px;border:1px solid #2c4a74;background:#12305a;color:#fff;font-size:18px;cursor:pointer;padding:0;align-self:center}}
+.shell-hide,.shell-show{display:none}
+.mtabs{display:none}
+
+/* ---------- tablet ---------- */
+@media(max-width:1399px){
+  .r1{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.r1 .c2{grid-column:1/-1;order:3}
+  .r2,.r3{grid-template-columns:1fr}
+  .r4{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.r4 .c7{grid-column:1/-1}
+}
+/* ---------- phone: four steps, not a squeezed desktop ---------- */
+@media(max-width:999px){
+  body{padding-bottom:84px}
+  .hdr{padding:10px 12px 12px;gap:8px}
+  .hdr .ttl{min-width:0;width:100%}.hdr h1{font-size:18px}.hdr p{display:none}
+  .hdr .f{flex:1 1 30%}.w-svc,.w-op,.w-bus,.w-late{width:100%}
+  .hdr .f-date,.hdr .f-time,.hdr .f-op,.stat{display:none}
+  .hdr .f-bus{flex:1 1 60%}
+  .in,.ro,.seg{height:44px}.seg button{min-width:44px}
+  .mtabs{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;position:sticky;top:0;z-index:900;background:var(--bg);padding:8px 10px}
+  .mtabs button{min-height:44px;border-radius:10px;border:1px solid var(--line);background:#fff;font-weight:700;font-size:13px;color:var(--mut);cursor:pointer}
+  .mtabs button[aria-selected="true"]{background:var(--aiBg);border-color:var(--ai);color:var(--ai)}
+  .page{padding:4px 10px 18px}
+  .row{display:contents}
+  .page>.row>.card{display:none}
+  body.tab-setup .page>.row>.s-setup,body.tab-options .page>.row>.s-options,body.tab-visual .page>.row>.s-visual,body.tab-plan .page>.row>.s-plan{display:block}
+  .page{display:flex;flex-direction:column}
+  .foot{order:99;margin-top:10px!important}
+  .o1{order:1}.o2{order:2}.o3{order:3}.o4{order:4}.o5{order:5}.o6{order:6}.o7{order:7}.o8{order:8}.o9{order:9}
+  .kv{grid-template-columns:1fr}.kv div:nth-last-child(2){border-bottom:1px solid #eef1f5}
+  .tw.dt{display:none}.cards{display:grid;gap:10px}
+  .oc{display:block;width:100%;text-align:left;border:1.5px solid var(--line);background:#fff;border-radius:12px;padding:12px;cursor:pointer}
+  .oc.sel{border-color:var(--ai);background:var(--aiBg)}
+  .oc .h{display:flex;align-items:center;gap:8px;font-weight:800;font-size:16px}
+  .oc .h .e{margin-left:auto;text-align:right;font-size:11px;color:var(--mut);font-weight:600;background:#eef4fb;border-radius:8px;padding:4px 10px}
+  .oc .h .e b{display:block;color:var(--ai);font-size:18px}
+  .oc .d{font-size:13px;color:var(--mut);margin-top:3px}
+  .oc .d b{color:var(--ink)}
+  .viewplan{position:sticky;bottom:82px;margin-top:10px;width:100%;min-height:50px;border:0;border-radius:12px;background:var(--ai);color:#fff;font-weight:800;font-size:16px;cursor:pointer;box-shadow:0 6px 18px rgba(21,101,216,.3)}
+  .chain{grid-template-columns:1fr auto 1fr auto 1fr auto 1fr;font-size:11px}.chain .st .ic{width:38px;height:38px;font-size:19px}.chain .st .tm{font-size:13px}
+  .mapbox{height:52vh;min-height:300px}
+  .mobile-bottom-nav{display:grid;grid-template-columns:repeat(4,1fr);position:fixed;left:0;right:0;bottom:0;z-index:12000;background:var(--navy);border-top:1px solid #21415e;padding:7px 6px calc(7px + env(safe-area-inset-bottom))}
+  .mbn{color:#9fb4cc;text-decoration:none;text-align:center;font-size:10px;font-weight:650;padding:3px 2px;border-radius:9px;min-height:44px}.mbn .mi{display:block;font-size:19px;line-height:22px}.mbn.active{color:#fff;background:#13315c}
+  .mobile-more{display:none;position:fixed;left:10px;right:10px;bottom:74px;z-index:13000;background:#fff;border:1px solid var(--line);border-radius:16px;padding:8px;box-shadow:0 10px 30px rgba(0,0,0,.2)}.mobile-more.open{display:block}.mobile-more a{display:block;color:var(--ink);text-decoration:none;padding:13px;border-radius:10px;font-weight:650}
+}
+@media(min-width:1000px){.viewplan{display:none}}
+</style>
+</head>
+<body class="tab-setup">
+<aside class="desktop-shell" aria-label="Primary navigation"><div class="shell-brand"><strong>SG Transport Pulse</strong><small>Operations Intelligence</small></div><div class="shell-label">ANALYSIS TOOLS</div><a class="shell-link " href="/"><span class="si">▰</span><span>Route Traffic</span></a><a class="shell-link " href="/control"><span class="si">↔</span><span>Headway Control</span></a><a class="shell-link " href="/bunching"><span class="si">≋</span><span>Bunching & Gap</span></a><a class="shell-link active" href="/halfway"><span class="si">½</span><span>Halfway Planner</span></a><a class="shell-link " href="/traffic"><span class="si">⚠</span><span>Traffic-Aware</span></a><a class="shell-link " href="/halfway/timetable"><span class="si">▤</span><span>Timetable Optimiser</span></a><a class="shell-link " href="/running-time"><span class="si">⏱</span><span>Running Time Analytics</span></a><a class="shell-link " href="/cameras"><span class="si">📷</span><span>Traffic Cameras</span></a><div class="shell-foot">● Live operational workspace</div></aside>
+<header class="hdr top">
+  <div class="ttl brand"><div class="ic" aria-hidden="true">🚌</div><div><h1>Halfway Planner</h1><p>Late bus &rarr; halfway on its next trip &rarr; regulate the buses around it &rarr; lowest downstream EWT</p></div></div>
+  <div class="f f-op"><label for="op">Operator</label><select class="in w-op" id="op"><option value="">All operators</option><option value="SBST">SBS Transit</option><option value="SMRT">SMRT</option><option value="TTS">Tower Transit</option><option value="GAS">Go-Ahead</option></select></div>
+  <div class="f"><label for="svc">Service</label><input class="in w-svc num" id="svc" list="svcList" maxlength="6" placeholder="e.g. 156" autocapitalize="characters" autocomplete="off"><datalist id="svcList"></datalist></div>
+  <div class="f f-date"><span class="lb">Date</span><div class="ro num" id="date">&nbsp;</div></div>
+  <div class="f f-time"><span class="lb">Reference time</span><div class="ro num" id="clock">&nbsp;</div></div>
+  <div class="f"><span class="lb">Late direction</span><div class="seg" role="group" aria-label="Direction of the late bus"><button type="button" id="d1" aria-pressed="true">D1</button><button type="button" id="d2" aria-pressed="false">D2</button></div></div>
+  <div class="f f-bus"><label for="bus">Late bus</label><select class="in w-bus" id="bus" disabled><option value="">Pick a service first</option></select></div>
+  <div class="f"><label for="late">Late, min</label><input class="in w-late num" id="late" value="20" inputmode="numeric" maxlength="3"></div>
+  <div class="stat" id="stat" aria-live="polite"></div>
+</header>
+
+<nav class="mtabs" role="tablist" aria-label="Planner steps">
+  <button type="button" role="tab" data-tab="setup" aria-selected="true">1 Setup</button>
+  <button type="button" role="tab" data-tab="options" aria-selected="false">2 Options</button>
+  <button type="button" role="tab" data-tab="visual" aria-selected="false">3 Visual</button>
+  <button type="button" role="tab" data-tab="plan" aria-selected="false">4 Plan</button>
+</nav>
+
+<main class="page" id="page">
+  <div class="row r1">
+    <section class="card s-setup o1" aria-labelledby="h1"><h2 id="h1"><span class="n">1</span> Incident &amp; recovery setup</h2><div id="setup"><div class="empty">Pick a service and direction, then the late bus.</div></div></section>
+    <section class="card c2 s-setup o2" aria-labelledby="h2"><h2 id="h2"><span class="n">2</span> <span id="h2t">Next-direction forecast (no intervention)</span></h2><div class="tl" id="noact"><div class="empty">The forecast of the buses around the late bus appears here.</div></div></section>
+    <section class="card impact s-setup o3" aria-labelledby="h3"><h2 id="h3">No-action impact</h2><div class="imp" id="impact"><div><span class="ic">⚠</span>Max headway<b>&ndash;</b></div><div><span class="ic">⏱</span>Average EWT<b>&ndash;</b></div><div><span class="ic">⇆</span>Bunching risk<b>&ndash;</b></div></div></section>
+  </div>
+  <div class="row r2">
+    <section class="card s-options o4" aria-labelledby="h4"><h2 id="h4"><span class="n">3</span> Halfway options <span class="opt-tools"><label for="sort" class="note" style="margin:0">Sort</label><select id="sort"><option value="ewt">Best EWT</option><option value="stop">Stop order</option></select></span></h2>
+      <div class="tw dt"><table class="t"><thead><tr><th></th><th class="l">Halfway entry stop</th><th>Forecast EWT</th><th>Max HW after</th><th>Earliest entry</th><th>Off-service<br><span style="font-weight:500">real road</span></th><th>Stops skip</th><th>In-service time avoided<br><span style="font-weight:500">(2 min/stop)</span></th><th class="l">Ahead / behind at entry</th></tr></thead><tbody id="optT"><tr><td colspan="9" class="note" style="padding:18px">Every stop of the next direction is tested once the late bus is picked.</td></tr></tbody></table></div>
+      <div class="cards" id="optC"></div>
+      <p class="note" id="optNote"></p>
+      <button type="button" class="viewplan" id="viewPlan" hidden>View plan</button>
+    </section>
+    <section class="card s-visual o5" aria-labelledby="h5"><h2 id="h5"><span class="n">4</span> <span id="h5t">Selected recovery plan</span><span class="sp" id="h5p"></span></h2><div id="plan"><div class="empty">Select a halfway option.</div></div></section>
+  </div>
+  <div class="row r3">
+    <section class="card ba s-visual o6" aria-labelledby="h6"><h2 id="h6"><span class="n">5</span> <span id="h6t">Bus movement &ndash; before vs after</span></h2><div class="tl" id="ba"><div class="empty">Before and after bus positions appear here.</div></div></section>
+    <section class="card s-plan o7" aria-labelledby="h7"><h2 id="h7"><span class="n">6</span> <span id="h7t">Off-service route</span></h2>
+      <div class="mapbox"><div id="map" role="application" aria-label="Off-service route map"></div><div class="rinfo" id="rinfo" hidden></div></div>
+      <div class="steps" id="steps"></div><p class="note" id="routeNote"></p></section>
+  </div>
+  <div class="row r4">
+    <section class="card c7 s-visual o8" aria-labelledby="h8"><h2 id="h8"><span class="n">7</span> <span id="h8t">Downstream headway forecast</span></h2><div class="tw" style="max-height:none"><table class="t" id="dn"><tbody><tr><td class="note" style="padding:18px">Pass times at the entry stop and further along.</td></tr></tbody></table></div><p class="note" id="dnNote"></p></section>
+    <section class="card s-visual o9" aria-labelledby="h9"><h2 id="h9"><span class="n">8</span> EWT comparison</h2><div id="chart"><div class="empty">EWT of no action vs the halfway options.</div></div></section>
+    <section class="card s-plan o9" aria-labelledby="h10"><h2 id="h10"><span class="n">9</span> Controller action plan</h2><div id="acts"><div class="empty">Numbered instructions for the selected plan.</div></div></section>
+  </div>
+  <p class="note foot" style="margin:0 2px">Live: LTA DataMall bus positions (unchanged). Simulated: the lateness you enter. Forecast: 2 min between stops in service; off-service by real road routing; interchange departures on the target headway. Deploying an OS bus is in the <a href="/halfway/os">previous planner</a>. SG Transport Pulse V15.0</p>
+</main>
+<nav class="mobile-bottom-nav" aria-label="Mobile primary navigation"><a class="mbn" href="/"><span class="mi">▰</span>Route</a><a class="mbn" href="/control"><span class="mi">↔</span>Headway</a><a class="mbn active" href="/halfway"><span class="mi">½</span>Halfway</a><button class="mbn" type="button" style="border:0;background:transparent;font-family:inherit" onclick="document.getElementById('mobileMore').classList.toggle('open')"><span class="mi">•••</span>More</button></nav><div class="mobile-more" id="mobileMore"><a href="/bunching">≋ Bunching</a><a href="/traffic">⚠ Traffic-Aware Regulation</a><a href="/halfway/timetable">▤ Timetable Optimiser</a><a href="/planner">◉ Off-service Route Planner</a><a href="/running-time">⏱ Running Time</a><a href="/cameras">📷 Traffic Cameras</a></div>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="/basemap.js"></script>
+<script>
+"use strict";
+/* SG Transport Pulse V15.0 - Halfway Planner.
+   Flow: service + late direction -> live buses -> late bus + lateness -> /api/hplan/plan (every stop of the next direction, real-road
+   off-service time, front/rear regulation, downstream EWT) -> click any option: every section re-renders from that option's data. */
+const $ = id => document.getElementById(id);
+const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const f0 = x => x == null ? "\u2013" : String(Math.round(x));
+const f1 = x => x == null ? "\u2013" : (Math.round(x * 10) / 10).toFixed(1);
+const f3 = x => x == null ? "\u2013" : x.toFixed(3);
+const fkm = k => k == null ? "\u2013" : k < 1 ? `${Math.round(k * 1000)} m` : `${f1(k)} km`;
+const q = o => new URLSearchParams(Object.entries(o).filter(([, v]) => v !== undefined && v !== null && v !== "")).toString();
+const isM = () => window.innerWidth < 1000;
+const toMin = c => { if(!c) return null; const [h, m] = c.split(":").map(Number); return h * 60 + m; };
+const sgn = (x, d = 0) => x == null ? "\u2013" : (x > 0 ? "+" : x < 0 ? "\u2212" : "") + Math.abs(x).toFixed(d);
+async function api(u, ms){
+  const c = new AbortController(), t = setTimeout(() => c.abort(), ms || 60000);
+  try{ const r = await fetch(u, {signal:c.signal}); return await r.json(); }
+  catch(e){ return {ok:false, error:e.name === "AbortError" ? "The request timed out." : "Network error \u2013 check the connection."}; }
+  finally{ clearTimeout(t); }
+}
+const ST = {svc:"", dir:1, op:"", snap:null, bus:null, late:20, brk:7, sm:2, res:null, sel:null, routes:{}, sort:"ewt", seq:0};
+const roleOf = n => { if(!ST.res) return null; const e = Object.entries(ST.res.roles).find(([, v]) => v.num === n); return e ? e[0] : null; };
+const busName = (role, num, kind) => role ? `Bus ${role}` + (num != null ? ` (${kind === "in_service" ? `D${ST.res.next_dir} ${num}, in service` : num})` : "") : `Bus ${num}`;
+const roleLabel = r => { const x = ST.res && ST.res.roles[r]; return x ? busName(r, x.num, x.kind) : `Bus ${r}`; };
+const cand = code => ST.res ? (ST.res.candidates || []).find(c => c.code === code) : null;
+
+/* ---------------------------------------------------------------- header inputs */
+function tick(){ const d = new Date(); $("clock").textContent = d.toLocaleTimeString("en-SG", {hour:"2-digit", minute:"2-digit", hour12:false}); $("date").textContent = d.toLocaleDateString("en-SG", {day:"2-digit", month:"short", year:"numeric", weekday:"short"}); }
+tick(); setInterval(tick, 20000);
+let SVCS = [];
+(async () => { const j = await api("/api/traffic/services", 30000); SVCS = j.services || []; fillSvc(); })();
+function fillSvc(){ $("svcList").innerHTML = SVCS.filter(s => !ST.op || (s.operators || []).includes(ST.op)).slice(0, 800).map(s => `<option value="${esc(s.svc)}">`).join(""); }
+$("op").onchange = () => { ST.op = $("op").value; fillSvc(); };
+$("svc").addEventListener("change", () => loadSnap());
+$("svc").addEventListener("keydown", e => { if(e.key === "Enter"){ e.preventDefault(); loadSnap(); } });
+const setDir = d => { ST.dir = d; $("d1").setAttribute("aria-pressed", String(d === 1)); $("d2").setAttribute("aria-pressed", String(d === 2)); };
+$("d1").onclick = () => { if(ST.dir !== 1){ setDir(1); if(ST.svc) loadSnap(); } };
+$("d2").onclick = () => { if(ST.dir !== 2){ setDir(2); if(ST.svc) loadSnap(); } };
+$("bus").onchange = () => { ST.bus = $("bus").value ? +$("bus").value : null; schedule(); };
+$("late").addEventListener("change", () => { ST.late = Math.max(0, Math.min(120, Math.round(+$("late").value || 0))); $("late").value = ST.late; schedule(); });
+$("sort").onchange = () => { ST.sort = $("sort").value; renderOptions(); };
+const stat = (h, err) => { $("stat").innerHTML = h ? (err ? `<span style="color:#ffb3b8">${esc(h)}</span>` : h) : ""; };
+
+async function loadSnap(){
+  const svc = $("svc").value.trim().toUpperCase(); if(!svc) return;
+  ST.svc = svc; ST.res = null; ST.sel = null; ST.routes = {}; renderAll();
+  stat("Loading live buses\u2026");
+  const sn = await api(`/api/hplan/snapshot?${q({service:svc, direction:ST.dir})}`, 60000);
+  if(!sn.ok){ stat(sn.error || "Could not load the live buses.", true); $("bus").innerHTML = `<option value="">No live buses</option>`; $("bus").disabled = true; return; }
+  if(sn.directions && sn.directions.length && !sn.directions.includes(ST.dir)){ setDir(sn.directions[0]); return loadSnap(); }
+  ST.snap = sn;
+  $("d2").disabled = !(sn.directions || []).includes(2); $("d1").disabled = !(sn.directions || []).includes(1);
+  const list = sn.buses.slice().sort((a, b) => b.km - a.km);
+  $("bus").innerHTML = `<option value="">Select the late bus (${list.length} live)</option>` + list.map(b => `<option value="${b.id}">Bus ${b.id} \u00b7 near ${esc(b.near ? b.near.name : "?")} \u00b7 ${f1(b.km)} km</option>`).join("");
+  $("bus").disabled = !list.length;
+  if(ST.bus != null && list.some(b => b.id === ST.bus)) $("bus").value = ST.bus; else ST.bus = null;
+  stat(`<b>${esc(svc)} D${ST.dir}</b> \u00b7 ${list.length} live buses${sn.opp ? ` \u00b7 D${sn.opp.direction}: ${sn.opp.buses.length}` : " \u00b7 loop service"} \u00b7 ${esc(sn.now)}`);
+  history.replaceState(null, "", `?${q({svc, dir:ST.dir, bus:ST.bus || "", late:ST.late})}`);
+  initMap(); drawBase();
+  if(ST.bus != null) runPlan();
+}
+let tmr = null;
+function schedule(){ clearTimeout(tmr); tmr = setTimeout(runPlan, 250); }
+async function runPlan(){
+  if(!ST.snap || ST.bus == null) return;
+  const my = ++ST.seq; stat(`Planning recovery for Bus ${ST.bus}\u2026`);
+  let r = await api(`/api/hplan/plan?${q({snap:ST.snap.snap, bus:ST.bus, delay:ST.late, brk:ST.brk, stop_min:ST.sm})}`, 90000);
+  if(r.expired){ await loadSnap(); return; }
+  if(my !== ST.seq) return;
+  if(!r.ok){ stat(r.error || "Planning failed.", true); ST.res = null; renderAll(); return; }
+  ST.res = r; ST.routes = {}; ST.sel = r.best;
+  history.replaceState(null, "", `?${q({svc:ST.svc, dir:ST.dir, bus:ST.bus, late:ST.late})}`);
+  stat(`<b>${r.candidates.length}</b> halfway points tested \u00b7 ${esc(r.routing)}`);
+  renderAll(); if(ST.sel) loadRoute(ST.sel);
+}
+function select(code, go){
+  if(!cand(code)) return; ST.sel = code; renderSelected(); loadRoute(code);
+  if(go && isM()) setTab("visual");
+}
+
+/* ---------------------------------------------------------------- rendering */
+function renderAll(){ renderSetup(); renderNoAction(); renderOptions(); renderSelected(); }
+function renderSelected(){ renderPlan(); renderBA(); renderDown(); renderChart(); renderActs(); drawSel(); renderOptionsSel(); }
+
+function renderSetup(){
+  const r = ST.res, el = $("setup");
+  if(!r){ el.innerHTML = `<div class="empty">${!ST.snap ? "Pick a service and direction." : "Select the late bus in the header."}</div>`; return; }
+  const ld = `D${r.late_dir}`, nd = `D${r.next_dir}`;
+  el.innerHTML = `<div class="kv">
+    <div><span>Late bus</span><b><span class="bb C">C</span> Bus ${r.late_bus}</b></div><div><span>Target headway</span><b class="num">${f0(r.H)} min</b></div>
+    <div><span>Current ${ld} lateness</span><b class="late num">+${f0(r.delay)} min</b></div><div><span>Required break</span><b><input id="brk" class="num" value="${f0(r.break_min)}" inputmode="numeric" aria-label="Break minutes"> min</b></div>
+    <div><span>Forecast ${ld} arrival</span><b class="num">${esc(r.c_arr)}</b></div><div><span>Stop-to-stop time</span><b><input id="sm" class="num" value="${r.stop_min}" inputmode="decimal" aria-label="Minutes between stops"> min</b></div>
+    <div><span>Next direction</span><b>${nd} <small style="color:var(--mut);font-weight:500">(halfway insertion)</small></b></div><div><span>Objective</span><b>Lowest downstream EWT</b></div>
+  </div><p class="note">Bus ${r.late_bus} completes ${ld} at ${esc(r.interchange.name)}, is ready ${esc(r.c_ready)} after the break; without action it would start ${nd} at ${esc(r.c_full_dep)}.</p>`;
+  $("brk").onchange = e => { ST.brk = Math.max(0, Math.min(30, +e.target.value || 0)); schedule(); };
+  $("sm").onchange = e => { ST.sm = Math.max(0.5, Math.min(6, +e.target.value || 2)); schedule(); };
+}
+
+/* one time-axis lane of buses with headway arrows */
+function lane(items, o){
+  const W = Math.max(320, o.W), h = o.h || 128, axY = h - 26, rowY = axY - 26, pL = 22, pR = 26;
+  const t0 = o.t0, t1 = o.t1, X = t => pL + (t - t0) / (t1 - t0) * (W - pL - pR);
+  const H = ST.res ? ST.res.H : 10;
+  let s = `<svg viewBox="0 0 ${W} ${h}" role="img" aria-label="${esc(o.aria || "")}"><defs><marker id="ah${o.id}" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto-start-reverse"><path d="M0,0 L7,3.5 L0,7 z" fill="currentColor"/></marker></defs>`;
+  s += `<line class="t-ax" x1="${pL - 10}" y1="${axY}" x2="${W - 8}" y2="${axY}"/><path d="M${W - 8},${axY - 4} L${W},${axY} L${W - 8},${axY + 4}z" fill="#9aa7b6"/>`;
+  for(let t = Math.ceil(t0 / 10) * 10; t <= t1; t += 10){ const x = X(t); s += `<line x1="${x}" y1="${axY - 3}" x2="${x}" y2="${axY + 3}" stroke="#9aa7b6"/><text class="tick" x="${x}" y="${axY + 16}" text-anchor="middle">${String(Math.floor(t / 60) % 24).padStart(2, "0")}:${String(t % 60).padStart(2, "0")}</text>`; }
+  const it = items.filter(x => x.t != null).sort((a, b) => a.t - b.t);
+  let prevX = -1e9;
+  it.forEach(x => { x._x = Math.max(X(x.t), prevX + 26); prevX = x._x; });          // displayed x: at least 26 px apart
+  const over = prevX - (W - pR); if(over > 0) it.forEach(x => x._x -= over * ((x._x - pL) / Math.max(1, prevX - pL)));
+  // gaps first (behind the markers)
+  for(let i = 0; i + 1 < it.length; i++){
+    const a = it[i], b = it[i + 1], g = b.t - a.t, x1 = a._x + 13, x2 = b._x - 13;
+    const cls = g >= 1.5 * H ? "#c8102e" : g < 0.5 * H ? "#e8590c" : o.after && Math.abs(g - H) <= 0.3 * H ? "#0f9d58" : "#5b6b7f";
+    if(g >= 1.5 * H && o.band) s += `<rect x="${a._x + 14}" y="${rowY - 16}" width="${Math.max(0, b._x - a._x - 28)}" height="32" rx="6" fill="#fbdfe3" opacity=".8"/>`;
+    if(x2 - x1 > 18) s += `<line x1="${x1}" y1="${rowY}" x2="${x2}" y2="${rowY}" stroke="${cls}" stroke-width="1.6" style="color:${cls}" marker-start="url(#ah${o.id})" marker-end="url(#ah${o.id})"/>`;
+    if(x2 - x1 > 30) s += `<rect x="${(x1 + x2) / 2 - 24}" y="${rowY - 9}" width="48" height="18" rx="4" fill="#fff"/><text x="${(x1 + x2) / 2}" y="${rowY + 4}" text-anchor="middle" style="font-size:12px;font-weight:800;fill:${cls}">${f0(g)} min${g >= 1.5 * H && o.band && x2 - x1 > 110 ? " gap" : ""}</text>`;
+  }
+  // markers + labels (stagger bunched labels)
+  let lastX = -1e9, lvl = 0;
+  it.forEach(x => {
+    const cx = x._x, tx = X(x.t);
+    lvl = cx - lastX < (W < 560 ? 40 : 64) ? (lvl + 1) % 3 : 0; lastX = cx;
+    const ly = rowY - 22 - lvl * 26;
+    const col = {A:"#1e6fd9", B:"#f08c00", C:"#d7263d", D:"#1f9d55", E:"#7c4dff"}[x.role] || "#8a98a9";
+    s += `<line x1="${cx}" y1="${rowY + 11}" x2="${tx}" y2="${axY}" stroke="${col}" stroke-dasharray="2 3"/><circle cx="${tx}" cy="${axY}" r="3.5" fill="#fff" stroke="${col}" stroke-width="2"/>`;
+    s += `<rect x="${cx - 11}" y="${rowY - 11}" width="22" height="22" rx="5" fill="${col}"${x.halfway ? ' stroke="#0f9d58" stroke-width="3"' : ""}/><text x="${cx}" y="${rowY + 5}" text-anchor="middle" style="font-size:13px;font-weight:800;fill:#fff">${esc(x.role || "\u2022")}</text>`;
+    if(W < 560){
+      s += `<text class="btim num" x="${cx}" y="${ly + 1}" text-anchor="middle" style="font-size:10.5px;fill:${col};font-weight:700">${esc(x.clock)}</text>`;
+      if(x.note) s += `<text x="${cx}" y="${ly + 12}" text-anchor="middle" style="font-size:9.5px;font-weight:800;fill:${x.noteCol || "#e8590c"}">${esc(x.short || x.note)}</text>`;
+    } else {
+      s += `<text class="blab" x="${cx}" y="${ly - 12}" text-anchor="middle" style="fill:${col}">${esc(x.label)}</text><text class="btim num" x="${cx}" y="${ly + 1}" text-anchor="middle">${esc(x.clock)}</text>`;
+      if(x.note) s += `<text x="${cx}" y="${ly + 14}" text-anchor="middle" style="font-size:11px;font-weight:800;fill:${x.noteCol || "#e8590c"}">${esc(x.note)}</text>`;
+    }
+  });
+  return s + `</svg>`;
+}
+const laneH = n => 150;
+function span(lists){ const ts = lists.flat().map(x => x.t).filter(t => t != null); const a = Math.min(...ts), b = Math.max(...ts); return [Math.floor((a - 4) / 10) * 10, Math.ceil((b + 4) / 10) * 10]; }
+const W = el => Math.max(320, (el.clientWidth || 700) - 4);
+
+function renderNoAction(){
+  const r = ST.res, el = $("noact");
+  if(!r){ el.innerHTML = `<div class="empty">The forecast of the buses around the late bus appears here.</div>`;
+    ["impact"].forEach(() => $("impact").innerHTML = `<div><span class="ic">⚠</span>Max headway<b>&ndash;</b></div><div><span class="ic">⏱</span>Average EWT<b>&ndash;</b></div><div><span class="ic">⇆</span>Bunching risk<b>&ndash;</b></div>`); return; }
+  const na = r.no_action, nd = `D${r.next_dir}`;
+  $("h2t").textContent = `${nd} forecast (no intervention) \u2013 departures from ${r.interchange.name}`;
+  const items = na.seq.map(s => ({role:s.role, t:s.dep, clock:s.clock, label:s.late ? `Bus C (late)` : `Bus ${s.role}`, short:s.late ? "late" : null, note:s.in_service ? "in service" : s.late ? `+${f0(r.delay)} late` : "", noteCol:s.late ? "#c8102e" : "#5b6b7f"}));
+  const [t0, t1] = span([items]);
+  el.innerHTML = lane(items, {W:W(el), t0, t1, h:laneH(), id:"na", band:true, aria:`${nd} departures without intervention`}) +
+    `<p class="note">${na.seq.map(s => `<span class="bb ${s.role}" style="width:18px;height:18px;font-size:11px">${s.role}</span> ${esc(busName(s.role, s.num, s.in_service ? "in_service" : ""))}`).join(" &nbsp; ")}</p>`;
+  $("impact").innerHTML = `<div><span class="ic">⚠</span>Max headway<b class="num">${f0(na.max_hw)} min</b></div><div><span class="ic">⏱</span>Average EWT<b class="num">${f3(na.ewt)}</b></div>
+    <div><span class="ic">⇆</span>Bunching risk<b>${esc(na.risk)}</b></div><p class="note" style="margin:0;color:#7a3a44">EWT in minutes across ${nd}, before any action.</p>`;
+}
+
+function sorted(){ const c = (ST.res ? ST.res.candidates : []).slice(); return ST.sort === "stop" ? c.sort((a, b) => a.j - b.j) : c; }
+function renderOptions(){
+  const r = ST.res;
+  if(!r){ $("optT").innerHTML = `<tr><td colspan="9" class="note" style="padding:18px">Every stop of the next direction is tested once the late bus is picked.</td></tr>`; $("optC").innerHTML = ""; $("optNote").textContent = ""; $("viewPlan").hidden = true; return; }
+  const list = sorted(), best = r.best;
+  const fb = x => `${x.front ? `<span class="bb ${x.front.role || "x"}" style="width:18px;height:18px;font-size:10px">${x.front.role || "\u2022"}</span> ${esc(x.front.pass)}${x.front.adj ? ` <span class="pill hold">+${f0(x.front.adj)}</span>` : ""}` : "\u2013"} / ${x.rear ? `<span class="bb ${x.rear.role || "x"}" style="width:18px;height:18px;font-size:10px">${x.rear.role || "\u2022"}</span> ${esc(x.rear.pass)}${x.rear.adj ? ` <span class="pill" style="background:var(--okBg);color:var(--ok)">${sgn(x.rear.adj)}</span>` : ""}` : "\u2013"}`;
+  $("optT").innerHTML = list.map(x => `<tr data-c="${esc(x.code)}" class="${x.code === ST.sel ? "sel" : ""}" tabindex="0"><td><span class="radio"></span></td>
+    <td class="l"><b>Stop ${x.no}</b> ${x.code === best ? `<span class="pill ai">AI best</span>` : ""}<br><span style="color:var(--mut);font-size:11.5px">${esc(x.code)} ${esc(x.name)}</span></td>
+    <td class="num ewt ${x.code === best ? "best" : ""}">${f3(x.ewt)}</td><td class="num">${f0(x.max_hw)} min</td><td class="num"><b>${esc(x.entry_clock)}</b></td>
+    <td class="num">${fkm(x.os_km)} \u00b7 ${f0(x.os_min)} min</td><td class="num">${x.skip}</td><td class="num">${f0(x.avoided)} min</td><td class="l num">${fb(x)}</td></tr>`).join("") || `<tr><td colspan="9" class="note" style="padding:18px">No feasible halfway point \u2013 Bus ${r.late_bus} should run its full trip.</td></tr>`;
+  $("optC").innerHTML = list.slice(0, 20).map(x => `<button type="button" class="oc${x.code === ST.sel ? " sel" : ""}" data-c="${esc(x.code)}">
+    <div class="h">Stop ${x.no} ${x.code === best ? `<span class="pill ai">AI best</span>` : ""}<span class="e">EWT<b class="num">${f3(x.ewt)}</b></span></div>
+    <div class="d">${esc(x.code)} ${esc(x.name)}</div><div class="d">Skip <b>${x.skip}</b> stops (${f0(x.avoided)} min) \u00b7 OS <b>${fkm(x.os_km)}</b> / <b>${f0(x.os_min)} min</b> \u00b7 enter <b>${esc(x.entry_clock)}</b></div></button>`).join("");
+  document.querySelectorAll("#optT tr[data-c]").forEach(tr => { tr.onclick = () => select(tr.dataset.c); tr.onkeydown = e => { if(e.key === "Enter") select(tr.dataset.c); }; });
+  document.querySelectorAll("#optC .oc").forEach(b => b.onclick = () => select(b.dataset.c, true));
+  const inf = r.infeasible || {};
+  $("optNote").textContent = `${r.candidates.length} feasible of ${r.n_stops - 2} stops. ${inf.no_benefit ? `${inf.no_benefit} where the full trip arrives sooner. ` : ""}${inf.too_far ? `${inf.too_far} beyond 60 min off-service. ` : ""}Off-service: ${r.routing}. In service: ${r.stop_min} min per stop.`;
+  const sel = cand(ST.sel); $("viewPlan").hidden = !sel; if(sel){ $("viewPlan").textContent = `View plan for Stop ${sel.no}`; $("viewPlan").onclick = () => setTab("visual"); }
+}
+function renderOptionsSel(){
+  document.querySelectorAll("#optT tr[data-c], #optC .oc").forEach(e => e.classList.toggle("sel", e.dataset.c === ST.sel));
+  const sel = cand(ST.sel); if(sel){ $("viewPlan").textContent = `View plan for Stop ${sel.no}`; }
+}
+
+function renderPlan(){
+  const r = ST.res, x = r ? cand(ST.sel) : null, el = $("plan");
+  if(!x){ el.innerHTML = `<div class="empty">${r ? (r.candidates.length ? "Select a halfway option." : `No feasible halfway point: Bus ${r.late_bus} runs its full D${r.next_dir} trip.`) : "Select a halfway option."}</div>`; $("h5p").innerHTML = ""; $("h5t").textContent = "Selected recovery plan"; return; }
+  const nd = `D${r.next_dir}`, rt = ST.routes[x.code], osMin = rt && rt.ok ? rt.time_min : x.os_min;
+  $("h5t").textContent = `Recommended plan \u2013 Stop ${x.no}`.replace("Recommended", x.code === r.best ? "Recommended" : "Selected");
+  $("h5p").innerHTML = x.code === r.best ? `<span class="pill ai">Best EWT recovery</span>` : `<span class="pill sel">Option #${x.rank}</span>`;
+  el.innerHTML = `<div class="chain">
+      <div class="st"><div class="ic c1">🚌</div><b>Complete D${r.late_dir}</b><span class="note" style="margin:0">arrive interchange</span><span class="tm num">${esc(r.c_arr)}</span></div><div class="ar">\u2192</div>
+      <div class="st"><div class="ic c2">🕒</div><b>Break (${f0(r.break_min)} min)</b><span class="tm num" style="font-size:13px">${esc(r.c_arr)} \u2013 ${esc(x.ready)}</span></div><div class="ar">\u2192</div>
+      <div class="st"><div class="ic c3">🛣️</div><b>Off-service to Stop ${x.no}</b><span class="note" style="margin:0">${fkm(x.os_km)} \u00b7 ${f0(x.os_min)} min</span><span class="tm num" style="font-size:13px">${esc(x.ready)} \u2013 ${esc(x.entry_clock)}</span></div><div class="ar">\u2192</div>
+      <div class="st"><div class="ic c4">🚏</div><b>Enter ${nd} at Stop ${x.no}</b><span class="note" style="margin:0">${esc(x.code)}</span><span class="tm num">${esc(x.entry_clock)}</span></div>
+    </div>
+    <div class="kr"><h3>✔ Key result</h3><div class="g">
+      <div><span>In-service time avoided</span><b class="num">${f0(x.avoided)} min</b></div><div><span>OS travel time</span><b class="num">${f0(x.os_min)} min</b></div>
+      <div><span>Net recovery opportunity</span><b class="num ${x.net < 0 ? "neg" : ""}">${f0(x.net)} min</b></div></div></div>
+    <div class="why"><b>Why Stop ${x.no}?</b> ${esc(x.why)}</div>`;
+}
+
+function renderBA(){
+  const r = ST.res, x = r ? cand(ST.sel) : null, el = $("ba");
+  if(!x){ el.innerHTML = `<div class="empty">Before and after bus positions appear here.</div>`; return; }
+  const d = x.detail, nd = `D${r.next_dir}`;
+  $("h6t").textContent = `${nd} bus movement at Stop ${x.no} \u2013 before vs after`;
+  const lab = (s, after) => ({role:s.role, t:s.t, clock:s.clock, halfway:after && s.role === "C",
+    label:s.role === "C" ? (after ? "Bus C (halfway)" : "Bus C (late)") : `Bus ${s.role}`,
+    short:after && s.role === "C" ? "halfway" : null, note:after && s.role === "C" ? `enter Stop ${x.no}` : s.adj > 0 ? `+${f0(s.adj)} min` : s.adj < 0 ? `${sgn(s.adj)} min` : "", noteCol:s.adj < 0 ? "#0f9d58" : after && s.role === "C" ? "#d7263d" : "#e8590c"});
+  const bef = d.before.map(s => lab(s, false)), aft = d.after.map(s => lab(s, true));
+  const [t0, t1] = span([bef, aft]), w = W(el);
+  const na = r.no_action;
+  el.innerHTML = `<div class="lane before"><h3>Before (no intervention)</h3><span class="meta">Max HW <b>${f0(na.max_hw)} min</b> \u00b7 EWT <b>${f3(na.ewt)}</b> \u00b7 bunching <b>${esc(na.risk)}</b></span>${lane(bef, {W:w - 24, t0, t1, h:laneH(), id:"b", band:true, aria:"Before"})}</div>
+    <div class="lane after"><h3>After (halfway at Stop ${x.no})</h3><span class="meta">Max HW <b>${f0(x.max_hw)} min</b> \u00b7 EWT <b style="color:var(--ok)">${f3(x.ewt)}</b></span>${lane(aft, {W:w - 24, t0, t1, h:laneH(), id:"a", after:true, aria:"After"})}</div>
+    <p class="note" style="margin:0">Times when each bus passes Stop ${x.no} (${esc(x.code)} ${esc(x.name)}). Orange = departs later, green = departs earlier, red band = gap of 1.5\u00d7 the ${f0(r.H)}-min headway or more.</p>`;
+}
+
+function renderDown(){
+  const r = ST.res, x = r ? cand(ST.sel) : null, el = $("dn");
+  if(!x){ el.innerHTML = `<tbody><tr><td class="note" style="padding:18px">Pass times at the entry stop and further along.</td></tr></tbody>`; $("dnNote").textContent = ""; return; }
+  const d = x.detail, H = r.H;
+  $("h8t").textContent = `Downstream headway forecast (after halfway at Stop ${x.no})`;
+  const hv = h => h == null ? "" : `<span class="hwv ${h >= 1.5 * H || h < 0.5 * H ? "bad" : Math.abs(h - H) <= 0.3 * H ? "good" : ""}">hw ${f0(h)}</span>`;
+  el.innerHTML = `<thead><tr><th class="l">Bus</th><th>Interchange depart (D${r.next_dir})</th>${d.cols.map(c => `<th>Stop ${c.no}<br><span style="font-weight:500">${esc(c.code)}</span></th>`).join("")}<th>Max headway (from Stop ${x.no})</th></tr></thead>
+    <tbody>${d.rows.map(row => `<tr style="cursor:default"><td class="l"><span class="bb ${row.role}">${row.role}</span> ${esc(row.role === "C" ? `Bus C (${row.num}) halfway` : busName(row.role, row.num, (r.roles[row.role] || {}).kind))}</td>
+      <td class="num">${row.halfway ? "\u2014" : esc(row.dep || "")}${row.adj ? ` <span class="pill ${row.adj > 0 ? "hold" : ""}" style="${row.adj < 0 ? "background:var(--okBg);color:var(--ok)" : ""}">${sgn(row.adj)}</span>` : ""}</td>
+      ${row.pass.map((p, i) => `<td class="num ${row.halfway ? "cH" : ""}">${p ? `<b>${esc(p)}</b>` : "\u2013"}${hv(row.hw[i])}</td>`).join("")}<td class="num"><b>${f0(row.max_hw)} min</b></td></tr>`).join("")}</tbody>`;
+  $("dnNote").textContent = `hw = headway to the bus ahead at that stop (all buses on D${r.next_dir}, ${r.stop_min} min between stops). The EWT also counts the stops before Stop ${x.no}, which Bus C skips.`;
+}
+
+function renderChart(){
+  const r = ST.res, el = $("chart"), x = r ? cand(ST.sel) : null;
+  if(!r || !r.candidates.length){ el.innerHTML = `<div class="empty">EWT of no action vs the halfway options.</div>`; return; }
+  let pick = r.candidates.slice(0, 5);
+  if(x && !pick.includes(x)) pick = pick.slice(0, 4).concat([x]);
+  pick = pick.slice().sort((a, b) => a.j - b.j);
+  const bars = [{k:"na", lab:"No action", v:r.no_action.ewt}, ...pick.map(c => ({k:c.code, lab:`Stop ${c.no}${c.code === r.best ? " (AI best)" : ""}`, v:c.ewt}))];
+  const lo = Math.min(0, ...bars.map(b => b.v)), hi = Math.max(...bars.map(b => b.v)) - lo || 1;
+  el.innerHTML = `<div class="chart" role="img" aria-label="EWT comparison">${bars.map(b => `<button type="button" class="bar ${b.k === "na" ? "na" : ""} ${b.k === r.best ? "best" : ""} ${x && b.k === x.code ? "cur" : ""}" ${b.k !== "na" ? `data-c="${esc(b.k)}"` : "disabled"} title="${esc(b.lab)}: EWT ${f3(b.v)}"><b class="num">${f3(b.v)}</b><i style="height:${Math.max(3, (b.v - lo) / hi * 150)}px"></i></button>`).join("")}</div>
+    <div class="blabs">${bars.map(b => `<span>${esc(b.lab)}</span>`).join("")}</div>
+    ${x ? `<div class="imprv"><span>EWT improvement (Stop ${x.no})</span><b class="num">${sgn(-x.gain, 3)}</b></div>` : ""}<p class="note">EWT in minutes, averaged over ${r.points.length} stops along D${r.next_dir}; lower is better.</p>`;
+  el.querySelectorAll(".bar[data-c]").forEach(b => b.onclick = () => select(b.dataset.c));
+}
+
+function planText(){
+  const r = ST.res, x = cand(ST.sel); if(!x) return "";
+  return `Halfway plan \u2013 Service ${ST.svc}, Bus ${r.late_bus} +${f0(r.delay)} min on D${r.late_dir}\n` + x.actions.map(a => `${a.n}. ${actBus(a)}: ${a.text}${a.time ? ` (${a.time})` : ""}`).join("\n") + `\nForecast D${r.next_dir} EWT ${f3(r.no_action.ewt)} -> ${f3(x.ewt)}`;
+}
+const actBus = a => a.role ? roleLabel(a.role) : a.bus;
+function renderActs(){
+  const r = ST.res, x = r ? cand(ST.sel) : null, el = $("acts");
+  if(!x){ el.innerHTML = `<div class="empty">Numbered instructions for the selected plan.</div>`; return; }
+  const col = {A:"#1e6fd9", B:"#f08c00", C:"#d7263d", D:"#1f9d55", E:"#7c4dff"};
+  el.innerHTML = `<div class="acts">${x.actions.map(a => `<div class="act ${a.kind}"><span class="no" style="background:${col[a.role] || "#8a98a9"}">${a.n}</span><div><b>${esc(actBus(a))}</b>${esc(a.text)}${a.time ? ` <span class="tm num">${esc(a.time)}</span>` : ""}</div></div>`).join("")}</div>
+    <button type="button" class="copy" id="copyPlan">Copy plan for broadcast</button>`;
+  $("copyPlan").onclick = async () => { try{ await navigator.clipboard.writeText(planText()); $("copyPlan").textContent = "Copied"; setTimeout(() => $("copyPlan").textContent = "Copy plan for broadcast", 1800); }catch(e){ $("copyPlan").textContent = "Copy not available here"; } };
+}
+
+/* ---------------------------------------------------------------- map: real road off-service route */
+let map = null; const G = {};
+function initMap(){
+  if(map) return;
+  map = L.map("map", {zoomControl:true}).setView([1.3521, 103.8198], 12);
+  (window.SGBasemap ? SGBasemap.add(map, {minZoom:11, maxZoom:19, style:"voyager"}) : L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {maxZoom:19, attribution:"\u00a9 OpenStreetMap contributors"}).addTo(map));
+  ["base", "cands", "route"].forEach(k => G[k] = L.layerGroup().addTo(map));
+}
+function drawBase(){
+  if(!map || !ST.snap) return; G.base.clearLayers();
+  const ln = ST.snap.opp ? ST.snap.opp.line : ST.snap.line;
+  L.polyline(ln, {color:"#1565d8", weight:4, opacity:.25}).addTo(G.base);
+  const b = L.latLngBounds(ln); if(b.isValid()) map.fitBounds(b, {padding:[20, 20]});
+}
+async function loadRoute(code){
+  const r = ST.res, x = cand(code); if(!r || !x || ST.routes[code]) { drawSel(); return; }
+  ST.routes[code] = {loading:true}; drawSel();
+  const ic = r.interchange;
+  const rt = await api(`/api/hplan/route?${q({snap:r.snap, stop:x.code, mode:"late", bus:ST.bus, leave:x.ready, from_pt:`${ic.lat},${ic.lon}`, from_label:`${ic.name} (interchange)`, on:"next"})}`, 90000);
+  if(ST.res !== r) return;
+  ST.routes[code] = rt;
+  if(ST.sel === code){ drawSel(); renderPlan(); }
+}
+function drawSel(){
+  const r = ST.res, x = r ? cand(ST.sel) : null;
+  if(!map){ return; }
+  G.cands.clearLayers(); G.route.clearLayers();
+  $("rinfo").hidden = !x; $("steps").innerHTML = ""; $("routeNote").textContent = "";
+  if(!r) return;
+  (r.candidates || []).forEach(c => { if(c.code !== ST.sel) L.circleMarker([c.lat, c.lon], {radius:4, color:"#fff", weight:1, fillColor:c.code === r.best ? "#0f9d58" : "#8a98a9", fillOpacity:.9}).bindTooltip(`Stop ${c.no} ${c.code} \u00b7 EWT ${f3(c.ewt)}`).on("click", () => select(c.code)).addTo(G.cands); });
+  const ic = r.interchange;
+  L.marker([ic.lat, ic.lon], {icon:L.divIcon({className:"", html:`<div class="mk"><div class="p">🚌 ${esc(ic.name)}<br><span style="font-weight:600">Depart OS ${esc(x ? x.ready : r.c_ready)}</span></div></div>`, iconSize:[10, 10], iconAnchor:[-6, 40]})}).addTo(G.route);
+  L.circleMarker([ic.lat, ic.lon], {radius:7, color:"#0b2545", weight:3, fillColor:"#fff", fillOpacity:1}).addTo(G.route);
+  if(!x) return;
+  $("h7t").textContent = `Off-service route for Bus C (interchange \u2192 Stop ${x.no})`;
+  const rt = ST.routes[x.code];
+  L.marker([x.lat, x.lon], {icon:L.divIcon({className:"", html:`<div class="mk"><div class="p g">Stop ${x.no} \u00b7 ${esc(x.code)}<br>Arrive ${esc(x.entry_clock)}</div></div>`, iconSize:[10, 10], iconAnchor:[-8, 40]})}).addTo(G.route);
+  L.circleMarker([x.lat, x.lon], {radius:8, color:"#fff", weight:3, fillColor:"#d7263d", fillOpacity:1}).addTo(G.route);
+  const mins = rt && rt.ok ? rt.time_min : x.os_min, km = rt && rt.ok ? rt.km : x.os_km;
+  $("rinfo").innerHTML = `<span>OS distance</span><b class="num">${fkm(km)}</b><span>OS travel time</span><b class="num">${f0(mins)} min</b><span>OS departure</span><b class="num">${esc(x.ready)}</b><span>Estimated arrival</span><b class="num">${esc(x.entry_clock)}</b>`;
+  if(rt && rt.ok && rt.line){
+    L.polyline(rt.line, {color:"#0b2545", weight:9, opacity:.35}).addTo(G.route);
+    L.polyline(rt.line, {color:"#1565d8", weight:5, opacity:1}).bindTooltip(`Off-service real road route: ${fkm(rt.km)}, ${f0(rt.time_min)} min`, {sticky:true}).addTo(G.route);
+    if(rt.service_after) L.polyline(rt.service_after, {color:"#0f9d58", weight:4, opacity:.7, dashArray:"6 6"}).bindTooltip(`D${r.next_dir} in service after entry`).addTo(G.route);
+    const bb = L.latLngBounds(rt.line.concat([[x.lat, x.lon], [ic.lat, ic.lon]])); if(bb.isValid()) map.fitBounds(bb, {padding:[40, 40]});
+    $("steps").innerHTML = `<div><i>●</i><b>${esc(ic.name)}</b><span>depart ${esc(x.ready)}</span></div>` + (rt.steps || []).map(s => `<div><i>${esc(s.icon)}</i><span style="color:var(--ink);white-space:normal">${esc(s.text)}</span><span>${s.km ? fkm(s.km) : ""}</span></div>`).join("");
+    $("routeNote").textContent = `${rt.time_src || "Road routing"} \u00b7 route check: ${rt.status_label || "\u2013"}.` + (Math.abs(rt.time_min - x.os_min) >= 2 ? ` The plan used ${f0(x.os_min)} min from the routing table; this route gives ${f0(rt.time_min)} min.` : "");
+  } else {
+    $("routeNote").textContent = rt && rt.loading ? "Calculating the real road route\u2026" : rt && rt.error ? `Road route unavailable: ${rt.error}` : "";
+    const bb = L.latLngBounds([[x.lat, x.lon], [ic.lat, ic.lon]]); if(bb.isValid()) map.fitBounds(bb, {padding:[60, 60]});
+  }
+}
+
+/* ---------------------------------------------------------------- phone steps */
+function setTab(t){
+  document.body.classList.remove("tab-setup", "tab-options", "tab-visual", "tab-plan"); document.body.classList.add(`tab-${t}`);
+  document.querySelectorAll(".mtabs button").forEach(b => b.setAttribute("aria-selected", String(b.dataset.tab === t)));
+  window.scrollTo({top:0});
+  setTimeout(() => { if(map) map.invalidateSize(); if(t === "visual" || t === "setup") { renderNoAction(); renderBA(); } }, 60);
+}
+document.querySelectorAll(".mtabs button").forEach(b => b.onclick = () => setTab(b.dataset.tab));
+let rz = null; window.addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(() => { renderNoAction(); renderBA(); if(map) map.invalidateSize(); }, 150); });
+document.addEventListener("click", e => { const mm = $("mobileMore"); if(mm && mm.classList.contains("open") && !e.target.closest("#mobileMore") && !e.target.closest(".mbn")) mm.classList.remove("open"); });
+
+/* start: ?svc=156&dir=1&bus=3&late=20 */
+(function(){
+  const u = new URLSearchParams(location.search);
+  if(+u.get("dir") === 2) setDir(2);
+  if(u.get("late")){ ST.late = +u.get("late") || 20; $("late").value = ST.late; }
+  if(u.get("bus")) ST.bus = +u.get("bus");
+  if(u.get("svc")){ $("svc").value = u.get("svc").toUpperCase(); initMap(); loadSnap(); } else initMap();
+  renderAll();
+})();
+</script>
+
+<script>
+/* V13.14: hide / show the desktop navigation; the choice is remembered in this browser */
+(function(){
+  var h = document.documentElement, shell = document.querySelector(".desktop-shell"); if(!shell) return;
+  function set(off){ h.classList.toggle("shell-off", off); try{ localStorage.setItem("shell.off", off ? "1" : "0"); }catch(e){} setTimeout(function(){ window.dispatchEvent(new Event("resize")); }, 60); }
+  var hide = document.createElement("button"); hide.type = "button"; hide.className = "shell-hide"; hide.innerHTML = "&laquo;";
+  hide.title = "Hide menu"; hide.setAttribute("aria-label", "Hide navigation menu");
+  var show = document.createElement("button"); show.type = "button"; show.className = "shell-show"; show.innerHTML = "&#9776;";
+  show.title = "Show menu"; show.setAttribute("aria-label", "Show navigation menu");
+  hide.onclick = function(){ set(true); show.focus(); };
+  show.onclick = function(){ set(false); hide.focus(); };
+  (shell.querySelector(".shell-brand") || shell).appendChild(hide);
+  var top = document.querySelector("header.top"), brand = top && top.querySelector(".brand"), mbtn = top && top.querySelector(".mobile-menu-btn");
+  if(brand) brand.parentNode.insertBefore(show, brand);
+  else if(mbtn) mbtn.parentNode.insertBefore(show, mbtn.nextSibling);
+  else if(top) top.insertBefore(show, top.firstChild);
+  else { show.classList.add("floating"); document.body.appendChild(show); }
+})();
+</script>
+</body>
+</html>

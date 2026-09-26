@@ -1,4 +1,15 @@
-# SG Transport Pulse V14.4 — Route Traffic + Departure Adjustment + Bunching, Gap & Alerts + AI Halfway Optimiser
+# SG Transport Pulse V15.0 — Route Traffic + Departure Adjustment + Bunching, Gap & Alerts + AI Halfway Optimiser
+
+## V15.0 — Halfway Planner rebuilt (next-trip halfway + front/rear regulation, lowest downstream EWT)
+
+New page at **`/halfway`** (`halfway_planner.html`, engine `hwplan.py`, endpoint `GET /api/hplan/plan`). The previous planner (incl. Deploy OS Bus) is unchanged at `/halfway/os`.
+
+* **Inputs only:** service (with operator filter), late direction, late bus (live DataMall buses), lateness. Everything else is derived; break (7 min) and stop-to-stop time (2 min) can be edited in the setup card. The plan runs as soon as the late bus is picked.
+* **Movement (one bus):** Bus C completes its current trip → arrives at the interchange → break → leaves off-service by **real road** → enters the next direction at the halfway stop → continues to the final stop. Bus C is never terminated or replaced.
+* **Forecast:** in-service running at 2 min per stop; off-service from the interchange to **every** stop of the next direction by real road routing (one OSRM table request × 1.25 bus factor); interchange departures on regular slots at the target headway (a bus departs at max(ready, slot)), continuing after the buses already on the next direction.
+* **Every stop tested (no minimum-skip setting):** earliest entry = ready + real-road time; the buses immediately ahead and behind at that stop; front bus **hold 0–5 min** (only if it has not departed) and rear bus **advance 0–(its layover slack, max 5) min** chosen by EWT, never by a fixed rule; gaps before/after, max headway after entry, downstream EWT over monitoring stops along the whole next direction (so skipped stops count). Stops where the full trip would arrive sooner are excluded.
+* **Page:** 1 setup · 2 no-action forecast (departures, gap, bunching) · no-action impact · 3 options table (click any row – every section updates from that option) · 4 plan chain (complete → break → off-service → enter) with key result and a numbers-based "Why" · 5 before vs after at the entry stop (shared time axis, hold/advance marked) · 6 real road route map with route details · 7 downstream pass times and headways · 8 EWT comparison chart · 9 numbered controller action plan (copy for broadcast).
+* **Phone:** four steps – Setup, Options (cards + View plan), Visual, Plan (map + actions); no sideways scrolling.
 
 ## V14.4 — Recover Late Duty: complete the trip, recover the NEXT trip halfway
 
