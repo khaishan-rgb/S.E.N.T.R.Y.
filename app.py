@@ -3578,6 +3578,82 @@ async def api_hp_snapshot(service: str = "", direction: int = 1):
             "source": "LTA DataMall Bus Arrival (live) \u00b7 route running times from LTA speed bands" if g["traffic_ok"] else "LTA DataMall Bus Arrival (live) \u00b7 running times at the fallback speed (no speed bands)"}
 
 
+@app.get("/api/hplan/testsnap")
+async def api_hp_testsnap(service: str = "", direction: int = 1, time_: str = Query("", alias="time"), headway: str = "10", buses: str = "",
+                          offset: str = "", stop_min: str = "2"):
+    """V15.2 TEST MODE: a synthetic, evenly spaced fleet on the service's real route (both directions) for a time you choose - for testing
+    when no buses are running (e.g. after midnight). Same snapshot shape as the live one, so planning and road routing work unchanged."""
+    svc = service.strip().upper()
+    if not svc:
+        return {"ok": False, "error": "Enter a service number."}
+    try:
+        H = max(2.0, min(60.0, float(headway)))
+        nb = max(2, min(40, int(float(buses)))) if str(buses).strip() else 40          # empty = fill the whole route at this headway
+        sm = max(0.5, min(6.0, float(stop_min or 2)))
+        off = float(offset) if str(offset).strip() else H / 2.0
+    except ValueError:
+        return {"ok": False, "error": "Headway, number of buses and offset must be numbers."}
+    t0 = ho_parse_hhmm(time_) if str(time_).strip() else None
+    if t0 is None:
+        n_ = now_sgt()
+        t0 = n_.hour * 60 + n_.minute
+    g0 = await ho_route(svc, direction)
+    if g0.get("error"):
+        return {"ok": False, "error": g0["error"]}
+    st = await static()
+    dirs = [d_ for d_ in (1, 2) if route_stops(st, svc, d_)]
+
+    def fleet(g, phase):
+        stops, ss = g["stops"], g["prep"]["stop_s"]
+        n = len(stops)
+        run = sm * (n - 1)
+        out = []
+        for k in range(nb):
+            el = k * H + phase + 1.0                               # minutes since this bus left the first stop
+            if el >= run - 0.5:
+                break
+            p = el / sm
+            i = min(n - 2, int(p)); f = p - i
+            s_km = ss[i] + f * (ss[i + 1] - ss[i])
+            lat = stops[i]["lat"] + f * (stops[i + 1]["lat"] - stops[i]["lat"]); lon = stops[i]["lon"] + f * (stops[i + 1]["lon"] - stops[i]["lon"])
+            near = stops[i + 1] if f >= 0.5 else stops[i]
+            nxt = stops[i + 1]
+            out.append({"s": s_km, "lat": lat, "lon": lon, "km": round(s_km, 2), "near": {"code": near["code"], "name": near["name"]}, "near_name": near["name"],
+                        "next": {"code": nxt["code"], "name": nxt["name"], "eta_min": round((1 - f) * sm, 1), "clock": hplan.hhmm(t0 + (1 - f) * sm)},
+                        "offset": 0.0, "load": None, "type": None, "monitored": 0, "test": True})
+        out.sort(key=lambda b: b["s"])
+        for i, b in enumerate(out, 1):
+            b["id"] = i
+        return out, int(run // H) + 1
+
+    g = {**g0, "H": H, "H_src": "test input"}
+    P = {**halfway.PARAMS, **HO["params"]}
+    tb, fit = fleet(g, 0.0)
+    opp = None
+    od = next((d_ for d_ in dirs if d_ != direction), None)
+    if od is not None:
+        g2 = await ho_route(svc, od)
+        if not g2.get("error"):
+            g2 = {**g2, "H": H, "H_src": "test input"}
+            ob, _ = fleet(g2, off)
+            opp = {"g": g2, "buses": ob, "dir": od}
+    sid = hashlib.sha1(f"test|{svc}|{direction}|{time.time()}".encode()).hexdigest()[:12]
+    hp_prune()
+    HP_SNAP[sid] = {"created": time.time(), "svc": svc, "d": direction, "g": g, "buses": tb, "now_min": float(t0), "P": P, "opp": opp, "test": True}
+    stops, ss, line = g["stops"], g["prep"]["stop_s"], g["line"]
+    strip_b = lambda bs: [{k: v for k, v in b.items() if k not in ("s", "offset")} for b in bs]
+    return {"ok": True, "test": True, "snap": sid, "service": svc, "direction": direction, "directions": dirs, "now": hplan.hhmm(t0) + ":00", "now_min": float(t0),
+            "H": H, "H_src": "test input", "traffic_ok": g0.get("traffic_ok"),
+            "route": {"km": round(g["prep"]["km"], 2), "run_min": round(sm * (len(stops) - 1), 1), "first": stops[0]["name"], "last": stops[-1]["name"], "n_stops": len(stops)},
+            "stops": [{"j": i, "code": s_["code"], "name": s_["name"], "lat": s_["lat"], "lon": s_["lon"], "km": round(ss[i], 2)} for i, s_ in enumerate(stops)],
+            "line": ho_simplify(line, 500), "buses": strip_b(tb), "bus_error": None, "off_route": 0,
+            "opp": ({"direction": opp["dir"], "line": ho_simplify(opp["g"]["line"], 400), "buses": strip_b(opp["buses"]), "km": round(opp["g"]["prep"]["km"], 2),
+                     "first": opp["g"]["stops"][0]["name"], "last": opp["g"]["stops"][-1]["name"], "H": H} if opp else None),
+            "test_info": {"time": hplan.hhmm(t0), "headway": H, "buses": nb, "fit": fit, "placed": len(tb), "placed_opp": len(opp["buses"]) if opp else 0,
+                          "offset": off, "stop_min": sm},
+            "source": "TEST MODE \u00b7 synthetic evenly spaced buses on the real route (not live)"}
+
+
 async def hp_live_buses(svc, direction, g, P):
     """LIVE buses of one direction, projected on its route and calibrated to DataMall's own next-stop arrival."""
     bj = await api_buses(svc, direction)
@@ -3762,7 +3838,7 @@ import hwplan
 
 
 @app.get("/api/hplan/plan")
-async def api_hp_plan(snap: str = "", bus: str = "", delay: str = "20", brk: str = "", stop_min: str = ""):
+async def api_hp_plan(snap: str = "", bus: str = "", delay: str = "20", brk: str = "", stop_min: str = "", layover: str = ""):
     """Late bus completes its trip; its NEXT trip starts halfway. Every stop of the next direction is tested with real-road off-service
     time from the interchange; front bus hold / rear bus advance chosen per stop; ranked by downstream EWT. Live data unchanged."""
     S = HP_SNAP.get(snap)
@@ -3777,6 +3853,8 @@ async def api_hp_plan(snap: str = "", bus: str = "", delay: str = "20", brk: str
             Pp["break_min"] = max(0.0, min(30.0, float(brk)))
         if str(stop_min).strip():
             Pp["stop_min"] = max(0.5, min(6.0, float(stop_min)))
+        if str(layover).strip():
+            Pp["layover"] = max(0.0, min(40.0, float(layover)))
     except ValueError:
         return {"ok": False, "error": "Lateness, break and stop-to-stop time must be numbers."}
     g = S["g"]

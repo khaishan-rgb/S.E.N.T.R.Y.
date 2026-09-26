@@ -43,7 +43,10 @@ select.in{padding-right:26px;appearance:none;background-image:linear-gradient(45
 .seg button[aria-pressed="true"]{background:var(--ai);color:#fff}
 .seg button[disabled]{opacity:.35;cursor:not-allowed}
 .w-svc{width:96px}.w-op{width:130px}.w-bus{width:210px}.w-late{width:84px}
-.stat{font-size:12px;color:#b8c7da;align-self:center;max-width:260px}
+.stat{font-size:12px;color:#b8c7da;align-self:center;max-width:280px}
+.testbar{background:#fff1e6;border:1px solid #f6d3b8;color:#a8410a;border-radius:10px;padding:8px 12px;font-size:13px;font-weight:600}
+.testbar b{color:#7a2f06}
+body.test .hdr{background:linear-gradient(90deg,#0b2545 0%,#0b2545 70%,#3a2a12 100%)}
 .stat b{color:#fff}
 
 /* ---------- page grid ---------- */
@@ -171,6 +174,7 @@ tr.sel .radio{border-color:var(--ai);background:radial-gradient(circle,var(--ai)
 .act b{display:block}
 .act .tm{color:var(--ai);font-weight:700}
 .act.hold b,.act.slow b{color:var(--hold)}.act.advance b,.act.keep b{color:var(--ok)}.act.halfway b{color:var(--bC)}
+.vt{color:var(--mut)!important;min-width:0!important;padding:0 10px!important;font-size:12px;white-space:nowrap}.vt[aria-pressed="true"]{color:#fff!important}
 .split{font-weight:700}.split .ev{color:var(--ok)}.split .un{color:var(--hold)}
 .copy{margin-top:12px;width:100%;min-height:44px;border-radius:10px;border:0;background:var(--ok);color:#fff;font-weight:800;font-size:14.5px;cursor:pointer}
 
@@ -207,6 +211,8 @@ tr.sel .radio{border-color:var(--ai);background:radial-gradient(circle,var(--ai)
   body.tab-setup .page>.row>.s-setup,body.tab-options .page>.row>.s-options,body.tab-visual .page>.row>.s-visual,body.tab-plan .page>.row>.s-plan{display:block}
   .page{display:flex;flex-direction:column}
   .foot{order:99;margin-top:10px!important}
+  .testbar{order:0;margin-bottom:6px}
+  .hdr .tf{flex:1 1 22%}
   .o1{order:1}.o2{order:2}.o3{order:3}.o4{order:4}.o5{order:5}.o6{order:6}.o7{order:7}.o8{order:8}.o9{order:9}
   .kv{grid-template-columns:1fr}.kv div:nth-last-child(2){border-bottom:1px solid #eef1f5}
   .tw.dt{display:none}.cards{display:grid;gap:10px}
@@ -235,6 +241,11 @@ tr.sel .radio{border-color:var(--ai);background:radial-gradient(circle,var(--ai)
   <div class="f"><label for="svc">Service</label><input class="in w-svc num" id="svc" list="svcList" maxlength="6" placeholder="e.g. 156" autocapitalize="characters" autocomplete="off"><datalist id="svcList"></datalist></div>
   <div class="f f-date"><span class="lb">Date</span><div class="ro num" id="date">&nbsp;</div></div>
   <div class="f f-time"><span class="lb">Reference time</span><div class="ro num" id="clock">&nbsp;</div></div>
+  <div class="f"><span class="lb">Data</span><div class="seg" role="group" aria-label="Live or test data"><button type="button" id="mLive" aria-pressed="true">Live</button><button type="button" id="mTest" aria-pressed="false">Test</button></div></div>
+  <div class="f tf" hidden><label for="tTime">Test time</label><input class="in num" id="tTime" style="width:78px" maxlength="5" inputmode="numeric" data-time placeholder="14:25"></div>
+  <div class="f tf" hidden><label for="tHw">Headway, min</label><input class="in num" id="tHw" style="width:70px" value="10" inputmode="numeric" maxlength="2"></div>
+  <div class="f tf" hidden><label for="tN">Buses / dir</label><input class="in num" id="tN" style="width:70px" placeholder="auto" inputmode="numeric" maxlength="2" title="Empty = fill the whole route at this headway"></div>
+  <div class="f tf" hidden><span class="lb">&nbsp;</span><button type="button" class="in" id="tGo" style="background:#f08c00;border-color:#f08c00;font-weight:800;cursor:pointer">Build test fleet</button></div>
   <div class="f"><span class="lb">Late direction</span><div class="seg" role="group" aria-label="Direction of the late bus"><button type="button" id="d1" aria-pressed="true">D1</button><button type="button" id="d2" aria-pressed="false">D2</button></div></div>
   <div class="f f-bus"><label for="bus">Late bus</label><select class="in w-bus" id="bus" disabled><option value="">Pick a service first</option></select></div>
   <div class="f"><label for="late">Late, min</label><input class="in w-late num" id="late" value="20" inputmode="numeric" maxlength="3"></div>
@@ -249,6 +260,7 @@ tr.sel .radio{border-color:var(--ai);background:radial-gradient(circle,var(--ai)
 </nav>
 
 <main class="page" id="page">
+  <div class="testbar o0" id="testbar" hidden></div>
   <div class="row r1">
     <section class="card s-setup o1" aria-labelledby="h1"><h2 id="h1"><span class="n">1</span> Incident &amp; recovery setup</h2><div id="setup"><div class="empty">Pick a service and direction, then the late bus.</div></div></section>
     <section class="card c2 s-setup o2" aria-labelledby="h2"><h2 id="h2"><span class="n">2</span> <span id="h2t">Next-direction forecast (no intervention)</span></h2><div class="tl" id="noact"><div class="empty">The forecast of the buses around the late bus appears here.</div></div></section>
@@ -264,7 +276,7 @@ tr.sel .radio{border-color:var(--ai);background:radial-gradient(circle,var(--ai)
     <section class="card s-visual o5" aria-labelledby="h5"><h2 id="h5"><span class="n">4</span> <span id="h5t">Selected recovery plan</span><span class="sp" id="h5p"></span></h2><div id="plan"><div class="empty">Select a halfway option.</div></div></section>
   </div>
   <div class="row r3">
-    <section class="card ba s-visual o6" aria-labelledby="h6"><h2 id="h6"><span class="n">5</span> <span id="h6t">Bus movement &ndash; before vs after</span></h2><div class="tl" id="ba"><div class="empty">Before and after bus positions appear here.</div></div></section>
+    <section class="card ba s-visual o6" aria-labelledby="h6"><h2 id="h6"><span class="n">5</span> <span id="h6t">Bus movement &ndash; before vs after</span><span class="sp opt-tools"><span class="seg" style="height:30px;background:#eef1f5;border-color:var(--line)" role="group" aria-label="Where"><button type="button" class="vt" id="vIc" aria-pressed="true">Interchange</button><button type="button" class="vt" id="vSt" aria-pressed="false">Halfway stop</button></span></span></h2><div class="tl" id="ba"><div class="empty">Before and after bus positions appear here.</div></div></section>
     <section class="card s-plan o7" aria-labelledby="h7"><h2 id="h7"><span class="n">6</span> <span id="h7t">Off-service route</span></h2>
       <div class="mapbox"><div id="map" role="application" aria-label="Off-service route map"></div><div class="rinfo" id="rinfo" hidden></div></div>
       <div class="steps" id="steps"></div><p class="note" id="routeNote"></p></section>
@@ -274,7 +286,7 @@ tr.sel .radio{border-color:var(--ai);background:radial-gradient(circle,var(--ai)
     <section class="card s-visual o9" aria-labelledby="h9"><h2 id="h9"><span class="n">8</span> EWT comparison</h2><div id="chart"><div class="empty">EWT of no action vs the halfway options.</div></div></section>
     <section class="card s-plan o9" aria-labelledby="h10"><h2 id="h10"><span class="n">9</span> Controller action plan</h2><div id="acts"><div class="empty">Numbered instructions for the selected plan.</div></div></section>
   </div>
-  <p class="note foot" style="margin:0 2px">Live: LTA DataMall bus positions (unchanged). Simulated: the lateness you enter. Forecast: 2 min between stops in service; off-service by real road routing; interchange departures on the target headway. Deploying an OS bus is in the <a href="/halfway/os">previous planner</a>. SG Transport Pulse V15.1</p>
+  <p class="note foot" style="margin:0 2px">Live: LTA DataMall bus positions (unchanged). Simulated: the lateness you enter. Forecast: 2 min between stops in service; off-service by real road routing; interchange departures on the target headway. Deploying an OS bus is in the <a href="/halfway/os">previous planner</a>. SG Transport Pulse V15.2</p>
 </main>
 <nav class="mobile-bottom-nav" aria-label="Mobile primary navigation"><a class="mbn" href="/"><span class="mi">▰</span>Route</a><a class="mbn" href="/control"><span class="mi">↔</span>Headway</a><a class="mbn active" href="/halfway"><span class="mi">½</span>Halfway</a><button class="mbn" type="button" style="border:0;background:transparent;font-family:inherit" onclick="document.getElementById('mobileMore').classList.toggle('open')"><span class="mi">•••</span>More</button></nav><div class="mobile-more" id="mobileMore"><a href="/bunching">≋ Bunching</a><a href="/traffic">⚠ Traffic-Aware Regulation</a><a href="/halfway/timetable">▤ Timetable Optimiser</a><a href="/planner">◉ Off-service Route Planner</a><a href="/running-time">⏱ Running Time</a><a href="/cameras">📷 Traffic Cameras</a></div>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -300,20 +312,20 @@ async function api(u, ms){
   catch(e){ return {ok:false, error:e.name === "AbortError" ? "The request timed out." : "Network error \u2013 check the connection."}; }
   finally{ clearTimeout(t); }
 }
-const ST = {svc:"", dir:1, op:"", snap:null, bus:null, late:20, brk:7, sm:2, res:null, sel:null, routes:{}, sort:"rec", seq:0};
+const ST = {svc:"", dir:1, op:"", snap:null, bus:null, late:20, brk:7, sm:2, lay:10, res:null, sel:null, routes:{}, sort:"rec", seq:0};
 const roleOf = n => { if(!ST.res) return null; const e = Object.entries(ST.res.roles).find(([, v]) => v.num === n); return e ? e[0] : null; };
 const busName = (role, num, kind) => role ? `Bus ${role}` + (num != null ? ` (${kind === "in_service" ? `D${ST.res.next_dir} ${num}, in service` : num})` : "") : `Bus ${num}`;
 const roleLabel = r => { const x = ST.res && ST.res.roles[r]; return x ? busName(r, x.num, x.kind) : `Bus ${r}`; };
 const cand = code => ST.res ? (ST.res.candidates || []).find(c => c.code === code) : null;
 
 /* ---------------------------------------------------------------- header inputs */
-function tick(){ const d = new Date(); $("clock").textContent = d.toLocaleTimeString("en-SG", {hour:"2-digit", minute:"2-digit", hour12:false}); $("date").textContent = d.toLocaleDateString("en-SG", {day:"2-digit", month:"short", year:"numeric", weekday:"short"}); }
-tick(); setInterval(tick, 20000);
+function tick(){ const d = new Date(); if(ST && ST.test && ST.snap){ $("clock").textContent = `${ST.snap.now.slice(0, 5)} (test)`; return; } $("clock").textContent = d.toLocaleTimeString("en-SG", {hour:"2-digit", minute:"2-digit", hour12:false}); $("date").textContent = d.toLocaleDateString("en-SG", {day:"2-digit", month:"short", year:"numeric", weekday:"short"}); }
+setTimeout(tick, 0); setInterval(tick, 20000);
 let SVCS = [];
 (async () => { const j = await api("/api/traffic/services", 30000); SVCS = j.services || []; fillSvc(); })();
 function fillSvc(){ $("svcList").innerHTML = SVCS.filter(s => !ST.op || (s.operators || []).includes(ST.op)).slice(0, 800).map(s => `<option value="${esc(s.svc)}">`).join(""); }
 $("op").onchange = () => { ST.op = $("op").value; fillSvc(); };
-$("svc").addEventListener("change", () => loadSnap());
+$("svc").addEventListener("change", () => { if(!ST.test) loadSnap(); else ST.svc = $("svc").value.trim().toUpperCase(); });
 $("svc").addEventListener("keydown", e => { if(e.key === "Enter"){ e.preventDefault(); loadSnap(); } });
 const setDir = d => { ST.dir = d; $("d1").setAttribute("aria-pressed", String(d === 1)); $("d2").setAttribute("aria-pressed", String(d === 2)); };
 $("d1").onclick = () => { if(ST.dir !== 1){ setDir(1); if(ST.svc) loadSnap(); } };
@@ -323,11 +335,31 @@ $("late").addEventListener("change", () => { ST.late = Math.max(0, Math.min(120,
 $("sort").onchange = () => { ST.sort = $("sort").value; renderOptions(); };
 const stat = (h, err) => { $("stat").innerHTML = h ? (err ? `<span style="color:#ffb3b8">${esc(h)}</span>` : h) : ""; };
 
+ST.test = false;
+function setMode(test){
+  ST.test = test; document.body.classList.toggle("test", test);
+  $("mLive").setAttribute("aria-pressed", String(!test)); $("mTest").setAttribute("aria-pressed", String(test));
+  document.querySelectorAll(".tf").forEach(e => e.hidden = !test);
+  if(test && !$("tTime").value){ const d = new Date(); $("tTime").value = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`; }
+  ST.snap = null; ST.res = null; ST.bus = null; renderAll(); $("bus").innerHTML = `<option value="">${test ? "Build the test fleet first" : "Pick a service first"}</option>`; $("bus").disabled = true;
+  $("testbar").hidden = true;
+  if(!test && ST.svc) loadSnap();
+}
+$("mLive").onclick = () => { if(ST.test) setMode(false); };
+$("mTest").onclick = () => { if(!ST.test) setMode(true); };
+$("tGo").onclick = () => loadSnap();
+["tHw", "tN"].forEach(id => $(id).addEventListener("keydown", e => { if(e.key === "Enter"){ e.preventDefault(); loadSnap(); } }));
 async function loadSnap(){
   const svc = $("svc").value.trim().toUpperCase(); if(!svc) return;
   ST.svc = svc; ST.res = null; ST.sel = null; ST.routes = {}; renderAll();
   stat("Loading live buses\u2026");
-  const sn = await api(`/api/hplan/snapshot?${q({service:svc, direction:ST.dir})}`, 60000);
+  if(ST.test){
+    const tm = $("tTime").value.trim();
+    if(tm && !/^\d{1,2}:\d{2}$/.test(tm)){ stat("Test time must look like 00:30.", true); return; }
+    stat("Building the test fleet on the real route\u2026");
+  } else stat("Loading live buses\u2026");
+  const sn = ST.test ? await api(`/api/hplan/testsnap?${q({service:svc, direction:ST.dir, time:$("tTime").value.trim(), headway:$("tHw").value.trim(), buses:$("tN").value.trim(), stop_min:ST.sm})}`, 60000)
+                     : await api(`/api/hplan/snapshot?${q({service:svc, direction:ST.dir})}`, 60000);
   if(!sn.ok){ stat(sn.error || "Could not load the live buses.", true); $("bus").innerHTML = `<option value="">No live buses</option>`; $("bus").disabled = true; return; }
   if(sn.directions && sn.directions.length && !sn.directions.includes(ST.dir)){ setDir(sn.directions[0]); return loadSnap(); }
   ST.snap = sn;
@@ -336,7 +368,11 @@ async function loadSnap(){
   $("bus").innerHTML = `<option value="">Select the late bus (${list.length} live)</option>` + list.map(b => `<option value="${b.id}">Bus ${b.id} \u00b7 near ${esc(b.near ? b.near.name : "?")} \u00b7 ${f1(b.km)} km</option>`).join("");
   $("bus").disabled = !list.length;
   if(ST.bus != null && list.some(b => b.id === ST.bus)) $("bus").value = ST.bus; else ST.bus = null;
-  stat(`<b>${esc(svc)} D${ST.dir}</b> \u00b7 ${list.length} live buses${sn.opp ? ` \u00b7 D${sn.opp.direction}: ${sn.opp.buses.length}` : " \u00b7 loop service"} \u00b7 ${esc(sn.now)}`);
+  const ti = sn.test_info;
+  stat(`<b>${esc(svc)} D${ST.dir}</b> \u00b7 ${list.length} ${sn.test ? "test" : "live"} buses${sn.opp ? ` \u00b7 D${sn.opp.direction}: ${sn.opp.buses.length}` : " \u00b7 loop service"} \u00b7 ${esc(sn.now)}`);
+  $("testbar").hidden = !sn.test; tick();
+  if(sn.test) $("testbar").innerHTML = `TEST MODE \u2013 synthetic buses, not live. Time <b>${esc(ti.time)}</b>, headway <b>${f0(ti.headway)} min</b>, <b>${ti.placed}</b> buses on D${ST.dir} and <b>${ti.placed_opp}</b> on the other direction (the route fits ${ti.fit} at this headway; ${f0(ti.stop_min)} min between stops). Off-service times still use real road routing.`;
+  if(!sn.test && !list.length) stat(`No live buses on ${esc(svc)} D${ST.dir} right now (e.g. after service hours) \u2013 switch to <b>Test</b> to plan with a fleet you enter.`, false);
   history.replaceState(null, "", `?${q({svc, dir:ST.dir, bus:ST.bus || "", late:ST.late})}`);
   initMap(); drawBase();
   if(ST.bus != null) runPlan();
@@ -346,7 +382,7 @@ function schedule(){ clearTimeout(tmr); tmr = setTimeout(runPlan, 250); }
 async function runPlan(){
   if(!ST.snap || ST.bus == null) return;
   const my = ++ST.seq; stat(`Planning recovery for Bus ${ST.bus}\u2026`);
-  let r = await api(`/api/hplan/plan?${q({snap:ST.snap.snap, bus:ST.bus, delay:ST.late, brk:ST.brk, stop_min:ST.sm})}`, 90000);
+  let r = await api(`/api/hplan/plan?${q({snap:ST.snap.snap, bus:ST.bus, delay:ST.late, brk:ST.brk, stop_min:ST.sm, layover:ST.lay})}`, 90000);
   if(r.expired){ await loadSnap(); return; }
   if(my !== ST.seq) return;
   if(!r.ok){ stat(r.error || "Planning failed.", true); ST.res = null; renderAll(); return; }
@@ -370,11 +406,13 @@ function renderSetup(){
   const ld = `D${r.late_dir}`, nd = `D${r.next_dir}`;
   el.innerHTML = `<div class="kv">
     <div><span>Late bus</span><b><span class="bb C">C</span> Bus ${r.late_bus}</b></div><div><span>Target headway</span><b class="num">${f0(r.H)} min</b></div>
-    <div><span>Current ${ld} lateness</span><b class="late num">+${f0(r.delay)} min</b></div><div><span>Required break</span><b><input id="brk" class="num" value="${f0(r.break_min)}" inputmode="numeric" aria-label="Break minutes"> min</b></div>
+    <div><span>Current ${ld} lateness</span><b class="late num">+${f0(r.delay)} min</b></div><div><span>Minimum break</span><b><input id="brk" class="num" value="${f0(r.break_min)}" inputmode="numeric" aria-label="Minimum break minutes"> min</b></div>
+    <div><span>Scheduled layover</span><b><input id="lay" class="num" value="${f0(r.layover)}" inputmode="numeric" aria-label="Scheduled layover minutes"> min</b></div>
     <div><span>Forecast ${ld} arrival</span><b class="num">${esc(r.c_arr)}</b></div><div><span>Stop-to-stop time</span><b><input id="sm" class="num" value="${r.stop_min}" inputmode="decimal" aria-label="Minutes between stops"> min</b></div>
     <div><span>Next direction</span><b>${nd} <small style="color:var(--mut);font-weight:500">(halfway insertion)</small></b></div><div><span>Objective</span><b>Lowest downstream EWT</b></div>
-  </div><p class="note">Bus ${r.late_bus} completes ${ld} at ${esc(r.interchange.name)}, is ready ${esc(r.c_ready)} after the break; without action it would start ${nd} at ${esc(r.c_full_dep)}.</p>`;
+  </div><p class="note">Bus ${r.late_bus} completes ${ld} at ${esc(r.interchange.name)}, is ready ${esc(r.c_ready)} after the break; without action it would start ${nd} at ${esc(r.c_full_dep)}. Each bus is planned to depart after the scheduled layover; an on-time bus can leave up to ${f0(r.layover - r.break_min)} min earlier (down to the minimum break), a late bus cannot.</p>`;
   $("brk").onchange = e => { ST.brk = Math.max(0, Math.min(30, +e.target.value || 0)); schedule(); };
+  $("lay").onchange = e => { ST.lay = Math.max(0, Math.min(40, +e.target.value || 10)); schedule(); };
   $("sm").onchange = e => { ST.sm = Math.max(0.5, Math.min(6, +e.target.value || 2)); schedule(); };
 }
 
@@ -442,14 +480,14 @@ function renderOptions(){
   const r = ST.res;
   if(!r){ $("optT").innerHTML = `<tr><td colspan="10" class="note" style="padding:18px">Every stop of the next direction is tested once the late bus is picked.</td></tr>`; $("optC").innerHTML = ""; $("optNote").textContent = ""; $("viewPlan").hidden = true; return; }
   const list = sorted(), best = r.best;
-  const fb = x => `${x.front ? `<span class="bb ${x.front.role || "x"}" style="width:18px;height:18px;font-size:10px">${x.front.role || "\u2022"}</span> ${esc(x.front.pass)}${x.front.adj ? ` <span class="pill hold">+${f0(x.front.adj)}</span>` : ""}` : "\u2013"} / ${x.rear ? `<span class="bb ${x.rear.role || "x"}" style="width:18px;height:18px;font-size:10px">${x.rear.role || "\u2022"}</span> ${esc(x.rear.pass)}` : "\u2013"}${(x.slows || []).length ? ` <span class="pill hold">\u{1F422} ${x.slows.map(s_ => `${s_.role || ""} +${f0(s_.x)}`).join(" ")}</span>` : ""}`;
+  const fb = x => `${x.front ? `<span class="bb ${x.front.role || "x"}" style="width:18px;height:18px;font-size:10px">${x.front.role || "\u2022"}</span> ${esc(x.front.pass)}${x.front.adj ? ` <span class="pill hold">+${f0(x.front.adj)}</span>` : ""}` : "\u2013"} / ${x.rear ? `<span class="bb ${x.rear.role || "x"}" style="width:18px;height:18px;font-size:10px">${x.rear.role || "\u2022"}</span> ${esc(x.rear.pass)}` : "\u2013"}`;
   $("optT").innerHTML = list.map(x => `<tr data-c="${esc(x.code)}" class="${x.code === ST.sel ? "sel" : ""}" tabindex="0"><td><span class="radio"></span></td>
     <td class="l"><b>Stop ${x.no}</b>${tags(x)}<br><span style="color:var(--mut);font-size:11.5px">${esc(x.code)} ${esc(x.name)}</span></td>
     <td class="num">${splitTxt(x)}</td><td class="num ewt ${x.code === best ? "best" : ""}">${f3(x.ewt)}</td><td class="num"><b>${esc(x.entry_clock)}</b>${x.wait >= 0.5 ? `<br><span style="font-size:11px;color:var(--mut)">leave ${esc(x.leave)}</span>` : ""}</td>
     <td class="num">${fkm(x.os_km)} \u00b7 ${f0(x.os_min)} min</td><td class="num">${x.skip}</td><td class="num">${f0(x.avoided)} min</td><td class="num">${f0(x.max_hw)} min</td><td class="l num">${fb(x)}</td></tr>`).join("") || `<tr><td colspan="10" class="note" style="padding:18px">No feasible halfway point \u2013 Bus ${r.late_bus} should run its full trip.</td></tr>`;
   $("optC").innerHTML = list.slice(0, 20).map(x => `<button type="button" class="oc${x.code === ST.sel ? " sel" : ""}" data-c="${esc(x.code)}">
     <div class="h">Stop ${x.no}${tags(x)}<span class="e">EWT<b class="num">${f3(x.ewt)}</b></span></div>
-    <div class="d">${esc(x.code)} ${esc(x.name)}</div><div class="d">Gap ${splitTxt(x)} min${(x.slows || []).length ? ` \u00b7 \u{1F422} ${x.slows.map(s_ => `Bus ${s_.role || s_.num} +${f0(s_.x)}`).join(", ")}` : ""}</div><div class="d">Skip <b>${x.skip}</b> stops (${f0(x.avoided)} min) \u00b7 OS <b>${fkm(x.os_km)}</b> / <b>${f0(x.os_min)} min</b> \u00b7 enter <b>${esc(x.entry_clock)}</b></div></button>`).join("");
+    <div class="d">${esc(x.code)} ${esc(x.name)}</div><div class="d">Gap ${splitTxt(x)} min</div><div class="d">Skip <b>${x.skip}</b> stops (${f0(x.avoided)} min) \u00b7 OS <b>${fkm(x.os_km)}</b> / <b>${f0(x.os_min)} min</b> \u00b7 enter <b>${esc(x.entry_clock)}</b></div></button>`).join("");
   document.querySelectorAll("#optT tr[data-c]").forEach(tr => { tr.onclick = () => select(tr.dataset.c); tr.onkeydown = e => { if(e.key === "Enter") select(tr.dataset.c); }; });
   document.querySelectorAll("#optC .oc").forEach(b => b.onclick = () => select(b.dataset.c, true));
   const inf = r.infeasible || {};
@@ -476,27 +514,47 @@ function renderPlan(){
     <div class="kr" style="background:${x.gap.even ? "var(--okBg)" : "var(--holdBg)"};border-color:${x.gap.even ? "#cdebd9" : "#f6d3b8"}"><h3 style="color:${x.gap.even ? "#0b6b3c" : "#a8410a"}">${x.gap.even ? "✔" : "!"} Prolonged headway ${f0(x.gap.minutes)} min (${esc(x.gap.front)} \u2192 ${esc(x.gap.rear)}) \u2192 Bus C lands at ${f0(x.gap.split[0])} / ${f0(x.gap.split[1])} min</h3><div class="g">
       <div><span>In-service time avoided</span><b class="num">${f0(x.avoided)} min</b></div><div><span>OS travel time</span><b class="num">${f0(x.os_min)} min</b></div>
       <div><span>Net recovery opportunity</span><b class="num ${x.net < 0 ? "neg" : ""}">${f0(x.net)} min</b></div></div></div>
+    ${(r.dep_adj || []).length ? `<div class="why" style="background:#fff8f1"><b>Interchange regulation</b> ${(r.dep_adj || []).map(a => `<span style="white-space:nowrap"><span class="bb ${a.role}" style="width:18px;height:18px;font-size:10px">${a.role}</span> ${a.adj > 0 ? `<b style="color:var(--hold)">+${f0(a.adj)} later</b>` : a.adj < 0 ? `<b style="color:var(--ok)">${sgn(a.adj)} earlier</b>` : `<span style="color:var(--mut)">${esc(a.reason || "no change")}</span>`}</span>`).join(" &nbsp; ")}</div>` : ""}
     <div class="why"><b>Why Stop ${x.no}?</b> ${esc(x.why)}</div>`;
 }
 
+ST.baView = "ic";
+$("vIc").onclick = () => { ST.baView = "ic"; $("vIc").setAttribute("aria-pressed", "true"); $("vSt").setAttribute("aria-pressed", "false"); renderBA(); };
+$("vSt").onclick = () => { ST.baView = "st"; $("vSt").setAttribute("aria-pressed", "true"); $("vIc").setAttribute("aria-pressed", "false"); renderBA(); };
 function renderBA(){
   const r = ST.res, x = r ? cand(ST.sel) : null, el = $("ba");
   if(!x){ el.innerHTML = `<div class="empty">Before and after bus positions appear here.</div>`; return; }
+  if(ST.baView === "ic" && x.detail.ic_before) return renderBAic(r, x, el);
   const d = x.detail, nd = `D${r.next_dir}`;
   $("h6t").textContent = `${nd} bus movement at Stop ${x.no} \u2013 before vs after`;
   const lab = (s, after) => ({role:s.role, t:s.t, clock:s.clock, halfway:after && s.role === "C",
     label:s.role === "C" ? (after ? "Bus C (halfway)" : "Bus C (late)") : `Bus ${s.role}`,
-    short:after && s.role === "C" ? "halfway" : after && s.slow ? `slow +${f0(s.adj)}` : s.adj > 0 ? `hold +${f0(s.adj)}` : null,
-    note:after && s.role === "C" ? `enter Stop ${x.no}` : after && s.slow ? `\u{1F422} slow +${f0(s.adj)}` : s.adj > 0 ? `hold +${f0(s.adj)}` : s.adj < 0 ? `${sgn(s.adj)} min` : "",
+    short:after && s.role === "C" ? "halfway" : s.adj > 0 ? `+${f0(s.adj)}` : s.adj < 0 ? `${sgn(s.adj)}` : null,
+    note:after && s.role === "C" ? `enter Stop ${x.no}` : s.adj > 0 ? `dep. later +${f0(s.adj)}` : s.adj < 0 ? `dep. earlier ${sgn(s.adj)}` : "",
     noteCol:s.adj < 0 ? "#0f9d58" : after && s.role === "C" ? "#d7263d" : "#e8590c"});
   const bef = d.before.map(s => lab(s, false)), aft = d.after.map(s => lab(s, true));
   const [t0, t1] = span([bef, aft]), w = W(el);
   const na = r.no_action;
   el.innerHTML = `<div class="lane before"><h3>Before (no intervention)</h3><span class="meta">Max HW <b>${f0(na.max_hw)} min</b> \u00b7 EWT <b>${f3(na.ewt)}</b> \u00b7 bunching <b>${esc(na.risk)}</b></span>${lane(bef, {W:w - 24, t0, t1, h:laneH(), id:"b", band:true, aria:"Before"})}</div>
     <div class="lane after"><h3>After (halfway at Stop ${x.no})</h3><span class="meta">Max HW <b>${f0(x.max_hw)} min</b> \u00b7 EWT <b style="color:var(--ok)">${f3(x.ewt)}</b></span>${lane(aft, {W:w - 24, t0, t1, h:laneH(), id:"a", after:true, aria:"After"})}</div>
-    <p class="note" style="margin:0">Times when each bus passes Stop ${x.no} (${esc(x.code)} ${esc(x.name)}). Orange = hold at the interchange or \u{1F422} slow down on the way, red band = gap of 1.5\u00d7 the ${f0(r.H)}-min headway or more.</p>`;
+    <p class="note" style="margin:0">Times when each bus passes Stop ${x.no} (${esc(x.code)} ${esc(x.name)}). Orange = departs the interchange later, green = departs earlier, red band = gap of 1.5\u00d7 the ${f0(r.H)}-min headway or more.</p>`;
 }
 
+function renderBAic(r, x, el){
+  const d = x.detail, nd = `D${r.next_dir}`;
+  $("h6t").textContent = `${nd} departures from ${r.interchange.name} \u2013 before vs after`;
+  const mk = (s, after) => ({role:s.role, t:s.t, clock:s.clock, label:s.late ? "Bus C (late)" : `Bus ${s.role}`,
+    short:s.adj > 0 ? `+${f0(s.adj)}` : s.adj < 0 ? `${sgn(s.adj)}` : s.late ? "late" : null,
+    note:s.in_service ? "in service" : s.late ? `+${f0(r.delay)} late` : s.adj > 0 ? `later +${f0(s.adj)}` : s.adj < 0 ? `earlier ${sgn(s.adj)}` : "",
+    noteCol:s.late ? "#c8102e" : s.adj < 0 ? "#0f9d58" : "#e8590c"});
+  const bef = d.ic_before.map(s => mk(s, false)), aft = d.ic_after.map(s => mk(s, true));
+  const [t0, t1] = span([bef, aft]), w = W(el);
+  const hwb = r.ic_hw_before || [], hwa = r.ic_hw_after || [];
+  const fx = (r.dep_adj || []).filter(a => !a.adj && a.reason && a.reason !== "no change needed");
+  el.innerHTML = `<div class="lane before"><h3>Before \u2013 departures</h3><span class="meta">largest departure headway <b>${f0(Math.max(0, ...hwb))} min</b></span>${lane(bef, {W:w - 24, t0, t1, h:laneH(), id:"ib", band:true, aria:"Interchange departures before"})}</div>
+    <div class="lane after"><h3>After \u2013 Bus C leaves off-service, the others re-spaced</h3><span class="meta">largest departure headway <b>${f0(Math.max(0, ...hwa))} min</b></span>${lane(aft, {W:w - 24, t0, t1, h:laneH(), id:"ia", after:true, aria:"Interchange departures after"})}</div>
+    <p class="note" style="margin:0">Bus C does not depart from the interchange \u2013 it runs off-service to Stop ${x.no}. The buses ahead depart later (orange) and the buses behind earlier (green) to close its empty slot, as far as their layover allows.${fx.length ? " Not adjusted: " + fx.map(a => `${esc(roleLabel(a.role))} (${esc(a.reason)})`).join(", ") + "." : ""}</p>`;
+}
 function renderDown(){
   const r = ST.res, x = r ? cand(ST.sel) : null, el = $("dn");
   if(!x){ el.innerHTML = `<tbody><tr><td class="note" style="padding:18px">Pass times at the entry stop and further along.</td></tr></tbody>`; $("dnNote").textContent = ""; return; }
@@ -633,6 +691,39 @@ document.addEventListener("click", e => { const mm = $("mobileMore"); if(mm && m
   else if(mbtn) mbtn.parentNode.insertBefore(show, mbtn.nextSibling);
   else if(top) top.insertBefore(show, top.firstChild);
   else { show.classList.add("floating"); document.body.appendChild(show); }
+})();
+</script>
+<script>
+/* V13.14: HH:MM fields. Phones show a number keypad with no ":" key, so the colon is added automatically:
+   type 0810 (or 810) and the field shows 08:10. A typed ":" still works on a keyboard. */
+(function(){
+  function fmt(v){
+    var d = String(v).replace(/\D/g, "");
+    if(!d) return "";
+    if(+d[0] > 2 || (/:/.test(v) && v.indexOf(":") === 1)) d = "0" + d;       // 8 -> 08, "8:1" -> 08:1
+    d = d.slice(0, 4);
+    return d.length > 2 ? d.slice(0, 2) + ":" + d.slice(2) : d;
+  }
+  function done(v){                                                             // on leaving the field: 8 -> 08:00, 810 -> 08:10
+    var d = String(v).replace(/\D/g, ""); if(!d) return "";
+    if(d.length <= 2) d = ("0" + d).slice(-2) + "00"; else if(d.length === 3) d = "0" + d;
+    return d.slice(0, 2) + ":" + d.slice(2, 4);
+  }
+  function valid(v){ var m = /^(\d\d):(\d\d)$/.exec(v); return !v || (m && +m[1] <= 23 && +m[2] <= 59); }
+  document.querySelectorAll("input[data-time]").forEach(function(el){
+    el.setAttribute("autocomplete", "off"); el.setAttribute("enterkeyhint", "done");
+    el.addEventListener("input", function(e){
+      if(e.inputType && e.inputType.indexOf("delete") === 0) return;           // let backspace work normally
+      var v = fmt(el.value); if(v !== el.value) el.value = v;
+      el.classList.toggle("bad-time", el.value.length === 5 && !valid(el.value));
+    });
+    el.addEventListener("blur", function(){
+      var v = done(el.value);
+      if(v !== el.value){ el.value = v; el.dispatchEvent(new Event("input")); }
+      var ok = valid(el.value); el.classList.toggle("bad-time", !ok);
+      el.title = ok ? "" : "Enter a time between 00:00 and 23:59";
+    });
+  });
 })();
 </script>
 </body>

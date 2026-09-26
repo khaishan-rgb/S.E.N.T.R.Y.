@@ -1,4 +1,11 @@
-# SG Transport Pulse V15.1 — Route Traffic + Departure Adjustment + Bunching, Gap & Alerts + AI Halfway Optimiser
+# SG Transport Pulse V15.2 — Route Traffic + Departure Adjustment + Bunching, Gap & Alerts + AI Halfway Optimiser
+
+## V15.2 — Interchange regulation by headway + Test mode
+
+* **Interchange regulation (replaces the V15.1 slow-down of Bus D / E):** Bus C does not depart from the interchange (it goes halfway), so its departure slot is empty. The buses around it are re-spaced **by headway** to close that gap: buses ahead (**A, B) may only depart later**, buses behind (**D, E) only earlier**, to the most even departure headways the limits allow (up to 10 min either way). Each bus is planned to depart after the **scheduled layover** (default 10 min, setup card) but only needs the **minimum break** (7 min), so an on-time bus can depart up to 3 min earlier; a **late** bus has used up that buffer and is **not moved earlier**; a bus that has already departed is not held. Every adjustment and every "not adjusted (late – no layover to spare)" is shown and explained.
+* The halfway stop is then chosen as in V15.1: Bus C aims at the middle of the (now smaller) prolonged headway between B and D, first stop where it can get there. The "Why" also gives the EWT with the halfway alone (without the interchange adjustments).
+* Section 5 has an **Interchange / Halfway stop** switch: before vs after departures from the interchange, and before vs after at the entry stop.
+* **Test mode** (header: Data → Test): enter a test time, headway and buses per direction (empty = fill the whole route at that headway), then *Build test fleet*. The planner places an evenly spaced synthetic fleet on the service's **real route in both directions** (`GET /api/hplan/testsnap`) – the planning, real-road off-service routing, visuals and action plan work exactly as with live buses. An orange TEST MODE banner says what was entered; nothing is presented as live. When live mode finds no buses (e.g. after midnight) the page suggests Test mode.
 
 ## V15.1 — Halfway point chosen by the prolonged headway (gap ÷ 2), Bus D / E slow-down
 
