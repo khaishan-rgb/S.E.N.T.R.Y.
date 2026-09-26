@@ -1,4 +1,20 @@
-# SG Transport Pulse V13.14 — Route Traffic + Departure Adjustment + Bunching, Gap & Alerts + AI Halfway Optimiser
+# SG Transport Pulse V14.0 — Route Traffic + Departure Adjustment + Bunching, Gap & Alerts + AI Halfway Optimiser
+
+## V14.0 — Halfway Planner (live simulation: Recover Late Duty / Deploy OS Bus)
+
+**Where should a bus enter / re-enter the service route to achieve the best projected EWT?**
+
+* **New page `/halfway` — Halfway Planner** (`hplanner.html`, engine `hplan.py`, endpoints `/api/hplan/snapshot`, `/api/hplan/simulate`, `/api/hplan/route`). Two modes on one engine:
+  * **Recover Late Duty** — pick a live DataMall bus and inject a simulated delay (±1 stepper, +5/+10/+15/+20/+30 or custom). The delay **holds the bus at its current position** for that long; it then either continues (No action) or runs off-service to an entry stop. Options compared: No action, Regulate (hold the bus ahead, and the one ahead of it by half, up to 8 min — best hold found by simulation), and halfway re-entry at every candidate stop (with an optional wait of up to 10 min at the stop to land mid-gap).
+  * **Deploy OS Bus** — an additional virtual bus available at the first stop, a stop code or a map point, at a given time. Options: No deployment vs insertion at every candidate stop, with the best departure time (up to 20 min later) chosen to centre the bus in the gap. Optionally combine with a simulated delay to create a gap to fill.
+* **How it scores:** each live bus's arrival at every downstream stop is predicted from the speed-band running-time model, calibrated to DataMall's own next-stop arrival. At up to 12 monitoring points the sequence is: the last bus that passed + every bus still to come + the next two departures from the first stop at the scheduled headway (derived, labelled). EWT = Σh² / 2Σh − H/2 per point, averaged (same formula as the Timetable Optimiser). The option with the lowest projected EWT is recommended if it beats No action by ≥ 0.1 min and ≥ 5 %; otherwise No action. **No hard-coded rule** such as "delay > 20 min = halfway".
+* **Candidates:** approved halfway points (Timetable Optimiser settings) or every eligible stop; ≥ 20 % of the route must remain; reachable within 45 min (editable); for a late bus only stops ahead of it and only where re-entry is earlier than continuing. Reach time/distance from one OSRM table request × 1.25 bus factor (straight-line estimate if routing is down, labelled).
+* **Explainability:** every option has "Why?" bullets built from its numbers (position in the gap, headways either side, reach, rank, EWT before → after, stops not served).
+* **Map (dark OneMap Night):** blue live buses, red simulated delayed bus, green recommended point, purple numbered alternatives (1–5), grey other tested stops, red "LARGE GAP — without intervention" band, traffic speed, incidents, road works.
+* **View Deployment Route:** off-service road route (reuses the off-service planner's routing, traffic, incidents, road works and suitability checks) drawn dashed over traffic colours, service route after entry in blue, turn-by-turn instructions from OSRM steps, leave / ETA / enter-service times.
+* **Phones:** dedicated workflow — mode buttons, LIVE MAP / SIMULATION / RESULTS tabs, map with a bottom sheet, candidate cards, sticky Run and View Deployment Route buttons, full-screen navigation mode with a large instruction banner and a time / distance / ETA card.
+* **Data principle:** live DataMall data is never modified. Every value is tagged LIVE, SIM or PRED; simulated scenarios show a "SIMULATION MODE" banner.
+* **Menus:** "Halfway Optimiser" → **Halfway Planner** (`/halfway`). The previous timetable-based optimiser is unchanged at **`/halfway/timetable`** ("Timetable Optimiser", incl. approved-points settings). The previous planner is unchanged at `/planner` ("Off-service Route Planner", linked from the Halfway Planner).
 
 ## V13.14 — Hideable desktop menu + phone-friendly time entry
 

@@ -398,7 +398,7 @@ table.tb{width:100%;border-collapse:collapse;font-size:14px}
 <script>try{if(localStorage.getItem("shell.off")==="1")document.documentElement.classList.add("shell-off")}catch(e){}</script>
 </head>
 <body>
-<aside class="desktop-shell" aria-label="Primary navigation"><div class="shell-brand"><strong>SG Transport Pulse</strong><small>Operations Intelligence</small></div><div class="shell-label">ANALYSIS TOOLS</div><a class="shell-link active" href="/"><span class="si">▰</span><span>Route Traffic</span></a><a class="shell-link " href="/control"><span class="si">↔</span><span>Headway Control</span></a><a class="shell-link " href="/bunching"><span class="si">≋</span><span>Bunching & Gap</span></a><a class="shell-link " href="/halfway"><span class="si">½</span><span>Halfway Optimiser</span></a><a class="shell-link " href="/traffic"><span class="si">⚠</span><span>Traffic-Aware</span></a><a class="shell-link " href="/planner"><span class="si">◉</span><span>Halfway Planner</span></a><a class="shell-link " href="/running-time"><span class="si">⏱</span><span>Running Time Analytics</span></a><a class="shell-link " href="/cameras"><span class="si">📷</span><span>Traffic Cameras</span></a><div class="shell-foot">● Live operational workspace</div></aside>
+<aside class="desktop-shell" aria-label="Primary navigation"><div class="shell-brand"><strong>SG Transport Pulse</strong><small>Operations Intelligence</small></div><div class="shell-label">ANALYSIS TOOLS</div><a class="shell-link active" href="/"><span class="si">▰</span><span>Route Traffic</span></a><a class="shell-link " href="/control"><span class="si">↔</span><span>Headway Control</span></a><a class="shell-link " href="/bunching"><span class="si">≋</span><span>Bunching & Gap</span></a><a class="shell-link " href="/halfway"><span class="si">½</span><span>Halfway Planner</span></a><a class="shell-link " href="/traffic"><span class="si">⚠</span><span>Traffic-Aware</span></a><a class="shell-link " href="/halfway/timetable"><span class="si">▤</span><span>Timetable Optimiser</span></a><a class="shell-link " href="/running-time"><span class="si">⏱</span><span>Running Time Analytics</span></a><a class="shell-link " href="/cameras"><span class="si">📷</span><span>Traffic Cameras</span></a><div class="shell-foot">● Live operational workspace</div></aside>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
   <symbol id="i-bus" viewBox="0 0 24 24"><path fill="currentColor" fill-rule="evenodd" d="M6 3h12a2.5 2.5 0 0 1 2.5 2.5v10.2c0 .7-.4 1.4-1 1.8V20a1 1 0 0 1-1 1h-1.4a1 1 0 0 1-1-1v-1.5H8.9V20a1 1 0 0 1-1 1H6.5a1 1 0 0 1-1-1v-2.5c-.6-.4-1-1.1-1-1.8V5.5A2.5 2.5 0 0 1 6 3zm-.5 2.5V10h13V5.5a.5.5 0 0 0-.5-.5H6a.5.5 0 0 0-.5.5zM8 13.3a1.3 1.3 0 1 0 0 2.6 1.3 1.3 0 0 0 0-2.6zm8 0a1.3 1.3 0 1 0 0 2.6 1.3 1.3 0 0 0 0-2.6z"/></symbol>
   <symbol id="i-search" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 5 5"/></g></symbol>
@@ -416,7 +416,7 @@ table.tb{width:100%;border-collapse:collapse;font-size:14px}
 
 <div class="app">
   <header class="top">
-    <button class="mobile-menu-btn" type="button" aria-label="Open navigation" onclick="document.getElementById('mobileTopMenu').classList.toggle('open')">☰</button><div class="mobile-top-menu" id="mobileTopMenu"><a class="active" href="/">▰ Route</a><a href="/control">↔ Headway</a><a href="/bunching">≋ Bunching</a><a href="/halfway">½ Halfway Optimiser</a><a href="/traffic">⚠ Traffic-Aware Regulation</a><a href="/planner">◉ Halfway Planner</a><a href="#" onclick="this.parentElement.classList.remove('open');return false">⚙ Settings / page options</a><a class="" href="/running-time">⏱ Running Time</a><a href="/cameras">📷 Traffic Cameras</a></div>
+    <button class="mobile-menu-btn" type="button" aria-label="Open navigation" onclick="document.getElementById('mobileTopMenu').classList.toggle('open')">☰</button><div class="mobile-top-menu" id="mobileTopMenu"><a class="active" href="/">▰ Route</a><a href="/control">↔ Headway</a><a href="/bunching">≋ Bunching</a><a href="/halfway">½ Halfway Planner</a><a href="/traffic">⚠ Traffic-Aware Regulation</a><a href="/halfway/timetable">▤ Timetable Optimiser</a><a href="#" onclick="this.parentElement.classList.remove('open');return false">⚙ Settings / page options</a><a class="" href="/running-time">⏱ Running Time</a><a href="/cameras">📷 Traffic Cameras</a></div>
     <div class="brand">
       <div class="logo"><svg class="i"><use href="#i-bus"/></svg></div>
       <div>
@@ -425,7 +425,7 @@ table.tb{width:100%;border-collapse:collapse;font-size:14px}
       </div>
     </div>
     <div class="hdr-right">
-      <nav class="navl" aria-label="Pages"><a href="/" class="on">Route Traffic</a><a href="/control">Headway Control</a><a href="/bunching">Bunching &amp; Gap</a><a href="/halfway">Halfway Optimiser</a><a href="/traffic">Traffic-Aware</a><a href="/planner">Halfway Planner</a></nav>
+      <nav class="navl" aria-label="Pages"><a href="/" class="on">Route Traffic</a><a href="/control">Headway Control</a><a href="/bunching">Bunching &amp; Gap</a><a href="/halfway">Halfway Planner</a><a href="/traffic">Traffic-Aware</a><a href="/halfway/timetable">Timetable Optimiser</a></nav>
       <div>
         <div class="clock" id="clock">&nbsp;</div>
         <div class="live" id="live"><span class="dot"></span><span id="liveText">Connecting…</span></div>
@@ -526,7 +526,7 @@ table.tb{width:100%;border-collapse:collapse;font-size:14px}
 
   <footer class="foot">
     <span>Sources: LTA DataMall (Bus, Traffic), OneMap, NEA &nbsp;|&nbsp; Not for operational use</span>
-    <span>SG Transport Pulse V13.14 &nbsp;|&nbsp; Built for a smarter Singapore</span>
+    <span>SG Transport Pulse V14.0 &nbsp;|&nbsp; Built for a smarter Singapore</span>
   </footer>
 </div>
 
@@ -1014,7 +1014,7 @@ function occSuggest(){
   const svcQ = `svc=${encodeURIComponent(S.svc)}&dir=${S.dir}`;
   $("occSuggest").innerHTML = `<h2>OCC suggestion</h2><p class="s">From the traffic engine for Service ${esc(S.svc)} Dir ${S.dir}. Decision support only \u2013 nothing is dispatched. ${tg("ai")}</p>
     <ul class="sug" style="margin:0;padding-left:18px">${list.map(x => `<li>${esc(x.t)}${x.b ? `<small>${esc(x.b)}</small>` : ""}</li>`).join("")}</ul>
-    <div class="occ-btns">${top ? `<button class="ob pri" type="button" id="occAn">Analyse impact</button>` : ""}<a class="ob" href="/control?${svcQ}">Go to Headway Control</a><a class="ob" href="/halfway?${svcQ}">Go to Halfway Optimiser</a></div>`;
+    <div class="occ-btns">${top ? `<button class="ob pri" type="button" id="occAn">Analyse impact</button>` : ""}<a class="ob" href="/control?${svcQ}">Go to Headway Control</a><a class="ob" href="/halfway?${svcQ}">Go to Halfway Planner</a></div>`;
   if($("occAn")) $("occAn").onclick = () => occSelect(top.id, true);
 }
 function occBusTable(){
@@ -1491,7 +1491,7 @@ api("/api/traffic/services", 20000).then(j => { if(j.services){ S.svcAll = j.ser
 setTimeout(() => map.invalidateSize(), 300);
 window.addEventListener("resize", () => map.invalidateSize());
 </script>
-<nav class="mobile-bottom-nav" aria-label="Mobile primary navigation"><a class="mbn active" href="/"><span class="mi">▰</span>Route</a><a class="mbn " href="/control"><span class="mi">↔</span>Headway</a><a class="mbn " href="/bunching"><span class="mi">≋</span>Bunching</a><button class="mbn " type="button" style="border:0;background:transparent;font-family:inherit" onclick="document.getElementById('mobileMore').classList.toggle('open')"><span class="mi">•••</span>More</button></nav><div class="mobile-more" id="mobileMore"><a class="" href="/halfway">½ Halfway Optimiser</a><a class="" href="/traffic">⚠ Traffic-Aware Regulation</a><a href="/planner">◉ Halfway Planner</a><a href="#" onclick="this.parentElement.classList.remove('open');return false">⚙ Settings / page options</a><a class="" href="/running-time">⏱ Running Time</a><a href="/cameras">📷 Traffic Cameras</a></div>
+<nav class="mobile-bottom-nav" aria-label="Mobile primary navigation"><a class="mbn active" href="/"><span class="mi">▰</span>Route</a><a class="mbn " href="/control"><span class="mi">↔</span>Headway</a><a class="mbn " href="/bunching"><span class="mi">≋</span>Bunching</a><button class="mbn " type="button" style="border:0;background:transparent;font-family:inherit" onclick="document.getElementById('mobileMore').classList.toggle('open')"><span class="mi">•••</span>More</button></nav><div class="mobile-more" id="mobileMore"><a class="" href="/halfway">½ Halfway Planner</a><a class="" href="/traffic">⚠ Traffic-Aware Regulation</a><a href="/halfway/timetable">▤ Timetable Optimiser</a><a href="#" onclick="this.parentElement.classList.remove('open');return false">⚙ Settings / page options</a><a class="" href="/running-time">⏱ Running Time</a><a href="/cameras">📷 Traffic Cameras</a></div>
 
 <script>
 document.addEventListener("click", function(e){

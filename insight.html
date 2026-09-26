@@ -113,14 +113,14 @@ tbody tr.click{cursor:pointer}tbody tr.sel td{background:#1d2a12}
 <a class="shell-link " href="/"><span class="si">&#9648;</span><span>Route Traffic</span></a>
 <a class="shell-link " href="/control"><span class="si">&#8596;</span><span>Headway Control</span></a>
 <a class="shell-link " href="/bunching"><span class="si">&#8776;</span><span>Bunching &amp; Gap</span></a>
-<a class="shell-link " href="/halfway"><span class="si">&frac12;</span><span>Halfway Optimiser</span></a>
+<a class="shell-link " href="/halfway"><span class="si">&frac12;</span><span>Halfway Planner</span></a>
 <a class="shell-link " href="/traffic"><span class="si">&#9888;</span><span>Traffic-Aware</span></a>
-<a class="shell-link " href="/planner"><span class="si">&#9673;</span><span>Halfway Planner</span></a>
+<a class="shell-link " href="/halfway/timetable"><span class="si">▤</span><span>Timetable Optimiser</span></a>
 <a class="shell-link active" href="/running-time"><span class="si">&#9201;</span><span>Running Time Analytics</span></a><a class="shell-link " href="/cameras"><span class="si">📷</span><span>Traffic Cameras</span></a>
 <div class="shell-foot">&#9679; Running time analytics</div></aside>
 <header class="top"><button class="mobile-menu-btn" type="button" aria-label="Open navigation" onclick="document.getElementById('inMenu').classList.toggle('open')">&#9776;</button>
 <div class="logo">&#9201;</div><h1>RUNNING TIME ANALYTICS<small>Zero-history model + live calibration &middot; Smarter Planning, Better Journeys</small></h1><div class="sp"></div><div class="clk" id="clk"></div></header>
-<div class="mobile-top-menu" id="inMenu"><a href="/">&#9648; Route</a><a href="/control">&#8596; Headway</a><a href="/bunching">&#8776; Bunching</a><a href="/halfway">&frac12; Halfway Optimiser</a><a href="/traffic">&#9888; Traffic-Aware</a><a href="/planner">&#9673; Halfway Planner</a><a class="active" href="/running-time">&#9201; Running Time</a></div>
+<div class="mobile-top-menu" id="inMenu"><a href="/">&#9648; Route</a><a href="/control">&#8596; Headway</a><a href="/bunching">&#8776; Bunching</a><a href="/halfway">&frac12; Halfway Planner</a><a href="/traffic">&#9888; Traffic-Aware</a><a href="/halfway/timetable">▤ Timetable Optimiser</a><a class="active" href="/running-time">&#9201; Running Time</a></div>
 <div class="wrap">
   <section class="card" style="border-color:#8a5a16">
     <h2>Day-1 Running Time Estimate <span class="tag-model">NO PAST TRIPS REQUIRED</span></h2>
@@ -210,7 +210,7 @@ tbody tr.click{cursor:pointer}tbody tr.sel td{background:#1d2a12}
   </section>
   <div id="inBody"><div class="card"><div class="msg">Loading measured running times…</div></div></div>
 </div>
-<nav class="bn" aria-label="Mobile primary navigation"><a href="/"><span class="mi">&#9648;</span>Route</a><a href="/control"><span class="mi">&#8596;</span>Headway</a><a href="/bunching"><span class="mi">&#8776;</span>Bunching</a><a href="/halfway"><span class="mi">&frac12;</span>Optimiser</a><a href="/planner"><span class="mi">&#9673;</span>Planner</a><a class="on" href="/running-time"><span class="mi">&#9201;</span>Run time</a></nav>
+<nav class="bn" aria-label="Mobile primary navigation"><a href="/"><span class="mi">&#9648;</span>Route</a><a href="/control"><span class="mi">&#8596;</span>Headway</a><a href="/bunching"><span class="mi">&#8776;</span>Bunching</a><a href="/halfway"><span class="mi">&frac12;</span>Halfway</a><a href="/halfway/timetable"><span class="mi">▤</span>Timetable</a><a class="on" href="/running-time"><span class="mi">&#9201;</span>Run time</a></nav>
 <script>
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));

@@ -1456,6 +1456,13 @@ async def bunching_page():
 
 @app.get("/halfway", response_class=HTMLResponse)
 async def halfway_page():
+    """V14.0: Halfway Planner (live simulation: Recover Late Duty / Deploy OS Bus)."""
+    return HTMLResponse((HERE / "hplanner.html").read_text(encoding="utf-8"))
+
+
+@app.get("/halfway/timetable", response_class=HTMLResponse)
+async def halfway_timetable_page():
+    """the V13 timetable-based Halfway Optimiser, unchanged (trip lateness at the first stop, approved halfway points, settings)."""
     return HTMLResponse((HERE / "halfway.html").read_text(encoding="utf-8"))
 
 
@@ -3368,7 +3375,7 @@ async def api_pl_search(service: str = "", direction: int = 1, frm: str = "", im
              "stops_total": n, "stops_omitted": j, "stops_remaining": n - j, "km_lost": round(ss[j], 2),
              "important_total": len(imp), "important_served": len(imp) - len(missed), "important_missed": len(missed),
              "missed": [{"code": c_, "name": next((x["name"] for x in stops if x["code"] == c_), c_)} for c_ in missed],
-             "gain": q["gain"], "hw": q, "after_next": q["after_next"], "dev_half": q["dev_half"], "target_hw": H}
+             "gain": q["gain"], "hw": q, "after_next": q["after_next"], "dev_half": q["dev_half"]}
         if mx_min is not None and off_min > mx_min + 1e-6:
             skipped["time"] += 1
             continue
@@ -3462,6 +3469,173 @@ async def api_pl_route(service: str = "", direction: int = 1, frm: str = "", sto
             "incidents": [x for x in R["incidents"] if any(offservice.dist_to_line_m((x["lat"], x["lon"]), y["line"]) <= 300 for y in R["options"])][:20],
             "why_route": offservice.why_route(R["options"], R["recommended"], R["fastest"], R["shortest"], None, stops[j]["name"]),
             "updated": now.isoformat(timespec="seconds")}
+
+
+# =========================================================================== V14.0 Halfway Planner (live snapshot + simulation; the engine is hplan.py)
+import hplan
+HP_SNAP = {}                      # snapshot id -> the live buses and route model at one moment (simulations reuse it, so results are consistent)
+HP_SNAP_TTL = 900
+
+
+def hp_prune():
+    now = time.time()
+    for k in [k for k, v in HP_SNAP.items() if now - v["created"] > HP_SNAP_TTL]:
+        HP_SNAP.pop(k, None)
+
+
+def hp_tt(g, P):
+    tm, ss = g["tm"], g["prep"]["stop_s"]
+    if tm is not None:
+        return lambda a, b: tm.t(a, b) if b > a else 0.0
+    kmh = float(P["fallback_kmh"])
+    return lambda a, b: max(0.0, b - a) / kmh * 60.0
+
+
+@app.get("/api/hplan/snapshot")
+async def api_hp_snapshot(service: str = "", direction: int = 1):
+    """LIVE: route, stops and the live DataMall buses projected on the route at this moment. Nothing here is simulated."""
+    svc = service.strip().upper()
+    if not svc:
+        return {"ok": False, "error": "Enter a service number."}
+    g = await ho_route(svc, direction)
+    if g.get("error"):
+        return {"ok": False, "error": g["error"]}
+    st = await static()
+    dirs = [d_ for d_ in (1, 2) if route_stops(st, svc, d_)]
+    bj = await api_buses(svc, direction)
+    P = {**halfway.PARAMS, **HO["params"]}
+    stops, ss, line, cum, now = g["stops"], g["prep"]["stop_s"], g["line"], g["prep"]["cum"], g["now"]
+    tt = hp_tt(g, P)
+    now_min = now.hour * 60 + now.minute + now.second / 60.0
+    buses, off_route = [], 0
+    for b in bj.get("buses", []):
+        if b.get("lat") is None:
+            continue
+        s, miss = headway.project(line, cum, b["lat"], b["lon"])
+        if miss > 0.35:
+            off_route += 1
+            continue
+        off, calib = 0.0, None                                       # calibrate the running-time model to DataMall's own predicted arrival
+        etas = b.get("etasf") or b.get("etas") or {}
+        ahead = sorted((int(i), float(e)) for i, e in etas.items() if e is not None and float(e) >= 0 and ss[int(i)] > s + 0.05)
+        if ahead:
+            i0, e0 = ahead[0]
+            off = max(-5.0, min(15.0, e0 - tt(s, ss[i0])))
+            calib = {"code": stops[i0]["code"], "name": stops[i0]["name"], "eta_min": round(e0, 1), "clock": hplan.hhmm(now_min + e0)}
+        buses.append({"id": b["id"], "lat": b["lat"], "lon": b["lon"], "s": s, "offset": off, "km": round(s, 2), "near": b.get("near"), "load": b.get("load"),
+                      "type": b.get("type"), "monitored": b.get("monitored"), "next": calib})
+    sid = hashlib.sha1(f"{svc}|{direction}|{time.time()}".encode()).hexdigest()[:12]
+    hp_prune()
+    HP_SNAP[sid] = {"created": time.time(), "svc": svc, "d": direction, "g": g, "buses": buses, "now_min": now_min, "P": P}
+    cands, unresolved, cinfo = ho_candidates(svc, direction, stops, "", "auto", g["prep"], P)
+    return {"ok": True, "snap": sid, "service": svc, "direction": direction, "directions": dirs, "now": now.strftime("%H:%M:%S"), "now_min": round(now_min, 2),
+            "H": g["H"], "H_src": g["H_src"], "traffic_ok": g["traffic_ok"],
+            "route": {"km": round(g["prep"]["km"], 2), "run_min": round(g["tau"][-1], 1), "first": stops[0]["name"], "last": stops[-1]["name"], "n_stops": len(stops)},
+            "stops": [{"j": i, "code": s_["code"], "name": s_["name"], "lat": s_["lat"], "lon": s_["lon"], "km": round(ss[i], 2)} for i, s_ in enumerate(stops)],
+            "line": ho_simplify(line, 500), "buses": [{k: v for k, v in b.items() if k not in ("s", "offset")} for b in buses],
+            "bus_error": bj.get("error"), "off_route": off_route,
+            "candidates": {"scope": cinfo.get("scope_used"), "approved": cinfo.get("approved"), "tested": len(cands), "unresolved": unresolved},
+            "source": "LTA DataMall Bus Arrival (live) \u00b7 route running times from LTA speed bands" if g["traffic_ok"] else "LTA DataMall Bus Arrival (live) \u00b7 running times at the fallback speed (no speed bands)"}
+
+
+async def hp_origin(snap, mode, bus, os_from):
+    """where the moving bus starts: the live position of the delayed bus, or the OS bus's location."""
+    stops = snap["g"]["stops"]
+    if mode == "late":
+        b = next((x for x in snap["buses"] if str(x["id"]) == str(bus)), None)
+        if not b:
+            return None, None, "Select one of the live buses."
+        return (b["lat"], b["lon"]), f"Bus {b['id']} (live position)", None
+    return await pl_origin(os_from, stops)
+
+
+@app.get("/api/hplan/simulate")
+async def api_hp_simulate(snap: str = "", mode: str = "late", bus: str = "", delay: str = "0", os_from: str = "", os_time: str = "", scope: str = "auto", max_reach: str = ""):
+    """SIMULATION on top of one live snapshot: No action / Regulate / halfway re-entry (late) or No deployment / OS insertion (os), ranked by projected EWT."""
+    S = HP_SNAP.get(snap)
+    if not S:
+        return {"ok": False, "error": "The live snapshot has expired. Refresh the live buses and run again.", "expired": True}
+    mode = "os" if mode == "os" else "late"
+    g, P = S["g"], S["P"]
+    stops, ss = g["stops"], g["prep"]["stop_s"]
+    try:
+        D = float(delay or 0)
+    except ValueError:
+        return {"ok": False, "error": "Delay must be a number of minutes."}
+    if mode == "late" and D <= 0:
+        return {"ok": False, "error": "Inject a delay (minutes) for the selected bus."}
+    origin, origin_label, err = await hp_origin(S, mode, bus, os_from)
+    if err:
+        return {"ok": False, "error": err}
+    t0 = S["now_min"]
+    if mode == "os" and os_time.strip():
+        t0p = ho_parse_hhmm(os_time)
+        if t0p is None:
+            return {"ok": False, "error": "OS available time must be like 14:15."}
+        t0 = t0p + (1440 if t0p < S["now_min"] - 720 else 0)
+        t0 = max(t0, S["now_min"])
+    cands, _unres, cinfo = ho_candidates(S["svc"], S["d"], stops, "", scope if scope in ("auto", "approved", "all") else "auto", g["prep"], P)
+    HP = dict(hplan.PARAMS)
+    try:
+        if max_reach.strip():
+            HP["max_reach_min"] = max(5.0, min(90.0, float(max_reach)))
+    except ValueError:
+        pass
+    offs, off_err = await os_table(origin, [(c["lat"], c["lon"]) for c in cands])
+    fac = float(offservice.PARAMS["bus_time_factor"])
+    cl = []
+    for i, c in enumerate(cands):
+        om = offs.get(i)
+        if om:
+            cl.append({**c, "reach_min": om["min"] * fac, "reach_km": om.get("km"), "reach_src": f"road routing time x {fac:g}"})
+        else:
+            km = hplan.hav_km(origin, (c["lat"], c["lon"])) * HP["detour"]
+            cl.append({**c, "reach_min": km / HP["offsvc_kmh"] * 60.0, "reach_km": km, "reach_src": "straight-line estimate (routing unavailable)"})
+    ctx = {"stops": stops, "ss": ss, "tt": hp_tt(g, P), "H": g["H"], "H_src": g["H_src"], "now": S["now_min"], "buses": [dict(b) for b in S["buses"]], "mode": mode,
+           "late": {"bus": int(bus) if str(bus).isdigit() else bus, "delay": D} if (bus and D > 0) else None,
+           "os": {"t0": t0, "lat": origin[0], "lon": origin[1], "label": origin_label} if mode == "os" else None, "cands": cl, "P": HP}
+    res = await asyncio.to_thread(hplan.simulate, ctx)
+    res.update(origin={"label": origin_label, "lat": origin[0], "lon": origin[1]}, snap=snap, service=S["svc"], direction=S["d"],
+               routing="road routing (OSRM) x bus factor" if offs else f"straight-line estimate ({off_err or 'routing unavailable'})",
+               scope=cinfo.get("scope_used"), n_candidates=len(cands), os_time=hplan.hhmm(t0) if mode == "os" else None,
+               labels={"live": "LTA DataMall observations (unchanged)", "sim": "Simulation layer: injected delay / virtual OS bus", "derived": "Predicted from the running-time model"})
+    return res
+
+
+@app.get("/api/hplan/route")
+async def api_hp_route(snap: str = "", stop: str = "", mode: str = "late", bus: str = "", os_from: str = "", leave: str = ""):
+    """Off-service deployment route from the bus / OS location to the entry stop, with turn-by-turn guidance, traffic, incidents and road works."""
+    S = HP_SNAP.get(snap)
+    if not S:
+        return {"ok": False, "error": "The live snapshot has expired. Refresh and run the simulation again.", "expired": True}
+    g = S["g"]
+    stops, ss, cum = g["stops"], g["prep"]["stop_s"], g["prep"]["cum"]
+    j = next((i for i, s_ in enumerate(stops) if s_["code"] == re.sub(r"\D", "", stop)), None)
+    if j is None:
+        return {"ok": False, "error": "Choose an entry stop on this route."}
+    origin, origin_label, err = await hp_origin(S, "os" if mode == "os" else "late", bus, os_from)
+    if err:
+        return {"ok": False, "error": err}
+    lv = ho_parse_hhmm(leave) if leave.strip() else None
+    lv = lv if lv is not None else S["now_min"]
+    prep = float(hplan.PARAMS["prep_min"])
+    R, rerr = await os_routes(origin, (stops[j]["lat"], stops[j]["lon"]), S["svc"], S["d"], stops[j]["code"], "dd", {}, g["line"], lv, planned_start=None, prep=prep)
+    if R is None:
+        return {"ok": False, "error": f"No road route could be calculated ({rerr})."}
+    x = next(o for o in R["options"] if o["idx"] == R["recommended"])
+    near = lambda p: offservice.dist_to_line_m((p["lat"], p["lon"]), x["line"]) <= 300
+    return {"ok": True, "origin": {"label": origin_label, "lat": origin[0], "lon": origin[1]},
+            "stop": {"code": stops[j]["code"], "name": stops[j]["name"], "lat": stops[j]["lat"], "lon": stops[j]["lon"], "km_from_start": round(ss[j], 2)},
+            "km": round(x["km"], 2), "time_min": round(x["time_min"], 1), "time_src": x["time_src"], "leave_clock": hplan.hhmm(lv),
+            "arrive_clock": hplan.hhmm(lv + x["time_min"]), "entry_clock": hplan.hhmm(lv + x["time_min"] + prep), "prep_min": prep,
+            "status": x["status"], "status_label": offservice.STATUS_TXT[x["status"]], "status_text": x["status_text"], "findings": x["findings"][:8],
+            "line": offservice.simplify(x["line"], 300), "traffic": x["traffic"], "roads": [q_["road"] for q_ in x["groups"]],
+            "steps": hplan.instructions(x.get("steps") or [], stops[j]["code"], stops[j]["name"]),
+            "alternatives": [{"label": o["label"], "km": round(o["km"], 2), "time_min": round(o["time_min"], 1), "status": o["status"], "tags": o["tags"]} for o in R["options"]],
+            "service_after": ho_simplify(ho_cut(g["line"], cum, ss[j], cum[-1]), 250),
+            "incidents": [p for p in R["incidents"] if p.get("lat") is not None and near(p)][:10],
+            "roadworks": [p for p in R["roadworks"] if p.get("lat") is not None and near(p)][:10],
+            "note": "Navigation guidance for OCC planning. Check restrictions on the ground before use."}
 
 
 @app.post("/api/halfway/offservice/record")

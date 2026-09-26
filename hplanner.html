@@ -1,0 +1,1017 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#050d1a">
+<title>Halfway Planner &middot; SG Transport Pulse</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script>try{if(localStorage.getItem("shell.off")==="1")document.documentElement.classList.add("shell-off")}catch(e){}</script>
+<style>
+:root{
+  --bg:#050d1a; --panel:#0a1a2e; --panel2:#0d2039; --line:#163250; --line2:#1f4468;
+  --text:#eaf3ff; --mut:#8ba3bd; --blue:#1785ff; --cyan:#3cc8ff;
+  --green:#20d16a; --amber:#ffc21a; --orange:#ff8a3d; --red:#ff4d55; --purple:#a78bfa; --grey:#6b7f95; --route:#2f7dff;
+  --font:Inter,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:radial-gradient(1200px 500px at 20% -10%,#0b2140 0%,var(--bg) 60%);color:var(--text);font-family:var(--font);font-size:14px;line-height:1.35;min-height:100vh;
+  padding:env(safe-area-inset-top,0) env(safe-area-inset-right,0) env(safe-area-inset-bottom,0) env(safe-area-inset-left,0)}
+button,input,select{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+a{color:#7fc0ff}
+.app{max-width:1600px;margin:0 auto;padding:0 14px 18px}
+.num{font-variant-numeric:tabular-nums}
+
+/* ---------- header (same pattern as the other pages) ---------- */
+.top{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:10px 4px;border-bottom:1px solid var(--line)}
+.brand{display:flex;align-items:center;gap:12px;min-width:0}
+.logo{width:36px;height:36px;border-radius:10px;background:linear-gradient(160deg,#2a95ff,#0d63d6);display:grid;place-items:center;font-size:20px;color:#fff;flex:none}
+.brand h1{margin:0;font-size:18px;font-weight:800;letter-spacing:-.3px;white-space:nowrap}
+.hdr-right{display:flex;align-items:center;gap:14px;text-align:right}
+.clock{font-size:12px;color:#cfe0f3}
+.live{display:flex;align-items:center;justify-content:flex-end;gap:7px;color:var(--mut);margin-top:3px;font-size:12.5px}
+.live .dot{width:9px;height:9px;border-radius:50%;background:var(--mut)}
+.live.ok .dot{background:var(--green);box-shadow:0 0 8px var(--green)}.live.ok{color:#9ff0bf}
+
+/* ---------- page head: title + mode selector ---------- */
+.hp-head{display:flex;align-items:flex-end;justify-content:space-between;gap:12px 20px;flex-wrap:wrap;margin:14px 2px 10px}
+.hp-head h2{margin:0;font-size:22px;letter-spacing:-.02em}.hp-head p{margin:3px 0 0;color:var(--mut);font-size:13px}
+.modes{display:flex;gap:6px;background:var(--panel);border:1px solid var(--line2);border-radius:12px;padding:4px}
+.modes button{min-height:44px;border:0;border-radius:9px;background:transparent;color:#a9c2da;padding:0 18px;font-weight:700;font-size:14px;cursor:pointer;display:flex;align-items:center;gap:8px;white-space:nowrap}
+.modes button .mi{font-size:16px}
+.modes button[aria-pressed="true"]{background:var(--blue);color:#fff;box-shadow:0 0 16px #1785ff55}
+
+/* ---------- filters ---------- */
+.filters{display:grid;grid-template-columns:minmax(130px,1fr) minmax(110px,.9fr) auto minmax(150px,1fr) auto auto;gap:10px;align-items:end;margin:0 2px 12px}
+.fld{min-width:0;display:flex;flex-direction:column;gap:4px}
+.fld>label,.flab{font-size:11.5px;color:var(--mut);font-weight:600}
+.inp,select.inp{width:100%;height:42px;background:#08192c;border:1px solid var(--line2);border-radius:9px;padding:0 11px;font-size:14px;color:var(--text)}
+select.inp{appearance:none;background-image:linear-gradient(45deg,transparent 50%,#7fa6c9 50%),linear-gradient(135deg,#7fa6c9 50%,transparent 50%);background-position:calc(100% - 16px) 18px,calc(100% - 11px) 18px;background-size:5px 5px;background-repeat:no-repeat;padding-right:28px}
+.seg{display:flex;height:42px;background:#08192c;border:1px solid var(--line2);border-radius:9px;padding:3px;gap:3px}
+.seg button{flex:1;border:0;background:transparent;color:#a9c2da;padding:0 14px;border-radius:7px;cursor:pointer;font-weight:650;white-space:nowrap;min-width:44px}
+.seg button[aria-pressed="true"]{background:#1d6fd6;color:#fff}
+.nowbox{height:42px;display:flex;align-items:center;gap:8px;background:#08192c;border:1px solid var(--line2);border-radius:9px;padding:0 11px;font-size:13.5px;white-space:nowrap;overflow:hidden}
+.nowbox small{color:var(--mut)}
+.btn{min-height:42px;border-radius:10px;border:1px solid var(--line2);background:#12283f;color:var(--text);font-weight:700;font-size:14px;cursor:pointer;padding:0 14px;display:inline-flex;align-items:center;justify-content:center;gap:8px;text-decoration:none}
+.btn:hover{border-color:#3b6f9f}.btn[disabled]{opacity:.5;cursor:default}
+.btn.go{background:var(--blue);border-color:#4aa6ff;color:#fff}
+.btn.go:hover{background:#2b93ff}
+.btn.rec{background:var(--green);border-color:#5ff0a0;color:#03240f}
+.btn.big{width:100%;min-height:50px;font-size:15.5px}
+.btn.sm{min-height:34px;padding:0 10px;font-size:12.5px;border-radius:8px}
+.pill{display:inline-flex;align-items:center;gap:6px;height:42px;padding:0 12px;border-radius:9px;font-weight:800;font-size:12px;letter-spacing:.05em;white-space:nowrap;border:1px solid}
+.pill i{width:8px;height:8px;border-radius:50%;background:currentColor}
+.pill.live{color:#7df0a8;border-color:#1f6b40;background:#0b2219}
+.pill.sim{color:#ff9aa0;border-color:#7a2a33;background:#2a0f16}
+
+/* ---------- workspace ---------- */
+.hp-grid{display:grid;grid-template-columns:300px minmax(0,1fr) 350px;gap:12px;align-items:start}
+.card{background:var(--panel);border:1px solid var(--line2);border-radius:14px;padding:14px;min-width:0}
+.card h3{margin:0 0 2px;font-size:15px}.card .s{color:var(--mut);font-size:12px;margin:0 0 10px}
+.side{position:sticky;top:10px;max-height:calc(100vh - 20px);overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin}
+.sec{border-top:1px solid var(--line);margin-top:12px;padding-top:12px}.sec:first-of-type{border-top:0;margin-top:0;padding-top:0}
+.sec-t{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:12px;font-weight:700;color:#cfe0f3;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px}
+
+/* data provenance tags */
+.tag{display:inline-flex;align-items:center;font-size:9.5px;font-weight:800;letter-spacing:.06em;border-radius:5px;padding:1px 5px;border:1px solid;white-space:nowrap;vertical-align:1px}
+.tag.live{color:#7df0a8;border-color:#1f6b40}.tag.sim{color:#ff9aa0;border-color:#7a2a33}.tag.pred{color:#ffd27a;border-color:#7a5d1a}.tag.rec{color:#03240f;background:var(--green);border-color:var(--green)}.tag.alt{color:#d9ccff;border-color:#5b4a9e}
+
+/* bus picker */
+.buses{display:grid;gap:6px;max-height:300px;overflow-y:auto;scrollbar-width:thin}
+.bus{display:flex;gap:10px;align-items:center;width:100%;min-height:48px;padding:7px 10px;border-radius:10px;border:1px solid var(--line);background:#0b1c31;cursor:pointer;text-align:left}
+.bus:hover{border-color:var(--line2)}
+.bus[aria-pressed="true"]{border-color:var(--red);background:#2a0f16}
+.bus .bi{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;background:var(--blue);color:#fff;font-weight:800;font-size:12.5px;flex:none}
+.bus[aria-pressed="true"] .bi{background:var(--red)}
+.bus b{display:block;font-size:13px}.bus small{display:block;color:var(--mut);font-size:11.5px}
+.bus .eta{margin-left:auto;text-align:right;font-size:12px;white-space:nowrap}
+.empty{color:var(--mut);font-size:13px;padding:10px;border:1px dashed var(--line2);border-radius:10px}
+.warn{background:#3a2a06;border:1px solid #7a5a12;color:#ffe08a;border-radius:9px;padding:8px 11px;font-size:12.5px;margin:8px 0}
+.err{background:#3a1216;border:1px solid #7a2228;color:#ffb3b8;border-radius:9px;padding:8px 11px;font-size:12.5px;margin:8px 0}
+
+/* delay stepper */
+.chk{display:flex;align-items:center;gap:10px;min-height:44px;cursor:pointer;font-weight:650}
+.chk input{width:20px;height:20px;accent-color:var(--red)}
+.step{display:flex;align-items:center;gap:8px;margin-top:4px}
+.step button{width:48px;height:48px;border-radius:12px;border:1px solid var(--line2);background:#12283f;font-size:22px;font-weight:700;cursor:pointer}
+.step .val{flex:1;height:48px;display:flex;align-items:center;justify-content:center;gap:6px;background:#08192c;border:1px solid var(--line2);border-radius:12px;font-size:22px;font-weight:800}
+.step .val input{width:64px;background:none;border:0;text-align:right;font-size:22px;font-weight:800;padding:0}
+.step .val input:focus{outline:none}
+.presets{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.presets button{min-width:48px;min-height:36px;border-radius:9px;border:1px solid var(--line2);background:#0b1c31;font-weight:700;cursor:pointer;padding:0 8px}
+.presets button[aria-pressed="true"]{border-color:var(--red);color:#ffb3b8;background:#2a0f16}
+.cmp{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+.cmp div{border-radius:10px;padding:8px 10px;border:1px solid var(--line)}
+.cmp span:not(.tag){display:block;font-size:11px;color:var(--mut)}.cmp b{font-size:20px}
+.cmp .l{background:#0b1c31}.cmp .l b{color:#8cc6ff}.cmp .x{background:#2a0f16;border-color:#7a2a33}.cmp .x b{color:#ff8a92}
+.simban{display:flex;gap:9px;align-items:flex-start;margin-top:10px;padding:9px 11px;border-radius:10px;border:1px solid #7a2a33;background:#2a0f16;color:#ffd0d4;font-size:12px}
+.simban b{display:block;color:#ff9aa0;font-size:11px;letter-spacing:.08em}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+
+/* ---------- map ---------- */
+.mapcard{position:relative;height:calc(100vh - 222px);min-height:520px;border-radius:14px;overflow:hidden;border:1px solid var(--line2);background:#0a1626}
+#map{position:absolute;inset:0}
+.leaflet-container{background:#0a1626;font-family:var(--font)}
+.leaflet-bar a{background:rgba(6,17,32,.95);color:#fff;border-bottom:1px solid var(--line2);width:38px;height:38px;line-height:38px}
+.leaflet-control-attribution{background:rgba(6,17,32,.7)!important;color:#7f98b3!important;font-size:10px}.leaflet-control-attribution a{color:#9ec3e6!important}
+.ovl{position:absolute;z-index:500;background:rgba(6,17,32,.92);border:1px solid var(--line2);border-radius:10px}
+.chips{top:10px;left:10px;right:10px;display:flex;gap:5px;flex-wrap:wrap;background:none;border:0;pointer-events:none}
+.chips label{pointer-events:auto;display:inline-flex;align-items:center;gap:6px;padding:5px 10px 5px 9px;border-radius:8px;background:rgba(6,17,32,.92);border:1px solid var(--line2);font-size:12px;font-weight:600;color:#9fb6cf;cursor:pointer;min-height:32px}
+.chips label::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--k,#8ba3bd);opacity:.45}
+.chips label:has(input:checked){border-color:#3b8bff;color:#fff;background:#0e2c52}.chips label:has(input:checked)::before{opacity:1}
+.chips input{position:absolute;opacity:0;width:1px;height:1px}
+.legend{left:10px;bottom:24px;padding:8px 11px;font-size:11.5px;display:grid;gap:3px}
+.legend div{display:flex;align-items:center;gap:7px;color:#cfe0f3}
+.legend i{width:12px;height:12px;border-radius:50%;display:inline-block;flex:none}
+.maptoast{left:50%;top:54px;transform:translateX(-50%);padding:8px 12px;font-size:12.5px;display:none;max-width:90%;text-align:center}
+.pickhint{background:#241b52;border-color:#5b4a9e;color:#e3dbff}
+
+/* markers */
+.bm{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;font-weight:800;font-size:12px;color:#fff;border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.5)}
+.bm.live{background:var(--blue)}.bm.sim{background:var(--red);box-shadow:0 0 0 5px rgba(255,77,85,.3),0 2px 8px rgba(0,0,0,.5)}.bm.held{background:var(--orange)}.bm.grey{background:var(--grey)}
+.bm-tag{position:absolute;left:30px;top:3px;background:var(--red);color:#fff;font-size:10px;font-weight:800;border-radius:5px;padding:2px 5px;white-space:nowrap}
+.cm{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font-weight:800;font-size:14px;color:#fff;border:2px solid #fff;box-shadow:0 2px 10px rgba(0,0,0,.55)}
+.cm.rec{background:var(--green);color:#03240f;box-shadow:0 0 0 6px rgba(32,209,106,.28),0 2px 10px rgba(0,0,0,.55)}.cm.alt{background:var(--purple)}.cm.sel{outline:3px solid var(--cyan);outline-offset:2px}
+.osm{width:34px;height:30px;border-radius:8px;display:grid;place-items:center;font-weight:800;font-size:11px;color:#fff;background:#6d4fd6;border:2px solid #fff}
+.gapl{background:rgba(42,15,22,.95);border:1px solid var(--red);color:#ffd0d4;border-radius:8px;padding:4px 8px;font-size:11px;white-space:nowrap;text-align:center;line-height:1.25}
+.gapl b{display:block;color:#ff8a92;font-size:10px;letter-spacing:.08em}.gapl strong{font-size:15px;color:#fff}
+.sm-ic{width:22px;height:22px;border-radius:6px;display:grid;place-items:center;font-size:13px;border:1.5px solid #fff}
+.leaflet-popup-content-wrapper{background:#0d2039;color:var(--text);border:1px solid var(--line2);border-radius:10px}.leaflet-popup-tip{background:#0d2039}
+.leaflet-popup-content{margin:10px 12px;font-size:12.5px}
+
+/* navigation overlay on the map */
+.navban{display:none;left:10px;right:10px;top:10px;padding:10px 14px;background:#0b3a22;border-color:#1f8f55;align-items:center;gap:14px}
+.navban .ic{font-size:34px;line-height:1;width:44px;text-align:center}
+.navban .verb{font-size:12px;font-weight:800;letter-spacing:.08em;color:#9ff0bf}
+.navban .road{font-size:19px;font-weight:800}
+.navban .dist{margin-left:auto;font-size:18px;font-weight:800;white-space:nowrap}
+.navban .nb{width:44px;height:44px;border-radius:10px;border:1px solid #1f8f55;background:#0e4a2b;font-size:20px;cursor:pointer;flex:none}
+.navcard{display:none;left:10px;right:10px;bottom:24px;padding:10px 14px;align-items:center;gap:16px}
+.navcard .big{font-size:24px;font-weight:800}.navcard small{display:block;color:var(--mut);font-size:11px}
+.navcard .btn{margin-left:auto}
+body.navmode .navban,body.navmode .navcard{display:flex}
+body.navmode .chips,body.navmode .legend{display:none}
+
+/* ---------- recommendation panel ---------- */
+.recbox{border:1px solid #1f8f55;background:linear-gradient(180deg,#0b2a1b,#0a1f17);border-radius:12px;padding:12px}
+.recbox.alt{border-color:#5b4a9e;background:linear-gradient(180deg,#1c1640,#141030)}
+.recbox.none{border-color:var(--line2);background:#0b1c31}
+.rb-k{font-size:11px;font-weight:800;letter-spacing:.1em;color:#7df0a8}.recbox.alt .rb-k{color:#cbbcff}.recbox.none .rb-k{color:#cfe0f3}
+.rb-t{font-size:18px;font-weight:800;margin:3px 0 2px;line-height:1.2}
+.rb-s{color:#cfe0f3;font-size:12.5px}
+.kv{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+.kv div{background:rgba(5,13,26,.45);border:1px solid var(--line);border-radius:9px;padding:7px 9px;min-width:0}
+.kv span:not(.tag){display:block;font-size:10.5px;color:var(--mut);text-transform:uppercase;letter-spacing:.05em;font-weight:700}
+.kv b{font-size:17px;white-space:nowrap}
+.ewt3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-top:10px}
+.ewt3 div{text-align:center;border-radius:9px;padding:8px 4px;border:1px solid var(--line);background:rgba(5,13,26,.45)}
+.ewt3 span{display:block;font-size:10px;color:var(--mut);font-weight:800;letter-spacing:.06em}
+.ewt3 b{font-size:22px;font-weight:800}
+.ewt3 .n b{color:#ff8a92}.ewt3 .w b{color:#7df0a8}.ewt3 .g b{color:#7df0a8}
+.why{margin-top:12px}.why h4{margin:0 0 6px;font-size:13px}
+.why ul{margin:0;padding-left:18px;display:grid;gap:4px;font-size:12.5px;color:#d5e5f5}
+.note{color:var(--mut);font-size:11.5px;margin-top:8px}
+
+/* ---------- bottom: option cards, timeline, table ---------- */
+.bottom{display:grid;gap:12px;margin-top:12px}
+.opts{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(170px,1fr);gap:10px;overflow-x:auto;padding-bottom:2px;scrollbar-width:thin}
+.opt{border:1px solid var(--line2);border-radius:12px;padding:10px 12px;background:#0b1c31;cursor:pointer;text-align:left;min-height:96px;position:relative}
+.opt:hover{border-color:#3b6f9f}
+.opt.rec{border-color:var(--green);background:#0b2a1b}.opt.sel{box-shadow:0 0 0 2px var(--cyan)}
+.opt .k{font-size:11px;font-weight:800;letter-spacing:.07em;color:#cfe0f3;text-transform:uppercase}
+.opt .n{font-size:12px;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.opt .e{font-size:24px;font-weight:800;margin-top:4px}.opt .e small{font-size:12px;color:var(--mut);font-weight:600;margin-left:4px}
+.opt .m{font-size:12px;color:#cfe0f3}
+.opt .badge{position:absolute;top:-9px;right:10px}.opts{padding-top:10px}
+.opt.na{opacity:.65;cursor:default}
+.tl{display:grid;gap:10px}
+.tlr{display:grid;grid-template-columns:150px minmax(0,1fr);gap:10px;align-items:center}
+.tlr .lab{font-size:12px;font-weight:700}.tlr .lab small{display:block;color:var(--mut);font-weight:500}
+.tlbar{display:flex;align-items:center;min-width:0}
+.tlbar .d{width:10px;height:10px;border-radius:50%;background:#cfe0f3;flex:none}
+.tlbar .d.sim{background:var(--red)}.tlbar .d.os{background:var(--purple)}.tlbar .d.v{background:transparent;border:1.5px dashed #8ba3bd}
+.tlbar .h{flex-grow:var(--w);flex-basis:0;min-width:28px;height:22px;display:flex;align-items:center;justify-content:center;position:relative;font-size:11.5px;font-weight:800}
+.tlbar .h::before{content:"";position:absolute;left:0;right:0;top:50%;height:4px;margin-top:-2px;border-radius:2px;background:var(--c)}
+.tlbar .h span{position:relative;background:var(--panel);padding:0 4px;border-radius:4px;color:var(--c)}
+.h.bad{--c:var(--red)}.h.mod{--c:var(--orange)}.h.ok{--c:var(--green)}.h.nrm{--c:#6b7f95}
+.tlkey{display:flex;flex-wrap:wrap;gap:12px;font-size:11.5px;color:var(--mut);margin-top:8px}
+.tlkey i{display:inline-block;width:18px;height:4px;border-radius:2px;vertical-align:middle;margin-right:5px}
+.ct{width:100%;border-collapse:collapse;font-size:12.5px}
+.ct th{text-align:left;color:var(--mut);font-weight:600;padding:6px;border-bottom:1px solid var(--line2);white-space:nowrap}
+.ct td{padding:7px 6px;border-bottom:1px solid var(--line);white-space:nowrap}
+.ct td.w{white-space:normal;min-width:140px}
+.ct tbody tr{cursor:pointer}.ct tbody tr:hover td{background:#0f2744}.ct tr.sel td{background:#0e2c52}
+.ct .gd{color:#7df0a8;font-weight:700}.ct .bd{color:#ff8a92;font-weight:700}
+.tw{overflow-x:auto}
+.clist{display:none}
+.cc{display:block;width:100%;text-align:left;border:1px solid var(--line2);border-radius:12px;background:#0b1c31;padding:12px;margin-top:8px;cursor:pointer;min-height:44px}
+.cc.rec{border-color:var(--green);background:#0b2a1b}
+.cc .t{display:flex;align-items:center;gap:10px;font-weight:800;font-size:15px}
+.cc .t .no{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;background:var(--purple);color:#fff;font-size:13px;flex:none}
+.cc.rec .t .no{background:var(--green);color:#03240f}
+.cc dl{display:grid;grid-template-columns:auto 1fr;gap:3px 14px;margin:8px 0 0;font-size:14px}.cc dt{color:var(--mut)}.cc dd{margin:0;font-weight:700;text-align:right}
+.mtabs,.sticky-cta,.m-only{display:none}
+.nav-steps{display:grid;gap:0;margin-top:10px}
+.ns{display:flex;gap:10px;align-items:flex-start;padding:8px 6px;border-radius:8px;cursor:pointer}
+.ns:hover{background:#0f2744}.ns.on{background:#0b3a22}
+.ns .ic{width:28px;height:28px;border-radius:8px;display:grid;place-items:center;background:#12283f;font-size:16px;flex:none}
+.ns.on .ic{background:var(--green);color:#03240f}
+.ns b{display:block;font-size:13px}.ns small{color:var(--mut);font-size:11.5px}
+.chain{display:flex;flex-direction:column;gap:2px;margin-top:10px;font-size:12.5px}
+.chain div{padding:3px 10px;border-left:3px solid #2b6b45}.chain div.a{border-color:var(--cyan);font-weight:700}.chain div.z{border-color:var(--green);font-weight:800;color:#7df0a8}
+.find{font-size:12px;margin-top:6px;display:grid;gap:4px}.find div{padding:5px 8px;border-radius:7px;background:#0b1c31;border:1px solid var(--line)}
+.foot{color:#5f7a94;font-size:11.5px;margin:16px 2px 0}
+
+/* ---------- shell (same as the other pages) ---------- */
+.desktop-shell{display:none}.mobile-bottom-nav{display:none}.mobile-more{display:none}.mobile-top-menu{display:none}.mobile-menu-btn{display:none}
+@media(min-width:1000px){body{padding-left:232px}.app{max-width:none;margin:0;padding-left:18px;padding-right:18px}.desktop-shell{display:flex;position:fixed;left:0;top:0;bottom:0;width:232px;background:#061425;border-right:1px solid #17324d;z-index:10000;flex-direction:column;padding:18px 12px}.shell-brand{padding:7px 10px 18px;border-bottom:1px solid #17324d}.shell-brand strong{font-size:16px;color:#f3f8ff}.shell-brand small{display:block;color:#718da7;margin-top:4px}.shell-label{padding:20px 10px 8px;color:#607d98;font-size:10px;font-weight:800;letter-spacing:.12em}.shell-link{display:flex;align-items:center;gap:10px;color:#9eb6cc;text-decoration:none;padding:11px 12px;margin:2px 0;border-radius:10px;font-size:13px;font-weight:650;position:relative}.shell-link .si{width:24px;text-align:center;font-size:16px}.shell-link:hover{background:#0c2238;color:#fff}.shell-link.active{background:#0c3154;color:#fff}.shell-link.active:before{content:'';position:absolute;left:-12px;top:8px;bottom:8px;width:3px;border-radius:4px;background:#35bfff}.shell-foot{margin-top:auto;padding:12px 10px;color:#64819b;font-size:11px}}
+.shell-hide,.shell-show{display:none}
+@media(min-width:1000px){
+  .shell-brand{position:relative;padding-right:40px!important}
+  .shell-hide{display:grid;place-items:center;position:absolute;right:0;top:4px;width:30px;height:30px;border-radius:8px;border:1px solid #17324d;background:#0a2036;color:#9eb6cc;font-size:17px;line-height:1;cursor:pointer;padding:0}
+  .shell-hide:hover,.shell-show:hover{background:#0c3154;color:#fff}
+  html.shell-off body{padding-left:0!important}
+  html.shell-off .desktop-shell{display:none!important}
+  html.shell-off .shell-show{display:grid;place-items:center;flex:none;width:36px;height:36px;border-radius:10px;border:1px solid #244766;background:#0a2036;color:#fff;font-size:18px;line-height:1;cursor:pointer;padding:0}
+  html.shell-off .shell-show + .brand{margin-right:auto}
+}
+
+/* ---------- tablet ---------- */
+@media(min-width:1000px) and (max-width:1399px){
+  .hp-grid{grid-template-columns:280px minmax(0,1fr)}
+  .hp-grid>.right{grid-column:1/-1;position:static;max-height:none}
+  .right .rec-inner{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:14px}
+  .filters{grid-template-columns:minmax(120px,1fr) minmax(100px,.8fr) auto minmax(130px,1fr) auto}
+  .filters .pill{display:none}
+}
+
+/* ---------- phone / small tablet: dedicated workflow ---------- */
+@media(max-width:999px){
+  body{padding-bottom:78px}
+  .app{padding:0 10px 18px}
+  .top{position:sticky;top:0;z-index:9000;background:rgba(5,18,33,.96);backdrop-filter:blur(12px);min-height:56px;padding:9px 2px}
+  .brand h1{font-size:16px}.brand p{display:none}
+  .hdr-right .clock{font-size:10px}.live{font-size:11px}
+  .mobile-menu-btn{display:grid;width:44px;height:44px;place-items:center;border:1px solid #244766;border-radius:10px;background:#0a2036;color:#fff;font-size:20px;cursor:pointer;flex:none}
+  .mobile-bottom-nav{display:grid;grid-template-columns:repeat(4,1fr);position:fixed;left:0;right:0;bottom:0;z-index:12000;background:rgba(5,18,33,.98);border-top:1px solid #21415e;padding:7px max(6px,env(safe-area-inset-right)) calc(7px + env(safe-area-inset-bottom)) max(6px,env(safe-area-inset-left))}
+  .mbn{color:#829db5;text-decoration:none;text-align:center;font-size:10px;font-weight:650;padding:3px 2px;border-radius:9px;min-height:44px}.mbn .mi{display:block;font-size:19px;line-height:22px}.mbn.active{color:#4bc7ff;background:#0a2945}
+  .mobile-more{display:none;position:fixed;left:10px;right:10px;bottom:74px;z-index:13000;background:#091c30;border:1px solid #275176;border-radius:16px;padding:8px}.mobile-more.open{display:block}.mobile-more a{display:flex;align-items:center;gap:12px;color:#d7e7f5;text-decoration:none;padding:13px;border-radius:10px;font-weight:650}.mobile-more a.active{background:#0d3559;color:#55c7ff}
+  .mobile-top-menu{display:none;position:fixed;top:calc(56px + env(safe-area-inset-top) + 8px);left:8px;z-index:13000;min-width:230px;max-width:82vw;background:#091c30;border:1px solid #275176;border-radius:16px;padding:8px}.mobile-top-menu.open{display:block}.mobile-top-menu a{display:flex;align-items:center;gap:12px;color:#d7e7f5;text-decoration:none;padding:13px;border-radius:10px;font-weight:650;white-space:nowrap}.mobile-top-menu a.active{background:#0d3559;color:#55c7ff}
+  .hp-head{margin:8px 0 8px;gap:8px}.hp-head h2{font-size:17px}.hp-head p{display:none}
+  .modes{width:100%}.modes button{flex:1;justify-content:center;min-height:48px;padding:0 8px;font-size:14px}
+  .filters{grid-template-columns:minmax(0,1fr) auto auto;gap:6px;margin:0 0 6px}
+  .filters .f-op,.filters .f-now{display:none}
+  .filters .fld>label,.filters .flab{display:none}
+  .filters .seg button{padding:0 10px}
+  .filters #load{padding:0 12px;font-size:13px}
+  .filters .pill{display:none}
+  .inp,select.inp,.seg{height:46px}.btn{min-height:46px}
+  .mtabs{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;position:sticky;top:56px;z-index:8000;background:rgba(5,13,26,.97);padding:6px 0;margin:0 0 8px}
+  .mtabs button{min-height:46px;border-radius:10px;border:1px solid var(--line2);background:var(--panel);font-weight:800;font-size:12.5px;letter-spacing:.05em;color:#a9c2da;cursor:pointer;position:relative}
+  .mtabs button[aria-selected="true"]{background:var(--blue);border-color:#4aa6ff;color:#fff}
+  .mtabs button .dotn{position:absolute;top:6px;right:8px;width:8px;height:8px;border-radius:50%;background:var(--green);display:none}
+  .mtabs button.has .dotn{display:block}
+  .hp-grid{display:block}
+  .side{position:static;max-height:none;overflow:visible}
+  .t-map,.t-sim,.t-res{display:none}
+  body.tab-map .t-map,body.tab-sim .t-sim,body.tab-res .t-res{display:block}
+  .mapcard{height:calc(100vh - 318px - env(safe-area-inset-bottom,0px));height:calc(100dvh - 318px - env(safe-area-inset-bottom,0px));min-height:340px}
+  .legend{display:none}
+  .chips{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;right:10px}.chips::-webkit-scrollbar{display:none}.chips label{flex:none}
+  .sheet{position:absolute;left:0;right:0;bottom:0;z-index:600;background:rgba(9,25,44,.98);border-top:1px solid var(--line2);border-radius:16px 16px 0 0;padding:6px 14px 12px;max-height:55%;overflow-y:auto}
+  .sheet::before{content:"";display:block;width:40px;height:4px;border-radius:2px;background:#3b5b7c;margin:0 auto 8px}
+  .opts{grid-auto-flow:row;grid-auto-columns:auto;overflow:visible}
+  .opt{min-height:0;display:grid;grid-template-columns:1fr auto;align-items:center;gap:2px 10px}
+  .opt .e{grid-row:1/3;grid-column:2;margin:0;text-align:right}.opt .badge{position:static;grid-column:1}
+  .ct-wrap{display:none}
+  .clist{display:block}
+  .tlr{grid-template-columns:1fr}.tlr .lab small{display:inline;margin-left:6px}
+  body:not(.tab-res) #mCta{display:none!important}
+  .sticky-cta-l{position:sticky;bottom:calc(74px + env(safe-area-inset-bottom,0px));z-index:700;padding:8px 0 4px;background:linear-gradient(180deg,rgba(10,26,46,0),var(--panel) 35%)}
+  .live #liveText{display:none}
+  .navcard{gap:12px}.navcard .big{font-size:20px;white-space:nowrap}
+  .sticky-cta{display:block;position:sticky;bottom:calc(74px + env(safe-area-inset-bottom,0px));z-index:700;padding:8px 0 0;background:linear-gradient(180deg,transparent,var(--bg) 30%)}
+  .m-only{display:block}
+  .d-only{display:none!important}
+  .kv b{font-size:18px}.ewt3 b{font-size:24px}
+  /* navigation mode: full screen map */
+  body.navmode{overflow:hidden}
+  body.navmode .mapcard{position:fixed;inset:0;z-index:14000;height:auto;min-height:0;border-radius:0;border:0;display:block!important}
+  body.navmode .sheet{display:none}
+  body.navmode .navban{top:calc(10px + env(safe-area-inset-top,0px))}
+  body.navmode .navcard{bottom:calc(14px + env(safe-area-inset-bottom,0px))}
+  .navban .road{font-size:20px}.navban .dist{font-size:20px}
+}
+@media(min-width:1000px){.sheet{display:none}.m-only{display:none!important}}
+</style>
+</head>
+<body class="tab-map">
+<aside class="desktop-shell" aria-label="Primary navigation"><div class="shell-brand"><strong>SG Transport Pulse</strong><small>Operations Intelligence</small></div><div class="shell-label">ANALYSIS TOOLS</div><a class="shell-link " href="/"><span class="si">▰</span><span>Route Traffic</span></a><a class="shell-link " href="/control"><span class="si">↔</span><span>Headway Control</span></a><a class="shell-link " href="/bunching"><span class="si">≋</span><span>Bunching & Gap</span></a><a class="shell-link active" href="/halfway"><span class="si">½</span><span>Halfway Planner</span></a><a class="shell-link " href="/traffic"><span class="si">⚠</span><span>Traffic-Aware</span></a><a class="shell-link " href="/halfway/timetable"><span class="si">▤</span><span>Timetable Optimiser</span></a><a class="shell-link " href="/running-time"><span class="si">⏱</span><span>Running Time Analytics</span></a><a class="shell-link " href="/cameras"><span class="si">📷</span><span>Traffic Cameras</span></a><div class="shell-foot">● Live operational workspace</div></aside>
+
+<div class="app">
+  <header class="top">
+    <button class="mobile-menu-btn" type="button" aria-label="Open navigation" onclick="document.getElementById('mobileTopMenu').classList.toggle('open')">☰</button><div class="mobile-top-menu" id="mobileTopMenu"><a href="/">▰ Route</a><a href="/control">↔ Headway</a><a href="/bunching">≋ Bunching</a><a class="active" href="/halfway">½ Halfway Planner</a><a href="/traffic">⚠ Traffic-Aware Regulation</a><a href="/halfway/timetable">▤ Timetable Optimiser</a><a href="/planner">◉ Off-service Route Planner</a><a href="/running-time">⏱ Running Time</a><a href="/cameras">📷 Traffic Cameras</a></div>
+    <div class="brand"><div class="logo" aria-hidden="true">🚌</div><div><h1>SG Transport Pulse</h1></div></div>
+    <div class="hdr-right"><div><div class="clock num" id="clock">&nbsp;</div><div class="live" id="live"><span class="dot"></span><span id="liveText">Live data (LTA)</span></div></div></div>
+  </header>
+
+  <section class="hp-head">
+    <div><h2>Halfway Planner</h2><p>Find the best deployment point to minimise EWT. Decision support only &mdash; nothing is dispatched.</p></div>
+    <div class="modes" role="group" aria-label="Planning mode">
+      <button type="button" id="mLate" aria-pressed="true"><span class="mi">⏱</span>Recover Late Duty</button>
+      <button type="button" id="mOs" aria-pressed="false"><span class="mi">＋</span>Deploy OS Bus</button>
+    </div>
+  </section>
+
+  <form class="filters" id="filters" autocomplete="off" onsubmit="return false">
+    <div class="fld f-op"><label for="op">Transport Operator</label><select class="inp" id="op"><option value="">All operators</option><option value="SBST">SBS Transit</option><option value="SMRT">SMRT</option><option value="TTS">Tower Transit</option><option value="GAS">Go-Ahead</option></select></div>
+    <div class="fld f-svc"><label for="svc">Service</label><input class="inp" id="svc" list="svcList" maxlength="6" placeholder="e.g. 156" inputmode="text" autocapitalize="characters"><datalist id="svcList"></datalist></div>
+    <div class="fld f-dir"><span class="flab">Direction</span><div class="seg" role="group" aria-label="Direction"><button type="button" id="d1" aria-pressed="true">Dir 1</button><button type="button" id="d2" aria-pressed="false">Dir 2</button></div></div>
+    <div class="fld f-now"><span class="flab">Date / time</span><div class="nowbox num" id="nowbox">Now <small>&middot; live snapshot</small></div></div>
+    <div class="fld f-load"><span class="flab d-only">&nbsp;</span><button type="button" class="btn go" id="load">Load live buses</button></div>
+    <div class="fld"><span class="flab d-only">&nbsp;</span><span class="pill live" id="modePill"><i></i>LIVE</span></div>
+  </form>
+
+  <nav class="mtabs" role="tablist" aria-label="Halfway Planner views">
+    <button type="button" role="tab" id="tMap" aria-selected="true" data-tab="map">LIVE MAP<i class="dotn"></i></button>
+    <button type="button" role="tab" id="tSim" aria-selected="false" data-tab="sim">SIMULATION<i class="dotn"></i></button>
+    <button type="button" role="tab" id="tRes" aria-selected="false" data-tab="res">RESULTS<i class="dotn"></i></button>
+  </nav>
+
+  <div class="hp-grid">
+    <!-- LEFT: scenario configuration -->
+    <aside class="card side left t-sim" id="cfg" aria-label="Scenario configuration">
+      <div id="cfgLate">
+        <div class="sec">
+          <div class="sec-t"><span>1 &middot; Observed bus</span><span class="tag live">LIVE</span></div>
+          <div class="buses" id="busList"><div class="empty">Enter a service and load the live buses.</div></div>
+        </div>
+      </div>
+      <div id="cfgOs" hidden>
+        <div class="sec">
+          <div class="sec-t"><span>1 &middot; OS bus</span><span class="tag sim">SIM</span></div>
+          <div class="fld"><label for="osFrom">OS available at</label>
+            <select class="inp" id="osFrom"><option value="first">First stop / interchange</option><option value="stop">A bus stop (code)</option><option value="map">Pick a point on the map</option></select></div>
+          <div class="fld" id="osStopF" hidden style="margin-top:8px"><label for="osStop">Bus stop code</label><input class="inp" id="osStop" maxlength="5" inputmode="numeric" placeholder="e.g. 17009"></div>
+          <div class="fld" id="osMapF" hidden style="margin-top:8px"><span class="flab">Map point</span><div class="row2"><div class="nowbox" id="osPt">not set</div><button type="button" class="btn" id="osPick">Pick</button></div></div>
+          <div class="fld" style="margin-top:8px"><label for="osTime">OS available time</label><input class="inp num" id="osTime" data-time maxlength="5" inputmode="numeric" placeholder="now"></div>
+          <label class="chk" style="margin-top:6px"><input type="checkbox" id="osWithDelay"> Also simulate a delayed bus</label>
+          <div id="osBusWrap" hidden><div class="buses" id="busList2"></div></div>
+        </div>
+      </div>
+      <div class="sec" id="delaySec">
+        <div class="sec-t"><span>2 &middot; Simulated delay</span><span class="tag sim">SIM</span></div>
+        <label class="chk"><input type="checkbox" id="delayOn" checked> Inject delay for simulation</label>
+        <div class="step" aria-label="Delay in minutes"><button type="button" id="dMinus" aria-label="Less delay">&minus;</button><div class="val"><input id="delay" class="num" value="20" inputmode="numeric" maxlength="3" aria-label="Delay minutes"><span style="font-size:14px;color:var(--mut)">min</span></div><button type="button" id="dPlus" aria-label="More delay">+</button></div>
+        <div class="presets" id="presets"><button type="button" data-v="5">+5</button><button type="button" data-v="10">+10</button><button type="button" data-v="15">+15</button><button type="button" data-v="20" aria-pressed="true">+20</button><button type="button" data-v="30">+30</button></div>
+        <div id="predCmp"></div>
+      </div>
+      <div class="sec">
+        <div class="sec-t"><span>Options tested</span></div>
+        <div class="row2">
+          <div class="fld"><label for="scope">Entry points</label><select class="inp" id="scope"><option value="auto">Auto</option><option value="approved">Approved only</option><option value="all">Every stop</option></select></div>
+          <div class="fld"><label for="maxReach">Max reach, min</label><input class="inp num" id="maxReach" value="45" inputmode="numeric" maxlength="2"></div>
+        </div>
+        <p class="note">Approved halfway points are managed in the <a href="/halfway/timetable">Timetable Optimiser</a> settings.</p>
+      </div>
+      <div class="sticky-cta-l"><button type="button" class="btn go big" id="run" disabled>Run Simulation</button></div>
+      <div id="cfgMsg"></div>
+      <div class="m-only" id="clistWrap"><div class="sec"><div class="sec-t"><span>Candidate points</span><span class="tag pred">PRED</span></div><div class="clist" id="clist"><div class="empty">Run the simulation to rank the candidate points.</div></div></div></div>
+    </aside>
+
+    <!-- CENTRE: map -->
+    <section class="t-map" aria-label="Route map">
+      <div class="mapcard" id="mapcard">
+        <div id="map" role="application" aria-label="Map of the service route"></div>
+        <div class="ovl chips" id="chips">
+          <label style="--k:var(--green)"><input type="checkbox" data-l="traffic" checked>Traffic speed</label>
+          <label style="--k:var(--red)"><input type="checkbox" data-l="incidents" checked>Incidents</label>
+          <label style="--k:var(--amber)"><input type="checkbox" data-l="roadworks" checked>Road works</label>
+          <label style="--k:#fff"><input type="checkbox" data-l="stops" checked>Bus stops</label>
+          <label style="--k:var(--purple)"><input type="checkbox" data-l="cands" checked>Candidate points</label>
+        </div>
+        <div class="ovl legend" id="legend">
+          <div><i style="background:var(--blue)"></i>Live DataMall bus</div>
+          <div><i style="background:var(--red)"></i>Simulated delayed bus</div>
+          <div><i style="background:var(--green)"></i>Recommended entry</div>
+          <div><i style="background:var(--purple)"></i>Alternative point</div>
+          <div><i style="background:var(--grey)"></i>Other tested stop</div>
+        </div>
+        <div class="ovl maptoast" id="maptoast"></div>
+        <div class="ovl navban" id="navban" aria-live="polite">
+          <button type="button" class="nb" id="navPrev" aria-label="Previous instruction">&lsaquo;</button>
+          <div class="ic" id="nbIc">↑</div><div style="min-width:0"><div class="verb" id="nbVerb">HEAD</div><div class="road" id="nbRoad">&nbsp;</div></div>
+          <div class="dist num" id="nbDist"></div>
+          <button type="button" class="nb" id="navNext" aria-label="Next instruction">&rsaquo;</button>
+        </div>
+        <div class="ovl navcard" id="navcard">
+          <div><div class="big num" id="ncMin">&ndash;</div><small>off-service</small></div>
+          <div><div class="big num" id="ncKm">&ndash;</div><small>distance</small></div>
+          <div><div class="big num" id="ncEta">&ndash;</div><small>ETA at stop</small></div>
+          <button type="button" class="btn" id="navExit">Exit route</button>
+        </div>
+        <div class="sheet" id="sheet"></div>
+      </div>
+    </section>
+
+    <!-- RIGHT: recommended deployment point -->
+    <aside class="card side right t-res" id="recPanel" aria-label="Recommended deployment point">
+      <div class="rec-inner" id="rec"><div><div class="sec-t"><span>Recommended deployment</span></div><div class="empty">Load a service, choose the scenario and run the simulation. The recommendation comes from the simulated EWT of every option.</div></div></div>
+    </aside>
+  </div>
+
+  <!-- BOTTOM: simulation comparison -->
+  <section class="bottom t-res" id="bottom" hidden>
+    <div class="card"><div class="sec-t"><span>Simulation results &middot; projected EWT</span><span class="tag pred">PRED</span></div><div class="opts" id="opts"></div><p class="note" id="optsNote"></p></div>
+    <div class="card"><div class="sec-t"><span id="tlTitle">Headway before / after</span><span class="tag pred">PRED</span></div><div class="tl" id="tl"></div>
+      <div class="tlkey"><span><i style="background:var(--red)"></i>problem gap</span><span><i style="background:var(--orange)"></i>moderate / bunching</span><span><i style="background:var(--green)"></i>recovered</span><span><i style="background:#6b7f95"></i>normal</span></div></div>
+    <div class="card ct-wrap"><div class="sec-t"><span>All tested entry points</span><span class="note" id="ctNote" style="margin:0;text-transform:none;letter-spacing:0;font-weight:500"></span></div><div class="tw"><table class="ct"><thead id="ctH"></thead><tbody id="ctB"></tbody></table></div></div>
+  </section>
+  <div class="sticky-cta t-res" id="mCta"></div>
+
+  <p class="foot">Live: LTA DataMall Bus Arrival &amp; speed bands (unchanged). Simulated: injected delays and virtual OS buses exist only in this planner. Predicted: running times, headways and EWT from the route model. SG Transport Pulse V14.0</p>
+</div>
+
+<nav class="mobile-bottom-nav" aria-label="Mobile primary navigation"><a class="mbn" href="/"><span class="mi">▰</span>Route</a><a class="mbn" href="/control"><span class="mi">↔</span>Headway</a><a class="mbn active" href="/halfway"><span class="mi">½</span>Halfway</a><button class="mbn" type="button" style="border:0;background:transparent;font-family:inherit" onclick="document.getElementById('mobileMore').classList.toggle('open')"><span class="mi">•••</span>More</button></nav><div class="mobile-more" id="mobileMore"><a href="/bunching">≋ Bunching</a><a href="/traffic">⚠ Traffic-Aware Regulation</a><a href="/halfway/timetable">▤ Timetable Optimiser</a><a href="/planner">◉ Off-service Route Planner</a><a href="/running-time">⏱ Running Time</a><a href="/cameras">📷 Traffic Cameras</a></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+"use strict";
+/* ===================== SG Transport Pulse V14.0 · Halfway Planner =====================
+   LIVE      = LTA DataMall observations (buses, arrivals, speed bands, incidents, road works) - never modified here.
+   SIMULATED = injected delays and the virtual OS bus - they exist only in this page's scenario.
+   PREDICTED = running times, headways and EWT from the route model (api/hplan/*, engine hplan.py). */
+const $ = id => document.getElementById(id);
+const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const f1 = x => x == null ? "\u2013" : (Math.round(x * 10) / 10).toFixed(1);
+const f0 = x => x == null ? "\u2013" : String(Math.round(x));
+const fkm = k => k == null ? "\u2013" : k < 1 ? `${Math.round(k * 1000)} m` : `${f1(k)} km`;
+const q = o => new URLSearchParams(Object.entries(o).filter(([, v]) => v !== undefined && v !== null && v !== "")).toString();
+const isM = () => window.innerWidth < 1000;
+const tag = (k, t) => `<span class="tag ${k}">${t || {live:"LIVE", sim:"SIM", pred:"PRED", rec:"RECOMMENDED", alt:"ALTERNATIVE"}[k]}</span>`;
+async function api(u, ms){
+  const c = new AbortController(), t = setTimeout(() => c.abort(), ms || 45000);
+  try{ const r = await fetch(u, {signal:c.signal}); return await r.json(); }
+  catch(e){ return {ok:false, error:e.name === "AbortError" ? "The request timed out." : "Network error - check the connection."}; }
+  finally{ clearTimeout(t); }
+}
+const hav = (a, b) => { const R = 6371, p1 = a[0] * Math.PI / 180, p2 = b[0] * Math.PI / 180, dp = p2 - p1, dl = (b[1] - a[1]) * Math.PI / 180;
+  return 2 * R * Math.asin(Math.sqrt(Math.sin(dp / 2) ** 2 + Math.cos(p1) * Math.cos(p2) * Math.sin(dl / 2) ** 2)); };
+const gainTxt = g => g == null ? "\u2013" : Math.abs(g) < 0.05 ? "\u00b10.0" : `${g > 0 ? "\u2193" : "\u2191"}${f1(Math.abs(g))}`;
+const addMin = (hhmm, m) => { if(!hhmm) return null; const [h, mm] = hhmm.split(":").map(Number); const t = ((h * 60 + mm + Math.round(m)) % 1440 + 1440) % 1440; return `${String(Math.floor(t / 60)).padStart(2, "0")}:${String(t % 60).padStart(2, "0")}`; };
+
+const ST = {mode:"late", svc:"", dir:1, op:"", snap:null, bus:null, delay:20, delayOn:true, osFrom:"first", osPt:null, picking:false, osWithDelay:false,
+            res:null, sel:null, route:null, navI:0, runs:null, inc:[], rw:[], cum:null, busy:false,
+            layers:{traffic:true, incidents:true, roadworks:true, stops:true, cands:true}};
+
+/* ---------------------------------------------------------------- map */
+const map = L.map("map", {zoomControl:true, attributionControl:true}).setView([1.3521, 103.8198], 12);
+let tileErr = 0, fell = false;
+const night = L.tileLayer("https://www.onemap.gov.sg/maps/tiles/Night/{z}/{x}/{y}.png", {minZoom:11, maxZoom:19, detectRetina:true,
+  attribution:'<a href="https://www.onemap.gov.sg/" target="_blank" rel="noopener">OneMap</a> &copy; contributors &#124; Singapore Land Authority'}).addTo(map);
+night.on("tileerror", () => { if(fell || ++tileErr < 4) return; fell = true; map.removeLayer(night);
+  L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {maxZoom:19, attribution:"&copy; OpenStreetMap contributors &copy; CARTO"}).addTo(map); });
+map.createPane("routeP").style.zIndex = 410; map.createPane("hiP").style.zIndex = 430;
+const G = {}; ["route", "traffic", "stops", "inc", "rw", "gap", "cands", "buses", "os", "nav", "after", "pin"].forEach(k => G[k] = L.layerGroup().addTo(map));
+const toast = (t, ms) => { const el = $("maptoast"); el.textContent = t; el.style.display = "block"; clearTimeout(toast.t); toast.t = setTimeout(() => el.style.display = "none", ms || 3500); };
+function syncLayers(){
+  const on = (g, v) => v ? (map.hasLayer(g) || map.addLayer(g)) : (map.hasLayer(g) && map.removeLayer(g));
+  const nav = document.body.classList.contains("navmode");
+  on(G.traffic, ST.layers.traffic && !nav); on(G.inc, ST.layers.incidents); on(G.rw, ST.layers.roadworks); on(G.stops, ST.layers.stops && !nav); on(G.cands, ST.layers.cands && !nav);
+  on(G.gap, !nav); on(G.buses, true);
+}
+document.querySelectorAll("#chips input").forEach(cb => cb.onchange = () => { ST.layers[cb.dataset.l] = cb.checked; syncLayers(); });
+
+const bandCol = b => b == null ? "#5d7390" : b <= 2 ? "#ff4d55" : b === 3 ? "#ff8a3d" : b === 4 ? "#ffc21a" : "#20d16a";
+function lineCum(line){ const c = [0]; for(let i = 1; i < line.length; i++) c.push(c[i - 1] + hav(line[i - 1], line[i])); return c; }
+function cutLine(a, b){                                          // part of the (simplified) service line between two route km positions
+  const L_ = ST.snap.line, c = ST.cum, tot = ST.snap.route.km || c[c.length - 1], k = (c[c.length - 1] || 1) / (tot || 1);
+  const lo = Math.min(a, b) * k, hi = Math.max(a, b) * k, out = [];
+  for(let i = 0; i < L_.length; i++) if(c[i] >= lo - 0.05 && c[i] <= hi + 0.05) out.push(L_[i]);
+  return out;
+}
+const busKm = id => { if(typeof id === "string" && id[0] === "S") return 0; const b = (ST.snap.buses || []).find(x => x.id === id); return b ? b.km : null; };
+const busLabel = id => id == null ? "\u2013" : typeof id === "string" && id[0] === "S" ? "next departure" : id === "OS" ? "the OS bus" : `Bus ${id}`;
+
+function drawBase(){
+  ["route", "traffic", "stops", "inc", "rw"].forEach(k => G[k].clearLayers());
+  const sn = ST.snap; if(!sn) return;
+  L.polyline(sn.line, {color:"#04101f", weight:9, opacity:.9, pane:"routeP", interactive:false}).addTo(G.route);
+  L.polyline(sn.line, {color:"#2f7dff", weight:5, opacity:.95, pane:"routeP", interactive:false}).addTo(G.route);
+  (ST.runs || []).forEach(r => { if(r.pts && r.pts.length > 1) L.polyline(r.pts, {color:bandCol(r.b), weight:4, opacity:.95, pane:"routeP", interactive:false}).addTo(G.traffic); });
+  sn.stops.forEach(s => L.circleMarker([s.lat, s.lon], {radius:3.5, color:"#cfe0f3", weight:1, fillColor:"#0a1626", fillOpacity:1, pane:"routeP"})
+    .bindTooltip(`${esc(s.code)} ${esc(s.name)}`, {direction:"top"}).addTo(G.stops));
+  const ic = (c, t) => L.divIcon({className:"", html:`<div class="sm-ic" style="background:${c}">${t}</div>`, iconSize:[22, 22], iconAnchor:[11, 11]});
+  ST.inc.forEach(x => L.marker([x.lat, x.lon], {icon:ic("#ff4d55", "!")}).bindPopup(`<b>${esc(x.type)}</b> ${tag("live")}<br>${esc(x.message)}`).addTo(G.inc));
+  ST.rw.forEach(x => L.marker([x.lat, x.lon], {icon:ic("#c99400", "\u26a0")}).bindPopup(`<b>Road works</b> ${tag("live")}<br>${esc(x.road || x.message || "")}${x.start ? `<br><small>${esc(x.start)} \u2013 ${esc(x.end || "")}</small>` : ""}`).addTo(G.rw));
+  syncLayers();
+}
+
+function simBusId(){ return (ST.mode === "late" || ST.osWithDelay) && ST.delayOn && ST.bus != null ? ST.bus : null; }
+function heldIds(){ const o = ST.res && ST.sel === "regulate" ? (ST.res.options || []).find(x => x.key === "regulate") : null; return o && o.held ? o.held.map(h => +h.split(" ")[1]) : []; }
+function drawBuses(){
+  G.buses.clearLayers(); const sn = ST.snap; if(!sn) return;
+  const sim = simBusId(), held = heldIds();
+  sn.buses.forEach(b => {
+    const isSim = b.id === sim, cls = isSim ? "sim" : held.includes(b.id) ? "held" : "live";
+    const icon = L.divIcon({className:"", html:`<div class="bm ${cls}">${b.id}</div>${isSim ? `<span class="bm-tag">+${ST.delay}\u2032 SIM</span>` : ""}`, iconSize:[28, 28], iconAnchor:[14, 14]});
+    const nx = b.next;
+    const pop = `<b>Bus ${b.id}</b> ${tag("live")}<br>Near ${esc(b.near ? b.near.name : "")}` +
+      (nx ? `<br>DataMall: ${esc(nx.name)} at <b>${esc(nx.clock)}</b>` + (isSim ? `<br><span style="color:#ff9aa0">Simulated: <b>${addMin(nx.clock, ST.delay)}</b> (+${ST.delay} min)</span>` : "") : "") +
+      ((ST.mode === "late" || ST.osWithDelay) ? `<br><button type="button" class="btn sm" data-bus="${b.id}" style="margin-top:6px">${isSim ? "Selected" : "Delay this bus"}</button>` : "");
+    L.marker([b.lat, b.lon], {icon, zIndexOffset:isSim ? 900 : 500}).bindPopup(pop).addTo(G.buses);
+  });
+}
+map.on("popupopen", e => { const b = e.popup.getElement() && e.popup.getElement().querySelector("[data-bus]"); if(b) b.onclick = () => { map.closePopup(); pickBus(+b.dataset.bus); }; });
+
+function osOrigin(){
+  if(ST.res && ST.res.origin && ST.mode === "os") return [ST.res.origin.lat, ST.res.origin.lon];
+  if(!ST.snap) return null;
+  if(ST.osFrom === "first") return [ST.snap.stops[0].lat, ST.snap.stops[0].lon];
+  if(ST.osFrom === "stop"){ const s = ST.snap.stops.find(x => x.code === $("osStop").value.trim()); return s ? [s.lat, s.lon] : null; }
+  return ST.osPt;
+}
+function drawOs(){
+  G.os.clearLayers(); if(ST.mode !== "os" || !ST.snap) return;
+  const p = osOrigin(); if(!p) return;
+  L.marker(p, {icon:L.divIcon({className:"", html:`<div class="osm">OS</div>`, iconSize:[34, 30], iconAnchor:[17, 15]}), zIndexOffset:950})
+    .bindPopup(`<b>OS bus</b> ${tag("sim")}<br>Available ${esc($("osTime").value || "now")}<br><small>Virtual bus: exists only in this simulation.</small>`).addTo(G.os);
+}
+
+function candByKey(k){ return ST.res ? (ST.res.candidates || []).find(c => c.key === k) : null; }
+function optByKey(k){ return ST.res ? ((ST.res.options || []).find(o => o.key === k) || candByKey(k)) : null; }
+function drawResult(){
+  G.gap.clearLayers(); G.cands.clearLayers(); G.pin.clearLayers();
+  const r = ST.res; if(!r || !r.ok) return;
+  // the developing gap (No action)
+  const g = r.gap, ka = busKm(g.between[0]), kb = busKm(g.between[1]);
+  if(ka != null && kb != null && Math.abs(ka - kb) > 0.1){
+    const seg = cutLine(ka, kb);
+    if(seg.length > 1){
+      L.polyline(seg, {color:"#ff4d55", weight:14, opacity:.35, pane:"hiP", interactive:false}).addTo(G.gap);
+      const mid = seg[Math.floor(seg.length / 2)], big = g.minutes >= 1.5 * r.H;
+      L.marker(mid, {icon:L.divIcon({className:"", html:`<div class="gapl"><b>${big ? "LARGE GAP" : "LARGEST GAP"}</b><strong class="num">${f0(g.minutes)} min</strong><br>without intervention</div>`, iconSize:[140, 52], iconAnchor:[70, 60]}), interactive:false}).addTo(G.gap);
+    }
+  }
+  // candidate points: top N numbered (green = recommended, purple = alternatives), the rest grey
+  const top = new Set(r.top);
+  (r.candidates || []).forEach(c => {
+    if(top.has(c.key)) return;
+    L.circleMarker([c.lat, c.lon], {radius:5, color:"#fff", weight:1, fillColor:"#6b7f95", fillOpacity:.9, pane:"hiP"})
+      .bindTooltip(`#${c.rank} BS ${esc(c.code)} \u00b7 EWT ${f1(c.ewt)}`).on("click", () => selectOpt(c.key, true)).addTo(G.cands);
+  });
+  r.top.map(candByKey).filter(Boolean).forEach(c => {
+    const cls = (c.key === r.recommended ? "rec" : "alt") + (c.key === ST.sel ? " sel" : "");
+    L.marker([c.lat, c.lon], {icon:L.divIcon({className:"", html:`<div class="cm ${cls}">${c.rank}</div>`, iconSize:[30, 30], iconAnchor:[15, 15]}), zIndexOffset:c.key === r.recommended ? 1200 : 1000})
+      .bindTooltip(`#${c.rank} BS ${esc(c.code)} ${esc(c.name)} \u00b7 EWT ${f1(c.ewt)} min`).on("click", () => selectOpt(c.key, true)).addTo(G.cands);
+  });
+  // indicative link from the bus / OS to the selected point (the road path comes with "View deployment route")
+  const c = candByKey(ST.sel);
+  if(c && r.origin) L.polyline([[r.origin.lat, r.origin.lon], [c.lat, c.lon]], {color:c.key === r.recommended ? "#20d16a" : "#a78bfa", weight:2.5, dashArray:"4 7", opacity:.9, interactive:false}).addTo(G.pin);
+  syncLayers();
+}
+function drawAll(){ drawBuses(); drawOs(); drawResult(); }
+map.on("click", e => {
+  if(!ST.picking) return;
+  ST.osPt = [+e.latlng.lat.toFixed(5), +e.latlng.lng.toFixed(5)]; ST.picking = false;
+  $("osPt").textContent = `${ST.osPt[0].toFixed(4)}, ${ST.osPt[1].toFixed(4)}`; $("maptoast").classList.remove("pickhint"); toast("OS location set.");
+  drawOs(); invalidate();
+});
+
+/* ---------------------------------------------------------------- services + operator filter */
+let SVCS = [];
+async function loadServices(){
+  const j = await api("/api/traffic/services", 30000); SVCS = j.services || []; fillSvc();
+}
+function fillSvc(){
+  const list = SVCS.filter(s => !ST.op || (s.operators || []).includes(ST.op)).map(s => s.svc);
+  $("svcList").innerHTML = list.slice(0, 700).map(s => `<option value="${esc(s)}">`).join("");
+}
+$("op").onchange = () => { ST.op = $("op").value; fillSvc(); };
+
+/* ---------------------------------------------------------------- live snapshot */
+async function loadSnap(){
+  const svc = $("svc").value.trim().toUpperCase();
+  if(!svc){ $("svc").focus(); cfgMsg("err", "Enter a bus service first."); return; }
+  ST.svc = svc; setBusy(true, "load");
+  const [sn, rt, inc, rw] = await Promise.all([
+    api(`/api/hplan/snapshot?${q({service:svc, direction:ST.dir})}`, 60000), api(`/api/route?${q({service:svc, direction:ST.dir})}`, 60000),
+    api(`/api/incidents?${q({service:svc, direction:ST.dir})}`, 30000), api("/api/roadworks", 30000)]);
+  setBusy(false, "load");
+  if(!sn.ok){ cfgMsg("err", sn.error || "Could not load the live buses."); return; }
+  if(sn.directions && sn.directions.length && !sn.directions.includes(ST.dir)){ ST.dir = sn.directions[0]; syncDir(); return loadSnap(); }
+  ST.snap = sn; ST.cum = lineCum(sn.line); ST.res = null; ST.sel = null; ST.route = null; exitNav(true);
+  ST.runs = rt && rt.runs ? rt.runs : null;
+  ST.inc = (inc.incidents || []).filter(x => x.lat != null);
+  const pts = sn.line.filter((p, i) => i % 3 === 0);
+  ST.rw = (rw.roadworks || []).filter(x => x.lat != null && pts.some(p => hav(p, [x.lat, x.lon]) <= 0.3)).slice(0, 40);
+  if(!sn.buses.some(b => b.id === ST.bus)) ST.bus = null;
+  $("d2").disabled = sn.directions && !sn.directions.includes(2);
+  $("load").textContent = "Refresh live buses";
+  $("nowbox").innerHTML = `${new Date().toLocaleDateString("en-SG", {day:"2-digit", month:"short"})} ${esc(sn.now)} <small>&middot; live snapshot</small>`;
+  history.replaceState(null, "", `?${q({svc, dir:ST.dir, mode:ST.mode === "os" ? "os" : ""})}`);
+  cfgMsg(sn.bus_error ? "warn" : "", sn.bus_error ? `DataMall: ${sn.bus_error}` : sn.buses.length < 2 ? "Fewer than 2 live buses on this direction: headways cannot be assessed." : "");
+  drawBase(); renderBusLists(); renderPred(); drawAll(); renderResults(); updRun();
+  const b = L.latLngBounds(sn.line); if(b.isValid()) map.fitBounds(b, {paddingTopLeft:[20, 60], paddingBottomRight:[20, 30]});
+  setLive(true);
+}
+function setBusy(on, which){
+  ST.busy = on; const b = which === "run" ? $("run") : $("load");
+  b.disabled = on; if(on){ b.dataset.t = b.textContent; b.textContent = which === "run" ? "Simulating\u2026" : "Loading\u2026"; } else if(b.dataset.t) b.textContent = b.dataset.t;
+  updRun();
+}
+function cfgMsg(kind, t){ $("cfgMsg").innerHTML = t ? `<div class="${kind || "warn"}">${esc(t)}</div>` : ""; }
+function setLive(ok){ $("live").classList.toggle("ok", ok); }
+
+/* ---------------------------------------------------------------- scenario inputs */
+function renderBusLists(){
+  const sn = ST.snap, sim = simBusId();
+  const html = !sn ? `<div class="empty">Enter a service and load the live buses.</div>` : !sn.buses.length ? `<div class="empty">No live buses on this direction right now.</div>` :
+    sn.buses.slice().sort((a, b) => b.km - a.km).map(b => `<button type="button" class="bus" data-bus="${b.id}" aria-pressed="${b.id === ST.bus}">
+      <span class="bi">${b.id}</span><span style="min-width:0"><b>Bus ${b.id}</b><small>near ${esc(b.near ? b.near.name : "?")} \u00b7 ${f1(b.km)} km</small></span>
+      <span class="eta">${b.next ? `<b class="num">${esc(b.next.clock)}</b><small>${esc(b.next.name)}</small>` : `<small>no ETA</small>`}</span></button>`).join("");
+  $("busList").innerHTML = html; $("busList2").innerHTML = html;
+  document.querySelectorAll(".bus[data-bus]").forEach(x => x.onclick = () => pickBus(+x.dataset.bus));
+}
+function pickBus(id){
+  if(ST.mode === "os" && !ST.osWithDelay){ $("osWithDelay").checked = true; ST.osWithDelay = true; $("osBusWrap").hidden = false; $("delaySec").hidden = false; }
+  ST.bus = ST.bus === id && ST.mode === "os" ? null : id; ST.delayOn = true; $("delayOn").checked = true;
+  invalidateResult(); renderBusLists(); renderPred(); drawBuses(); updRun(); renderSheet();
+  if(isM() && ST.bus != null && document.body.classList.contains("tab-map")) toast(`Bus ${id} selected \u2013 set the delay in SIMULATION.`);
+}
+function renderPred(){
+  const b = ST.snap && ST.bus != null ? ST.snap.buses.find(x => x.id === ST.bus) : null;
+  if(!b){ $("predCmp").innerHTML = ST.mode === "late" ? `<p class="note">Select the observed bus above (or tap it on the map).</p>` : ""; return; }
+  const nx = b.next, D = ST.delayOn ? ST.delay : 0;
+  $("predCmp").innerHTML = (nx ? `<div class="cmp"><div class="l"><span>Live prediction ${tag("live")}</span><b class="num">${esc(nx.clock)}</b><span>${esc(nx.name)}</span></div>
+      <div class="x"><span>Simulated ${tag("sim")}</span><b class="num">${D ? addMin(nx.clock, D) : esc(nx.clock)}</b><span>${D ? `+${D} min` : "no delay"}</span></div></div>` : `<p class="note">DataMall has no arrival estimate for Bus ${b.id}; the route model is used.</p>`) +
+    (D ? `<div class="simban"><span>\u26a0</span><div><b>SIMULATION MODE</b>Bus ${b.id} artificially delayed +${D} min, held at its current position. Live DataMall information has NOT been modified.</div></div>` : "");
+  setPill();
+}
+function setPill(){
+  const sim = (ST.mode === "late" || ST.osWithDelay) && ST.delayOn && ST.bus != null && ST.delay > 0 || ST.mode === "os";
+  const p = $("modePill"); p.className = `pill ${sim ? "sim" : "live"}`; p.innerHTML = `<i></i>${sim ? "SIMULATION" : "LIVE"}`;
+}
+function setDelay(v){
+  ST.delay = Math.max(1, Math.min(120, Math.round(+v || 0))); $("delay").value = ST.delay;
+  document.querySelectorAll("#presets button").forEach(b => b.setAttribute("aria-pressed", String(+b.dataset.v === ST.delay)));
+  invalidateResult(); renderPred(); drawBuses();
+}
+$("dMinus").onclick = () => setDelay(ST.delay - 1); $("dPlus").onclick = () => setDelay(ST.delay + 1);
+$("delay").onchange = () => setDelay($("delay").value);
+document.querySelectorAll("#presets button").forEach(b => b.onclick = () => setDelay(b.dataset.v));
+$("delayOn").onchange = () => { ST.delayOn = $("delayOn").checked; invalidateResult(); renderPred(); drawBuses(); updRun(); };
+function setMode(m){
+  ST.mode = m; $("mLate").setAttribute("aria-pressed", String(m === "late")); $("mOs").setAttribute("aria-pressed", String(m === "os"));
+  $("cfgLate").hidden = m !== "late"; $("cfgOs").hidden = m !== "os"; $("delaySec").hidden = m === "os" && !ST.osWithDelay;
+  if(m === "os" && !ST.osWithDelay) ST.bus = ST.bus;               // keep the pick; it only counts when the box is ticked
+  invalidateResult(true); renderBusLists(); renderPred(); drawAll(); updRun(); setPill();
+  if(ST.snap) history.replaceState(null, "", `?${q({svc:ST.svc, dir:ST.dir, mode:m === "os" ? "os" : ""})}`);
+}
+$("mLate").onclick = () => setMode("late"); $("mOs").onclick = () => setMode("os");
+$("osFrom").onchange = () => { ST.osFrom = $("osFrom").value; $("osStopF").hidden = ST.osFrom !== "stop"; $("osMapF").hidden = ST.osFrom !== "map"; invalidateResult(); drawOs(); updRun(); };
+$("osStop").oninput = () => { invalidateResult(); drawOs(); updRun(); };
+$("osTime").addEventListener("input", () => invalidateResult());
+$("osPick").onclick = () => { ST.picking = true; if(isM()) setTab("map"); const t = $("maptoast"); t.classList.add("pickhint"); toast("Tap the map where the OS bus is available.", 8000); };
+$("osWithDelay").onchange = () => { ST.osWithDelay = $("osWithDelay").checked; $("osBusWrap").hidden = !ST.osWithDelay; $("delaySec").hidden = !ST.osWithDelay; invalidateResult(); renderPred(); drawBuses(); updRun(); setPill(); };
+["scope", "maxReach"].forEach(id => $(id).onchange = () => invalidateResult());
+function syncDir(){ $("d1").setAttribute("aria-pressed", String(ST.dir === 1)); $("d2").setAttribute("aria-pressed", String(ST.dir === 2)); }
+$("d1").onclick = () => { if(ST.dir !== 1){ ST.dir = 1; syncDir(); if(ST.snap) loadSnap(); } };
+$("d2").onclick = () => { if(ST.dir !== 2){ ST.dir = 2; syncDir(); if(ST.snap) loadSnap(); } };
+$("load").onclick = loadSnap;
+$("svc").addEventListener("keydown", e => { if(e.key === "Enter"){ e.preventDefault(); loadSnap(); } });
+function osFromParam(){ return ST.osFrom === "first" ? "first" : ST.osFrom === "stop" ? $("osStop").value.trim() : ST.osPt ? `${ST.osPt[0]},${ST.osPt[1]}` : ""; }
+function readyToRun(){
+  if(!ST.snap || ST.busy) return false;
+  if(ST.mode === "late") return ST.bus != null && ST.delayOn && ST.delay > 0;
+  if(ST.osFrom === "stop" && !/^\d{5}$/.test($("osStop").value.trim())) return false;
+  if(ST.osFrom === "map" && !ST.osPt) return false;
+  return !ST.osWithDelay || (ST.bus != null && ST.delayOn);
+}
+function updRun(){ $("run").disabled = !readyToRun(); }
+function invalidateResult(silent){
+  if(!ST.res) return; ST.res = null; ST.sel = null; exitNav(true); drawResult(); renderResults();
+  if(!silent) toast("Scenario changed \u2013 run the simulation again.");
+}
+
+/* ---------------------------------------------------------------- run the simulation */
+async function run(){
+  if(!readyToRun()) return;
+  const p = {snap:ST.snap.snap, mode:ST.mode, scope:$("scope").value, max_reach:$("maxReach").value.trim()};
+  if(ST.mode === "late" || ST.osWithDelay){ p.bus = ST.bus; p.delay = ST.delayOn ? ST.delay : 0; }
+  if(ST.mode === "os"){ p.os_from = osFromParam(); p.os_time = $("osTime").value.trim(); }
+  setBusy(true, "run"); cfgMsg("", "");
+  let r = await api(`/api/hplan/simulate?${q(p)}`, 90000);
+  if(r.expired){ await loadSnap(); if(ST.snap){ p.snap = ST.snap.snap; if(ST.mode === "late" && !ST.snap.buses.some(b => b.id === p.bus)){ setBusy(false, "run"); cfgMsg("warn", "Live buses were refreshed and the selected bus changed. Select the bus again."); return; } r = await api(`/api/hplan/simulate?${q(p)}`, 90000); } }
+  setBusy(false, "run");
+  if(!r.ok){ cfgMsg("err", r.error || "The simulation failed."); return; }
+  ST.res = r; ST.sel = r.recommended;
+  drawAll(); renderResults();
+  ["tSim", "tRes"].forEach(t => $(t).classList.add("has"));
+  if(isM()) setTab("res");
+  else { const c = candByKey(ST.sel); if(c) map.flyTo([c.lat, c.lon], Math.max(map.getZoom(), 14), {duration:.6}); }
+}
+$("run").onclick = run;
+
+/* ---------------------------------------------------------------- results */
+function selectOpt(key, focus){
+  if(!ST.res) return; ST.sel = key; drawAll(); renderResults();
+  const c = candByKey(key);
+  if(c && focus){ map.flyTo([c.lat, c.lon], Math.max(map.getZoom(), 15), {duration:.5}); if(isM() && !document.body.classList.contains("tab-map")) setTab("map"); }
+}
+const optName = o => o.kind === "none" ? o.label : o.kind === "regulate" ? "Regulate" : `BS ${o.code} \u2014 ${o.name}`;
+function renderResults(){
+  const r = ST.res;
+  $("bottom").hidden = !r || !r.ok;
+  renderRec(); renderSheet(); renderCta();
+  if(!r || !r.ok){ $("clist").innerHTML = `<div class="empty">Run the simulation to rank the candidate points.</div>`; return; }
+  renderOpts(); renderTimeline(); renderTable(); renderCList();
+}
+function recHead(o, r){
+  const isRec = o.key === r.recommended;
+  return isRec ? (o.kind === "none" ? `<div class="rb-k">RECOMMENDED \u00b7 NO ACTION</div>` : `<div class="rb-k">\u2714 RECOMMENDED</div>`)
+    : `<div class="rb-k">ALTERNATIVE${o.rank ? ` \u00b7 entry point #${o.rank}` : ""} \u00b7 ${esc((optByKey(r.recommended) || {}).label || "")} has the lower EWT</div>`;
+}
+function renderRec(){
+  const r = ST.res, el = $("rec");
+  if(ST.route && document.body.classList.contains("navmode")) return renderNavPanel();
+  if(!r || !r.ok){
+    el.innerHTML = `<div><div class="sec-t"><span>Recommended deployment</span></div><div class="empty">${!ST.snap ? "Enter a service and load the live buses." :
+      ST.mode === "late" ? "1 Select the observed bus \u2192 2 inject a delay \u2192 3 Run Simulation." : "1 Set where and when the OS bus is available \u2192 2 Run Simulation."}<br><br>The recommendation comes from the simulated EWT of every option \u2013 never from a fixed rule.</div></div>`;
+    return;
+  }
+  const o = optByKey(ST.sel) || optByKey(r.recommended), none = r.options[0], isRec = o.key === r.recommended;
+  const box = o.kind === "none" ? "none" : isRec ? "" : "alt";
+  const simline = r.sim_bus ? `<div class="simban" style="margin:0 0 10px"><span>\u26a0</span><div><b>SIMULATION MODE</b>Bus ${r.sim_bus.bus} artificially delayed +${r.sim_bus.delay} min${r.mode === "os" ? "; the OS bus is virtual" : ""}. Live DataMall information has NOT been modified.</div></div>`
+    : r.mode === "os" ? `<div class="simban" style="margin:0 0 10px;border-color:#5b4a9e;background:#1c1640;color:#e3dbff"><span>\u2795</span><div><b style="color:#cbbcff">SIMULATION MODE</b>The OS bus is a virtual additional bus. Live DataMall information has NOT been modified.</div></div>` : "";
+  let body = "";
+  if(o.kind === "halfway" || o.kind === "os"){
+    const between = `${busLabel(o.between[0])} and ${busLabel(o.between[1])}`;
+    body = `<div class="rb-t">Bus Stop ${esc(o.code)} \u2014 ${esc(o.name)}</div>
+      <div class="rb-s">${o.kind === "os" ? "Insert the OS bus" : `Bus ${r.sim_bus ? r.sim_bus.bus : ""} re-enters service`} between ${esc(between)}${o.approved ? " \u00b7 approved halfway point" : ""}</div>
+      <div class="kv">
+        <div><span>To reach</span><b class="num">${f0(o.reach_min)} min</b></div><div><span>Distance</span><b class="num">${fkm(o.reach_km)}</b></div>
+        <div><span>${o.kind === "os" ? "Recommended departure" : "Leave route"}</span><b class="num">${esc(o.leave_clock)}</b></div><div><span>Enter service</span><b class="num" style="color:#7df0a8">${esc(o.entry_clock)}</b></div>
+        <div><span>Gap before ${tag("pred")}</span><b class="num" style="color:#ff8a92">${f1(o.gap_before)} min</b></div><div><span>Gap after ${tag("pred")}</span><b class="num" style="color:#7df0a8">${f1(o.hw_after[0])} / ${f1(o.hw_after[1])}</b></div>
+      </div>`;
+  } else if(o.kind === "regulate"){
+    body = `<div class="rb-t">Regulate</div><div class="rb-s">${esc(o.hold_text || o.na || "")}</div>`;
+  } else {
+    body = `<div class="rb-t">${esc(o.label)}</div><div class="rb-s">${esc(r.rec_reason || "")}</div>`;
+  }
+  const ewt = `<div class="ewt3"><div class="n"><span>${esc(none.label.toUpperCase())}</span><b class="num">${f1(none.ewt)}</b><span>min EWT</span></div>
+    ${o.kind !== "none" && o.ewt != null ? `<div class="w"><span>WITH ${o.kind === "regulate" ? "REGULATION" : "DEPLOYMENT"}</span><b class="num">${f1(o.ewt)}</b><span>min EWT</span></div>
+    <div class="g"><span>IMPROVEMENT</span><b class="num" style="color:${o.gain >= 0.05 ? "#7df0a8" : o.gain <= -0.05 ? "#ff8a92" : "#cfe0f3"}">${gainTxt(o.gain)}</b><span>min</span></div>` : `<div style="grid-column:span 2;display:grid;place-items:center;color:var(--mut);font-size:12px">Max headway ${f0(none.max_hw)} min</div>`}</div>`;
+  const cta = (o.kind === "halfway" || o.kind === "os") ? `<button type="button" class="btn ${isRec ? "rec" : "go"} big d-only" style="margin-top:12px" id="viewRoute">View Deployment Route</button>` : "";
+  const why = o.why && o.why.length ? `<div class="why"><h4>Why ${o.kind === "halfway" || o.kind === "os" ? `BS ${esc(o.code)}` : o.kind === "regulate" ? "regulate" : "no action"}?</h4><ul>${o.why.map(w => `<li>${esc(w)}</li>`).join("")}</ul></div>` : "";
+  el.innerHTML = `<div>${simline}<div class="recbox ${box}">${recHead(o, r)}${body}${ewt}${cta}</div></div>
+    <div>${why}<p class="note">EWT = excess waiting time over the scheduled headway (${f0(r.H)} min, ${esc(r.H_src)}); below 0 means shorter waits than scheduled. Reach: ${esc(o.reach_src || r.routing)}. ${(r.notes || []).map(esc).join(" ")}</p>
+    ${!isRec ? `<button type="button" class="btn sm" id="backRec" style="margin-top:6px">Show the recommended option</button>` : ""}</div>`;
+  const vr = $("viewRoute"); if(vr) vr.onclick = () => viewRoute(o.key);
+  const br = $("backRec"); if(br) br.onclick = () => selectOpt(r.recommended, true);
+}
+function renderOpts(){
+  const r = ST.res, letters = "ABCDEFG";
+  const list = [...r.options, ...r.top.map(candByKey).filter(Boolean)];
+  $("opts").innerHTML = list.map((o, i) => {
+    const na = o.ewt == null, rec = o.key === r.recommended, k = o.kind === "none" ? o.label : o.kind === "regulate" ? "Regulate" : `${o.kind === "os" ? "OS" : "Halfway"} ${letters[(o.rank || 1) - 1] || o.rank}`;
+    return `<button type="button" class="opt${rec ? " rec" : ""}${o.key === ST.sel ? " sel" : ""}${na ? " na" : ""}" data-k="${esc(o.key)}" ${na ? "disabled" : ""}>
+      <div class="k">${esc(k)}</div><div class="n">${o.code ? `BS ${esc(o.code)} ${esc(o.name)}` : o.kind === "regulate" ? esc(o.hold_text || o.na || "") : "Continue as predicted"}</div>
+      <div class="e num">${na ? "\u2013" : f1(o.ewt)}<small>EWT</small></div>
+      <div class="m num">${na ? esc(o.na || "") : `Max HW ${f0(o.max_hw)} min${o.kind !== "none" ? ` \u00b7 ${gainTxt(o.gain)}` : ""}`}</div>
+      ${rec ? `<span class="badge">${tag("rec")}</span>` : ""}</button>`;
+  }).join("");
+  document.querySelectorAll("#opts .opt[data-k]").forEach(b => b.onclick = () => selectOpt(b.dataset.k, true));
+  $("optsNote").textContent = `${r.n_tested} entry points tested (${r.scope === "approved" ? "approved halfway points" : "every eligible stop"}); ${Object.entries(r.skipped || {}).filter(([, v]) => v).map(([k, v]) => `${v} ${({behind:"behind the bus", reach:"too far to reach", remaining:"too close to the end", later:"no earlier than continuing"})[k]}`).join(", ") || "none excluded"}. Recommendation needs \u2265 ${f1(r.min_gain)} min EWT improvement.`;
+}
+function hwCls(h, H, base){
+  if(h >= 1.5 * H) return "bad";
+  if(h >= 1.2 * H || h < 0.5 * H) return "mod";
+  return base ? "nrm" : "ok";
+}
+function tlRow(label, sub, o, base, r){
+  const t = o && o.timeline; if(!t) return "";
+  const simId = r.sim_bus ? r.sim_bus.bus : null;
+  let h = `<div class="tlbar">`;
+  t.arr.forEach((a, i) => {
+    const d = a.bus === "OS" ? "os" : a.bus === simId ? "sim" : typeof a.bus === "string" && a.bus[0] === "S" ? "v" : "";
+    h += `<i class="d ${d}" title="${esc(busLabel(a.bus))} ${esc(a.clock)}"></i>`;
+    if(i < t.hw.length){ const v = t.hw[i]; h += `<div class="h ${hwCls(v, r.H, base)}" style="--w:${Math.max(1, v)}"><span class="num">${f0(v)}</span></div>`; }
+  });
+  return `<div class="tlr"><div class="lab">${esc(label)}<small>${esc(sub)}</small></div>${h}</div></div>`;
+}
+function renderTimeline(){
+  const r = ST.res, fk = r.focus, none = r.options[0], reg = r.options.find(o => o.kind === "regulate" && o.ewt != null), sel = optByKey(ST.sel);
+  $("tlTitle").textContent = `Headway at BS ${fk.code} ${fk.name} \u2013 before / after`;
+  let h = tlRow(none.label, `EWT ${f1(none.ewt)}`, none, true, r);
+  if(reg && reg.key !== ST.sel) h += tlRow("Regulate", `EWT ${f1(reg.ewt)}`, reg, false, r);
+  if(sel && sel.kind !== "none") h += tlRow(sel.kind === "regulate" ? "Regulate" : `${sel.kind === "os" ? "OS" : "Halfway"} BS ${sel.code}`, `EWT ${f1(sel.ewt)}${sel.key === r.recommended ? " \u00b7 recommended" : ""}`, sel, false, r);
+  $("tl").innerHTML = h + `<p class="note" style="margin:0">Each dot is a bus passing the stop (red = the delayed bus, purple = OS bus, dashed = next scheduled departure). Numbers are headways in minutes; scheduled ${f0(r.H)}.</p>`;
+}
+function renderTable(){
+  const r = ST.res;
+  $("ctH").innerHTML = `<tr><th>#</th><th>Entry stop</th><th>EWT</th><th>vs none</th><th>Max HW</th><th>Reach</th><th>Distance</th><th>${r.mode === "os" ? "Depart" : "Leave"}</th><th>Enter</th><th>Headways after</th></tr>`;
+  $("ctB").innerHTML = (r.candidates || []).map(c => `<tr data-k="${esc(c.key)}" class="${c.key === ST.sel ? "sel" : ""}"><td>${c.rank}${c.key === r.recommended ? " \u2714" : ""}</td>
+    <td class="w">BS ${esc(c.code)} ${esc(c.name)}${c.approved ? " \u2605" : ""}</td><td class="num"><b>${f1(c.ewt)}</b></td>
+    <td class="num ${c.gain >= 0.05 ? "gd" : c.gain <= -0.05 ? "bd" : ""}">${gainTxt(c.gain)}</td><td class="num">${f0(c.max_hw)}</td>
+    <td class="num">${f0(c.reach_min)} min</td><td class="num">${fkm(c.reach_km)}</td><td class="num">${esc(c.leave_clock)}</td><td class="num">${esc(c.entry_clock)}</td>
+    <td class="num">${f1(c.hw_after[0])} / ${f1(c.hw_after[1])}</td></tr>`).join("") || `<tr><td colspan="10" class="note">No feasible entry point \u2013 see the reasons above.</td></tr>`;
+  $("ctNote").textContent = "\u2605 approved halfway point \u00b7 tap a row to inspect it on the map";
+  document.querySelectorAll("#ctB tr[data-k]").forEach(tr => tr.onclick = () => selectOpt(tr.dataset.k, true));
+}
+function renderCList(){
+  const r = ST.res;
+  $("clist").innerHTML = (r.candidates || []).slice(0, 12).map(c => `<button type="button" class="cc${c.key === r.recommended ? " rec" : ""}" data-k="${esc(c.key)}">
+    <div class="t"><span class="no">${c.rank}</span><span style="min-width:0">BS ${esc(c.code)} \u2014 ${esc(c.name)}</span>${c.key === r.recommended ? `<span style="margin-left:auto">${tag("rec")}</span>` : ""}</div>
+    <dl><dt>EWT</dt><dd class="num">${f1(c.ewt)} min</dd><dt>Reach</dt><dd class="num">${f0(c.reach_min)} min</dd><dt>Distance</dt><dd class="num">${fkm(c.reach_km)}</dd><dt>Enter service</dt><dd class="num">${esc(c.entry_clock)}</dd></dl></button>`).join("")
+    || `<div class="empty">No feasible entry point.</div>`;
+  document.querySelectorAll("#clist .cc").forEach(b => b.onclick = () => selectOpt(b.dataset.k, true));
+}
+function renderSheet(){
+  const el = $("sheet"), r = ST.res;
+  if(!ST.snap){ el.innerHTML = `<b>Halfway Planner</b><p class="note">Enter a service above and tap <b>Load live buses</b>.</p>`; return; }
+  if(!r || !r.ok){
+    const b = ST.bus != null ? `Bus ${ST.bus} selected \u00b7 +${ST.delay} min ${tag("sim")}` : ST.mode === "late" ? "Tap a blue bus to simulate its delay." : "OS bus: set location and time in SIMULATION.";
+    el.innerHTML = `<div style="display:flex;align-items:center;gap:10px"><div style="min-width:0"><b>${esc(ST.snap.service)} Dir ${ST.snap.direction}</b> \u00b7 ${ST.snap.buses.length} live buses ${tag("live")}<div class="note" style="margin:2px 0 0">${b}</div></div>
+      <button type="button" class="btn go sm" style="margin-left:auto;min-height:44px" onclick="setTab('sim')">Simulation</button></div>`;
+    return;
+  }
+  const o = optByKey(ST.sel) || optByKey(r.recommended), none = r.options[0];
+  const isC = o.kind === "halfway" || o.kind === "os";
+  el.innerHTML = `<div style="display:flex;align-items:flex-start;gap:10px"><div style="min-width:0">${o.key === r.recommended ? tag("rec") : tag("alt", o.rank ? `#${o.rank}` : "OPTION")}
+      <div style="font-weight:800;font-size:16px;margin-top:3px">${esc(optName(o))}</div>
+      <div class="note" style="margin:2px 0 0">EWT ${f1(none.ewt)} \u2192 <b style="color:#7df0a8">${f1(o.ewt)}</b> min${isC ? ` \u00b7 reach ${f0(o.reach_min)} min \u00b7 ${fkm(o.reach_km)} \u00b7 enter ${esc(o.entry_clock)}` : ""}</div>
+      <div class="note" style="margin:2px 0 0">Largest gap without action: ${f0(r.gap.minutes)} min</div></div></div>
+    <div class="row2" style="margin-top:8px"><button type="button" class="btn" onclick="setTab('res')">Results</button>${isC ? `<button type="button" class="btn rec" onclick="viewRoute('${esc(o.key)}')">Route</button>` : `<button type="button" class="btn" onclick="setTab('sim')">Options</button>`}</div>`;
+}
+function renderCta(){
+  const r = ST.res, o = r && r.ok ? optByKey(ST.sel) : null;
+  $("mCta").innerHTML = o && (o.kind === "halfway" || o.kind === "os") ? `<button type="button" class="btn rec big" onclick="viewRoute('${esc(o.key)}')">VIEW DEPLOYMENT ROUTE</button>` : "";
+}
+
+/* ---------------------------------------------------------------- deployment route (navigation view) */
+async function viewRoute(key){
+  const c = candByKey(key); if(!c) return;
+  const b = $("viewRoute"); if(b){ b.disabled = true; b.textContent = "Calculating the road route\u2026"; }
+  toast("Calculating the off-service road route\u2026", 8000);
+  const r = await api(`/api/hplan/route?${q({snap:ST.res.snap, stop:c.code, mode:ST.res.mode, bus:ST.bus, os_from:ST.res.mode === "os" ? osFromParam() : "", leave:c.leave_clock})}`, 90000);
+  if(b){ b.disabled = false; b.textContent = "View Deployment Route"; }
+  if(!r.ok){ toast(r.error || "No road route available.", 6000); if(r.expired) cfgMsg("warn", "The live snapshot expired \u2013 refresh the live buses and run again."); return; }
+  $("maptoast").style.display = "none";
+  ST.route = {...r, key}; ST.navI = 0;
+  document.body.classList.add("navmode"); syncLayers();
+  if(isM()){ document.body.classList.remove("tab-sim", "tab-res"); document.body.classList.add("tab-map"); }
+  drawNav(); renderNavPanel(); showStep(0, true); invalidate();
+  if(!isM()) $("mapcard").scrollIntoView({behavior:"smooth", block:"start"});
+}
+function drawNav(){
+  G.nav.clearLayers(); G.after.clearLayers(); const r = ST.route; if(!r) return;
+  L.polyline(r.service_after, {color:"#2f7dff", weight:6, opacity:.95, pane:"routeP"}).bindTooltip("SERVICE ROUTE after entry").addTo(G.after);
+  L.polyline(r.line, {color:"#03240f", weight:11, opacity:.9, pane:"hiP", interactive:false}).addTo(G.nav);
+  const runs = (r.traffic && r.traffic.runs) || [];
+  if(runs.length) runs.forEach(x => x.pts && x.pts.length > 1 && L.polyline(x.pts, {color:bandCol(x.b), weight:6, opacity:.95, pane:"hiP", interactive:false}).addTo(G.nav));
+  else L.polyline(r.line, {color:"#20d16a", weight:6, opacity:.95, pane:"hiP", interactive:false}).addTo(G.nav);
+  L.polyline(r.line, {color:"#fff", weight:2, dashArray:"6 9", opacity:.95, pane:"hiP"}).bindTooltip("OFF-SERVICE ROUTE (no passengers)", {sticky:true}).addTo(G.nav);
+  L.marker([r.origin.lat, r.origin.lon], {icon:L.divIcon({className:"", html:ST.res.mode === "os" ? `<div class="osm">OS</div>` : `<div class="bm sim">${ST.bus}</div>`, iconSize:[30, 30], iconAnchor:[15, 15]}), zIndexOffset:1500})
+    .bindTooltip(`Start: ${esc(r.origin.label)}`).addTo(G.nav);
+  L.marker([r.stop.lat, r.stop.lon], {icon:L.divIcon({className:"", html:`<div class="cm rec" style="width:auto;padding:0 8px;border-radius:9px;font-size:11px">ENTER BS ${esc(r.stop.code)}</div>`, iconSize:[96, 30], iconAnchor:[48, 15]}), zIndexOffset:1500}).addTo(G.nav);
+  const ic = (c, t) => L.divIcon({className:"", html:`<div class="sm-ic" style="background:${c}">${t}</div>`, iconSize:[22, 22], iconAnchor:[11, 11]});
+  (r.incidents || []).forEach(x => L.marker([x.lat, x.lon], {icon:ic("#ff4d55", "!")}).bindPopup(`<b>${esc(x.type)}</b> on the off-service route ${tag("live")}<br>${esc(x.message)}`).addTo(G.nav));
+  (r.roadworks || []).forEach(x => L.marker([x.lat, x.lon], {icon:ic("#c99400", "\u26a0")}).bindPopup(`<b>Road works</b> near the off-service route ${tag("live")}<br>${esc(x.road || "")}`).addTo(G.nav));
+  const bb = L.latLngBounds(r.line); if(bb.isValid()) map.fitBounds(bb, {paddingTopLeft:[30, isM() ? 110 : 90], paddingBottomRight:[30, isM() ? 110 : 90]});
+}
+function showStep(i, noPan){
+  const r = ST.route; if(!r || !r.steps.length) return;
+  ST.navI = Math.max(0, Math.min(r.steps.length - 1, i)); const s = r.steps[ST.navI];
+  $("nbIc").textContent = s.icon; $("nbVerb").textContent = s.verb; $("nbRoad").textContent = s.road;
+  $("nbDist").textContent = ST.navI === 0 ? `${fkm(s.km)}` : `in ${fkm(r.steps[ST.navI - 1].km)}`;
+  $("navPrev").disabled = ST.navI === 0; $("navNext").disabled = ST.navI === r.steps.length - 1;
+  $("ncMin").textContent = `${f0(r.time_min)} min`; $("ncKm").textContent = fkm(r.km); $("ncEta").textContent = r.arrive_clock;
+  G.pin.clearLayers();
+  if(s.lat != null){ L.circleMarker([s.lat, s.lon], {radius:13, color:"#fff", weight:3, fillColor:"#20d16a", fillOpacity:.35, pane:"hiP"}).addTo(G.pin); if(!noPan) map.panTo([s.lat, s.lon], {animate:true}); }
+  document.querySelectorAll(".ns").forEach(x => x.classList.toggle("on", +x.dataset.i === ST.navI));
+}
+$("navPrev").onclick = () => showStep(ST.navI - 1); $("navNext").onclick = () => showStep(ST.navI + 1);
+$("navExit").onclick = () => exitNav();
+function exitNav(silent){
+  if(!document.body.classList.contains("navmode") && !ST.route) return;
+  document.body.classList.remove("navmode"); ST.route = null; G.nav.clearLayers(); G.after.clearLayers(); G.pin.clearLayers();
+  if(!silent){ syncLayers(); drawResult(); renderRec(); invalidate(); if(isM()) setTab("res"); }
+}
+function renderNavPanel(){
+  const r = ST.route, c = candByKey(r.key);
+  const stCol = r.status === "verified" ? "#7df0a8" : r.status === "unsuitable" ? "#ff8a92" : "#ffd27a";
+  $("rec").innerHTML = `<div>
+    <div class="sec-t"><span>Deployment route \u00b7 off-service</span><button type="button" class="btn sm" id="navBack">\u2039 Back to results</button></div>
+    <div class="recbox"><div class="rb-k">OFF-SERVICE ROUTE ${tag("pred")}</div><div class="rb-t">${esc(r.origin.label)} \u2192 BS ${esc(r.stop.code)}</div><div class="rb-s">${esc(r.stop.name)}</div>
+      <div class="kv"><div><span>Travel</span><b class="num">${f0(r.time_min)} min</b></div><div><span>Distance</span><b class="num">${fkm(r.km)}</b></div>
+      <div><span>Leave</span><b class="num">${esc(r.leave_clock)}</b></div><div><span>ETA at stop</span><b class="num">${esc(r.arrive_clock)}</b></div>
+      <div><span>Enter service</span><b class="num" style="color:#7df0a8">${esc(r.entry_clock)}</b></div><div><span>Route check</span><b style="font-size:12px;color:${stCol}">${esc(r.status_label)}</b></div></div>
+      <p class="note">${esc(r.time_src)} \u00b7 +${f0(r.prep_min)} min preparation at the stop.${c && c.entry_clock !== r.entry_clock ? ` The simulation planned entry at ${esc(c.entry_clock)}${c.wait ? ` (incl. ${f0(c.wait)} min wait)` : ""}.` : ""}</p></div>
+    <div class="chain"><div class="a">\u25cf ${esc(r.origin.label)}</div>${(r.roads || []).map(x => `<div>${esc(x)}</div>`).join("")}<div class="a">BS ${esc(r.stop.code)} ${esc(r.stop.name)}</div><div class="z">ENTER SERVICE \u2192 service route</div></div>
+    <div class="sec-t" style="margin-top:14px"><span>Turn by turn</span></div>
+    <div class="nav-steps">${r.steps.map((s, i) => `<div class="ns" data-i="${i}"><span class="ic">${esc(s.icon)}</span><div><b>${esc(s.text)}</b><small>${s.km ? fkm(s.km) : ""}</small></div></div>`).join("") || `<p class="note">No step list from the routing service.</p>`}</div>
+    ${(r.incidents || []).length || (r.roadworks || []).length ? `<div class="sec-t" style="margin-top:12px"><span>On / near the route ${tag("live")}</span></div><div class="find">${(r.incidents || []).map(x => `<div>\u26a0 ${esc(x.type)}: ${esc(x.message)}</div>`).join("")}${(r.roadworks || []).map(x => `<div>\u26a0 Road works: ${esc(x.road || "")}</div>`).join("")}</div>` : ""}
+    ${(r.findings || []).length ? `<div class="sec-t" style="margin-top:12px"><span>Route check</span></div><div class="find">${r.findings.map(f => `<div>${esc(f.text || f.msg || "")}</div>`).join("")}</div>` : ""}
+    ${(r.alternatives || []).length > 1 ? `<p class="note">Alternatives: ${r.alternatives.map(a => `${esc(a.label)} ${f0(a.time_min)} min / ${fkm(a.km)}`).join(" \u00b7 ")}. Full comparison in the <a href="/planner">Off-service Route Planner</a>.</p>` : ""}
+    <p class="note">${esc(r.note)}</p></div>`;
+  $("navBack").onclick = () => exitNav();
+  document.querySelectorAll(".ns").forEach(x => x.onclick = () => showStep(+x.dataset.i));
+}
+
+/* ---------------------------------------------------------------- tabs (phone) + misc */
+function setTab(t){
+  if(document.body.classList.contains("navmode") && t !== "map") exitNav(true), syncLayers(), drawResult(), renderRec();
+  document.body.classList.remove("tab-map", "tab-sim", "tab-res"); document.body.classList.add(`tab-${t}`);
+  [["tMap", "map"], ["tSim", "sim"], ["tRes", "res"]].forEach(([id, k]) => $(id).setAttribute("aria-selected", String(k === t)));
+  if(t === "map") invalidate();
+  window.scrollTo({top:0});
+}
+window.setTab = setTab; window.viewRoute = viewRoute;
+document.querySelectorAll(".mtabs button").forEach(b => b.onclick = () => setTab(b.dataset.tab));
+function fitMobileMap(){                                        // phones: the map fills exactly the space between the tabs and the bottom bar
+  const mc = $("mapcard");
+  if(!isM() || document.body.classList.contains("navmode")){ mc.style.height = ""; return; }
+  const top = mc.getBoundingClientRect().top + window.scrollY, nav = document.querySelector(".mobile-bottom-nav");
+  const nb = nav ? nav.getBoundingClientRect().height : 74;
+  mc.style.height = Math.max(340, window.innerHeight - top - nb - 8) + "px";
+}
+function invalidate(){ setTimeout(() => { fitMobileMap(); map.invalidateSize(); }, 60); }
+window.addEventListener("resize", invalidate);
+document.addEventListener("click", e => {
+  const m = $("mobileTopMenu"), mm = $("mobileMore");
+  if(m && m.classList.contains("open") && !e.target.closest("#mobileTopMenu") && !e.target.closest(".mobile-menu-btn")) m.classList.remove("open");
+  if(mm && mm.classList.contains("open") && !e.target.closest("#mobileMore") && !e.target.closest(".mbn")) mm.classList.remove("open");
+});
+function tick(){ const d = new Date(); $("clock").textContent = d.toLocaleString("en-SG", {weekday:"short", day:"2-digit", month:"short", hour:"2-digit", minute:"2-digit", hour12:false}); }
+tick(); setInterval(tick, 15000);
+
+/* start: ?svc=156&dir=1&mode=os */
+(function(){
+  const u = new URLSearchParams(location.search);
+  if(u.get("mode") === "os") setMode("os");
+  if(+u.get("dir") === 2){ ST.dir = 2; syncDir(); }
+  renderSheet(); renderPred(); loadServices(); invalidate();
+  if(u.get("svc")){ $("svc").value = u.get("svc").toUpperCase(); loadSnap(); }
+})();
+</script>
+<script>
+/* V13.14: hide / show the desktop navigation; the choice is remembered in this browser */
+(function(){
+  var h = document.documentElement, shell = document.querySelector(".desktop-shell"); if(!shell) return;
+  function set(off){ h.classList.toggle("shell-off", off); try{ localStorage.setItem("shell.off", off ? "1" : "0"); }catch(e){} setTimeout(function(){ window.dispatchEvent(new Event("resize")); }, 60); }
+  var hide = document.createElement("button"); hide.type = "button"; hide.className = "shell-hide"; hide.innerHTML = "&laquo;";
+  hide.title = "Hide menu"; hide.setAttribute("aria-label", "Hide navigation menu");
+  var show = document.createElement("button"); show.type = "button"; show.className = "shell-show"; show.innerHTML = "&#9776;";
+  show.title = "Show menu"; show.setAttribute("aria-label", "Show navigation menu");
+  hide.onclick = function(){ set(true); show.focus(); };
+  show.onclick = function(){ set(false); hide.focus(); };
+  (shell.querySelector(".shell-brand") || shell).appendChild(hide);
+  var top = document.querySelector("header.top"), brand = top && top.querySelector(".brand"), mbtn = top && top.querySelector(".mobile-menu-btn");
+  if(brand) brand.parentNode.insertBefore(show, brand);
+  else if(mbtn) mbtn.parentNode.insertBefore(show, mbtn.nextSibling);
+  else if(top) top.insertBefore(show, top.firstChild);
+  else { show.classList.add("floating"); document.body.appendChild(show); }
+})();
+</script>
+<script>
+/* V13.14: HH:MM fields. Phones show a number keypad with no ":" key, so the colon is added automatically:
+   type 0810 (or 810) and the field shows 08:10. A typed ":" still works on a keyboard. */
+(function(){
+  function fmt(v){
+    var d = String(v).replace(/\D/g, "");
+    if(!d) return "";
+    if(+d[0] > 2 || (/:/.test(v) && v.indexOf(":") === 1)) d = "0" + d;       // 8 -> 08, "8:1" -> 08:1
+    d = d.slice(0, 4);
+    return d.length > 2 ? d.slice(0, 2) + ":" + d.slice(2) : d;
+  }
+  function done(v){                                                             // on leaving the field: 8 -> 08:00, 810 -> 08:10
+    var d = String(v).replace(/\D/g, ""); if(!d) return "";
+    if(d.length <= 2) d = ("0" + d).slice(-2) + "00"; else if(d.length === 3) d = "0" + d;
+    return d.slice(0, 2) + ":" + d.slice(2, 4);
+  }
+  function valid(v){ var m = /^(\d\d):(\d\d)$/.exec(v); return !v || (m && +m[1] <= 23 && +m[2] <= 59); }
+  document.querySelectorAll("input[data-time]").forEach(function(el){
+    el.setAttribute("autocomplete", "off"); el.setAttribute("enterkeyhint", "done");
+    el.addEventListener("input", function(e){
+      if(e.inputType && e.inputType.indexOf("delete") === 0) return;           // let backspace work normally
+      var v = fmt(el.value); if(v !== el.value) el.value = v;
+      el.classList.toggle("bad-time", el.value.length === 5 && !valid(el.value));
+    });
+    el.addEventListener("blur", function(){
+      var v = done(el.value);
+      if(v !== el.value){ el.value = v; el.dispatchEvent(new Event("input")); }
+      var ok = valid(el.value); el.classList.toggle("bad-time", !ok);
+      el.title = ok ? "" : "Enter a time between 00:00 and 23:59";
+    });
+  });
+})();
+</script>
+
+</body>
+</html>
