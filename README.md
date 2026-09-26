@@ -1,4 +1,14 @@
-# SG Transport Pulse V14.3 — Route Traffic + Departure Adjustment + Bunching, Gap & Alerts + AI Halfway Optimiser
+# SG Transport Pulse V14.4 — Route Traffic + Departure Adjustment + Bunching, Gap & Alerts + AI Halfway Optimiser
+
+## V14.4 — Recover Late Duty: complete the trip, recover the NEXT trip halfway
+
+* **Late Bus C completes its full D1 trip** (never terminated, no other bus stands in for it). Its **next D2 trip** is recovered: at the D2 interchange Bus C leaves off-service, drives the **real road** to the best D2 halfway stop and enters as **Bus C Halfway**, then runs to the D2 end.
+* **Buses A and B** (the two buses ahead of C) are forecast to the interchange; their next D2 departures may be **put back 0–5 min** to protect the headway at the start of D2 while C's trip starts halfway. Interchange departures only — nothing is held or slowed mid-route.
+* **Entry selection:** every D2 stop that skips ≥ the minimum % of the route (setting) and leaves ≥ 20 % is tested with real-road off-service time/distance from the interchange (OSRM, × 1.25 bus factor), Bus C's entry time (never ahead of A / B), resulting headways and D2 EWT before/after; the best 8 are refined with A/B departure adjustments. If nothing improves the D2 EWT enough → No halfway.
+* **SIMULATE** (the button) immediately shows the recommendation, draws the **real drivable route** (interchange → halfway stop, purple) on the map, and a **4-panel movement diagram**: 1 current D1 (C late, B, A ahead) · 2 D2 interchange (A/B departure adjustments, C late arrival) · 3 recovery movement (off-service real road → enter D2) · 4 final D2 positions at the entry time (forecast; C Halfway behind B and A).
+* **Result card:** late duty, complete D1 = Yes, A/B next D2 departure adjustment, Bus C Halfway entry stop and time, off-service min/km, route skipped % / stops, EWT before / after / improvement.
+* **Settings:** Balance trips and Max slow-down removed; Halfway must skip at least __ % kept.
+* The V14.3 cross-direction search is kept in the code (`/api` helper `hp_simulate_cross`, `hplan.simulate_cross`) but no longer used by the page.
 
 ## V14.3 — Recover Late Duty: cross-direction halfway deployment (no holds)
 

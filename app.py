@@ -3627,7 +3627,7 @@ async def api_hp_simulate(snap: str = "", mode: str = "late", bus: str = "", del
     if mode == "late" and D <= 0:
         return {"ok": False, "error": "Inject a delay (minutes) for the selected bus."}
     if mode == "late":
-        return await hp_simulate_cross(S, snap, bus, D, scope, max_reach, min_skip)
+        return await hp_simulate_next(S, snap, bus, D, scope, max_reach, min_skip)
     origin, origin_label, err = await hp_origin(S, mode, bus, os_from)
     if err:
         return {"ok": False, "error": err}
@@ -3665,6 +3665,45 @@ async def api_hp_simulate(snap: str = "", mode: str = "late", bus: str = "", del
                routing="road routing (OSRM) x bus factor" if offs else f"straight-line estimate ({off_err or 'routing unavailable'})",
                scope=cinfo.get("scope_used"), n_candidates=len(cands), os_time=hplan.hhmm(t0) if mode == "os" else None,
                labels={"live": "LTA DataMall observations (unchanged)", "sim": "Simulation layer: injected delay / virtual OS bus", "derived": "Predicted from the running-time model"})
+    return res
+
+
+async def hp_simulate_next(S, snap, bus, D, scope, max_reach, min_skip):
+    """V14.4 RECOVER LATE DUTY: the late bus completes its trip; its NEXT trip (other direction) starts halfway, reached by real road
+    from the interchange. Buses A / B ahead may leave the interchange a few minutes later. (V14.3 cross-direction search kept below.)"""
+    g, P = S["g"], S["P"]
+    if not str(bus).isdigit() or not any(b["id"] == int(bus) for b in S["buses"]):
+        return {"ok": False, "error": "Select one of the live buses as the late duty."}
+    HP = dict(hplan.PARAMS)
+    for val, key, lo, hi in ((max_reach, "max_reach_min", 5.0, 90.0), (min_skip, "os_min_skip_pct", 0.0, 60.0)):
+        try:
+            if str(val).strip():
+                HP[key] = max(lo, min(hi, float(val)))
+        except ValueError:
+            pass
+    mk = lambda gg, bs, d_: {"dir": d_, "stops": gg["stops"], "ss": gg["prep"]["stop_s"], "tt": hp_tt(gg, P), "H": gg["H"], "H_src": gg["H_src"],
+                             "buses": [{**b, "near": b.get("near_name")} for b in bs]}
+    T = mk(g, S["buses"], S["d"])
+    O = mk(S["opp"]["g"], S["opp"]["buses"], S["opp"]["dir"]) if S.get("opp") else None
+    gn = S["opp"]["g"] if S.get("opp") else g                           # the direction of the late bus's NEXT trip
+    dn = S["opp"]["dir"] if S.get("opp") else S["d"]
+    cands, _u, cinfo = ho_candidates(S["svc"], dn, gn["stops"], "", scope if scope in ("auto", "approved", "all") else "auto", gn["prep"], P)
+    ic = gn["stops"][0]
+    offs, off_err = await os_table((ic["lat"], ic["lon"]), [(c["lat"], c["lon"]) for c in cands])
+    fac = float(offservice.PARAMS["bus_time_factor"])
+    reach = {}
+    for i, c in enumerate(cands):
+        om = offs.get(i)
+        if om:
+            reach[c["j"]] = (om["min"] * fac, om.get("km"), f"real-road routing time x {fac:g}")
+        else:
+            km = hplan.hav_km((ic["lat"], ic["lon"]), (c["lat"], c["lon"])) * HP["detour"]
+            reach[c["j"]] = (km / HP["offsvc_kmh"] * 60.0, km, "straight-line estimate (road routing unavailable)")
+    ctx = {"now": S["now_min"], "late": {"bus": int(bus), "delay": D}, "T": T, "O": O, "cands": cands, "P": HP}
+    res = await asyncio.to_thread(hplan.simulate_next_trip, ctx, reach)
+    res.update(snap=snap, service=S["svc"], direction=S["d"], scope=cinfo.get("scope_used"), n_candidates=len(cands),
+               routing="real-road routing (OSRM) x bus factor" if offs else f"straight-line estimate ({off_err or 'road routing unavailable'})", origin=None,
+               labels={"live": "LTA DataMall observations (unchanged)", "sim": "Simulation layer: injected delay", "derived": "Forecast from the running-time model"})
     return res
 
 
@@ -3713,12 +3752,14 @@ async def hp_simulate_cross(S, snap, bus, D, scope, max_reach, min_skip):
 
 
 @app.get("/api/hplan/route")
-async def api_hp_route(snap: str = "", stop: str = "", mode: str = "late", bus: str = "", os_from: str = "", leave: str = "", from_pt: str = "", from_label: str = ""):
+async def api_hp_route(snap: str = "", stop: str = "", mode: str = "late", bus: str = "", os_from: str = "", leave: str = "", from_pt: str = "", from_label: str = "", on: str = ""):
     """Off-service deployment route from the bus / OS location to the entry stop, with turn-by-turn guidance, traffic, incidents and road works."""
     S = HP_SNAP.get(snap)
     if not S:
         return {"ok": False, "error": "The live snapshot has expired. Refresh and run the simulation again.", "expired": True}
-    g = S["g"]
+    g, rdir = S["g"], S["d"]
+    if on == "next" and S.get("opp"):                                    # V14.4: the late bus's next trip runs in the other direction
+        g, rdir = S["opp"]["g"], S["opp"]["dir"]
     stops, ss, cum = g["stops"], g["prep"]["stop_s"], g["prep"]["cum"]
     j = next((i for i, s_ in enumerate(stops) if s_["code"] == re.sub(r"\D", "", stop)), None)
     if j is None:
@@ -3733,7 +3774,7 @@ async def api_hp_route(snap: str = "", stop: str = "", mode: str = "late", bus: 
     lv = ho_parse_hhmm(leave) if leave.strip() else None
     lv = lv if lv is not None else S["now_min"]
     prep = float(hplan.PARAMS["prep_min"])
-    R, rerr = await os_routes(origin, (stops[j]["lat"], stops[j]["lon"]), S["svc"], S["d"], stops[j]["code"], "dd", {}, g["line"], lv, planned_start=None, prep=prep)
+    R, rerr = await os_routes(origin, (stops[j]["lat"], stops[j]["lon"]), S["svc"], rdir, stops[j]["code"], "dd", {}, g["line"], lv, planned_start=None, prep=prep)
     if R is None:
         return {"ok": False, "error": f"No road route could be calculated ({rerr})."}
     x = next(o for o in R["options"] if o["idx"] == R["recommended"])
