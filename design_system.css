@@ -91,31 +91,3 @@ body{
 
 /* Mobile top-bar cmdbar spacing */
 @media(max-width:999px){.cmdbar{gap:5px}.cmdbtn{width:32px;height:32px}.profilechip{display:none}}
-
-
-/* ===== V2 shared shell: 2027 professional OCC command platform ===== */
-:root{--shell-w:244px;--top-glass:rgba(5,15,29,.88)}
-.desktop-shell,.mobile-bottom-nav,.mobile-more,.mobile-top-menu{display:none}
-.shell-live-dot,.ds-live-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--green,#20d16a);box-shadow:0 0 10px rgba(32,209,106,.8)}
-@media(min-width:1000px){
- body{padding-left:var(--shell-w)!important}
- .app,.wrap{max-width:none!important;margin-left:0!important;margin-right:0!important}
- .desktop-shell{display:flex;position:fixed;inset:0 auto 0 0;width:var(--shell-w);z-index:15000;flex-direction:column;padding:18px 12px;background:linear-gradient(180deg,rgba(5,18,34,.98),rgba(4,13,25,.99));border-right:1px solid rgba(60,200,255,.20);box-shadow:12px 0 40px rgba(0,0,0,.25)}
- .shell-brand{padding:8px 10px 18px;border-bottom:1px solid rgba(60,200,255,.16)}
- .shell-brand strong{display:block;font-size:14px;letter-spacing:.05em}.shell-brand small{display:block;color:#64819b;font-size:10.5px;margin-top:5px;line-height:1.35}
- .shell-link{display:flex;align-items:center;gap:11px;color:#96adc3;text-decoration:none;padding:10px 11px;border-radius:9px;margin:2px 0;font-size:12.5px;font-weight:680;position:relative}
- .shell-link .si{width:22px;text-align:center;font-size:15px}.shell-link:hover{background:rgba(60,200,255,.07);color:#fff}.shell-link.active{background:linear-gradient(90deg,rgba(60,200,255,.15),rgba(60,200,255,.03));color:#fff;box-shadow:inset 0 0 0 1px rgba(60,200,255,.22)}
- .shell-link.active:before{content:"";position:absolute;left:-12px;top:8px;bottom:8px;width:3px;border-radius:3px;background:var(--cyan,#3cc8ff);box-shadow:0 0 10px rgba(60,200,255,.8)}
- .shell-foot{margin-top:auto;padding:12px 10px;color:#6f8da6;font-size:10.5px;display:flex;align-items:center;gap:7px}
-}
-.ds-status{height:36px;padding:0 10px;display:flex;align-items:center;gap:7px;border:1px solid var(--edge);border-radius:10px;background:rgba(9,24,43,.62);font-size:11px;color:#9eb8d1}.ds-status b{font-size:10px;letter-spacing:.09em;color:#a9eec5}.ds-status small{font-size:10.5px;color:#7894ad;white-space:nowrap}
-a.cmdbtn{text-decoration:none}
-.ds-shortcuts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.ds-shortcut{display:flex;align-items:center;gap:9px;padding:10px 11px;border:1px solid var(--edge);border-radius:10px;background:rgba(9,24,43,.62);color:#cfe0f3;text-decoration:none}.ds-shortcut span{color:var(--cyan);font-size:16px}.ds-shortcut b{font-size:12px}
-@media(max-width:999px){
- body{padding-bottom:76px!important}.desktop-shell{display:none!important}.mobile-bottom-nav{display:grid;grid-template-columns:repeat(5,1fr);position:fixed;left:0;right:0;bottom:0;z-index:15000;background:rgba(4,14,27,.98);border-top:1px solid rgba(60,200,255,.22);padding:7px 5px calc(7px + env(safe-area-inset-bottom));backdrop-filter:blur(14px)}
- .mbn{border:0;background:transparent;color:#7e99b2;text-decoration:none;text-align:center;font-size:9.5px;font-weight:750;padding:3px 1px;border-radius:8px}.mbn .mi{display:block;font-size:18px;line-height:21px}.mbn.active{color:#55cfff;background:rgba(60,200,255,.09)}
- .mobile-more{position:fixed;left:10px;right:10px;bottom:76px;z-index:16000;background:#07192c;border:1px solid rgba(60,200,255,.28);border-radius:14px;padding:7px;box-shadow:0 18px 60px rgba(0,0,0,.55)}.mobile-more.open{display:block}.mobile-more a{display:flex;gap:10px;align-items:center;padding:12px;border-radius:9px;color:#d2e2f1;text-decoration:none;font-weight:650}.mobile-more a.active{background:rgba(60,200,255,.10);color:#5bd2ff}
- .ds-status{display:none}.launcher{right:-48px;width:min(330px,88vw)}.cmdbar{gap:4px}.cmdbtn{width:33px;height:33px}.profilechip{display:none}.ds-shortcuts{grid-template-columns:1fr 1fr}
-}
-@media(max-width:600px){.launcher-grid{grid-template-columns:repeat(3,1fr)}.ds-shortcuts{grid-template-columns:1fr}.card,.kpi,section.card{border-radius:11px!important}}
-@media(prefers-reduced-motion:reduce){*,*:before,*:after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
