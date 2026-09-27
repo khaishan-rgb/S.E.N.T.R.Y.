@@ -1466,6 +1466,22 @@ async def basemap_js():
     return Response(js, media_type="application/javascript", headers={"Cache-Control": "public, max-age=600"})
 
 
+# ---- V15.9 shared command-platform design system + single-source navigation registry.
+# Loaded by pages one at a time as they are redesigned; pages that don't include them are unaffected.
+@app.get("/design-system.css")
+async def design_system_css():
+    from fastapi.responses import Response
+    css = (HERE / "design_system.css").read_text(encoding="utf-8")
+    return Response(css, media_type="text/css", headers={"Cache-Control": "public, max-age=600"})
+
+
+@app.get("/nav-registry.js")
+async def nav_registry_js():
+    from fastapi.responses import Response
+    js = (HERE / "nav_registry.js").read_text(encoding="utf-8")
+    return Response(js, media_type="application/javascript", headers={"Cache-Control": "public, max-age=600"})
+
+
 @app.get("/halfway", response_class=HTMLResponse)
 async def halfway_page():
     """V14.0: Halfway Planner (live simulation: Recover Late Duty / Deploy OS Bus)."""

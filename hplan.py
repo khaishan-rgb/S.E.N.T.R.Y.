@@ -16,7 +16,7 @@ Time unit: minutes of the day (float). Distance: km along the service route.
 Projected headways are calculated at MONITORING POINTS (stops downstream of the disruption). At each point the arrival sequence is:
     the most recent bus that has already passed the point (estimated passage time in the past)
   + every bus that has not yet passed it (predicted arrival).
-EWT at a point = sum(h^2) / (2 sum h) - H/2  (H = scheduled headway), the same formula as the Timetable Optimiser.
+EWT at a point = sum(h^2) / (2 sum h) - H/2  (H = scheduled headway), the same formula as the Recovery Decision Engine.
 Projected EWT of an option = mean over the monitoring points. The recommendation is the option with the lowest projected EWT,
 subject to a minimum improvement - never a hard-coded delay rule.
 """
@@ -28,7 +28,7 @@ PARAMS = {
     "prep_min": 2.0,            # preparation at the entry stop before taking passengers (same as the off-service planner)
     "max_wait_min": 10.0,       # a halfway / OS bus may wait at the entry stop up to this long to centre itself in the gap
     "os_max_wait_min": 20.0,    # an OS bus may delay its departure up to this long for the same reason
-    "reg_hold_max": 8.0,        # regulation: hold of the bus ahead, at most (same cap as the Timetable Optimiser)
+    "reg_hold_max": 8.0,        # regulation: hold of the bus ahead, at most (same cap as the Recovery Decision Engine)
     "max_reach_min": 45.0,      # candidate stops the bus cannot reach within this many minutes are not feasible
     "min_remaining_pct": 20.0,  # at least this % of the route must remain after the entry stop
     "n_points": 12,             # monitoring points
@@ -40,7 +40,7 @@ PARAMS = {
     "bus_time_factor": 1.25,    # car routing time -> bus off-service time (same as the off-service planner)
     # ---- V14.2 downstream regulation after the OS / halfway bus enters
     "balance_trips": 6,         # buses behind the inserted bus that may be regulated (the "Balance Trips")
-    "reg_bus_max": 8.0,         # regulation per bus, at most (min) - same cap as the Timetable Optimiser's hold
+    "reg_bus_max": 8.0,         # regulation per bus, at most (min) - same cap as the Recovery Decision Engine's hold
     "reg_per_stop": 1.0,        # regulation is applied progressively: at most this many extra min per stop (slower running / longer dwell)
     "reg_cost": 0.01,           # EWT-min charged per min of regulation, so a bus is only slowed when it really helps
     "reg_maxgap_w": 0.05,       # EWT-min charged per min the largest headway grows because of regulation (never open a new gap)

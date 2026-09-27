@@ -1,0 +1,93 @@
+/* SG Transport Pulse — Command Platform design system (V1)
+   Shared across pages. Adds visual language only — no layout ids are removed,
+   only reskinned. Safe to load after a page's own <style> block. */
+:root{
+  --purple:#9b6bff; --grey:#6b7f95;
+  --glass:rgba(13,32,55,.62); --glass2:rgba(9,22,38,.72);
+  --edge:rgba(60,200,255,.22); --edge-strong:rgba(60,200,255,.5);
+  --glow-cyan:0 0 0 1px rgba(60,200,255,.18),0 0 22px rgba(35,150,255,.10);
+  --glow-purple:0 0 0 1px rgba(155,107,255,.30),0 0 22px rgba(155,107,255,.16);
+  --glow-green:0 0 0 1px rgba(34,211,106,.28),0 0 18px rgba(34,211,106,.14);
+  --glow-amber:0 0 0 1px rgba(255,159,28,.28),0 0 18px rgba(255,159,28,.14);
+  --glow-red:0 0 0 1px rgba(255,77,85,.30),0 0 20px rgba(255,77,85,.16);
+}
+html{background:var(--bg,#050d1a)}
+body{
+  background:
+    radial-gradient(900px 420px at 14% -8%, rgba(30,110,200,.16), transparent 60%),
+    radial-gradient(700px 380px at 100% 0%, rgba(120,70,220,.10), transparent 55%),
+    linear-gradient(rgba(60,200,255,.035) 1px, transparent 1px) 0 0/100% 34px,
+    linear-gradient(90deg, rgba(60,200,255,.035) 1px, transparent 1px) 0 0/34px 100%,
+    var(--bg,#050d1a) !important;
+  background-attachment:fixed !important;
+}
+
+/* ---- Glass panels: cards, kpis, recommendation, pills ---- */
+.card,.kpi,.horec,section.card{
+  background:linear-gradient(180deg,var(--glass),var(--glass2)) !important;
+  backdrop-filter:blur(6px);
+  border:1px solid var(--edge) !important;
+  border-radius:13px !important;
+  box-shadow:var(--glow-cyan);
+  transition:box-shadow .2s ease,border-color .2s ease;
+  animation:ds-fade .32s ease both;
+}
+.card:hover{border-color:var(--edge-strong) !important}
+.card h2,.kpi b{letter-spacing:.01em}
+@keyframes ds-fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+
+/* Live / active indicator pulse */
+.live.ok .dot{animation:ds-pulse 1.6s ease-in-out infinite}
+@keyframes ds-pulse{0%,100%{box-shadow:0 0 0 0 rgba(34,211,106,.55)}50%{box-shadow:0 0 0 5px rgba(34,211,106,0)}}
+
+/* ---- Recommendation / AI panels: purple + cyan illumination only here ---- */
+.horec,.ai-shell-card,#hoRec{box-shadow:var(--glow-purple) !important;border-color:rgba(155,107,255,.35) !important}
+.horec .star{color:var(--purple) !important;text-shadow:0 0 10px rgba(155,107,255,.55)}
+.pill.g{box-shadow:var(--glow-green)}
+.pill.a{box-shadow:var(--glow-amber)}
+.ai-shell-icon{color:#c9a8ff !important;background:rgba(155,107,255,.16) !important}
+.ai-shell-badge{border-color:rgba(155,107,255,.5) !important;color:#c9a8ff !important}
+
+/* ---- Buttons ---- */
+.vbtn,.btn{border-radius:9px}
+
+/* ================= Application shell polish ================= */
+@media(min-width:1000px){
+  .desktop-shell{
+    background:linear-gradient(180deg,#071527,#050f1e) !important;
+    border-right:1px solid var(--edge) !important;
+    box-shadow:4px 0 24px rgba(0,0,0,.35);
+  }
+  .shell-brand strong{color:#eaf6ff}
+  .shell-link:hover{background:rgba(60,200,255,.08) !important}
+  .shell-link.active{background:linear-gradient(90deg,rgba(60,200,255,.16),rgba(60,200,255,.02)) !important;box-shadow:inset 0 0 0 1px rgba(60,200,255,.28)}
+  .shell-link.active:before{background:var(--cyan,#3cc8ff) !important;box-shadow:0 0 8px var(--cyan,#3cc8ff)}
+  .shell-group-label{padding:14px 12px 6px;color:#5f7d9a;font-size:10px;font-weight:800;letter-spacing:.12em}
+}
+
+/* ---- Top command bar right cluster: notifications / app launcher / settings / profile ---- */
+.cmdbar{display:flex;align-items:center;gap:8px;margin-left:auto}
+.cmdbtn{position:relative;width:36px;height:36px;border-radius:10px;border:1px solid var(--edge);background:var(--glass);color:#cfe0f3;display:grid;place-items:center;cursor:pointer;font-size:16px}
+.cmdbtn:hover{border-color:var(--edge-strong);box-shadow:var(--glow-cyan)}
+.cmdbtn .dot{position:absolute;top:6px;right:6px;width:7px;height:7px;border-radius:50%;background:var(--red);box-shadow:0 0 6px var(--red)}
+.profilechip{display:flex;align-items:center;gap:7px;height:36px;padding:0 10px 0 4px;border-radius:10px;border:1px solid var(--edge);background:var(--glass);color:#eaf3ff;cursor:pointer;font-weight:700;font-size:13px}
+.profilechip .av{width:26px;height:26px;border-radius:50%;background:linear-gradient(160deg,#2a95ff,#0d63d6);display:grid;place-items:center;font-size:12px;font-weight:800}
+.dropdown{position:absolute;right:0;top:44px;min-width:190px;background:#081627;border:1px solid var(--edge-strong);border-radius:12px;box-shadow:0 18px 50px rgba(0,0,0,.5),var(--glow-cyan);padding:6px;display:none;z-index:14000}
+.dropdown.open{display:block}
+.dropdown a,.dropdown button{display:flex;align-items:center;gap:9px;width:100%;text-align:left;padding:10px 11px;border-radius:8px;color:#d7e7f5;text-decoration:none;font-size:13px;font-weight:600;background:transparent;border:0;cursor:pointer}
+.dropdown a:hover,.dropdown button:hover{background:rgba(60,200,255,.1);color:#fff}
+.cmdwrap{position:relative}
+
+/* ---- App Launcher popover (3x3 grid) ---- */
+.launcher{position:absolute;right:0;top:44px;width:320px;background:#081627;border:1px solid var(--edge-strong);border-radius:14px;box-shadow:0 20px 60px rgba(0,0,0,.55),var(--glow-cyan);padding:12px;display:none;z-index:14000}
+.launcher.open{display:block}
+.launcher h4{margin:2px 4px 8px;color:#7d9ab6;font-size:11px;font-weight:800;letter-spacing:.1em}
+.launcher-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.launcher-item{display:flex;flex-direction:column;align-items:center;gap:6px;padding:12px 4px;border-radius:11px;color:#cfe0f3;text-decoration:none;font-size:11.5px;font-weight:650;text-align:center;border:1px solid transparent}
+.launcher-item:hover{background:rgba(60,200,255,.08);border-color:var(--edge)}
+.launcher-item .li-ic{width:34px;height:34px;border-radius:9px;background:var(--glass);border:1px solid var(--edge);display:grid;place-items:center;font-size:16px}
+.launcher-item.active .li-ic{border-color:var(--cyan,#3cc8ff);box-shadow:var(--glow-cyan)}
+.launcher-item.disabled{opacity:.42;pointer-events:none}
+
+/* Mobile top-bar cmdbar spacing */
+@media(max-width:999px){.cmdbar{gap:5px}.cmdbtn{width:32px;height:32px}.profilechip{display:none}}
