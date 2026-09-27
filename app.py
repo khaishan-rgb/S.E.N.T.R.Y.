@@ -22,7 +22,7 @@ import headway
 import routegeom
 import traffic
 
-VERSION = "V16.0"
+VERSION = "V16.1"
 LTA = os.getenv("LTA_BASE", "https://datamall2.mytransport.sg/ltaodataservice").rstrip("/")
 KEY = os.getenv("LTA_ACCOUNT_KEY", "")
 OSRM = os.getenv("OSRM_URL", "https://router.project-osrm.org").rstrip("/")
@@ -4395,7 +4395,7 @@ def camera_road(cid):
 def annex_g_lookup(cid):
     return ANNEX_G.get(str(cid).strip())
 TTL_CAMERAS = 120      # LTA's ImageLink is a short-lived signed URL, so this list is not cached long
-TR = {"params": dict(traffic.PARAMS), "book": traffic.new_book(), "last": 0.0, "ridx": None, "ridx_key": None, "feeds": {}, "lock": None, "rw": [], "stretch_cache": None}
+TR = {"params": dict(traffic.PARAMS), "book": traffic.new_book(), "last": 0.0, "ridx": None, "ridx_key": None, "feeds": {}, "lock": None, "rw": [], "stretch_cache": None, "roads": None, "roads_key": None}
 
 
 @app.get("/cameras", response_class=HTMLResponse)
@@ -4633,6 +4633,56 @@ def nearest_camera(cams, lat, lon, max_km):
     return (best, bd) if best else (None, None)
 
 
+# ---- V16.1: every service drawn on the REAL road for the traffic engine (busrouter.sg lines fitted to the LTA stops, one download for the whole network)
+TR_LINES = {"lines": {}, "key": None, "at": 0.0, "task": None, "info": "not built yet", "n": 0}
+
+
+async def tr_build_lines(st):
+    try:
+        data = await routegeom.busrouter_routes(client())
+        if not data:
+            TR_LINES.update(info=routegeom._BR.get("err") or "busrouter.sg unavailable", at=time.time())
+            return
+
+        def work():
+            out, dec = {}, {}
+            for (svc, d) in list(st["routes"].keys()):
+                stops = route_stops(st, svc, d)
+                if len(stops) < 2:
+                    continue
+                if svc not in dec:
+                    polys = []
+                    for enc in (data.get(svc) or data.get(svc.upper()) or []):
+                        try:
+                            polys.append(routegeom.decode_polyline(enc))
+                        except Exception:
+                            pass
+                    dec[svc] = polys
+                if not dec[svc]:
+                    continue
+                try:
+                    r = routegeom.fast_fit(dec[svc], stops)
+                except Exception:
+                    r = None
+                if r:
+                    out[(svc, d)] = r
+            return out
+        lines = await asyncio.to_thread(work)
+        TR_LINES.update(lines=lines, key=(len(st["routes"]), len(st["stops"])), at=time.time(), n=len(lines),
+                        info=f"{len(lines)} of {len(st['routes'])} service-directions on the real road (busrouter.sg, fitted to LTA stops)")
+    except Exception as e:
+        TR_LINES.update(info=f"road lines failed ({type(e).__name__})", at=time.time())
+
+
+def tr_lines_kick(st):
+    """Start (in the background) a rebuild of the road lines when missing or a day old; never blocks a refresh."""
+    key = (len(st["routes"]), len(st["stops"]))
+    stale = TR_LINES["key"] != key or time.time() - TR_LINES["at"] > 24 * 3600
+    retry_ok = TR_LINES["n"] > 0 or time.time() - TR_LINES["at"] > 1800
+    if stale and retry_ok and (TR_LINES["task"] is None or TR_LINES["task"].done()):
+        TR_LINES["task"] = asyncio.create_task(tr_build_lines(st))
+
+
 async def tr_refresh(force=False):
     """One detection cycle: speed bands -> whole congestion stretches; incidents, road works and rain -> events; then every live event is matched to the services (and directions) it affects."""
     P = TR["params"]
@@ -4650,15 +4700,20 @@ async def tr_refresh(force=False):
         snap = int(CACHE["bands"][1]) if "bands" in CACHE else None
         count = traffic.counts(book, P, snap)
         if st["stops"] and st["routes"]:
-            key = (len(st["routes"]), len(st["stops"]))
+            tr_lines_kick(st)
+            key = (len(st["routes"]), len(st["stops"]), TR_LINES["at"], TR_LINES["n"])
             if TR["ridx"] is None or TR["ridx_key"] != key:
-                TR["ridx"] = await asyncio.to_thread(traffic.RouteIndex, st["routes"], st["stops"])
+                TR["ridx"] = await asyncio.to_thread(traffic.RouteIndex, st["routes"], st["stops"], TR_LINES["lines"])
                 TR["ridx_key"] = key
+        if bs.get("idx") and (TR.get("roads_key") != id(bs["idx"])):
+            TR["roads"] = await asyncio.to_thread(traffic.RoadLinks, bs["idx"].segs)       # the speed-band network by road name: ties incidents / road works to their road
+            TR["roads_key"] = id(bs["idx"])
         feeds = {"bands": {"ok": bool(bs.get("idx")), "error": bs.get("error"), "segments": bs.get("usable"), "age_s": cache_age("bands")},
                  "incidents": {"ok": not inc.get("error"), "error": inc.get("error"), "count": len(inc.get("incidents", []))},
                  "roadworks": {"ok": not rw_err, "error": rw_err, "count": len(rw)},
                  "rain": {"ok": not rain.get("error"), "error": rain.get("error"), "gauges_wet": len(rain.get("stations", []))},
-                 "routes": {"ok": TR["ridx"] is not None, "services": len({k[0] for k in st["routes"]}) if st["routes"] else 0}}
+                 "routes": {"ok": TR["ridx"] is not None, "services": len({k[0] for k in st["routes"]}) if st["routes"] else 0,
+                            "real_road": TR["ridx"].n_exact if TR["ridx"] is not None else 0, "detail": TR_LINES["info"]}}
         # a feed that failed is skipped (never read as 'all clear'), so a broken feed cannot clear an active alert by mistake
         if bs.get("idx"):
             # build_stretches is the expensive part of a refresh; LTA speed bands only change every ~5 min (TTL_BANDS), so recomputing on
@@ -4684,7 +4739,7 @@ async def tr_refresh(force=False):
             traffic.update_weather(book, traffic.rain_cells(rain.get("stations", []), P), now, P, count)
         traffic.tick(book, now, P, snap)
         if TR["ridx"] is not None:
-            await asyncio.to_thread(traffic.refresh_matches, book, TR["ridx"], P)
+            await asyncio.to_thread(traffic.refresh_matches, book, TR["ridx"], P, TR.get("roads"))
         TR["last"], TR["feeds"] = now, feeds
         tr_save()
 
@@ -4725,9 +4780,9 @@ def tr_event_public(e, now):
         out.update(segments=c["segments"], length_km=round(c["length_m"] / 1000, 2), avg_kmh=round(c["avg_kmh"], 1), min_kmh=round(c["min_kmh"], 1), ref_kmh=c["ref_kmh"], road=c["road"], center=c["center"],
                    very_slow_pct=round(c["very_slow_pct"]), from_=c["from"], to=c["to"], peak_min_kmh=round(e["peak"].get("min_kmh", c["min_kmh"]), 1), peak_len_km=round(e["peak"].get("max_len_m", c["length_m"]) / 1000, 2))
     elif e["kind"] == "incident":
-        out.update(lat=c["lat"], lon=c["lon"], type=c.get("type"), message=c.get("message"), reported=c.get("reported"))
+        out.update(lat=c["lat"], lon=c["lon"], type=c.get("type"), message=c.get("message"), reported=c.get("reported"), road=c.get("road_used"), geo=c.get("geo"), basis=c.get("match_basis"))
     elif e["kind"] == "roadworks":
-        out.update(lat=c.get("lat"), lon=c.get("lon"), road=c.get("road"), start_date=tr_hhmm(c.get("start_epoch")) and datetime.fromtimestamp(c["start_epoch"], SGT).strftime("%d %b %H:%M"),
+        out.update(lat=c.get("lat"), lon=c.get("lon"), road=c.get("road"), geo=c.get("geo"), basis=c.get("match_basis"), approx_pos=bool(c.get("approx_pos")), start_date=tr_hhmm(c.get("start_epoch")) and datetime.fromtimestamp(c["start_epoch"], SGT).strftime("%d %b %H:%M"),
                    end_date=(datetime.fromtimestamp(c["end_epoch"], SGT).strftime("%d %b %H:%M") if c.get("end_epoch") else None), other=c.get("other"))
     else:
         out.update(lat=c["lat"], lon=c["lon"], radius_km=c.get("radius_km"), level=c.get("level"), max_mm=c.get("max_mm"), n=c.get("n"), name=c.get("name"), stations=c.get("stations"))
@@ -4863,10 +4918,21 @@ async def api_tr_route(service: str = "", direction: int = 1):
     stops = route_stops(st, svc, direction) if st["stops"] else []
     if not stops:
         return {"line": [], "stops": [], "error": "Route not available"}
-    line = cached_line(svc, direction, stops)
-    step = max(1, len(line) // 500)
-    return {"service": svc, "direction": direction, "line": [[round(p[0], 5), round(p[1], 5)] for p in line[::step]] + ([[round(line[-1][0], 5), round(line[-1][1], 5)]] if step > 1 else []),
-            "stops": [[s["lat"], s["lon"], s["name"], s["dist"]] for s in stops]}
+    # V16.1: the SAME real-road line the traffic engine matched against (so what is drawn is what was matched), with the route km of every vertex.
+    # Before V16.1 this returned whatever geometry happened to be cached - on a cold cache that was straight stop-to-stop lines across blocks.
+    fit, source = TR_LINES["lines"].get((svc, direction)), "busrouter.sg (fitted to LTA stops)"
+    if not fit:
+        g = await route_geometry(svc, direction, stops)
+        source = g.get("source") or "stops"
+        try:
+            fit = routegeom.fast_fit([g["line"]], stops) if g.get("line") and source != "stops" else None
+        except Exception:
+            fit = None
+        if not fit:
+            fit = {"line": [(s["lat"], s["lon"]) for s in stops], "km": [s["dist"] for s in stops]}
+            source = "stops (road geometry unavailable - straight lines between stops)"
+    return {"service": svc, "direction": direction, "line": [[round(p[0], 6), round(p[1], 6)] for p in fit["line"]], "km": [round(k, 3) if k is not None else None for k in fit["km"]],
+            "stops": [[s["lat"], s["lon"], s["name"], s["dist"]] for s in stops], "source": source, "real_road": not source.startswith("stops")}
 
 
 @app.get("/api/traffic/detail")

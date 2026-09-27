@@ -120,6 +120,11 @@ td{padding:8px;border-bottom:1px solid #12304d;vertical-align:middle}
   html.shell-off .shell-show + .brand{margin-right:auto}
   html.shell-off .shell-show.floating{position:absolute;left:10px;top:12px;z-index:10001}
 }
+.ackhd{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin:18px 0 8px;padding-top:14px;border-top:1px solid var(--line)}
+.ackhd h2{margin:0}
+#aTab td{opacity:.92}
+#aTab tr.al.sel td{opacity:1}
+.basis{display:inline-block;margin-top:4px;font-size:11px;color:var(--mut)}
 </style>
 <link rel="stylesheet" href="/design-system.css">
 <script src="/app-shell.js" data-module="trafficaware"></script>
@@ -161,6 +166,8 @@ td{padding:8px;border-bottom:1px solid #12304d;vertical-align:middle}
         <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><h2 id="qTitle">Affected services</h2><div style="display:flex;gap:8px"><button class="btn go" id="btnAckAll" type="button">Acknowledge All</button></div></div>
         <div class="tw"><table id="qTab" aria-label="Affected services"></table></div>
         <div class="foot"><a href="#" id="qMore" style="color:var(--cyan);text-decoration:none">Show more services &rarr;</a><span id="qCount"></span></div>
+        <div class="ackhd"><h2 id="aTitle">Acknowledged</h2><span id="aCount" class="sub"></span></div>
+        <div class="tw"><table id="aTab" aria-label="Acknowledged alerts"></table></div>
       </div>
     </section>
 
@@ -302,9 +309,25 @@ function actionCell(r){
   const t = {acknowledged:`\u{1F535} ACKNOWLEDGED \u2014 ${r.acked_hhmm || ""}`, monitoring:`\u{1F535} MONITORING \u2014 ack ${r.acked_hhmm || ""}`, improving:`\u{1F7E2} IMPROVING \u2014 ack ${r.acked_hhmm || ""}`, cleared:"CLEARED"}[r.status];
   return `<span class="st ${r.status}" title="${esc(r.acked_by ? "Acknowledged by " + r.acked_by : "")}">${t}</span>`;
 }
+const isAcked = r => r.status === "acknowledged" || r.status === "monitoring" || r.status === "improving";          // V16.1: shown in the Acknowledged list below
+function ackRows(){
+  const q = S.q;
+  return (S.data.rows || []).filter(r => isAcked(r) && (!q || `${r.svc} ${r.location} ${typeLabel(r)}`.toLowerCase().includes(q)))
+    .sort((a, b) => String(b.acked_hhmm || "").localeCompare(String(a.acked_hhmm || "")));
+}
+function renderAckTable(){
+  const rows = ackRows();
+  $("aCount").textContent = rows.length ? rows.length + " alert" + (rows.length === 1 ? "" : "s") : "";
+  $("aTab").innerHTML = `<thead><tr><th>Service</th><th>Affected by</th><th>Location / section</th><th>Est. delay</th><th>Acknowledged</th></tr></thead><tbody>` + (rows.map(r =>
+    `<tr class="al ${S.sel === r.id ? "sel" : ""}" data-id="${esc(r.id)}" tabindex="0"><td><b>${esc(r.svc)}</b> <span class="sub">Dir ${r.dir}</span></td><td><span class="ty">${KIC[r.kind]} ${esc(typeLabel(r))}</span></td>`
+    + `<td class="loc"><b>${esc(r.location)}</b><small>${esc(facts(r))}</small></td><td>${r.delay_min != null ? `+${f1(r.delay_min)} min` : `<span class="sub">\u2014</span>`}</td>`
+    + `<td><b>${esc(r.acked_hhmm || "\u2013")}</b> <span class="sub">${esc(r.acked_by || "")}</span><br><span class="sub">${esc({acknowledged:"Acknowledged", monitoring:"Monitoring", improving:"Improving"}[r.status] || r.status)}</span></td></tr>`).join("")
+    || `<tr><td colspan="5" class="msg">No acknowledged alerts${S.stat && !S.stat.has("acknowledged") ? " (the Acknowledged status filter is off)" : ""}.</td></tr>`) + `</tbody>`;
+  $("aTab").querySelectorAll("tr.al").forEach(tr => { const go = () => selectAlert(tr.dataset.id); tr.onclick = go; tr.onkeydown = e => { if(e.key === "Enter"){ e.preventDefault(); go(); } }; });
+}
 function visibleRows(){
   const q = S.q;
-  let rows = (S.data.rows || []).filter(r => !q || `${r.svc} ${r.location} ${typeLabel(r)}`.toLowerCase().includes(q));
+  let rows = (S.data.rows || []).filter(r => !isAcked(r) && (!q || `${r.svc} ${r.location} ${typeLabel(r)}`.toLowerCase().includes(q)));
   if(S.sort.key === "delay") rows = rows.slice().sort((a, b) => (((a.delay_min == null ? -1 : a.delay_min) - (b.delay_min == null ? -1 : b.delay_min))) * S.sort.dir);
   return rows;
 }
@@ -312,17 +335,18 @@ function renderTable(){
   if(!S.data) return;
   const rows = visibleRows(), show = rows.slice(0, S.shown);
   $("qTitle").textContent = "Affected services (" + ({0:"current", 30:"next 30 min", 60:"next 60 min", 120:"next 120 min"}[S.hor]) + ")";
-  $("qTab").innerHTML = `<thead><tr><th>Risk</th><th>Service</th><th>Affected by</th><th>Location / section</th><th><button type="button" class="thsort" id="thDelay" aria-sort="${S.sort.key === "delay" ? (S.sort.dir === -1 ? "descending" : "ascending") : "none"}">Est. delay${S.sort.key === "delay" ? (S.sort.dir === -1 ? " \u25BC" : " \u25B2") : ""}</button></th><th>Action</th></tr></thead><tbody>` + (show.map(r => `<tr class="al ${S.sel === r.id ? "sel" : ""}" data-id="${esc(r.id)}" tabindex="0"><td><span class="dotr lv-${r.level}" title="${esc(r.level)} (score ${r.score})"></span></td><td><b>${esc(r.svc)}</b> <span class="sub">Dir ${r.dir}</span></td><td><span class="ty">${KIC[r.kind]} ${esc(typeLabel(r))}</span></td><td class="loc"><b>${esc(r.location)}</b><small>${esc(facts(r))}</small></td><td>${r.delay_min != null ? `<b>+${f1(r.delay_min)} min</b>` : `<span class="sub">\u2014</span>`}</td><td>${actionCell(r)}</td></tr>`).join("") || `<tr><td colspan="6" class="msg">No disruption currently affects the selected services.</td></tr>`) + `</tbody>`;
+  $("qTab").innerHTML = `<thead><tr><th>Risk</th><th>Service</th><th>Affected by</th><th>Location / section</th><th><button type="button" class="thsort" id="thDelay" aria-sort="${S.sort.key === "delay" ? (S.sort.dir === -1 ? "descending" : "ascending") : "none"}">Est. delay${S.sort.key === "delay" ? (S.sort.dir === -1 ? " \u25BC" : " \u25B2") : ""}</button></th><th>Action</th></tr></thead><tbody>` + (show.map(r => `<tr class="al ${S.sel === r.id ? "sel" : ""}" data-id="${esc(r.id)}" tabindex="0"><td><span class="dotr lv-${r.level}" title="${esc(r.level)} (score ${r.score})"></span></td><td><b>${esc(r.svc)}</b> <span class="sub">Dir ${r.dir}</span></td><td><span class="ty">${KIC[r.kind]} ${esc(typeLabel(r))}</span></td><td class="loc"><b>${esc(r.location)}</b><small>${esc(facts(r))}</small></td><td>${r.delay_min != null ? `<b>+${f1(r.delay_min)} min</b>` : `<span class="sub">\u2014</span>`}</td><td>${actionCell(r)}</td></tr>`).join("") || `<tr><td colspan="6" class="msg">No unacknowledged disruption affects the selected services.</td></tr>`) + `</tbody>`;
   $("qCount").textContent = rows.length ? `1\u2013${show.length} of ${rows.length} alert${rows.length === 1 ? "" : "s"}` : "";
   $("qMore").style.display = rows.length > show.length ? "" : "none";
   $("btnAckAll").disabled = !rows.some(r => r.status === "new");
   $("qTab").querySelectorAll("tr.al").forEach(tr => { const go = () => selectAlert(tr.dataset.id); tr.onclick = go; tr.onkeydown = e => { if(e.key === "Enter"){ e.preventDefault(); go(); } }; });
   $("qTab").querySelectorAll("button.ack").forEach(b => b.onclick = e => { e.stopPropagation(); askAck([b.dataset.ack], "this alert"); });
+  renderAckTable();
   const th = $("thDelay"); if(th) th.onclick = () => { S.sort = S.sort.key !== "delay" ? {key:"delay", dir:-1} : S.sort.dir === -1 ? {key:"delay", dir:1} : {key:null, dir:-1}; S.shown = 10; renderTable(); };
 }
 $("qMore").onclick = e => { e.preventDefault(); S.shown += 10; renderTable(); };
 $("btnAckAll").onclick = () => { const ids = visibleRows().filter(r => r.status === "new").map(r => r.id); if(ids.length) askAck(ids, `${ids.length} active alert${ids.length === 1 ? "" : "s"} affecting ${S.svc.length ? "the selected services (" + S.svc.join(", ") + ")" : "all services in the current view"}`); };
-function selectAlert(id){ S.sel = id; S.detail = null; S.curhw = ""; renderTable(); renderDetailAll(); drawMap(); loadDetail(true); }
+function selectAlert(id){ S.sel = id; S.detail = null; S.curhw = ""; S.zoomTo = id; renderTable(); renderDetailAll(); drawMap(false); loadDetail(true); }
 
 /* ---------------------------------------------------------------- acknowledge */
 let pendingAck = null;
@@ -355,6 +379,9 @@ function initMap(){
 }
 const spdColor = k => { const p = (S.data && S.data.params) || {very_slow_kmh:20, congest_kmh:30, normal_kmh:40}; return k < p.very_slow_kmh ? "#e0101f" : k < p.congest_kmh ? "#ff9f1c" : k < p.normal_kmh ? "#ffd23f" : "#22d36a"; };
 const icon = (cls, txt, sz) => L.divIcon({className:"", iconSize:[sz || 26, sz || 26], iconAnchor:[(sz || 26) / 2, (sz || 26) / 2], html:`<div class="${cls}">${txt}</div>`});
+const BASIS = {road:"Matched to the road itself: only services running along this road are affected (not ones that just cross it).",
+  road_name:"LTA gives only the road name: services running along the whole road are listed.", distance:"Road not found in the LTA road network: matched by distance to the route.",
+  stops_on_road:"Matched by bus stops on this road."};
 function selEventId(){ const r = S.data && S.sel ? (S.data.rows || []).find(x => x.id === S.sel) : null; return r ? r.event : null; }
 function evBounds(e){
   const pts = [];
@@ -376,9 +403,10 @@ function drawMap(fit){
       L.marker([e.lat, e.lon], {icon:icon("tinfo ti-weather", "\u{1F327}"), pane:"pts"}).on("click", () => selectEvent(e.id)).bindPopup(`<b>${e.level === "heavy" ? "Heavy" : "Moderate"} rain \u2013 ${esc(e.name)}</b><br>${e.n} gauge(s), max ${f1(e.max_mm)} mm<br>Potential operational impact on ${esc((e.services || []).slice(0, 12).join(", "))}`).addTo(M.g.pts);
     } else if(e.lat != null){
       const inc = e.kind === "incident";
+      if(e.geo && e.geo.length) e.geo.forEach(g => L.polyline([[g[0], g[1]], [g[2], g[3]]], {color:inc ? "#ff4d55" : "#ff9f1c", weight:inc ? 6 : 5, opacity:.9, dashArray:inc ? null : "8 6", pane:"cong", interactive:false}).addTo(M.g.cong));
       L.marker([e.lat, e.lon], {icon:icon("tinfo " + (inc ? "ti-incident" : "ti-roadworks"), inc ? "!" : "\u{1F6A7}"), pane:"pts"}).on("click", () => selectEvent(e.id))
-        .bindPopup(inc ? `<b>${esc(e.type || "Incident")}</b><br>${esc(e.message)}<br>${e.reported ? "Reported " + esc(e.reported) : "Report time not given by the source"}<br>Nearby services: ${esc((e.services || []).slice(0, 14).join(", "))}`
-                       : `<b>Road works \u2013 ${esc(e.road)}</b><br>Start ${esc(e.start_date || "?")}<br>${e.end_date ? "Expected end " + esc(e.end_date) : "End time unavailable"}<br>${esc(e.other || "")}<br>Nearby services: ${esc((e.services || []).slice(0, 14).join(", "))}`).addTo(M.g.pts);
+        .bindPopup(inc ? `<b>${esc(e.type || "Incident")}</b><br>${esc(e.message)}<br>${e.reported ? "Reported " + esc(e.reported) : "Report time not given by the source"}<br>Services on this road: ${esc((e.services || []).slice(0, 14).join(", "))}<br><span class="basis">${esc(BASIS[e.basis] || "")}</span>`
+                       : `<b>Road works \u2013 ${esc(e.road)}</b><br>Start ${esc(e.start_date || "?")}<br>${e.end_date ? "Expected end " + esc(e.end_date) : "End time unavailable"}<br>${esc(e.other || "")}<br>Services on this road: ${esc((e.services || []).slice(0, 14).join(", "))}<br><span class="basis">${esc(BASIS[e.basis] || "")}${e.approx_pos ? " Marker is placed on the road; LTA gives no exact position." : ""}</span>`).addTo(M.g.pts);
     }
   });
   (S.data.events || []).filter(e => e.kind === "congestion").sort((a, b) => a.avg_kmh - b.avg_kmh).slice(0, 4).forEach(e => L.marker(e.center, {icon:L.divIcon({className:"", iconSize:[0, 0], iconAnchor:[0, 0], html:`<div class="evl">${esc(e.road)} \u00b7 ${f1(e.avg_kmh)} km/h</div>`}), interactive:false, keyboard:false, pane:"pts"}).addTo(M.g.pts));
@@ -409,6 +437,7 @@ async function drawRoute(){
   if(!rt){ rt = await getJSON(`/api/traffic/route?service=${encodeURIComponent(r.svc)}&direction=${r.dir}`, 30000); S.routes[key] = rt; if(S.sel !== r.id) return; M.g.route.clearLayers(); }
   if(rt && rt.line && rt.line.length > 1){
     const line = rt.line, n = line.length;
+    if(rt.real_road === false && !(S.warned || (S.warned = {}))[key]){ S.warned[key] = 1; toast("Road geometry unavailable for this route \u2013 drawn stop to stop"); }
     L.polyline(line, {color:"#04101d", weight:9, opacity:.6, interactive:false, pane:"route", lineCap:"round", lineJoin:"round"}).addTo(M.g.route);   // dark casing: keeps the route legible over any speed-band colour
     L.polyline(line, {color:"#eaf3ff", weight:6, opacity:.85, interactive:false, pane:"route", lineCap:"round", lineJoin:"round"}).addTo(M.g.route);  // white halo
     L.polyline(line, {color:"#1785ff", weight:3.2, opacity:1, interactive:false, pane:"route", lineCap:"round", lineJoin:"round"}).addTo(M.g.route);  // the route itself, on top
@@ -417,6 +446,22 @@ async function drawRoute(){
       const a = line[i - 1], b = line[Math.min(n - 1, i + 1)], ang = Math.atan2((b[1] - a[1]) * Math.cos(a[0] * Math.PI / 180), b[0] - a[0]) * 180 / Math.PI;
       L.marker(line[i], {icon:L.divIcon({className:"", iconSize:[16, 16], iconAnchor:[8, 8], html:`<div class="rtarrow" style="transform:rotate(${ang.toFixed(0)}deg)">\u25B2</div>`}), interactive:false, keyboard:false, pane:"route"}).addTo(M.g.route);
     }
+  }
+  /* V16.1: the affected section ON THE ROUTE (route km a..b of this alert), drawn along the real road, and the map zooms to it when the alert is selected */
+  let fitPts = [];
+  if(rt && rt.line && rt.km && r.a_km != null){
+    const a = Math.min(r.a_km, r.b_km != null ? r.b_km : r.a_km), b = Math.max(r.a_km, r.b_km != null ? r.b_km : r.a_km);
+    const pad = b - a < 0.05 ? 0.12 : 0;                                     // a point event: show ~120 m of route either side
+    const sec = rt.line.filter((p, i) => rt.km[i] != null && rt.km[i] >= a - pad && rt.km[i] <= b + pad);
+    const col = {critical:"#ff2d3d", high:"#ff9f1c", monitor:"#ffd23f", normal:"#3cc8ff"}[r.level] || "#ff4d55";
+    if(sec.length >= 2){ L.polyline(sec, {color:col, weight:9, opacity:.95, pane:"route", lineCap:"round", lineJoin:"round"}).bindTooltip(`Affected section of Svc ${esc(r.svc)} Dir ${r.dir}: km ${a.toFixed(1)}\u2013${b.toFixed(1)}`, {sticky:true}).addTo(M.g.route); fitPts = sec; }
+    else { let k = 0, bd = 1e9; rt.km.forEach((x, i) => { if(x != null && Math.abs(x - a) < bd){ bd = Math.abs(x - a); k = i; } }); fitPts = [rt.line[Math.max(0, k - 3)], rt.line[k], rt.line[Math.min(n - 1, k + 3)]]; }
+  }
+  if(S.zoomTo === r.id && M.map){
+    const e = S.ev[r.event], pts = fitPts.slice();
+    if(e && e.kind !== "weather") pts.push(...evBounds(e).slice(0, 60));
+    if(e && e.kind === "weather" && !pts.length) pts.push([e.lat, e.lon]);
+    if(pts.length){ S.zoomTo = null; M.map.fitBounds(L.latLngBounds(pts), {padding:[70, 70], maxZoom:17}); }
   }
   const d = S.detail;
   if(d && d.buses && d.alert && d.alert.id === S.sel) d.buses.forEach(b => { if(b.lat == null) return; L.marker([b.lat, b.lon], {icon:icon("busm bm-" + b.state, b.id, 22), pane:"bus", interactive:false, keyboard:false}).addTo(M.g.bus); });

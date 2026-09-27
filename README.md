@@ -1,4 +1,22 @@
-# SG Transport Pulse V16.0 — Operational Intelligence & Service Recovery Platform
+# SG Transport Pulse V16.1 — Operational Intelligence & Service Recovery Platform
+
+## V16.1 — Traffic-Aware Regulation: road-accurate alerts, correct route on zoom, Acknowledged list
+
+**1. Alerts are tied to the actual road (engine `traffic-1.3-road`)**
+* **Every service is now matched on the real road.** The engine uses the busrouter.sg road line of each service, fitted to the LTA stop list (`routegeom.fast_fit`, one download for the whole network, rebuilt daily in the background). Before, it used straight stop-to-stop chords, which cut across blocks and missed or mis-matched roads. Routes without a usable line keep the old chords and the old tolerance.
+* **Congestion** must lie within 35 m of the real road (was 70 m around the chords) and run the same way as the traffic. Parallel roads and the opposite carriageway are no longer flagged.
+* **Incidents** are tied to the road named in the LTA message ("... on PIE (towards Tuas) ..." → Pan Island Expressway; "Upp Thomson Rd" → Upper Thomson Road) through the LTA speed-band road network. A service is affected only if it runs ALONG that road through the incident, not if it crosses it, passes under a flyover or uses a nearby road. The old rule was "any route within 300 m".
+* **Road works:** with coordinates, the same road-tied rule applies. With only a road name (LTA gives no position), the services running along that road's links are matched and the road itself is drawn. The popup says the position is approximate.
+* **Fallback:** if the road cannot be found in the network, matching is by distance to the real-road route (60 m). Every incident / road-works popup states which basis was used.
+* **Weather** stays area-based (rain gauges are points), but the affected stretch is now measured along the real road.
+* New settings (Settings tab): `match_m_exact`, `point_road_m`, `point_stretch_m`, `point_overlap_m`, `point_m_exact`.
+
+**2. Selecting an affected service zooms to it on the correct route**
+* `/api/traffic/route` returns the same real-road line the engine matched against, with the route km of every vertex. It previously returned stop-to-stop straight lines when the geometry was not yet cached.
+* Selecting an alert draws the affected section of that service's route (route km a–b, coloured by priority) and zooms the map to it together with the disruption.
+
+**3. Acknowledged list**
+* The Affected services list shows only alerts still needing action. Acknowledged / monitoring / improving alerts move to a separate **Acknowledged** list underneath, with time, who acknowledged, and the current state. Selecting a row there works the same way.
 
 ## V16.0 — Command platform redesign (UI and information architecture; engines unchanged)
 

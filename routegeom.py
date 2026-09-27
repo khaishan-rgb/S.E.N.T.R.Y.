@@ -226,3 +226,126 @@ async def onemap_line(client, stops):
     for (a, b), g in zip(zip(pts, pts[1:]), legs):
         line += (g[1:] if g else [b])
     return line, f"OneMap drive routing, {good} of {len(legs)} legs"
+
+
+# --------------------------------------------------------------------------- V16.1 fast whole-network fit (Traffic-Aware Regulation)
+def dp_simplify(line, tol_m=6.0):
+    """Douglas-Peucker in metres: keeps the road shape within tol_m while dropping redundant vertices. Returns the kept indices."""
+    n = len(line)
+    if n < 3:
+        return list(range(n))
+    lat0 = line[0][0]
+    xy = [_xy(p[0], p[1], lat0) for p in line]
+    keep = [False] * n
+    keep[0] = keep[-1] = True
+    stack = [(0, n - 1)]
+    while stack:
+        a, b = stack.pop()
+        ax, ay = xy[a]
+        bx, by = xy[b]
+        dx, dy = bx - ax, by - ay
+        L = math.hypot(dx, dy)
+        best, bi = -1.0, -1
+        for i in range(a + 1, b):
+            px, py = xy[i]
+            d = abs(dy * (px - ax) - dx * (py - ay)) / L if L > 1e-9 else math.hypot(px - ax, py - ay)
+            if d > best:
+                best, bi = d, i
+        if bi > 0 and best > tol_m:
+            keep[bi] = True
+            stack.append((a, bi))
+            stack.append((bi, b))
+    return [i for i in range(n) if keep[i]]
+
+
+def fast_fit(cands, stops, on_m=ON_LINE_M, min_match=MIN_MATCH, tol_m=6.0):
+    """Fit the road polyline(s) of a service to one direction's LTA stop list, vectorised (a few ms per route).
+    -> {"line": [(lat, lon)], "km": [km along the route on LTA's own distance scale per vertex], "score": share of stops on the line} or None.
+    Stops are walked forward only (loop services work); the km of every vertex is interpolated between the stops it lies between,
+    so a position on the line converts exactly to the same route km the rest of the app uses."""
+    import numpy as np
+    if len(stops) < 2 or not cands:
+        return None
+    lat0 = stops[0]["lat"]
+    kx, ky = 111320.0 * math.cos(math.radians(lat0)), 110574.0
+    S = np.array([[s["lon"] * kx, s["lat"] * ky] for s in stops])
+    best = None
+    for ln in cands:
+        if not ln or len(ln) < 2:
+            continue
+        for cand in (ln, ln[::-1]):
+            V = np.array([[p[1] * kx, p[0] * ky] for p in cand])
+            A, B = V[:-1], V[1:]
+            D = B - A
+            L2 = (D * D).sum(1)
+            L2[L2 < 1e-9] = 1e-9
+            P_ = S[:, None, :] - A[None, :, :]
+            t = np.clip((P_ * D[None, :, :]).sum(2) / L2[None, :], 0.0, 1.0)
+            Q = A[None, :, :] + t[:, :, None] * D[None, :, :]
+            dist = np.hypot(S[:, None, 0] - Q[:, :, 0], S[:, None, 1] - Q[:, :, 1])
+            near = dist <= on_m
+            prev, hits, seg, tt = 0, 0, [], []
+            nseg = len(A)
+            for i in range(len(stops)):
+                idx = np.nonzero(near[i, prev:])[0]
+                if not len(idx):
+                    seg.append(None); tt.append(None)
+                    continue
+                j = prev + int(idx[0])
+                k = j
+                while k + 1 < nseg and near[i, k + 1] and dist[i, k + 1] <= dist[i, k]:
+                    k += 1
+                hits += 1
+                prev = k
+                seg.append(k); tt.append(float(t[i, k]))
+            score = hits / len(stops)
+            if best is None or score > best[0]:
+                best = (score, cand, seg, tt)
+    if best is None or best[0] < min_match:
+        return None
+    score, cand, seg, tt = best
+    m = [i for i, s_ in enumerate(seg) if s_ is not None]
+    i0, i1 = m[0], m[-1]
+    s0, s1 = seg[i0], seg[i1]
+    lerp = lambda a, b, f: (a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f)
+    body = [lerp(cand[s0], cand[s0 + 1], tt[i0])] + list(cand[s0 + 1:s1 + 1]) + [lerp(cand[s1], cand[s1 + 1], tt[i1])]
+    # metres along body for every matched stop
+    cum = [0.0]
+    for a, b in zip(body, body[1:]):
+        ax, ay = _xy(a[0], a[1], lat0)
+        bx, by = _xy(b[0], b[1], lat0)
+        cum.append(cum[-1] + math.hypot(bx - ax, by - ay))
+    def pos(i):
+        s_ = seg[i]
+        base = cum[s_ - s0] if s_ > s0 else 0.0
+        a, b = (body[0], cand[s0 + 1]) if s_ == s0 else (cand[s_], cand[s_ + 1])
+        f = tt[i] if s_ != s0 else max(0.0, (tt[i] - tt[i0]) / max(1e-9, 1.0 - tt[i0]))
+        ax, ay = _xy(a[0], a[1], lat0)
+        bx, by = _xy(b[0], b[1], lat0)
+        return base + f * math.hypot(bx - ax, by - ay)
+    anchors, last_m, last_km = [], -1.0, -1.0
+    for i in m:
+        km_ = stops[i].get("dist")
+        pm = pos(i)
+        if km_ is None or pm <= last_m or km_ <= last_km:
+            continue
+        anchors.append((pm, float(km_)))
+        last_m, last_km = pm, float(km_)
+    if len(anchors) < 2:
+        return None
+    am = np.array([a[0] for a in anchors]); ak = np.array([a[1] for a in anchors])
+    cm = np.array(cum)
+    km = np.interp(cm, am, ak)
+    km[cm < am[0]] = ak[0] - (am[0] - cm[cm < am[0]]) / 1000.0
+    km[cm > am[-1]] = ak[-1] + (cm[cm > am[-1]] - am[-1]) / 1000.0
+    line, kms = list(body), [float(x) for x in km]
+    head = [((s["lat"], s["lon"]), s.get("dist")) for s in stops[:i0]]
+    tail = [((s["lat"], s["lon"]), s.get("dist")) for s in stops[i1 + 1:]]
+    if head:
+        line = [h[0] for h in head] + line
+        kms = [float(h[1]) if h[1] is not None else kms[0] for h in head] + kms
+    if tail:
+        line = line + [h[0] for h in tail]
+        kms = kms + [float(h[1]) if h[1] is not None else kms[-1] for h in tail]
+    keep = dp_simplify(line, tol_m)
+    return {"line": [line[i] for i in keep], "km": [kms[i] for i in keep], "score": round(score, 3)}

@@ -10,7 +10,7 @@ Everything is deterministic and decision support only.
 """
 import math
 
-MODEL_VERSION = "traffic-1.2"
+MODEL_VERSION = "traffic-1.3-road"
 EPS = 1e-9
 
 PARAMS = {
@@ -29,7 +29,12 @@ PARAMS = {
     # ---- reference (normal) speed by LTA road category, km/h
     "ref_A": 70.0, "ref_B": 50.0, "ref_C": 45.0, "ref_D": 40.0, "ref_E": 35.0, "ref_F": 30.0, "ref_default": 50.0,
     # ---- matching a disruption to a bus service
-    "match_m": 70.0,            # a route point within this distance of the disrupted road counts as on it
+    "match_m": 70.0,            # a route point within this distance of the disrupted road counts as on it (routes known only stop-to-stop)
+    "match_m_exact": 35.0,      # V16.1: the same, for routes drawn on the real road (busrouter.sg geometry): tighter, so parallel roads are not matched
+    "point_road_m": 80.0,       # V16.1: an incident / road works point is tied to a road link of the SAME road within this distance
+    "point_stretch_m": 150.0,   # V16.1: ... and the route must run ALONG that road for this far either side of the point (a route that only crosses it is not affected)
+    "point_overlap_m": 60.0,    # V16.1: minimum length the route shares with that road stretch
+    "point_m_exact": 60.0,      # V16.1: fallback when the road is not in the speed-band network: distance from a real-road route
     "match_angle": 45.0,        # ... and the bus travels the same way as the traffic (deg) - direction matters
     "min_overlap_m": 200.0,     # ignore a route that only clips the disruption
     "sample_m": 40.0,           # spacing of the points used to measure the overlap
@@ -62,7 +67,7 @@ PARAMS = {
 }
 RANGES = {
     "very_slow_kmh": (5, 40), "congest_kmh": (10, 50), "normal_kmh": (20, 80), "min_len_m": (100, 5000), "persist_updates": (1, 20), "clear_updates": (1, 20),
-    "persist_new_data_only": (0, 1), "refresh_s": (15, 600), "join_gap_m": (20, 300), "join_gap_other_m": (5, 200), "join_angle": (10, 120),
+    "persist_new_data_only": (0, 1), "match_m_exact": (10, 100), "point_road_m": (20, 300), "point_stretch_m": (50, 500), "point_overlap_m": (20, 300), "point_m_exact": (20, 300), "refresh_s": (15, 600), "join_gap_m": (20, 300), "join_gap_other_m": (5, 200), "join_angle": (10, 120),
     "ref_A": (20, 120), "ref_B": (20, 120), "ref_C": (20, 120), "ref_D": (20, 120), "ref_E": (10, 120), "ref_F": (10, 120), "ref_default": (20, 120),
     "match_m": (20, 200), "match_angle": (10, 120), "min_overlap_m": (0, 2000), "sample_m": (10, 200), "incident_m": (50, 2000), "roadwork_m": (50, 2000),
     "weather_km": (0.5, 20), "rain_group_km": (0.5, 20), "rain_mod_mm": (0.05, 20), "rain_heavy_mm": (0.1, 40),
@@ -229,12 +234,14 @@ class RouteIndex:
     """Stop-to-stop segments of every service and direction in a grid, so a disruption finds the routes it overlaps in one pass.
     routes: {(svc, dir): [{"seq", "code", "dist"}]}, stops: {code: {"lat", "lon", "name", "road"}}."""
 
-    def __init__(self, routes, stops):
+    def __init__(self, routes, stops, lines=None):
         self.cell = 0.003
         self.grid = {}
-        self.segs = []                                   # (svc, dir, lat1, lon1, lat2, lon2, km_at_start, km_at_end, bearing)
-        self.meta = {}                                   # (svc, dir) -> {"km": total route km, "n": stops, "first": name, "last": name, "stops": [(lat, lon, km)]}
+        self.segs = []                                   # (svc, dir, lat1, lon1, lat2, lon2, km_at_start, km_at_end, bearing, exact)
+        self.meta = {}                                   # (svc, dir) -> {"km": total route km, "n": stops, "first": name, "last": name, "stops": [(lat, lon, km)], "exact": bool}
         self.by_road = {}
+        self.n_exact = 0
+        lines = lines or {}
         for (svc, d), rows in routes.items():
             pts = []
             cum = 0.0
@@ -249,12 +256,19 @@ class RouteIndex:
             if len(pts) < 2:
                 continue
             total = max(p[2] for p in pts) or cum
-            self.meta[(svc, d)] = {"km": total, "n": len(pts), "first": pts[0][3]["name"], "last": pts[-1][3]["name"], "stops": [(p[0], p[1], p[2]) for p in pts]}
-            for a, b in zip(pts, pts[1:]):
-                if hav_m(a[0], a[1], b[0], b[1]) < 5.0:
+            ln = lines.get((svc, d))
+            exact = bool(ln and len(ln.get("line") or []) >= 2)
+            self.meta[(svc, d)] = {"km": total, "n": len(pts), "first": pts[0][3]["name"], "last": pts[-1][3]["name"], "stops": [(p[0], p[1], p[2]) for p in pts], "exact": exact}
+            # V16.1: segments follow the REAL road (busrouter.sg line fitted to the LTA stops) when available; otherwise straight stop-to-stop chords
+            chain = [(p[0], p[1], k) for p, k in zip(ln["line"], ln["km"])] if exact else [(p[0], p[1], p[2]) for p in pts]
+            if exact:
+                self.n_exact += 1
+                self.meta[(svc, d)]["line"] = chain
+            for a, b in zip(chain, chain[1:]):
+                if hav_m(a[0], a[1], b[0], b[1]) < 3.0:
                     continue
                 i = len(self.segs)
-                self.segs.append((svc, d, a[0], a[1], b[0], b[1], a[2], max(b[2], a[2]), brg(a[0], a[1], b[0], b[1])))
+                self.segs.append((svc, d, a[0], a[1], b[0], b[1], a[2], max(b[2], a[2]), brg(a[0], a[1], b[0], b[1]), exact))
                 n = int(hav_m(a[0], a[1], b[0], b[1]) // 150) + 1
                 for c in {(int((a[0] + (b[0] - a[0]) * k / n) / self.cell), int((a[1] + (b[1] - a[1]) * k / n) / self.cell)) for k in range(n + 1)}:
                     self.grid.setdefault(c, []).append(i)
@@ -283,8 +297,9 @@ class RouteIndex:
         t = _clip((ax * vx + ay * vy) / l2, 0.0, 1.0) if l2 > 1e-6 else 0.0
         return math.hypot(ax - t * vx, ay - t * vy), t
 
-    def match_stretch(self, segments, P):
-        """segments: [[alat, alon, blat, blon, kmh]]. -> {(svc, dir): {overlap_km, a_km, b_km, route_km, pct}} - only routes that run ALONG the stretch in the SAME direction."""
+    def match_stretch(self, segments, P, both=False, min_overlap=None):
+        """segments: [[alat, alon, blat, blon, kmh]]. -> {(svc, dir): {overlap_km, a_km, b_km, route_km, pct}} - only routes that run ALONG the stretch in the SAME direction
+        (both=True: either direction along the road, still never a route that merely crosses it)."""
         step = P["sample_m"]
         hit = {}
         for s in segments:
@@ -297,10 +312,11 @@ class RouteIndex:
                 best = {}
                 for i in self._near(lat, lon):
                     g = self.segs[i]
-                    if angdiff(bt, g[8]) > P["match_angle"]:
+                    ad = angdiff(bt, g[8])
+                    if ad > P["match_angle"] and not (both and ad >= 180.0 - P["match_angle"]):
                         continue
                     d, t = self._proj(g, lat, lon)
-                    if d <= P["match_m"]:
+                    if d <= (P.get("match_m_exact", 35.0) if g[9] else P["match_m"]):
                         key = (g[0], g[1])
                         if key not in best or d < best[key][0]:
                             best[key] = (d, g[6] + (g[7] - g[6]) * t)
@@ -311,19 +327,19 @@ class RouteIndex:
                     h["lo"], h["hi"] = min(h["lo"], km), max(h["hi"], km)
         out = {}
         for key, h in hit.items():
-            if h["len"] < P["min_overlap_m"]:
+            if h["len"] < (P["min_overlap_m"] if min_overlap is None else min_overlap):
                 continue
             km = self.meta[key]["km"]
             out[key] = {"overlap_km": h["len"] / 1000.0, "a_km": h["lo"], "b_km": h["hi"], "route_km": km, "pct": 100.0 * (h["len"] / 1000.0) / km if km > 0 else 0.0}
         return out
 
-    def match_point(self, lat, lon, radius_m):
+    def match_point(self, lat, lon, radius_m, exact_m=None):
         """Routes that pass within radius_m of a point (an incident, roadworks): direction is not known, so both directions that pass by are returned."""
         out = {}
         for i in self._near(lat, lon):
             g = self.segs[i]
             d, t = self._proj(g, lat, lon)
-            if d <= radius_m:
+            if d <= (min(radius_m, exact_m) if (g[9] and exact_m) else radius_m):
                 key = (g[0], g[1])
                 if key not in out or d < out[key]["dist_m"]:
                     km = g[6] + (g[7] - g[6]) * t
@@ -366,13 +382,134 @@ class RouteIndex:
         if not m:
             return None
         best = None
-        pts = m["stops"]
+        pts = m.get("line") or m["stops"]                 # V16.1: the real road line when known
         for a, b in zip(pts, pts[1:]):
             seg = (0, 0, a[0], a[1], b[0], b[1])
             dd, t = self._proj(seg, lat, lon)
             if best is None or dd < best[1]:
                 best = (a[2] + (b[2] - a[2]) * t, dd)
         return best
+
+
+    def match_on_road(self, lat, lon, roads, road, P):
+        """V16.1 - an incident / road works POINT on a named road. It is tied to the nearest link of that same road (LTA speed-band network)
+        and a route is affected only if it runs ALONG that road through the point (either direction: the source does not say which carriageway
+        is blocked when both are equally close). A route that merely crosses the road, or runs on a parallel road, is not matched.
+        -> (matches, stretch_segments) or (None, None) when the road cannot be found near the point (caller falls back to distance)."""
+        cand = roads.near(lat, lon, road, P["point_road_m"]) if roads else []
+        if not cand:
+            return None, None
+        best_d = cand[0][0]
+        use = [c for c in cand if c[0] <= best_d + 12.0]            # both carriageways when they are about equally close to the point
+        stretch = []
+        for d_, seg, t in use:
+            stretch += roads.clip(seg, t, P["point_stretch_m"])
+        m = self.match_stretch([[a[0], a[1], b[0], b[1], 0] for a, b in stretch], P, both=True, min_overlap=P["point_overlap_m"])
+        for v in m.values():
+            v["overlap_km"] = 0.0                                    # a point event: the shared length only proves the route is on the road
+            v["dist_m"] = round(best_d, 1)
+        return m, stretch
+
+    def match_road_links(self, links, P):
+        """V16.1 - road works with only a road NAME (LTA gives no coordinates): routes that run along that road's links."""
+        if not links:
+            return {}
+        m = self.match_stretch([[a[0], a[1], a[2], a[3], 0] for a in links], P, both=True, min_overlap=P["point_overlap_m"])
+        for v in m.values():
+            v["overlap_km"] = 0.0
+            v["dist_m"] = 0.0
+        return m
+
+
+# ----------------------------------------------------------------------------- V16.1 road names: the same road in incident text, road works and speed bands
+_ABBR = {"RD": "ROAD", "AVE": "AVENUE", "AV": "AVENUE", "ST": "STREET", "DR": "DRIVE", "CRES": "CRESCENT", "BT": "BUKIT", "UPP": "UPPER", "UP": "UPPER",
+         "NTH": "NORTH", "STH": "SOUTH", "JLN": "JALAN", "LOR": "LORONG", "CTRL": "CENTRAL", "CTR": "CENTRE", "PL": "PLACE", "TER": "TERRACE", "TG": "TANJONG",
+         "BLVD": "BOULEVARD", "HWY": "HIGHWAY", "EXPWY": "EXPRESSWAY", "PK": "PARK", "LK": "LINK", "CL": "CLOSE", "GDN": "GARDEN", "GDNS": "GARDENS", "HTS": "HEIGHTS",
+         "IND": "INDUSTRIAL", "E": "EAST", "W": "WEST", "N": "NORTH", "S": "SOUTH", "MT": "MOUNT", "KG": "KAMPONG", "SG": "SUNGEI", "PASIR": "PASIR"}
+_EXPWY = {"PIE": "PAN ISLAND EXPRESSWAY", "CTE": "CENTRAL EXPRESSWAY", "AYE": "AYER RAJAH EXPRESSWAY", "ECP": "EAST COAST PARKWAY", "BKE": "BUKIT TIMAH EXPRESSWAY",
+          "KJE": "KRANJI EXPRESSWAY", "SLE": "SELETAR EXPRESSWAY", "TPE": "TAMPINES EXPRESSWAY", "KPE": "KALLANG PAYA LEBAR EXPRESSWAY",
+          "MCE": "MARINA COASTAL EXPRESSWAY", "NSC": "NORTH SOUTH CORRIDOR"}
+
+
+def road_norm(name):
+    """'Upp Thomson Rd' / 'UPPER THOMSON ROAD' -> 'UPPER THOMSON ROAD'; 'PIE' -> 'PAN ISLAND EXPRESSWAY'."""
+    import re as _re
+    t = _re.sub(r"[^A-Z0-9 ]", " ", str(name or "").upper())
+    w = [x for x in t.split() if x]
+    if len(w) == 1 and w[0] in _EXPWY:
+        return _EXPWY[w[0]]
+    if len(w) > 1 and w[-1] in _EXPWY and w[-2] in ("EXPRESSWAY", "PARKWAY", "CORRIDOR", "EXPWY"):
+        w = w[:-1]                                                   # "PAN ISLAND EXPRESSWAY (PIE)"
+    return " ".join(_ABBR.get(x, x) for x in w)
+
+
+def incident_road(message):
+    """The road an LTA incident message names: '... Accident on PIE (towards Tuas) after ...' -> 'PIE'; '... at Ang Mo Kio Ave 3/Ang Mo Kio St 21' -> first road."""
+    import re as _re
+    msg = _re.sub(r"^\(\d{1,2}/\d{1,2}\)\s*\d{1,2}:\d{2}\s*", "", str(message or ""))
+    m = _re.search(r"\b(?:on|along)\s+(.+?)(?=\s*\(|\s+(?:after|before|near|at|towards|exit|in|into|with|from|to)\b|[.,;]|$)", msg, _re.I)
+    if not m:
+        m = _re.search(r"\bat\s+([^/.,;(]+)", msg, _re.I)
+    return m.group(1).strip() if m else ""
+
+
+class RoadLinks:
+    """Speed-band road links grouped by normalised road name, with a grid for 'the nearest link of road X to this point'."""
+
+    def __init__(self, segs):
+        self.cell = 0.003
+        self.by = {}
+        self.grid = {}
+        for s in segs:
+            nm = road_norm(s[5])
+            if not nm:
+                continue
+            seg = (s[0], s[1], s[2], s[3], nm)
+            i = len(self.by.setdefault(nm, []))
+            self.by[nm].append(seg)
+            n = int(hav_m(s[0], s[1], s[2], s[3]) // 150) + 1
+            for c in {(int((s[0] + (s[2] - s[0]) * k / n) / self.cell), int((s[1] + (s[3] - s[1]) * k / n) / self.cell)) for k in range(n + 1)}:
+                self.grid.setdefault(c, []).append((nm, i))
+
+    def names(self, road):
+        """Normalised names of the network that are this road."""
+        r = road_norm(road)
+        return {r} if r and r in self.by else set()                  # exact road only: "THOMSON ROAD" is not "UPPER THOMSON ROAD"
+
+    def near(self, lat, lon, road, max_m):
+        """[(distance m, link, t along link)] of links of `road` within max_m, nearest first."""
+        want = self.names(road)
+        if not want:
+            return []
+        cx, cy = int(lat / self.cell), int(lon / self.cell)
+        out, seen = [], set()
+        for dx in (-1, 0, 1):
+            for dy in (-1, 0, 1):
+                for nm, i in self.grid.get((cx + dx, cy + dy), ()):
+                    if nm not in want or (nm, i) in seen:
+                        continue
+                    seen.add((nm, i))
+                    seg = self.by[nm][i]
+                    d, t = RouteIndex._proj((0, 0, seg[0], seg[1], seg[2], seg[3]), lat, lon)
+                    if d <= max_m:
+                        out.append((d, seg, t))
+        return sorted(out, key=lambda x: x[0])
+
+    def links(self, road):
+        out = []
+        for nm in self.names(road):
+            out += self.by[nm]
+        return out
+
+    @staticmethod
+    def clip(seg, t, half_m):
+        """The part of one link within half_m either side of fraction t, as [(a, b)] (lat, lon pairs)."""
+        L = hav_m(seg[0], seg[1], seg[2], seg[3])
+        if L < 1.0:
+            return []
+        f0, f1 = max(0.0, t - half_m / L), min(1.0, t + half_m / L)
+        p = lambda f: (seg[0] + (seg[2] - seg[0]) * f, seg[1] + (seg[3] - seg[1]) * f)
+        return [(p(f0), p(f1))] if f1 > f0 else []
 
 
 # ----------------------------------------------------------------------------- settings validation
@@ -565,7 +702,7 @@ def rain_cells(stations, P):
     return out
 
 
-def refresh_matches(book, ridx, P):
+def refresh_matches(book, ridx, P, roads=None):
     """Layer 2: for every live event, which service + direction it affects and how much of the route. An event that touches no bus route is not a bus alert and is dropped.
     Only ACTIVE events are matched (never mere candidates): route matching is the expensive part of a refresh, and most congestion candidates are noise that never persists into an
     alert, so matching them would be pure waste, repeated every cycle. A candidate is matched for the first time on the very refresh it gets promoted to active (update_congestion /
@@ -576,13 +713,35 @@ def refresh_matches(book, ridx, P):
         c = e["cur"]
         if e["kind"] == "congestion":
             m = ridx.match_stretch(c["segments"], P)
-        elif e["kind"] == "incident":
-            m = ridx.match_point(c["lat"], c["lon"], P["incident_m"])
-        elif e["kind"] == "roadworks":
-            m = ridx.match_point(c["lat"], c["lon"], P["roadwork_m"]) if c.get("lat") is not None else ridx.match_road(c.get("road"))
-            if c.get("lat") is None and m:
-                v = next(iter(m.values()))
-                c["lat"], c["lon"] = v["lat"], v["lon"]
+        elif e["kind"] in ("incident", "roadworks"):
+            # V16.1: tie the event to its own ROAD first (the road named in the incident text / road works record), so a route that only crosses it,
+            # passes under a flyover, or runs on a parallel road is not flagged. Distance-only matching is the fallback when the road is not known.
+            road = c.get("road") or (incident_road(c.get("message")) if e["kind"] == "incident" else "")
+            c["road_used"], c["geo"], c["match_basis"] = road or None, None, None
+            m = None
+            if c.get("lat") is not None and road and roads is not None:
+                m, stretch = ridx.match_on_road(c["lat"], c["lon"], roads, road, P)
+                if m is not None:
+                    c["geo"] = [[round(a[0], 6), round(a[1], 6), round(b[0], 6), round(b[1], 6)] for a, b in stretch]
+                    c["match_basis"] = "road"
+            if m is None and c.get("lat") is None and e["kind"] == "roadworks" and roads is not None:
+                links = roads.links(road)
+                if links:
+                    m = ridx.match_road_links(links, P)
+                    c["geo"] = [[round(x[0], 6), round(x[1], 6), round(x[2], 6), round(x[3], 6)] for x in links[:80]]
+                    c["match_basis"] = "road_name"
+                    if links:
+                        mid = links[len(links) // 2]
+                        c["lat"], c["lon"], c["approx_pos"] = (mid[0] + mid[2]) / 2, (mid[1] + mid[3]) / 2, True
+            if m is None and c.get("lat") is not None:
+                m = ridx.match_point(c["lat"], c["lon"], P["incident_m"] if e["kind"] == "incident" else P["roadwork_m"], P.get("point_m_exact"))
+                c["match_basis"] = "distance"
+            if m is None:
+                m = ridx.match_road(c.get("road"))
+                c["match_basis"] = "stops_on_road"
+                if c.get("lat") is None and m:
+                    v = next(iter(m.values()))
+                    c["lat"], c["lon"], c["approx_pos"] = v["lat"], v["lon"], True
         else:
             m = ridx.match_circle(c["lat"], c["lon"], max(P["weather_km"], c.get("radius_km", 0)))
         e["match"] = {f"{k[0]}|{k[1]}": v for k, v in m.items()}
