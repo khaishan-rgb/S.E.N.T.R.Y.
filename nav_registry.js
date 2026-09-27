@@ -18,7 +18,7 @@
   function ensureShell(){
     if(!document.querySelector(".desktop-shell")){var a=document.createElement("aside");a.className="desktop-shell";a.setAttribute("aria-label","Primary navigation");a.innerHTML='<div class="shell-brand"><strong>SG TRANSPORT PULSE</strong><small>Operational Intelligence Platform</small></div><div id="dsSidebar"></div><div class="shell-foot"><span class="shell-live-dot"></span> Live operational workspace</div>';document.body.insertBefore(a,document.body.firstChild)}
     if(!document.getElementById("dsMobileBottom")){var n=document.createElement("nav");n.className="mobile-bottom-nav";n.id="dsMobileBottom";document.body.appendChild(n);var m=document.createElement("div");m.className="mobile-more";m.id="dsMobileMore";document.body.appendChild(m)}
-    if(!document.getElementById("dsMobileTop")){var mt=document.createElement("div");mt.className="mobile-top-menu";mt.id="dsMobileTop";document.body.appendChild(mt)}
+    if(!document.getElementById("dsMobileTop")){var mt=document.createElement("header");mt.className="mobile-top-menu";mt.id="dsMobileTop";document.body.insertBefore(mt,document.body.firstChild)}
   }
   function ensureCmdbar(){
     if(document.querySelector(".cmdbar"))return;
