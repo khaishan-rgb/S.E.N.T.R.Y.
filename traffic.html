@@ -350,13 +350,23 @@ function ackRows(){ return (S.data.rows || []).filter(r => isAcked(r) && matchQ(
 function visibleRows(){ return (S.data.rows || []).filter(r => !isAcked(r) && matchQ(r)); }
 const delayTxt = g => g.maxDelay == null ? `<span class="sub">\u2014</span>` : g.minDelay != null && g.maxDelay - g.minDelay >= 0.5 ? `<b>+${f1(g.minDelay)}\u2013${f1(g.maxDelay)} min</b>` : `<b>+${f1(g.maxDelay)} min</b>`;
 function svcChips(g){
-  const own = g.rows.map(r => `<button type="button" class="sv lv-b-${r.level}${S.sel === r.id ? " on" : ""}${r.status === "new" ? "" : " done"}" data-id="${esc(r.id)}" title="Svc ${esc(r.svc)} Dir ${r.dir}${r.delay_min != null ? " \u00b7 est. +" + f1(r.delay_min) + " min" : ""} \u2013 show on map"><b>${esc(r.svc)}</b><small>D${r.dir}${r.delay_min != null ? " +" + f1(r.delay_min) : ""}</small></button>`).join("");
+  /* V16.3: several rows can share the same service+direction (the same bus route crosses the
+     disruption at more than one point/segment) \u2013 show ONE chip per service+direction, not one per row.
+     Every location is still visible: selecting the chip draws this alert's own affected section AND every
+     "mate" row's section (drawRoute()'s mates loop already does this for the whole group), so nothing is lost. */
+  const byKey = new Map();
+  g.rows.forEach(r => { const key = r.svc + "|" + r.dir; if(!byKey.has(key)) byKey.set(key, []); byKey.get(key).push(r); });
+  const own = [...byKey.values()].map(rows => {
+    const rep = rows[0], n = rows.length, ids = rows.map(x => x.id), sel = ids.includes(S.sel), isNew = rows.some(x => x.status === "new");
+    const locTxt = n > 1 ? ` \u2013 affects ${n} locations on this route (all shown on the map)` : "";
+    return `<button type="button" class="sv lv-b-${rep.level}${sel ? " on" : ""}${isNew ? "" : " done"}" data-id="${esc(rep.id)}" title="Svc ${esc(rep.svc)} Dir ${rep.dir}${rep.delay_min != null ? " \u00b7 est. +" + f1(rep.delay_min) + " min" : ""}${locTxt} \u2013 show on map"><b>${esc(rep.svc)}</b><small>D${rep.dir}${rep.delay_min != null ? " +" + f1(rep.delay_min) : ""}${n > 1 ? ` \u00d7${n}` : ""}</small></button>`;
+  }).join("");
   // services this disruption also affects but which the Services filter hides: shown, never silently dropped; one tap adds them to the filter
   const oth = S.svc.length && g.others.length ? `<div class="othsv"><span>Also affects (not in your filter):</span>${g.others.slice(0, 24).map(x => `<button type="button" class="svx" data-add="${esc(x)}" title="Add ${esc(x)} to the Services filter">+ ${esc(x)}</button>`).join("")}${g.others.length > 24 ? ` <span>+${g.others.length - 24} more</span>` : ""}</div>` : "";
   return `<div class="svs">${own}</div>${oth}`;
 }
 function groupHTML(g, acked){
-  const r = g.lead, sel = g.rows.some(x => x.id === S.sel), n = g.rows.length, newIds = g.rows.filter(x => x.status === "new").map(x => x.id);
+  const r = g.lead, sel = g.rows.some(x => x.id === S.sel), n = new Set(g.rows.map(x => x.svc + "|" + x.dir)).size, newIds = g.rows.filter(x => x.status === "new").map(x => x.id);
   const loc = `<b>${esc(r.location)}</b><small>${esc(facts(r))}${g.records > 1 ? ` \u00b7 ${g.records} ${r.kind === "roadworks" ? "road works records" : "reports"}` : ""}</small>`;
   const head3 = `<td>${acked ? "" : `<span class="dotr lv-${r.level}" title="${esc(r.level)} (highest of ${n})"></span>`}</td><td class="svcell"><span class="nsv">${n} service${n === 1 ? "" : "s"}</span>${svcChips(g)}</td><td class="loc"><span class="ty">${KIC[r.kind]} ${esc(typeLabel(r))}</span>${loc}</td>`;
   const head = head3 + `<td>${delayTxt(g)}</td>`;

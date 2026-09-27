@@ -1,4 +1,11 @@
-# SG Transport Pulse V16.2 — Operational Intelligence & Service Recovery Platform
+# SG Transport Pulse V16.3 — Operational Intelligence & Service Recovery Platform
+
+## V16.3 — Affected services: one chip per service+direction
+
+* **No more duplicate chips.** A disruption often crosses the same bus route at more than one point (several road segments, several matched sections). Before, each of those rows got its own chip, so e.g. "30 D1" could repeat dozens of times. Now every service+direction gets exactly ONE chip (e.g. "30 D1", "30 D2"), picking the worst-risk / longest-delay row to represent it.
+* **The "N services" count for the line now matches the chips** \u2014 it counts unique service+direction pairs, not raw alert rows.
+* **Multiple locations are still shown, just not as repeated chips.** If a chip covers more than one location it shows "\u00d7N" (e.g. "30 D1 \u00d72") and its tooltip says so. Selecting the chip already draws that alert's affected section AND every other affected section of the same disruption dashed on the map (this was already true in V16.2) \u2014 so all locations for that service are visible on the map from a single chip.
+* Nothing else about grouping, filtering, or acknowledging changed.
 
 ## V16.2 — Traffic-Aware Regulation: one line per disruption
 
