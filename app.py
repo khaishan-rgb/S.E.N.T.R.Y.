@@ -22,7 +22,7 @@ import headway
 import routegeom
 import traffic
 
-VERSION = "V16.1"
+VERSION = "V16.2"
 LTA = os.getenv("LTA_BASE", "https://datamall2.mytransport.sg/ltaodataservice").rstrip("/")
 KEY = os.getenv("LTA_ACCOUNT_KEY", "")
 OSRM = os.getenv("OSRM_URL", "https://router.project-osrm.org").rstrip("/")

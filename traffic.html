@@ -120,6 +120,19 @@ td{padding:8px;border-bottom:1px solid #12304d;vertical-align:middle}
   html.shell-off .shell-show + .brand{margin-right:auto}
   html.shell-off .shell-show.floating{position:absolute;left:10px;top:12px;z-index:10001}
 }
+.svcell{min-width:130px}
+.dact{min-width:104px}
+#qTab th:first-child,#qTab td:first-child,#aTab th:first-child,#aTab td:first-child{width:30px;padding-left:6px;padding-right:2px}.dact .ack{white-space:nowrap}
+td.loc .ty{display:block;margin-bottom:3px;font-weight:600}
+.nsv{display:block;font-size:11px;color:var(--mut);margin-bottom:4px}
+.svs{display:flex;flex-wrap:wrap;gap:4px}
+.sv{display:inline-flex;flex-direction:column;align-items:center;min-width:44px;padding:3px 6px;border-radius:7px;border:1px solid var(--line2);background:#0c1b30;color:#fff;cursor:pointer;line-height:1.1;font-family:inherit}
+.sv b{font-size:13px}.sv small{font-size:10px;color:var(--mut);font-weight:600}
+.sv.lv-b-critical{border-color:#ff4d55;box-shadow:inset 3px 0 0 #ff4d55}.sv.lv-b-high{border-color:#ff9f1c;box-shadow:inset 3px 0 0 #ff9f1c}.sv.lv-b-monitor{box-shadow:inset 3px 0 0 #ffd23f}
+.sv.on{background:#1b4f86;outline:2px solid var(--cyan)}.sv.done{opacity:.75}
+.othsv{margin-top:6px;font-size:11px;color:var(--mut);display:flex;flex-wrap:wrap;gap:4px;align-items:center}
+.svx{border:1px dashed var(--line2);background:transparent;color:var(--text);border-radius:6px;padding:1px 6px;font:600 11px inherit;cursor:pointer}
+.svx:hover{border-color:var(--cyan);color:#fff}
 .ackhd{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin:18px 0 8px;padding-top:14px;border-top:1px solid var(--line)}
 .ackhd h2{margin:0}
 #aTab td{opacity:.92}
@@ -310,37 +323,79 @@ function actionCell(r){
   return `<span class="st ${r.status}" title="${esc(r.acked_by ? "Acknowledged by " + r.acked_by : "")}">${t}</span>`;
 }
 const isAcked = r => r.status === "acknowledged" || r.status === "monitoring" || r.status === "improving";          // V16.1: shown in the Acknowledged list below
-function ackRows(){
-  const q = S.q;
-  return (S.data.rows || []).filter(r => isAcked(r) && (!q || `${r.svc} ${r.location} ${typeLabel(r)}`.toLowerCase().includes(q)))
-    .sort((a, b) => String(b.acked_hhmm || "").localeCompare(String(a.acked_hhmm || "")));
+const LV_ORD = {critical:0, high:1, monitor:2, normal:3};
+const matchQ = r => { const q = S.q; return !q || `${r.svc} ${r.location} ${typeLabel(r)}`.toLowerCase().includes(q); };
+/* V16.2: one line per DISRUPTION, listing every service it affects. Same event = same group; road works records on the same road (LTA often
+   files several for one site) are one group too. Grouping never drops a row: every alert the filter returns is inside exactly one group. */
+function groupKey(r){ const e = S.ev[r.event]; return r.kind === "roadworks" ? "roadworks|" + String((e && e.road) || r.location || "").trim().toUpperCase() : r.event; }
+function groupRows(rows){
+  const m = new Map();
+  rows.forEach(r => { const k = groupKey(r); if(!m.has(k)) m.set(k, []); m.get(k).push(r); });
+  return [...m.entries()].map(([key, rs]) => {
+    rs.sort((a, b) => (LV_ORD[a.level] - LV_ORD[b.level]) || ((b.delay_min || 0) - (a.delay_min || 0)) || String(a.svc).localeCompare(String(b.svc), undefined, {numeric:true}) || a.dir - b.dir);
+    const delays = rs.map(r => r.delay_min).filter(v => v != null);
+    const evs = [...new Set(rs.map(r => r.event))];
+    const all = new Set(); evs.forEach(id => ((S.ev[id] || {}).services || []).forEach(x => all.add(String(x))));
+    const shown = new Set(rs.map(r => String(r.svc)));
+    return {key, rows:rs, lead:rs[0], level:rs[0].level, maxDelay:delays.length ? Math.max(...delays) : null, minDelay:delays.length ? Math.min(...delays) : null,
+            isNew:rs.some(r => r.status === "new"), worsened:rs.some(r => r.worsened), records:evs.length,
+            others:[...all].filter(x => !shown.has(x)).sort((a, b) => a.localeCompare(b, undefined, {numeric:true}))};
+  });
+}
+function sortGroups(gs){
+  if(S.sort.key === "delay") return gs.sort((a, b) => ((a.maxDelay == null ? -1 : a.maxDelay) - (b.maxDelay == null ? -1 : b.maxDelay)) * S.sort.dir);
+  return gs.sort((a, b) => (b.isNew - a.isNew) || (LV_ORD[a.level] - LV_ORD[b.level]) || (b.rows.length - a.rows.length) || ((b.maxDelay || 0) - (a.maxDelay || 0)));
+}
+function ackRows(){ return (S.data.rows || []).filter(r => isAcked(r) && matchQ(r)); }
+function visibleRows(){ return (S.data.rows || []).filter(r => !isAcked(r) && matchQ(r)); }
+const delayTxt = g => g.maxDelay == null ? `<span class="sub">\u2014</span>` : g.minDelay != null && g.maxDelay - g.minDelay >= 0.5 ? `<b>+${f1(g.minDelay)}\u2013${f1(g.maxDelay)} min</b>` : `<b>+${f1(g.maxDelay)} min</b>`;
+function svcChips(g){
+  const own = g.rows.map(r => `<button type="button" class="sv lv-b-${r.level}${S.sel === r.id ? " on" : ""}${r.status === "new" ? "" : " done"}" data-id="${esc(r.id)}" title="Svc ${esc(r.svc)} Dir ${r.dir}${r.delay_min != null ? " \u00b7 est. +" + f1(r.delay_min) + " min" : ""} \u2013 show on map"><b>${esc(r.svc)}</b><small>D${r.dir}${r.delay_min != null ? " +" + f1(r.delay_min) : ""}</small></button>`).join("");
+  // services this disruption also affects but which the Services filter hides: shown, never silently dropped; one tap adds them to the filter
+  const oth = S.svc.length && g.others.length ? `<div class="othsv"><span>Also affects (not in your filter):</span>${g.others.slice(0, 24).map(x => `<button type="button" class="svx" data-add="${esc(x)}" title="Add ${esc(x)} to the Services filter">+ ${esc(x)}</button>`).join("")}${g.others.length > 24 ? ` <span>+${g.others.length - 24} more</span>` : ""}</div>` : "";
+  return `<div class="svs">${own}</div>${oth}`;
+}
+function groupHTML(g, acked){
+  const r = g.lead, sel = g.rows.some(x => x.id === S.sel), n = g.rows.length, newIds = g.rows.filter(x => x.status === "new").map(x => x.id);
+  const loc = `<b>${esc(r.location)}</b><small>${esc(facts(r))}${g.records > 1 ? ` \u00b7 ${g.records} ${r.kind === "roadworks" ? "road works records" : "reports"}` : ""}</small>`;
+  const head3 = `<td>${acked ? "" : `<span class="dotr lv-${r.level}" title="${esc(r.level)} (highest of ${n})"></span>`}</td><td class="svcell"><span class="nsv">${n} service${n === 1 ? "" : "s"}</span>${svcChips(g)}</td><td class="loc"><span class="ty">${KIC[r.kind]} ${esc(typeLabel(r))}</span>${loc}</td>`;
+  const head = head3 + `<td>${delayTxt(g)}</td>`;
+  if(acked){
+    const last = g.rows.slice().sort((a, b) => String(b.acked_hhmm || "").localeCompare(String(a.acked_hhmm || "")))[0];
+    const states = [...new Set(g.rows.map(x => ({acknowledged:"Acknowledged", monitoring:"Monitoring", improving:"Improving"}[x.status] || x.status)))].join(" \u00b7 ");
+    return `<tr class="al grp ${sel ? "sel" : ""}" data-id="${esc(r.id)}" tabindex="0">${head}<td><b>${esc(last.acked_hhmm || "\u2013")}</b> <span class="sub">${esc(last.acked_by || "")}</span><br><span class="sub">${esc(states)}</span></td></tr>`;
+  }
+  const act = newIds.length ? (g.worsened ? `<span class="st worse">\u{1F534} CONDITION WORSENED</span>` : "") + `<button class="ack" type="button" data-ack="${esc(newIds.join(","))}">Acknowledge${newIds.length > 1 ? " all " + newIds.length : ""}</button>` : actionCell(r);
+  return `<tr class="al grp ${sel ? "sel" : ""}" data-id="${esc(r.id)}" tabindex="0">${head3}<td class="dact">${delayTxt(g)}<div style="margin-top:6px">${act}</div></td></tr>`;
+}
+function wireGroups(tab){
+  tab.querySelectorAll("tr.al").forEach(tr => { const go = () => selectAlert(tr.dataset.id); tr.onclick = go; tr.onkeydown = e => { if(e.key === "Enter" && e.target === tr){ e.preventDefault(); go(); } }; });
+  tab.querySelectorAll("button.sv").forEach(b => b.onclick = e => { e.stopPropagation(); selectAlert(b.dataset.id); });
+  tab.querySelectorAll("button.svx").forEach(b => b.onclick = e => { e.stopPropagation(); addSvc([b.dataset.add], true); toast(`Service ${b.dataset.add} added to the Services filter`); });
+  tab.querySelectorAll("button.ack").forEach(b => b.onclick = e => { e.stopPropagation(); const ids = b.dataset.ack.split(","); const g = (S.data.rows || []).find(x => x.id === ids[0]);
+    askAck(ids, ids.length > 1 ? `this ${g ? typeLabel(g).toLowerCase() : "disruption"} for all ${ids.length} affected services` : "this alert"); });
 }
 function renderAckTable(){
-  const rows = ackRows();
-  $("aCount").textContent = rows.length ? rows.length + " alert" + (rows.length === 1 ? "" : "s") : "";
-  $("aTab").innerHTML = `<thead><tr><th>Service</th><th>Affected by</th><th>Location / section</th><th>Est. delay</th><th>Acknowledged</th></tr></thead><tbody>` + (rows.map(r =>
-    `<tr class="al ${S.sel === r.id ? "sel" : ""}" data-id="${esc(r.id)}" tabindex="0"><td><b>${esc(r.svc)}</b> <span class="sub">Dir ${r.dir}</span></td><td><span class="ty">${KIC[r.kind]} ${esc(typeLabel(r))}</span></td>`
-    + `<td class="loc"><b>${esc(r.location)}</b><small>${esc(facts(r))}</small></td><td>${r.delay_min != null ? `+${f1(r.delay_min)} min` : `<span class="sub">\u2014</span>`}</td>`
-    + `<td><b>${esc(r.acked_hhmm || "\u2013")}</b> <span class="sub">${esc(r.acked_by || "")}</span><br><span class="sub">${esc({acknowledged:"Acknowledged", monitoring:"Monitoring", improving:"Improving"}[r.status] || r.status)}</span></td></tr>`).join("")
-    || `<tr><td colspan="5" class="msg">No acknowledged alerts${S.stat && !S.stat.has("acknowledged") ? " (the Acknowledged status filter is off)" : ""}.</td></tr>`) + `</tbody>`;
-  $("aTab").querySelectorAll("tr.al").forEach(tr => { const go = () => selectAlert(tr.dataset.id); tr.onclick = go; tr.onkeydown = e => { if(e.key === "Enter"){ e.preventDefault(); go(); } }; });
-}
-function visibleRows(){
-  const q = S.q;
-  let rows = (S.data.rows || []).filter(r => !isAcked(r) && (!q || `${r.svc} ${r.location} ${typeLabel(r)}`.toLowerCase().includes(q)));
-  if(S.sort.key === "delay") rows = rows.slice().sort((a, b) => (((a.delay_min == null ? -1 : a.delay_min) - (b.delay_min == null ? -1 : b.delay_min))) * S.sort.dir);
-  return rows;
+  const gs = groupRows(ackRows()).sort((a, b) => String(b.lead.acked_hhmm || "").localeCompare(String(a.lead.acked_hhmm || "")));
+  const n = gs.reduce((t, g) => t + g.rows.length, 0);
+  $("aCount").textContent = gs.length ? `${gs.length} disruption${gs.length === 1 ? "" : "s"} \u00b7 ${n} service alert${n === 1 ? "" : "s"}` : "";
+  $("aTab").innerHTML = `<thead><tr><th></th><th>Services</th><th>Disruption</th><th>Est. delay</th><th>Acknowledged</th></tr></thead><tbody>`
+    + (gs.map(g => groupHTML(g, true)).join("") || `<tr><td colspan="5" class="msg">No acknowledged alerts${S.stat && !S.stat.has("acknowledged") ? " (the Acknowledged status filter is off)" : ""}.</td></tr>`) + `</tbody>`;
+  wireGroups($("aTab"));
 }
 function renderTable(){
   if(!S.data) return;
-  const rows = visibleRows(), show = rows.slice(0, S.shown);
+  const rows = visibleRows(), gs = sortGroups(groupRows(rows)), show = gs.slice(0, S.shown);
+  const flt = S.svc.length ? ` \u00b7 filter: ${S.svc.join(", ")}` : "";
   $("qTitle").textContent = "Affected services (" + ({0:"current", 30:"next 30 min", 60:"next 60 min", 120:"next 120 min"}[S.hor]) + ")";
-  $("qTab").innerHTML = `<thead><tr><th>Risk</th><th>Service</th><th>Affected by</th><th>Location / section</th><th><button type="button" class="thsort" id="thDelay" aria-sort="${S.sort.key === "delay" ? (S.sort.dir === -1 ? "descending" : "ascending") : "none"}">Est. delay${S.sort.key === "delay" ? (S.sort.dir === -1 ? " \u25BC" : " \u25B2") : ""}</button></th><th>Action</th></tr></thead><tbody>` + (show.map(r => `<tr class="al ${S.sel === r.id ? "sel" : ""}" data-id="${esc(r.id)}" tabindex="0"><td><span class="dotr lv-${r.level}" title="${esc(r.level)} (score ${r.score})"></span></td><td><b>${esc(r.svc)}</b> <span class="sub">Dir ${r.dir}</span></td><td><span class="ty">${KIC[r.kind]} ${esc(typeLabel(r))}</span></td><td class="loc"><b>${esc(r.location)}</b><small>${esc(facts(r))}</small></td><td>${r.delay_min != null ? `<b>+${f1(r.delay_min)} min</b>` : `<span class="sub">\u2014</span>`}</td><td>${actionCell(r)}</td></tr>`).join("") || `<tr><td colspan="6" class="msg">No unacknowledged disruption affects the selected services.</td></tr>`) + `</tbody>`;
-  $("qCount").textContent = rows.length ? `1\u2013${show.length} of ${rows.length} alert${rows.length === 1 ? "" : "s"}` : "";
-  $("qMore").style.display = rows.length > show.length ? "" : "none";
+  $("qTab").innerHTML = `<thead><tr><th>Risk</th><th>Services</th><th>Disruption</th><th><button type="button" class="thsort" id="thDelay" aria-sort="${S.sort.key === "delay" ? (S.sort.dir === -1 ? "descending" : "ascending") : "none"}">Est. delay${S.sort.key === "delay" ? (S.sort.dir === -1 ? " \u25BC" : " \u25B2") : ""}</button> / action</th></tr></thead><tbody>`
+    + (show.map(g => groupHTML(g, false)).join("") || `<tr><td colspan="4" class="msg">No unacknowledged disruption affects ${S.svc.length ? "the selected services (" + esc(S.svc.join(", ")) + ")" : "any service"}.</td></tr>`) + `</tbody>`;
+  const nsvc = new Set(rows.map(r => r.svc + "|" + r.dir)).size;
+  $("qCount").textContent = gs.length ? `1\u2013${show.length} of ${gs.length} disruption${gs.length === 1 ? "" : "s"} \u00b7 ${nsvc} service-direction${nsvc === 1 ? "" : "s"} affected${flt}` : (flt ? flt.slice(3) : "");
+  $("qMore").style.display = gs.length > show.length ? "" : "none";
+  $("qMore").textContent = gs.length > show.length ? `Show ${Math.min(10, gs.length - show.length)} more of ${gs.length - show.length} remaining \u2192` : "";
   $("btnAckAll").disabled = !rows.some(r => r.status === "new");
-  $("qTab").querySelectorAll("tr.al").forEach(tr => { const go = () => selectAlert(tr.dataset.id); tr.onclick = go; tr.onkeydown = e => { if(e.key === "Enter"){ e.preventDefault(); go(); } }; });
-  $("qTab").querySelectorAll("button.ack").forEach(b => b.onclick = e => { e.stopPropagation(); askAck([b.dataset.ack], "this alert"); });
+  wireGroups($("qTab"));
   renderAckTable();
   const th = $("thDelay"); if(th) th.onclick = () => { S.sort = S.sort.key !== "delay" ? {key:"delay", dir:-1} : S.sort.dir === -1 ? {key:"delay", dir:1} : {key:null, dir:-1}; S.shown = 10; renderTable(); };
 }
@@ -431,6 +486,7 @@ if(window.innerWidth < 700){ $("legBody").hidden = true; $("legTog").setAttribut
 $("btnFit").onclick = () => { S.mapFit = false; fitAll(); };
 function selectEvent(id){ const rows = (S.data.rows || []).filter(r => r.event === id); if(!rows.length) return; const cur = rows.find(r => r.id === S.sel); selectAlert((cur || rows[0]).id); }
 async function drawRoute(){
+  const rtok = (M.rtok = (M.rtok || 0) + 1);
   M.g.route.clearLayers(); M.g.bus.clearLayers();
   const r = S.data && S.sel ? (S.data.rows || []).find(x => x.id === S.sel) : null; if(!r) return;
   const key = r.svc + "|" + r.dir; let rt = S.routes[key];
@@ -463,6 +519,18 @@ async function drawRoute(){
     if(e && e.kind === "weather" && !pts.length) pts.push([e.lat, e.lon]);
     if(pts.length){ S.zoomTo = null; M.map.fitBounds(L.latLngBounds(pts), {padding:[70, 70], maxZoom:17}); }
   }
+  /* V16.2: the other services hit by the same disruption: their affected sections too (thinner), so the whole impact is visible at once */
+  const gk = groupKey(r), mates = (S.data.rows || []).filter(x => x.id !== r.id && groupKey(x) === gk).slice(0, 12);
+  for(const x of mates){
+    const k2 = x.svc + "|" + x.dir; let r2 = S.routes[k2];
+    if(!r2){ r2 = await getJSON(`/api/traffic/route?service=${encodeURIComponent(x.svc)}&direction=${x.dir}`, 30000); S.routes[k2] = r2; }
+    if(S.sel !== r.id || rtok !== M.rtok) return;
+    if(!r2 || !r2.line || !r2.km || x.a_km == null) continue;
+    const a2 = Math.min(x.a_km, x.b_km != null ? x.b_km : x.a_km), b2 = Math.max(x.a_km, x.b_km != null ? x.b_km : x.a_km), pd = b2 - a2 < 0.05 ? 0.12 : 0;
+    const sec2 = r2.line.filter((p, i) => r2.km[i] != null && r2.km[i] >= a2 - pd && r2.km[i] <= b2 + pd);
+    if(sec2.length >= 2) L.polyline(sec2, {color:"#ffffff", weight:4, opacity:.7, dashArray:"2 6", pane:"route", lineCap:"round"}).bindTooltip(`Also affected: Svc ${esc(x.svc)} Dir ${x.dir}`, {sticky:true}).on("click", () => selectAlert(x.id)).addTo(M.g.route);
+  }
+
   const d = S.detail;
   if(d && d.buses && d.alert && d.alert.id === S.sel) d.buses.forEach(b => { if(b.lat == null) return; L.marker([b.lat, b.lon], {icon:icon("busm bm-" + b.state, b.id, 22), pane:"bus", interactive:false, keyboard:false}).addTo(M.g.bus); });
 }

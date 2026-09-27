@@ -1,4 +1,18 @@
-# SG Transport Pulse V16.1 — Operational Intelligence & Service Recovery Platform
+# SG Transport Pulse V16.2 — Operational Intelligence & Service Recovery Platform
+
+## V16.2 — Traffic-Aware Regulation: one line per disruption
+
+* **Grouped by disruption.** Affected services (and the Acknowledged list below it) show ONE line per disruption with every affected service as a chip (service, direction, estimated delay). A disruption is:
+  * the same event (the same congestion stretch, the same incident), or
+  * the same road for road works, because LTA often files several road-works records for one site; the line says how many records were combined.
+* **Worst first.** The line shows the highest risk of its services and the delay range (e.g. +6.5–8 min).
+* **Nothing is dropped by grouping.** Every alert the filters return is inside exactly one line. Paging counts disruptions, never splits one, and the footer shows disruptions and service-directions affected.
+* **Linked to the Services (multi-select) filter.** The server still returns only the selected services. When the filter is on and a disruption also affects services outside it, those appear as "Also affects (not in your filter)". Tapping one adds it to the filter.
+* **Actions.**
+  * Click the line to select its worst-affected service; click a chip to select that service.
+  * The map zooms to the selected service's affected section; the sections of the other services hit by the same disruption are drawn dashed and are clickable.
+  * "Acknowledge all N" acknowledges every still-open service of that disruption at once.
+  * A service that becomes affected after the others were acknowledged appears as a new line, so it is not missed.
 
 ## V16.1 — Traffic-Aware Regulation: road-accurate alerts, correct route on zoom, Acknowledged list
 
