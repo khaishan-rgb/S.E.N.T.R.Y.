@@ -251,7 +251,7 @@ tr.sel .radio{border-color:var(--ai);background:radial-gradient(circle,var(--ai)
 </style>
 <link rel="stylesheet" href="/design-system.css?v=20260927b">\n</head>
 <body class="tab-setup">
-<aside class="desktop-shell" aria-label="Primary navigation"><div class="shell-brand"><strong>SG Transport Pulse</strong><small>Operations Intelligence</small></div><div class="shell-label">ANALYSIS TOOLS</div><a class="shell-link " href="/"><span class="si">▰</span><span>Route Traffic</span></a><a class="shell-link " href="/control"><span class="si">↔</span><span>Headway Control</span></a><a class="shell-link " href="/bunching"><span class="si">≋</span><span>Bunching & Gap</span></a><a class="shell-link active" href="/halfway"><span class="si">½</span><span>Halfway Planner</span></a><a class="shell-link " href="/traffic"><span class="si">⚠</span><span>Traffic-Aware</span></a><a class="shell-link " href="/halfway/timetable"><span class="si">▤</span><span>Recovery Decision Engine</span></a><a class="shell-link " href="/running-time"><span class="si">⏱</span><span>Running Time Analytics</span></a><a class="shell-link " href="/cameras"><span class="si">📷</span><span>Traffic Cameras</span></a><div class="shell-foot">● Live operational workspace</div></aside>
+
 <header class="hdr top" id="hdr">
   <div class="ttl brand"><div class="ic" aria-hidden="true">🚌</div><div style="min-width:0;flex:1"><h1>Halfway Planner</h1><button type="button" class="hsum" id="hsum" aria-expanded="false" aria-controls="hdr" hidden></button><p>Late bus &rarr; halfway on its next trip &rarr; regulate the buses around it &rarr; lowest downstream EWT</p></div></div>
   <div class="f f-op"><label for="op">Operator</label><select class="in w-op" id="op"><option value="">All operators</option><option value="SBST">SBS Transit</option><option value="SMRT">SMRT</option><option value="TTS">Tower Transit</option><option value="GAS">Go-Ahead</option></select></div>
@@ -312,7 +312,7 @@ tr.sel .radio{border-color:var(--ai);background:radial-gradient(circle,var(--ai)
   </div>
   <p class="note foot" style="margin:0 2px">Live: LTA DataMall bus positions (unchanged). Simulated: the lateness you enter. Forecast: 2 min between stops in service; off-service by real road routing; interchange departures on the target headway. SG Transport Pulse V15.8</p>
 </main>
-<nav class="mobile-bottom-nav" aria-label="Mobile primary navigation"><a class="mbn" href="/"><span class="mi">▰</span>Route</a><a class="mbn" href="/control"><span class="mi">↔</span>Headway</a><a class="mbn active" href="/halfway"><span class="mi">½</span>Halfway</a><button class="mbn" type="button" style="border:0;background:transparent;font-family:inherit" onclick="document.getElementById('mobileMore').classList.toggle('open')"><span class="mi">•••</span>More</button></nav><div class="mobile-more" id="mobileMore"><a href="/bunching">≋ Bunching</a><a href="/traffic">⚠ Traffic-Aware Regulation</a><a href="/halfway/timetable">▤ Recovery Decision Engine</a><a href="/running-time">⏱ Running Time</a><a href="/cameras">📷 Traffic Cameras</a></div>
+
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="/basemap.js"></script>
 <script>
