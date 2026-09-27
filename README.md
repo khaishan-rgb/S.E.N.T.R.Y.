@@ -1,4 +1,17 @@
-# SG Transport Pulse V15.4 — Route Traffic + Departure Adjustment + Bunching, Gap & Alerts + AI Halfway Optimiser
+# SG Transport Pulse V15.6 — Route Traffic + Departure Adjustment + Bunching, Gap & Alerts + AI Halfway Optimiser
+
+## V15.6 — OS bus: full trip when there is no prolonged headway
+
+* In OS mode the planner now also tests a **full trip**: the OS bus departs the first stop as an extra departure, slotted into the largest upcoming departure gap, and the departures around it are **re-spaced by headway** (buses ahead later, buses behind earlier within their layover; buses that have already left are not moved).
+* **Recommendation:** full trip when there is **no prolonged headway** (largest gap < 1.5 × target), when the best halfway stop would be **right at the start** of the route (first 10 %), or when no halfway stop is reachable in time; otherwise the OS bus goes **halfway** mid-gap as in V15.5. Both are always listed ("Full trip" tag).
+* Test mode: the full-trip search ignores the edge of a partial test fleet, and the banner warns when "Buses / dir" leaves part of the route empty (leave it empty for a full fleet).
+
+## V15.5 — OS bus put halfway into a prolonged headway (Live and Test)
+
+* **Recover with: OS bus** now targets the **prolonged headway on the direction on screen**: the longest gap between buses on the road (or departing within the hour). Picking a bus + lateness is optional (it simulates a bigger gap). The extra OS bus + Bus Captain drives by real road from its start point (empty = the direction's first stop / interchange, or a 5-digit stop code) to a stop **ahead of the rear bus**, and enters in the **middle of the gap**; if early it stands by. Recommended = the first stop where it can be mid-gap in time (covers the most of the gap). Engine `hwplan.plan_os`.
+* If the gap is moving away faster than the OS bus can catch its middle (e.g. OS at the interchange, gap far down the route), no stop is feasible and the page says so – start the OS bus from a stop further along.
+* **Test mode – Long headway:** enter e.g. 30 to create one prolonged headway near the start of the route in the test fleet (`/api/hplan/testsnap?...&gap=30[&gap_at=middle]`), to demonstrate the OS deployment.
+* Bus C halfway mode is unchanged.
 
 ## V15.4 — OS bus option (Live and Test)
 

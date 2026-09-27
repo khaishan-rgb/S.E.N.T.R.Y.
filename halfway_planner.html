@@ -246,9 +246,10 @@ tr.sel .radio{border-color:var(--ai);background:radial-gradient(circle,var(--ai)
   <div class="f"><span class="lb">Data</span><div class="seg" role="group" aria-label="Live or test data"><button type="button" id="mLive" aria-pressed="true">Live</button><button type="button" id="mTest" aria-pressed="false">Test</button></div></div>
   <div class="f tf" hidden><label for="tTime">Test time</label><input class="in num" id="tTime" style="width:78px" maxlength="5" inputmode="numeric" data-time placeholder="14:25"></div>
   <div class="f tf" hidden><label for="tHw">Headway, min</label><input class="in num" id="tHw" style="width:70px" value="10" inputmode="numeric" maxlength="2"></div>
+  <div class="f tf" hidden><label for="tGap">Long headway</label><input class="in num" id="tGap" style="width:72px" placeholder="none" inputmode="numeric" maxlength="3" title="Minutes: creates one prolonged headway near the start of the route (for the OS demo)"></div>
   <div class="f tf" hidden><label for="tN">Buses / dir</label><input class="in num" id="tN" style="width:70px" placeholder="auto" inputmode="numeric" maxlength="2" title="Empty = fill the whole route at this headway"></div>
   <div class="f tf" hidden><span class="lb">&nbsp;</span><button type="button" class="in" id="tGo" style="background:#f08c00;border-color:#f08c00;font-weight:800;cursor:pointer">Build test fleet</button></div>
-  <div class="f"><span class="lb">Late direction</span><div class="seg" role="group" aria-label="Direction of the late bus"><button type="button" id="d1" aria-pressed="true">D1</button><button type="button" id="d2" aria-pressed="false">D2</button></div></div>
+  <div class="f"><span class="lb" id="dirLab">Late direction</span><div class="seg" role="group" aria-label="Direction of the late bus"><button type="button" id="d1" aria-pressed="true">D1</button><button type="button" id="d2" aria-pressed="false">D2</button></div></div>
   <div class="f f-bus"><label for="bus">Late bus</label><select class="in w-bus" id="bus" disabled><option value="">Pick a service first</option></select></div>
   <div class="f"><label for="late">Late, min</label><input class="in w-late num" id="late" value="20" inputmode="numeric" maxlength="3"></div>
   <div class="f"><span class="lb">Recover with</span><div class="seg" role="group" aria-label="Recovery"><button type="button" id="rC" aria-pressed="true">Bus C halfway</button><button type="button" id="rOS" aria-pressed="false">OS bus</button></div></div>
@@ -291,7 +292,7 @@ tr.sel .radio{border-color:var(--ai);background:radial-gradient(circle,var(--ai)
     <section class="card s-visual o9" aria-labelledby="h9"><h2 id="h9"><span class="n">8</span> EWT comparison</h2><div id="chart"><div class="empty">EWT of no action vs the halfway options.</div></div></section>
     <section class="card s-plan o9" aria-labelledby="h10"><h2 id="h10"><span class="n">9</span> Controller action plan</h2><div id="acts"><div class="empty">Numbered instructions for the selected plan.</div></div></section>
   </div>
-  <p class="note foot" style="margin:0 2px">Live: LTA DataMall bus positions (unchanged). Simulated: the lateness you enter. Forecast: 2 min between stops in service; off-service by real road routing; interchange departures on the target headway. Deploying an OS bus is in the <a href="/halfway/os">previous planner</a>. SG Transport Pulse V15.4</p>
+  <p class="note foot" style="margin:0 2px">Live: LTA DataMall bus positions (unchanged). Simulated: the lateness you enter. Forecast: 2 min between stops in service; off-service by real road routing; interchange departures on the target headway. Deploying an OS bus is in the <a href="/halfway/os">previous planner</a>. SG Transport Pulse V15.6</p>
 </main>
 <nav class="mobile-bottom-nav" aria-label="Mobile primary navigation"><a class="mbn" href="/"><span class="mi">▰</span>Route</a><a class="mbn" href="/control"><span class="mi">↔</span>Headway</a><a class="mbn active" href="/halfway"><span class="mi">½</span>Halfway</a><button class="mbn" type="button" style="border:0;background:transparent;font-family:inherit" onclick="document.getElementById('mobileMore').classList.toggle('open')"><span class="mi">•••</span>More</button></nav><div class="mobile-more" id="mobileMore"><a href="/bunching">≋ Bunching</a><a href="/traffic">⚠ Traffic-Aware Regulation</a><a href="/halfway/timetable">▤ Timetable Optimiser</a><a href="/planner">◉ Off-service Route Planner</a><a href="/running-time">⏱ Running Time</a><a href="/cameras">📷 Traffic Cameras</a></div>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -344,6 +345,10 @@ const stat = (h, err) => { $("stat").innerHTML = h ? (err ? `<span style="color:
 
 function setRec(m){
   ST.rec = m; $("rC").setAttribute("aria-pressed", String(m === "late")); $("rOS").setAttribute("aria-pressed", String(m === "os"));
+  $("dirLab").textContent = m === "os" ? "Direction (gap)" : "Late direction";
+  if(ST.snap){ const o = $("bus").options[0]; if(o) o.textContent = m === "os" ? "No late bus \u2013 use the longest gap" : "Select the late bus"; }
+  $("vIc").parentNode.hidden = m === "os";
+  ST.baView = m === "os" ? "st" : ST.baView; drawBase();
   document.querySelectorAll(".of").forEach(e => e.hidden = m !== "os");
   if(m === "os" && !$("osTime").value && ST.snap) $("osTime").value = ST.snap.now.slice(0, 5);
   schedule();
@@ -364,7 +369,7 @@ function setMode(test){
 $("mLive").onclick = () => { if(ST.test) setMode(false); };
 $("mTest").onclick = () => { if(!ST.test) setMode(true); };
 $("tGo").onclick = () => loadSnap();
-["tHw", "tN"].forEach(id => $(id).addEventListener("keydown", e => { if(e.key === "Enter"){ e.preventDefault(); loadSnap(); } }));
+["tHw", "tN", "tGap"].forEach(id => $(id).addEventListener("keydown", e => { if(e.key === "Enter"){ e.preventDefault(); loadSnap(); } }));
 async function loadSnap(){
   const svc = $("svc").value.trim().toUpperCase(); if(!svc) return;
   ST.svc = svc; ST.res = null; ST.sel = null; ST.routes = {}; renderAll();
@@ -374,30 +379,30 @@ async function loadSnap(){
     if(tm && !/^\d{1,2}:\d{2}$/.test(tm)){ stat("Test time must look like 00:30.", true); return; }
     stat("Building the test fleet on the real route\u2026");
   } else stat("Loading live buses\u2026");
-  const sn = ST.test ? await api(`/api/hplan/testsnap?${q({service:svc, direction:ST.dir, time:$("tTime").value.trim(), headway:$("tHw").value.trim(), buses:$("tN").value.trim(), stop_min:ST.sm})}`, 60000)
+  const sn = ST.test ? await api(`/api/hplan/testsnap?${q({service:svc, direction:ST.dir, time:$("tTime").value.trim(), headway:$("tHw").value.trim(), buses:$("tN").value.trim(), gap:$("tGap").value.trim(), stop_min:ST.sm})}`, 60000)
                      : await api(`/api/hplan/snapshot?${q({service:svc, direction:ST.dir})}`, 60000);
   if(!sn.ok){ stat(sn.error || "Could not load the live buses.", true); $("bus").innerHTML = `<option value="">No live buses</option>`; $("bus").disabled = true; return; }
   if(sn.directions && sn.directions.length && !sn.directions.includes(ST.dir)){ setDir(sn.directions[0]); return loadSnap(); }
   ST.snap = sn;
   $("d2").disabled = !(sn.directions || []).includes(2); $("d1").disabled = !(sn.directions || []).includes(1);
   const list = sn.buses.slice().sort((a, b) => b.km - a.km);
-  $("bus").innerHTML = `<option value="">Select the late bus (${list.length} live)</option>` + list.map(b => `<option value="${b.id}">Bus ${b.id} \u00b7 near ${esc(b.near ? b.near.name : "?")} \u00b7 ${f1(b.km)} km</option>`).join("");
+  $("bus").innerHTML = `<option value="">${ST.rec === "os" ? `No late bus \u2013 use the longest gap (${list.length} ${sn.test ? "test" : "live"})` : `Select the late bus (${list.length} ${sn.test ? "test" : "live"})`}</option>` + list.map(b => `<option value="${b.id}">Bus ${b.id} \u00b7 near ${esc(b.near ? b.near.name : "?")} \u00b7 ${f1(b.km)} km</option>`).join("");
   $("bus").disabled = !list.length;
   if(ST.bus != null && list.some(b => b.id === ST.bus)) $("bus").value = ST.bus; else ST.bus = null;
   const ti = sn.test_info;
   stat(`<b>${esc(svc)} D${ST.dir}</b> \u00b7 ${list.length} ${sn.test ? "test" : "live"} buses${sn.opp ? ` \u00b7 D${sn.opp.direction}: ${sn.opp.buses.length}` : " \u00b7 loop service"} \u00b7 ${esc(sn.now)}`);
   $("testbar").hidden = !sn.test; tick();
-  if(sn.test) $("testbar").innerHTML = `TEST MODE \u2013 synthetic buses, not live. Time <b>${esc(ti.time)}</b>, headway <b>${f0(ti.headway)} min</b>, <b>${ti.placed}</b> buses on D${ST.dir} and <b>${ti.placed_opp}</b> on the other direction (the route fits ${ti.fit} at this headway; ${f0(ti.stop_min)} min between stops). Off-service times still use real road routing.`;
+  if(sn.test) $("testbar").innerHTML = `TEST MODE \u2013 synthetic buses, not live. Time <b>${esc(ti.time)}</b>, headway <b>${f0(ti.headway)} min</b>,${ti.gap ? ` one <b>long headway of ${f0(ti.gap)} min</b> near the start of D${ST.dir},` : ""} <b>${ti.placed}</b> buses on D${ST.dir} and <b>${ti.placed_opp}</b> on the other direction (the route fits ${ti.fit} at this headway; ${f0(ti.stop_min)} min between stops). Off-service times still use real road routing.${ti.placed < ti.fit ? ` <b>Only ${ti.placed} of ${ti.fit} buses \u2013 part of the route has no test buses, so departures and the OS bus may have to wait; leave "Buses / dir" empty for a full fleet.</b>` : ""}`;
   if(!sn.test && !list.length) stat(`No live buses on ${esc(svc)} D${ST.dir} right now (e.g. after service hours) \u2013 switch to <b>Test</b> to plan with a fleet you enter.`, false);
   history.replaceState(null, "", `?${q({svc, dir:ST.dir, bus:ST.bus || "", late:ST.late})}`);
   initMap(); drawBase();
-  if(ST.bus != null) runPlan();
+  if(ST.bus != null || ST.rec === "os") runPlan();
 }
 let tmr = null;
 function schedule(){ clearTimeout(tmr); tmr = setTimeout(runPlan, 250); }
 async function runPlan(){
-  if(!ST.snap || ST.bus == null) return;
-  const my = ++ST.seq; stat(`Planning recovery for Bus ${ST.bus}\u2026`);
+  if(!ST.snap || (ST.bus == null && ST.rec !== "os")) return;
+  const my = ++ST.seq; stat(ST.rec === "os" ? "Planning the OS bus\u2026" : `Planning recovery for Bus ${ST.bus}\u2026`);
   let r = await api(`/api/hplan/plan?${q({snap:ST.snap.snap, bus:ST.bus, delay:ST.late, brk:ST.brk, stop_min:ST.sm, layover:ST.lay, mode:ST.rec === "os" ? "os" : "", os_from:ST.rec === "os" ? $("osFrom").value.trim() : "", os_time:ST.rec === "os" ? $("osTime").value.trim() : ""})}`, 90000);
   if(r.expired){ await loadSnap(); return; }
   if(my !== ST.seq) return;
@@ -419,6 +424,23 @@ function renderSelected(){ renderPlan(); renderBA(); renderDown(); renderChart()
 function renderSetup(){
   const r = ST.res, el = $("setup");
   if(!r){ el.innerHTML = `<div class="empty">${!ST.snap ? "Pick a service and direction." : "Select the late bus in the header."}</div>`; return; }
+  if(r.mode === "os"){
+    const gi = r.gap_info;
+    el.innerHTML = `<div class="kv">
+      <div><span>Recovery</span><b><span class="bb OS">OS</span> extra bus + Bus Captain</b></div>
+      <div><span>Direction</span><b>D${r.next_dir}</b></div>
+      <div><span>Prolonged headway</span><b class="late num">${f0(gi.minutes)} min</b></div>
+      <div><span>Between</span><b>${esc(gi.front)} \u2192 ${esc(gi.rear)}</b></div>
+      ${r.late_bus != null && r.delay ? `<div><span>Simulated late bus</span><b>Bus ${r.late_bus} +${f0(r.delay)} min</b></div>` : ""}
+      <div><span>Target headway</span><b class="num">${f0(r.H)} min</b></div>
+      <div><span>OS from</span><b>${esc(r.os.label)}</b></div>
+      <div><span>OS available</span><b class="num">${esc(r.os.ready)}</b></div>
+      <div><span>Stop-to-stop time</span><b><input id="sm" class="num" value="${r.stop_min}" inputmode="decimal" aria-label="Minutes between stops"> min</b></div>
+      <div><span>Objective</span><b>OS mid-gap, lowest EWT</b></div>
+    </div><p class="note">The OS bus drives by real road to a stop ahead of ${esc(gi.rear)} and enters in the middle of the gap. Recommended = the first stop where it can be there in time, so it covers the most of the gap.</p>`;
+    $("sm").onchange = e => { ST.sm = Math.max(0.5, Math.min(6, +e.target.value || 2)); schedule(); };
+    return;
+  }
   const ld = `D${r.late_dir}`, nd = `D${r.next_dir}`;
   el.innerHTML = `<div class="kv">
     <div><span>Late bus</span><b><span class="bb C">C</span> Bus ${r.late_bus}</b></div><div><span>Target headway</span><b class="num">${f0(r.H)} min</b></div>
@@ -440,7 +462,7 @@ function lane(items, o){
   const H = ST.res ? ST.res.H : 10;
   let s = `<svg viewBox="0 0 ${W} ${h}" role="img" aria-label="${esc(o.aria || "")}"><defs><marker id="ah${o.id}" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto-start-reverse"><path d="M0,0 L7,3.5 L0,7 z" fill="currentColor"/></marker></defs>`;
   s += `<line class="t-ax" x1="${pL - 10}" y1="${axY}" x2="${W - 8}" y2="${axY}"/><path d="M${W - 8},${axY - 4} L${W},${axY} L${W - 8},${axY + 4}z" fill="#9aa7b6"/>`;
-  for(let t = Math.ceil(t0 / 10) * 10; t <= t1; t += 10){ const x = X(t); s += `<line x1="${x}" y1="${axY - 3}" x2="${x}" y2="${axY + 3}" stroke="#9aa7b6"/><text class="tick" x="${x}" y="${axY + 16}" text-anchor="middle">${String(Math.floor(t / 60) % 24).padStart(2, "0")}:${String(t % 60).padStart(2, "0")}</text>`; }
+  for(let t = Math.ceil(t0 / 10) * 10; t <= t1; t += 10){ const x = X(t); s += `<line x1="${x}" y1="${axY - 3}" x2="${x}" y2="${axY + 3}" stroke="#9aa7b6"/><text class="tick" x="${x}" y="${axY + 16}" text-anchor="middle">${String(Math.floor(((t % 1440) + 1440) % 1440 / 60)).padStart(2, "0")}:${String(((t % 60) + 60) % 60).padStart(2, "0")}</text>`; }
   const it = items.filter(x => x.t != null).sort((a, b) => a.t - b.t);
   let prevX = -1e9;
   it.forEach(x => { x._x = Math.max(X(x.t), prevX + 26); prevX = x._x; });          // displayed x: at least 26 px apart
@@ -481,10 +503,11 @@ function renderNoAction(){
   if(!r){ el.innerHTML = `<div class="empty">The forecast of the buses around the late bus appears here.</div>`;
     ["impact"].forEach(() => $("impact").innerHTML = `<div><span class="ic">⚠</span>Max headway<b>&ndash;</b></div><div><span class="ic">⏱</span>Average EWT<b>&ndash;</b></div><div><span class="ic">⇆</span>Bunching risk<b>&ndash;</b></div>`); return; }
   const na = r.no_action, nd = `D${r.next_dir}`;
-  $("h2t").textContent = `${nd} forecast (no intervention) \u2013 departures from ${r.interchange.name}`;
+  $("h2t").textContent = r.mode === "os" ? `${nd} now (no intervention) \u2013 the prolonged headway` : `${nd} forecast (no intervention) \u2013 departures from ${r.interchange.name}`;
   const items = na.seq.map(s => ({role:s.role, t:s.dep, clock:s.clock, label:s.late ? `Bus C (late)` : `Bus ${s.role}`, short:s.late ? "late" : null, note:s.in_service ? "in service" : s.late ? `+${f0(r.delay)} late` : "", noteCol:s.late ? "#c8102e" : "#5b6b7f"}));
   const [t0, t1] = span([items]);
   el.innerHTML = lane(items, {W:W(el), t0, t1, h:laneH(), id:"na", band:true, aria:`${nd} departures without intervention`}) +
+    (r.mode === "os" ? `<p class="note" style="margin:4px 0 0">Times each bus left (or will leave) ${esc(r.interchange.name)} \u2013 their spacing on the road.</p>` : "") +
     `<p class="note">${na.seq.map(s => `<span class="bb ${s.role}" style="width:18px;height:18px;font-size:11px">${s.role}</span> ${esc(busName(s.role, s.num, s.in_service ? "in_service" : ""))}`).join(" &nbsp; ")}</p>`;
   $("impact").innerHTML = `<div><span class="ic">⚠</span>Max headway<b class="num">${f0(na.max_hw)} min</b></div><div><span class="ic">⏱</span>Average EWT<b class="num">${f3(na.ewt)}</b></div>
     <div><span class="ic">⇆</span>Bunching risk<b>${esc(na.risk)}</b></div><p class="note" style="margin:0;color:#7a3a44">EWT in minutes across ${nd}, before any action.</p>`;
@@ -492,7 +515,7 @@ function renderNoAction(){
 
 function sorted(){ const c = (ST.res ? ST.res.candidates : []).slice(); return ST.sort === "stop" ? c.sort((a, b) => a.j - b.j) : ST.sort === "ewt" ? c.sort((a, b) => a.ewt_rank - b.ewt_rank) : c; }
 const splitTxt = x => `<span class="split">${f0(x.gap.minutes)} min \u2192 <span class="${x.gap.even ? "ev" : "un"}">${f0(x.gap.split[0])} / ${f0(x.gap.split[1])}</span></span>`;
-const tags = x => (x.code === ST.res.best ? ` <span class="pill ai">AI recommended</span>` : "") + (x.code === ST.res.best_ewt && x.code !== ST.res.best ? ` <span class="pill sel">Lowest EWT</span>` : "");
+const tags = x => (x.full ? ` <span class="pill" style="background:#0b2545;color:#fff">Full trip</span>` : "") + (x.code === ST.res.best ? ` <span class="pill ai">AI recommended</span>` : "") + (x.code === ST.res.best_ewt && x.code !== ST.res.best ? ` <span class="pill sel">Lowest EWT</span>` : "");
 function renderOptions(){
   const r = ST.res;
   if(!r){ $("optT").innerHTML = `<tr><td colspan="10" class="note" style="padding:18px">Every stop of the next direction is tested once the late bus is picked.</td></tr>`; $("optC").innerHTML = ""; $("optNote").textContent = ""; $("viewPlan").hidden = true; return; }
@@ -508,7 +531,7 @@ function renderOptions(){
   document.querySelectorAll("#optT tr[data-c]").forEach(tr => { tr.onclick = () => select(tr.dataset.c); tr.onkeydown = e => { if(e.key === "Enter") select(tr.dataset.c); }; });
   document.querySelectorAll("#optC .oc").forEach(b => b.onclick = () => select(b.dataset.c, true));
   const inf = r.infeasible || {};
-  $("optNote").textContent = `AI recommended = the first stop where ${r.mode === "os" ? "the OS bus" : "Bus C"} can reach the middle of the prolonged headway (within ${f0(r.even_tol)} min), so the fewest stops are skipped. ${r.candidates.length} feasible of ${r.n_stops - 2} stops. ${inf.no_benefit ? `${inf.no_benefit} where the full trip arrives sooner. ` : ""}${inf.too_far ? `${inf.too_far} beyond 60 min off-service. ` : ""}Off-service: ${r.routing}. In service: ${r.stop_min} min per stop.`;
+  $("optNote").textContent = `AI recommended = the first stop where ${r.mode === "os" ? "the OS bus" : "Bus C"} can reach the middle of the prolonged headway (within ${f0(r.even_tol)} min), ${r.mode === "os" ? "so it covers the most of the gap" : "so the fewest stops are skipped"}. ${r.candidates.filter(c => !c.full).length} feasible of ${r.n_stops - 2} stops${r.candidates.some(c => c.full) ? " + the full-trip option" : ""}. ${inf.no_benefit ? `${inf.no_benefit} where the full trip arrives sooner. ` : ""}${inf.too_far ? `${inf.too_far} beyond 60 min off-service. ` : ""}Off-service: ${r.routing}. In service: ${r.stop_min} min per stop.`;
   const sel = cand(ST.sel); $("viewPlan").hidden = !sel; if(sel){ $("viewPlan").textContent = `View plan for Stop ${sel.no}`; $("viewPlan").onclick = () => setTab("visual"); }
 }
 function renderOptionsSel(){
@@ -520,14 +543,20 @@ function renderPlan(){
   const r = ST.res, x = r ? cand(ST.sel) : null, el = $("plan");
   if(!x){ el.innerHTML = `<div class="empty">${r ? (r.candidates.length ? "Select a halfway option." : `No feasible halfway point: Bus ${r.late_bus} runs its full D${r.next_dir} trip.`) : "Select a halfway option."}</div>`; $("h5p").innerHTML = ""; $("h5t").textContent = "Selected recovery plan"; return; }
   const nd = `D${r.next_dir}`, rt = ST.routes[x.code], osMin = rt && rt.ok ? rt.time_min : x.os_min;
-  $("h5t").textContent = `${x.code === r.best ? "Recommended" : "Selected"} plan \u2013 ${r.mode === "os" ? "OS bus to " : ""}Stop ${x.no}`;
+  $("h5t").textContent = `${x.code === r.best ? "Recommended" : "Selected"} plan \u2013 ${x.full ? "OS bus full trip" : `${r.mode === "os" ? "OS bus to " : ""}Stop ${x.no}`}`;
   $("h5p").innerHTML = x.code === r.best ? `<span class="pill ai">AI recommended \u00b7 even split</span>` : x.code === r.best_ewt ? `<span class="pill sel">Lowest EWT</span>` : `<span class="pill sel">Option #${x.rank}</span>`;
-  const osChain = r.mode === "os" ? `<div class="chain">
+  const osChain = r.mode === "os" && x.full ? `<div class="chain">
+      <div class="st"><div class="ic c2">🚍</div><b>OS bus + BC</b><span class="note" style="margin:0">${esc(r.os.label)}</span><span class="tm num">${esc(r.os.ready)}</span></div><div class="ar">\u2192</div>
+      <div class="st"><div class="ic c2">🕒</div><b>${x.wait >= 0.5 ? `Stand by ${f0(x.wait)} min` : "Ready"}</b><span class="tm num" style="font-size:13px">${esc(x.earliest)}</span></div><div class="ar">\u2192</div>
+      <div class="st"><div class="ic c3">🚏</div><b>Depart ${esc(r.interchange.name)}</b><span class="note" style="margin:0">full trip, extra departure</span><span class="tm num">${esc(x.entry_clock)}</span></div><div class="ar">\u2192</div>
+      <div class="st"><div class="ic c4">🏁</div><b>All ${r.n_stops - 1} stops</b><span class="note" style="margin:0">to the final stop</span><span class="tm num">\u2014</span></div>
+    </div><p class="note" style="margin:6px 0 0">${x.why_full === "no prolonged headway" ? "No prolonged headway \u2013" : x.why_full === "halfway point right at the start" ? "The halfway point would be right at the start \u2013" : "No halfway stop is reachable in time \u2013"} the OS bus runs a full trip and the departures around it are re-spaced by headway.</p>`
+    : r.mode === "os" ? `<div class="chain">
       <div class="st"><div class="ic c2">🚍</div><b>OS bus + BC</b><span class="note" style="margin:0">${esc(r.os.label)}</span><span class="tm num">${esc(r.os.ready)}</span></div><div class="ar">\u2192</div>
       <div class="st"><div class="ic c2">🕒</div><b>${x.wait >= 0.5 ? `Stand by ${f0(x.wait)} min` : "Depart"}</b><span class="tm num" style="font-size:13px">leave ${esc(x.leave)}</span></div><div class="ar">\u2192</div>
       <div class="st"><div class="ic c3">🛣️</div><b>Off-service to Stop ${x.no}</b><span class="note" style="margin:0">${fkm(x.os_km)} \u00b7 ${f0(x.os_min)} min</span><span class="tm num" style="font-size:13px">${esc(x.leave)} \u2013 ${esc(x.entry_clock)}</span></div><div class="ar">\u2192</div>
       <div class="st"><div class="ic c4">🚏</div><b>Enter ${nd} at Stop ${x.no}</b><span class="note" style="margin:0">${esc(x.code)}</span><span class="tm num">${esc(x.entry_clock)}</span></div>
-    </div><p class="note" style="margin:6px 0 0">Bus C (${r.late_bus}) completes D${r.late_dir} ${f0(r.delay)} min late and runs its full ${nd} trip from ${esc(r.c_full_dep)}.</p>` : null;
+    </div><p class="note" style="margin:6px 0 0">${r.gap_info ? `Fills the ${f0(r.gap_info.minutes)}-min gap between ${esc(r.gap_info.front)} and ${esc(r.gap_info.rear)}; stop ${x.no} of ${r.n_stops} (${Math.round(100 * x.j / (r.n_stops - 1))}% along the route).` : `Bus C (${r.late_bus}) completes D${r.late_dir} ${f0(r.delay)} min late and runs its full ${nd} trip from ${esc(r.c_full_dep)}.`}</p>` : null;
   el.innerHTML = osChain ? osChain + planRest0(r, x) : `<div class="chain">
       <div class="st"><div class="ic c1">🚌</div><b>Complete D${r.late_dir}</b><span class="note" style="margin:0">arrive interchange</span><span class="tm num">${esc(r.c_arr)}</span></div><div class="ar">\u2192</div>
       <div class="st"><div class="ic c2">🕒</div><b>Break (${f0(r.break_min)} min${x.wait >= 0.5 ? ` + ${f0(x.wait)}` : ""})</b><span class="tm num" style="font-size:13px">${esc(r.c_arr)} \u2013 ${esc(x.leave)}</span></div><div class="ar">\u2192</div>
@@ -546,7 +575,7 @@ function planRest0(r, x){
 function planRest(r, x){
   const cmp = r.mode === "os" && r.compare_c ? `<div class="why" style="background:var(--aiBg)"><b>OS bus vs Bus C halfway:</b> EWT <b class="num">${f3(x.ewt)}</b> with the OS bus against <b class="num">${f3(r.compare_c.ewt)}</b> if Bus C went halfway itself (Stop ${r.compare_c.no}, ${f0(r.compare_c.split[0])} / ${f0(r.compare_c.split[1])} min) \u2013 ${x.ewt < r.compare_c.ewt ? `${f3(r.compare_c.ewt - x.ewt)} lower with the extra bus` : "no better with the extra bus"}.</div>` : "";
   return `${cmp}${(x.dep_adj || []).some(a => a.adj) ? `<div class="why" style="background:#fff8f1"><b>Interchange regulation</b> ${(x.dep_adj || []).map(a => `<span style="white-space:nowrap"><span class="bb ${a.role}" style="width:18px;height:18px;font-size:10px">${a.role}</span> ${a.adj > 0 ? `<b style="color:var(--hold)">+${f0(a.adj)} later</b>` : a.adj < 0 ? `<b style="color:var(--ok)">${sgn(a.adj)} earlier</b>` : `<span style="color:var(--mut)">${esc(a.reason || "no change")}</span>`}</span>`).join(" &nbsp; ")}</div>` : ""}
-    <div class="why"><b>Why Stop ${x.no}?</b> ${esc(x.why)}</div>`;
+    <div class="why"><b>${x.full ? "Why a full trip?" : `Why Stop ${x.no}?`}</b> ${esc(x.why)}</div>`;
 }
 
 ST.baView = "ic";
@@ -593,7 +622,7 @@ function renderDown(){
   const d = x.detail, H = r.H;
   $("h8t").textContent = `Downstream headway forecast (after halfway at Stop ${x.no})`;
   const hv = h => h == null ? "" : `<span class="hwv ${h >= 1.5 * H || h < 0.5 * H ? "bad" : Math.abs(h - H) <= 0.3 * H ? "good" : ""}">hw ${f0(h)}</span>`;
-  el.innerHTML = `<thead><tr><th class="l">Bus</th><th>Interchange depart (D${r.next_dir})</th>${d.cols.map(c => `<th>Stop ${c.no}<br><span style="font-weight:500">${esc(c.code)}</span></th>`).join("")}<th>Max headway (from Stop ${x.no})</th></tr></thead>
+  el.innerHTML = `<thead><tr><th class="l">Bus</th><th>${r.mode === "os" ? "Left the first stop" : `Interchange depart (D${r.next_dir})`}</th>${d.cols.map(c => `<th>Stop ${c.no}<br><span style="font-weight:500">${esc(c.code)}</span></th>`).join("")}<th>Max headway (from Stop ${x.no})</th></tr></thead>
     <tbody>${d.rows.map(row => `<tr style="cursor:default"><td class="l"><span class="bb ${row.role}">${row.role}</span> ${esc(row.role === "OS" ? "OS bus (halfway)" : row.role === "C" ? (row.halfway ? `Bus C (${row.num}) halfway` : `Bus C (${row.num}) late, full trip`) : busName(row.role, row.num, (r.roles[row.role] || {}).kind))}</td>
       <td class="num">${row.halfway ? "\u2014" : esc(row.dep || "")}${row.adj ? ` <span class="pill ${row.adj > 0 ? "hold" : ""}" style="${row.adj < 0 ? "background:var(--okBg);color:var(--ok)" : ""}">${row.slow ? `\u{1F422} slow ${sgn(row.adj)}` : sgn(row.adj)}</span>` : ""}</td>
       ${row.pass.map((p, i) => `<td class="num ${row.halfway ? "cH" : ""}">${p ? `<b>${esc(p)}</b>` : "\u2013"}${hv(row.hw[i])}</td>`).join("")}<td class="num"><b>${f0(row.max_hw)} min</b></td></tr>`).join("")}</tbody>`;
@@ -621,7 +650,7 @@ function planText(){
   const r = ST.res, x = cand(ST.sel); if(!x) return "";
   return `Halfway plan \u2013 Service ${ST.svc}, Bus ${r.late_bus} +${f0(r.delay)} min on D${r.late_dir}\n` + x.actions.map(a => `${a.n}. ${actBus(a)}: ${a.text}${a.time ? ` (${a.time})` : ""}`).join("\n") + `\nForecast D${r.next_dir} EWT ${f3(r.no_action.ewt)} -> ${f3(x.ewt)}`;
 }
-const actBus = a => a.role ? roleLabel(a.role) : a.bus;
+const actBus = a => a.bus_label || (a.role ? roleLabel(a.role) : a.bus);
 function renderActs(){
   const r = ST.res, x = r ? cand(ST.sel) : null, el = $("acts");
   if(!x){ el.innerHTML = `<div class="empty">Numbered instructions for the selected plan.</div>`; return; }
@@ -641,15 +670,16 @@ function initMap(){
 }
 function drawBase(){
   if(!map || !ST.snap) return; G.base.clearLayers();
-  const ln = ST.snap.opp ? ST.snap.opp.line : ST.snap.line;
+  const ln = ST.rec !== "os" && ST.snap.opp ? ST.snap.opp.line : ST.snap.line;
   L.polyline(ln, {color:"#1565d8", weight:4, opacity:.25}).addTo(G.base);
   const b = L.latLngBounds(ln); if(b.isValid()) map.fitBounds(b, {padding:[20, 20]});
 }
 async function loadRoute(code){
+  { const x0 = cand(code); if(x0 && x0.full && (x0.os_km || 0) < 0.3){ ST.routes[code] = {ok:false, error:"The OS bus starts at the first stop \u2013 no off-service run."}; drawSel(); return; } }
   const r = ST.res, x = cand(code); if(!r || !x || ST.routes[code]) { drawSel(); return; }
   ST.routes[code] = {loading:true}; drawSel();
   const ic = r.mode === "os" ? {lat:r.os.lat, lon:r.os.lon, name:r.os.label} : r.interchange;
-  const rt = await api(`/api/hplan/route?${q({snap:r.snap, stop:x.code, mode:"late", bus:ST.bus, leave:x.leave, from_pt:`${ic.lat},${ic.lon}`, from_label:r.mode === "os" ? `OS bus \u00b7 ${ic.name}` : `${ic.name} (interchange)`, on:"next"})}`, 90000);
+  const rt = await api(`/api/hplan/route?${q({snap:r.snap, stop:x.code, mode:"late", bus:ST.bus, leave:x.leave, from_pt:`${ic.lat},${ic.lon}`, from_label:r.mode === "os" ? `OS bus \u00b7 ${ic.name}` : `${ic.name} (interchange)`, on:r.mode === "os" ? "" : "next"})}`, 90000);
   if(ST.res !== r) return;
   ST.routes[code] = rt;
   if(ST.sel === code){ drawSel(); renderPlan(); }

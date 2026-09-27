@@ -3580,7 +3580,7 @@ async def api_hp_snapshot(service: str = "", direction: int = 1):
 
 @app.get("/api/hplan/testsnap")
 async def api_hp_testsnap(service: str = "", direction: int = 1, time_: str = Query("", alias="time"), headway: str = "10", buses: str = "",
-                          offset: str = "", stop_min: str = "2"):
+                          offset: str = "", stop_min: str = "2", gap: str = "", gap_at: str = "start"):
     """V15.2 TEST MODE: a synthetic, evenly spaced fleet on the service's real route (both directions) for a time you choose - for testing
     when no buses are running (e.g. after midnight). Same snapshot shape as the live one, so planning and road routing work unchanged."""
     svc = service.strip().upper()
@@ -3591,6 +3591,7 @@ async def api_hp_testsnap(service: str = "", direction: int = 1, time_: str = Qu
         nb = max(2, min(40, int(float(buses)))) if str(buses).strip() else 40          # empty = fill the whole route at this headway
         sm = max(0.5, min(6.0, float(stop_min or 2)))
         off = float(offset) if str(offset).strip() else H / 2.0
+        LG = max(H, min(120.0, float(gap))) if str(gap).strip() else None
     except ValueError:
         return {"ok": False, "error": "Headway, number of buses and offset must be numbers."}
     t0 = ho_parse_hhmm(time_) if str(time_).strip() else None
@@ -3603,13 +3604,16 @@ async def api_hp_testsnap(service: str = "", direction: int = 1, time_: str = Qu
     st = await static()
     dirs = [d_ for d_ in (1, 2) if route_stops(st, svc, d_)]
 
-    def fleet(g, phase):
+    def fleet(g, phase, long_gap=None):
         stops, ss = g["stops"], g["prep"]["stop_s"]
         n = len(stops)
         run = sm * (n - 1)
         out = []
+        gk = None
+        if long_gap:                                               # one prolonged headway: near the start (default) or mid-route
+            gk = 2 if gap_at != "middle" else max(2, int(run // H) // 2)
         for k in range(nb):
-            el = k * H + phase + 1.0                               # minutes since this bus left the first stop
+            el = k * H + phase + 1.0 + ((long_gap - H) if (gk is not None and k >= gk) else 0.0)   # minutes since this bus left the first stop
             if el >= run - 0.5:
                 break
             p = el / sm
@@ -3628,7 +3632,7 @@ async def api_hp_testsnap(service: str = "", direction: int = 1, time_: str = Qu
 
     g = {**g0, "H": H, "H_src": "test input"}
     P = {**halfway.PARAMS, **HO["params"]}
-    tb, fit = fleet(g, 0.0)
+    tb, fit = fleet(g, 0.0, LG)
     opp = None
     od = next((d_ for d_ in dirs if d_ != direction), None)
     if od is not None:
@@ -3650,7 +3654,7 @@ async def api_hp_testsnap(service: str = "", direction: int = 1, time_: str = Qu
             "opp": ({"direction": opp["dir"], "line": ho_simplify(opp["g"]["line"], 400), "buses": strip_b(opp["buses"]), "km": round(opp["g"]["prep"]["km"], 2),
                      "first": opp["g"]["stops"][0]["name"], "last": opp["g"]["stops"][-1]["name"], "H": H} if opp else None),
             "test_info": {"time": hplan.hhmm(t0), "headway": H, "buses": nb, "fit": fit, "placed": len(tb), "placed_opp": len(opp["buses"]) if opp else 0,
-                          "offset": off, "stop_min": sm},
+                          "offset": off, "stop_min": sm, "gap": LG, "gap_at": gap_at if LG else None},
             "source": "TEST MODE \u00b7 synthetic evenly spaced buses on the real route (not live)"}
 
 
@@ -3845,7 +3849,8 @@ async def api_hp_plan(snap: str = "", bus: str = "", delay: str = "20", brk: str
     S = HP_SNAP.get(snap)
     if not S:
         return {"ok": False, "error": "The live snapshot has expired. Load the live buses again.", "expired": True}
-    if not str(bus).isdigit() or not any(b["id"] == int(bus) for b in S["buses"]):
+    has_bus = str(bus).isdigit() and any(b["id"] == int(bus) for b in S["buses"])
+    if not has_bus and mode != "os":
         return {"ok": False, "error": "Select the late bus."}
     try:
         D = max(0.0, min(120.0, float(delay or 0)))
@@ -3860,6 +3865,36 @@ async def api_hp_plan(snap: str = "", bus: str = "", delay: str = "20", brk: str
         return {"ok": False, "error": "Lateness, break and stop-to-stop time must be numbers."}
     g = S["g"]
     mk = lambda gg, bs, d_: {"dir": d_, "stops": gg["stops"], "ss": gg["prep"]["stop_s"], "buses": bs, "H": gg["H"], "H_src": gg["H_src"]}
+    if mode == "os":                                                   # V15.5: OS bus put halfway into the prolonged headway of THIS direction
+        X = mk(g, S["buses"], S["d"])
+        Y = mk(S["opp"]["g"], S["opp"]["buses"], S["opp"]["dir"]) if S.get("opp") else None
+        stx = g["stops"]
+        frm = (os_from or "").strip()
+        if not frm or frm.lower() in ("ic", "interchange", "first"):
+            org, olabel = (stx[0]["lat"], stx[0]["lon"]), f"{stx[0]['name']} ({stx[0]['code']}, interchange)"
+        else:
+            org, olabel, oerr = await pl_origin(frm, stx)
+            if oerr:
+                return {"ok": False, "error": f"OS start: {oerr}"}
+        t0 = ho_parse_hhmm(os_time) if str(os_time).strip() else None
+        t0 = S["now_min"] if t0 is None else (t0 + 1440 if t0 < S["now_min"] - 720 else t0)
+        fac = float(offservice.PARAMS["bus_time_factor"])
+        jx = list(range(0, len(stx) - 1))                                  # 0 = the first stop (full-trip option)
+        offs, off_err = await os_table(org, [(stx[j]["lat"], stx[j]["lon"]) for j in jx])
+        reach = {}
+        for i, j in enumerate(jx):
+            om = offs.get(i)
+            if om:
+                reach[j] = (om["min"] * fac, om.get("km"), f"real road routing (OSRM) x {fac:g} bus factor")
+            else:
+                km = hplan.hav_km(org, (stx[j]["lat"], stx[j]["lon"])) * 1.35
+                reach[j] = (km / 25.0 * 60.0, km, "estimate - road routing unavailable")
+        if S.get("test"):
+            Pp["edge_trim"] = True
+        res = await asyncio.to_thread(hwplan.plan_os, {"now": S["now_min"], "X": X, "Y": Y, "P": Pp, "os": {"t0": t0, "label": olabel, "lat": org[0], "lon": org[1]},
+                                                       "late": {"bus": int(bus), "delay": D} if has_bus and D > 0 else None}, reach)
+        res.update(snap=snap, service=S["svc"], routing="real road routing (OSRM)" if offs else f"estimate ({off_err or 'road routing unavailable'})")
+        return res
     T = mk(g, S["buses"], S["d"])
     O = mk(S["opp"]["g"], S["opp"]["buses"], S["opp"]["dir"]) if S.get("opp") else None
     gn = S["opp"]["g"] if S.get("opp") else g
