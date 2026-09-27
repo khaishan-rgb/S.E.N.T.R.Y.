@@ -119,3 +119,37 @@ a.cmdbtn{text-decoration:none}
 }
 @media(max-width:600px){.launcher-grid{grid-template-columns:repeat(3,1fr)}.ds-shortcuts{grid-template-columns:1fr}.card,.kpi,section.card{border-radius:11px!important}}
 @media(prefers-reduced-motion:reduce){*,*:before,*:after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
+
+
+/* ===== V3 unified module theme =====
+   Force legacy/light modules (notably Halfway Planner) into the same OCC shell. */
+body{color:#dceafb!important}
+body .hdr{background:linear-gradient(180deg,#071b31,#08213b)!important;border-bottom:1px solid rgba(60,200,255,.20)!important;color:#eef7ff!important}
+body .page{background:transparent!important}
+body .card,body section.card,body .impact{
+  background:linear-gradient(180deg,rgba(10,31,54,.88),rgba(6,21,39,.92))!important;
+  color:#dceafb!important;border-color:rgba(60,200,255,.22)!important;
+}
+body .card h1,body .card h2,body .card h3,body .card b,body .impact h2{color:#eef7ff!important}
+body .empty,body .note,body .kv span,body .ba .meta,body .kr .g span{color:#8fa9c1!important}
+body .empty{border-color:rgba(112,151,184,.38)!important;background:rgba(7,24,43,.45)!important}
+body .impact{border-color:rgba(255,77,85,.32)!important;box-shadow:var(--glow-red)!important}
+body .impact h2,body .impact b{color:#ff6b76!important}
+body .impact .imp div{color:#d9a7ad!important}
+body .testbar{background:rgba(255,159,28,.10)!important;border-color:rgba(255,159,28,.32)!important;color:#ffc36d!important}
+body .why,body .kr,body .ba .lane.before,body .ba .lane.after{background:rgba(7,25,44,.72)!important;border-color:rgba(60,200,255,.18)!important;color:#c9d9e8!important}
+body .tw{border-color:rgba(60,200,255,.18)!important}
+body table.t{color:#d5e4f2!important}
+body .t th{background:#0b223b!important;color:#8fa9c1!important;border-color:rgba(60,200,255,.18)!important}
+body .t td{border-color:rgba(60,200,255,.10)!important}
+body .t tbody tr:hover td,body .t tr.sel td{background:rgba(60,200,255,.08)!important}
+body .opt-tools select,body .kv input{background:#0b223b!important;color:#e7f3ff!important;border-color:rgba(60,200,255,.25)!important}
+body .omapbox,body .mapbox{border-color:rgba(60,200,255,.22)!important}
+body .olegend,body .rinfo{background:rgba(7,24,43,.94)!important;color:#dceafb!important;border-color:rgba(60,200,255,.25)!important}
+body .tl text{fill:#dceafb!important} body .tl .tick,body .tl .btim{fill:#8fa9c1!important}
+body .mobile-bottom-nav{grid-template-columns:repeat(5,1fr)!important}
+@media(max-width:999px){
+ body .hdr{padding-top:12px!important}
+ body .page{padding:12px 14px 24px!important}
+ body .card,body section.card{box-shadow:0 0 0 1px rgba(60,200,255,.08),0 10px 28px rgba(0,0,0,.16)!important}
+}
