@@ -1,4 +1,9 @@
-# SG Transport Pulse V15.7 — Route Traffic + Departure Adjustment + Bunching, Gap & Alerts + AI Halfway Optimiser
+# SG Transport Pulse V15.8 — Route Traffic + Departure Adjustment + Bunching, Gap & Alerts + AI Halfway Optimiser
+
+## V15.8 — Compact header, map with arrows in Options
+
+* **Header minimises:** once a plan is shown the navy header collapses to one summary line (service · direction · bus / lateness · recovery · TEST) – automatically on phones, with a *Minimise* button on desktop; tap the line (✎ Edit) to change inputs. The test banner is a one-line summary that expands on tap.
+* **Options map:** the Options step starts with a map – the service route with arrows showing its direction of travel, every candidate stop (green = AI recommended, blue ring = selected, tap a stop to select it), the start point (interchange / OS start), and the selected option's **off-service real road route with arrowheads** (while it is loading a thin dashed placeholder is shown, labelled as such).
 
 ## V15.7 — Test fleet as one continuous stream (no false gaps)
 

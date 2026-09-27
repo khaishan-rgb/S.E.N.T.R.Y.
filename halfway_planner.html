@@ -45,9 +45,17 @@ select.in{padding-right:26px;appearance:none;background-image:linear-gradient(45
 .w-svc{width:96px}.w-op{width:130px}.w-bus{width:210px}.w-late{width:84px}
 .stat{font-size:12px;color:#b8c7da;align-self:center;max-width:280px}
 .testbar{background:#fff1e6;border:1px solid #f6d3b8;color:#a8410a;border-radius:10px;padding:8px 12px;font-size:13px;font-weight:600}
-.testbar b{color:#7a2f06}
+.testbar b{color:#7a2f06}.testbar summary{cursor:pointer}.testbar details[open] summary{margin-bottom:4px}
 body.test .hdr{background:linear-gradient(90deg,#0b2545 0%,#0b2545 70%,#3a2a12 100%)}
 .stat b{color:#fff}
+.hsum{display:flex;align-items:center;gap:8px;max-width:100%;margin-top:4px;border:1px solid #2c4a74;background:#12305a;color:#fff;border-radius:999px;padding:5px 12px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hsum .ed{margin-left:auto;color:#b8c7da;font-weight:600;flex:none}
+.hmin{display:none;border:1px solid #2c4a74;background:#12305a;color:#b8c7da;border-radius:8px;height:30px;padding:0 10px;font-size:12px;font-weight:700;cursor:pointer;align-self:center}
+body.hdr-min .hdr{padding-top:8px;padding-bottom:8px}
+body.hdr-min .hdr>.f,body.hdr-min .hdr>.stat{display:none!important}
+body.hdr-min .hdr .ttl p{display:none}
+body.hdr-min .hdr h1{font-size:16px}
+body.hdr-min .hdr .ttl .ic{width:32px;height:32px;font-size:18px}
 
 /* ---------- page grid ---------- */
 .page{padding:14px 18px 24px;display:grid;gap:12px}
@@ -95,6 +103,12 @@ body.test .hdr{background:linear-gradient(90deg,#0b2545 0%,#0b2545 70%,#3a2a12 1
 .imp .ic{width:26px;text-align:center;font-size:17px}
 
 /* 3 options */
+.omapbox{position:relative;height:280px;border-radius:10px;overflow:hidden;border:1px solid var(--line);margin-bottom:10px}
+#omap{position:absolute;inset:0}
+.olegend{position:absolute;left:8px;bottom:8px;z-index:500;background:rgba(255,255,255,.95);border:1px solid var(--line);border-radius:8px;padding:5px 8px;font-size:11px;display:flex;flex-wrap:wrap;gap:4px 10px;max-width:calc(100% - 16px)}
+.olegend i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:4px;vertical-align:-1px}
+.oarr{width:18px;height:18px;display:grid;place-items:center;pointer-events:none}
+.onum{min-width:22px;height:22px;border-radius:11px;display:grid;place-items:center;color:#fff;font-weight:800;font-size:11px;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.3);padding:0 4px}
 .opt-tools{display:flex;gap:8px;align-items:center;margin-left:auto}
 .opt-tools select{height:30px;border:1px solid var(--line2);border-radius:7px;padding:0 8px;background:#fff;font-size:12.5px}
 .tw{overflow:auto;max-height:340px;border:1px solid var(--line);border-radius:9px}
@@ -228,17 +242,18 @@ tr.sel .radio{border-color:var(--ai);background:radial-gradient(circle,var(--ai)
   .viewplan{position:sticky;bottom:82px;margin-top:10px;width:100%;min-height:50px;border:0;border-radius:12px;background:var(--ai);color:#fff;font-weight:800;font-size:16px;cursor:pointer;box-shadow:0 6px 18px rgba(21,101,216,.3)}
   .chain{grid-template-columns:1fr auto 1fr auto 1fr auto 1fr;font-size:11px}.chain .st .ic{width:38px;height:38px;font-size:19px}.chain .st .tm{font-size:13px}
   .mapbox{height:52vh;min-height:300px}
+  .omapbox{height:240px}
   .mobile-bottom-nav{display:grid;grid-template-columns:repeat(4,1fr);position:fixed;left:0;right:0;bottom:0;z-index:12000;background:var(--navy);border-top:1px solid #21415e;padding:7px 6px calc(7px + env(safe-area-inset-bottom))}
   .mbn{color:#9fb4cc;text-decoration:none;text-align:center;font-size:10px;font-weight:650;padding:3px 2px;border-radius:9px;min-height:44px}.mbn .mi{display:block;font-size:19px;line-height:22px}.mbn.active{color:#fff;background:#13315c}
   .mobile-more{display:none;position:fixed;left:10px;right:10px;bottom:74px;z-index:13000;background:#fff;border:1px solid var(--line);border-radius:16px;padding:8px;box-shadow:0 10px 30px rgba(0,0,0,.2)}.mobile-more.open{display:block}.mobile-more a{display:block;color:var(--ink);text-decoration:none;padding:13px;border-radius:10px;font-weight:650}
 }
-@media(min-width:1000px){.viewplan{display:none}}
+@media(min-width:1000px){.viewplan{display:none}.hmin{display:inline-block}body.hdr-min .hmin{display:none}}
 </style>
 </head>
 <body class="tab-setup">
 <aside class="desktop-shell" aria-label="Primary navigation"><div class="shell-brand"><strong>SG Transport Pulse</strong><small>Operations Intelligence</small></div><div class="shell-label">ANALYSIS TOOLS</div><a class="shell-link " href="/"><span class="si">▰</span><span>Route Traffic</span></a><a class="shell-link " href="/control"><span class="si">↔</span><span>Headway Control</span></a><a class="shell-link " href="/bunching"><span class="si">≋</span><span>Bunching & Gap</span></a><a class="shell-link active" href="/halfway"><span class="si">½</span><span>Halfway Planner</span></a><a class="shell-link " href="/traffic"><span class="si">⚠</span><span>Traffic-Aware</span></a><a class="shell-link " href="/halfway/timetable"><span class="si">▤</span><span>Timetable Optimiser</span></a><a class="shell-link " href="/running-time"><span class="si">⏱</span><span>Running Time Analytics</span></a><a class="shell-link " href="/cameras"><span class="si">📷</span><span>Traffic Cameras</span></a><div class="shell-foot">● Live operational workspace</div></aside>
-<header class="hdr top">
-  <div class="ttl brand"><div class="ic" aria-hidden="true">🚌</div><div><h1>Halfway Planner</h1><p>Late bus &rarr; halfway on its next trip &rarr; regulate the buses around it &rarr; lowest downstream EWT</p></div></div>
+<header class="hdr top" id="hdr">
+  <div class="ttl brand"><div class="ic" aria-hidden="true">🚌</div><div style="min-width:0;flex:1"><h1>Halfway Planner</h1><button type="button" class="hsum" id="hsum" aria-expanded="false" aria-controls="hdr" hidden></button><p>Late bus &rarr; halfway on its next trip &rarr; regulate the buses around it &rarr; lowest downstream EWT</p></div></div>
   <div class="f f-op"><label for="op">Operator</label><select class="in w-op" id="op"><option value="">All operators</option><option value="SBST">SBS Transit</option><option value="SMRT">SMRT</option><option value="TTS">Tower Transit</option><option value="GAS">Go-Ahead</option></select></div>
   <div class="f"><label for="svc">Service</label><input class="in w-svc num" id="svc" list="svcList" maxlength="6" placeholder="e.g. 156" autocapitalize="characters" autocomplete="off"><datalist id="svcList"></datalist></div>
   <div class="f f-date"><span class="lb">Date</span><div class="ro num" id="date">&nbsp;</div></div>
@@ -256,6 +271,7 @@ tr.sel .radio{border-color:var(--ai);background:radial-gradient(circle,var(--ai)
   <div class="f of" hidden><label for="osFrom">OS from</label><input class="in num" id="osFrom" style="width:130px" placeholder="interchange" maxlength="12" title="Empty = the next direction's interchange; or a 5-digit bus stop code"></div>
   <div class="f of" hidden><label for="osTime">OS available</label><input class="in num" id="osTime" style="width:78px" maxlength="5" inputmode="numeric" data-time placeholder="now"></div>
   <div class="stat" id="stat" aria-live="polite"></div>
+  <button type="button" class="hmin" id="hmin" title="Hide the inputs">Minimise \u25b4</button>
 </header>
 
 <nav class="mtabs" role="tablist" aria-label="Planner steps">
@@ -274,6 +290,8 @@ tr.sel .radio{border-color:var(--ai);background:radial-gradient(circle,var(--ai)
   </div>
   <div class="row r2">
     <section class="card s-options o4" aria-labelledby="h4"><h2 id="h4"><span class="n">3</span> Halfway options <span class="opt-tools"><label for="sort" class="note" style="margin:0">Sort</label><select id="sort"><option value="rec">Recommended</option><option value="ewt">Lowest EWT</option><option value="stop">Stop order</option></select></span></h2>
+      <div class="omapbox"><div id="omap" role="application" aria-label="Map of the halfway options"></div>
+        <div class="olegend"><span><i style="background:#1565d8"></i>route &amp; direction</span><span><i style="background:#0f9d58"></i>AI recommended</span><span><i style="background:#1565d8;box-shadow:0 0 0 3px #bcd4fb"></i>selected</span><span><i style="background:#7c4dff"></i>off-service road route</span></div></div>
       <div class="tw dt"><table class="t"><thead><tr><th></th><th class="l">Halfway entry stop</th><th>Prolonged gap &rarr; split</th><th>Forecast EWT</th><th>Entry time</th><th>Off-service<br><span style="font-weight:500">real road</span></th><th>Stops skip</th><th>In-service time avoided<br><span style="font-weight:500">(2 min/stop)</span></th><th>Max HW after</th><th class="l">Ahead / behind at entry</th></tr></thead><tbody id="optT"><tr><td colspan="10" class="note" style="padding:18px">Every stop of the next direction is tested once the late bus is picked.</td></tr></tbody></table></div>
       <div class="cards" id="optC"></div>
       <p class="note" id="optNote"></p>
@@ -292,7 +310,7 @@ tr.sel .radio{border-color:var(--ai);background:radial-gradient(circle,var(--ai)
     <section class="card s-visual o9" aria-labelledby="h9"><h2 id="h9"><span class="n">8</span> EWT comparison</h2><div id="chart"><div class="empty">EWT of no action vs the halfway options.</div></div></section>
     <section class="card s-plan o9" aria-labelledby="h10"><h2 id="h10"><span class="n">9</span> Controller action plan</h2><div id="acts"><div class="empty">Numbered instructions for the selected plan.</div></div></section>
   </div>
-  <p class="note foot" style="margin:0 2px">Live: LTA DataMall bus positions (unchanged). Simulated: the lateness you enter. Forecast: 2 min between stops in service; off-service by real road routing; interchange departures on the target headway. Deploying an OS bus is in the <a href="/halfway/os">previous planner</a>. SG Transport Pulse V15.7</p>
+  <p class="note foot" style="margin:0 2px">Live: LTA DataMall bus positions (unchanged). Simulated: the lateness you enter. Forecast: 2 min between stops in service; off-service by real road routing; interchange departures on the target headway. Deploying an OS bus is in the <a href="/halfway/os">previous planner</a>. SG Transport Pulse V15.8</p>
 </main>
 <nav class="mobile-bottom-nav" aria-label="Mobile primary navigation"><a class="mbn" href="/"><span class="mi">▰</span>Route</a><a class="mbn" href="/control"><span class="mi">↔</span>Headway</a><a class="mbn active" href="/halfway"><span class="mi">½</span>Halfway</a><button class="mbn" type="button" style="border:0;background:transparent;font-family:inherit" onclick="document.getElementById('mobileMore').classList.toggle('open')"><span class="mi">•••</span>More</button></nav><div class="mobile-more" id="mobileMore"><a href="/bunching">≋ Bunching</a><a href="/traffic">⚠ Traffic-Aware Regulation</a><a href="/halfway/timetable">▤ Timetable Optimiser</a><a href="/planner">◉ Off-service Route Planner</a><a href="/running-time">⏱ Running Time</a><a href="/cameras">📷 Traffic Cameras</a></div>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -356,6 +374,20 @@ function setRec(m){
 $("rC").onclick = () => { if(ST.rec !== "late") setRec("late"); };
 $("rOS").onclick = () => { if(ST.rec !== "os") setRec("os"); };
 ["osFrom", "osTime"].forEach(id => $(id).addEventListener("change", () => schedule()));
+function hdrSummary(){
+  const r = ST.res, parts = [ST.svc || "\u2013", `D${ST.dir}`];
+  if(ST.rec === "os") parts.push("OS bus" + (ST.bus != null && ST.late ? ` \u00b7 Bus ${ST.bus} +${ST.late}` : ""));
+  else parts.push(ST.bus != null ? `Bus ${ST.bus} +${ST.late} min` : "no bus", "Bus C halfway");
+  if(ST.test) parts.push(`TEST ${$("tTime").value || ""}`.trim());
+  $("hsum").innerHTML = `<span style="overflow:hidden;text-overflow:ellipsis">${esc(parts.join(" \u00b7 "))}</span><span class="ed">\u270e Edit</span>`;
+}
+function setHdrMin(on){
+  document.body.classList.toggle("hdr-min", on); $("hsum").hidden = !on; $("hsum").setAttribute("aria-expanded", String(!on));
+  if(on) hdrSummary();
+  setTimeout(() => { if(map) map.invalidateSize(); if(omap) omap.invalidateSize(); }, 80);
+}
+$("hsum").onclick = () => setHdrMin(false);
+$("hmin").onclick = () => { if(ST.res) setHdrMin(true); };
 ST.test = false;
 function setMode(test){
   ST.test = test; document.body.classList.toggle("test", test);
@@ -392,7 +424,7 @@ async function loadSnap(){
   const ti = sn.test_info;
   stat(`<b>${esc(svc)} D${ST.dir}</b> \u00b7 ${list.length} ${sn.test ? "test" : "live"} buses${sn.opp ? ` \u00b7 D${sn.opp.direction}: ${sn.opp.buses.length}` : " \u00b7 loop service"} \u00b7 ${esc(sn.now)}`);
   $("testbar").hidden = !sn.test; tick();
-  if(sn.test) $("testbar").innerHTML = `TEST MODE \u2013 synthetic buses, not live. Time <b>${esc(ti.time)}</b>, headway <b>${f0(ti.headway)} min</b>,${ti.gap ? ` one <b>long headway of ${f0(ti.gap)} min</b> near the start of D${ST.dir},` : ""} <b>${ti.placed}</b> buses on D${ST.dir} and <b>${ti.placed_opp}</b> on the other direction (the route fits ${ti.fit} at this headway; ${f0(ti.stop_min)} min between stops). Off-service times still use real road routing.${ti.waiting ? ` ${ti.waiting} bus${ti.waiting > 1 ? "es" : ""} in layover at a terminal (${f0(ti.layover)}-min layover).` : ""}${ti.placed < ti.fit ? ` Only ${ti.placed} of ${ti.fit} buses: they run as one continuous block round the ${ti.gap ? "start of the route" : "interchange"}; the empty rest of the route is ignored.` : ""}`;
+  if(sn.test) $("testbar").innerHTML = `<details><summary><b>TEST MODE</b> \u2013 synthetic buses, not live \u00b7 ${esc(ti.time)} \u00b7 headway ${f0(ti.headway)} min${ti.gap ? ` \u00b7 long headway ${f0(ti.gap)} min` : ""}</summary>Time <b>${esc(ti.time)}</b>, headway <b>${f0(ti.headway)} min</b>,${ti.gap ? ` one <b>long headway of ${f0(ti.gap)} min</b> near the start of D${ST.dir},` : ""} <b>${ti.placed}</b> buses on D${ST.dir} and <b>${ti.placed_opp}</b> on the other direction (the route fits ${ti.fit} at this headway; ${f0(ti.stop_min)} min between stops). Off-service times still use real road routing.${ti.waiting ? ` ${ti.waiting} bus${ti.waiting > 1 ? "es" : ""} in layover at a terminal (${f0(ti.layover)}-min layover).` : ""}${ti.placed < ti.fit ? ` Only ${ti.placed} of ${ti.fit} buses: they run as one continuous block round the ${ti.gap ? "start of the route" : "interchange"}; the empty rest of the route is ignored.` : ""}</details>`;
   if(!sn.test && !list.length) stat(`No live buses on ${esc(svc)} D${ST.dir} right now (e.g. after service hours) \u2013 switch to <b>Test</b> to plan with a fleet you enter.`, false);
   history.replaceState(null, "", `?${q({svc, dir:ST.dir, bus:ST.bus || "", late:ST.late})}`);
   initMap(); drawBase();
@@ -408,6 +440,7 @@ async function runPlan(){
   if(my !== ST.seq) return;
   if(!r.ok){ stat(r.error || "Planning failed.", true); ST.res = null; renderAll(); return; }
   ST.res = r; ST.routes = {}; ST.sel = r.best;
+  if(isM()) setHdrMin(true); else if(document.body.classList.contains("hdr-min")) hdrSummary();
   history.replaceState(null, "", `?${q({svc:ST.svc, dir:ST.dir, bus:ST.bus, late:ST.late})}`);
   stat(`<b>${r.candidates.length}</b> halfway points tested \u00b7 ${esc(r.routing)}`);
   renderAll(); if(ST.sel) loadRoute(ST.sel);
@@ -419,7 +452,8 @@ function select(code, go){
 
 /* ---------------------------------------------------------------- rendering */
 function renderAll(){ renderSetup(); renderNoAction(); renderOptions(); renderSelected(); }
-function renderSelected(){ renderPlan(); renderBA(); renderDown(); renderChart(); renderActs(); drawSel(); renderOptionsSel(); }
+window.addEventListener("load", () => { if(!isM()) initOMap(); });
+function renderSelected(){ renderPlan(); renderBA(); renderDown(); renderChart(); renderActs(); drawSel(); renderOptionsSel(); drawOMap(); }
 
 function renderSetup(){
   const r = ST.res, el = $("setup");
@@ -682,7 +716,7 @@ async function loadRoute(code){
   const rt = await api(`/api/hplan/route?${q({snap:r.snap, stop:x.code, mode:"late", bus:ST.bus, leave:x.leave, from_pt:`${ic.lat},${ic.lon}`, from_label:r.mode === "os" ? `OS bus \u00b7 ${ic.name}` : `${ic.name} (interchange)`, on:r.mode === "os" ? "" : "next"})}`, 90000);
   if(ST.res !== r) return;
   ST.routes[code] = rt;
-  if(ST.sel === code){ drawSel(); renderPlan(); }
+  if(ST.sel === code){ drawSel(); renderPlan(); drawOMap(); }
 }
 function drawSel(){
   const r = ST.res, x = r ? cand(ST.sel) : null;
@@ -714,12 +748,74 @@ function drawSel(){
   }
 }
 
+/* ---------------------------------------------------------------- Options map: route direction, candidate stops, arrowed off-service route */
+let omap = null; const OG = {};
+function initOMap(){
+  if(omap) return;
+  omap = L.map("omap", {zoomControl:true, attributionControl:true}).setView([1.3521, 103.8198], 12);
+  (window.SGBasemap ? SGBasemap.add(omap, {minZoom:11, maxZoom:19, style:"voyager", switcher:false}) : L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {maxZoom:19, attribution:"\u00a9 OpenStreetMap contributors"}).addTo(omap));
+  ["line", "dir", "cands", "path", "sel"].forEach(k => OG[k] = L.layerGroup().addTo(omap));
+}
+const arrowIcon = (deg, col, sz) => L.divIcon({className:"", iconSize:[sz, sz], iconAnchor:[sz / 2, sz / 2],
+  html:`<div class="oarr" style="width:${sz}px;height:${sz}px;transform:rotate(${deg}deg)"><svg viewBox="0 0 20 20" width="${sz}" height="${sz}"><path d="M3 4 L17 10 L3 16 L7 10 Z" fill="${col}" stroke="#fff" stroke-width="1.4" stroke-linejoin="round"/></svg></div>`});
+function arrowsAlong(group, pts, col, count, sz){                 // arrowheads spaced along a polyline, pointing the way it runs
+  if(!pts || pts.length < 2) return;
+  const d = [0]; for(let i = 1; i < pts.length; i++) d.push(d[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], (pts[i][1] - pts[i - 1][1]) * Math.cos(pts[i][0] * Math.PI / 180)));
+  const tot = d[d.length - 1] || 1;
+  for(let a = 1; a <= count; a++){
+    const want = tot * (count === 1 ? 1 : (a - 0.5) / count) - (count === 1 ? 1e-9 : 0);
+    let i = d.findIndex(x => x >= want); if(i < 1) i = 1;
+    const p0 = pts[i - 1], p1 = pts[i], f = (want - d[i - 1]) / Math.max(1e-12, d[i] - d[i - 1]);
+    const lat = p0[0] + f * (p1[0] - p0[0]), lon = p0[1] + f * (p1[1] - p0[1]);
+    const deg = -Math.atan2(p1[0] - p0[0], (p1[1] - p0[1]) * Math.cos(lat * Math.PI / 180)) * 180 / Math.PI;
+    L.marker([lat, lon], {icon:arrowIcon(deg, col, sz), interactive:false, keyboard:false}).addTo(group);
+  }
+}
+function drawOMap(){
+  const r = ST.res; if(!r || !ST.snap) return;
+  initOMap(); Object.values(OG).forEach(g => g.clearLayers());
+  const ln = r.mode === "os" ? ST.snap.line : (ST.snap.opp ? ST.snap.opp.line : ST.snap.line);
+  L.polyline(ln, {color:"#1565d8", weight:5, opacity:.35}).bindTooltip(`D${r.next_dir} service route`).addTo(OG.line);
+  arrowsAlong(OG.dir, ln, "#1565d8", 8, 16);
+  const x = cand(ST.sel), start = r.mode === "os" ? r.os : r.interchange;
+  const rankOf = new Map((r.candidates || []).map((c, i) => [c.code, i + 1]));
+  (r.candidates || []).forEach(c => {
+    const isBest = c.code === r.best, isSel = x && c.code === x.code;
+    if(isSel) return;
+    L.circleMarker([c.lat, c.lon], {radius:isBest ? 7 : 5, color:"#fff", weight:1.5, fillColor:isBest ? "#0f9d58" : "#8a98a9", fillOpacity:.95})
+      .bindTooltip(`Stop ${c.no} \u00b7 ${esc(c.code)} ${esc(c.name)} \u00b7 EWT ${f3(c.ewt)} \u00b7 split ${f0(c.gap.split[0])}/${f0(c.gap.split[1])}${isBest ? " \u00b7 AI recommended" : ""}`)
+      .on("click", () => select(c.code)).addTo(OG.cands);
+  });
+  const bounds = [...ln];
+  if(start && start.lat != null){
+    L.marker([start.lat, start.lon], {icon:L.divIcon({className:"", iconSize:[10, 10], iconAnchor:[-4, 30], html:`<div class="mk"><div class="p">${r.mode === "os" ? "🚍 OS start" : "🚌 Interchange"}</div></div>`}), interactive:false}).addTo(OG.sel);
+    L.circleMarker([start.lat, start.lon], {radius:7, color:"#0b2545", weight:3, fillColor:"#fff", fillOpacity:1}).addTo(OG.sel);
+    bounds.push([start.lat, start.lon]);
+  }
+  if(x){
+    const rt = ST.routes[x.code];
+    if(rt && rt.ok && rt.line && rt.line.length > 1){
+      L.polyline(rt.line, {color:"#fff", weight:8, opacity:.9}).addTo(OG.path);
+      L.polyline(rt.line, {color:"#7c4dff", weight:5}).bindTooltip(`Off-service real road: ${fkm(rt.km)} \u00b7 ${f0(rt.time_min)} min`, {sticky:true}).addTo(OG.path);
+      arrowsAlong(OG.path, rt.line, "#7c4dff", 3, 20);
+      arrowsAlong(OG.path, rt.line, "#7c4dff", 1, 24);
+      rt.line.forEach(p => bounds.push(p));
+    } else if(!x.full && start && start.lat != null){
+      L.polyline([[start.lat, start.lon], [x.lat, x.lon]], {color:"#7c4dff", weight:2, dashArray:"4 6", opacity:.8}).bindTooltip(rt && rt.loading ? "Calculating the real road route\u2026" : "Real road route not available").addTo(OG.path);
+    }
+    L.marker([x.lat, x.lon], {icon:L.divIcon({className:"", iconSize:[10, 10], iconAnchor:[-8, 34], html:`<div class="mk"><div class="p g">Stop ${x.no} \u00b7 enter ${esc(x.entry_clock)}</div></div>`}), interactive:false, zIndexOffset:1000}).addTo(OG.sel);
+    L.circleMarker([x.lat, x.lon], {radius:9, color:"#bcd4fb", weight:4, fillColor:x.code === r.best ? "#0f9d58" : "#1565d8", fillOpacity:1}).addTo(OG.sel);
+    bounds.push([x.lat, x.lon]);
+  }
+  const b = L.latLngBounds(bounds); if(b.isValid()) omap.fitBounds(b, {padding:[24, 24]});
+}
+
 /* ---------------------------------------------------------------- phone steps */
 function setTab(t){
   document.body.classList.remove("tab-setup", "tab-options", "tab-visual", "tab-plan"); document.body.classList.add(`tab-${t}`);
   document.querySelectorAll(".mtabs button").forEach(b => b.setAttribute("aria-selected", String(b.dataset.tab === t)));
   window.scrollTo({top:0});
-  setTimeout(() => { if(map) map.invalidateSize(); if(t === "visual" || t === "setup") { renderNoAction(); renderBA(); } }, 60);
+  setTimeout(() => { if(map) map.invalidateSize(); if(t === "options"){ initOMap(); omap.invalidateSize(); drawOMap(); } if(t === "visual" || t === "setup") { renderNoAction(); renderBA(); } }, 60);
 }
 document.querySelectorAll(".mtabs button").forEach(b => b.onclick = () => setTab(b.dataset.tab));
 let rz = null; window.addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(() => { renderNoAction(); renderBA(); if(map) map.invalidateSize(); }, 150); });
