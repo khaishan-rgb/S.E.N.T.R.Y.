@@ -2,21 +2,19 @@
    ONE registry drives sidebar, launcher, shortcuts and mobile navigation. */
 (function(){
   var MODULES = [
-    {id:"command",name:"Command Centre",icon:"⌂",route:"/command",group:"COMMAND",mobile:true,shortcut:true,enabled:true},
-    {id:"route",name:"Route Traffic",icon:"△",route:"/",group:"COMMAND",mobile:true,shortcut:true,enabled:true},
-    {id:"headway",name:"Headway Control",icon:"↔",route:"/control",group:"COMMAND",mobile:true,shortcut:true,enabled:true},
-    {id:"bunching",name:"Bunching & Gap",icon:"≋",route:"/bunching",group:"COMMAND",mobile:true,shortcut:true,enabled:true},
-    {id:"recovery",name:"Recovery Decision Engine",icon:"◫",route:"/halfway/timetable",group:"RECOVERY",mobile:true,shortcut:true,enabled:true},
-    {id:"halfplan",name:"Halfway Planner",icon:"½",route:"/halfway",group:"RECOVERY",mobile:true,shortcut:true,enabled:true},
-    {id:"trafficaware",name:"Traffic-Aware",icon:"⚠",route:"/traffic",group:"RECOVERY",mobile:true,shortcut:true,enabled:true},
-    {id:"running",name:"Running Time Analytics",icon:"◷",route:"/running-time",group:"ANALYTICS",mobile:true,shortcut:true,enabled:true},
-    {id:"cameras",name:"Traffic Cameras",icon:"▣",route:"/cameras",group:"ANALYTICS",mobile:true,shortcut:true,enabled:true},
-    {id:"settings",name:"Settings",icon:"⚙",route:"/settings",group:"SYSTEM",mobile:true,shortcut:true,enabled:true}
+    {id:"route",name:"Route Traffic",icon:"▬",route:"/",group:"ANALYSIS TOOLS",mobile:true,shortcut:true,enabled:true},
+    {id:"headway",name:"Headway Control",icon:"↔",route:"/control",group:"ANALYSIS TOOLS",mobile:true,shortcut:true,enabled:true},
+    {id:"bunching",name:"Bunching & Gap",icon:"▪",route:"/bunching",group:"ANALYSIS TOOLS",mobile:true,shortcut:true,enabled:true},
+    {id:"halfplan",name:"Halfway Planner",icon:"½",route:"/halfway",group:"ANALYSIS TOOLS",mobile:true,shortcut:true,enabled:true},
+    {id:"trafficaware",name:"Traffic-Aware",icon:"△",route:"/traffic",group:"ANALYSIS TOOLS",mobile:true,shortcut:true,enabled:true},
+    {id:"recovery",name:"Recovery Decision Engine",icon:"▤",route:"/halfway/timetable",group:"ANALYSIS TOOLS",mobile:true,shortcut:true,enabled:true},
+    {id:"running",name:"Running Time Analytics",icon:"◷",route:"/running-time",group:"ANALYSIS TOOLS",mobile:true,shortcut:true,enabled:true},
+    {id:"cameras",name:"Traffic Cameras",icon:"▣",route:"/cameras",group:"ANALYSIS TOOLS",mobile:true,shortcut:true,enabled:true}
   ], GROUP_ORDER=["COMMAND","RECOVERY","ANALYTICS","SYSTEM"];
   function esc(s){return String(s).replace(/[&<>"']/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]})}
   function byPath(){var p=location.pathname;if(p==="/command")return"command";if(p==="/control")return"headway";if(p==="/bunching")return"bunching";if(p==="/halfway/timetable")return"recovery";if(p==="/halfway"||p==="/halfway/os")return"halfplan";if(p==="/traffic")return"trafficaware";if(p==="/running-time"||p==="/insight")return"running";if(p==="/cameras")return"cameras";if(p==="/settings")return"settings";return"route"}
   function ensureShell(){
-    if(!document.querySelector(".desktop-shell")){var a=document.createElement("aside");a.className="desktop-shell";a.setAttribute("aria-label","Primary navigation");a.innerHTML='<div class="shell-brand"><strong>SG TRANSPORT PULSE</strong><small>Operational Intelligence Platform</small></div><div id="dsSidebar"></div><div class="shell-foot"><span class="shell-live-dot"></span> Live operational workspace</div>';document.body.insertBefore(a,document.body.firstChild)}
+    if(!document.querySelector(".desktop-shell")){var a=document.createElement("aside");a.className="desktop-shell";a.setAttribute("aria-label","Primary navigation");a.innerHTML='<div class="shell-brand"><strong>SG Transport Pulse</strong><small>Operations Intelligence</small></div><div id="dsSidebar"></div><div class="shell-foot"><span class="shell-live-dot"></span> Live operational workspace</div>';document.body.insertBefore(a,document.body.firstChild)}
     if(!document.getElementById("dsMobileBottom")){var n=document.createElement("nav");n.className="mobile-bottom-nav";n.id="dsMobileBottom";document.body.appendChild(n);var m=document.createElement("div");m.className="mobile-more";m.id="dsMobileMore";document.body.appendChild(m)}
     if(!document.getElementById("dsMobileTop")){var mt=document.createElement("header");mt.className="mobile-top-menu";mt.id="dsMobileTop";document.body.insertBefore(mt,document.body.firstChild)}
   }
