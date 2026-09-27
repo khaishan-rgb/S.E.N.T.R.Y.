@@ -1488,12 +1488,6 @@ async def halfway_page():
     return HTMLResponse((HERE / "halfway_planner.html").read_text(encoding="utf-8"))
 
 
-@app.get("/halfway/os", response_class=HTMLResponse)
-async def halfway_os_page():
-    """the V14 planner (Recover Late Duty cross-direction + Deploy OS Bus), unchanged."""
-    return HTMLResponse((HERE / "hplanner.html").read_text(encoding="utf-8"))
-
-
 @app.get("/halfway/timetable", response_class=HTMLResponse)
 async def halfway_timetable_page():
     """the V13 timetable-based Halfway Optimiser, unchanged (trip lateness at the first stop, approved halfway points, settings)."""
