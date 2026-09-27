@@ -3580,7 +3580,7 @@ async def api_hp_snapshot(service: str = "", direction: int = 1):
 
 @app.get("/api/hplan/testsnap")
 async def api_hp_testsnap(service: str = "", direction: int = 1, time_: str = Query("", alias="time"), headway: str = "10", buses: str = "",
-                          offset: str = "", stop_min: str = "2", gap: str = "", gap_at: str = "start"):
+                          offset: str = "", stop_min: str = "2", gap: str = "", gap_at: str = "start", layover: str = ""):
     """V15.2 TEST MODE: a synthetic, evenly spaced fleet on the service's real route (both directions) for a time you choose - for testing
     when no buses are running (e.g. after midnight). Same snapshot shape as the live one, so planning and road routing work unchanged."""
     svc = service.strip().upper()
@@ -3604,46 +3604,77 @@ async def api_hp_testsnap(service: str = "", direction: int = 1, time_: str = Qu
     st = await static()
     dirs = [d_ for d_ in (1, 2) if route_stops(st, svc, d_)]
 
-    def fleet(g, phase, long_gap=None):
-        stops, ss = g["stops"], g["prep"]["stop_s"]
-        n = len(stops)
-        run = sm * (n - 1)
-        out = []
-        gk = None
-        if long_gap:                                               # one prolonged headway: near the start (default) or mid-route
-            gk = 2 if gap_at != "middle" else max(2, int(run // H) // 2)
-        for k in range(nb):
-            el = k * H + phase + 1.0 + ((long_gap - H) if (gk is not None and k >= gk) else 0.0)   # minutes since this bus left the first stop
-            if el >= run - 0.5:
-                break
-            p = el / sm
-            i = min(n - 2, int(p)); f = p - i
-            s_km = ss[i] + f * (ss[i + 1] - ss[i])
-            lat = stops[i]["lat"] + f * (stops[i + 1]["lat"] - stops[i]["lat"]); lon = stops[i]["lon"] + f * (stops[i + 1]["lon"] - stops[i]["lon"])
-            near = stops[i + 1] if f >= 0.5 else stops[i]
-            nxt = stops[i + 1]
-            out.append({"s": s_km, "lat": lat, "lon": lon, "km": round(s_km, 2), "near": {"code": near["code"], "name": near["name"]}, "near_name": near["name"],
-                        "next": {"code": nxt["code"], "name": nxt["name"], "eta_min": round((1 - f) * sm, 1), "clock": hplan.hhmm(t0 + (1 - f) * sm)},
-                        "offset": 0.0, "load": None, "type": None, "monitored": 0, "test": True})
-        out.sort(key=lambda b: b["s"])
-        for i, b in enumerate(out, 1):
-            b["id"] = i
-        return out, int(run // H) + 1
-
+    # V15.7: ONE continuous stream of buses round the loop  D1 -> layover -> D2 -> layover, every H minutes, including the buses
+    # waiting in layover at a terminal. A partial fleet is one continuous block (no empty stretch inside the scenario):
+    # around the D1-end / D2-start interchange for a late bus, around the start of the direction for the OS long-headway demo.
     g = {**g0, "H": H, "H_src": "test input"}
     P = {**halfway.PARAMS, **HO["params"]}
-    tb, fit = fleet(g, 0.0, LG)
-    opp = None
     od = next((d_ for d_ in dirs if d_ != direction), None)
+    g2 = None
     if od is not None:
-        g2 = await ho_route(svc, od)
-        if not g2.get("error"):
-            g2 = {**g2, "H": H, "H_src": "test input"}
-            ob, _ = fleet(g2, off)
-            opp = {"g": g2, "buses": ob, "dir": od}
+        g2x = await ho_route(svc, od)
+        if not g2x.get("error"):
+            g2 = {**g2x, "H": H, "H_src": "test input"}
+    try:
+        lay = max(0.0, min(40.0, float(layover))) if str(layover).strip() else 10.0
+    except ValueError:
+        lay = 10.0
+    runT = sm * (len(g["stops"]) - 1)
+    runO = sm * (len(g2["stops"]) - 1) if g2 else 0.0
+    C = runT + lay + ((runO + lay) if g2 else 0.0)
+    fit_total = max(2, int(C // H))
+    total = min(fit_total, nb * (2 if g2 else 1)) if str(buses).strip() else fit_total
+    tc = (C - lay / 2.0) if LG else (runT + lay / 2.0)               # centre of the block
+    taus = sorted(tc + (k - (total - 1) / 2.0) * H + 0.37 for k in range(total))
+    if LG:                                                            # one prolonged headway between the 2nd and 3rd bus of the direction
+        t_sec = [t for t in taus if C <= t < C + runT] or [t for t in taus if 0 <= t < runT]
+        if len(t_sec) >= 3:
+            cut = t_sec[min(3, len(t_sec) - 2)] if gap_at != "middle" else t_sec[max(1, len(t_sec) // 2 - 1)]
+            shifted = [t - (LG - H) for t in taus if t <= cut + 1e-9]
+            kept = [t for t in taus if t > cut + 1e-9]
+            # a gap means missing buses: drop shifted buses that would now sit on top of the others round the loop
+            circ = lambda a_, b_: min(abs(a_ - b_) % C, C - abs(a_ - b_) % C)
+            taus = sorted(kept + [t for t in shifted if all(circ(t, k_) >= H / 2.0 for k_ in kept)])
+
+    def mkbus(gg, el=None, wait=None):
+        stops, ss = gg["stops"], gg["prep"]["stop_s"]
+        n = len(stops)
+        if wait is not None:                                          # waiting in layover at the first stop
+            st0 = stops[0]
+            return {"s": ss[0], "lat": st0["lat"], "lon": st0["lon"], "km": 0.0, "near": {"code": st0["code"], "name": st0["name"]}, "near_name": st0["name"],
+                    "next": {"code": st0["code"], "name": st0["name"], "eta_min": round(wait, 1), "clock": hplan.hhmm(t0 + wait)}, "wait": round(wait, 2),
+                    "offset": 0.0, "load": None, "type": None, "monitored": 0, "test": True}
+        p = el / sm
+        i = min(n - 2, int(p)); f = p - i
+        s_km = ss[i] + f * (ss[i + 1] - ss[i])
+        lat = stops[i]["lat"] + f * (stops[i + 1]["lat"] - stops[i]["lat"]); lon = stops[i]["lon"] + f * (stops[i + 1]["lon"] - stops[i]["lon"])
+        near = stops[i + 1] if f >= 0.5 else stops[i]
+        nxt = stops[i + 1]
+        return {"s": s_km, "lat": lat, "lon": lon, "km": round(s_km, 2), "near": {"code": near["code"], "name": near["name"]}, "near_name": near["name"],
+                "next": {"code": nxt["code"], "name": nxt["name"], "eta_min": round((1 - f) * sm, 1), "clock": hplan.hhmm(t0 + (1 - f) * sm)},
+                "offset": 0.0, "load": None, "type": None, "monitored": 0, "test": True}
+
+    tb, ob = [], []
+    for t in taus:
+        tm = t % C
+        if tm < runT:
+            tb.append(mkbus(g, el=tm))
+        elif g2 and tm < runT + lay:
+            ob.append(mkbus(g2, wait=runT + lay - tm))
+        elif g2 and tm < runT + lay + runO:
+            ob.append(mkbus(g2, el=tm - runT - lay))
+        else:
+            tb.append(mkbus(g, wait=C - tm))
+    for lst in (tb, ob):
+        lst.sort(key=lambda b: (b["s"], -b.get("wait", 0.0)))
+        for i, b in enumerate(lst, 1):
+            b["id"] = i
+    fit = int(round(fit_total / (2 if g2 else 1)))
+    opp = {"g": g2, "buses": ob, "dir": od} if g2 else None
     sid = hashlib.sha1(f"test|{svc}|{direction}|{time.time()}".encode()).hexdigest()[:12]
     hp_prune()
-    HP_SNAP[sid] = {"created": time.time(), "svc": svc, "d": direction, "g": g, "buses": tb, "now_min": float(t0), "P": P, "opp": opp, "test": True}
+    HP_SNAP[sid] = {"created": time.time(), "svc": svc, "d": direction, "g": g, "buses": tb, "now_min": float(t0), "P": P, "opp": opp, "test": True,
+                    "partial": total < fit_total, "test_gap": LG}
     stops, ss, line = g["stops"], g["prep"]["stop_s"], g["line"]
     strip_b = lambda bs: [{k: v for k, v in b.items() if k not in ("s", "offset")} for b in bs]
     return {"ok": True, "test": True, "snap": sid, "service": svc, "direction": direction, "directions": dirs, "now": hplan.hhmm(t0) + ":00", "now_min": float(t0),
@@ -3654,7 +3685,8 @@ async def api_hp_testsnap(service: str = "", direction: int = 1, time_: str = Qu
             "opp": ({"direction": opp["dir"], "line": ho_simplify(opp["g"]["line"], 400), "buses": strip_b(opp["buses"]), "km": round(opp["g"]["prep"]["km"], 2),
                      "first": opp["g"]["stops"][0]["name"], "last": opp["g"]["stops"][-1]["name"], "H": H} if opp else None),
             "test_info": {"time": hplan.hhmm(t0), "headway": H, "buses": nb, "fit": fit, "placed": len(tb), "placed_opp": len(opp["buses"]) if opp else 0,
-                          "offset": off, "stop_min": sm, "gap": LG, "gap_at": gap_at if LG else None},
+                          "offset": off, "stop_min": sm, "gap": LG, "gap_at": gap_at if LG else None, "layover": lay,
+                          "waiting": sum(1 for b in tb + ob if b.get("wait") is not None)},
             "source": "TEST MODE \u00b7 synthetic evenly spaced buses on the real route (not live)"}
 
 
@@ -3889,8 +3921,8 @@ async def api_hp_plan(snap: str = "", bus: str = "", delay: str = "20", brk: str
             else:
                 km = hplan.hav_km(org, (stx[j]["lat"], stx[j]["lon"])) * 1.35
                 reach[j] = (km / 25.0 * 60.0, km, "estimate - road routing unavailable")
-        if S.get("test"):
-            Pp["edge_trim"] = True
+        if S.get("test") and S.get("partial"):
+            Pp["edge_trim"] = True; Pp["edge_gap"] = S.get("test_gap")          # only a partial test fleet has an edge
         res = await asyncio.to_thread(hwplan.plan_os, {"now": S["now_min"], "X": X, "Y": Y, "P": Pp, "os": {"t0": t0, "label": olabel, "lat": org[0], "lon": org[1]},
                                                        "late": {"bus": int(bus), "delay": D} if has_bus and D > 0 else None}, reach)
         res.update(snap=snap, service=S["svc"], routing="real road routing (OSRM)" if offs else f"estimate ({off_err or 'road routing unavailable'})")
@@ -3915,8 +3947,8 @@ async def api_hp_plan(snap: str = "", bus: str = "", delay: str = "20", brk: str
                 out[j] = (km / 25.0 * 60.0, km, "estimate - road routing unavailable")
         return out, offs_, err_
     reach, offs, off_err = await reach_from((ic["lat"], ic["lon"]))
-    if S.get("test"):
-        Pp["edge_trim"] = True                                          # test fleet: ignore the gap in front of its first bus
+    if S.get("test") and S.get("partial"):
+        Pp["edge_trim"] = True; Pp["edge_gap"] = S.get("test_gap")              # partial test fleet: ignore the gaps at its two ends
     base_ctx = {"now": S["now_min"], "late": {"bus": int(bus), "delay": D}, "T": T, "O": O, "P": Pp}
     if mode == "os":                                                   # V15.4: an extra OS bus + Bus Captain goes halfway; Bus C runs its next trip late
         frm = (os_from or "").strip()

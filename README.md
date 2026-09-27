@@ -1,4 +1,11 @@
-# SG Transport Pulse V15.6 — Route Traffic + Departure Adjustment + Bunching, Gap & Alerts + AI Halfway Optimiser
+# SG Transport Pulse V15.7 — Route Traffic + Departure Adjustment + Bunching, Gap & Alerts + AI Halfway Optimiser
+
+## V15.7 — Test fleet as one continuous stream (no false gaps)
+
+* **Why a 91-min gap appeared:** with fewer test buses than the route holds (e.g. 6 of 13), the D1 and D2 test buses were each placed from the start of their direction, leaving an empty stretch between the D2 buses already out and the next D1 bus to reach the interchange. Even a full fleet had no bus in layover at the terminal, so there was a false ~1.5-headway gap at the interchange.
+* **Now:** test buses are placed as one continuous stream round the loop D1 → layover → D2 → layover, every headway, **including the buses waiting in layover** at a terminal (they depart on schedule). A partial fleet is one continuous block round the interchange (late-bus case) or round the start of the direction (OS long-headway demo), so there is no empty stretch inside the scenario; the ends of a partial block are ignored.
+* Engine: a bus with `wait` is at the first stop in layover and departs in `wait` minutes (both planners). The late label on the forecast only shows when lateness > 0.
+* **Long headway (OS demo)** is now made by leaving buses out (a real gap = missing buses), placed behind the 4th bus from the start so the OS bus goes properly mid-route.
 
 ## V15.6 — OS bus: full trip when there is no prolonged headway
 

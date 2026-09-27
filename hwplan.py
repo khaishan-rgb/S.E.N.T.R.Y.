@@ -60,20 +60,27 @@ def plan(ctx, reach):
     Cn, D = ctx["late"]["bus"], float(ctx["late"]["delay"])
     tl, ol = f"D{T['dir']}", f"D{O['dir']}"
     # ---- current direction: every bus completes its trip (Bus C with its lateness), then becomes ready after the break
-    t_buses = sorted(({"num": b["id"], "p": prog(T["ss"], b["s"])} for b in T["buses"]), key=lambda x: -x["p"])   # front first
+    t_buses = sorted(({"num": b["id"], "p": prog(T["ss"], b["s"]), "w": float(b.get("wait") or 0.0)} for b in T["buses"]),
+                     key=lambda x: (-x["p"], x["w"]))                # front first; buses waiting at the first stop last
     if not any(b["num"] == Cn for b in t_buses):
         return {"ok": False, "error": "The selected bus is no longer in the live snapshot - refresh the live buses."}
     for b in t_buses:
-        b["arr"] = now + SM * ((nT - 1) - b["p"]) + (D if b["num"] == Cn else 0.0)
+        b["arr"] = now + b["w"] + SM * ((nT - 1) - b["p"]) + (D if b["num"] == Cn else 0.0)
         b["ready"] = b["arr"] + BRK
     c = next(i for i, b in enumerate(t_buses) if b["num"] == Cn)
     # ---- next direction: buses already on it (in service), then the next trip of every current-direction bus, in scheduled order
     units = []
-    o_cur = [] if loop else sorted(({"num": b["id"], "q": prog(O["ss"], b["s"])} for b in O["buses"]), key=lambda x: -x["q"])
+    LAY = max(float(P["layover"]), BRK)                            # scheduled layover: planned departure = on-time arrival + layover
+    o_all = [] if loop else [{"num": b["id"], "q": prog(O["ss"], b["s"]), "w": b.get("wait")} for b in O["buses"]]
+    o_cur = sorted((b for b in o_all if b["w"] is None), key=lambda x: -x["q"])
     for b in o_cur:
         units.append({"uid": f"O{b['num']}", "num": b["num"], "kind": "in_service", "q": b["q"], "dep": now - SM * b["q"], "movable": False,
                       "label": f"{ol} Bus {b['num']}", "src": f"in service on {ol}"})
-    LAY = max(float(P["layover"]), BRK)                            # scheduled layover: planned departure = on-time arrival + layover
+    for b in sorted((b for b in o_all if b["w"] is not None), key=lambda x: x["w"]):     # in layover at the interchange, departing on schedule
+        dep_ = now + float(b["w"])
+        units.append({"uid": f"O{b['num']}", "num": b["num"], "kind": "next_trip", "dep": dep_, "slot": dep_, "ready": max(now, dep_ - LAY + BRK),
+                      "arr": dep_ - LAY, "slack": max(0.0, dep_ - max(dep_ - LAY + BRK, now)), "movable": True, "late": False,
+                      "label": f"{ol} Bus {b['num']} (at interchange)", "src": f"in layover at {O['stops'][0]['name']}"})
     for i, b in enumerate(t_buses):
         slot = (b["arr"] - (D if b["num"] == Cn else 0.0)) + LAY      # the timetable slot is not moved by lateness
         dep = max(b["ready"], slot, now)
@@ -115,7 +122,7 @@ def plan(ctx, reach):
         points.append(nO - 1)
 
     TRIM = bool(P.get("edge_trim"))                                # TEST MODE: gaps at the edge of the entered fleet are not real
-    EDGE = 2.5 * H
+    EDGE = max(2.5 * H, float(P.get("edge_gap") or 0.0) + H)
     RS = {roles[r]["uid"] for r in ("B", "C", "D", "E") if r in roles}
 
     def evaluate(tab):
@@ -476,16 +483,22 @@ def plan_os(ctx, reach):
     late = ctx.get("late") or {}
     Ln, LD = late.get("bus"), float(late.get("delay") or 0.0)
     units = []
+    BRK_ = float(P["break_min"])
     for b in X["buses"]:                                            # buses on the direction now
         q = prog(ss, b["s"])
         d_ = LD if (Ln is not None and b["id"] == Ln) else 0.0
+        if b.get("wait") is not None:                               # in layover at the first stop, departing on schedule
+            dep_ = now + float(b["wait"]) + d_
+            units.append({"uid": f"X{b['id']}", "num": b["id"], "kind": "next_trip", "dep": dep_, "ready": max(now, dep_ - LAY + BRK_),
+                          "label": f"Bus {b['id']} (at first stop)", "late": d_ > 0})
+            continue
         units.append({"uid": f"X{b['id']}", "num": b["id"], "kind": "in_service", "q": q, "delay": d_, "dep": now - SM * q + d_,
                       "label": f"Bus {b['id']}", "late": d_ > 0})
     ob = Y["buses"] if Y else []
     oss = Y["ss"] if Y else ss
-    for b in (ob if Y else X["buses"]):                             # their next trips on this direction (circulation)
+    for b in (ob if Y else [b_ for b_ in X["buses"] if b_.get("wait") is None]):   # their next trips on this direction (circulation)
         q = prog(oss, b["s"])
-        arr = now + SM * ((len(oss) - 1) - q) + (LD if (not Y and Ln is not None and b["id"] == Ln) else 0.0)
+        arr = now + float(b.get("wait") or 0.0) + SM * ((len(oss) - 1) - q) + (LD if (not Y and Ln is not None and b["id"] == Ln) else 0.0)
         units.append({"uid": f"N{b['id']}", "num": b["id"], "kind": "next_trip", "dep": arr + LAY, "ready": arr + float(P["break_min"]),
                       "label": f"Bus {b['id']}" + (f" (from D{Y['dir']})" if Y else " (next loop)")})
     units.sort(key=lambda u: u["dep"])
@@ -502,7 +515,7 @@ def plan_os(ctx, reach):
     points = list(range(1, n, step))
     if n - 1 not in points:
         points.append(n - 1)
-    TRIM = bool(P.get("edge_trim")); EDGE = 2.5 * H
+    TRIM = bool(P.get("edge_trim")); EDGE = max(2.5 * H, float(P.get("edge_gap") or 0.0) + H)
 
     def evaluate(tab, keep_uids=()):
         vals, mx, mn, perk = [], 0.0, 1e9, {}
@@ -528,7 +541,7 @@ def plan_os(ctx, reach):
     if ctx.get("gap_rear") is not None:
         pairs = [p for p in pairs if p[1]["num"] == ctx["gap_rear"] and p[1]["kind"] == "in_service"] or pairs
     if TRIM:                                                         # test fleet: the seam between the two synthetic fleets is not a real gap
-        pairs = [p for p in pairs if not (p[0]["kind"] != p[1]["kind"] and (p[1]["dep"] - p[0]["dep"]) > EDGE)] or pairs
+        pairs = [p for p in pairs if (p[1]["dep"] - p[0]["dep"]) <= EDGE] or pairs
     if not pairs:
         return {"ok": False, "error": f"Not enough buses on {xl} to find a headway gap."}
     F, R = max(pairs, key=lambda p: p[1]["dep"] - p[0]["dep"])
@@ -595,7 +608,7 @@ def plan_os(ctx, reach):
     dseq = sorted(units, key=lambda u: u["dep"])
     fpairs = [(dseq[i], dseq[i + 1]) for i in range(len(dseq) - 1) if dseq[i + 1]["dep"] > t_os0 + 0.5 and dseq[i + 1]["dep"] <= now + 90.0]
     if TRIM:                                                         # test fleet: skip the edge of the entered fleet (not a real gap)
-        fpairs = [p for p in fpairs if not ((p[1]["dep"] - p[0]["dep"]) > EDGE and p[0]["kind"] != p[1]["kind"])]
+        fpairs = [p for p in fpairs if (p[1]["dep"] - p[0]["dep"]) <= EDGE]
     if fpairs:
         Fp, Rp = max(fpairs, key=lambda p: (round(p[1]["dep"] - p[0]["dep"], 1), -p[0]["dep"]))
         iF_ = dseq.index(Fp)
