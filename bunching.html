@@ -118,15 +118,16 @@ tbody tr{cursor:pointer}tbody tr:hover{background:#0d2440}tbody tr.sel{backgroun
   html.shell-off .shell-show.floating{position:absolute;left:10px;top:12px;z-index:10001}
 }
 </style>
-<script>try{if(localStorage.getItem("shell.off")==="1")document.documentElement.classList.add("shell-off")}catch(e){}</script>
-<link rel="stylesheet" href="/design-system.css?v=20260927-standard">\n</head>
+<link rel="stylesheet" href="/design-system.css">
+<script src="/app-shell.js" data-module="bunching"></script>
+</head>
 <body>
 
 <div class="app">
   <header class="top">
-    <button class="mobile-menu-btn" type="button" aria-label="Open navigation" onclick="document.getElementById('mobileTopMenu').classList.toggle('open')">☰</button><div class="mobile-top-menu" id="mobileTopMenu"><a href="/">▰ Route</a><a href="/control">↔ Headway</a><a class="active" href="/bunching">≋ Bunching</a><a href="/halfway">½ Halfway Planner</a><a href="/traffic">⚠ Traffic-Aware Regulation</a><a href="/halfway/timetable">▤ Recovery Decision Engine</a><a href="#" onclick="this.parentElement.classList.remove('open');return false">⚙ Settings / page options</a><a class="" href="/running-time">⏱ Running Time</a><a href="/cameras">📷 Traffic Cameras</a></div>
+    
     <div class="brand"><div class="logo">&#128652;</div><div><h1>SG Transport Pulse</h1><p>Bus Bunching &amp; Headway Gap &bull; Detect earlier &bull; Prevent bunching &bull; Keep even headway</p></div></div>
-    <nav class="nav" aria-label="Pages"><a href="/">Route Traffic</a><a href="/control">Headway Control</a><a class="on" href="/bunching" aria-current="page">Bunching &amp; Gap</a><a href="/halfway">Halfway Planner</a><a href="/traffic">Traffic-Aware</a><a href="/halfway/timetable">Recovery Decision Engine</a></nav>
+    
     <div class="hdr-right"><div id="clock">&nbsp;</div><div class="live" id="live"><span class="dot"></span><span id="liveText">Connecting&hellip;</span></div></div>
   </header>
   <section class="module-intro"><h2>Bunching & Gap</h2><p>Detect bunching, prolonged gaps and unstable service spacing.</p></section>
@@ -532,5 +533,55 @@ document.addEventListener("click", function(e){
   else { show.classList.add("floating"); document.body.appendChild(show); }
 })();
 </script>
-<script src="/nav-registry.js?v=20260927-standard"></script>\n</body>
+<!-- V16.0 Bunching & Gap: exception console for the selected service (headway diagram + AI insight + acknowledge).
+     Uses only the row the bunching engine already returned (S.data / selRow()) and the existing acknowledge endpoint. -->
+<style>
+.bbx{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(300px,1fr);gap:12px;margin-top:12px}
+@media (max-width:1100px){.bbx{grid-template-columns:1fr}}
+.bbx .ds-hwline{height:92px}
+.bbx .dir{display:flex;justify-content:space-between;font-size:11px;color:var(--ds-faint);margin:0 14px}
+.bbx .acts{display:flex;gap:8px;flex-wrap:wrap}
+</style>
+<script>
+(function(){
+  "use strict";
+  if(!window.DS || typeof S === "undefined" || typeof selRow !== "function") return;
+  var $ = function(id){ return document.getElementById(id); }, esc = DS.esc, f1 = function(x){ return x == null || isNaN(x) ? "\u2013" : (Math.round(x * 10) / 10).toString(); };
+  var host = $("insight"); if(!host) return;
+  var box = document.createElement("section"); box.className = "bbx"; box.id = "bbConsole"; host.parentNode.insertBefore(box, host.nextSibling);
+  function diagram(r){
+    var seq = (r.seq || []).slice().sort(function(a, b){ return a.order - b.order; }), H = r.sched_hw || 0;
+    if(seq.length < 2) return DS.empty({icon:"bunch", title:"NOT ENOUGH BUSES", text:"At least two live buses are needed to draw the headway diagram."});
+    var gaps = seq.slice(0, -1).map(function(s){ return s.hw_next == null ? H || 1 : Math.max(.5, s.hw_next); }), tot = gaps.reduce(function(a, b){ return a + b; }, 0) || 1, x = 3, pos = [3];
+    gaps.forEach(function(g){ x += 94 * g / tot; pos.push(x); });
+    var h = gaps.map(function(g, i){ var raw = seq[i].hw_next, cls = raw == null ? "" : raw <= (r.bunch_min || 3) || (H && raw <= .5 * H) ? "short" : H && raw >= 1.5 * H ? "long" : "";
+      return '<div class="seg ' + cls + '" style="left:' + pos[i] + '%;width:' + (pos[i + 1] - pos[i]) + '%"><span>' + (raw == null ? "?" : f1(raw) + "m") + '</span></div>'; }).join("");
+    h += seq.map(function(s, i){ var bad = s.status && s.status !== "Normal"; return '<div class="bus' + (bad ? " late" : "") + '" style="left:' + pos[i] + '%" title="' + esc(s.id + " \u00b7 " + (s.near || "") + " \u00b7 " + (s.status || "")) + '"><i></i><b>' + esc(String.fromCharCode(65 + (i % 26))) + '</b></div>'; }).join("");
+    return '<div class="ds-hwline"><div class="rail"></div>' + h + '</div><div class="dir"><span>\u2190 leading (further along the route)</span><span>scheduled headway ' + f1(H) + ' min</span><span>following \u2192</span></div>';
+  }
+  function alertFor(r){ return ((S.data && S.data.alerts) || []).filter(function(a){ return a.service === r.service && +a.direction === +r.direction; })[0] || null; }
+  function render(){
+    var r = selRow();
+    if(!r){ box.innerHTML = '<div class="ds-panel" style="grid-column:1/-1">' + DS.empty({icon:"bunch", title:"NO SERVICE SELECTED", text:"Select a service in the table to open its exception console: live headway diagram, insight and actions."}) + '</div>'; return; }
+    var a = alertFor(r), sev = r.risk === "red" ? "critical" : r.risk === "orange" || r.risk === "yellow" ? "warning" : "ok";
+    var det = r.bb ? r.bb.label + (r.bb.min_hw != null ? " \u00b7 min headway " + f1(r.bb.min_hw) + " min" : "") + (r.bb.location ? " near " + r.bb.location : "")
+            : r.gap ? "Gap up to " + f1(r.gap.max_hw) + " min (scheduled " + f1(r.sched_hw) + ")" + (r.gap.location ? " near " + r.gap.location : "") : "Spacing within tolerance";
+    var when = r.t_occur != null && r.t_occur > 0 ? "Projected in about " + Math.round(r.t_occur) + " min" : r.bb && r.bb.status === "early" ? "Developing" : "";
+    var rec = r.bb ? "Regulate the following bus \u2014 Headway Control calculates the hold" : r.gap && r.sched_hw && r.gap.max_hw >= 2 * r.sched_hw ? "Evaluate recovery (Recovery Decision Engine)" : r.gap ? "Monitor the gap; regulate if it keeps widening" : "No action needed";
+    var href = r.bb ? "/control?svc=" + encodeURIComponent(r.service) : "/recovery?svc=" + encodeURIComponent(r.service);
+    box.innerHTML = '<div class="ds-panel"><div class="ds-ph">HEADWAY DIAGRAM \u00b7 SVC ' + esc(r.service) + ' DIR ' + r.direction + '<span class="sp"></span>' + DS.sev(sev, (r.issue || "Normal").toUpperCase()) + '</div>' + diagram(r) + '</div>'
+      + '<div>' + DS.ai({detected:esc(det), cause:esc(r.note || (r.traffic && r.traffic.text) || when || "\u2013"), recommendation:esc(rec), effect:"Quantified in the target module \u2014 not estimated here.",
+          badge:when ? DS.sev("warning", when.toUpperCase()) : "", basis:"From the bunching engine\u2019s classification of live positions"})
+      + '<div class="acts" style="margin-top:10px">'
+      + (a ? (a.acked ? DS.sev("ok", "ACKNOWLEDGED") : '<button class="ds-btn pri sm" type="button" id="bbxAck">Acknowledge</button>') : '<span class="ds-note">No alert raised for this service yet (alerts start once a case is confirmed).</span>')
+      + '<a class="ds-btn sm" href="/control?svc=' + encodeURIComponent(r.service) + '">Open Headway Control</a><a class="ds-btn sm ghost" href="' + href + '">' + (r.bb ? "Regulate" : "Analyse") + '</a></div></div>';
+    var b = $("bbxAck"); if(b) b.onclick = function(){ b.disabled = true;
+      DS.api("/api/bunching/alerts/ack", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({id:a.id})}).then(function(j){ if(j.ok){ a.acked = true; DS.refreshNotes(); render(); } else { b.disabled = false; b.textContent = j.error || "Retry"; } }); };
+  }
+  var o = window.renderInsight; if(typeof o === "function") window.renderInsight = function(){ try{ return o.apply(this, arguments); } finally{ try{ render(); }catch(e){ console.error(e); } } };
+  render();
+})();
+</script>
+
+</body>
 </html>

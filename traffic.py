@@ -884,5 +884,5 @@ def recommend(alert, impact, reg, restore, current_hw, P):
     if not out:
         out.append({"key": "monitor", "text": "Monitor: no headway deterioration is predicted from this disruption yet.", "basis": "Re-checked at every refresh."})
     if impact and (impact["deterioration"] or (reg and reg.get("best"))):
-        out.append({"key": "escalate", "text": "If the condition persists, consider halfway deployment (Halfway Optimiser) for the buses that will arrive late.", "basis": "Halfway deployment is a Layer 4 option; it is simulated on its own page."})
+        out.append({"key": "escalate", "text": "If the condition persists, consider halfway deployment (Recovery Decision Engine) for the buses that will arrive late.", "basis": "Halfway deployment is a Layer 4 option; it is simulated on its own page."})
     return out

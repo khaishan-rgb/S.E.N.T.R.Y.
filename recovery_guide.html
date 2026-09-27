@@ -70,6 +70,8 @@ svg{display:block;max-width:100%;height:auto}
   .flow>.st:last-child::after{display:none!important}.modes{grid-template-columns:1fr}.trade{grid-template-columns:1fr;justify-items:center}.trade i{transform:rotate(90deg)}.card .t{min-height:0}}
 @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
+<link rel="stylesheet" href="/design-system.css">
+<script src="/app-shell.js" data-module="recovery"></script>
 </head>
 <body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
@@ -86,11 +88,11 @@ svg{display:block;max-width:100%;height:auto}
 </svg>
 <div class="wrap">
   <header class="top">
-    <div class="brand">AI Recovery<br>Scenario Optimiser<span>SG Transport Pulse</span></div>
+    <div class="brand">Recovery<br>Decision Engine<span>SG Transport Pulse</span></div>
     <div><h1>How AI optimisation makes <em>trip adjustment &amp; halfway deployment decisions</em></h1>
       <p class="lede">Not &ldquo;late bus = halfway&rdquo;. The AI works like an experienced controller: look at the situation, try every feasible action, follow each one through the next trips, test it against a thousand possible futures, then recommend &ndash; and explain the trade-off.</p>
       <div class="live" id="live"></div></div>
-    <a class="back" href="/halfway/timetable">&larr; Back to optimiser</a>
+    <a class="back" href="/recovery">&larr; Back to Recovery Decision Engine</a>
   </header>
 
   <div class="flow">
@@ -207,7 +209,7 @@ svg{display:block;max-width:100%;height:auto}
     <div class="trade" aria-label="The trade-off"><span>Passenger headway</span><i>&harr;</i><span>Mileage preservation</span><i>&harr;</i><span>BC welfare</span><i>&harr;</i><span>Recovery speed</span></div>
   </section>
 
-  <div class="foot"><span>Illustrative figures unless a live result is shown above. Decision support only &ndash; the controller decides.</span><span>SG Transport Pulse V12.7 &middot; AI Recovery Scenario Optimiser</span></div>
+  <div class="foot"><span>Illustrative figures unless a live result is shown above. Decision support only &ndash; the controller decides.</span><span>SG Transport Pulse V12.7 &middot; Recovery Decision Engine guide</span></div>
 </div>
 <script>
 (function(){                       // show the latest optimiser result from this browser, if there is one

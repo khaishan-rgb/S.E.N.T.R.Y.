@@ -395,8 +395,9 @@ table.tb{width:100%;border-collapse:collapse;font-size:14px}
   html.shell-off .shell-show.floating{position:absolute;left:10px;top:12px;z-index:10001}
 }
 </style>
-<script>try{if(localStorage.getItem("shell.off")==="1")document.documentElement.classList.add("shell-off")}catch(e){}</script>
-<link rel="stylesheet" href="/design-system.css?v=20260927-standard">\n</head>
+<link rel="stylesheet" href="/design-system.css">
+<script src="/app-shell.js" data-module="route"></script>
+</head>
 <body>
 
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
@@ -416,7 +417,7 @@ table.tb{width:100%;border-collapse:collapse;font-size:14px}
 
 <div class="app">
   <header class="top">
-    <button class="mobile-menu-btn" type="button" aria-label="Open navigation" onclick="document.getElementById('mobileTopMenu').classList.toggle('open')">☰</button><div class="mobile-top-menu" id="mobileTopMenu"><a class="active" href="/">▰ Route</a><a href="/control">↔ Headway</a><a href="/bunching">≋ Bunching</a><a href="/halfway">½ Halfway Planner</a><a href="/traffic">⚠ Traffic-Aware Regulation</a><a href="/halfway/timetable">▤ Recovery Decision Engine</a><a href="#" onclick="this.parentElement.classList.remove('open');return false">⚙ Settings / page options</a><a class="" href="/running-time">⏱ Running Time</a><a href="/cameras">📷 Traffic Cameras</a></div>
+    
     <div class="brand">
       <div class="logo"><svg class="i"><use href="#i-bus"/></svg></div>
       <div>
@@ -425,7 +426,7 @@ table.tb{width:100%;border-collapse:collapse;font-size:14px}
       </div>
     </div>
     <div class="hdr-right">
-      <nav class="navl" aria-label="Pages"><a href="/" class="on">Route Traffic</a><a href="/control">Headway Control</a><a href="/bunching">Bunching &amp; Gap</a><a href="/halfway">Halfway Planner</a><a href="/traffic">Traffic-Aware</a><a href="/halfway/timetable">Recovery Decision Engine</a></nav>
+      
       <div>
         <div class="clock" id="clock">&nbsp;</div>
         <div class="live" id="live"><span class="dot"></span><span id="liveText">Connecting…</span></div>
@@ -1506,5 +1507,63 @@ document.addEventListener("click", function(e){
   else { show.classList.add("floating"); document.body.appendChild(show); }
 })();
 </script>
-<script src="/nav-registry.js?v=20260927-standard"></script>\n</body>
+<!-- V16.0 Route Traffic: ROUTE CONDITION STRIP. Built from the route and traffic-engine data this page already loaded (S.route runs, OCC.rows);
+     acknowledging uses the page's own rtAck(). Nothing new is estimated. -->
+<style>
+.rcs{margin:10px 0 0}
+.rcs .ds-panel{padding:12px 14px}
+.rcs-bar{position:relative;height:14px;border-radius:7px;overflow:hidden;display:flex;background:#0c1a2e;box-shadow:inset 0 0 0 1px var(--ds-line)}
+.rcs-bar i{display:block;height:100%}
+.rcs-wrap{position:relative;padding:22px 6px 26px;min-width:520px}
+.rcs-ev{position:absolute;top:14px;height:30px;border:2px solid #fff;border-radius:6px;background:rgba(255,85,102,.25);cursor:pointer;min-width:10px;box-shadow:0 0 14px rgba(255,85,102,.5)}
+.rcs-ev.warn{background:rgba(255,181,71,.22);box-shadow:0 0 12px rgba(255,181,71,.45)}
+.rcs-ev.acked{border-style:dashed;box-shadow:none;opacity:.7}
+.rcs-ev b{position:absolute;top:-19px;left:50%;transform:translateX(-50%);white-space:nowrap;font:700 11px var(--ds-font);color:#fff;background:#081426;border:1px solid var(--ds-line-2);border-radius:5px;padding:1px 5px}
+.rcs-stop{position:absolute;bottom:0;transform:translateX(-50%);font-size:11px;color:var(--ds-mut);white-space:nowrap;max-width:140px;overflow:hidden;text-overflow:ellipsis}
+.rcs-stop:before{content:"";position:absolute;left:50%;top:-12px;width:1px;height:8px;background:var(--ds-line-2)}
+.rcs-stop:first-child{transform:none}.rcs-stop:last-child{transform:translateX(-100%)}
+.rcs-det{margin-top:6px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:10px 12px;border-radius:10px;border:1px solid rgba(255,85,102,.35);background:rgba(255,85,102,.06);font-size:13px}
+.rcs-det b{color:#fff}.rcs-det .sp{flex:1}
+</style>
+<script>
+(function(){
+  "use strict";
+  if(!window.DS || typeof occRender !== "function") return;
+  var $ = function(id){ return document.getElementById(id); }, esc = DS.esc, SEL = null;
+  var host = $("occStrip"); if(!host) return;
+  var box = document.createElement("section"); box.className = "rcs"; box.id = "rcs"; box.setAttribute("aria-label", "Route condition strip"); box.hidden = true;
+  host.parentNode.insertBefore(box, host.nextSibling);
+  function render(){
+    var G = typeof occGeo === "function" ? occGeo() : null;
+    if(!S.route || !G || !G.total){ box.hidden = true; return; }
+    box.hidden = false;
+    var T = G.total, pc = function(k){ return Math.max(0, Math.min(100, 100 * k / T)); };
+    var bar = S.route.runs.map(function(run){ return '<i style="width:' + (100 * run.km / Math.max(T, .01)).toFixed(2) + '%;background:' + COL4[band4(run.b)] + '" title="' + esc((run.road || "") + " \u00b7 " + band4(run.b)) + '"></i>'; }).join("");
+    var n = S.route.stops.length, pick = Array.from(new Set([0, Math.round(n * .25), Math.round(n * .5), Math.round(n * .75), n - 1].map(function(i){ return Math.min(n - 1, i); })));
+    var stops = pick.map(function(i){ return '<span class="rcs-stop" style="left:' + pc(G.stopKm[i]) + '%">' + esc(S.route.stops[i].name) + '</span>'; }).join("");
+    var act = (OCC.rows || []).filter(function(r){ return r.status !== "cleared" && r.a_km != null; });
+    var evs = act.map(function(r){ var a = pc(r.a_km), b = pc(r.b_km != null ? r.b_km : r.a_km), crit = r.level === "critical" || r.level === "high";
+      return '<button type="button" class="rcs-ev' + (crit ? "" : " warn") + (r.status === "acknowledged" ? " acked" : "") + '" data-id="' + esc(r.id) + '" style="left:' + a + '%;width:' + Math.max(1.2, b - a) + '%" aria-label="' + esc((r.kind || "event") + " on route") + '"><b>' + (r.delay_min != null ? "+" + Math.round(r.delay_min) + " min" : esc(r.kind || "")) + '</b></button>'; }).join("");
+    var det = "";
+    var sel = SEL && act.filter(function(r){ return String(r.id) === String(SEL); })[0];
+    if(sel){ var bs = occBusStates(), aff = Object.keys(bs).filter(function(k){ return bs[k].ev && String(bs[k].ev.id) === String(sel.id) && (bs[k].state === "inside" || bs[k].state === "approaching"); }).length;
+      var from = occStopAt(sel.a_km || 0), to = occStopAt(sel.b_km || sel.a_km || 0);
+      det = '<div class="rcs-det">' + DS.sev(sel.level === "critical" ? "critical" : "warning", String(sel.kind || "event").toUpperCase() + " DETECTED")
+        + '<span><b>' + esc(from ? from.name : "") + (to && from && to.code !== from.code ? " \u2192 " + esc(to.name) : "") + '</b></span>'
+        + '<span>Expected delay <b>' + (sel.delay_min != null ? "+" + (Math.round(sel.delay_min * 10) / 10) + " min" : "not estimated") + '</b></span>'
+        + '<span><b>' + aff + '</b> bus' + (aff === 1 ? "" : "es") + ' affected</span><span class="sp"></span>'
+        + '<button class="ds-btn sm ghost" type="button" id="rcsView">Details</button>'
+        + (sel.status === "acknowledged" ? DS.sev("ok", "ACKNOWLEDGED") : '<button class="ds-btn sm pri" type="button" id="rcsAck">Acknowledge</button>') + '</div>'; }
+    box.innerHTML = '<div class="ds-panel"><div class="ds-ph">ROUTE CONDITION STRIP<span class="sp"></span><small>' + esc(S.route.stops[0].name) + ' \u2192 ' + esc(S.route.stops[n - 1].name) + (act.length ? ' \u00b7 select a highlighted stretch' : ' \u00b7 no traffic event on this route') + '</small></div>'
+      + '<div style="overflow-x:auto"><div class="rcs-wrap"><div class="rcs-bar">' + bar + '</div>' + evs + stops + '</div></div>' + det + '</div>';
+    box.querySelectorAll(".rcs-ev").forEach(function(e){ e.onclick = function(){ SEL = SEL === e.dataset.id ? null : e.dataset.id; if(SEL && typeof occDetail === "function") occDetail(SEL).then(render); render(); }; });
+    var ak = $("rcsAck"); if(ak) ak.onclick = function(){ rtAck([sel.id], ak); };
+    var vw = $("rcsView"); if(vw) vw.onclick = function(){ if(typeof occSelect === "function") occSelect(sel.id, true); };
+  }
+  var o = window.occRender; window.occRender = function(){ try{ return o.apply(this, arguments); } finally{ try{ render(); }catch(e){ console.error(e); } } };
+  var c = window.clearAll; if(typeof c === "function") window.clearAll = function(){ try{ return c.apply(this, arguments); } finally{ SEL = null; box.hidden = true; } };
+})();
+</script>
+
+</body>
 </html>

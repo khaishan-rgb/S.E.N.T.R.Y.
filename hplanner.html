@@ -8,8 +8,6 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-<script>try{if(localStorage.getItem("shell.off")==="1")document.documentElement.classList.add("shell-off")}catch(e){}</script>
-<link rel="stylesheet" href="/design-system.css">
 <style>
 :root{
   --bg:#050d1a; --panel:#0a1a2e; --panel2:#0d2039; --line:#163250; --line2:#1f4468;
@@ -371,24 +369,18 @@ body.navmode .chips,body.navmode .legend{display:none}
 }
 @media(min-width:1000px){.sheet{display:none}.m-only{display:none!important}}
 </style>
+<link rel="stylesheet" href="/design-system.css">
+<script src="/app-shell.js" data-module="halfplan"></script>
 </head>
 <body class="tab-map">
-<aside class="desktop-shell" aria-label="Primary navigation"><div class="shell-brand"><strong>SG Transport Pulse</strong><small>Operational Intelligence Platform</small></div><div id="dsSidebar"></div><div class="shell-foot">● Live operational workspace</div></aside>
+
 
 <div class="app">
   <header class="top">
-    <button class="mobile-menu-btn" type="button" aria-label="Open navigation" onclick="document.getElementById('mobileTopMenu').classList.toggle('open')">☰</button><div class="mobile-top-menu" id="mobileTopMenu"><div id="dsMobileTop"></div></div>
+    
     <div class="brand"><div class="logo" aria-hidden="true">🚌</div><div><h1>SG Transport Pulse</h1></div></div>
     <div class="hdr-right"><div><div class="clock num" id="clock">&nbsp;</div><div class="live" id="live"><span class="dot"></span><span id="liveText">Live data (LTA)</span></div></div></div>
-    <div class="cmdbar">
-      <div class="cmdwrap"><button class="cmdbtn" type="button" data-ds-toggle="dsNotif" aria-label="Notifications">🔔</button>
-        <div class="dropdown" id="dsNotif"><a href="#">No new notifications</a></div></div>
-      <div class="cmdwrap"><button class="cmdbtn" type="button" data-ds-toggle="dsLauncher" aria-label="Apps">▦</button>
-        <div class="launcher" id="dsLauncher"><h4>APPS</h4><div class="launcher-grid" id="dsLauncherGrid"></div></div></div>
-      <div class="cmdwrap"><a class="cmdbtn" href="#" aria-label="Settings">⚙</a></div>
-      <div class="cmdwrap"><button class="profilechip" type="button" data-ds-toggle="dsProfile"><span class="av">KS</span><span class="hide-m">KS</span> ▾</button>
-        <div class="dropdown" id="dsProfile"><a href="#">Profile</a><a href="#">Preferences</a><a href="#">Settings</a><a href="#">Sign out</a></div></div>
-    </div>
+    
   </header>
 
   <section class="hp-head">
@@ -450,7 +442,7 @@ body.navmode .chips,body.navmode .legend{display:none}
         </div>
         <div class="fld" id="minSkipF" style="margin-top:8px"><label for="minSkip" id="minSkipL">Halfway must skip at least, % of route</label><input class="inp num" id="minSkip" value="15" inputmode="numeric" maxlength="2"></div>
         <p class="note" id="lateNote">The late bus <b>completes its trip</b>. Its <b>next trip</b> (other direction) starts halfway: off-service by real road from the interchange to the best entry stop. The two buses ahead may leave the interchange a few minutes later. Nothing is held or slowed mid-route.</p>
-        <p class="note" id="osNote" hidden>Every entry point is tested with the buses behind it regulated (slowed progressively, max 1 min per stop). Approved halfway points are managed in the <a href="/halfway/timetable">Recovery Decision Engine</a> settings.</p>
+        <p class="note" id="osNote" hidden>Every entry point is tested with the buses behind it regulated (slowed progressively, max 1 min per stop). Approved halfway points are managed in the <a href="/recovery">Recovery Decision Engine</a> settings.</p>
       </div>
       <div class="sticky-cta-l"><button type="button" class="btn go big" id="run" disabled>SIMULATE</button></div>
       <div id="cfgMsg"></div>
@@ -512,7 +504,7 @@ body.navmode .chips,body.navmode .legend{display:none}
   <p class="foot">Live: LTA DataMall Bus Arrival &amp; speed bands (unchanged). Simulated: injected delays and virtual OS buses exist only in this planner. Predicted: running times, headways and EWT from the route model. SG Transport Pulse V14.4</p>
 </div>
 
-<nav class="mobile-bottom-nav" id="dsMobileBottom" aria-label="Mobile primary navigation"></nav><div class="mobile-more" id="dsMobileMore"></div>
+
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="/basemap.js"></script>
@@ -1331,7 +1323,7 @@ function renderNavPanel(){
     <div class="nav-steps">${r.steps.map((s, i) => `<div class="ns" data-i="${i}"><span class="ic">${esc(s.icon)}</span><div><b>${esc(s.text)}</b><small>${s.km ? fkm(s.km) : ""}</small></div></div>`).join("") || `<p class="note">No step list from the routing service.</p>`}</div>
     ${(r.incidents || []).length || (r.roadworks || []).length ? `<div class="sec-t" style="margin-top:12px"><span>On / near the route ${tag("live")}</span></div><div class="find">${(r.incidents || []).map(x => `<div>\u26a0 ${esc(x.type)}: ${esc(x.message)}</div>`).join("")}${(r.roadworks || []).map(x => `<div>\u26a0 Road works: ${esc(x.road || "")}</div>`).join("")}</div>` : ""}
     ${(r.findings || []).length ? `<div class="sec-t" style="margin-top:12px"><span>Route check</span></div><div class="find">${r.findings.map(f => `<div>${esc(f.text || f.msg || "")}</div>`).join("")}</div>` : ""}
-    ${(r.alternatives || []).length > 1 ? `<p class="note">Alternatives: ${r.alternatives.map(a => `${esc(a.label)} ${f0(a.time_min)} min / ${fkm(a.km)}`).join(" \u00b7 ")}. Full comparison in the <a href="/planner">Off-service Route Planner</a>.</p>` : ""}
+    ${(r.alternatives || []).length > 1 ? `<p class="note">Alternatives: ${r.alternatives.map(a => `${esc(a.label)} ${f0(a.time_min)} min / ${fkm(a.km)}`).join(" \u00b7 ")}. Full comparison in the <a href="/halfway">Halfway Planner</a>.</p>` : ""}
     <p class="note">${esc(r.note)}</p></div>`;
   $("navBack").onclick = () => exitNav();
   document.querySelectorAll(".ns").forEach(x => x.onclick = () => showStep(+x.dataset.i));
@@ -1425,8 +1417,6 @@ tick(); setInterval(tick, 15000);
   });
 })();
 </script>
-<script src="/nav-registry.js"></script>
-<script>DS_NAV.init("halfplan");</script>
 
 </body>
 </html>

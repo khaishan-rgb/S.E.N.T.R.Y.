@@ -1,3 +1,36 @@
+# SG Transport Pulse V16.0 — Operational Intelligence & Service Recovery Platform
+
+## V16.0 — Command platform redesign (UI and information architecture; engines unchanged)
+
+No engine, collector, calculation or existing API was rebuilt. `recovery.py`, `hwplan.py`, `hplan.py`, `bunching.py`, `traffic.py`, `offservice.py`, `headway.py` and `insight.py` are untouched.
+
+**Shell and navigation**
+* `app_shell.js` (served at `/app-shell.js`; `/nav-registry.js` kept for cached pages) holds the ONE navigation registry (`MODULES`). It generates the sidebar (collapsible), App Launcher (3×3 button), Command Centre shortcuts, tablet rail, phone drawer, phone bottom bar (Home · Traffic · Control · Recovery · More) and More sheet. Each page's hard-coded menus were removed.
+* Top command bar: breadcrumb, live status and data freshness (from `/api/system/status`), notifications (`/api/system/notifications` plus data-feed interruptions), App Launcher, Settings, profile menu.
+* `design_system.css`: one dark command-centre theme with the same colour meaning everywhere. Cyan is normal, green is healthy, amber needs attention, red needs intervention, purple is AI / simulation, grey is inactive. Severity always carries a text label and a shape, never colour alone. Includes shared panels, KPIs, buttons, AI insight module, loading sequence and empty states.
+* The Halfway Planner (previously light-themed) now uses the dark palette; only colour values changed.
+* Maps default to the CARTO Dark basemap. A controller's own choice (map button or Settings) still wins.
+
+**New pages**
+* `/login` (`login.html`). Uses `auth.py` as the plug-in point for a real identity provider; there are NO built-in credentials. Without `AUTH_PROVIDER` + `AUTH_SECRET` the page says "open access" and offers Continue, exactly as before V16.
+* `/command` (`command.html`): Command Centre with KPIs, network map, Attention required queue, service health, recent OCC actions, AI insights and module shortcuts. All figures come from live collectors and the audit log.
+* `/settings` (`settings.html`): General, Appearance, Operations, Notifications, Data & Refresh, AI & Optimisation, Map & Traffic, Accessibility, Account, Security, About.
+  * Personal preferences are stored in the browser (`sgtp.prefs`).
+  * Operational rules are the existing server settings (`/api/halfway/config`, `/api/bunching/settings`). They are saved only after a Review changes confirmation, using the existing admin token.
+
+**Renames and removals**
+* "Timetable Optimiser" is now **Recovery Decision Engine** everywhere, at `/recovery`. `/halfway/timetable` still works for old bookmarks.
+* The standalone Off-service Route Planner page is retired: `/planner` redirects to `/halfway` and `planner.html` is removed. Its routing API (`/api/planner/*`, `/api/hplan/route`) is unchanged and appears in context inside the Halfway Planner and the Recovery Decision Engine.
+* EWT / Performance Analytics is listed as SOON (greyed out), because no EWT history page exists yet.
+
+**Module enhancements (added on top of existing pages; engine data only)**
+* Recovery Decision Engine: Detect → Diagnose → Simulate → Recommend → Controller Decision strip; objective buttons driving the existing priority setting; RUN ANALYSIS; current-state bus timeline; option cards A Continue / B Regulate / C Trip adjustment / D Halfway mapped 1:1 onto the engine plans `none` / `local` / `adjust` / `halfway`. Each card shows EWT, P85, max gap, mileage, recovery time, BC impact and feasibility. The AI RECOMMENDED card explains why using the engine's own reasoning and tests. The controller's decision is recorded in the browser.
+* Halfway Planner: three zones (current condition / candidate halfway points / forecast after deployment) and an OFF-SERVICE MOVEMENT chain (interchange → real road route with km, time, traffic and the bus-type route check → entry stop → resume service).
+* Bunching & Gap: exception console with headway diagram, insight, Acknowledge (existing endpoint) and a link to Headway Control.
+* Route Traffic: ROUTE CONDITION STRIP from live speed bands. Clicking a highlighted stretch shows expected delay, buses affected and Acknowledge.
+
+**Responsive:** phone < 700 px (bottom bar, one card per row), tablet 700–999 px (icon rail), desktop sidebar, denser layout on large OCC displays.
+
 # SG Transport Pulse V15.8 — Route Traffic + Departure Adjustment + Bunching, Gap & Alerts + AI Halfway Optimiser
 
 ## V15.8 — Compact header, map with arrows in Options

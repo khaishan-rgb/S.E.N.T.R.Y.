@@ -8,7 +8,6 @@
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-<link rel="stylesheet" href="/design-system.css">
 <style>
 :root{--bg:#050d1a;--panel:#0a1a2e;--panel2:#0d2039;--line:#163250;--line2:#1f4468;--text:#eaf3ff;--mut:#8ba3bd;--blue:#1785ff;--cyan:#3cc8ff;
   --green:#22d36a;--amber:#ff9f1c;--yellow:#ffd23f;--red:#ff4d55;--font:Inter,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif}
@@ -371,29 +370,22 @@ details.hall{margin-top:10px}details.hall summary{cursor:pointer;color:#9cc4ff;f
 }
 input.bad-time{border-color:#ff4d55!important;box-shadow:0 0 0 1px #ff4d55}
 </style>
-<script>try{if(localStorage.getItem("shell.off")==="1")document.documentElement.classList.add("shell-off")}catch(e){}</script>
+<link rel="stylesheet" href="/design-system.css">
+<script src="/app-shell.js" data-module="recovery"></script>
 </head>
 <body>
 
 <div class="app">
   <header class="top">
-    <button class="mobile-menu-btn" type="button" aria-label="Open navigation" onclick="document.getElementById('mobileTopMenu').classList.toggle('open')">☰</button><div class="mobile-top-menu" id="mobileTopMenu"><div id="dsMobileTop"></div><a href="#" onclick="this.parentElement.classList.remove('open');return false">⚙ Settings / page options</a></div>
+    
     <div class="brand"><div class="logo">&#128652;</div><div><h1>SG Transport Pulse</h1><p>Recovery Decision Engine &bull; Regulate headway &bull; Halfway deployment &bull; Decision support</p></div></div>
-    <nav class="nav" aria-label="Pages"><a href="/">Route Traffic</a><a href="/control">Headway Control</a><a href="/bunching">Bunching &amp; Gap</a><a href="/halfway">Halfway Planner</a><a href="/traffic">Traffic-Aware</a><a class="on" href="/halfway/timetable" aria-current="page">Recovery Decision Engine</a></nav>
+    
     <div class="hdr-right"><div id="clock">&nbsp;</div><div class="live" id="live"><span class="dot"></span><span id="liveText">Connecting&hellip;</span></div></div>
-    <div class="cmdbar">
-      <div class="cmdwrap"><button class="cmdbtn" type="button" data-ds-toggle="dsNotif" aria-label="Notifications">🔔</button>
-        <div class="dropdown" id="dsNotif"><a href="#">No new notifications</a></div></div>
-      <div class="cmdwrap"><button class="cmdbtn" type="button" data-ds-toggle="dsLauncher" aria-label="Apps">▦</button>
-        <div class="launcher" id="dsLauncher"><h4>APPS</h4><div class="launcher-grid" id="dsLauncherGrid"></div></div></div>
-      <div class="cmdwrap"><a class="cmdbtn" href="#" onclick="document.getElementById('tabSet').click();return false" aria-label="Settings">⚙</a></div>
-      <div class="cmdwrap"><button class="profilechip" type="button" data-ds-toggle="dsProfile"><span class="av">KS</span><span class="hide-m">KS</span> ▾</button>
-        <div class="dropdown" id="dsProfile"><a href="#">Profile</a><a href="#">Preferences</a><a href="#" onclick="document.getElementById('tabSet').click();return false">Settings</a><a href="#">Sign out</a></div></div>
-    </div>
+    
   </header>
   <section class="module-intro"><h2>Recovery Decision Engine</h2><p style="margin:2px 0 6px"><a href="/halfway">&larr; Halfway Planner (live buses)</a></p><p>Detect &rarr; diagnose &rarr; simulate &rarr; recommend &rarr; controller decision.</p></section>
   <section class="ai-shell-card" aria-label="AI Operational Assistant" hidden><div class="ai-shell-icon">✦</div><div><b>AI Operational Assistant</b><span>Context-aware operational interpretation for halfway optimiser; existing calculations remain authoritative.</span></div><div class="ai-shell-badge">AI READY</div></section>
-  <div class="tabs" role="tablist"><button role="tab" id="tabOpt" aria-selected="true">Optimiser</button><button role="tab" id="tabSet" aria-selected="false">Settings</button></div>
+  <div class="tabs" role="tablist"><button role="tab" id="tabOpt" aria-selected="true">Decision Engine</button><button role="tab" id="tabSet" aria-selected="false">Settings</button></div>
 
   <main id="opt">
     <div class="st-panel st-in" id="stIn"><div class="st-hd"><i class="nb">1</i><div><b>Select scenario (inputs)</b><small>Service, direction, lateness and recovery settings</small></div><button class="btn sm st-tog" id="stInTog" type="button" aria-expanded="true">Hide inputs</button></div>
@@ -490,8 +482,8 @@ input.bad-time{border-color:#ff4d55!important;box-shadow:0 0 0 1px #ff4d55}
   </main>
 
   <main id="settings" hidden>
-    <section class="card"><header><div><h2>Optimiser parameters</h2><div class="sub">Defaults for the scenario, the regulation limits and the score. Weights are starting points: tune them after operational testing.</div></div><div><button class="btn sm go" id="hoParSave" type="button">Save</button> <button class="btn sm" id="hoParReset" type="button">Reset to defaults</button></div></header><div class="set" id="hoParams"></div><div class="sub" id="hoParNote"></div></section>
-    <section class="card" style="margin-top:12px"><header><div><h2>Approved halfway stops <small style="color:var(--mut);font-weight:400">(optional)</small></h2><div class="sub">Not required: by default the AI tests every eligible stop from timing and headway. Use this list only to restrict the AI (choose <b>Approved stops list only</b> on the Optimiser page). One row per service, direction and stop.</div></div>
+    <section class="card"><header><div><h2>Engine parameters</h2><div class="sub">Defaults for the scenario, the regulation limits and the score. Weights are starting points: tune them after operational testing.</div></div><div><button class="btn sm go" id="hoParSave" type="button">Save</button> <button class="btn sm" id="hoParReset" type="button">Reset to defaults</button></div></header><div class="set" id="hoParams"></div><div class="sub" id="hoParNote"></div></section>
+    <section class="card" style="margin-top:12px"><header><div><h2>Approved halfway stops <small style="color:var(--mut);font-weight:400">(optional)</small></h2><div class="sub">Not required: by default the AI tests every eligible stop from timing and headway. Use this list only to restrict the AI (choose <b>Approved stops list only</b> on the Decision Engine tab). One row per service, direction and stop.</div></div>
       <div><button class="btn sm" id="hoPTpl" type="button">Template</button> <button class="btn sm go" id="hoPUp" type="button">Upload CSV</button> <button class="btn sm" id="hoPClr" type="button">Clear all</button><input type="file" id="hoPFile" accept=".csv,.txt,.tsv" hidden></div></header>
       <div class="tw" id="hoPts"></div>
       <div class="set" style="margin-top:12px;align-items:end"><div><label for="hoAS">Service</label><input id="hoAS" maxlength="6" placeholder="32"></div><div><label for="hoAD">Direction</label><select id="hoAD" style="width:100%"><option>1</option><option>2</option></select></div><div><label for="hoAC">Stop code (5 digits)</label><input id="hoAC" maxlength="5" placeholder="18011"></div><div><label for="hoAQ">or stop sequence</label><input id="hoAQ" maxlength="3" placeholder="18"></div><div><label><input type="checkbox" id="hoAE" checked style="width:auto;height:auto"> Enabled</label><button class="btn sm go" id="hoPAdd" type="button" style="margin-top:6px">Add stop</button></div></div>
@@ -604,7 +596,7 @@ function hoRenderTrips(){
     rd.innerHTML = esc(x.dep_clock) + (Math.abs(x.shift) >= .5 ? ` <small>(${sg(x.shift)})</small>` : "") + (x.type === "locked" ? ` <small>departed</small>` : "") + (x.overtaken_by && x.overtaken_by.length ? ` <small>after T${x.overtaken_by.join(",T")}</small>` : "");
     rh.textContent = x.hw == null ? "\u2014" : f1(x.hw); rh.className = "ai rh" + (x.hw != null && x.hw >= 2 * r.sched_hw - 1e-9 ? " wr" : x.hw != null && (x.hw >= 1.5 * r.sched_hw - 1e-9 || x.hw < (r.bunch_min || 3)) ? " wl" : ""); });
   const ai = fresh && HO.res.ai ? HO.res.ai : null;
-  if(rp && HO.rec){ $("hoDisMsg").innerHTML = HO.rec.decision === "halfway" ? `AI Recovery Optimiser: trip <b>${HO.rec.plans.halfway.rows.filter(x => x.type === "halfway").map(x => x.n).join(", ")}</b> starts halfway; every other trip runs in full and is regulated` : HO.rec.decision === "adjust" ? "AI Recovery Optimiser: every trip runs in full \u2013 departures adjusted (no halfway)" : "AI Recovery Optimiser: no intervention needed"; return; }
+  if(rp && HO.rec){ $("hoDisMsg").innerHTML = HO.rec.decision === "halfway" ? `Recovery Decision Engine: trip <b>${HO.rec.plans.halfway.rows.filter(x => x.type === "halfway").map(x => x.n).join(", ")}</b> starts halfway; every other trip runs in full and is regulated` : HO.rec.decision === "adjust" ? "Recovery Decision Engine: every trip runs in full \u2013 departures adjusted (no halfway)" : "Recovery Decision Engine: no intervention needed"; return; }
   $("hoDisMsg").innerHTML = ai ? (ai.suggest.length ? `AI ticked trip <b>${ai.suggest.join(", ")}</b> (halfway); the other trips keep running and are adjusted` : ai.decision === "adjust" ? "AI ticked nothing: adjust the trips and continue service" : "AI ticked nothing: continue service as it is")
     : HO.auto ? "The AI will decide which trips to tick when you press Run" : `Manual: ${HO.dis.length ? "trip " + HO.dis.join(", ") + " ticked" : "no trip ticked"} - press Run`;
 }
@@ -682,7 +674,7 @@ async function hoRun(){
   if(rj.ok && rj.plans && rj.plans.none){ try{ const P_ = rj.plans, ch_ = P_[rj.decision]; localStorage.setItem("rv.last", JSON.stringify({ts:Date.now(), svc:HO.svc, dir:HO.dir, decision:rj.decision, H:rj.H, sims:rj.sims,
     ins:(rj.instructions || []).filter(i => i.kind === "halfway" || i.kind === "hold" || i.kind === "release").slice(0, 7).map(i => i.text), why:rj.why, ewt:rj.ewt ? {bal:rj.ewt.balance_trips, cont:rj.ewt.continue.avg, half:rj.ewt.halfway ? rj.ewt.halfway.avg : null, pct:rj.ewt.improvement_pct, pts:rj.ewt.continue.n_points} : null, none:P_.none.mc.max_p85, adjust:P_.adjust.mc.max_p85, ai:ch_.mc.max_p85,
     rec:[rvRec(P_.none), rvRec(ch_)], km:ch_.det.km, bc:[P_[rj.full_choice === "none" ? "none" : "adjust"].mc.bc_p85, ch_.mc.bc_p85]})); }catch(e){} }
-  if(rj.ok && HO.auto && rj.plans && Object.keys(rj.plans).length){               // align the stop-level view below with the Recovery Optimiser's decision
+  if(rj.ok && HO.auto && rj.plans && Object.keys(rj.plans).length){               // align the stop-level view below with the Recovery Decision Engine's decision
     const hw = rj.decision === "halfway" ? rj.plans.halfway.rows.filter(x => x.type === "halfway") : [];
     HO.dis = hw.map(x => x.n); HO.selKey = null; HO.pick = "";
     HO.force = hw.length ? {dis:HO.dis.join(","), stop:hw[0].code} : {dis:"continue", stop:""};
@@ -753,7 +745,7 @@ function hoRenderRecovery(){
   osRender();
   const el = $("rvBody"); if(!el) return; const r = HO.rec;
   if(!r){ el.innerHTML = `<div class="ho-msg">Type the lateness of the late trips, then press <b>Compare Recovery Options</b>. The AI simulates <b>Continue full trip</b> (no action / + adjustment) and <b>Halfway + adjustment</b> over the selected <b>${hoBal() || "?"} Balance Trips</b> and compares them on <b>EWT</b> at every evaluation point.</div>`; return; }
-  if(!r.ok){ el.innerHTML = `<div class="ho-msg hx-err">${esc(r.error || "Recovery Optimiser failed")}</div>`; return; }
+  if(!r.ok){ el.innerHTML = `<div class="ho-msg hx-err">${esc(r.error || "Recovery Decision Engine failed")}</div>`; return; }
   const stale = HO.recStale ? `<div class="rvstale">Inputs changed since this result \u2013 press <b>Compare Recovery Options</b> to update it.</div>` : "";
   if(!r.plans || !r.plans.none){ el.innerHTML = stale + `<div class="rvdec none"><div class="ic">\u2713</div><b>No intervention needed</b><small>${esc((r.why || [])[0] || r.message || "")}</small></div>`; return; }
   const P = r.plans, ch = P[r.decision], N = P.none, A = P.adjust, Hw = P.halfway, g = r.generated || {};
@@ -1123,7 +1115,7 @@ function osRender(){
   const o = osOpt(), rec = p.options[p.recommended], b = o.benefit, A = b.A, B = b.B, pick = p.recommended_by_ai;
   const statusBadge = x => `<span class="st-badge st-${x.status}">${esc(x.status_label)}</span>`;
   let h = `<div class="osban ${pick ? "" : "no"}"><b>${pick ? "HALFWAY RECOMMENDED" : "Halfway NOT recommended \u2013 best calculated halfway option shown for inspection"}</b>
-    <small>${pick ? "Best calculated halfway / off-service option. The controller remains responsible for approving the deployment." : "The AI Recovery Optimiser found that adjusting the trips is enough (see the comparison below). You can still inspect this option."}</small></div>`;
+    <small>${pick ? "Best calculated halfway / off-service option. The controller remains responsible for approving the deployment." : "The Recovery Decision Engine found that adjusting the trips is enough (see the comparison below). You can still inspect this option."}</small></div>`;
   h += `<div class="osgrid"><div><div id="osMap" role="region" aria-label="Map of the normal route, the off-service route and the halfway start"></div>
     <div class="oskey"><span><i></i>Normal service route (\u25b2 direction)</span><span><i class="off"></i>Off-service (no passengers)</span><span><i class="rec"></i>Recovered service</span><span><i class="skip"></i>Not operated</span><span>\u26a0 incident</span><span style="color:#ffb020">\u25b2</span><span>road works</span><span>Tn = other buses at insertion time</span></div></div>
     <div class="osrec"><div class="hd ${pick ? "" : "no"}">${pick ? "HALFWAY RECOMMENDED" : "BEST HALFWAY OPTION (not recommended)"}</div>
@@ -1261,11 +1253,11 @@ function hoRenderRec(){
   const legacy = el.innerHTML;
   const title = r.decision === "halfway" ? "Halfway + regulation" : r.decision === "adjust" ? "Full trip + adjustment" : "No action";
   const top = (r.instructions || []).filter(i => i.kind === "halfway" || i.kind === "hold" || i.kind === "release").slice(0, 6);
-  el.innerHTML = `<header style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:0"><h2>Trip-level check</h2><span class="pill g">AI Recovery Optimiser</span></header>
+  el.innerHTML = `<header style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:0"><h2>Trip-level check</h2><span class="pill g">Recovery Decision Engine</span></header>
     <div class="ttl"><span class="star" style="color:#ff9f1c">\u2605</span><div><h3>${title}</h3><div class="sub2">P85 max headway ${Math.round(r.plans.none.mc.max_p85)} \u2192 ${Math.round(ch.mc.max_p85)} min \u00b7 ${f1(ch.det.km)} km lost \u00b7 BC finish +${Math.round(ch.mc.bc_p85)} min (P85)</div></div></div>
     ${top.length ? `<div class="hoplan"><b>Key actions</b><ol class="hosteps">${top.map(i => `<li><time>${esc(i.time)}</time><span>${esc(i.text.replace(/^Trip \d+ \u2014 /, "Trip " + i.n + ": "))}</span></li>`).join("")}</ol></div>` : ""}
     <div class="btns"><button class="btn sm go" type="button" id="rvGo">Full comparison: full trip vs halfway</button></div>
-    <details class="hall"><summary>Stop-level what-if for this decision (earlier engine: map, heatmap, per-stop options)</summary><div class="ho-note">The stop-level view re-simulates the same halfway trip and stop with the earlier single-direction engine, so its hold minutes can differ from the Recovery Optimiser plan above. The plan in the trip table is the Recovery Optimiser's.</div>${legacy}</details>`;
+    <details class="hall"><summary>Stop-level what-if for this decision (earlier engine: map, heatmap, per-stop options)</summary><div class="ho-note">The stop-level view re-simulates the same halfway trip and stop with the earlier single-direction engine, so its hold minutes can differ from the Recovery Decision Engine plan above. The plan in the trip table is the Recovery Decision Engine's.</div>${legacy}</details>`;
   $("rvGo").onclick = () => $("rvCard").scrollIntoView({behavior:"smooth", block:"start"});
   if($("hoViewSim")) $("hoViewSim").onclick = () => $("hoHeatCard").scrollIntoView({behavior:"smooth", block:"start"});
   if($("hoCmp")) $("hoCmp").onclick = () => $("hoOpts").scrollIntoView({behavior:"smooth", block:"center"});
@@ -1686,12 +1678,12 @@ const HLAB = {n_trips:["Trips simulated", "trips at the first stop"], layover_mi
   reg_min_side:["Regulate at least this many trips each side", "trips before AND after the gap regulated at the interchange (3 + 3 = 6). With fewer trips above the gap, more future trips are used (0 = off)"], reg_early_future:["Future trips may leave early by up to", "min, when the trips above the gap are too few (never before arrival + minimum layover)"],
   max_disrupted:["Trips AI may compare", "AI will compare selected delayed trips, but normally deploy only one halfway trip while the others continue full route"],
   auto_late_min:["AI looks at trips leaving at least this late", "min late when it would leave on its own (Compare Recovery Options decides which of them, if any, to disrupt + halfway, and adjusts the rest)"],
-  balance_trips:["Balance Trips (default)", "subsequent trips of every bus in the EWT and recovery assessment (UP 1, DOWN 1, UP 2 \u2026); 6 = the former 3 UP + 3 DOWN. The field at the top of the Optimiser overrides it per run"],
-  term_reg:["AI regulates later trips at the terminals (default)", "1 = every terminal departure after UP 1 is regulated towards even spacing, d = (d before + d after) / 2, in both scenarios; 0 = off. The tick box on the Optimiser overrides it per run"],
+  balance_trips:["Balance Trips (default)", "subsequent trips of every bus in the EWT and recovery assessment (UP 1, DOWN 1, UP 2 \u2026); 6 = the former 3 UP + 3 DOWN. The field at the top of the Decision Engine tab overrides it per run"],
+  term_reg:["AI regulates later trips at the terminals (default)", "1 = every terminal departure after UP 1 is regulated towards even spacing, d = (d before + d after) / 2, in both scenarios; 0 = off. The tick box on the Decision Engine tab overrides it per run"],
   term_hold_max:["Terminal: max hold per departure", "min beyond the natural departure"], term_early_max:["Terminal: max early release", "min before the natural departure (never before arrival + minimum layover)"],
   term_tol_pct:["Terminal: normal headway band", "\u00b1% of scheduled; only buses near a headway outside it are regulated"], term_zone:["Terminal: buses either side that take part", "buses each side of an abnormal headway"],
   term_total_max:["BC welfare: total hold per BC", "min of artificial holding over the whole horizon, UP 1 included"],
-  allow_adjacent_halfway:["Allow two back-to-back halfway trips (default)", "0 = two consecutive trips (e.g. T3 + T4) may never both be disrupted / start halfway; 1 = allowed. The tick box on the Optimiser overrides it per run"],
+  allow_adjacent_halfway:["Allow two back-to-back halfway trips (default)", "0 = two consecutive trips (e.g. T3 + T4) may never both be disrupted / start halfway; 1 = allowed. The tick box on the Decision Engine tab overrides it per run"],
   ewt_gain_min:["Halfway: minimum Average EWT saving", "min lower than Continue full trip, to recommend halfway"], ewt_gain_pct:["Halfway: minimum Average EWT saving (%)", "% of the Continue scenario's Average EWT (halved under headway priority)"],
   ewt_gain_per_km:["Mileage priority: EWT saving per km", "min of Average EWT that each km not operated must buy"], ewt_adjust_min:["Adjustment worth making from", "min of Average EWT saved against no action"],
   offsvc_factor:["Off-service run time factor", "the halfway bus runs to the halfway stop in this fraction of the in-service running time (no dwell, no stopping). Unvalidated: 1 = same as in service"]};
@@ -1703,7 +1695,7 @@ async function loadHoSettings(){
   const p = j.points; $("hoPts").innerHTML = p.length ? `<table><thead><tr><th>Service</th><th>Dir</th><th>Stop code</th><th>Stop name</th><th>Seq</th><th>Enabled</th><th></th></tr></thead><tbody>${p.map(x => `<tr><td class="svc">${esc(x.service)}</td><td>${x.direction}</td><td>${esc(x.stop_code || "\u2013")}</td><td>${esc(x.name || "\u2013")}</td><td>${x.seq == null ? "\u2013" : x.seq}</td><td>${x.enabled ? "Yes" : "No"}</td><td><button class="btn sm" data-del="${x.id}" type="button">Remove</button></td></tr>`).join("")}</tbody></table>` : `<div class="empty">No approved halfway stops yet. Upload a CSV or add one below.</div>`;
   $("hoPts").querySelectorAll("[data-del]").forEach(b => b.onclick = async () => { const r = await post("/api/halfway/points/delete", JSON.stringify({id:+b.dataset.del})); if(r.error){ toast(r.error); return; } loadHoSettings(); });
   const rn = await getJSON("/api/halfway/runs?limit=20", 20000), full = ts => ts ? sgt({day:"2-digit", month:"short", hour:"2-digit", minute:"2-digit", second:"2-digit"}).format(new Date(ts * 1000)) : "\u2013", runs = rn.runs || [];
-  $("hoRuns").innerHTML = runs.length ? `<table><thead><tr><th>Run</th><th>Time</th><th>Service</th><th>Dir</th><th>First dep.</th><th>Headway</th><th>Disrupted trip</th><th>Preference</th><th>Recommended option</th><th>Score</th><th>Holding</th><th>Model</th></tr></thead><tbody>${runs.map(r => `<tr><td>#${r.id}</td><td>${full(r.ts)}</td><td class="svc">${esc(r.service)}</td><td>${r.direction}</td><td>${esc(r.ref_time)}</td><td>${f1(r.sched_hw)} min</td><td>${r.disrupted}</td><td>${esc(r.pref || "")}</td><td>${esc(r.rec_label || "none")}</td><td>${r.score == null ? "\u2013" : f1(r.score)}</td><td>${r.hold_min == null ? "\u2013" : f1(r.hold_min) + " min"}</td><td>${esc(r.model_version)}</td></tr>`).join("")}</tbody></table>` : `<div class="empty">No optimisations stored yet. Press <b>Compare Recovery Options</b> on the Optimiser page.</div>`;
+  $("hoRuns").innerHTML = runs.length ? `<table><thead><tr><th>Run</th><th>Time</th><th>Service</th><th>Dir</th><th>First dep.</th><th>Headway</th><th>Disrupted trip</th><th>Preference</th><th>Recommended option</th><th>Score</th><th>Holding</th><th>Model</th></tr></thead><tbody>${runs.map(r => `<tr><td>#${r.id}</td><td>${full(r.ts)}</td><td class="svc">${esc(r.service)}</td><td>${r.direction}</td><td>${esc(r.ref_time)}</td><td>${f1(r.sched_hw)} min</td><td>${r.disrupted}</td><td>${esc(r.pref || "")}</td><td>${esc(r.rec_label || "none")}</td><td>${r.score == null ? "\u2013" : f1(r.score)}</td><td>${r.hold_min == null ? "\u2013" : f1(r.hold_min) + " min"}</td><td>${esc(r.model_version)}</td></tr>`).join("")}</tbody></table>` : `<div class="empty">No optimisations stored yet. Press <b>Compare Recovery Options</b> on the Decision Engine tab.</div>`;
 }
 $("hoParSave").onclick = async () => { const params = {}; document.querySelectorAll("#hoParams input").forEach(i => params[i.dataset.k] = i.value); const j = await post("/api/halfway/config", JSON.stringify({params})); if(j.error){ toast(j.error); return; } toast("Parameters saved"); loadHoSettings(); };
 $("hoParReset").onclick = async () => { const j = await post("/api/halfway/config", JSON.stringify({reset:true})); if(j.error){ toast(j.error); return; } toast("Parameters reset to defaults"); loadHoSettings(); };
@@ -1732,9 +1724,7 @@ getJSON("/api/traffic/services", 20000).then(j => { if(j.services){ HO.svcAll = 
 })();
 window.addEventListener("resize", () => { if(HO.map) HO.map.invalidateSize(); });
 </script>
-<div class="mobile-more" id="dsMobileMore"></div>
-<script src="/nav-registry.js"></script>
-<script>DS_NAV.init("recovery");</script>
+
 
 <script>
 document.addEventListener("click", function(e){
@@ -1795,5 +1785,189 @@ document.addEventListener("click", function(e){
   });
 })();
 </script>
+<!-- V16.0 Recovery Decision Engine: decision board. Reads the engine result the page already fetched (HO.rec from /api/halfway/recovery);
+     it never computes a figure of its own and never changes the engine inputs except through the page's own controls. -->
+<style>
+.rde-top{display:grid;gap:12px;margin:10px 0 14px}
+.rde-cmd{display:flex;align-items:flex-end;gap:14px 22px;flex-wrap:wrap}
+.rde-cmd .ds-field{min-width:0}
+.rde-cmd .val{font:600 20px/1.1 var(--ds-display);color:#fff}
+.rde-cmd .val small{font:500 12px var(--ds-font);color:var(--ds-mut);margin-left:6px}
+.rde-cmd .sit{font:600 15px/1.25 var(--ds-font);color:#ffc3ca}
+.rde-cmd .sit.none{color:var(--ds-mut);font-weight:500;font-size:13px}
+.rde-cmd .sp{flex:1}
+.rde-board{display:grid;gap:14px;margin:14px 0}
+.rde-opts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+@media (max-width:1280px){.rde-opts{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:640px){.rde-opts{grid-template-columns:1fr}}
+.opt{position:relative;padding:14px 14px 12px;border-radius:12px;border:1px solid var(--ds-line);background:linear-gradient(180deg,var(--ds-surface-2),rgba(8,18,33,.9));display:flex;flex-direction:column;gap:10px;min-width:0}
+.opt .k{font:600 10.5px/1 var(--ds-font);letter-spacing:.14em;color:var(--ds-mut)}
+.opt h3{margin:0;font:600 17px/1.15 var(--ds-display);color:#fff;letter-spacing:.02em}
+.opt .lbl{font-size:12px;color:var(--ds-mut);margin-top:-6px}
+.opt dl{display:grid;grid-template-columns:1fr auto;gap:6px 10px;margin:0;font-size:12.5px}
+.opt dt{color:var(--ds-mut)} .opt dd{margin:0;text-align:right;color:#fff;font-weight:600;font-variant-numeric:tabular-nums}
+.opt dd small{color:var(--ds-mut);font-weight:400}
+.opt dd.good{color:#b9f7dc} .opt dd.bad{color:#ffc3ca}
+.opt.rec{border-color:rgba(160,123,255,.6);box-shadow:0 0 0 1px rgba(160,123,255,.25),0 0 34px -10px rgba(160,123,255,.55);background:radial-gradient(300px 120px at 0 0,rgba(160,123,255,.16),transparent 70%),linear-gradient(180deg,rgba(20,24,56,.92),rgba(9,16,33,.95))}
+.opt.off{opacity:.55}
+.opt .flag{position:absolute;top:-10px;right:12px}
+.opt .sel{margin-top:auto}
+.opt.picked{outline:2px solid var(--ds-cyan);outline-offset:2px}
+.rde-why{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:14px;align-items:start}
+.rde-why ul{margin:6px 0 0;padding-left:18px;color:var(--ds-text);font-size:13.5px;line-height:1.55}
+.rde-why li{margin:3px 0}
+.rde-why .tests{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.rde-acts{display:flex;flex-direction:column;gap:8px;min-width:210px}
+.rde-dec{font-size:12.5px;color:var(--ds-text-2);margin-top:6px}
+@media (max-width:760px){.rde-why{grid-template-columns:1fr}.rde-acts{min-width:0}}
+.rde-tl .axis{display:flex;justify-content:space-between;font-size:11px;color:var(--ds-faint);margin:0 14px}
+</style>
+<script>
+(function(){
+  "use strict";
+  if(!window.DS) return;
+  var $ = function(id){ return document.getElementById(id); }, esc = DS.esc;
+  var f2 = function(x){ return x == null || isNaN(x) ? "\u2013" : (+x).toFixed(2); }, f0 = function(x){ return x == null || isNaN(x) ? "\u2013" : String(Math.round(x)); };
+  var P = DS.prefs();
+
+  /* ---------- mount: flow + command header above the inputs, the board after them */
+  var inp = $("stIn"), story = $("story"); if(!inp || !story) return;
+  var top = document.createElement("section"); top.className = "rde-top"; top.id = "rdeTop";
+  top.innerHTML = '<ol class="ds-flow" id="rdeFlow"></ol>'
+    + '<div class="ds-panel"><div class="rde-cmd">'
+    + '<div class="ds-field"><span class="lb">Service</span><span class="val" id="rdeSvc">\u2013</span></div>'
+    + '<div class="ds-field"><span class="lb">Direction</span><span class="val" id="rdeDir">\u2013</span></div>'
+    + '<div class="ds-field" style="min-width:180px"><span class="lb">Situation</span><span class="sit none" id="rdeSit">Enter the service and the late trips below.</span></div>'
+    + '<span class="sp"></span>'
+    + '<div class="ds-field"><span class="lb">Operational objective</span><div class="ds-segm" id="rdeObj"><button type="button" data-v="recovery">Headway</button><button type="button" data-v="mileage">Mileage</button><button type="button" data-v="balanced">Balanced</button></div></div>'
+    + '<button class="ds-btn pri" id="rdeRun" type="button" style="height:40px;letter-spacing:.1em">RUN ANALYSIS</button></div></div>';
+  inp.parentNode.insertBefore(top, inp);
+  var board = document.createElement("section"); board.className = "rde-board"; board.id = "rdeBoard"; board.setAttribute("aria-label", "Recovery decision board");
+  story.parentNode.insertBefore(board, story);
+
+  /* objective = the page's own Recovery priority radios (no second setting) */
+  function syncObj(){ var v = (document.querySelector("input[name=hopref]:checked") || {}).value || "balanced";
+    document.querySelectorAll("#rdeObj button").forEach(function(b){ b.setAttribute("aria-pressed", String(b.dataset.v === v)); }); }
+  document.querySelectorAll("#rdeObj button").forEach(function(b){ b.onclick = function(){ var r = document.querySelector('input[name=hopref][value="' + b.dataset.v + '"]');
+    if(r){ r.checked = true; r.dispatchEvent(new Event("change", {bubbles:true})); r.dispatchEvent(new Event("click", {bubbles:true})); } syncObj(); }; });
+  document.addEventListener("change", function(e){ if(e.target && e.target.name === "hopref") syncObj(); });
+  syncObj();
+  $("rdeRun").onclick = function(){ var b = $("hoRun"); if(b && !b.disabled) b.click(); };
+
+  /* loading: the page's own Run button starts the engine; the board shows the analysis sequence until the result object changes */
+  var LOADING = null;
+  $("hoRun").addEventListener("click", function(){ if(!HO.svc) return; LOADING = {prev:HO.rec};
+    DS.loading(board, ["Checking current headways\u2026", "Evaluating recovery options\u2026", "Simulating downstream trips\u2026", "Calculating EWT impact\u2026"]);
+    flow(2); }, true);
+
+  /* ---------- flow strip */
+  function flow(stage, dec){
+    var S = [["DETECT", "late trip"], ["DIAGNOSE", "headway impact"], ["SIMULATE", "every option"], ["RECOMMEND", "lowest EWT"], ["CONTROLLER DECISION", dec || "awaiting"]];
+    $("rdeFlow").innerHTML = S.map(function(s, i){ var c = i < stage ? "done" : i === stage ? (i === 4 ? "wait" : "now") : ""; if(i === 4 && dec && dec !== "awaiting") c = "done";
+      return '<li class="' + c + '">' + s[0] + '<small>' + esc(s[1]) + '</small></li>'; }).join("");
+  }
+
+  /* ---------- the four recovery options, mapped 1:1 onto the engine's four simulated plans */
+  var OPTS = [["none", "A", "CONTINUE SERVICE", "Run every trip as it is"], ["local", "B", "REGULATE", "Fix the next departure only"],
+              ["adjust", "C", "TRIP ADJUSTMENT", "Hold / release full trips"], ["halfway", "D", "HALFWAY DEPLOYMENT", "Start the late trip part-way"]];
+  function situation(r){
+    var late = (r && r.trips || []).filter(function(t){ return (t.late || 0) >= 0.5; });
+    if(!late.length) return null;
+    return late.slice(0, 3).map(function(t){ return "Trip " + t.n + " +" + f0(t.late) + " min"; }).join(" \u00b7 ");
+  }
+  function timeline(r){
+    var t = (r.trips || []).filter(function(x){ return x.nat; }); if(t.length < 2) return "";
+    var m = function(s){ var p = String(s).split(":"); return +p[0] * 60 + +p[1]; };
+    var xs = t.map(function(x){ return m(x.nat); }); for(var i = 1; i < xs.length; i++) while(xs[i] < xs[i - 1] - 600) xs[i] += 1440;
+    var a = Math.min.apply(null, xs), b = Math.max.apply(null, xs), span = Math.max(1, b - a), pos = function(v){ return 3 + 94 * (v - a) / span; };
+    var order = t.map(function(x, i){ return {x:x, v:xs[i]}; }).sort(function(p, q){ return p.v - q.v; }), H = r.H || 0, h = "";
+    for(var k = 1; k < order.length; k++){ var g = order[k].v - order[k - 1].v, cls = H && g >= 1.5 * H ? "long" : H && g <= 0.5 * H ? "short" : "";
+      h += '<div class="seg ' + cls + '" style="left:' + pos(order[k - 1].v) + '%;width:' + (pos(order[k].v) - pos(order[k - 1].v)) + '%"><span>' + f0(g) + 'm</span></div>'; }
+    h += order.map(function(o){ var late = (o.x.late || 0) >= 0.5; return '<div class="bus' + (late ? " late" : "") + '" style="left:' + pos(o.v) + '%" title="Trip ' + o.x.n + ' \u00b7 natural departure ' + esc(o.x.nat) + (late ? ' \u00b7 +' + f0(o.x.late) + ' min late' : '') + '"><i></i><b>T' + o.x.n + (late ? ' +' + f0(o.x.late) : '') + '</b></div>'; }).join("");
+    return '<div class="ds-panel rde-tl"><div class="ds-ph">CURRENT STATE<span class="sp"></span><small>Natural departures from ' + esc(r.first_stop || "the first stop") + ' without intervention \u00b7 scheduled headway ' + f0(H) + ' min</small></div>'
+      + '<div class="ds-hwline"><div class="rail"></div>' + h + '</div><div class="axis"><span>' + esc(order[0].x.nat) + '</span><span>' + esc(order[order.length - 1].x.nat) + '</span></div></div>';
+  }
+  function card(o, r, base){
+    var pl = (r.plans || {})[o[0]], rec = r.decision === o[0], conf = DS.prefs().showConf !== false;
+    if(!pl) return '<article class="opt off"><div class="k">OPTION ' + o[1] + '</div><h3>' + o[2] + '</h3><div class="lbl">' + esc(o[3]) + '</div>'
+      + DS.empty({icon:"lock", title:"NOT FEASIBLE", text:o[0] === "halfway" ? "No halfway start can be reached inside the slot window." : "Not simulated in this run."}) + '</article>';
+    var e = pl.ewt || {}, d = pl.det || {}, mc = pl.mc || {}, be = base && base.ewt ? base.ewt.avg : null;
+    var dE = be != null && e.avg != null && o[0] !== "none" ? e.avg - be : null;
+    var feas = o[0] === "halfway" ? (r.halfway_ok ? ["ok", "FEASIBLE"] : ["warn", "BELOW THRESHOLD"]) : (r.adjust_unacceptable && o[0] !== "halfway" && (mc.max_p85 || 0) >= Math.max(30, 2 * (r.H || 0)) ? ["warn", "GAP STAYS LARGE"] : ["ok", "FEASIBLE"]);
+    return '<article class="opt' + (rec ? " rec" : "") + '" data-k="' + o[0] + '">' + (rec ? '<span class="flag">' + DS.sev("ai", "AI RECOMMENDED") + '</span>' : '')
+      + '<div class="k">OPTION ' + o[1] + '</div><h3>' + o[2] + '</h3><div class="lbl">' + esc(pl.label || o[3]) + '</div><dl>'
+      + '<dt>Predicted EWT</dt><dd class="' + (dE != null ? (dE < -0.005 ? "good" : dE > 0.005 ? "bad" : "") : "") + '">' + f2(e.avg) + ' min' + (dE != null ? ' <small>(' + (dE > 0 ? "+" : "") + f2(dE) + ')</small>' : '') + '</dd>'
+      + (conf ? '<dt>EWT stress test P85</dt><dd>' + f2(mc.ewt_p85) + ' min</dd>' : '')
+      + '<dt>Maximum gap</dt><dd>' + f0(d.max) + ' min' + (conf && mc.max_p85 != null ? ' <small>P85 ' + f0(mc.max_p85) + '</small>' : '') + '</dd>'
+      + '<dt>Mileage impact</dt><dd class="' + ((d.km || 0) > 0 ? "bad" : "") + '">' + ((d.km || 0) > 0 ? "\u2212" + (+d.km).toFixed(1) + " km" : "none") + '</dd>'
+      + '<dt>Recovery time</dt><dd>' + (d.recovered ? f0(d.rec) + ' min' : '<small>not within horizon</small>') + '</dd>'
+      + '<dt>BC impact (P85)</dt><dd>' + (mc.bc_p85 != null ? '+' + f0(mc.bc_p85) + ' min' : '\u2013') + '</dd>'
+      + '<dt>Feasibility</dt><dd>' + DS.sev(feas[0], feas[1]) + '</dd></dl>'
+      + '<button class="ds-btn sm sel" type="button" data-pick="' + o[0] + '">' + (rec ? "Accept recommendation" : "Choose this option") + '</button></article>';
+  }
+  function recBlock(r){
+    var key = r.decision, pl = (r.plans || {})[key]; if(!pl) return "";
+    var name = {none:"CONTINUE SERVICE", local:"REGULATE", adjust:"TRIP ADJUSTMENT", halfway:"HALFWAY DEPLOYMENT"}[key] || String(key).toUpperCase();
+    var why = (r.why || []).slice(0, 5), showWhy = DS.prefs().showWhy !== false;
+    var hw = key === "halfway" ? (pl.rows || []).filter(function(x){ return x.type === "halfway"; })[0] : null;
+    var eff = r.ewt && r.ewt.continue ? "Average EWT " + f2(r.ewt.continue.avg) + (r.ewt.halfway && key === "halfway" ? " \u2192 " + f2(r.ewt.halfway.avg) + " min" + (r.ewt.improvement_pct != null ? " (" + r.ewt.improvement_pct + "% better)" : "") : " min") : "";
+    var tests = (r.tests || []).map(function(t){ return DS.sev(t.pass ? "ok" : "warn", (t.pass ? "PASS " : "FAIL ") + t.value); }).join("");
+    var dec = decision(r);
+    return '<section class="ds-ai rde-why" aria-label="AI recommendation"><div><div class="ds-ai-h">' + DS.icon("spark") + '<span>RECOMMENDED \u00b7 ' + esc(name) + '</span><span class="sp"></span>' + DS.sev("ai", "DECISION SUPPORT") + '</div>'
+      + (hw ? '<div style="font-size:14px;color:#fff;margin-bottom:6px">Start Trip ' + hw.n + ' halfway at <b>' + esc(hw.stop) + '</b> (' + esc(hw.code) + ') at ' + esc(hw.start_clock) + ' \u00b7 leave off-service ' + esc(hw.leave_clock || "\u2013") + ' \u00b7 ' + (+hw.km_lost).toFixed(1) + ' km not operated</div>' : '')
+      + (eff ? '<div style="font-size:13px;color:var(--ds-text-2)">Expected effect: <b style="color:#fff">' + esc(eff) + '</b></div>' : '')
+      + '<details' + (showWhy ? " open" : "") + '><summary style="cursor:pointer;margin-top:10px;font:600 11px var(--ds-font);letter-spacing:.14em;color:#cdb9ff">WHY</summary><ul>' + why.map(function(w){ return "<li>" + esc(w) + "</li>"; }).join("") + '</ul>'
+      + (tests ? '<div class="tests">' + tests + '</div>' : '') + '</details>'
+      + '<div class="rde-dec" id="rdeDec">' + (dec ? DS.sev("ok", "CONTROLLER DECISION") + ' ' + esc(dec.label) + ' at ' + esc(dec.time) : '') + '</div></div>'
+      + '<div class="rde-acts"><a class="ds-btn ai" href="#stRec" id="rdeView">VIEW RECOVERY PLAN</a>'
+      + (key === "halfway" ? '<a class="ds-btn" href="#osCard">Off-service route</a><a class="ds-btn" href="/halfway?svc=' + encodeURIComponent(r.service || HO.svc || "") + '">Open Halfway Planner</a>' : '')
+      + '<span class="ds-note">The engine recommends. Nothing is sent to buses; the controller instructs.</span></div></section>';
+  }
+
+  /* controller decision: recorded in this browser (audit of the engine run itself is already stored on the server) */
+  var DKEY = "rde.decisions";
+  function decisions(){ try{ return JSON.parse(localStorage.getItem(DKEY) || "[]"); }catch(e){ return []; } }
+  function runKey(r){ return [r.service, r.direction, r.ref, r.updated].join("|"); }
+  function decision(r){ var k = runKey(r); return decisions().filter(function(d){ return d.key === k; })[0] || null; }
+  function decide(r, opt){
+    var lbl = {none:"Continue service", local:"Regulate", adjust:"Trip adjustment", halfway:"Halfway deployment"}[opt] + (opt === r.decision ? " (as recommended)" : " (controller override)");
+    var list = decisions().filter(function(d){ return d.key !== runKey(r); }); list.unshift({key:runKey(r), svc:r.service, dir:r.direction, opt:opt, label:lbl, rec:r.decision, ts:Date.now(), time:DS.fmtTime(new Date())});
+    try{ localStorage.setItem(DKEY, JSON.stringify(list.slice(0, 50))); }catch(e){}
+    render();
+  }
+
+  function render(){
+    var r = HO.rec;
+    $("rdeSvc").innerHTML = HO.svc ? esc(HO.svc) : "\u2013"; $("rdeDir").textContent = HO.svc ? "Dir " + HO.dir : "\u2013";
+    if(LOADING && r === LOADING.prev) return;       // the engine is still running
+    LOADING = null;
+    if(!r){ flow(HO.svc ? 1 : 0);
+      board.innerHTML = '<div class="ds-panel">' + DS.empty({icon:"engine", title:HO.svc ? "READY TO ANALYSE" : "NO SERVICE SELECTED",
+        text:HO.svc ? "Type the lateness of the late trips in the trip sequence, choose the objective, then run the analysis." : "Select a service to compare Continue, Regulate, Trip adjustment and Halfway on EWT.",
+        action:HO.svc ? "Run analysis" : "Select service", href:"#stIn"}) + '</div>'; return; }
+    if(!r.ok){ flow(1); board.innerHTML = '<div class="ds-panel">' + DS.empty({icon:"alert", title:"ANALYSIS NOT AVAILABLE", text:r.error || "The engine returned no result."}) + '</div>'; return; }
+    var sit = situation(r); $("rdeSit").textContent = sit || "No trip leaves late"; $("rdeSit").className = "sit" + (sit ? "" : " none");
+    if(!r.plans || !r.plans.none){ flow(3, "no action needed"); board.innerHTML = '<div class="ds-panel">' + DS.empty({icon:"engine", title:"NO INTERVENTION NEEDED", text:r.message || "No trip would leave the interchange late."}) + '</div>'; return; }
+    var dec = decision(r); flow(4, dec ? dec.label : "awaiting");
+    if(DS.prefs().aiRecs === false){ board.innerHTML = timeline(r) + '<div class="rde-opts">' + OPTS.map(function(o){ return card(o, Object.assign({}, r, {decision:null}), r.plans.none); }).join("") + '</div>'; }
+    else board.innerHTML = timeline(r) + '<div class="rde-opts">' + OPTS.map(function(o){ return card(o, r, r.plans.none); }).join("") + '</div>' + recBlock(r);
+    if(dec){ var c = board.querySelector('.opt[data-k="' + dec.opt + '"]'); if(c) c.classList.add("picked"); }
+    board.querySelectorAll("[data-pick]").forEach(function(b){ b.onclick = function(){ decide(r, b.dataset.pick); }; });
+    var v = $("rdeView"); if(v) v.onclick = function(e){ e.preventDefault(); var t = $("stRec") || $("hoRec"); if(t) t.scrollIntoView({behavior:"smooth", block:"start"}); };
+  }
+
+  /* re-render whenever the page renders its recovery section (no change to the page's own functions' behaviour) */
+  var orig = window.hoRenderRecovery;
+  if(typeof orig === "function"){ window.hoRenderRecovery = function(){ try{ return orig.apply(this, arguments); } finally{ try{ render(); }catch(e){ console.error(e); } } }; try{ hoRenderRecovery = window.hoRenderRecovery; }catch(e){} }
+  document.addEventListener("input", function(e){ if(e.target && e.target.id === "hoSvc") setTimeout(render, 50); });
+  render();
+
+  /* default service (Settings) + auto-run when opened from an alert */
+  var q = new URLSearchParams(location.search), svcIn = $("hoSvc");
+  if(svcIn && !q.get("svc") && !svcIn.value && P.defaultService){ svcIn.value = P.defaultService; svcIn.dispatchEvent(new Event("change", {bubbles:true})); }
+  if(q.get("svc") && P.autoRun){ var tries = 0, t = setInterval(function(){ tries++; if(HO.setup && !HO.setup.error && !$("hoRun").disabled){ clearInterval(t); $("hoRun").click(); } if(tries > 40) clearInterval(t); }, 500); }
+})();
+</script>
+
 </body>
 </html>

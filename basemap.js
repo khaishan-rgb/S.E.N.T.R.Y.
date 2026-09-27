@@ -31,7 +31,7 @@
   function add(map, opt){
     opt = opt || {};
     var minZ = opt.minZoom != null ? opt.minZoom : 10, maxZ = opt.maxZoom != null ? opt.maxZoom : 19;
-    var st = {style:stored() || opt.style || "voyager", source:null, layer:null}, gen = 0;
+    var st = {style:stored() || "dark", source:null, layer:null}, gen = 0;          // V16.0: Dark Operations is the platform default; a controller's own choice (map button or Settings) still wins
     if(!STYLES[st.style]) st.style = "voyager";
     function mount(style){
       var list = sources(style), i = 0, my = ++gen;

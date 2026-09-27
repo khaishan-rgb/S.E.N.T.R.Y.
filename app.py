@@ -22,7 +22,7 @@ import headway
 import routegeom
 import traffic
 
-VERSION = "V13.11"
+VERSION = "V16.0"
 LTA = os.getenv("LTA_BASE", "https://datamall2.mytransport.sg/ltaodataservice").rstrip("/")
 KEY = os.getenv("LTA_ACCOUNT_KEY", "")
 OSRM = os.getenv("OSRM_URL", "https://router.project-osrm.org").rstrip("/")
@@ -1478,7 +1478,7 @@ async def design_system_css():
 @app.get("/nav-registry.js")
 async def nav_registry_js():
     from fastapi.responses import Response
-    js = (HERE / "nav_registry.js").read_text(encoding="utf-8")
+    js = (HERE / "app_shell.js").read_text(encoding="utf-8")                   # V16.0: the navigation registry now lives in the app shell
     return Response(js, media_type="application/javascript", headers={"Cache-Control": "public, max-age=600"})
 
 
@@ -1486,6 +1486,12 @@ async def nav_registry_js():
 async def halfway_page():
     """V14.0: Halfway Planner (live simulation: Recover Late Duty / Deploy OS Bus)."""
     return HTMLResponse((HERE / "halfway_planner.html").read_text(encoding="utf-8"))
+
+
+@app.get("/halfway/os", response_class=HTMLResponse)
+async def halfway_os_page():
+    """the V14 planner (Recover Late Duty cross-direction + Deploy OS Bus), unchanged."""
+    return HTMLResponse((HERE / "hplanner.html").read_text(encoding="utf-8"))
 
 
 @app.get("/halfway/timetable", response_class=HTMLResponse)
@@ -3287,9 +3293,12 @@ async def api_in_tpr_xlsx(service: str = "", direction: int = 0, day_type: str =
 
 
 # ----------------------------------------------------------------------------- V13.0 Halfway Deployment Planner (proactive: /planner)
-@app.get("/planner", response_class=HTMLResponse)
+@app.get("/planner")
 async def planner_page():
-    return HTMLResponse((HERE / "planner.html").read_text(encoding="utf-8"))
+    """V16.0: the standalone Off-service Route Planner is retired. Off-service routing now appears in context inside the Halfway Planner
+    and the Recovery Decision Engine; its API (/api/planner/*, /api/hplan/route) is unchanged. Old bookmarks land on the Halfway Planner."""
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse("/halfway", status_code=307)
 
 
 async def pl_origin(frm, stops):
@@ -4171,7 +4180,7 @@ async def api_ho_recovery(service: str = "", direction: int = 1, ref: str = "", 
         try:
             res["planner"] = await os_plan(g, res, svc, direction, bus, dims)
         except Exception as e:
-            res["planner"] = {"ok": False, "reason": f"Route planner failed ({type(e).__name__}); the recommendation above still stands."}
+            res["planner"] = {"ok": False, "reason": f"Off-service routing failed ({type(e).__name__}); the recommendation above still stands."}
     if res.get("ok"):
         res.update(service=svc, direction=direction, ref=ho_hhmm(t0), route={"km": round(g["prep"]["km"], 1), "run_min": round(g["tau"][-1], 1), "first": stops[0]["name"], "last": stops[-1]["name"]},
                    traffic_ok=g["traffic_ok"], updated=now.isoformat(timespec="seconds"))
@@ -4982,3 +4991,153 @@ async def api_tr_settings_post(request: Request):
     for k, v in clean.items():
         bb_sql("INSERT OR REPLACE INTO traffic_setting(k, v) VALUES (?, ?)", (k, float(v)))
     return {"ok": True, "params": TR["params"]}
+
+
+# =========================================================================== V16.0 Command Platform shell
+# New pages (login, command centre, settings), the /recovery alias, and read-only system status for the shared command bar.
+# Nothing here changes an engine, a collector or a stored setting.
+import auth  # noqa: E402  (authentication boundary - see auth.py; no built-in credentials)
+
+
+def _page(name):
+    return HTMLResponse((HERE / name).read_text(encoding="utf-8"))
+
+
+@app.get("/login", response_class=HTMLResponse)
+async def login_page():
+    return _page("login.html")
+
+
+@app.get("/command", response_class=HTMLResponse)
+async def command_page():
+    return _page("command.html")
+
+
+@app.get("/settings", response_class=HTMLResponse)
+async def settings_page():
+    return _page("settings.html")
+
+
+@app.get("/recovery", response_class=HTMLResponse)
+async def recovery_page():
+    """Recovery Decision Engine (formerly Timetable Optimiser). /halfway/timetable keeps working for old bookmarks."""
+    return _page("halfway.html")
+
+
+@app.get("/app-shell.js")
+async def app_shell_js():
+    from fastapi.responses import Response
+    return Response((HERE / "app_shell.js").read_text(encoding="utf-8"), media_type="application/javascript", headers={"Cache-Control": "public, max-age=600"})
+
+
+# ---- authentication hooks (open access until AUTH_PROVIDER + AUTH_SECRET are set)
+@app.get("/api/auth/config")
+async def api_auth_config():
+    return auth.config()
+
+
+@app.get("/api/auth/session")
+async def api_auth_session(request: Request):
+    s = auth.read(request.cookies.get(auth.COOKIE, ""))
+    cfg = auth.config()
+    return {"enabled": cfg["enabled"], "mode": cfg["mode"], "authenticated": bool(s), "user": s["u"] if s else None,
+            "since": datetime.fromtimestamp(s["iat"], SGT).isoformat(timespec="seconds") if s else None,
+            "expires": datetime.fromtimestamp(s["exp"], SGT).isoformat(timespec="seconds") if s else None}
+
+
+@app.post("/api/auth/login")
+async def api_auth_login(request: Request):
+    try:
+        body = json.loads((await request.body()).decode("utf-8") or "{}")
+    except ValueError:
+        return JSONResponse({"error": "Body must be JSON."}, status_code=400)
+    ident, pw = str(body.get("identifier") or "").strip()[:120], str(body.get("password") or "")
+    if not auth.config()["enabled"]:
+        return JSONResponse({"error": "No authentication provider is configured on this server.", "mode": "open"}, status_code=501)
+    if not ident or not pw:
+        return JSONResponse({"error": "Enter your Staff ID and password."}, status_code=400)
+    user, err = await asyncio.to_thread(auth.authenticate, ident, pw)
+    if not user:
+        await asyncio.sleep(0.6)                                             # slow down guessing
+        return JSONResponse({"error": err}, status_code=401)
+    tok = auth.issue(user)
+    r = JSONResponse({"ok": True, "user": auth.read(tok)["u"]})
+    r.set_cookie(auth.COOKIE, tok, httponly=True, samesite="lax", secure=request.url.scheme == "https",
+                 max_age=int(auth.SESSION_HOURS * 3600) if body.get("remember") else None)
+    return r
+
+
+@app.post("/api/auth/logout")
+async def api_auth_logout():
+    r = JSONResponse({"ok": True})
+    r.delete_cookie(auth.COOKIE)
+    return r
+
+
+# ---- system status: what the server actually knows about each data feed (never invented)
+def _feed(key, ttl, label, source, prefix=False):
+    if prefix:
+        hits = [(k, v) for k, v in CACHE.items() if k.startswith(key)]
+        hit = max(hits, key=lambda kv: kv[1][1])[1] if hits else None
+    else:
+        hit = CACHE.get(key)
+    if not hit:
+        return {"id": key.rstrip(":"), "label": label, "source": source, "status": "idle", "age_s": None, "last": None, "refresh_s": ttl,
+                "detail": "Not requested since the server started (feeds load when a page needs them)."}
+    age = int(time.time() - hit[1])
+    val = hit[2]
+    err = val.get("error") if isinstance(val, dict) else None
+    status = "error" if err and not (isinstance(val, dict) and (val.get("rows") or val.get("stops") or val.get("idx"))) else ("ok" if age <= max(3 * ttl, ttl + 120) else "stale")
+    return {"id": key.rstrip(":"), "label": label, "source": source, "status": status, "age_s": age, "refresh_s": ttl,
+            "last": datetime.fromtimestamp(hit[1], SGT).isoformat(timespec="seconds"), "detail": str(err)[:200] if err else None}
+
+
+@app.get("/api/system/status")
+async def api_system_status():
+    now = time.time()
+    feeds = [
+        _feed("static", TTL_STATIC, "Bus routes & stops", "LTA DataMall"),
+        _feed("arr:", TTL_ARRIVAL, "Bus arrival", "LTA DataMall", prefix=True),
+        _feed("bands", TTL_BANDS, "Traffic speed bands", "LTA DataMall"),
+        _feed("incidents", TTL_INCIDENTS, "Traffic incidents", "LTA DataMall"),
+        _feed("roadworks", TTL_ROADWORKS, "Road works", "LTA DataMall"),
+        _feed("cameras", TTL_CAMERAS, "Traffic images", "LTA DataMall + data.gov.sg"),
+        _feed("rain", TTL_RAIN, "Rainfall (weather)", "NEA via data.gov.sg"),
+    ]
+    bb_alive = bool(BB.get("loop_at")) and now - BB["loop_at"] < 3 * BB["params"]["refresh_sec"]
+    engines = [
+        {"id": "bunching", "label": "Bunching & gap collector", "status": "ok" if bb_alive else ("idle" if not BB.get("loop_at") else "stale"),
+         "last": datetime.fromtimestamp(BB["loop_at"], SGT).isoformat(timespec="seconds") if BB.get("loop_at") else None,
+         "age_s": int(now - BB["loop_at"]) if BB.get("loop_at") else None, "refresh_s": BB["params"]["refresh_sec"], "db_ok": BB.get("db_ok")},
+        {"id": "traffic", "label": "Traffic-aware engine", "status": "ok" if TR["last"] and now - TR["last"] < 3 * TR["params"]["refresh_s"] else ("idle" if not TR["last"] else "stale"),
+         "last": datetime.fromtimestamp(TR["last"], SGT).isoformat(timespec="seconds") if TR["last"] else None,
+         "age_s": int(now - TR["last"]) if TR["last"] else None, "refresh_s": TR["params"]["refresh_s"], "feeds": TR["feeds"]},
+    ]
+    config = {"lta_key": bool(KEY), "datagov_key": bool(DATAGOV_KEY), "onemap_routing": bool(routegeom.ONEMAP_EMAIL and routegeom.ONEMAP_PASSWORD),
+              "osrm": OSRM, "carto_key": bool(CARTO_API_KEY)}
+    newest = max([f["last"] for f in feeds + engines if f.get("last") and f["status"] in ("ok", "stale")] or [None], key=lambda x: x or "")
+    return {"version": VERSION, "platform": "V16.0", "time": now_sgt().isoformat(timespec="seconds"), "feeds": feeds, "engines": engines,
+            "config": config, "newest": newest, "auth": auth.config()["mode"]}
+
+
+@app.get("/api/system/notifications")
+async def api_system_notifications():
+    """For the notification bell: alerts the collectors have ALREADY raised (open bunching / long-headway alerts, unacknowledged
+    high / critical traffic alerts). Reads cached state only - never triggers a DataMall call."""
+    out = []
+    for a in bb_alerts():
+        out.append({"id": f"bb:{a['id']}", "kind": "bunching" if a["kind"] == "bb" else "gap", "severity": "critical" if (a["kind"] == "gap" or (a.get("level") or 0) >= 3) else "warning",
+                    "title": f"Svc {a['service']} Dir {a['direction']} \u00b7 {a['label']}", "detail": f"{a['stops']} stops" + (f" \u00b7 max headway {a['max_hw']:.0f} min" if a.get("max_hw") else "") + (f" \u00b7 min headway {a['min_hw']:.1f} min" if a.get("min_hw") and a["kind"] == "bb" else ""),
+                    "acked": a["acked"], "ts": a.get("last") or a.get("start"), "href": f"/bunching?svc={a['service']}&dir={a['direction']}"})
+    try:
+        ov = traffic.overview(TR["book"], TR["params"], time.time(), None, 0, 0, None, ["unacknowledged"])
+        for r in ov["rows"]:
+            if r["level"] not in ("critical", "high"):
+                continue
+            out.append({"id": f"tr:{r['id']}", "kind": "traffic", "severity": "critical" if r["level"] == "critical" else "warning",
+                        "title": f"Svc {r['svc']} Dir {r['dir']} \u00b7 {r['kind'].capitalize()}", "detail": (r.get("location") or "") + (f" \u00b7 +{r['delay_min']:.0f} min" if r.get("delay_min") else ""),
+                        "acked": False, "ts": r.get("start"), "href": f"/?svc={r['svc']}&dir={r['dir']}"})
+    except Exception:
+        pass
+    out.sort(key=lambda x: (x["acked"], 0 if x["severity"] == "critical" else 1, -(x["ts"] or 0)))
+    return {"items": out[:40], "unacknowledged": sum(1 for x in out if not x["acked"]), "time": now_sgt().isoformat(timespec="seconds")}

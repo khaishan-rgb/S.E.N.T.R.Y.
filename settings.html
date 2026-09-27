@@ -1,17 +1,295 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#050d1a"><title>Settings · SG Transport Pulse</title><link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet"><link rel="stylesheet" href="/design-system.css"><style>
-:root{--bg:#050d1a;--panel:#0a1a2e;--line:#163250;--line2:#1f4468;--text:#eaf3ff;--mut:#8ba3bd;--blue:#1785ff;--cyan:#3cc8ff;--green:#20d16a;--amber:#ffb020;--red:#ff4d55;--font:Inter,system-ui,-apple-system,"Segoe UI",sans-serif}*{box-sizing:border-box}body{margin:0;color:var(--text);font-family:var(--font)}.app{padding:0 18px 30px}.top{min-height:58px;display:flex;align-items:center;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:9000;background:rgba(5,13,26,.9);backdrop-filter:blur(12px)}.brand h1{font-size:16px;margin:0}.brand p{font-size:11px;color:var(--mut);margin:3px 0 0}.hdr-right{margin-left:auto}.page{padding:20px 2px 8px}.page h2{margin:0;font-size:26px}.page p{color:var(--mut);margin:6px 0 0}.layout{display:grid;grid-template-columns:220px minmax(0,1fr);gap:12px}.snav{position:sticky;top:72px;align-self:start;padding:8px}.snav a{display:block;color:#8fa8be;text-decoration:none;padding:10px 11px;border-radius:8px;font-size:12.5px;font-weight:650}.snav a:hover,.snav a.on{background:rgba(60,200,255,.08);color:#dff6ff}.card{padding:15px;margin-bottom:12px;scroll-margin-top:80px}.card h3{margin:0 0 4px;font-size:16px}.sub{color:var(--mut);font-size:11.5px;margin-bottom:12px}.setting{display:grid;grid-template-columns:minmax(180px,1fr) minmax(210px,360px);gap:18px;align-items:center;padding:11px 0;border-top:1px solid rgba(60,200,255,.09)}.setting:first-of-type{border-top:0}.setting b{font-size:13px}.setting small{display:block;color:#7894aa;margin-top:2px;line-height:1.35}.setting select,.setting input[type=text],.setting input[type=number]{width:100%;height:40px;border-radius:9px;border:1px solid var(--line2);background:#08192d;color:var(--text);padding:0 10px}.toggle{display:flex;justify-content:flex-end}.toggle input{width:42px;height:22px;accent-color:var(--cyan)}.seg{display:flex;border:1px solid var(--line2);background:#07192c;border-radius:9px;padding:3px}.seg button{flex:1;border:0;background:transparent;color:#8ba5bd;border-radius:7px;padding:7px 8px;font-weight:650}.seg button.on{background:#12395e;color:#cfefff}.feed{display:grid;grid-template-columns:1.2fr auto auto;gap:12px;padding:10px 0;border-top:1px solid rgba(60,200,255,.09);align-items:center}.feed .state{font-size:10px;color:#8ce9aa;font-weight:800;letter-spacing:.06em}.feed .meta{font-size:11px;color:#7b97ad;text-align:right}.note{padding:10px 11px;border-radius:9px;border:1px solid #5c501e;background:#211d0e;color:#ddca7a;font-size:11.5px}.profile{display:flex;align-items:center;gap:12px}.avatar{width:48px;height:48px;border-radius:50%;display:grid;place-items:center;background:linear-gradient(150deg,#2a95ff,#0d63d6);font-weight:800}.savebar{position:sticky;bottom:12px;display:flex;justify-content:flex-end;margin-top:12px}.save{height:42px;padding:0 18px;border:1px solid #54ceff;border-radius:9px;background:#117adc;color:white;font-weight:800}.toast{margin-right:10px;color:#8ce9aa;font-size:12px;align-self:center}@media(max-width:800px){.app{padding:0 10px 90px}.layout{grid-template-columns:1fr}.snav{position:static;display:flex;overflow-x:auto;gap:4px;padding:4px}.snav a{white-space:nowrap}.setting{grid-template-columns:1fr;gap:7px}.toggle{justify-content:flex-start}.feed{grid-template-columns:1fr auto}.feed .meta{grid-column:1/-1;text-align:left}.page h2{font-size:22px}}
-</style></head><body><div class="app"><header class="top"><div class="brand"><h1>Settings Centre</h1><p>Application, operational and accessibility preferences</p></div><div class="hdr-right"></div></header><div class="page"><h2>Settings</h2><p>Configure the workspace without changing operational logic silently.</p></div><div class="layout"><nav class="card snav" id="snav"></nav><main>
-<section class="card" id="general"><h3>General</h3><div class="sub">Language, time and default landing preferences.</div><div class="setting"><div><b>Language</b></div><select data-key="language"><option>English</option><option>中文</option></select></div><div class="setting"><div><b>Timezone</b></div><select data-key="timezone"><option>Singapore (GMT+8)</option></select></div><div class="setting"><div><b>Time format</b></div><div class="seg" data-seg="timeFormat"><button class="on">24-hour</button><button>12-hour</button></div></div><div class="setting"><div><b>Default landing page</b></div><select data-key="landing"><option>Command Centre</option><option>Route Traffic</option><option>Headway Control</option></select></div><div class="setting"><div><b>Default PTO</b><small>Applied only where the selected module supports PTO filtering.</small></div><input data-key="pto" type="text" placeholder="All PTOs"></div><div class="setting"><div><b>Default Service</b></div><input data-key="service" type="text" placeholder="None"></div></section>
-<section class="card" id="appearance"><h3>Appearance</h3><div class="sub">Visual density and command-centre display behaviour.</div><div class="setting"><div><b>Theme</b></div><div class="seg" data-seg="theme"><button>System</button><button class="on">Dark Command</button><button>Light</button></div></div><div class="setting"><div><b>Interface density</b></div><div class="seg" data-seg="density"><button>Comfortable</button><button class="on">Compact</button></div></div><div class="setting"><div><b>Sidebar</b></div><div class="seg" data-seg="sidebar"><button class="on">Expanded</button><button>Collapsed</button></div></div><div class="setting"><div><b>Reduce animations</b></div><div class="toggle"><input data-key="reduceAnimations" type="checkbox"></div></div><div class="setting"><div><b>Map visual intensity</b></div><input data-key="mapIntensity" type="range" min="1" max="5" value="3"></div></section>
-<section class="card" id="operations"><h3>Operations</h3><div class="sub">Preferences only. Existing module business rules remain authoritative until explicitly wired.</div><div class="note">These fields are stored as user preferences unless the existing module exposes a validated server-side setting. They do not silently override live recovery rules.</div><div class="setting"><div><b>Target headway default</b></div><input data-key="targetHeadway" type="number" min="1" placeholder="Module default"></div><div class="setting"><div><b>Adjustment warning threshold</b></div><input data-key="adjustWarn" type="number" min="0" placeholder="Module default"></div><div class="setting"><div><b>Minimum layover</b></div><input data-key="minLayover" type="number" min="0" placeholder="Module default"></div><div class="setting"><div><b>Default analysis horizon</b></div><input data-key="horizon" type="number" min="1" placeholder="Module default"></div><div class="setting"><div><b>Default direction</b></div><select data-key="direction"><option>Auto</option><option>Direction 1</option><option>Direction 2</option></select></div><div class="setting"><div><b>Remember last selected service</b></div><div class="toggle"><input data-key="rememberService" type="checkbox" checked></div></div></section>
-<section class="card" id="notifications"><h3>Notifications</h3><div class="sub">Choose which operational exceptions should be surfaced.</div><div id="notif"></div></section>
-<section class="card" id="data"><h3>Data &amp; Refresh</h3><div class="sub">Actual application status only; no fabricated connection state.</div><div id="feeds">Checking data sources…</div></section>
-<section class="card" id="ai"><h3>AI &amp; Optimisation</h3><div class="sub">Decision support remains controller-confirmed.</div><div class="setting"><div><b>AI recommendations</b></div><div class="toggle"><input data-key="aiRecommendations" type="checkbox" checked></div></div><div class="setting"><div><b>Auto-run simulation</b></div><div class="toggle"><input data-key="autoSimulation" type="checkbox"></div></div><div class="setting"><div><b>Show recommendation reasoning</b></div><div class="toggle"><input data-key="showReasoning" type="checkbox" checked></div></div><div class="setting"><div><b>Recommendation confidence display</b></div><div class="toggle"><input data-key="confidence" type="checkbox" checked></div></div><div class="setting"><div><b>Controller confirmation required</b><small>Operational action is never executed automatically.</small></div><div class="toggle"><input type="checkbox" checked disabled></div></div></section>
-<section class="card" id="map"><h3>Map &amp; Traffic</h3><div class="sub">Default layer visibility.</div><div id="layers"></div><div class="setting"><div><b>Map style</b></div><div class="seg" data-seg="mapStyle"><button class="on">Dark Operations</button><button>Standard</button></div></div></section>
-<section class="card" id="accessibility"><h3>Accessibility</h3><div class="sub">Severity must never rely on colour alone.</div><div class="setting"><div><b>Text size</b></div><select data-key="textSize"><option>Standard</option><option>Large</option></select></div><div class="setting"><div><b>Reduced motion</b></div><div class="toggle"><input data-key="reducedMotion" type="checkbox"></div></div><div class="setting"><div><b>High contrast</b></div><div class="toggle"><input data-key="highContrast" type="checkbox"></div></div><div class="setting"><div><b>Colour-blind friendly indicators</b></div><div class="toggle"><input data-key="colourBlind" type="checkbox" checked></div></div></section>
-<section class="card" id="account"><h3>Account</h3><div class="profile"><div class="avatar">KS</div><div><b>Display name</b><div class="sub" style="margin:3px 0 0">Account profile fields are placeholders until an identity provider is connected.</div></div></div><div class="setting"><div><b>Staff ID</b></div><input type="text" disabled placeholder="From identity provider"></div><div class="setting"><div><b>Role / Department</b></div><input type="text" disabled placeholder="From identity provider"></div></section>
-<section class="card" id="security"><h3>Security</h3><div class="sub">Authentication functions appear only when supported.</div><div class="setting"><div><b>Change password</b></div><button disabled>Not configured</button></div><div class="setting"><div><b>Active session</b></div><span class="sub">No authentication provider connected</span></div><div class="setting"><div><b>Two-factor authentication</b></div><span class="sub">Unavailable until authentication is configured</span></div></section>
-<section class="card" id="about"><h3>About</h3><div class="sub">Build and API status.</div><div class="setting"><div><b>Application version</b></div><span id="version">—</span></div><div class="setting"><div><b>API status</b></div><span id="apiStatus">Checking…</span></div><div class="setting"><div><b>Usage notice</b></div><span class="sub">Operational decision support. Controller judgement and authorised procedures remain authoritative.</span></div></section>
-<div class="savebar"><span class="toast" id="toast"></span><button class="save" id="save">Save preferences</button></div></main></div></div><script src="/nav-registry.js"></script><script>
-const sections=["General","Appearance","Operations","Notifications","Data & Refresh","AI & Optimisation","Map & Traffic","Accessibility","Account","Security","About"],ids=["general","appearance","operations","notifications","data","ai","map","accessibility","account","security","about"];document.getElementById("snav").innerHTML=sections.map((x,i)=>'<a href="#'+ids[i]+'">'+x+"</a>").join("");let prefs={};try{prefs=JSON.parse(localStorage.getItem("sgtp.preferences")||"{}")}catch(e){}document.querySelectorAll("[data-key]").forEach(el=>{let k=el.dataset.key;if(k in prefs){if(el.type==="checkbox")el.checked=!!prefs[k];else el.value=prefs[k]}});document.querySelectorAll("[data-seg]").forEach(seg=>seg.querySelectorAll("button").forEach(b=>b.onclick=()=>{seg.querySelectorAll("button").forEach(x=>x.classList.remove("on"));b.classList.add("on")}));const notif=["Bunching alerts","Long-gap alerts","Traffic incidents","Recovery recommendation","Data feed interruption","System notification"];document.getElementById("notif").innerHTML=notif.map((x,i)=>'<div class="setting"><div><b>'+x+'</b><small>'+(i<3?"Operational exception":"Application notification")+'</small></div><div class="toggle"><input data-n="'+x+'" type="checkbox" '+(i<5?"checked":"")+'></div></div>').join("");const layers=["Traffic speed","Traffic incidents","Traffic cameras","Bus stops","Bus positions","Important points"];document.getElementById("layers").innerHTML=layers.map((x,i)=>'<div class="setting"><div><b>'+x+'</b></div><div class="toggle"><input data-layer="'+x+'" type="checkbox" '+(i<5?"checked":"")+'></div></div>').join("");document.getElementById("save").onclick=()=>{document.querySelectorAll("[data-key]").forEach(el=>prefs[el.dataset.key]=el.type==="checkbox"?el.checked:el.value);document.querySelectorAll("[data-seg]").forEach(seg=>prefs[seg.dataset.seg]=seg.querySelector(".on")?.textContent||"");prefs.notifications=[...document.querySelectorAll("[data-n]:checked")].map(x=>x.dataset.n);prefs.layers=[...document.querySelectorAll("[data-layer]:checked")].map(x=>x.dataset.layer);localStorage.setItem("sgtp.preferences",JSON.stringify(prefs));document.getElementById("toast").textContent="Preferences saved";setTimeout(()=>document.getElementById("toast").textContent="",1800)};async function status(){try{let h=await(await fetch("/api/health")).json();document.getElementById("version").textContent=h.version||"—";document.getElementById("apiStatus").innerHTML=h.online?'<span style="color:#8ce9aa">● Operational</span>':"Unavailable";let t=null;try{t=await(await fetch("/api/traffic/overview")).json()}catch(e){}let feeds=[["LTA DataMall",h.lta,h.time],["Traffic Speed Bands",!!h.speedEndpoint,t?.updated],["Traffic Incidents",!!t,t?.updated],["Bus Arrival",h.lta,h.time],["OneMap",null,null],["Weather",null,null]];document.getElementById("feeds").innerHTML=feeds.map(f=>'<div class="feed"><b>'+f[0]+'</b><span class="state" style="color:'+(f[1]===true?"#8ce9aa":f[1]===false?"#ff9b9f":"#7f9ab5")+'">'+(f[1]===true?"● CONNECTED":f[1]===false?"● NOT CONFIGURED":"STATUS FROM MODULE")+'</span><span class="meta">'+(f[2]?"Last update "+f[2]:"No fabricated status shown")+"</span></div>").join("")}catch(e){document.getElementById("apiStatus").textContent="Unavailable"}}status();
-</script></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#040a14">
+<title>Settings · SG Transport Pulse</title>
+<link rel="stylesheet" href="/design-system.css">
+<script src="/app-shell.js" data-module="settings"></script>
+<style>
+.st{display:grid;grid-template-columns:230px minmax(0,1fr);gap:var(--ds-gap);align-items:start}
+.st-nav{position:sticky;top:calc(var(--ds-cmd-h) + 14px);display:grid;gap:2px;padding:8px}
+.st-nav a{display:flex;align-items:center;gap:10px;height:38px;padding:0 10px;border-radius:8px;color:var(--ds-text-2);text-decoration:none;font-size:13.5px}
+.st-nav a svg{width:17px;height:17px;opacity:.8}
+.st-nav a:hover{background:rgba(126,178,230,.07);color:#fff}
+.st-nav a[aria-current="page"]{background:rgba(56,214,255,.1);color:#fff;box-shadow:inset 2px 0 0 var(--ds-cyan)}
+.sec{display:none}.sec.on{display:block;animation:ds-fade 200ms var(--ds-ease) both}
+.sec h2{margin:0 0 4px;font:600 22px/1.2 var(--ds-display);color:#fff}
+.sec > p.lede{margin:0 0 16px;color:var(--ds-mut);font-size:13.5px;max-width:70ch}
+.grp{margin-bottom:var(--ds-gap)}
+.grp .ds-ph{margin-bottom:4px}
+.it{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px 18px;align-items:center;padding:14px 2px;border-bottom:1px solid var(--ds-line)}
+.it:last-child{border-bottom:0}
+.it b{display:block;font-size:14px;font-weight:600;color:#fff}
+.it small{display:block;margin-top:3px;color:var(--ds-mut);font-size:12.5px;line-height:1.45;max-width:64ch}
+.it .ctl{display:flex;align-items:center;gap:8px;justify-content:flex-end;flex-wrap:wrap}
+.it .ctl .ds-input,.it .ctl .ds-select{width:200px}
+.it .ctl .ds-input.num{width:96px;text-align:right}
+.src{font-size:10.5px;letter-spacing:.1em;font-weight:600;color:var(--ds-faint);margin-left:6px}
+.feed{display:grid;grid-template-columns:minmax(0,1.3fr) auto minmax(0,1fr) auto;gap:6px 16px;align-items:center;padding:12px 2px;border-bottom:1px solid var(--ds-line);font-size:13px}
+.feed:last-child{border-bottom:0}
+.feed b{color:#fff;font-weight:600;font-size:14px}.feed small{display:block;color:var(--ds-mut);font-size:12px}
+.feed .t{font-variant-numeric:tabular-nums;color:var(--ds-text-2)}
+.bar{display:flex;gap:8px;align-items:center;justify-content:flex-end;margin-top:12px;flex-wrap:wrap}
+.diff{margin:10px 0 0;padding:12px;border-radius:10px;border:1px solid rgba(255,181,71,.4);background:rgba(255,181,71,.06);font-size:13px}
+.diff li{margin:3px 0}
+.av-lg{width:64px;height:64px;border-radius:14px;font-size:22px}
+.toast{position:fixed;left:50%;bottom:26px;transform:translate(-50%,20px);opacity:0;z-index:16000;padding:10px 16px;border-radius:10px;background:#0c1b30;border:1px solid var(--ds-line-2);color:#fff;font-size:13px;transition:all 200ms var(--ds-ease);pointer-events:none}
+.toast.on{opacity:1;transform:translate(-50%,0)}
+@media (max-width:999px){
+  .st{grid-template-columns:1fr}
+  .st-nav{position:static;display:flex;overflow-x:auto;padding:6px;gap:4px}
+  .st-nav a{flex:none;white-space:nowrap}
+  .it{grid-template-columns:1fr}.it .ctl{justify-content:flex-start}
+  .it .ctl .ds-input,.it .ctl .ds-select{width:100%}
+  .feed{grid-template-columns:1fr auto}
+  .toast{bottom:90px}
+}
+</style>
+</head>
+<body>
+<main class="ds-page ds-main">
+  <div class="ds-head"><div><h1 class="ds-title">Settings</h1><p class="ds-sub">Personal preferences are saved in this browser. Operational rules are server settings shared by every controller: they change only when you review and save them.</p></div></div>
+  <div class="st">
+    <nav class="ds-panel st-nav" id="nav" aria-label="Settings sections"></nav>
+    <div id="secs">
+
+<section class="sec" id="general"><h2>General</h2><p class="lede">Language, time and where the platform opens.</p>
+  <div class="ds-panel grp">
+    <div class="it"><div><b>Language</b><small>Chinese interface text is not available in this build yet.</small></div><div class="ctl"><div class="ds-segm" data-p="lang"><button data-v="en">English</button><button data-v="zh" disabled title="Not yet translated">中文</button></div></div></div>
+    <div class="it"><div><b>Timezone</b><small>Every operational time is Singapore time; LTA feeds are published in SGT.</small></div><div class="ctl"><span class="ds-chip">Singapore (GMT+8)</span></div></div>
+    <div class="it"><div><b>Date format</b></div><div class="ctl"><select class="ds-select" data-p="dateFormat"><option value="dmy">27 Sep 2026</option><option value="iso">2026-09-27</option></select></div></div>
+    <div class="it"><div><b>Time format</b><small>Used by the command bar and the new command views.</small></div><div class="ctl"><div class="ds-segm" data-p="timeFormat"><button data-v="24">24-hour</button><button data-v="12">12-hour</button></div></div></div>
+    <div class="it"><div><b>Default landing page</b><small>Where you arrive after signing in.</small></div><div class="ctl"><select class="ds-select" data-p="landing" id="landSel"></select></div></div>
+    <div class="it"><div><b>Default PTO</b><small>Transport operator pre-selected where a module offers an operator filter.</small></div><div class="ctl"><select class="ds-select" data-p="pto"><option value="">All operators</option><option value="SBST">SBS Transit</option><option value="SMRT">SMRT</option><option value="TTS">Tower Transit</option><option value="GAS">Go-Ahead</option></select></div></div>
+    <div class="it"><div><b>Default service</b><small>Pre-fills the Recovery Decision Engine when you open it without a service.</small></div><div class="ctl"><input class="ds-input" data-p="defaultService" maxlength="6" placeholder="e.g. 32" style="text-transform:uppercase"></div></div>
+  </div></section>
+
+<section class="sec" id="appearance"><h2>Appearance</h2><p class="lede">How the command platform looks on this workstation.</p>
+  <div class="ds-panel grp">
+    <div class="it"><div><b>Theme</b><small>Dark Command is the operational theme. A light theme is not available in this build.</small></div><div class="ctl"><div class="ds-segm" data-p="theme"><button data-v="system">System</button><button data-v="dark">Dark Command</button><button data-v="light" disabled>Light</button></div></div></div>
+    <div class="it"><div><b>Interface density</b><small>Compact fits more on 1366×768 screens; large OCC displays tighten automatically.</small></div><div class="ctl"><div class="ds-segm" data-p="density"><button data-v="comfortable">Comfortable</button><button data-v="compact">Compact</button></div></div></div>
+    <div class="it"><div><b>Sidebar</b></div><div class="ctl"><div class="ds-segm" data-p="sidebar"><button data-v="expanded">Expanded</button><button data-v="collapsed">Collapsed</button></div></div></div>
+    <div class="it"><div><b>Reduce animations</b><small>Stops live pulses, count-ups and panel transitions.</small></div><div class="ctl"><input type="checkbox" class="ds-switch" data-p="reduceMotion"></div></div>
+    <div class="it"><div><b>Map visual intensity</b></div><div class="ctl"><div class="ds-segm" data-p="mapFx"><button data-v="low">Subdued</button><button data-v="normal">Normal</button><button data-v="high">Vivid</button></div></div></div>
+  </div></section>
+
+<section class="sec" id="operations"><h2>Operations</h2><p class="lede">Operational rules used by the engines. These are <b>server settings shared by all controllers</b>. Nothing is saved until you press <b>Review changes</b> and confirm.</p>
+  <div class="ds-panel grp"><div class="ds-ph">RECOVERY DECISION ENGINE<span class="sp"></span><a class="ds-btn sm ghost" href="/recovery">Open module</a></div><div id="opHo"></div></div>
+  <div class="ds-panel grp"><div class="ds-ph">BUNCHING &amp; GAP DETECTION<span class="sp"></span><a class="ds-btn sm ghost" href="/bunching">Open module</a></div><div id="opBb"></div></div>
+  <div class="ds-panel grp"><div class="ds-ph">TARGET HEADWAYS</div>
+    <div class="it"><div><b>Target headway defaults</b><small>Scheduled headways are taken per service from LTA DataMall service frequencies (or your uploaded timetable in Headway Control). No global default is applied, so none is set here.</small></div><div class="ctl"><a class="ds-btn sm" href="/control">Timetables</a></div></div></div>
+  <div class="bar"><span class="ds-note" id="opMsg"></span><button class="ds-btn" id="opReset" type="button">Discard</button><button class="ds-btn pri" id="opReview" type="button">Review changes</button></div>
+  <div id="opDiff"></div>
+  <div class="ds-panel grp" style="margin-top:var(--ds-gap)"><div class="ds-ph">MY WORKING PREFERENCES</div>
+    <div class="it"><div><b>Default direction</b></div><div class="ctl"><div class="ds-segm" data-p="defaultDir"><button data-v="1">Dir 1</button><button data-v="2">Dir 2</button></div></div></div>
+    <div class="it"><div><b>Remember last selected service</b><small>Modules that already remember your last service keep doing so.</small></div><div class="ctl"><input type="checkbox" class="ds-switch" data-p="rememberService"></div></div>
+    <div class="it"><div><b>Important bus stops</b><small>EWT evaluation stops (AITP) are ticked per service inside the Recovery Decision Engine.</small></div><div class="ctl"><a class="ds-btn sm" href="/recovery">Choose stops</a></div></div>
+  </div></section>
+
+<section class="sec" id="notifications"><h2>Notifications</h2><p class="lede">What appears under the bell. Alerts are raised by the collectors; these switches only filter what you see.</p>
+  <div class="ds-panel grp"><div class="ds-ph">ALERT TYPES</div>
+    <div class="it"><div><b>Bunching alerts</b></div><div class="ctl"><input type="checkbox" class="ds-switch" data-p="note_bunching" data-def="1"></div></div>
+    <div class="it"><div><b>Long-gap alerts</b></div><div class="ctl"><input type="checkbox" class="ds-switch" data-p="note_longgap" data-def="1"></div></div>
+    <div class="it"><div><b>Traffic incidents</b><small>High and critical traffic alerts on bus routes.</small></div><div class="ctl"><input type="checkbox" class="ds-switch" data-p="note_traffic" data-def="1"></div></div>
+    <div class="it"><div><b>Data feed interruption</b><small>Shown when a feed returns errors or the server cannot be reached.</small></div><div class="ctl"><input type="checkbox" class="ds-switch" data-p="note_feed" data-def="1"></div></div>
+    <div class="it"><div><b>Recovery recommendation</b><small>Recommendations are shown inside the Recovery Decision Engine when you run it; the engine does not push notifications.</small></div><div class="ctl"><span class="ds-sev off">NOT PUSHED</span></div></div>
+  </div>
+  <div class="ds-panel grp"><div class="ds-ph">SEVERITY</div>
+    <div class="it"><div><b>Critical</b></div><div class="ctl"><input type="checkbox" class="ds-switch" data-p="sev_critical" data-def="1"></div></div>
+    <div class="it"><div><b>Warning</b></div><div class="ctl"><input type="checkbox" class="ds-switch" data-p="sev_warning" data-def="1"></div></div>
+    <div class="it"><div><b>Information</b></div><div class="ctl"><input type="checkbox" class="ds-switch" data-p="sev_info" data-def="1"></div></div>
+    <div class="it"><div><b>Sound</b><small>A short tone when the number of unacknowledged alerts goes up.</small></div><div class="ctl"><input type="checkbox" class="ds-switch" data-p="sound"></div></div>
+  </div></section>
+
+<section class="sec" id="data"><h2>Data &amp; Refresh</h2><p class="lede">What the server actually knows about each feed, read live. A feed shows <b>Idle</b> until a module needs it.</p>
+  <div class="ds-panel grp"><div class="ds-ph">DATA FEEDS<span class="sp"></span><button class="ds-btn sm" id="dataRefresh" type="button">Refresh</button></div><div id="feeds"></div></div>
+  <div class="ds-panel grp"><div class="ds-ph">ENGINES</div><div id="engines"></div></div>
+  <div class="ds-panel grp"><div class="ds-ph">CONFIGURATION</div><div id="config"></div></div></section>
+
+<section class="sec" id="ai"><h2>AI &amp; Optimisation</h2><p class="lede">The AI is decision support. It simulates and recommends; the controller decides and acts.</p>
+  <div class="ds-panel grp">
+    <div class="it"><div><b>AI recommendations</b><small>Show AI insight modules on the Command Centre and the recommendation board in the Recovery Decision Engine.</small></div><div class="ctl"><input type="checkbox" class="ds-switch" data-p="aiRecs" data-def="1"></div></div>
+    <div class="it"><div><b>Auto-run simulation</b><small>Run the Recovery Decision Engine straight away when it is opened from an alert with the service already filled in.</small></div><div class="ctl"><input type="checkbox" class="ds-switch" data-p="autoRun"></div></div>
+    <div class="it"><div><b>Show recommendation reasoning</b><small>Expand the "Why" beside each recommendation by default.</small></div><div class="ctl"><input type="checkbox" class="ds-switch" data-p="showWhy" data-def="1"></div></div>
+    <div class="it"><div><b>Recommendation confidence display</b><small>Show the stress-test (P85 of 1,000 simulated futures) beside each option.</small></div><div class="ctl"><input type="checkbox" class="ds-switch" data-p="showConf" data-def="1"></div></div>
+    <div class="it"><div><b>Simulation depth</b><small>Balance trips assessed by the engine — a server setting, edited under Operations.</small></div><div class="ctl"><span class="ds-chip" id="aiDepth">–</span></div></div>
+    <div class="it"><div><b>Controller confirmation required</b><small>Always on. The platform never executes an operational action by itself.</small></div><div class="ctl"><input type="checkbox" class="ds-switch" checked disabled aria-label="Controller confirmation required (always on)"></div></div>
+  </div></section>
+
+<section class="sec" id="map"><h2>Map &amp; Traffic</h2><p class="lede">Default map appearance and Command Centre layers.</p>
+  <div class="ds-panel grp">
+    <div class="it"><div><b>Map style</b><small>Applies to every map; the map button on each map can still switch it.</small></div><div class="ctl"><div class="ds-segm" id="mapStyle"><button data-v="dark">Dark Operations</button><button data-v="voyager">Standard</button></div></div></div>
+  </div>
+  <div class="ds-panel grp"><div class="ds-ph">COMMAND CENTRE DEFAULT LAYERS</div>
+    <div class="it"><div><b>Bus positions</b></div><div class="ctl"><input type="checkbox" class="ds-switch" data-p="lay_buses" data-def="1"></div></div>
+    <div class="it"><div><b>Alerts</b></div><div class="ctl"><input type="checkbox" class="ds-switch" data-p="lay_alerts" data-def="1"></div></div>
+    <div class="it"><div><b>Traffic speed (congestion)</b></div><div class="ctl"><input type="checkbox" class="ds-switch" data-p="lay_traffic" data-def="1"></div></div>
+    <div class="it"><div><b>Traffic incidents</b></div><div class="ctl"><input type="checkbox" class="ds-switch" data-p="lay_inc" data-def="1"></div></div>
+    <div class="it"><div><b>Traffic cameras, bus stops, road works</b><small>Available as layers in Route Traffic.</small></div><div class="ctl"><a class="ds-btn sm" href="/">Route Traffic</a></div></div>
+  </div></section>
+
+<section class="sec" id="accessibility"><h2>Accessibility</h2><p class="lede">Severity is always shown with a label and a shape as well as colour.</p>
+  <div class="ds-panel grp">
+    <div class="it"><div><b>Text size</b></div><div class="ctl"><div class="ds-segm" data-p="textSize"><button data-v="normal">Default</button><button data-v="large">Large</button><button data-v="xl">Extra large</button></div></div></div>
+    <div class="it"><div><b>Reduced motion</b></div><div class="ctl"><input type="checkbox" class="ds-switch" data-p="reduceMotion"></div></div>
+    <div class="it"><div><b>High contrast</b></div><div class="ctl"><input type="checkbox" class="ds-switch" data-p="highContrast"></div></div>
+    <div class="it"><div><b>Colour-blind friendly indicators</b><small>Adds symbols (!!, !, ✓) and dashed / heavy borders to severity labels.</small></div><div class="ctl"><input type="checkbox" class="ds-switch" data-p="colourBlind"></div></div>
+    <div class="it"><div><b>Preview</b></div><div class="ctl" id="sevPrev"></div></div>
+  </div></section>
+
+<section class="sec" id="account"><h2>Account</h2><p class="lede" id="accLede">Your profile on this workstation.</p>
+  <div class="ds-panel grp">
+    <div class="it"><div><b>Profile picture</b><small>Stored in this browser only.</small></div><div class="ctl"><span class="ds-av av-lg" id="accAv">OCC</span><label class="ds-btn sm">Upload<input type="file" accept="image/*" id="accFile" hidden></label><button class="ds-btn sm ghost" id="accRm" type="button">Remove</button></div></div>
+    <div class="it"><div><b>Display name</b></div><div class="ctl"><input class="ds-input" data-p="displayName" data-acc maxlength="60"></div></div>
+    <div class="it"><div><b>Staff ID</b></div><div class="ctl"><input class="ds-input" data-p="staffId" data-acc maxlength="20"></div></div>
+    <div class="it"><div><b>Role</b></div><div class="ctl"><input class="ds-input" data-p="role" data-acc maxlength="60" placeholder="e.g. Duty Controller"></div></div>
+    <div class="it"><div><b>Department</b></div><div class="ctl"><input class="ds-input" data-p="department" data-acc maxlength="60" placeholder="e.g. OCC"></div></div>
+  </div></section>
+
+<section class="sec" id="security"><h2>Security</h2><p class="lede">Sign-in and session.</p>
+  <div class="ds-panel grp" id="secBody"></div></section>
+
+<section class="sec" id="about"><h2>About</h2><p class="lede">SG Transport Pulse — Operational Intelligence &amp; Service Recovery Platform.</p>
+  <div class="ds-panel grp" id="aboutBody"></div>
+  <div class="ds-panel grp"><div class="ds-ph">RELEASE NOTES · V16.0</div>
+    <ul style="margin:0;padding-left:18px;color:var(--ds-text-2);font-size:13.5px;line-height:1.6">
+      <li>Command platform shell: one navigation registry for sidebar, App Launcher, shortcuts and mobile navigation.</li>
+      <li>New Command Centre, sign-in page and this Settings Centre.</li>
+      <li>"Timetable Optimiser" renamed <b>Recovery Decision Engine</b>, with the Continue / Regulate / Trip adjustment / Halfway decision board.</li>
+      <li>Off-service routing now lives inside the Halfway Planner; the standalone Off-service Route Planner page is retired.</li>
+      <li>Engines, collectors, calculations and APIs are unchanged.</li></ul></div>
+  <div class="ds-panel grp"><div class="ds-ph">PRIVACY &amp; USAGE NOTICE</div>
+    <p style="margin:0;color:var(--ds-text-2);font-size:13.5px;line-height:1.6">For authorised operational use only. Recommendations are decision support: the duty controller remains responsible for every operational action. Preferences and your profile picture are stored in this browser. Acknowledgements and recovery analyses are recorded on the server for audit. Live data: LTA DataMall, OneMap (Singapore Land Authority), NEA via data.gov.sg.</p></div></section>
+
+    </div>
+  </div>
+</main>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<script>
+(function(){
+  "use strict";
+  var $ = function(id){ return document.getElementById(id); }, esc = DS.esc;
+  var SECS = [["general", "General", "gear"], ["appearance", "Appearance", "sliders"], ["operations", "Operations", "headway"], ["notifications", "Notifications", "bell"],
+              ["data", "Data & Refresh", "clock"], ["ai", "AI & Optimisation", "spark"], ["map", "Map & Traffic", "route"], ["accessibility", "Accessibility", "user"],
+              ["account", "Account", "user"], ["security", "Security", "lock"], ["about", "About", "inbox"]];
+  $("nav").innerHTML = SECS.map(function(s){ return '<a href="#' + s[0] + '" data-s="' + s[0] + '">' + DS.icon(s[2]) + esc(s[1]) + '</a>'; }).join("");
+  function show(){ var id = (location.hash || "#general").slice(1); if(!$(id)) id = "general";
+    document.querySelectorAll(".sec").forEach(function(s){ s.classList.toggle("on", s.id === id); });
+    document.querySelectorAll("#nav a").forEach(function(a){ if(a.dataset.s === id) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current"); });
+    if(id === "data") loadData(); if(id === "operations") loadOps(); if(id === "security" || id === "about") loadSec(); }
+  window.addEventListener("hashchange", show);
+  var tT; function toast(m){ var t = $("toast"); t.textContent = m; t.classList.add("on"); clearTimeout(tT); tT = setTimeout(function(){ t.classList.remove("on"); }, 2200); }
+
+  /* landing options from the registry (same list as the sidebar) */
+  $("landSel").innerHTML = DS.modules.filter(function(m){ return m.enabled && m.id !== "settings"; }).map(function(m){ return '<option value="' + m.route + '">' + esc(m.name) + '</option>'; }).join("");
+  $("sevPrev").innerHTML = ["critical", "warning", "ok", "ai"].map(function(l){ return DS.sev(l); }).join(" ");
+
+  /* ---------- local preferences: bind every [data-p] control */
+  function bind(){
+    var p = DS.prefs();
+    document.querySelectorAll(".ds-segm[data-p]").forEach(function(g){ var k = g.dataset.p, v = String(p[k] != null ? p[k] : (k === "lang" ? "en" : k === "defaultDir" ? "1" : ""));
+      g.querySelectorAll("button").forEach(function(b){ b.type = "button"; b.setAttribute("aria-pressed", String(b.dataset.v === v));
+        b.onclick = function(){ var o = {}; o[k] = b.dataset.v; DS.savePrefs(o); bind(); toast("Saved on this device"); if(k === "sidebar") setTimeout(function(){ window.dispatchEvent(new Event("resize")); }, 260); }; }); });
+    document.querySelectorAll("input.ds-switch[data-p]").forEach(function(c){ var k = c.dataset.p; c.checked = p[k] != null ? !!p[k] : c.dataset.def === "1";
+      c.onchange = function(){ var o = {}; o[k] = c.checked; DS.savePrefs(o); toast("Saved on this device"); if(k.indexOf("note_") === 0 || k.indexOf("sev_") === 0) DS.refreshNotes(); }; });
+    document.querySelectorAll("select[data-p],input.ds-input[data-p]").forEach(function(c){ var k = c.dataset.p; c.value = p[k] != null ? p[k] : (c.tagName === "SELECT" ? c.options[0].value : "");
+      c.onchange = function(){ var o = {}; o[k] = k === "defaultService" ? c.value.trim().toUpperCase() : c.value.trim(); DS.savePrefs(o); toast("Saved on this device"); if(c.hasAttribute("data-acc")) DS.refreshSession(); }; });
+    var st = null; try{ st = localStorage.getItem("basemap.style"); }catch(e){}
+    document.querySelectorAll("#mapStyle button").forEach(function(b){ b.type = "button"; b.setAttribute("aria-pressed", String(b.dataset.v === (st === "voyager" ? "voyager" : "dark")));
+      b.onclick = function(){ try{ localStorage.setItem("basemap.style", b.dataset.v); }catch(e){} bind(); toast("Map style saved"); }; });
+    var av = $("accAv"); av.innerHTML = p.avatar ? '<img alt="" src="' + esc(p.avatar) + '">' : esc((p.displayName || "OCC").split(/\s+/).map(function(w){ return w[0]; }).join("").slice(0, 2).toUpperCase());
+  }
+  $("accFile").onchange = function(){ var f = this.files[0]; if(!f) return; var img = new Image(), r = new FileReader();
+    r.onload = function(){ img.onload = function(){ var c = document.createElement("canvas"); c.width = c.height = 96; var s = Math.min(img.width, img.height);
+      c.getContext("2d").drawImage(img, (img.width - s) / 2, (img.height - s) / 2, s, s, 0, 0, 96, 96); DS.savePrefs({avatar:c.toDataURL("image/jpeg", .85)}); bind(); DS.refreshSession(); toast("Profile picture saved on this device"); }; img.src = r.result; }; r.readAsDataURL(f); };
+  $("accRm").onclick = function(){ DS.savePrefs({avatar:""}); bind(); DS.refreshSession(); };
+
+  /* ---------- Operations: server rules, explicit review + save to the owning endpoint */
+  var OPS = {ho:null, bb:null, edit:{ho:{}, bb:{}}};
+  var HO_F = [["layover_min", "Scheduled layover", "min", "Default layover at both terminals."], ["min_layover_min", "Minimum layover", "min", "Hard rule: a full trip never departs before arrival + this."],
+              ["reg_hold_max", "Adjustment warning threshold", "min", "Maximum departure adjustment the engine may propose (hold / release), capped at 8 min."],
+              ["balance_trips", "Default analysis horizon (balance trips)", "trips", "Subsequent trips simulated for every recovery decision (simulation depth)."]];
+  var BB_F = [["bunch_min", "Bunching threshold", "min", "Buses closer than this are bunched."], ["gap_add_min", "Long-gap threshold", "min above schedule", "A headway this much above scheduled is a long gap."],
+              ["confirm_stops", "Bunching confirmation", "stops", "Consecutive stops before a bunching case is confirmed."], ["horizon_min", "Prediction horizon", "min", "How far ahead bunching and gaps are predicted."],
+              ["refresh_sec", "Collector interval", "s", "How often live bus positions are polled."]];
+  function opRows(el, key, fields, d){
+    $(el).innerHTML = d && d.params ? fields.map(function(f){ var v = d.params[f[0]], rg = (d.ranges || {})[f[0]] || [];
+      return '<div class="it"><div><b>' + esc(f[1]) + '<span class="src">SERVER</span></b><small>' + esc(f[3]) + (d.defaults && d.defaults[f[0]] != null ? " Default " + d.defaults[f[0]] + "." : "") + '</small></div>'
+        + '<div class="ctl"><input class="ds-input num" type="number" step="any" data-op="' + key + '" data-k="' + f[0] + '" value="' + esc(v) + '"' + (rg.length ? ' min="' + rg[0] + '" max="' + rg[1] + '"' : '') + '><span class="ds-note">' + esc(f[2]) + '</span></div></div>'; }).join("")
+      : DS.empty({title:"SETTINGS UNAVAILABLE", text:"The server did not return these settings" + (d && d.error ? " (" + d.error + ")" : "") + "."});
+    $(el).querySelectorAll("input[data-op]").forEach(function(i){ i.oninput = function(){ var o = OPS.edit[i.dataset.op], orig = OPS[i.dataset.op].params[i.dataset.k];
+      if(i.value === "" || +i.value === +orig) delete o[i.dataset.k]; else o[i.dataset.k] = +i.value; opState(); }; });
+  }
+  function opState(){ var n = Object.keys(OPS.edit.ho).length + Object.keys(OPS.edit.bb).length; $("opMsg").textContent = n ? n + " unsaved change" + (n > 1 ? "s" : "") : ""; $("opReview").disabled = !n; $("opDiff").innerHTML = ""; }
+  function loadOps(){
+    if(loadOps.busy) return; loadOps.busy = true;
+    Promise.all([DS.api("/api/halfway/config"), DS.api("/api/bunching/settings")]).then(function(a){ OPS.ho = a[0]; OPS.bb = a[1]; OPS.edit = {ho:{}, bb:{}};
+      opRows("opHo", "ho", HO_F, a[0]); opRows("opBb", "bb", BB_F, a[1]); opState(); loadOps.busy = false;
+      $("aiDepth").textContent = a[0] && a[0].params ? a[0].params.balance_trips + " balance trips" : "–"; });
+  }
+  $("opReset").onclick = loadOps;
+  $("opReview").onclick = function(){
+    var L = [], lab = {}; HO_F.concat(BB_F).forEach(function(f){ lab[f[0]] = f[1]; });
+    ["ho", "bb"].forEach(function(k){ Object.keys(OPS.edit[k]).forEach(function(x){ L.push("<li><b>" + esc(lab[x]) + "</b>: " + esc(OPS[k].params[x]) + " \u2192 " + esc(OPS.edit[k][x]) + "</li>"); }); });
+    $("opDiff").innerHTML = '<div class="diff"><b>These server rules change for every controller:</b><ul>' + L.join("") + '</ul><div class="bar"><button class="ds-btn" type="button" id="opNo">Cancel</button><button class="ds-btn pri" type="button" id="opYes">Save to server</button></div></div>';
+    $("opNo").onclick = opState;
+    $("opYes").onclick = function(){ save("ho", "/api/halfway/config").then(function(a){ return save("bb", "/api/bunching/settings").then(function(b){ var err = a || b;
+      if(err){ $("opDiff").innerHTML = '<div class="diff">' + DS.sev("warning", "NOT SAVED") + " " + esc(err) + '</div>'; } else { toast("Server settings saved"); loadOps(); } }); }); };
+  };
+  function save(k, url){
+    var params = OPS.edit[k]; if(!Object.keys(params).length) return Promise.resolve(null);
+    var send = function(tok){ return DS.api(url, {method:"POST", headers:Object.assign({"Content-Type":"application/json"}, tok ? {"x-admin-token":tok} : {}), body:JSON.stringify({params:params})}); };
+    return send(sessionStorage.getItem("bb.tok") || "").then(function(r){
+      if(r._status === 401){ var t = prompt("This server needs an admin token to change operational rules:"); if(!t) return "Cancelled (admin token required)."; sessionStorage.setItem("bb.tok", t); return send(t).then(function(r2){ return r2.error || null; }); }
+      return r.error || null; });
+  }
+
+  /* ---------- Data & Refresh: live status, never invented */
+  var SEVMAP = {ok:["ok", "CONNECTED"], stale:["warn", "STALE"], error:["critical", "ERROR"], idle:["off", "IDLE"]};
+  function ago(s){ if(s == null) return "\u2013"; return s < 90 ? s + " s ago" : s < 5400 ? Math.round(s / 60) + " min ago" : Math.round(s / 3600) + " h ago"; }
+  function every(s){ return s == null ? "\u2013" : s < 120 ? "every " + s + " s" : s < 7200 ? "every " + Math.round(s / 60) + " min" : "every " + Math.round(s / 3600) + " h"; }
+  function loadData(){
+    $("feeds").innerHTML = '<div class="ds-shimmer" style="height:120px"></div>';
+    DS.refreshStatus().then(function(s){
+      if(!s || s.error || !s.feeds){ $("feeds").innerHTML = DS.empty({title:"STATUS UNAVAILABLE", text:"The server did not answer (" + ((s && s.error) || "no response") + ")."}); $("engines").innerHTML = ""; $("config").innerHTML = ""; return; }
+      var row = function(f){ var m = SEVMAP[f.status] || SEVMAP.idle; return '<div class="feed"><span><b>' + esc(f.label) + '</b><small>' + esc(f.source || "") + (f.detail ? " \u00b7 " + esc(f.detail) : "") + '</small></span>'
+        + DS.sev(m[0], m[1]) + '<span class="t">Last sync ' + (f.last ? DS.fmtTime(new Date(f.last), true) : "\u2013") + ' <small>' + ago(f.age_s) + '</small></span><span class="t">' + every(f.refresh_s) + '</span></div>'; };
+      $("feeds").innerHTML = s.feeds.map(row).join("");
+      $("engines").innerHTML = (s.engines || []).map(function(e){ return row({label:e.label, source:e.db_ok === false ? "database unavailable" : "", status:e.status, last:e.last, age_s:e.age_s, refresh_s:e.refresh_s}); }).join("");
+      var c = s.config || {}, yes = function(v, a, b){ return DS.sev(v ? "ok" : "off", v ? a : b); };
+      $("config").innerHTML = [["LTA DataMall account key", yes(c.lta_key, "SET", "NOT SET")], ["data.gov.sg API key", yes(c.datagov_key, "SET", "OPTIONAL")],
+        ["OneMap road routing", yes(c.onemap_routing, "CONFIGURED", "NOT CONFIGURED")], ["Road routing (OSRM)", '<span class="ds-chip">' + esc(c.osrm || "\u2013") + '</span>'], ["CARTO basemap key", yes(c.carto_key, "SET", "NOT SET")]]
+        .map(function(x){ return '<div class="it"><div><b>' + x[0] + '</b></div><div class="ctl">' + x[1] + '</div></div>'; }).join("");
+    });
+  }
+  $("dataRefresh").onclick = loadData;
+
+  /* ---------- Security + About */
+  function loadSec(){
+    Promise.all([DS.api("/api/auth/config"), DS.api("/api/auth/session"), DS.api("/api/system/status")]).then(function(a){ var c = a[0], s = a[1], st = a[2];
+      var it = function(t, d, ctl){ return '<div class="it"><div><b>' + t + '</b>' + (d ? '<small>' + d + '</small>' : '') + '</div><div class="ctl">' + ctl + '</div></div>'; };
+      $("secBody").innerHTML = !c.enabled
+        ? it("Sign-in", "No authentication provider is connected, so the platform runs in open access. Set AUTH_PROVIDER and AUTH_SECRET on the server to enable sign-in." + (c.problem ? " Problem: " + esc(c.problem) : ""), DS.sev("warn", "OPEN ACCESS"))
+          + it("Change password", "Not applicable without a sign-in provider.", DS.sev("off", "N/A")) + it("Two-factor authentication", "Provided by your identity provider when one is connected.", DS.sev("off", "N/A"))
+        : it("Signed in as", esc((s.user && (s.user.display_name || s.user.staff_id)) || "\u2013"), DS.sev(s.authenticated ? "ok" : "warn", s.authenticated ? "ACTIVE SESSION" : "NOT SIGNED IN"))
+          + it("Last login", "Start of this session.", '<span class="ds-chip">' + esc(s.since ? new Date(s.since).toLocaleString("en-GB", {timeZone:"Asia/Singapore"}) : "\u2013") + '</span>')
+          + it("Session expires", "", '<span class="ds-chip">' + esc(s.expires ? new Date(s.expires).toLocaleString("en-GB", {timeZone:"Asia/Singapore"}) : "\u2013") + '</span>')
+          + it("Change password", c.change_password ? "Handled by the connected provider." : "Managed by your organisation's identity provider.", DS.sev("off", "PROVIDER"))
+          + it("Two-factor authentication", "Configured in your identity provider, if it supports it.", DS.sev("off", "PROVIDER"))
+          + it("Sign out", "", '<button class="ds-btn sm" type="button" id="secOut">Sign out</button>');
+      var so = $("secOut"); if(so) so.onclick = function(){ DS.api("/api/auth/logout", {method:"POST"}).then(function(){ location.href = "/login"; }); };
+      var m = DS.summarise(st);
+      $("aboutBody").innerHTML = it("Application version", "", '<span class="ds-chip">' + esc((st && st.platform) || "V16.0") + '</span>') + it("Build / engine version", "", '<span class="ds-chip">' + esc((st && st.version) || "\u2013") + '</span>')
+        + it("API status", esc(m.title), DS.sev(m.cls === "ok" ? "ok" : m.cls === "warn" ? "warning" : m.cls === "bad" ? "critical" : "info", m.txt)) + it("Authentication", "", '<span class="ds-chip">' + esc(c.enabled ? "Provider: " + c.provider : "Open access") + '</span>');
+    });
+  }
+  $("accLede").textContent = "Your profile on this workstation.";
+  document.addEventListener("ds:session", function(e){ if(e.detail.enabled && e.detail.user){ $("accLede").textContent = "Signed in through your identity provider. Name, Staff ID, role and department come from the provider; values here are used only when the provider does not supply them."; } });
+
+  bind(); show(); loadOps();
+})();
+</script>
+</body>
+</html>

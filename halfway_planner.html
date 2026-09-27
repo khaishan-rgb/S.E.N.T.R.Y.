@@ -8,12 +8,11 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-<script>try{if(localStorage.getItem("shell.off")==="1")document.documentElement.classList.add("shell-off")}catch(e){}</script>
 <style>
 :root{
-  --navy:#0b2545; --navy2:#13315c; --bg:#eef2f6; --surface:#fff; --line:#dde3ea; --line2:#c9d3de; --ink:#13233a; --mut:#5b6b7f; --faint:#8a98a9;
+  --navy:#07111f; --navy2:#0c1b30; --bg:#040a14; --surface:#0b182b; --line:#16304e; --line2:#21446a; --ink:#e6f1ff; --mut:#8aa2bd; --faint:#5f7690;
   --bA:#1e6fd9; --bB:#f08c00; --bC:#d7263d; --bD:#1f9d55; --bE:#7c4dff; --bx:#8a98a9;
-  --risk:#c8102e; --hold:#e8590c; --ok:#0f9d58; --ai:#1565d8; --aiBg:#eaf2ff; --okBg:#e8f6ee; --riskBg:#fdecee; --holdBg:#fff1e6;
+  --risk:#ff5566; --hold:#ffb547; --ok:#12a36a; --ai:#2f8cff; --aiBg:rgba(47,140,255,.14); --okBg:rgba(46,229,157,.10); --riskBg:rgba(255,85,102,.12); --holdBg:rgba(255,181,71,.12);
   --font:Inter,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
 }
 *{box-sizing:border-box}
@@ -44,8 +43,8 @@ select.in{padding-right:26px;appearance:none;background-image:linear-gradient(45
 .seg button[disabled]{opacity:.35;cursor:not-allowed}
 .w-svc{width:96px}.w-op{width:130px}.w-bus{width:210px}.w-late{width:84px}
 .stat{font-size:12px;color:#b8c7da;align-self:center;max-width:280px}
-.testbar{background:#fff1e6;border:1px solid #f6d3b8;color:#a8410a;border-radius:10px;padding:8px 12px;font-size:13px;font-weight:600}
-.testbar b{color:#7a2f06}.testbar summary{cursor:pointer}.testbar details[open] summary{margin-bottom:4px}
+.testbar{background:#2a1d0c;border:1px solid #6a4a1c;color:#ffd08a;border-radius:10px;padding:8px 12px;font-size:13px;font-weight:600}
+.testbar b{color:#ffe0ad}.testbar summary{cursor:pointer}.testbar details[open] summary{margin-bottom:4px}
 body.test .hdr{background:linear-gradient(90deg,#0b2545 0%,#0b2545 70%,#3a2a12 100%)}
 .stat b{color:#fff}
 .hsum{display:flex;align-items:center;gap:8px;max-width:100%;margin-top:4px;border:1px solid #2c4a74;background:#12305a;color:#fff;border-radius:999px;padding:5px 12px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -70,7 +69,7 @@ body.hdr-min .hdr .ttl .ic{width:32px;height:32px;font-size:18px}
 .card>h2 .n{color:var(--faint);font-weight:700}
 .card>h2 .sp{margin-left:auto}
 .pill{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:700;border-radius:999px;padding:2px 9px;white-space:nowrap}
-.pill.ai{background:var(--ok);color:#fff}.pill.sel{background:var(--ai);color:#fff}.pill.risk{background:var(--riskBg);color:var(--risk)}.pill.hold{background:var(--holdBg);color:var(--hold)}.pill.grey{background:#eef1f5;color:var(--mut)}
+.pill.ai{background:var(--ok);color:#fff}.pill.sel{background:var(--ai);color:#fff}.pill.risk{background:var(--riskBg);color:var(--risk)}.pill.hold{background:var(--holdBg);color:var(--hold)}.pill.grey{background:#12263f;color:var(--mut)}
 .empty{color:var(--mut);font-size:13.5px;padding:18px;border:1px dashed var(--line2);border-radius:10px;text-align:center}
 .err{background:var(--riskBg);color:var(--risk);border-radius:9px;padding:9px 12px;font-size:13px}
 .note{color:var(--mut);font-size:12px;margin:8px 0 0}
@@ -82,7 +81,7 @@ body.hdr-min .hdr .ttl .ic{width:32px;height:32px;font-size:18px}
 
 /* 1 setup */
 .kv{display:grid;grid-template-columns:1fr;column-gap:18px}
-.kv div{display:flex;justify-content:space-between;align-items:baseline;gap:10px;padding:6px 0;border-bottom:1px solid #eef1f5;font-size:13px}
+.kv div{display:flex;justify-content:space-between;align-items:baseline;gap:10px;padding:6px 0;border-bottom:1px solid #12263f;font-size:13px}
 .kv div:last-child{border-bottom:0}
 .kv span{color:var(--mut)}.kv b{font-weight:700;text-align:right}
 .kv b.late{color:var(--risk);font-size:16px}
@@ -95,29 +94,29 @@ body.hdr-min .hdr .ttl .ic{width:32px;height:32px;font-size:18px}
 .tl .tick{font-size:11px;fill:var(--mut)}
 .tl .blab{font-size:11.5px;font-weight:700}
 .tl .btim{font-size:11.5px;font-weight:600;fill:var(--mut)}
-.impact{background:var(--riskBg);border-color:#f4c7cd}
+.impact{background:var(--riskBg);border-color:#5a2230}
 .impact h2{color:var(--risk)}
 .imp{display:grid;gap:10px}
-.imp div{display:flex;align-items:center;gap:10px;font-size:13px;color:#5b2a33}
+.imp div{display:flex;align-items:center;gap:10px;font-size:13px;color:#ffc3ca}
 .imp b{margin-left:auto;font-size:20px;color:var(--risk)}
 .imp .ic{width:26px;text-align:center;font-size:17px}
 
 /* 3 options */
 .omapbox{position:relative;height:280px;border-radius:10px;overflow:hidden;border:1px solid var(--line);margin-bottom:10px}
 #omap{position:absolute;inset:0}
-.olegend{position:absolute;left:8px;bottom:8px;z-index:500;background:rgba(255,255,255,.95);border:1px solid var(--line);border-radius:8px;padding:5px 8px;font-size:11px;display:flex;flex-wrap:wrap;gap:4px 10px;max-width:calc(100% - 16px)}
+.olegend{position:absolute;left:8px;bottom:8px;z-index:500;background:rgba(8,18,33,.92);border:1px solid var(--line);border-radius:8px;padding:5px 8px;font-size:11px;display:flex;flex-wrap:wrap;gap:4px 10px;max-width:calc(100% - 16px)}
 .olegend i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:4px;vertical-align:-1px}
 .oarr{width:18px;height:18px;display:grid;place-items:center;pointer-events:none}
 .onum{min-width:22px;height:22px;border-radius:11px;display:grid;place-items:center;color:#fff;font-weight:800;font-size:11px;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.3);padding:0 4px}
 .opt-tools{display:flex;gap:8px;align-items:center;margin-left:auto}
-.opt-tools select{height:30px;border:1px solid var(--line2);border-radius:7px;padding:0 8px;background:#fff;font-size:12.5px}
+.opt-tools select{height:30px;border:1px solid var(--line2);border-radius:7px;padding:0 8px;background:var(--surface);font-size:12.5px}
 .tw{overflow:auto;max-height:340px;border:1px solid var(--line);border-radius:9px}
 table.t{border-collapse:collapse;width:100%;font-size:12.5px}
-.t th{position:sticky;top:0;background:#f5f7fa;color:var(--mut);font-weight:700;font-size:11.5px;text-align:center;padding:7px 6px;border-bottom:1px solid var(--line);white-space:nowrap}
-.t td{padding:7px 6px;border-bottom:1px solid #eef1f5;text-align:center;white-space:nowrap}
+.t th{position:sticky;top:0;background:#0f2038;color:var(--mut);font-weight:700;font-size:11.5px;text-align:center;padding:7px 6px;border-bottom:1px solid var(--line);white-space:nowrap}
+.t td{padding:7px 6px;border-bottom:1px solid #12263f;text-align:center;white-space:nowrap}
 .t td.l,.t th.l{text-align:left}
 .t tbody tr{cursor:pointer}
-.t tbody tr:hover td{background:#f7faff}
+.t tbody tr:hover td{background:#12284a}
 .t tr.sel td{background:var(--aiBg);font-weight:700}
 .t tr.sel td:first-child{box-shadow:inset 3px 0 0 var(--ai)}
 .t .ewt{font-weight:700}
@@ -133,21 +132,21 @@ tr.sel .radio{border-color:var(--ai);background:radial-gradient(circle,var(--ai)
 .chain .st b{font-size:13px}
 .chain .st .tm{font-size:15px;font-weight:800}
 .chain .ar{color:var(--ai);font-size:22px;padding-top:10px}
-.ic.c1{background:var(--riskBg)}.ic.c2{background:#eef1f5}.ic.c3{background:var(--aiBg)}.ic.c4{background:var(--okBg)}
-.kr{margin-top:12px;border:1px solid #cdebd9;background:var(--okBg);border-radius:10px;padding:10px 12px}
-.kr h3{margin:0 0 8px;font-size:13.5px;color:#0b6b3c;display:flex;align-items:center;gap:6px}
+.ic.c1{background:var(--riskBg)}.ic.c2{background:#12263f}.ic.c3{background:var(--aiBg)}.ic.c4{background:var(--okBg)}
+.kr{margin-top:12px;border:1px solid #1c5a42;background:var(--okBg);border-radius:10px;padding:10px 12px}
+.kr h3{margin:0 0 8px;font-size:13.5px;color:#7ff0c0;display:flex;align-items:center;gap:6px}
 .kr .g{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;text-align:center}
-.kr .g span{display:block;font-size:12px;color:var(--mut)}.kr .g b{font-size:21px;color:#0b6b3c}
+.kr .g span{display:block;font-size:12px;color:var(--mut)}.kr .g b{font-size:21px;color:#7ff0c0}
 .kr .g b.neg{color:var(--risk)}
-.why{margin-top:10px;font-size:13px;line-height:1.5;color:#2a3b52;background:#f5f8fc;border-radius:10px;padding:10px 12px}
+.why{margin-top:10px;font-size:13px;line-height:1.5;color:#2a3b52;background:#0e1f36;border-radius:10px;padding:10px 12px}
 .why b{color:var(--ink)}
 
 /* 5 before / after */
 .ba .lane{border-radius:10px;padding:8px 10px 2px;margin-bottom:10px}
-.ba .lane.before{background:#fdf5f6;border:1px solid #f4d9dd}
-.ba .lane.after{background:#f3fbf6;border:1px solid #cdebd9}
+.ba .lane.before{background:#2a1219;border:1px solid #5a2230}
+.ba .lane.after{background:#0c2a22;border:1px solid #1c5a42}
 .ba .lane h3{margin:0;font-size:12.5px;font-weight:800;display:inline-block;padding:2px 9px;border-radius:6px}
-.ba .before h3{background:#fbdfe3;color:var(--risk)}.ba .after h3{background:#d4f0de;color:#0b6b3c}
+.ba .before h3{background:#5a2230;color:var(--risk)}.ba .after h3{background:#1c5a42;color:#7ff0c0}
 .ba .meta{float:right;font-size:12px;color:var(--mut);padding-top:3px}
 .ba .meta b{color:var(--ink)}
 
@@ -155,18 +154,18 @@ tr.sel .radio{border-color:var(--ai);background:radial-gradient(circle,var(--ai)
 .mapbox{position:relative;height:340px;border-radius:10px;overflow:hidden;border:1px solid var(--line)}
 #map{position:absolute;inset:0}
 .leaflet-container{font-family:var(--font)}
-.rinfo{position:absolute;right:10px;top:10px;z-index:500;background:rgba(255,255,255,.96);border:1px solid var(--line);border-radius:10px;padding:8px 12px;font-size:12.5px;display:grid;grid-template-columns:auto auto;gap:3px 14px;box-shadow:0 2px 10px rgba(11,37,69,.12)}
+.rinfo{position:absolute;right:10px;top:10px;z-index:500;background:rgba(8,18,33,.94);border:1px solid var(--line);border-radius:10px;padding:8px 12px;font-size:12.5px;display:grid;grid-template-columns:auto auto;gap:3px 14px;box-shadow:0 2px 10px rgba(11,37,69,.12)}
 .rinfo span{color:var(--mut)}.rinfo b{text-align:right}
 .mk{display:flex;flex-direction:column;align-items:flex-start}
-.mk .p{background:#fff;border:1.5px solid var(--navy);border-radius:8px;padding:3px 8px;font-size:11.5px;font-weight:700;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,.15)}
+.mk .p{background:var(--surface);border:1.5px solid var(--navy);border-radius:8px;padding:3px 8px;font-size:11.5px;font-weight:700;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,.15)}
 .mk .p.g{border-color:var(--bC);color:var(--bC)}
 .steps{margin-top:10px;display:grid;gap:0;max-height:180px;overflow:auto}
-.steps div{display:grid;grid-template-columns:22px 1fr auto;gap:8px;padding:6px 2px;border-bottom:1px solid #eef1f5;font-size:12.5px;align-items:center}
+.steps div{display:grid;grid-template-columns:22px 1fr auto;gap:8px;padding:6px 2px;border-bottom:1px solid #12263f;font-size:12.5px;align-items:center}
 .steps i{font-style:normal;text-align:center;color:var(--ai);font-weight:800}
 .steps span{color:var(--mut);white-space:nowrap}
 
 /* 7 downstream */
-.t td.cH{background:#fff1f3}
+.t td.cH{background:#2a1219}
 .hwv{display:block;font-size:10.5px;color:var(--mut);font-weight:600}
 .hwv.bad{color:var(--risk)}.hwv.good{color:var(--ok)}
 
@@ -175,10 +174,10 @@ tr.sel .radio{border-color:var(--ai);background:radial-gradient(circle,var(--ai)
 .bar{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;min-width:0;cursor:pointer;border:0;background:none;padding:0}
 .bar i{display:block;width:100%;max-width:54px;border-radius:5px 5px 0 0;background:#b5c0cc}
 .bar b{font-size:12px;margin-bottom:4px}
-.bar.na i{background:#f0a3ad}.bar.best i{background:var(--ok)}.bar.cur{outline:2px solid var(--ai);outline-offset:3px;border-radius:6px}
+.bar.na i{background:#7a2c3a}.bar.best i{background:var(--ok)}.bar.cur{outline:2px solid var(--ai);outline-offset:3px;border-radius:6px}
 .blabs{display:flex;gap:10px;padding:6px 4px 0}
 .blabs span{flex:1;text-align:center;font-size:11.5px;color:var(--mut);min-width:0;line-height:1.2}
-.imprv{margin-top:12px;display:flex;align-items:center;justify-content:space-between;background:var(--okBg);border-radius:10px;padding:9px 12px;font-weight:700;color:#0b6b3c}
+.imprv{margin-top:12px;display:flex;align-items:center;justify-content:space-between;background:var(--okBg);border-radius:10px;padding:9px 12px;font-weight:700;color:#7ff0c0}
 .imprv b{font-size:22px}
 
 /* 9 actions */
@@ -194,7 +193,7 @@ tr.sel .radio{border-color:var(--ai);background:radial-gradient(circle,var(--ai)
 
 /* shell (shared with the other pages) */
 .desktop-shell{display:none}.mobile-bottom-nav{display:none}.mobile-more{display:none}
-@media(min-width:1000px){body{padding-left:232px}.desktop-shell{display:flex;position:fixed;left:0;top:0;bottom:0;width:232px;background:#061425;border-right:1px solid #17324d;z-index:10000;flex-direction:column;padding:18px 12px}.shell-brand{padding:7px 40px 18px 10px;border-bottom:1px solid #17324d;position:relative}.shell-brand strong{font-size:16px;color:#f3f8ff}.shell-brand small{display:block;color:#718da7;margin-top:4px}.shell-label{padding:20px 10px 8px;color:#607d98;font-size:10px;font-weight:800;letter-spacing:.12em}.shell-link{display:flex;align-items:center;gap:10px;color:#9eb6cc;text-decoration:none;padding:11px 12px;margin:2px 0;border-radius:10px;font-size:13px;font-weight:650;position:relative}.shell-link .si{width:24px;text-align:center;font-size:16px}.shell-link:hover{background:#0c2238;color:#fff}.shell-link.active{background:#0c3154;color:#fff}.shell-link.active:before{content:'';position:absolute;left:-12px;top:8px;bottom:8px;width:3px;border-radius:4px;background:#35bfff}.shell-foot{margin-top:auto;padding:12px 10px;color:#64819b;font-size:11px}
+@media(min-width:1000px){body{padding-left:232px}.desktop-shell{display:flex;position:fixed;left:0;top:0;bottom:0;width:232px;background:#061425;border-right:1px solid #17324d;z-index:10000;flex-direction:column;padding:18px 12px}.shell-brand{padding:7px 40px 18px 10px;border-bottom:1px solid #17324d;position:relative}.shell-brand strong{font-size:16px;color:#0f2440}.shell-brand small{display:block;color:#718da7;margin-top:4px}.shell-label{padding:20px 10px 8px;color:#607d98;font-size:10px;font-weight:800;letter-spacing:.12em}.shell-link{display:flex;align-items:center;gap:10px;color:#9eb6cc;text-decoration:none;padding:11px 12px;margin:2px 0;border-radius:10px;font-size:13px;font-weight:650;position:relative}.shell-link .si{width:24px;text-align:center;font-size:16px}.shell-link:hover{background:#0c2238;color:#fff}.shell-link.active{background:#0c3154;color:#fff}.shell-link.active:before{content:'';position:absolute;left:-12px;top:8px;bottom:8px;width:3px;border-radius:4px;background:#35bfff}.shell-foot{margin-top:auto;padding:12px 10px;color:#64819b;font-size:11px}
   .shell-hide{display:grid;place-items:center;position:absolute;right:0;top:4px;width:30px;height:30px;border-radius:8px;border:1px solid #17324d;background:#0a2036;color:#9eb6cc;font-size:17px;cursor:pointer;padding:0}
   html.shell-off body{padding-left:0!important}html.shell-off .desktop-shell{display:none!important}
   html.shell-off .shell-show{display:grid;place-items:center;width:36px;height:36px;border-radius:10px;border:1px solid #2c4a74;background:#12305a;color:#fff;font-size:18px;cursor:pointer;padding:0;align-self:center}}
@@ -217,7 +216,7 @@ tr.sel .radio{border-color:var(--ai);background:radial-gradient(circle,var(--ai)
   .hdr .f-bus{flex:1 1 60%}
   .in,.ro,.seg{height:44px}.seg button{min-width:44px}
   .mtabs{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;position:sticky;top:0;z-index:900;background:var(--bg);padding:8px 10px}
-  .mtabs button{min-height:44px;border-radius:10px;border:1px solid var(--line);background:#fff;font-weight:700;font-size:13px;color:var(--mut);cursor:pointer}
+  .mtabs button{min-height:44px;border-radius:10px;border:1px solid var(--line);background:var(--surface);font-weight:700;font-size:13px;color:var(--mut);cursor:pointer}
   .mtabs button[aria-selected="true"]{background:var(--aiBg);border-color:var(--ai);color:var(--ai)}
   .page{padding:4px 10px 18px}
   .row{display:contents}
@@ -230,12 +229,12 @@ tr.sel .radio{border-color:var(--ai);background:radial-gradient(circle,var(--ai)
   #osFrom,#osTime,#tTime,#tHw,#tN{width:100%!important}
   .hdr .seg button{padding:0 10px}
   .o1{order:1}.o2{order:2}.o3{order:3}.o4{order:4}.o5{order:5}.o6{order:6}.o7{order:7}.o8{order:8}.o9{order:9}
-  .kv{grid-template-columns:1fr}.kv div:nth-last-child(2){border-bottom:1px solid #eef1f5}
+  .kv{grid-template-columns:1fr}.kv div:nth-last-child(2){border-bottom:1px solid #12263f}
   .tw.dt{display:none}.cards{display:grid;gap:10px}
-  .oc{display:block;width:100%;text-align:left;border:1.5px solid var(--line);background:#fff;border-radius:12px;padding:12px;cursor:pointer}
+  .oc{display:block;width:100%;text-align:left;border:1.5px solid var(--line);background:var(--surface);border-radius:12px;padding:12px;cursor:pointer}
   .oc.sel{border-color:var(--ai);background:var(--aiBg)}
   .oc .h{display:flex;align-items:center;gap:8px;font-weight:800;font-size:16px}
-  .oc .h .e{margin-left:auto;text-align:right;font-size:11px;color:var(--mut);font-weight:600;background:#eef4fb;border-radius:8px;padding:4px 10px}
+  .oc .h .e{margin-left:auto;text-align:right;font-size:11px;color:var(--mut);font-weight:600;background:#0e2139;border-radius:8px;padding:4px 10px}
   .oc .h .e b{display:block;color:var(--ai);font-size:18px}
   .oc .d{font-size:13px;color:var(--mut);margin-top:3px}
   .oc .d b{color:var(--ink)}
@@ -245,11 +244,13 @@ tr.sel .radio{border-color:var(--ai);background:radial-gradient(circle,var(--ai)
   .omapbox{height:240px}
   .mobile-bottom-nav{display:grid;grid-template-columns:repeat(4,1fr);position:fixed;left:0;right:0;bottom:0;z-index:12000;background:var(--navy);border-top:1px solid #21415e;padding:7px 6px calc(7px + env(safe-area-inset-bottom))}
   .mbn{color:#9fb4cc;text-decoration:none;text-align:center;font-size:10px;font-weight:650;padding:3px 2px;border-radius:9px;min-height:44px}.mbn .mi{display:block;font-size:19px;line-height:22px}.mbn.active{color:#fff;background:#13315c}
-  .mobile-more{display:none;position:fixed;left:10px;right:10px;bottom:74px;z-index:13000;background:#fff;border:1px solid var(--line);border-radius:16px;padding:8px;box-shadow:0 10px 30px rgba(0,0,0,.2)}.mobile-more.open{display:block}.mobile-more a{display:block;color:var(--ink);text-decoration:none;padding:13px;border-radius:10px;font-weight:650}
+  .mobile-more{display:none;position:fixed;left:10px;right:10px;bottom:74px;z-index:13000;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:8px;box-shadow:0 10px 30px rgba(0,0,0,.2)}.mobile-more.open{display:block}.mobile-more a{display:block;color:var(--ink);text-decoration:none;padding:13px;border-radius:10px;font-weight:650}
 }
 @media(min-width:1000px){.viewplan{display:none}.hmin{display:inline-block}body.hdr-min .hmin{display:none}}
 </style>
-<link rel="stylesheet" href="/design-system.css?v=20260927b">\n</head>
+<link rel="stylesheet" href="/design-system.css">
+<script src="/app-shell.js" data-module="halfplan"></script>
+</head>
 <body class="tab-setup">
 
 <header class="hdr top" id="hdr">
@@ -291,7 +292,7 @@ tr.sel .radio{border-color:var(--ai);background:radial-gradient(circle,var(--ai)
   <div class="row r2">
     <section class="card s-options o4" aria-labelledby="h4"><h2 id="h4"><span class="n">3</span> Halfway options <span class="opt-tools"><label for="sort" class="note" style="margin:0">Sort</label><select id="sort"><option value="rec">Recommended</option><option value="ewt">Lowest EWT</option><option value="stop">Stop order</option></select></span></h2>
       <div class="omapbox"><div id="omap" role="application" aria-label="Map of the halfway options"></div>
-        <div class="olegend"><span><i style="background:#1565d8"></i>route &amp; direction</span><span><i style="background:#0f9d58"></i>AI recommended</span><span><i style="background:#1565d8;box-shadow:0 0 0 3px #bcd4fb"></i>selected</span><span><i style="background:#7c4dff"></i>off-service road route</span></div></div>
+        <div class="olegend"><span><i style="background:#1565d8"></i>route &amp; direction</span><span><i style="background:#0f9d58"></i>AI recommended</span><span><i style="background:#1565d8;box-shadow:0 0 0 3px #1f4f8f"></i>selected</span><span><i style="background:#7c4dff"></i>off-service road route</span></div></div>
       <div class="tw dt"><table class="t"><thead><tr><th></th><th class="l">Halfway entry stop</th><th>Prolonged gap &rarr; split</th><th>Forecast EWT</th><th>Entry time</th><th>Off-service<br><span style="font-weight:500">real road</span></th><th>Stops skip</th><th>In-service time avoided<br><span style="font-weight:500">(2 min/stop)</span></th><th>Max HW after</th><th class="l">Ahead / behind at entry</th></tr></thead><tbody id="optT"><tr><td colspan="10" class="note" style="padding:18px">Every stop of the next direction is tested once the late bus is picked.</td></tr></tbody></table></div>
       <div class="cards" id="optC"></div>
       <p class="note" id="optNote"></p>
@@ -300,7 +301,7 @@ tr.sel .radio{border-color:var(--ai);background:radial-gradient(circle,var(--ai)
     <section class="card s-visual o5" aria-labelledby="h5"><h2 id="h5"><span class="n">4</span> <span id="h5t">Selected recovery plan</span><span class="sp" id="h5p"></span></h2><div id="plan"><div class="empty">Select a halfway option.</div></div></section>
   </div>
   <div class="row r3">
-    <section class="card ba s-visual o6" aria-labelledby="h6"><h2 id="h6"><span class="n">5</span> <span id="h6t">Bus movement &ndash; before vs after</span><span class="sp opt-tools"><span class="seg" style="height:30px;background:#eef1f5;border-color:var(--line)" role="group" aria-label="Where"><button type="button" class="vt" id="vIc" aria-pressed="true">Interchange</button><button type="button" class="vt" id="vSt" aria-pressed="false">Halfway stop</button></span></span></h2><div class="tl" id="ba"><div class="empty">Before and after bus positions appear here.</div></div></section>
+    <section class="card ba s-visual o6" aria-labelledby="h6"><h2 id="h6"><span class="n">5</span> <span id="h6t">Bus movement &ndash; before vs after</span><span class="sp opt-tools"><span class="seg" style="height:30px;background:#12263f;border-color:var(--line)" role="group" aria-label="Where"><button type="button" class="vt" id="vIc" aria-pressed="true">Interchange</button><button type="button" class="vt" id="vSt" aria-pressed="false">Halfway stop</button></span></span></h2><div class="tl" id="ba"><div class="empty">Before and after bus positions appear here.</div></div></section>
     <section class="card s-plan o7" aria-labelledby="h7"><h2 id="h7"><span class="n">6</span> <span id="h7t">Off-service route</span></h2>
       <div class="mapbox"><div id="map" role="application" aria-label="Off-service route map"></div><div class="rinfo" id="rinfo" hidden></div></div>
       <div class="steps" id="steps"></div><p class="note" id="routeNote"></p></section>
@@ -310,7 +311,7 @@ tr.sel .radio{border-color:var(--ai);background:radial-gradient(circle,var(--ai)
     <section class="card s-visual o9" aria-labelledby="h9"><h2 id="h9"><span class="n">8</span> EWT comparison</h2><div id="chart"><div class="empty">EWT of no action vs the halfway options.</div></div></section>
     <section class="card s-plan o9" aria-labelledby="h10"><h2 id="h10"><span class="n">9</span> Controller action plan</h2><div id="acts"><div class="empty">Numbered instructions for the selected plan.</div></div></section>
   </div>
-  <p class="note foot" style="margin:0 2px">Live: LTA DataMall bus positions (unchanged). Simulated: the lateness you enter. Forecast: 2 min between stops in service; off-service by real road routing; interchange departures on the target headway. SG Transport Pulse V15.8</p>
+  <p class="note foot" style="margin:0 2px">Live: LTA DataMall bus positions (unchanged). Simulated: the lateness you enter. Forecast: 2 min between stops in service; off-service by real road routing; interchange departures on the target headway. Deploying an OS bus is in the <a href="/halfway/os">previous planner</a>. SG Transport Pulse V15.8</p>
 </main>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -505,9 +506,9 @@ function lane(items, o){
   for(let i = 0; i + 1 < it.length; i++){
     const a = it[i], b = it[i + 1], g = b.t - a.t, x1 = a._x + 13, x2 = b._x - 13;
     const cls = g >= 1.5 * H ? "#c8102e" : g < 0.5 * H ? "#e8590c" : o.after && Math.abs(g - H) <= 0.3 * H ? "#0f9d58" : "#5b6b7f";
-    if(g >= 1.5 * H && o.band) s += `<rect x="${a._x + 14}" y="${rowY - 16}" width="${Math.max(0, b._x - a._x - 28)}" height="32" rx="6" fill="#fbdfe3" opacity=".8"/>`;
+    if(g >= 1.5 * H && o.band) s += `<rect x="${a._x + 14}" y="${rowY - 16}" width="${Math.max(0, b._x - a._x - 28)}" height="32" rx="6" fill="#5a2230" opacity=".8"/>`;
     if(x2 - x1 > 18) s += `<line x1="${x1}" y1="${rowY}" x2="${x2}" y2="${rowY}" stroke="${cls}" stroke-width="1.6" style="color:${cls}" marker-start="url(#ah${o.id})" marker-end="url(#ah${o.id})"/>`;
-    if(x2 - x1 > 30) s += `<rect x="${(x1 + x2) / 2 - 24}" y="${rowY - 9}" width="48" height="18" rx="4" fill="#fff"/><text x="${(x1 + x2) / 2}" y="${rowY + 4}" text-anchor="middle" style="font-size:12px;font-weight:800;fill:${cls}">${f0(g)} min${g >= 1.5 * H && o.band && x2 - x1 > 110 ? " gap" : ""}</text>`;
+    if(x2 - x1 > 30) s += `<rect x="${(x1 + x2) / 2 - 24}" y="${rowY - 9}" width="48" height="18" rx="4" fill="#0b182b" stroke="#21446a"/><text x="${(x1 + x2) / 2}" y="${rowY + 4}" text-anchor="middle" style="font-size:12px;font-weight:800;fill:${cls}">${f0(g)} min${g >= 1.5 * H && o.band && x2 - x1 > 110 ? " gap" : ""}</text>`;
   }
   // markers + labels (stagger bunched labels)
   let lastX = -1e9, lvl = 0;
@@ -544,7 +545,7 @@ function renderNoAction(){
     (r.mode === "os" ? `<p class="note" style="margin:4px 0 0">Times each bus left (or will leave) ${esc(r.interchange.name)} \u2013 their spacing on the road.</p>` : "") +
     `<p class="note">${na.seq.map(s => `<span class="bb ${s.role}" style="width:18px;height:18px;font-size:11px">${s.role}</span> ${esc(busName(s.role, s.num, s.in_service ? "in_service" : ""))}`).join(" &nbsp; ")}</p>`;
   $("impact").innerHTML = `<div><span class="ic">⚠</span>Max headway<b class="num">${f0(na.max_hw)} min</b></div><div><span class="ic">⏱</span>Average EWT<b class="num">${f3(na.ewt)}</b></div>
-    <div><span class="ic">⇆</span>Bunching risk<b>${esc(na.risk)}</b></div><p class="note" style="margin:0;color:#7a3a44">EWT in minutes across ${nd}, before any action.</p>`;
+    <div><span class="ic">⇆</span>Bunching risk<b>${esc(na.risk)}</b></div><p class="note" style="margin:0;color:#ffc3ca">EWT in minutes across ${nd}, before any action.</p>`;
 }
 
 function sorted(){ const c = (ST.res ? ST.res.candidates : []).slice(); return ST.sort === "stop" ? c.sort((a, b) => a.j - b.j) : ST.sort === "ewt" ? c.sort((a, b) => a.ewt_rank - b.ewt_rank) : c; }
@@ -600,7 +601,7 @@ function renderPlan(){
     ` + planRest0(r, x);
 }
 function planRest0(r, x){
-  return `<div class="kr" style="background:${x.gap.even ? "var(--okBg)" : "var(--holdBg)"};border-color:${x.gap.even ? "#cdebd9" : "#f6d3b8"}"><h3 style="color:${x.gap.even ? "#0b6b3c" : "#a8410a"}">${x.gap.even ? "✔" : "!"} Prolonged headway ${f0(x.gap.minutes)} min (${esc(x.gap.front)} \u2192 ${esc(x.gap.rear)}) \u2192 ${r.mode === "os" ? "the OS bus" : "Bus C"} lands at ${f0(x.gap.split[0])} / ${f0(x.gap.split[1])} min</h3><div class="g">
+  return `<div class="kr" style="background:${x.gap.even ? "var(--okBg)" : "var(--holdBg)"};border-color:${x.gap.even ? "#1c5a42" : "#6a4a1c"}"><h3 style="color:${x.gap.even ? "#7ff0c0" : "#ffd08a"}">${x.gap.even ? "✔" : "!"} Prolonged headway ${f0(x.gap.minutes)} min (${esc(x.gap.front)} \u2192 ${esc(x.gap.rear)}) \u2192 ${r.mode === "os" ? "the OS bus" : "Bus C"} lands at ${f0(x.gap.split[0])} / ${f0(x.gap.split[1])} min</h3><div class="g">
       ${r.mode === "os" ? `<div><span>Stops served by the OS bus</span><b class="num">${r.n_stops - 1 - x.j}</b></div><div><span>Off-service travel</span><b class="num">${f0(x.os_min)} min</b></div>
       <div><span>Stand-by before leaving</span><b class="num">${f0(x.wait)} min</b></div>` : `<div><span>In-service time avoided</span><b class="num">${f0(x.avoided)} min</b></div><div><span>OS travel time</span><b class="num">${f0(x.os_min)} min</b></div>
       <div><span>Net recovery opportunity</span><b class="num ${x.net < 0 ? "neg" : ""}">${f0(x.net)} min</b></div>`}</div></div>
@@ -608,7 +609,7 @@ function planRest0(r, x){
 }
 function planRest(r, x){
   const cmp = r.mode === "os" && r.compare_c ? `<div class="why" style="background:var(--aiBg)"><b>OS bus vs Bus C halfway:</b> EWT <b class="num">${f3(x.ewt)}</b> with the OS bus against <b class="num">${f3(r.compare_c.ewt)}</b> if Bus C went halfway itself (Stop ${r.compare_c.no}, ${f0(r.compare_c.split[0])} / ${f0(r.compare_c.split[1])} min) \u2013 ${x.ewt < r.compare_c.ewt ? `${f3(r.compare_c.ewt - x.ewt)} lower with the extra bus` : "no better with the extra bus"}.</div>` : "";
-  return `${cmp}${(x.dep_adj || []).some(a => a.adj) ? `<div class="why" style="background:#fff8f1"><b>Interchange regulation</b> ${(x.dep_adj || []).map(a => `<span style="white-space:nowrap"><span class="bb ${a.role}" style="width:18px;height:18px;font-size:10px">${a.role}</span> ${a.adj > 0 ? `<b style="color:var(--hold)">+${f0(a.adj)} later</b>` : a.adj < 0 ? `<b style="color:var(--ok)">${sgn(a.adj)} earlier</b>` : `<span style="color:var(--mut)">${esc(a.reason || "no change")}</span>`}</span>`).join(" &nbsp; ")}</div>` : ""}
+  return `${cmp}${(x.dep_adj || []).some(a => a.adj) ? `<div class="why" style="background:#2a1d0c"><b>Interchange regulation</b> ${(x.dep_adj || []).map(a => `<span style="white-space:nowrap"><span class="bb ${a.role}" style="width:18px;height:18px;font-size:10px">${a.role}</span> ${a.adj > 0 ? `<b style="color:var(--hold)">+${f0(a.adj)} later</b>` : a.adj < 0 ? `<b style="color:var(--ok)">${sgn(a.adj)} earlier</b>` : `<span style="color:var(--mut)">${esc(a.reason || "no change")}</span>`}</span>`).join(" &nbsp; ")}</div>` : ""}
     <div class="why"><b>${x.full ? "Why a full trip?" : `Why Stop ${x.no}?`}</b> ${esc(x.why)}</div>`;
 }
 
@@ -804,7 +805,7 @@ function drawOMap(){
       L.polyline([[start.lat, start.lon], [x.lat, x.lon]], {color:"#7c4dff", weight:2, dashArray:"4 6", opacity:.8}).bindTooltip(rt && rt.loading ? "Calculating the real road route\u2026" : "Real road route not available").addTo(OG.path);
     }
     L.marker([x.lat, x.lon], {icon:L.divIcon({className:"", iconSize:[10, 10], iconAnchor:[-8, 34], html:`<div class="mk"><div class="p g">Stop ${x.no} \u00b7 enter ${esc(x.entry_clock)}</div></div>`}), interactive:false, zIndexOffset:1000}).addTo(OG.sel);
-    L.circleMarker([x.lat, x.lon], {radius:9, color:"#bcd4fb", weight:4, fillColor:x.code === r.best ? "#0f9d58" : "#1565d8", fillOpacity:1}).addTo(OG.sel);
+    L.circleMarker([x.lat, x.lon], {radius:9, color:"#1f4f8f", weight:4, fillColor:x.code === r.best ? "#0f9d58" : "#1565d8", fillOpacity:1}).addTo(OG.sel);
     bounds.push([x.lat, x.lon]);
   }
   const b = L.latLngBounds(bounds); if(b.isValid()) omap.fitBounds(b, {padding:[24, 24]});
@@ -884,5 +885,67 @@ document.addEventListener("click", e => { const mm = $("mobileMore"); if(mm && m
   });
 })();
 </script>
-<script src="/nav-registry.js?v=20260927b"></script>\n</body>
+<!-- V16.0 Halfway Planner: three visual zones + contextual OFF-SERVICE MOVEMENT (replaces the retired standalone Off-service Route Planner).
+     Reads only what the page already loaded (ST.res, the selected candidate, ST.routes from /api/hplan/route). -->
+<style>
+.hz{display:flex;align-items:center;gap:12px;margin:6px 2px -2px;font:600 11.5px/1 var(--ds-font);letter-spacing:.15em;color:var(--ds-text-2)}
+.hz i{font-style:normal;display:grid;place-items:center;width:22px;height:22px;border-radius:6px;border:1px solid var(--ds-edge);color:var(--ds-cyan);font-size:11px}
+.hz:after{content:"";flex:1;height:1px;background:linear-gradient(90deg,var(--ds-line-2),transparent)}
+.hz small{letter-spacing:0;font-weight:400;color:var(--ds-mut);font-size:12px}
+.hz.ai i{border-color:rgba(160,123,255,.6);color:#cdb9ff}
+@media (max-width:700px){.hz small{display:none}}
+.hp-link{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:10px 14px;border-radius:10px;border:1px solid rgba(160,123,255,.3);background:linear-gradient(90deg,rgba(160,123,255,.10),rgba(8,18,33,.4));font-size:13px;color:var(--ds-text-2)}
+.hp-link b{color:#fff}.hp-link a{margin-left:auto}
+.osm{margin-top:12px;display:grid;gap:0}
+.osm .st{display:grid;grid-template-columns:30px 1fr auto;gap:10px;align-items:start;padding:9px 0;position:relative}
+.osm .st:not(:last-child):after{content:"";position:absolute;left:14px;top:34px;bottom:-4px;width:2px;background:linear-gradient(180deg,var(--c,var(--ds-cyan)),transparent)}
+.osm .dot{width:30px;height:30px;border-radius:9px;display:grid;place-items:center;border:1.5px solid var(--c,var(--ds-cyan));color:var(--c,var(--ds-cyan));background:#081426;font:700 12px var(--ds-font)}
+.osm b{display:block;color:#fff;font-size:13.5px}.osm small{display:block;color:var(--ds-mut);font-size:12px;margin-top:2px;line-height:1.4}
+.osm .t{font:600 13px var(--ds-font);font-variant-numeric:tabular-nums;color:var(--ds-text-2);white-space:nowrap}
+.osm .off{--c:var(--ds-purple)} .osm .in{--c:var(--ds-green)}
+.osm-h{display:flex;align-items:center;gap:8px;font:600 11px/1 var(--ds-font);letter-spacing:.14em;color:#cdb9ff;margin-top:12px}
+</style>
+<script>
+(function(){
+  "use strict";
+  if(!window.DS || typeof ST === "undefined") return;
+  var $ = function(id){ return document.getElementById(id); }, esc = DS.esc;
+  var f0 = function(x){ return x == null || isNaN(x) ? "\u2013" : String(Math.round(x)); }, fk = function(x){ return x == null || isNaN(x) ? "\u2013" : (+x).toFixed(1) + " km"; };
+  var page = document.querySelector("main.page") || document.querySelector(".page");
+  function zone(beforeSel, n, title, sub, ai){ var el = page && page.querySelector(beforeSel); if(!el) return;
+    var z = document.createElement("div"); z.className = "hz" + (ai ? " ai" : ""); z.innerHTML = "<i>" + n + "</i>" + title + (sub ? " <small>" + esc(sub) + "</small>" : ""); el.parentNode.insertBefore(z, el); }
+  if(page){
+    var ln = document.createElement("div"); ln.className = "hp-link";
+    ln.innerHTML = DS.sev("ai", "RECOVERY") + '<span>The <b>Recovery Decision Engine</b> decides <b>what</b> recovery to use; this planner works out <b>where, when and how</b> a halfway recovery happens.</span><a class="ds-btn sm" href="/recovery' + (ST.svc ? "?svc=" + encodeURIComponent(ST.svc) : "") + '">Recovery Decision Engine</a>';
+    var r1 = page.querySelector(".row.r1"); if(r1) r1.parentNode.insertBefore(ln, r1);
+    zone(".row.r1", 1, "CURRENT SERVICE CONDITION", "late bus, next-direction forecast and no-action impact");
+    zone(".row.r2", 2, "CANDIDATE HALFWAY POINTS", "select a stop \u2014 map, forecast and timeline update", true);
+    zone(".row.r3", 3, "FORECAST AFTER DEPLOYMENT", "bus movement, off-service route, downstream headways and EWT");
+  }
+  /* OFF-SERVICE MOVEMENT inside section 6 */
+  var sec = $("steps") && $("steps").parentNode, box = document.createElement("div"); box.id = "osMove";
+  if(sec) sec.insertBefore(box, $("steps"));
+  function render(){
+    var r = ST.res, x = r && typeof cand === "function" ? cand(ST.sel) : null;
+    if(!box.parentNode) return;
+    if(!r || !x){ box.innerHTML = DS.empty({icon:"half", title:"NO HALFWAY POINT SELECTED", text:"Select a candidate halfway point to see the off-service movement from the interchange to the entry stop."}); return; }
+    var os = r.mode === "os", ic = os ? r.os : r.interchange, rt = ST.routes[x.code] || {}, ok = rt.ok;
+    var mins = ok ? rt.time_min : x.os_min, km = ok ? rt.km : x.os_km;
+    var tk = ok && rt.traffic && rt.traffic.km ? Object.keys(rt.traffic.km).filter(function(k){ return rt.traffic.km[k] > 0.05; }).map(function(k){ return k + " " + fk(rt.traffic.km[k]); }).join(" \u00b7 ") : "";
+    var chk = ok && rt.status_label ? DS.sev(rt.status === "verified" ? "ok" : rt.status === "unsuitable" ? "critical" : "warning", rt.status_label) : "";
+    var inc = ok ? ((rt.incidents || []).length ? (rt.incidents.length + " incident(s) near the route") : "") + ((rt.roadworks || []).length ? ((rt.incidents || []).length ? " \u00b7 " : "") + rt.roadworks.length + " road work(s) near the route" : "") : "";
+    box.innerHTML = '<div class="osm-h">' + DS.icon("route", ' width="15" height="15"') + 'OFF-SERVICE MOVEMENT</div><div class="osm">'
+      + '<div class="st"><span class="dot">1</span><span><b>' + esc(os ? "OS bus \u00b7 " + (ic && ic.label || "start point") : (ic && ic.name || "Interchange")) + '</b><small>' + (os ? "Extra bus + Bus Captain available" : "Bus C completes its trip and takes its break") + '</small></span><span class="t">depart ' + esc(x.leave || "\u2013") + '</span></div>'
+      + '<div class="st off"><span class="dot">2</span><span><b>Off-service route</b><small>' + (ok ? esc((rt.roads || []).slice(0, 4).join(" \u2192 ") || "real road route") : rt.loading ? "Calculating the real road route\u2026" : rt.error ? "Road route unavailable: " + esc(rt.error) : "Routing-table estimate") + '</small>'
+        + '<small>' + fk(km) + ' \u00b7 ' + f0(mins) + ' min' + (ok && rt.time_src ? ' (' + esc(rt.time_src) + ')' : '') + (tk ? ' \u00b7 traffic: ' + esc(tk) : '') + (inc ? ' \u00b7 ' + esc(inc) : '') + '</small>'
+        + (chk ? '<small style="margin-top:6px">Route check for this bus type ' + chk + (rt.status_text ? ' ' + esc(rt.status_text) : '') + '</small>' : '') + '</span><span class="t">' + f0(mins) + ' min</span></div>'
+      + '<div class="st in"><span class="dot">3</span><span><b>Halfway entry \u00b7 Stop ' + esc(x.no) + ' ' + esc(x.code) + '</b><small>' + esc(x.name || "") + ' \u00b7 direction D' + esc(r.next_dir || ST.dir) + '</small></span><span class="t">enter ' + esc(x.entry_clock || "\u2013") + '</span></div>'
+      + '<div class="st in"><span class="dot">4</span><span><b>Resume passenger service</b><small>Continues in service to the end of the direction' + (x.gap && x.gap.split ? ' \u00b7 gap split ' + f0(x.gap.split[0]) + ' / ' + f0(x.gap.split[1]) + ' min' : '') + '</small></span><span class="t"></span></div></div>';
+  }
+  if(typeof drawSel === "function"){ var o = window.drawSel; window.drawSel = function(){ try{ return o.apply(this, arguments); } finally{ try{ render(); }catch(e){ console.error(e); } } }; }
+  render();
+})();
+</script>
+
+</body>
 </html>
