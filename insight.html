@@ -106,18 +106,9 @@ tbody tr.click{cursor:pointer}tbody tr.sel td{background:#1d2a12}
 }
 </style>
 <script>try{if(localStorage.getItem("shell.off")==="1")document.documentElement.classList.add("shell-off")}catch(e){}</script>
-</head>
+<link rel="stylesheet" href="/design-system.css?v=20260927-standard">\n</head>
 <body>
-<aside class="desktop-shell" aria-label="Primary navigation"><div class="shell-brand"><strong>SG Transport Pulse</strong><small>Operations Intelligence</small></div>
-<div class="shell-label">ANALYSIS TOOLS</div>
-<a class="shell-link " href="/"><span class="si">&#9648;</span><span>Route Traffic</span></a>
-<a class="shell-link " href="/control"><span class="si">&#8596;</span><span>Headway Control</span></a>
-<a class="shell-link " href="/bunching"><span class="si">&#8776;</span><span>Bunching &amp; Gap</span></a>
-<a class="shell-link " href="/halfway"><span class="si">&frac12;</span><span>Halfway Planner</span></a>
-<a class="shell-link " href="/traffic"><span class="si">&#9888;</span><span>Traffic-Aware</span></a>
-<a class="shell-link " href="/halfway/timetable"><span class="si">▤</span><span>Recovery Decision Engine</span></a>
-<a class="shell-link active" href="/running-time"><span class="si">&#9201;</span><span>Running Time Analytics</span></a><a class="shell-link " href="/cameras"><span class="si">📷</span><span>Traffic Cameras</span></a>
-<div class="shell-foot">&#9679; Running time analytics</div></aside>
+
 <header class="top"><button class="mobile-menu-btn" type="button" aria-label="Open navigation" onclick="document.getElementById('inMenu').classList.toggle('open')">&#9776;</button>
 <div class="logo">&#9201;</div><h1>RUNNING TIME ANALYTICS<small>Zero-history model + live calibration &middot; Smarter Planning, Better Journeys</small></h1><div class="sp"></div><div class="clk" id="clk"></div></header>
 <div class="mobile-top-menu" id="inMenu"><a href="/">&#9648; Route</a><a href="/control">&#8596; Headway</a><a href="/bunching">&#8776; Bunching</a><a href="/halfway">&frac12; Halfway Planner</a><a href="/traffic">&#9888; Traffic-Aware</a><a href="/halfway/timetable">▤ Recovery Decision Engine</a><a class="active" href="/running-time">&#9201; Running Time</a></div>
@@ -658,5 +649,5 @@ loadDatasets();
   else { show.classList.add("floating"); document.body.appendChild(show); }
 })();
 </script>
-</body>
+<script src="/nav-registry.js?v=20260927-standard"></script>\n</body>
 </html>
