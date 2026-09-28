@@ -22,7 +22,7 @@ import headway
 import routegeom
 import traffic
 
-VERSION = "V16.4.3"
+VERSION = "V16.5"
 LTA = os.getenv("LTA_BASE", "https://datamall2.mytransport.sg/ltaodataservice").rstrip("/")
 KEY = os.getenv("LTA_ACCOUNT_KEY", "")
 OSRM = os.getenv("OSRM_URL", "https://router.project-osrm.org").rstrip("/")
@@ -4720,9 +4720,11 @@ def waze_live():
 # ---- V16.4 TomTom Traffic API (optional second source). Set TOMTOM_API_KEY on the server (never put the key in the code).
 # Two uses: (1) Flow Segment Data checks the speed on each active LTA congestion stretch; (2) Incident Details adds accidents / closures / breakdowns.
 # Calls are cached and capped per day so the free tier is not used up. TOMTOM_DAILY_CAP (default 2000) is the most calls per Singapore day.
-TT = {"referer": os.getenv("TOMTOM_REFERER", "").strip(), "key": os.getenv("TOMTOM_API_KEY", "").strip(), "cap": int(os.getenv("TOMTOM_DAILY_CAP", "2000") or 2000), "day": "", "n": 0,
+# CONGESTION_FIRST: "tomtom" (default when a TomTom key is set) = TomTom jams are detected first and LTA speed bands check them; "lta" = the old order.
+TT_FIRST = bool(os.getenv("TOMTOM_API_KEY", "").strip()) and os.getenv("CONGESTION_FIRST", "tomtom").strip().lower() != "lta"
+TT = {"jams": [], "referer": os.getenv("TOMTOM_REFERER", "").strip(), "key": os.getenv("TOMTOM_API_KEY", "").strip(), "cap": int(os.getenv("TOMTOM_DAILY_CAP", "2000") or 2000), "day": "", "n": 0,
       "inc_at": 0.0, "inc_ok_at": 0.0, "alerts": [], "error": None, "flow": {}, "flow_error": None, "flow_ok_at": 0.0}
-TT_INC_TTL = 300                    # incidents: one call per 5 minutes for the whole island
+TT_INC_TTL = 120 if TT_FIRST else 300   # one call for the whole island: every 2 min when TomTom finds jams first, else every 5 min
 TT_FLOW_TTL = 600                   # flow: one reading per stretch point per 10 minutes
 TT_FLOW_MAX_EVENTS = 10             # at most this many congestion stretches are checked per cycle
 TT_SLOW_RATIO = 0.5                 # current speed / free-flow speed at or below this = jam
@@ -4780,17 +4782,25 @@ async def tomtom_incidents():
     try:
         r = await client().get("https://api.tomtom.com/traffic/services/5/incidentDetails", timeout=20, headers=tt_headers(), params={
             "key": TT["key"], "bbox": TT_BBOX, "language": "en-GB", "timeValidityFilter": "present",
-            "fields": "{incidents{type,geometry{type,coordinates},properties{id,iconCategory,magnitudeOfDelay,events{description,code,iconCategory},from,to,roadNumbers}}}"})
+            "fields": "{incidents{type,geometry{type,coordinates},properties{id,iconCategory,magnitudeOfDelay,events{description,code,iconCategory},from,to,roadNumbers,length,delay}}}"})
         r.raise_for_status()
-        out = []
+        out, jams = [], []
         for inc in (r.json().get("incidents") or []):
             pr = inc.get("properties") or {}
             cat = pr.get("iconCategory")
-            if cat not in TT_CATS:
-                continue
             g = inc.get("geometry") or {}
             co = g.get("coordinates")
-            if not co:
+            if cat == 6 and g.get("type") == "LineString" and co and len(co) >= 2:      # V16.5: a traffic jam with its line, in the direction of travel
+                try:
+                    line = [(float(c[1]), float(c[0])) for c in co]
+                except Exception:
+                    line = []
+                mag = pr.get("magnitudeOfDelay")
+                if len(line) >= 2 and mag in (1, 2, 3):                                  # 0 unknown and 4 (road closed) are not jams
+                    jams.append({"id": str(pr.get("id") or ""), "coords": line, "delay_s": pr.get("delay"), "length_m": pr.get("length"), "mag": mag,
+                                 "from": (pr.get("from") or "").strip(), "to": (pr.get("to") or "").strip(), "road": " / ".join(pr.get("roadNumbers") or [])})
+                continue
+            if cat not in TT_CATS or not co:
                 continue
             if g.get("type") == "LineString":
                 pt = co[len(co) // 2]
@@ -4808,7 +4818,7 @@ async def tomtom_incidents():
             desc = (ev.get("description") or label).strip()
             out.append({"key": "tomtom|" + str(pr.get("id") or f"{lat:.5f},{lon:.5f},{cat}"), "type": "TomTom: " + label,
                         "message": f"{desc} ({road})" if road else desc, "lat": lat, "lon": lon, "road": road, "reported": None, "source": "tomtom"})
-        TT.update(alerts=out, inc_ok_at=now, error=None)
+        TT.update(alerts=out, jams=jams, inc_ok_at=now, error=None)
     except Exception as e:
         TT["error"] = "incidents: " + tt_err(e)
     return TT
@@ -4893,9 +4903,14 @@ async def tr_verify_cycle():
     evs = [e for e in TR["book"]["events"].values() if e["kind"] == "congestion" and e["status"] == "active" and e["match"]]
     evs.sort(key=lambda e: (-len(e["match"]), -(e["cur"].get("length_m") or 0)))
     evs = evs[:int(P.get("verify_max_events", 20))]
-    ttres = {}
-    if TT["key"]:                                                                # V16.4: TomTom speed check (cached, capped per day)
-        for e in evs[:TT_FLOW_MAX_EVENTS]:
+    ttres, ltares = {}, {}
+    lidx = TR.get("ltaidx")
+    for e in evs:
+        if (e.get("cur") or {}).get("source") == "tomtom":                       # V16.5: TomTom found it first -> LTA speed bands check it
+            if lidx is not None:
+                ltares[e["id"]] = lidx.cover(e["cur"]["segments"], P)
+    if TT["key"]:                                                                # V16.4: TomTom speed check of LTA-found stretches (cached, capped per day)
+        for e in [x for x in evs if (x.get("cur") or {}).get("source") != "tomtom"][:TT_FLOW_MAX_EVENTS]:
             ttres[e["id"]] = await tt_verify(e, P)
     plan, stops_needed = [], set()
     for e in evs:
@@ -4940,14 +4955,14 @@ async def tr_verify_cycle():
         m0 = max(e["match"].values(), key=lambda v: v["overlap_km"])
         speeds = traffic.bus_speed_samples(TRV["obs"][e["id"]], min(m0["a_km"], m0["b_km"]), max(m0["a_km"], m0["b_km"]), now, P)
         wz = WAZE["idx"].cover(e["cur"]["segments"], P) if wl else ({"live": False} if WAZE["url"] else None)
-        e["verify"] = dict(traffic.verdict(speeds, wz, P, ttres.get(e["id"])), at=now)
+        e["verify"] = dict(traffic.verdict(speeds, wz, P, ttres.get(e["id"]), ltares.get(e["id"])), at=now)
     in_plan = {e["id"] for e, _ in plan}
     for e in evs:                                                                # V16.4: stretches with no bus data still get a Waze / TomTom verdict
         if e["id"] in in_plan:
             continue
         wz = WAZE["idx"].cover(e["cur"]["segments"], P) if wl else ({"live": False} if WAZE["url"] else None)
-        if wz is not None or ttres.get(e["id"]):
-            e["verify"] = dict(traffic.verdict([], wz, P, ttres.get(e["id"])), at=now)
+        if wz is not None or ttres.get(e["id"]) or ltares.get(e["id"]):
+            e["verify"] = dict(traffic.verdict([], wz, P, ttres.get(e["id"]), ltares.get(e["id"])), at=now)
     live_ids = {e["id"] for e in evs}
     for k in [k for k in TRV["obs"] if k not in TR["book"]["events"] or TR["book"]["events"][k]["status"] != "active"]:
         TRV["obs"].pop(k, None)
@@ -5001,7 +5016,17 @@ async def tr_refresh(force=False):
                  "routes": {"ok": TR["ridx"] is not None, "services": len({k[0] for k in st["routes"]}) if st["routes"] else 0,
                             "real_road": TR["ridx"].n_exact if TR["ridx"] is not None else 0, "detail": TR_LINES["info"]}}
         # a feed that failed is skipped (never read as 'all clear'), so a broken feed cannot clear an active alert by mistake
-        if bs.get("idx"):
+        tt_used = bool(TT_FIRST and TT["inc_ok_at"] and now - TT["inc_ok_at"] < 15 * 60)           # V16.5: TomTom found jams recently -> it detects first
+        if TT_FIRST and bs.get("idx") and TR.get("lta_key") != id(bs["idx"]):
+            TR["ltaidx"] = await asyncio.to_thread(traffic.JamIndex, traffic.lta_jam_lines(bs["idx"].segs, P))       # LTA slow links, to check TomTom's jams
+            TR["lta_key"] = id(bs["idx"])
+        if tt_used:
+            landmarks = [(s["lat"], s["lon"], s["name"]) for s in st["stops"].values()] if st["stops"] else []
+            tstr = traffic.stretches_from_jams(TT["jams"], P, landmarks)
+            traffic.update_congestion(book, tstr, now, P, count)
+            feeds["tomtom"]["first"] = True
+            feeds["tomtom"]["jams"] = len(tstr)
+        elif bs.get("idx"):
             # build_stretches is the expensive part of a refresh; LTA speed bands only change every ~5 min (TTL_BANDS), so recomputing on
             # every refresh_s (60s) cycle wastes most of that work. Reuse the last result while the underlying band snapshot is unchanged.
             bkey = (id(bs["idx"]), len(st["stops"]))
@@ -5482,7 +5507,7 @@ async def api_system_status():
                       "status": "ok" if tt_live() and not TT["error"] else ("error" if (TT["error"] or TT["flow_error"]) else "idle"),
                       "age_s": int(now - TT["inc_ok_at"]) if TT["inc_ok_at"] else None,
                       "last": datetime.fromtimestamp(TT["inc_ok_at"], SGT).isoformat(timespec="seconds") if TT["inc_ok_at"] else None,
-                      "detail": TT["error"] or TT["flow_error"] or f"{len(TT['alerts'])} incidents; {TT['n']} of {TT['cap']} calls used today"})
+                      "detail": TT["error"] or TT["flow_error"] or (("finds congestion first; " if TT_FIRST else "") + f"{len(TT['jams'])} jams, {len(TT['alerts'])} incidents; {TT['n']} of {TT['cap']} calls used today")})
     bb_alive = bool(BB.get("loop_at")) and now - BB["loop_at"] < 3 * BB["params"]["refresh_sec"]
     engines = [
         {"id": "bunching", "label": "Bunching & gap collector", "status": "ok" if bb_alive else ("idle" if not BB.get("loop_at") else "stale"),

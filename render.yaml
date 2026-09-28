@@ -17,6 +17,8 @@ services:
         sync: false
       - key: TOMTOM_REFERER       # optional: only if your TomTom key is limited to certain websites (Referer), e.g. https://your-app.onrender.com/
         sync: false
+      - key: CONGESTION_FIRST     # optional: tomtom (default when TOMTOM_API_KEY is set) = TomTom finds congestion first, LTA speed bands check it; lta = old order
+        sync: false
       - key: TOMTOM_DAILY_CAP     # optional: most TomTom calls per day (default 2000)
         sync: false
       - key: BUNCHING_SERVICES    # optional: default watch list, e.g. 32,145,65

@@ -1,4 +1,10 @@
-# SG Transport Pulse V16.4 — Operational Intelligence & Service Recovery Platform
+# SG Transport Pulse V16.5 — Operational Intelligence & Service Recovery Platform
+
+## V16.5 — TomTom finds congestion first, LTA speed bands check it
+* With `TOMTOM_API_KEY` set, congestion stretches now come from TomTom jams (Incident Details, every 2 min). LTA speed bands then check each one: slow on LTA too = Confirmed; normal on LTA = Unconfirmed (shown as Monitor, never High / Critical).
+* If TomTom gives no answer for 15 minutes, the app goes back to LTA-first automatically.
+* Set `CONGESTION_FIRST=lta` on the server to keep the old order (LTA finds, TomTom checks).
+* TomTom gives a jam's length and delay, not its speed, so the speed shown for a TomTom jam is calculated from them.
 
 ## V16.4 — TomTom Traffic API as a second source
 * Set `TOMTOM_API_KEY` on the server (Render > Environment). The key is never in the code.

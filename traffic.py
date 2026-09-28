@@ -634,6 +634,8 @@ def update_congestion(book, stretches, now, P, count=True):
                 best = e
                 break
         cur = {k: st[k] for k in ("road", "from", "to", "length_m", "avg_kmh", "min_kmh", "ref_kmh", "very_slow_pct", "start", "end", "center", "bbox", "segments", "cat", "n_links")}
+        if st.get("source"):
+            cur["source"] = st["source"]                                       # V16.5: "tomtom" when TomTom found the jam first
         if best is None:
             e = _mk_event(book, "congestion", st["road"], now, cur, st["keys"], P["persist_updates"])
             if not count and e["status"] == "candidate":
@@ -1094,7 +1096,7 @@ def bus_speed_samples(obs, a_km, b_km, now, P):
     return out
 
 
-def verdict(bus_kmh_list, waze, P, tt=None):
+def verdict(bus_kmh_list, waze, P, tt=None, lta=None):
     """-> {"state": confirmed | unconfirmed | unverified, "text": ..., "bus_kmh", "bus_n", "waze"}.
     confirmed: our buses crawl through the stretch, or a Waze jam covers it. unconfirmed: our buses move at normal speed and Waze has no jam there.
     unverified: not enough evidence either way (the LTA reading stands as it is)."""
@@ -1113,13 +1115,17 @@ def verdict(bus_kmh_list, waze, P, tt=None):
     t_clear = bool(tt and tt.get("clear"))
     if tt and tt.get("live"):
         bits.append(f"TomTom {tt['cur']:.0f} km/h (normal {tt['free']:.0f})")
-    if b_slow or w_yes or t_yes:
+    l_yes = bool(lta and lta.get("jam"))
+    l_known = bool(lta and lta.get("live"))
+    if l_known:
+        bits.append(f"LTA speed bands slow over {lta['pct']:.0f}% of the stretch (avg {lta['kmh']:.0f} km/h)" if l_yes else "LTA speed bands show normal speed here")
+    if b_slow or w_yes or t_yes or l_yes:
         state = "confirmed"
-    elif b_clear or t_clear:
+    elif b_clear or t_clear or (l_known and not l_yes):
         state = "unconfirmed"
     else:
         state = "unverified"
-    return {"state": state, "text": "; ".join(bits) or "no second source yet", "bus_kmh": round(med, 1) if med is not None else None, "bus_n": n, "waze": waze, "tomtom": tt}
+    return {"state": state, "text": "; ".join(bits) or "no second source yet", "bus_kmh": round(med, 1) if med is not None else None, "bus_n": n, "waze": waze, "tomtom": tt, "lta": lta}
 
 
 def parse_waze(feed, P):
@@ -1151,6 +1157,62 @@ def parse_waze(feed, P):
                         "message": f"{label} on {street}".strip() + " (Waze user report)", "lat": float(loc["y"]), "lon": float(loc["x"]), "road": street,
                         "reported": None, "source": "waze", "reliability": a.get("reliability")})
     return jams, alerts_
+
+
+def _jam_speed(length_m, delay_s, mag, P):
+    """TomTom gives a jam's length and delay, not its speed. Speed = length / (normal time + delay), clamped. No delay given: use the delay class."""
+    ref = P["ref_default"]
+    km = length_m / 1000.0
+    if delay_s and delay_s > 0 and km > 0:
+        v = km / (km / ref + delay_s / 3600.0)
+    else:
+        v = ref * {1: 0.6, 2: 0.4, 3: 0.25}.get(mag, 0.4)
+    return max(3.0, min(ref, v))
+
+
+def stretches_from_jams(jams, P, landmarks=None):
+    """V16.5: TomTom jam lines -> congestion stretches in the same shape as build_stretches (TomTom finds the jam first; LTA speed bands then check it).
+    jams: [{"coords": [(lat, lon)], "delay_s", "length_m", "mag", "from", "to", "road", "id"}]."""
+    out = []
+    for j in jams:
+        co = j.get("coords") or []
+        segs, L = [], 0.0
+        for a, b in zip(co, co[1:]):
+            d = hav_m(a[0], a[1], b[0], b[1])
+            if d >= 2.0:
+                segs.append((a, b, d))
+                L += d
+        if not segs or L < P["min_len_m"]:
+            continue
+        v = _jam_speed(L, j.get("delay_s"), j.get("mag"), P)
+        cells = set()
+        for a, b, d in segs:                                              # coarse ~110 m cells along the jam: the same jam keeps matching its event as its ends move
+            n = int(d // 50) + 1
+            for k in range(n + 1):
+                f = k / n
+                cells.add(f"tt|{(a[0] + (b[0] - a[0]) * f):.3f},{(a[1] + (b[1] - a[1]) * f):.3f}")
+        lats = [c[0] for c in co]
+        lons = [c[1] for c in co]
+        road = j.get("road") or j.get("from") or "Unnamed road"
+        s0, s1 = co[0], co[-1]
+        out.append({
+            "keys": sorted(cells), "road": road, "cat": "", "length_m": L, "avg_kmh": v, "min_kmh": v, "ref_kmh": P["ref_default"],
+            "very_slow_pct": 100.0 if v < P["very_slow_kmh"] else 0.0, "n_links": len(segs),
+            "from": _nearest_name(s0[0], s0[1], landmarks) or j.get("from") or road, "to": _nearest_name(s1[0], s1[1], landmarks) or j.get("to") or road,
+            "start": [s0[0], s0[1]], "end": [s1[0], s1[1]], "bbox": [min(lats), min(lons), max(lats), max(lons)], "center": [sum(lats) / len(lats), sum(lons) / len(lons)],
+            "segments": [[round(a[0], 5), round(a[1], 5), round(b[0], 5), round(b[1], 5), round(v, 1)] for a, b, _ in segs], "source": "tomtom"})
+    out.sort(key=lambda x: -x["length_m"])
+    return out
+
+
+def lta_jam_lines(segs, P):
+    """V16.5: the slow LTA speed-band links as 'jam' lines (level 5), so JamIndex.cover can ask how much of a TomTom jam LTA also sees as slow."""
+    out = []
+    for s in segs:
+        v = seg_kmh(s[4], s[6], s[7])
+        if v < P["congest_kmh"] and hav_m(s[0], s[1], s[2], s[3]) > 5.0:
+            out.append({"line": [(s[0], s[1]), (s[2], s[3])], "kmh": v, "level": 5, "delay_s": None, "street": s[5] or ""})
+    return out
 
 
 class JamIndex:
