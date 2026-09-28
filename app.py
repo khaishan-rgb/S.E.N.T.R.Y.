@@ -22,7 +22,7 @@ import headway
 import routegeom
 import traffic
 
-VERSION = "V16.4"
+VERSION = "V16.4.1"
 LTA = os.getenv("LTA_BASE", "https://datamall2.mytransport.sg/ltaodataservice").rstrip("/")
 KEY = os.getenv("LTA_ACCOUNT_KEY", "")
 OSRM = os.getenv("OSRM_URL", "https://router.project-osrm.org").rstrip("/")
@@ -4747,8 +4747,9 @@ def tt_err(e):
     try:
         if isinstance(e, httpx.HTTPStatusError):
             code = e.response.status_code
-            hint = {401: "key rejected", 403: "key not allowed for this API", 429: "too many calls"}.get(code, (e.response.text or "")[:80])
-            return f"HTTP {code} ({hint})"
+            hint = {401: "key rejected", 403: "key is not enabled for this TomTom product", 429: "too many calls"}.get(code, "")
+            body = " ".join((e.response.text or "").split())[:100]
+            return f"HTTP {code} ({hint}) {body}".replace("()", "").strip()
     except Exception:
         pass
     return f"{type(e).__name__}: {str(e)[:100]}"
@@ -4802,7 +4803,7 @@ async def tomtom_incidents():
                         "message": f"{desc} ({road})" if road else desc, "lat": lat, "lon": lon, "road": road, "reported": None, "source": "tomtom"})
         TT.update(alerts=out, inc_ok_at=now, error=None)
     except Exception as e:
-        TT["error"] = tt_err(e)
+        TT["error"] = "incidents: " + tt_err(e)
     return TT
 
 
@@ -4830,8 +4831,29 @@ async def tomtom_flow(lat, lon):
         TT.update(flow_ok_at=now, flow_error=None)
         return res
     except Exception as e:
-        TT["flow_error"] = tt_err(e)
+        TT["flow_error"] = "speed check: " + tt_err(e)
         return hit[1] if hit else None
+
+
+@app.get("/api/tomtom/test")
+async def api_tomtom_test():
+    """One-click check of the TomTom key: calls both TomTom services once and shows the plain answer (the key itself is never shown)."""
+    if not TT["key"]:
+        return {"ok": False, "message": "TOMTOM_API_KEY is not set on the server."}
+    out = {}
+    tests = {"speed_check": ("https://api.tomtom.com/traffic/services/4/flowSegmentData/absolute/10/json", {"point": "1.3521,103.8198", "unit": "KMPH"}),
+             "incidents": ("https://api.tomtom.com/traffic/services/5/incidentDetails", {"bbox": TT_BBOX, "language": "en-GB", "timeValidityFilter": "present",
+                                                                                          "fields": "{incidents{type,properties{iconCategory}}}"})}
+    for name, (url, prm) in tests.items():
+        try:
+            r = await client().get(url, params=dict(prm, key=TT["key"]), timeout=20)
+            body = " ".join((r.text or "").split())[:160]
+            out[name] = {"status": r.status_code, "ok": r.status_code == 200, "answer": body}
+        except Exception as ex:
+            out[name] = {"status": None, "ok": False, "answer": f"{type(ex).__name__}: {str(ex)[:100]}"}
+    ok = all(v["ok"] for v in out.values())
+    hint = "" if ok else ("Status 403 = the key is not enabled for this product. In your TomTom account: open your app, then tick 'Traffic Flow' and 'Traffic Incidents'. Or create a new key with both ticked." if any(v["status"] == 403 for v in out.values()) else "See the answer text for each service.")
+    return {"ok": ok, "results": out, "hint": hint}
 
 
 async def tt_verify(e, P):
