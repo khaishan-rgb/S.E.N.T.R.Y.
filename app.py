@@ -22,7 +22,7 @@ import headway
 import routegeom
 import traffic
 
-VERSION = "V16.2"
+VERSION = "V16.3"
 LTA = os.getenv("LTA_BASE", "https://datamall2.mytransport.sg/ltaodataservice").rstrip("/")
 KEY = os.getenv("LTA_ACCOUNT_KEY", "")
 OSRM = os.getenv("OSRM_URL", "https://router.project-osrm.org").rstrip("/")
@@ -550,6 +550,7 @@ async def lifespan(app):
             pass
     task = None
     trtask = None
+    trvtask = None
     if KEY:
         asyncio.create_task(warm())
         bb_init()
@@ -557,11 +558,14 @@ async def lifespan(app):
         asyncio.create_task(rt_data_loop())
         asyncio.create_task(tr_refresh(force=True))
         trtask = asyncio.create_task(tr_loop())
+        trvtask = asyncio.create_task(tr_verify_loop())      # V16.3: second-source check of congestion (our buses + Waze)
     yield
     if task is not None:
         task.cancel()
     if trtask is not None:
         trtask.cancel()
+    if trvtask is not None:
+        trvtask.cancel()
     if _client is not None:
         await _client.aclose()
 
@@ -4683,6 +4687,114 @@ def tr_lines_kick(st):
         TR_LINES["task"] = asyncio.create_task(tr_build_lines(st))
 
 
+# ---- V16.3 Waze for Cities data feed (optional). Set WAZE_FEED_URL to the JSON feed link from Waze Partner Hub > Toolbox > Waze Data Feed.
+# Without it everything below is switched off and the platform behaves exactly as before.
+WAZE = {"url": os.getenv("WAZE_FEED_URL", "").strip(), "at": 0.0, "ok_at": 0.0, "error": None, "jams": [], "alerts": [], "idx": None, "n_raw": 0}
+WAZE_TTL = 120                      # Waze refreshes the feed every 2 minutes
+
+
+async def waze_state():
+    if not WAZE["url"]:
+        return WAZE
+    now = time.time()
+    if now - WAZE["at"] < WAZE_TTL:
+        return WAZE
+    WAZE["at"] = now
+    try:
+        url = WAZE["url"] + ("" if "format=" in WAZE["url"] else ("&" if "?" in WAZE["url"] else "?") + "format=1")
+        r = await client().get(url, timeout=25)
+        r.raise_for_status()
+        feed = r.json()
+        jams, alerts_ = traffic.parse_waze(feed, TR["params"])
+        idx = await asyncio.to_thread(traffic.JamIndex, jams)
+        WAZE.update(jams=jams, alerts=alerts_, idx=idx, ok_at=now, error=None, n_raw=len(feed.get("jams") or []) + len(feed.get("alerts") or []))
+    except Exception as e:
+        WAZE["error"] = f"{type(e).__name__}: {str(e)[:120]}"
+    return WAZE
+
+
+def waze_live():
+    return bool(WAZE["url"]) and WAZE["idx"] is not None and time.time() - WAZE["ok_at"] < 10 * 60
+
+
+# ---- V16.3 second-source verification of LTA congestion: our own buses (DataMall Bus Arrival positions) + Waze jams
+TRV = {"obs": {}, "at": 0.0, "probed": 0, "error": None}
+
+
+async def tr_verify_cycle():
+    P = TR["params"]
+    ridx = TR["ridx"]
+    if not P.get("verify_on", 1) or ridx is None:
+        return
+    now = time.time()
+    st = await static()
+    await waze_state()
+    wl = waze_live()
+    evs = [e for e in TR["book"]["events"].values() if e["kind"] == "congestion" and e["status"] == "active" and e["match"]]
+    evs.sort(key=lambda e: (-len(e["match"]), -(e["cur"].get("length_m") or 0)))
+    evs = evs[:int(P.get("verify_max_events", 20))]
+    plan, stops_needed = [], set()
+    for e in evs:
+        key = max(e["match"].items(), key=lambda kv: kv[1]["overlap_km"])[0]
+        svc, d = key.split("|")[0], int(key.split("|")[1])
+        m = e["match"][key]
+        rs = route_stops(st, svc, d) if st["stops"] else []
+        if not rs:
+            continue
+        a, b = min(m["a_km"], m["b_km"]), max(m["a_km"], m["b_km"])
+        down = next((x for x in rs if x.get("dist") is not None and x["dist"] >= b), None)       # first stop after the stretch: buses inside it are "next bus" there
+        mid = next((x for x in rs if x.get("dist") is not None and a < x["dist"] < b), None)
+        codes = [x["code"] for x in (down, mid) if x]
+        if codes:
+            plan.append((e, codes))
+            stops_needed.update(codes)
+    res = dict(zip(stops_needed, await asyncio.gather(*[arrivals_raw(c) for c in stops_needed]))) if stops_needed else {}
+    now_dt = now_sgt()
+    for e, codes in plan:
+        ob = TRV["obs"].setdefault(e["id"], [])
+        for key, m in list(e["match"].items())[:8]:
+            svc, d = key.split("|")[0], int(key.split("|")[1])
+            rs = route_stops(st, svc, d) if st["stops"] else []
+            last_code = rs[-1]["code"] if rs else None
+            loop = bool(rs) and rs[0]["code"] == last_code
+            a, b = min(m["a_km"], m["b_km"]), max(m["a_km"], m["b_km"])
+            for c in codes:
+                r = res.get(c) or {}
+                if r.get("_error"):
+                    continue
+                for sv in parse_services(r, now_dt, svc):
+                    for bus in sv["buses"]:
+                        if bus.get("lat") is None or (bus.get("dest") and not loop and last_code and bus["dest"] != last_code):
+                            continue
+                        pos = ridx.position(svc, d, bus["lat"], bus["lon"])
+                        if not pos or pos[1] > 60 or not (a - 0.3 <= pos[0] <= b + 0.05):
+                            continue
+                        if not any(abs(o[0] - now) < 5 and o[1] == svc and o[2] == d and abs(o[3] - pos[0]) < 0.02 for o in ob):
+                            ob.append((now, svc, d, pos[0]))
+        cut = now - P["verify_window_min"] * 60 - 300
+        TRV["obs"][e["id"]] = [o for o in ob if o[0] >= cut]
+        m0 = max(e["match"].values(), key=lambda v: v["overlap_km"])
+        speeds = traffic.bus_speed_samples(TRV["obs"][e["id"]], min(m0["a_km"], m0["b_km"]), max(m0["a_km"], m0["b_km"]), now, P)
+        wz = WAZE["idx"].cover(e["cur"]["segments"], P) if wl else ({"live": False} if WAZE["url"] else None)
+        e["verify"] = dict(traffic.verdict(speeds, wz, P), at=now)
+    live_ids = {e["id"] for e in evs}
+    for k in [k for k in TRV["obs"] if k not in TR["book"]["events"] or TR["book"]["events"][k]["status"] != "active"]:
+        TRV["obs"].pop(k, None)
+    TRV.update(at=now, probed=len(plan), error=None)
+
+
+async def tr_verify_loop():
+    await asyncio.sleep(20)
+    while True:
+        try:
+            await tr_verify_cycle()
+        except asyncio.CancelledError:
+            raise
+        except Exception as e:
+            TRV["error"] = f"{type(e).__name__}"
+        await asyncio.sleep(60)
+
+
 async def tr_refresh(force=False):
     """One detection cycle: speed bands -> whole congestion stretches; incidents, road works and rain -> events; then every live event is matched to the services (and directions) it affects."""
     P = TR["params"]
@@ -4712,6 +4824,8 @@ async def tr_refresh(force=False):
                  "incidents": {"ok": not inc.get("error"), "error": inc.get("error"), "count": len(inc.get("incidents", []))},
                  "roadworks": {"ok": not rw_err, "error": rw_err, "count": len(rw)},
                  "rain": {"ok": not rain.get("error"), "error": rain.get("error"), "gauges_wet": len(rain.get("stations", []))},
+                 "waze": {"configured": bool(WAZE["url"]), "ok": waze_live(), "error": WAZE["error"], "jams": len(WAZE["jams"]), "alerts": len(WAZE["alerts"])},
+                 "verify": {"on": bool(P.get("verify_on", 1)), "probed": TRV["probed"], "error": TRV["error"]},
                  "routes": {"ok": TR["ridx"] is not None, "services": len({k[0] for k in st["routes"]}) if st["routes"] else 0,
                             "real_road": TR["ridx"].n_exact if TR["ridx"] is not None else 0, "detail": TR_LINES["info"]}}
         # a feed that failed is skipped (never read as 'all clear'), so a broken feed cannot clear an active alert by mistake
@@ -4732,6 +4846,13 @@ async def tr_refresh(force=False):
             for x in inc.get("incidents", []):
                 m = re.search(r"\((\d{1,2})/(\d{1,2})\)\s*(\d{1,2}:\d{2})", x.get("message") or "")
                 items.append({"key": f"{x['type']}|{round(x['lat'], 4)}|{round(x['lon'], 4)}", "type": x["type"], "message": x.get("message") or "", "lat": x["lat"], "lon": x["lon"], "reported": m.group(3) if m else None})
+            # V16.3: Waze user reports (accidents, closures, on-road hazards) join the incident list, unless LTA already reports one within 200 m
+            if WAZE["url"]:
+                await waze_state()
+                if time.time() - WAZE["ok_at"] < 10 * 60:                  # a failed Waze fetch keeps the last good list, so it cannot clear Waze incidents by mistake
+                    for w in WAZE["alerts"]:
+                        if not any(traffic.hav_m(w["lat"], w["lon"], x["lat"], x["lon"]) < 200 for x in items if not str(x["key"]).startswith("waze|")):
+                            items.append(w)
             traffic.update_points(book, "incident", items, now, P, count)
         if not rw_err:
             traffic.update_points(book, "roadworks", rw[:300], now, P, count)
@@ -4777,10 +4898,12 @@ def tr_event_public(e, now):
     out = {"id": e["id"], "kind": e["kind"], "status": e["status"], "start": tr_hhmm(e["first_seen"]), "alerted": tr_hhmm(e["alert_time"]), "location": traffic.location_text(e),
            "services": sorted({k.split("|")[0] for k in e["match"]}, key=lambda s: (not s.isdigit(), int(s) if s.isdigit() else 0, s))}
     if e["kind"] == "congestion":
+        out.update(verify=e.get("verify"))
         out.update(segments=c["segments"], length_km=round(c["length_m"] / 1000, 2), avg_kmh=round(c["avg_kmh"], 1), min_kmh=round(c["min_kmh"], 1), ref_kmh=c["ref_kmh"], road=c["road"], center=c["center"],
                    very_slow_pct=round(c["very_slow_pct"]), from_=c["from"], to=c["to"], peak_min_kmh=round(e["peak"].get("min_kmh", c["min_kmh"]), 1), peak_len_km=round(e["peak"].get("max_len_m", c["length_m"]) / 1000, 2))
     elif e["kind"] == "incident":
-        out.update(lat=c["lat"], lon=c["lon"], type=c.get("type"), message=c.get("message"), reported=c.get("reported"), road=c.get("road_used"), geo=c.get("geo"), basis=c.get("match_basis"))
+        out.update(lat=c["lat"], lon=c["lon"], type=c.get("type"), message=c.get("message"), reported=c.get("reported"), road=c.get("road_used"), geo=c.get("geo"), basis=c.get("match_basis"),
+                   source=c.get("source") or "lta")
     elif e["kind"] == "roadworks":
         out.update(lat=c.get("lat"), lon=c.get("lon"), road=c.get("road"), geo=c.get("geo"), basis=c.get("match_basis"), approx_pos=bool(c.get("approx_pos")), start_date=tr_hhmm(c.get("start_epoch")) and datetime.fromtimestamp(c["start_epoch"], SGT).strftime("%d %b %H:%M"),
                    end_date=(datetime.fromtimestamp(c["end_epoch"], SGT).strftime("%d %b %H:%M") if c.get("end_epoch") else None), other=c.get("other"))
@@ -5170,6 +5293,11 @@ async def api_system_status():
         _feed("cameras", TTL_CAMERAS, "Traffic images", "LTA DataMall + data.gov.sg"),
         _feed("rain", TTL_RAIN, "Rainfall (weather)", "NEA via data.gov.sg"),
     ]
+    if WAZE["url"]:
+        feeds.append({"id": "waze", "label": "Waze traffic (jams & user reports)", "source": "Waze for Cities", "refresh_s": WAZE_TTL,
+                      "status": "ok" if waze_live() else ("error" if WAZE["error"] else "idle"), "age_s": int(now - WAZE["ok_at"]) if WAZE["ok_at"] else None,
+                      "last": datetime.fromtimestamp(WAZE["ok_at"], SGT).isoformat(timespec="seconds") if WAZE["ok_at"] else None,
+                      "detail": WAZE["error"] or f"{len(WAZE['jams'])} jams, {len(WAZE['alerts'])} usable reports"})
     bb_alive = bool(BB.get("loop_at")) and now - BB["loop_at"] < 3 * BB["params"]["refresh_sec"]
     engines = [
         {"id": "bunching", "label": "Bunching & gap collector", "status": "ok" if bb_alive else ("idle" if not BB.get("loop_at") else "stale"),
@@ -5180,7 +5308,7 @@ async def api_system_status():
          "age_s": int(now - TR["last"]) if TR["last"] else None, "refresh_s": TR["params"]["refresh_s"], "feeds": TR["feeds"]},
     ]
     config = {"lta_key": bool(KEY), "datagov_key": bool(DATAGOV_KEY), "onemap_routing": bool(routegeom.ONEMAP_EMAIL and routegeom.ONEMAP_PASSWORD),
-              "osrm": OSRM, "carto_key": bool(CARTO_API_KEY)}
+              "osrm": OSRM, "carto_key": bool(CARTO_API_KEY), "waze_feed": bool(WAZE["url"])}
     newest = max([f["last"] for f in feeds + engines if f.get("last") and f["status"] in ("ok", "stale")] or [None], key=lambda x: x or "")
     return {"version": VERSION, "platform": "V16.0", "time": now_sgt().isoformat(timespec="seconds"), "feeds": feeds, "engines": engines,
             "config": config, "newest": newest, "auth": auth.config()["mode"]}

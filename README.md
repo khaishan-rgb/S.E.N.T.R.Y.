@@ -1,11 +1,32 @@
 # SG Transport Pulse V16.3 — Operational Intelligence & Service Recovery Platform
 
-## V16.3 — Affected services: one chip per service+direction
+## V16.3 — Second-source check for LTA congestion (our buses + optional Waze)
 
-* **No more duplicate chips.** A disruption often crosses the same bus route at more than one point (several road segments, several matched sections). Before, each of those rows got its own chip, so e.g. "30 D1" could repeat dozens of times. Now every service+direction gets exactly ONE chip (e.g. "30 D1", "30 D2"), picking the worst-risk / longest-delay row to represent it.
-* **The "N services" count for the line now matches the chips** \u2014 it counts unique service+direction pairs, not raw alert rows.
-* **Multiple locations are still shown, just not as repeated chips.** If a chip covers more than one location it shows "\u00d7N" (e.g. "30 D1 \u00d72") and its tooltip says so. Selecting the chip already draws that alert's affected section AND every other affected section of the same disruption dashed on the map (this was already true in V16.2) \u2014 so all locations for that service are visible on the map from a single chip.
-* Nothing else about grouping, filtering, or acknowledging changed.
+LTA Traffic Speed Bands can show a quiet road as congested because a few slow probe vehicles pull the band down (e.g. Aviation Park Road). Every congestion stretch on a bus route is now cross-checked before it can be High / Critical.
+
+**1. Our own buses (always on, no sign-up)**
+* A background check runs every minute on up to 20 active congestion stretches.
+* It polls DataMall Bus Arrival at the first stop after the stretch (and one inside it). This is at most 2 stops per stretch, cached and shared with the rest of the app.
+* Buses on the stretch are placed on their real-road route. Consecutive readings of the same service give the actual speed of OUR buses through the stretch; the median over the last 12 min is used.
+
+**2. Waze for Cities (optional, off until configured)**
+* Set `WAZE_FEED_URL` to the JSON feed link from Waze Partner Hub (Toolbox › Waze Data Feed), which requires a Waze for Cities partnership.
+* **Waze jams:** a jam at level 2 or more, in the same direction, covering at least 30% of the LTA stretch confirms it. Waze detects a jam as slower than that road's usual speed for the time of day.
+* **Waze user reports:** accidents, road closures and on-road hazards with reliability 6 or more are added as incidents, unless LTA already reports one within 200 m. They are marked "Waze" and matched to their road like LTA incidents.
+* A failed Waze fetch keeps the last good data for 10 min, so it cannot clear alerts by mistake.
+
+**Result on every congestion alert**
+* ✔ **Confirmed:** our buses crawl through the stretch (15 km/h or less), or a Waze jam covers it.
+* ? **Unconfirmed:** our buses move at 25 km/h or more and Waze shows no jam. The alert is kept but shown as **Monitor**, never High / Critical, so it also stays out of the notification bell.
+* … **Checking:** not enough evidence yet; the LTA reading stands.
+
+**Where to see and set it**
+* The badge and the evidence (bus km/h and readings, Waze level and coverage) appear on the Traffic-Aware list and in the map popup.
+* All thresholds are in Traffic-Aware › Settings › "Second-source check".
+* Waze feed status is shown in Settings › Data & Refresh.
+* No new Python packages are needed.
+
+(The S.E.N.T.R.Y rebrand trial was not kept; the product name is unchanged.)
 
 ## V16.2 — Traffic-Aware Regulation: one line per disruption
 

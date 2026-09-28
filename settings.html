@@ -260,7 +260,7 @@
       $("engines").innerHTML = (s.engines || []).map(function(e){ return row({label:e.label, source:e.db_ok === false ? "database unavailable" : "", status:e.status, last:e.last, age_s:e.age_s, refresh_s:e.refresh_s}); }).join("");
       var c = s.config || {}, yes = function(v, a, b){ return DS.sev(v ? "ok" : "off", v ? a : b); };
       $("config").innerHTML = [["LTA DataMall account key", yes(c.lta_key, "SET", "NOT SET")], ["data.gov.sg API key", yes(c.datagov_key, "SET", "OPTIONAL")],
-        ["OneMap road routing", yes(c.onemap_routing, "CONFIGURED", "NOT CONFIGURED")], ["Road routing (OSRM)", '<span class="ds-chip">' + esc(c.osrm || "\u2013") + '</span>'], ["CARTO basemap key", yes(c.carto_key, "SET", "NOT SET")]]
+        ["OneMap road routing", yes(c.onemap_routing, "CONFIGURED", "NOT CONFIGURED")], ["Road routing (OSRM)", '<span class="ds-chip">' + esc(c.osrm || "\u2013") + '</span>'], ["CARTO basemap key", yes(c.carto_key, "SET", "NOT SET")], ["Waze for Cities feed (WAZE_FEED_URL)", yes(c.waze_feed, "SET", "NOT SET")]]
         .map(function(x){ return '<div class="it"><div><b>' + x[0] + '</b></div><div class="ctl">' + x[1] + '</div></div>'; }).join("");
     });
   }

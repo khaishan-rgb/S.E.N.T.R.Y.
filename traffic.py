@@ -10,7 +10,7 @@ Everything is deterministic and decision support only.
 """
 import math
 
-MODEL_VERSION = "traffic-1.3-road"
+MODEL_VERSION = "traffic-1.4-verified"
 EPS = 1e-9
 
 PARAMS = {
@@ -30,6 +30,16 @@ PARAMS = {
     "ref_A": 70.0, "ref_B": 50.0, "ref_C": 45.0, "ref_D": 40.0, "ref_E": 35.0, "ref_F": 30.0, "ref_default": 50.0,
     # ---- matching a disruption to a bus service
     "match_m": 70.0,            # a route point within this distance of the disrupted road counts as on it (routes known only stop-to-stop)
+    "verify_on": 1,             # V16.3: cross-check every LTA congestion stretch on a bus route with a second source before it can be critical
+    "verify_slow_kmh": 15.0,    # V16.3: median speed of OUR buses through the stretch at or below this = congestion confirmed
+    "verify_clear_kmh": 25.0,   # V16.3: ... at or above this = buses are moving normally -> the LTA reading is unconfirmed
+    "verify_min_samples": 2,    # V16.3: bus speed readings needed before the buses can confirm or contradict
+    "verify_window_min": 12,    # V16.3: only bus movements from the last N minutes count
+    "verify_max_events": 20,    # V16.3: congestion stretches probed per cycle (Bus Arrival calls: at most 2 stops each)
+    "verify_downgrade": 1,      # V16.3: 1 = an UNCONFIRMED stretch is shown as Monitor, never High / Critical
+    "waze_min_level": 2,        # V16.3: Waze jam level (0 free flow .. 5 standstill) that counts as congestion
+    "waze_overlap_pct": 30.0,   # V16.3: share of the LTA stretch a Waze jam must cover to confirm it
+    "waze_min_reliability": 6,  # V16.3: Waze user alerts (accident / closure / hazard) below this reliability (0-10) are ignored
     "match_m_exact": 35.0,      # V16.1: the same, for routes drawn on the real road (busrouter.sg geometry): tighter, so parallel roads are not matched
     "point_road_m": 80.0,       # V16.1: an incident / road works point is tied to a road link of the SAME road within this distance
     "point_stretch_m": 150.0,   # V16.1: ... and the route must run ALONG that road for this far either side of the point (a route that only crosses it is not affected)
@@ -67,7 +77,8 @@ PARAMS = {
 }
 RANGES = {
     "very_slow_kmh": (5, 40), "congest_kmh": (10, 50), "normal_kmh": (20, 80), "min_len_m": (100, 5000), "persist_updates": (1, 20), "clear_updates": (1, 20),
-    "persist_new_data_only": (0, 1), "match_m_exact": (10, 100), "point_road_m": (20, 300), "point_stretch_m": (50, 500), "point_overlap_m": (20, 300), "point_m_exact": (20, 300), "refresh_s": (15, 600), "join_gap_m": (20, 300), "join_gap_other_m": (5, 200), "join_angle": (10, 120),
+    "persist_new_data_only": (0, 1), "verify_on": (0, 1), "verify_slow_kmh": (3, 40), "verify_clear_kmh": (10, 60), "verify_min_samples": (1, 10), "verify_window_min": (3, 30),
+    "verify_max_events": (0, 60), "verify_downgrade": (0, 1), "waze_min_level": (1, 5), "waze_overlap_pct": (5, 100), "waze_min_reliability": (0, 10), "match_m_exact": (10, 100), "point_road_m": (20, 300), "point_stretch_m": (50, 500), "point_overlap_m": (20, 300), "point_m_exact": (20, 300), "refresh_s": (15, 600), "join_gap_m": (20, 300), "join_gap_other_m": (5, 200), "join_angle": (10, 120),
     "ref_A": (20, 120), "ref_B": (20, 120), "ref_C": (20, 120), "ref_D": (20, 120), "ref_E": (10, 120), "ref_F": (10, 120), "ref_default": (20, 120),
     "match_m": (20, 200), "match_angle": (10, 120), "min_overlap_m": (0, 2000), "sample_m": (10, 200), "incident_m": (50, 2000), "roadwork_m": (50, 2000),
     "weather_km": (0.5, 20), "rain_group_km": (0.5, 20), "rain_mod_mm": (0.05, 20), "rain_heavy_mm": (0.1, 40),
@@ -77,7 +88,7 @@ RANGES = {
     "crit_score": (1, 100), "high_score": (1, 100), "monitor_score": (1, 100),
     "sev_incident": (0, 1), "sev_roadwork": (0, 1), "sev_rain_mod": (0, 1), "sev_rain_heavy": (0, 1),
 }
-INT_PARAMS = ("persist_updates", "clear_updates", "persist_new_data_only", "refresh_s", "ack_updates", "keep_cleared_min", "reg_deps")
+INT_PARAMS = ("verify_on", "verify_min_samples", "verify_window_min", "verify_max_events", "verify_downgrade", "waze_min_level", "waze_min_reliability", "persist_updates", "clear_updates", "persist_new_data_only", "refresh_s", "ack_updates", "keep_cleared_min", "reg_deps")
 
 
 def _r(x, n=1):
@@ -867,12 +878,17 @@ def alerts(book, P, now, hw_map=None, bus_counts=None):
             row["delay_min"] = delay
             hw = (hw_map or {}).get((svc, d))
             score, lvl, parts = priority(e, row, P, now, hw, (bus_counts or {}).get((svc, d)))
+            ver = e.get("verify") if e["kind"] == "congestion" else None
+            if ver and ver.get("state") == "unconfirmed" and P.get("verify_downgrade", 1) and lvl in ("critical", "high"):
+                lvl = "monitor"                                                     # V16.3: a second source says traffic is moving: never High / Critical on LTA alone
+                parts = dict(parts, downgraded="unconfirmed by a second source")
             out.append({"id": aid, "event": e["id"], "kind": e["kind"], "svc": svc, "dir": d, "location": location_text(e), "length_km": (c["length_m"] / 1000.0) if e["kind"] == "congestion" else None,
                         "speed_kmh": c["avg_kmh"] if e["kind"] == "congestion" else None, "ref_kmh": c.get("ref_kmh"), "duration_min": _duration_min(e, now), "overlap_km": m["overlap_km"], "route_pct": m["pct"],
                         "route_km": m["route_km"], "a_km": m["a_km"], "b_km": m["b_km"], "delay_min": delay, "status": status, "worsened": worse, "acked_time": ack["time"] if ack else None,
                         "acked_by": ack["by"] if ack else None, "score": score, "level": lvl, "parts": parts, "n_services": nsvc, "start": e["first_seen"], "level_detail": c.get("level"),
                         "planned": bool(e["kind"] == "roadworks" and c.get("start_epoch") and c["start_epoch"] > now),
-                        "starts_in_min": ((c["start_epoch"] - now) / 60.0) if (e["kind"] == "roadworks" and c.get("start_epoch") and c["start_epoch"] > now) else None})
+                        "starts_in_min": ((c["start_epoch"] - now) / 60.0) if (e["kind"] == "roadworks" and c.get("start_epoch") and c["start_epoch"] > now) else None,
+                        "verify": ver, "source": c.get("source") or "lta"})
     return out
 
 
@@ -1045,3 +1061,140 @@ def recommend(alert, impact, reg, restore, current_hw, P):
     if impact and (impact["deterioration"] or (reg and reg.get("best"))):
         out.append({"key": "escalate", "text": "If the condition persists, consider halfway deployment (Recovery Decision Engine) for the buses that will arrive late.", "basis": "Halfway deployment is a Layer 4 option; it is simulated on its own page."})
     return out
+
+
+
+# ----------------------------------------------------------------------------- V16.3 second-source verification of LTA congestion
+def bus_speed_samples(obs, a_km, b_km, now, P):
+    """obs: [(t, svc, dir, km)] positions of OUR buses on or just before the stretch, from successive Bus Arrival polls.
+    Pairs each reading with the same service's reading 40-240 s earlier that is just behind it (the same bus moving on), and returns km/h per pair.
+    A pair only counts if the bus was inside the stretch at one of the two readings."""
+    win = now - P["verify_window_min"] * 60.0
+    by = {}
+    for t, svc, d, km in obs:
+        if t >= win:
+            by.setdefault((svc, d), []).append((t, km))
+    out = []
+    for key, pts in by.items():
+        pts.sort()
+        for i, (t2, k2) in enumerate(pts):
+            best = None
+            for t1, k1 in pts[:i]:
+                dt = t2 - t1
+                if dt < 40 or dt > 240 or k1 > k2 + 0.02:
+                    continue
+                if (k2 - k1) > dt / 3600.0 * 90.0:                              # faster than 90 km/h: a different bus, not this one
+                    continue
+                if not (a_km - 0.05 <= k1 <= b_km or a_km - 0.05 <= k2 <= b_km):
+                    continue
+                if best is None or k1 > best[1]:
+                    best = (t1, k1)
+            if best:
+                out.append(max(0.0, (k2 - best[1]) / ((t2 - best[0]) / 3600.0)))
+    return out
+
+
+def verdict(bus_kmh_list, waze, P):
+    """-> {"state": confirmed | unconfirmed | unverified, "text": ..., "bus_kmh", "bus_n", "waze"}.
+    confirmed: our buses crawl through the stretch, or a Waze jam covers it. unconfirmed: our buses move at normal speed and Waze has no jam there.
+    unverified: not enough evidence either way (the LTA reading stands as it is)."""
+    n = len(bus_kmh_list)
+    med = sorted(bus_kmh_list)[n // 2] if n else None
+    enough = n >= P["verify_min_samples"]
+    w_yes = bool(waze and waze.get("jam"))
+    b_slow = enough and med is not None and med <= P["verify_slow_kmh"]
+    b_clear = enough and med is not None and med >= P["verify_clear_kmh"]
+    bits = []
+    if med is not None:
+        bits.append(f"our buses {med:.0f} km/h ({n} reading{'s' if n != 1 else ''})")
+    if waze and waze.get("live"):
+        bits.append(f"Waze jam level {waze['level']} at {waze['kmh']:.0f} km/h over {waze['pct']:.0f}% of the stretch" if w_yes else "no Waze jam here")
+    if b_slow or w_yes:
+        state = "confirmed"
+    elif b_clear:
+        state = "unconfirmed"
+    else:
+        state = "unverified"
+    return {"state": state, "text": "; ".join(bits) or "no second source yet", "bus_kmh": round(med, 1) if med is not None else None, "bus_n": n, "waze": waze}
+
+
+def parse_waze(feed, P):
+    """Waze for Cities data feed (JSON) -> (jams, alerts). jams: [{"line": [(lat, lon)], "kmh", "level", "delay_s", "street"}];
+    alerts: incident items in the same shape as LTA incidents (only accidents, closures and on-road hazards, above the reliability threshold)."""
+    jams, alerts_ = [], []
+    for j in (feed or {}).get("jams") or []:
+        line = [(p.get("y"), p.get("x")) for p in (j.get("line") or []) if p.get("y") is not None and p.get("x") is not None]
+        if len(line) < 2:
+            continue
+        kmh = j.get("speedKMH")
+        if kmh is None and j.get("speed") is not None:
+            kmh = float(j["speed"]) * 3.6
+        jams.append({"line": line, "kmh": float(kmh) if kmh is not None else None, "level": int(j.get("level") or 0), "delay_s": j.get("delay"), "street": j.get("street") or ""})
+    keep = {"ACCIDENT": "Accident", "ROAD_CLOSED": "Road closed", "HAZARD": "Hazard", "WEATHERHAZARD": "Hazard"}
+    for a in (feed or {}).get("alerts") or []:
+        t = str(a.get("type") or "").upper()
+        sub = str(a.get("subtype") or "").upper()
+        if t not in keep or (a.get("reliability") is not None and int(a["reliability"]) < P["waze_min_reliability"]):
+            continue
+        if t in ("HAZARD", "WEATHERHAZARD") and not sub.startswith("HAZARD_ON_ROAD"):
+            continue                                                               # shoulder / weather hazards do not block a bus
+        loc = a.get("location") or {}
+        if loc.get("y") is None or loc.get("x") is None:
+            continue
+        label = keep[t] + (" (" + sub.replace("_", " ").lower() + ")" if sub and t != "ACCIDENT" else "")
+        street = a.get("street") or ""
+        alerts_.append({"key": "waze|" + str(a.get("uuid") or f"{loc['y']:.5f},{loc['x']:.5f},{t}"), "type": "Waze: " + label,
+                        "message": f"{label} on {street}".strip() + " (Waze user report)", "lat": float(loc["y"]), "lon": float(loc["x"]), "road": street,
+                        "reported": None, "source": "waze", "reliability": a.get("reliability")})
+    return jams, alerts_
+
+
+class JamIndex:
+    """Waze jam lines on a grid, to ask 'how much of this LTA stretch does a Waze jam cover, in the same direction?'."""
+
+    def __init__(self, jams):
+        self.cell = 0.003
+        self.grid = {}
+        self.segs = []
+        for j in jams:
+            for a, b in zip(j["line"], j["line"][1:]):
+                if hav_m(a[0], a[1], b[0], b[1]) < 2.0:
+                    continue
+                i = len(self.segs)
+                self.segs.append((a[0], a[1], b[0], b[1], brg(a[0], a[1], b[0], b[1]), j))
+                n = int(hav_m(a[0], a[1], b[0], b[1]) // 150) + 1
+                for c in {(int((a[0] + (b[0] - a[0]) * k / n) / self.cell), int((a[1] + (b[1] - a[1]) * k / n) / self.cell)) for k in range(n + 1)}:
+                    self.grid.setdefault(c, []).append(i)
+
+    def cover(self, segments, P, tol_m=40.0, step_m=25.0):
+        """segments: the LTA stretch [[alat, alon, blat, blon, ...]]. -> {"jam": bool, "pct", "level", "kmh", "street", "live": True}."""
+        tot, hit, lv, sp, street = 0.0, 0.0, 0, [], ""
+        for s_ in segments:
+            L = hav_m(s_[0], s_[1], s_[2], s_[3])
+            if L < 1.0:
+                continue
+            bt = brg(s_[0], s_[1], s_[2], s_[3])
+            n = max(1, int(L // step_m))
+            for k in range(n):
+                f = (k + 0.5) / n
+                lat, lon = s_[0] + (s_[2] - s_[0]) * f, s_[1] + (s_[3] - s_[1]) * f
+                tot += L / n
+                cx, cy = int(lat / self.cell), int(lon / self.cell)
+                best = None
+                for dx in (-1, 0, 1):
+                    for dy in (-1, 0, 1):
+                        for i in self.grid.get((cx + dx, cy + dy), ()):
+                            g = self.segs[i]
+                            if g[5]["level"] < P["waze_min_level"] or angdiff(bt, g[4]) > P["match_angle"]:
+                                continue
+                            d, _ = RouteIndex._proj((0, 0, g[0], g[1], g[2], g[3]), lat, lon)
+                            if d <= tol_m and (best is None or d < best[0]):
+                                best = (d, g[5])
+                if best:
+                    hit += L / n
+                    lv = max(lv, best[1]["level"])
+                    if best[1]["kmh"] is not None:
+                        sp.append(best[1]["kmh"])
+                    street = street or best[1]["street"]
+        pct = 100.0 * hit / tot if tot else 0.0
+        return {"live": True, "jam": pct >= P["waze_overlap_pct"], "pct": round(pct, 1), "level": lv, "kmh": round(sum(sp) / len(sp), 1) if sp else 0.0, "street": street}
