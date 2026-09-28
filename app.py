@@ -22,7 +22,7 @@ import headway
 import routegeom
 import traffic
 
-VERSION = "V16.4.1"
+VERSION = "V16.4.2"
 LTA = os.getenv("LTA_BASE", "https://datamall2.mytransport.sg/ltaodataservice").rstrip("/")
 KEY = os.getenv("LTA_ACCOUNT_KEY", "")
 OSRM = os.getenv("OSRM_URL", "https://router.project-osrm.org").rstrip("/")
@@ -4970,7 +4970,7 @@ async def tr_refresh(force=False):
         now = time.time()
         if not force and TR["last"] and now - TR["last"] < P["refresh_s"] * 0.9:
             return
-        st, bs, inc, rain, (rw, rw_err) = await asyncio.gather(static(), bands_state(), api_incidents(), api_rain(), tr_roadworks(now))     # concurrent: a slow feed no longer holds up the others
+        st, bs, inc, rain, (rw, rw_err), _tt = await asyncio.gather(static(), bands_state(), api_incidents(), api_rain(), tr_roadworks(now), tomtom_incidents())     # concurrent: a slow feed no longer holds up the others
         book = TR["book"]
         snap = int(CACHE["bands"][1]) if "bands" in CACHE else None
         count = traffic.counts(book, P, snap)
@@ -4988,7 +4988,7 @@ async def tr_refresh(force=False):
                  "roadworks": {"ok": not rw_err, "error": rw_err, "count": len(rw)},
                  "rain": {"ok": not rain.get("error"), "error": rain.get("error"), "gauges_wet": len(rain.get("stations", []))},
                  "waze": {"configured": bool(WAZE["url"]), "ok": waze_live(), "error": WAZE["error"], "jams": len(WAZE["jams"]), "alerts": len(WAZE["alerts"])},
-                 "tomtom": {"configured": bool(TT["key"]), "ok": tt_live() and not TT["error"], "error": TT["error"] or TT["flow_error"], "alerts": len(TT["alerts"]), "calls_today": TT["n"], "cap": TT["cap"]},
+                 "tomtom": {"configured": bool(TT["key"]), "ok": not (TT["error"] or TT["flow_error"]), "pending": TT["inc_ok_at"] == 0.0 and not TT["error"], "error": TT["error"] or TT["flow_error"], "alerts": len(TT["alerts"]), "calls_today": TT["n"], "cap": TT["cap"]},
                  "verify": {"on": bool(P.get("verify_on", 1)), "probed": TRV["probed"], "error": TRV["error"]},
                  "routes": {"ok": TR["ridx"] is not None, "services": len({k[0] for k in st["routes"]}) if st["routes"] else 0,
                             "real_road": TR["ridx"].n_exact if TR["ridx"] is not None else 0, "detail": TR_LINES["info"]}}
