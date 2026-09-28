@@ -22,7 +22,10 @@ import headway
 import routegeom
 import traffic
 
-VERSION = "V16.6"
+VERSION = "V16.9"
+# V16.8: pages hidden for everyone (see Settings > Pages). Defined here because bb_init() reads the saved value while the module loads.
+SITE_PAGE_IDS = ("command", "route", "headway", "bunching", "recovery", "halfplan", "trafficaware", "running", "ewt", "cameras")     # "settings" can never be hidden
+SITE = {"hidden": [x.strip() for x in os.getenv("HIDDEN_PAGES", "").split(",") if x.strip() in SITE_PAGE_IDS], "block": True}
 LTA = os.getenv("LTA_BASE", "https://datamall2.mytransport.sg/ltaodataservice").rstrip("/")
 KEY = os.getenv("LTA_ACCOUNT_KEY", "")
 OSRM = os.getenv("OSRM_URL", "https://router.project-osrm.org").rstrip("/")
@@ -585,7 +588,7 @@ async def home():
 
 @app.get("/api/health")
 async def health():
-    return {"online": True, "lta": bool(KEY), "version": VERSION, "time": now_sgt().isoformat(timespec="seconds"), "speedEndpoint": GOOD_SPEED_PATH}
+    return {"online": True, "lta": bool(KEY), "version": VERSION, "time": now_sgt().isoformat(timespec="seconds"), "speedEndpoint": GOOD_SPEED_PATH, "tomtom": bool(TT["key"])}
 
 
 @app.get("/api/traffic-test")
@@ -4438,6 +4441,12 @@ async def page_traffic():
 
 def tr_init():
     bb_sql("CREATE TABLE IF NOT EXISTS traffic_setting(k TEXT PRIMARY KEY, v REAL)")
+    bb_sql("CREATE TABLE IF NOT EXISTS site_setting(k TEXT PRIMARY KEY, v TEXT)")                      # V16.8: site-wide settings (hidden pages)
+    for r in bb_sql("SELECT k, v FROM site_setting", fetch=True):
+        if r["k"] == "hidden_pages":
+            SITE["hidden"] = [x for x in str(r["v"]).split(",") if x in SITE_PAGE_IDS]
+        elif r["k"] == "block_hidden":
+            SITE["block"] = str(r["v"]) != "0"
     bb_sql("CREATE TABLE IF NOT EXISTS traffic_state(k TEXT PRIMARY KEY, v TEXT)")
     bb_sql("CREATE TABLE IF NOT EXISTS alert_acknowledgement(id INTEGER PRIMARY KEY AUTOINCREMENT, alert_id TEXT, event_id TEXT, service TEXT, direction INTEGER, ack_time REAL, ack_by TEXT, condition TEXT)")
     TR["params"] = dict(traffic.PARAMS)
@@ -4868,10 +4877,63 @@ async def api_tomtom_test():
             out[name] = {"status": r.status_code, "ok": r.status_code == 200, "answer": body}
         except Exception as ex:
             out[name] = {"status": None, "ok": False, "answer": f"{type(ex).__name__}: {str(ex)[:100]}"}
+    try:                                                                             # V16.9: one map tile (over Singapore, zoom 14)
+        r = await client().get(f"https://api.tomtom.com/traffic/map/4/tile/flow/{TT_FLOW_STYLE}/14/12916/8130.png", params={"key": TT["key"], "tileSize": 256}, timeout=20, headers=tt_headers())
+        out["map_tile"] = {"status": r.status_code, "ok": r.status_code == 200, "answer": (f"image, {len(r.content)} bytes" if r.status_code == 200 else " ".join((r.text or "").split())[:160])}
+    except Exception as ex:
+        out["map_tile"] = {"status": None, "ok": False, "answer": f"{type(ex).__name__}: {str(ex)[:100]}"}
     ok = all(v["ok"] for v in out.values())
     inv = any("InvalidReferer" in (v.get("answer") or "") for v in out.values())
     hint = "" if ok else ("The key is limited to certain websites (InvalidReferer). In TomTom: open your key, set Allowed Referers to * (or remove the limit). Or set TOMTOM_REFERER on Render to your site address." if inv else "Status 403 = the key is not enabled for this product. In your TomTom account: open your app, then tick 'Traffic Flow' and 'Traffic Incidents'. Or create a new key with both ticked." if any(v["status"] == 403 for v in out.values()) else "See the answer text for each service.")
     return {"ok": ok, "results": out, "hint": hint}
+
+
+# ---- V16.9: TomTom traffic-flow map tiles (road colours on the Route Traffic map). The browser asks OUR server for tiles, so the key never reaches the browser.
+# Tiles are cached 2 min, only tiles over Singapore are fetched, and TOMTOM_TILE_CAP (default 20000 per Singapore day) limits the calls.
+TT_TILE = {"day": "", "n": 0, "cap": int(os.getenv("TOMTOM_TILE_CAP", "20000") or 20000), "cache": {}, "error": None, "ok_at": 0.0}
+TT_TILE_TTL = 120
+TT_FLOW_STYLE = os.getenv("TOMTOM_FLOW_STYLE", "relative").strip() or "relative"
+_BLANK_PNG = base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=")
+
+
+def _tile_over_sg(z, x, y):
+    n = 2.0 ** z
+    lon0, lon1 = x / n * 360.0 - 180.0, (x + 1) / n * 360.0 - 180.0
+    lat_of = lambda ty: math.degrees(math.atan(math.sinh(math.pi * (1 - 2 * ty / n))))
+    lat1, lat0 = lat_of(y), lat_of(y + 1)
+    return not (lon1 < 103.55 or lon0 > 104.15 or lat1 < 1.12 or lat0 > 1.52)
+
+
+@app.get("/api/tomtom/tile/{z}/{x}/{y}.png")
+async def api_tomtom_tile(z: int, x: int, y: int):
+    from fastapi.responses import Response
+    blank = Response(_BLANK_PNG, media_type="image/png", headers={"Cache-Control": "public, max-age=60"})
+    if not TT["key"] or z < 8 or z > 19 or not (0 <= x < 2 ** z and 0 <= y < 2 ** z) or not _tile_over_sg(z, x, y):
+        return blank
+    now = time.time()
+    hit = TT_TILE["cache"].get((z, x, y))
+    if hit and now - hit[0] < TT_TILE_TTL:
+        return Response(hit[1], media_type="image/png", headers={"Cache-Control": "public, max-age=60"})
+    day = now_sgt().strftime("%Y-%m-%d")
+    if TT_TILE["day"] != day:
+        TT_TILE["day"], TT_TILE["n"] = day, 0
+    if TT_TILE["n"] >= TT_TILE["cap"]:
+        TT_TILE["error"] = "daily tile cap reached"
+        return blank
+    TT_TILE["n"] += 1
+    try:
+        r = await client().get(f"https://api.tomtom.com/traffic/map/4/tile/flow/{TT_FLOW_STYLE}/{z}/{x}/{y}.png", timeout=15,
+                               headers=tt_headers(), params={"key": TT["key"], "tileSize": 256})
+        r.raise_for_status()
+        TT_TILE["cache"][(z, x, y)] = (now, r.content)
+        TT_TILE.update(ok_at=now, error=None)
+        if len(TT_TILE["cache"]) > 500:
+            for k in sorted(TT_TILE["cache"], key=lambda k: TT_TILE["cache"][k][0])[:150]:
+                TT_TILE["cache"].pop(k, None)
+        return Response(r.content, media_type="image/png", headers={"Cache-Control": "public, max-age=60"})
+    except Exception as e:
+        TT_TILE["error"] = "map tiles: " + tt_err(e)
+        return blank
 
 
 async def tt_verify(e, P):
@@ -5417,10 +5479,37 @@ async def recovery_page():
     return _page("halfway.html")
 
 
+# ---- V16.8: hide pages for everyone (Settings > Pages). Saved in the database; HIDDEN_PAGES (comma list, e.g. cameras,running) is the default when nothing is saved,
+# and survives a Render restart. The list is put at the top of /app-shell.js, so every page knows it before it draws its menu.
+
+
 @app.get("/app-shell.js")
 async def app_shell_js():
     from fastapi.responses import Response
-    return Response((HERE / "app_shell.js").read_text(encoding="utf-8"), media_type="application/javascript", headers={"Cache-Control": "public, max-age=600"})
+    head = "window.__SGTP_HIDDEN=" + json.dumps(SITE["hidden"]) + ";window.__SGTP_BLOCK=" + ("true" if SITE["block"] else "false") + ";\n"
+    return Response(head + (HERE / "app_shell.js").read_text(encoding="utf-8"), media_type="application/javascript", headers={"Cache-Control": "no-cache"})
+
+
+@app.get("/api/site/pages")
+async def api_site_pages():
+    return {"hidden": SITE["hidden"], "block": SITE["block"], "pages": list(SITE_PAGE_IDS)}
+
+
+@app.post("/api/site/pages")
+async def api_site_pages_save(request: Request):
+    try:
+        body = json.loads((await request.body()).decode("utf-8") or "{}")
+    except ValueError:
+        return JSONResponse({"error": "Body must be JSON."}, status_code=400)
+    hidden = body.get("hidden", SITE["hidden"])
+    if not isinstance(hidden, list) or any(x not in SITE_PAGE_IDS for x in hidden):
+        return JSONResponse({"error": "Unknown page name."}, status_code=400)
+    SITE["hidden"] = [x for x in SITE_PAGE_IDS if x in hidden]
+    if "block" in body:
+        SITE["block"] = bool(body["block"])
+    bb_sql("INSERT OR REPLACE INTO site_setting(k, v) VALUES ('hidden_pages', ?)", (",".join(SITE["hidden"]),))
+    bb_sql("INSERT OR REPLACE INTO site_setting(k, v) VALUES ('block_hidden', ?)", ("1" if SITE["block"] else "0",))
+    return {"ok": True, "hidden": SITE["hidden"], "block": SITE["block"], "saved": bool(BB.get("db_ok"))}
 
 
 # ---- authentication hooks (open access until AUTH_PROVIDER + AUTH_SECRET are set)
@@ -5527,7 +5616,7 @@ async def api_system_status():
                       "status": "ok" if tt_live() and not TT["error"] else ("error" if (TT["error"] or TT["flow_error"]) else "idle"),
                       "age_s": int(now - TT["inc_ok_at"]) if TT["inc_ok_at"] else None,
                       "last": datetime.fromtimestamp(TT["inc_ok_at"], SGT).isoformat(timespec="seconds") if TT["inc_ok_at"] else None,
-                      "detail": TT["error"] or TT["flow_error"] or (("finds congestion first; " if TT_FIRST else "") + f"{len(TT['jams'])} jams, {len(TT['alerts'])} incidents; {TT['n']} of {TT['cap']} calls used today")})
+                      "detail": TT["error"] or TT["flow_error"] or (("finds congestion first; " if TT_FIRST else "") + f"{len(TT['jams'])} jams, {len(TT['alerts'])} incidents; {TT['n']} of {TT['cap']} calls and {TT_TILE['n']} of {TT_TILE['cap']} map tiles used today" + (f"; map tiles: {TT_TILE['error']}" if TT_TILE["error"] else ""))})
     bb_alive = bool(BB.get("loop_at")) and now - BB["loop_at"] < 3 * BB["params"]["refresh_sec"]
     engines = [
         {"id": "bunching", "label": "Bunching & gap collector", "status": "ok" if bb_alive else ("idle" if not BB.get("loop_at") else "stale"),
