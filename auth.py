@@ -24,8 +24,14 @@ import os
 import time
 
 COOKIE = "sgtp_session"
-PROVIDER_PATH = os.getenv("AUTH_PROVIDER", "").strip()
+# V16.6: the built-in single-user login (simple_auth.py: Admin / 123456 unless APP_USERNAME / APP_PASSWORD are set) is ON by default.
+# AUTH_PROVIDER=none turns the login off (open access). Any other value is a real identity provider module.
+PROVIDER_PATH = os.getenv("AUTH_PROVIDER", "simple_auth").strip()
+if PROVIDER_PATH.lower() in ("none", "off", "open"):
+    PROVIDER_PATH = ""
 SECRET = os.getenv("AUTH_SECRET", "").strip()
+if not SECRET and PROVIDER_PATH == "simple_auth":                       # a stable session key, so people stay signed in after a restart
+    SECRET = hashlib.sha256(("sgtp-session|" + os.getenv("APP_USERNAME", "Admin") + "|" + os.getenv("APP_PASSWORD", "123456")).encode()).hexdigest()
 SESSION_HOURS = float(os.getenv("AUTH_SESSION_HOURS", "12") or 12)
 
 _provider = None

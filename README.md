@@ -1,4 +1,8 @@
-# SG Transport Pulse V16.5 — Operational Intelligence & Service Recovery Platform
+# SG Transport Pulse V16.6 — Operational Intelligence & Service Recovery Platform
+
+## V16.6 — simple login
+* A built-in single-user login is ON. Default sign-in: **Admin / 123456**. Change it in Render > Environment with `APP_USERNAME` and `APP_PASSWORD` (no new upload needed).
+* Every page and API needs sign-in, except `/login`, its assets and `/api/health`. `AUTH_GATE=0` keeps the login page but blocks nothing. `AUTH_PROVIDER=none` turns the login off. A real identity provider can still be set with `AUTH_PROVIDER=module` (see `auth.py`).
 
 ## V16.5 — TomTom finds congestion first, LTA speed bands check it
 * With `TOMTOM_API_KEY` set, congestion stretches now come from TomTom jams (Incident Details, every 2 min). LTA speed bands then check each one: slow on LTA too = Confirmed; normal on LTA = Unconfirmed (shown as Monitor, never High / Critical).

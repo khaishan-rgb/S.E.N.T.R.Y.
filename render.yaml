@@ -9,6 +9,10 @@ services:
     envVars:
       - key: LTA_ACCOUNT_KEY
         sync: false
+      - key: APP_USERNAME         # optional: login name (default Admin)
+        sync: false
+      - key: APP_PASSWORD         # RECOMMENDED: change the default password (123456) here
+        sync: false
       - key: TIMETABLE_TOKEN      # optional but recommended: protects planned-timetable upload/clear
         sync: false
       - key: BUNCHING_ADMIN_TOKEN # optional: protects Bunching settings / Service Headway Master edits (falls back to TIMETABLE_TOKEN)

@@ -22,7 +22,7 @@ import headway
 import routegeom
 import traffic
 
-VERSION = "V16.5"
+VERSION = "V16.6"
 LTA = os.getenv("LTA_BASE", "https://datamall2.mytransport.sg/ltaodataservice").rstrip("/")
 KEY = os.getenv("LTA_ACCOUNT_KEY", "")
 OSRM = os.getenv("OSRM_URL", "https://router.project-osrm.org").rstrip("/")
@@ -5465,6 +5465,26 @@ async def api_auth_logout():
     r = JSONResponse({"ok": True})
     r.delete_cookie(auth.COOKIE)
     return r
+
+
+# ---- V16.6: the login gate. When the login is on, every page and API needs a signed-in session (except the login page itself, its assets and the health check).
+# AUTH_GATE=0 keeps the login page but does not block anything.
+_GATE_OPEN = ("/login", "/api/auth/", "/api/health", "/app-shell.js", "/design-system.css", "/basemap.js", "/nav-registry.js", "/favicon")
+
+
+@app.middleware("http")
+async def login_gate(request: Request, call_next):
+    if not auth.config()["enabled"] or os.getenv("AUTH_GATE", "1") == "0":
+        return await call_next(request)
+    path = request.url.path
+    if request.method == "OPTIONS" or path.startswith(_GATE_OPEN) or auth.read(request.cookies.get(auth.COOKIE, "")):
+        return await call_next(request)
+    if path.startswith("/api/"):
+        return JSONResponse({"error": "Sign in required.", "login": "/login"}, status_code=401)
+    from urllib.parse import quote
+    from fastapi.responses import RedirectResponse
+    nxt = path + ("?" + request.url.query if request.url.query else "")
+    return RedirectResponse("/login?next=" + quote(nxt, safe="/?=&"), status_code=303)
 
 
 # ---- system status: what the server actually knows about each data feed (never invented)
