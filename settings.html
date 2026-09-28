@@ -130,6 +130,13 @@
     <div class="it"><div><b>Traffic cameras, bus stops, road works</b><small>Available as layers in Route Traffic.</small></div><div class="ctl"><a class="ds-btn sm" href="/">Route Traffic</a></div></div>
   </div></section>
 
+<section class="sec" id="pages"><h2>Pages</h2><p class="lede">Hide the pages you do not want to show, for example when you present. A hidden page disappears from the menu, the app list and the home shortcuts. This applies to everyone who uses this site.</p>
+  <div class="ds-panel grp" id="pagesList"></div>
+  <div class="ds-panel grp">
+    <div class="it"><div><b>Block hidden pages</b><small>If a hidden page is opened from a link or bookmark, show a notice instead of the page. Applies to everyone.</small></div><div class="ctl"><input type="checkbox" class="ds-switch" id="pagesBlock"></div></div>
+    <div class="it"><div><b>Show all pages again</b></div><div class="ctl"><button type="button" class="ds-btn sm" id="pagesAll">Show all</button></div></div>
+  </div></section>
+
 <section class="sec" id="accessibility"><h2>Accessibility</h2><p class="lede">Severity is always shown with a label and a shape as well as colour.</p>
   <div class="ds-panel grp">
     <div class="it"><div><b>Text size</b></div><div class="ctl"><div class="ds-segm" data-p="textSize"><button data-v="normal">Default</button><button data-v="large">Large</button><button data-v="xl">Extra large</button></div></div></div>
@@ -171,7 +178,7 @@
 (function(){
   "use strict";
   var $ = function(id){ return document.getElementById(id); }, esc = DS.esc;
-  var SECS = [["general", "General", "gear"], ["appearance", "Appearance", "sliders"], ["operations", "Operations", "headway"], ["notifications", "Notifications", "bell"],
+  var SECS = [["general", "General", "gear"], ["appearance", "Appearance", "sliders"], ["pages", "Pages", "grid"], ["operations", "Operations", "headway"], ["notifications", "Notifications", "bell"],
               ["data", "Data & Refresh", "clock"], ["ai", "AI & Optimisation", "spark"], ["map", "Map & Traffic", "route"], ["accessibility", "Accessibility", "user"],
               ["account", "Account", "user"], ["security", "Security", "lock"], ["about", "About", "inbox"]];
   $("nav").innerHTML = SECS.map(function(s){ return '<a href="#' + s[0] + '" data-s="' + s[0] + '">' + DS.icon(s[2]) + esc(s[1]) + '</a>'; }).join("");
@@ -184,6 +191,25 @@
 
   /* landing options from the registry (same list as the sidebar) */
   $("landSel").innerHTML = DS.modules.filter(function(m){ return m.enabled && m.id !== "settings"; }).map(function(m){ return '<option value="' + m.route + '">' + esc(m.name) + '</option>'; }).join("");
+  /* ---------- Pages: choose which pages show in the menus (saved on the server, so it is the same for everyone) */
+  var pgT;
+  function pgSave(patch){
+    DS.api("/api/site/pages", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(patch)}).then(function(j){
+      if(j.error){ toast("Not saved: " + j.error); pagesDraw(); return; }
+      toast(j.saved === false ? "Applied, but the disk could not be written (see Data & Refresh)" : "Saved for everyone. Updating the menu\u2026");
+      clearTimeout(pgT); pgT = setTimeout(function(){ location.reload(); }, 900); });
+  }
+  function pagesDraw(){
+    var hidden = DS.hiddenIds();
+    $("pagesList").innerHTML = DS.allModules.filter(function(m){ return m.id !== "settings"; }).map(function(m){
+      return '<div class="it"><div><b>' + esc(m.name) + '</b><small>' + esc(m.enabled ? m.desc : "Not yet available") + '</small></div><div class="ctl"><input type="checkbox" class="ds-switch" data-pg="' + m.id + '"' + (hidden.indexOf(m.id) < 0 ? " checked" : "") + ' aria-label="Show ' + esc(m.name) + '"></div></div>'; }).join("");
+    document.querySelectorAll("#pagesList input[data-pg]").forEach(function(c){
+      c.onchange = function(){ var off = []; document.querySelectorAll("#pagesList input[data-pg]").forEach(function(x){ if(!x.checked) off.push(x.dataset.pg); }); pgSave({hidden:off}); }; });
+    $("pagesBlock").checked = DS.blockOn();
+    $("pagesBlock").onchange = function(){ pgSave({block:this.checked}); };
+  }
+  pagesDraw();
+  $("pagesAll").onclick = function(){ pgSave({hidden:[]}); };
   $("sevPrev").innerHTML = ["critical", "warning", "ok", "ai"].map(function(l){ return DS.sev(l); }).join(" ");
 
   /* ---------- local preferences: bind every [data-p] control */

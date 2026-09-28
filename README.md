@@ -1,4 +1,13 @@
-# SG Transport Pulse V16.6 — Operational Intelligence & Service Recovery Platform
+# SG Transport Pulse V16.8 — Operational Intelligence & Service Recovery Platform
+
+## V16.8 — pages are hidden for everyone
+* Settings > Pages now saves on the server, so a hidden page is hidden for every user and device (V16.7 saved per browser).
+* Page names: `command, route, headway, bunching, recovery, halfplan, trafficaware, running, ewt, cameras`. Set `HIDDEN_PAGES=cameras,running` on Render to keep the choice after a restart (on the free plan the database disk can reset).
+* Anyone signed in can change it. With the login off, anyone who opens Settings can.
+
+## V16.7 — hide pages (Settings > Pages)
+* Settings has a new **Pages** section. Switch a page off to hide it from the sidebar, the app list, the mobile menu and the home shortcuts. Saved in this browser only (useful when presenting). Settings itself cannot be hidden.
+* **Block hidden pages** (on by default): a hidden page opened by link or bookmark shows a notice instead.
 
 ## V16.6 — simple login
 * A built-in single-user login is ON. Default sign-in: **Admin / 123456**. Change it in Render > Environment with `APP_USERNAME` and `APP_PASSWORD` (no new upload needed).

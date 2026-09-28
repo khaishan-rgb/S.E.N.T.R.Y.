@@ -465,6 +465,7 @@ table.tb{width:100%;border-collapse:collapse;font-size:14px}
       <button type="button" class="lay-h" id="layH" aria-expanded="false">Layers</button>
       <div class="lay-list">
         <label class="k-traffic"><input type="checkbox" data-l="traffic" checked>Live traffic</label>
+        <label class="k-traffic" id="tomChip" hidden><input type="checkbox" data-l="tomtom">TomTom colours</label>
         <label class="k-inc"><input type="checkbox" data-l="incidents">Incidents</label>
         <label class="k-rw"><input type="checkbox" data-l="roadworks">Road works</label>
         <label class="k-cam"><input type="checkbox" data-l="cams">Cameras</label>
@@ -475,10 +476,19 @@ table.tb{width:100%;border-collapse:collapse;font-size:14px}
       </div>
     </div>
     <div class="ov legend"><h3 id="legendTitle">Traffic Speed (LTA)</h3>
+      <div id="legendSpeed">
       <div class="row"><span class="sw" style="background:#22d36a"></span><span>Smooth <small>(≥ 40 km/h)</small></span></div>
       <div class="row"><span class="sw" style="background:#ffc21a"></span><span>Moderate <small>(30 – 39 km/h)</small></span></div>
       <div class="row"><span class="sw" style="background:#ff8a1f"></span><span>Slow <small>(20 – 29 km/h)</small></span></div>
       <div class="row"><span class="sw" style="background:#ff4d55"></span><span>Congested <small>(&lt; 20 km/h)</small></span></div>
+      </div>
+      <div id="legendTom" hidden>
+        <div class="row"><span class="sw" style="background:#2fb34a"></span><span>Flowing <small>(normal speed)</small></span></div>
+        <div class="row"><span class="sw" style="background:#f5a623"></span><span>Slower than usual</span></div>
+        <div class="row"><span class="sw" style="background:#e0332e"></span><span>Slow</span></div>
+        <div class="row"><span class="sw" style="background:#7a0d0b"></span><span>Very slow / stopped</span></div>
+        <div class="row"><small>Colours as shown by TomTom</small></div>
+      </div>
       <div class="row" title="Blue means the route has no LTA traffic reading on that stretch"><span class="sw rt"></span><span>Bus route &amp; stops</span></div>
       <div id="legendExtra"></div>
     </div>
@@ -1478,6 +1488,33 @@ api("/api/traffic/services", 20000).then(j => { if(j.services){ S.svcAll = j.ser
 })();
 setTimeout(() => map.invalidateSize(), 300);
 window.addEventListener("resize", () => map.invalidateSize());
+
+/* ===================== V16.9 TomTom road colours =====================
+   The colours of the roads follow TomTom's live traffic map (tiles from OUR server, so the key stays secret). With a service selected the route is
+   drawn as a plain line under the TomTom colours. Switch it off with the "TomTom colours" chip to see the LTA speed-band colours again.
+   Only the road colours change: the summary bar, timeline and counters still use LTA speed bands. */
+map.createPane("tomtom").style.zIndex = 412;
+const TOM = {ok:false};
+const tomLayer = L.tileLayer("/api/tomtom/tile/{z}/{x}/{y}.png", {pane:"tomtom", minZoom:10, maxZoom:19, maxNativeZoom:18, opacity:.95, updateWhenIdle:true, keepBuffer:2, attribution:"Traffic \u00a9 TomTom"});
+const tomOn = () => !!(TOM.ok && S.layers.tomtom && S.layers.traffic);
+(function(){ const fT = syncLayers; syncLayers = function(){ fT();
+  const on = (g, v) => { if(v && !map.hasLayer(g)) map.addLayer(g); if(!v && map.hasLayer(g)) map.removeLayer(g); };
+  const t = tomOn(); on(tomLayer, t);
+  if(t){ on(gRoute, false); on(gBase, true); on(gIslandSpeed, false); }
+  const ls = $("legendSpeed"), lt = $("legendTom"); if(ls) ls.hidden = t; if(lt) lt.hidden = !t;
+  const ti = $("legendTitle"); if(t && ti) ti.textContent = S.svc && S.route ? "Traffic on Route (TomTom)" : "Island Traffic (TomTom)";
+}; })();
+(function(){ const fD = drawRoute; drawRoute = function(r){ fD(r); syncLayers(); }; })();
+fetch("/api/health", {credentials:"same-origin"}).then(r => r.json()).then(j => {
+  if(!j || !j.tomtom) return;
+  TOM.ok = true; $("tomChip").hidden = false;
+  let pref = null; try{ pref = localStorage.getItem("rt.tomtom"); }catch(e){}
+  S.layers.tomtom = pref !== "0";
+  const cb = document.querySelector('#layers input[data-l="tomtom"]'); cb.checked = S.layers.tomtom;
+  cb.addEventListener("change", () => { try{ localStorage.setItem("rt.tomtom", cb.checked ? "1" : "0"); }catch(e){} if(!cb.checked && typeof loadIslandSpeed === "function") loadIslandSpeed(true); });
+  syncLayers();
+}).catch(() => {});
+setInterval(() => { if(!document.hidden && map.hasLayer(tomLayer)) tomLayer.redraw(); }, 120000);
 </script>
 
 

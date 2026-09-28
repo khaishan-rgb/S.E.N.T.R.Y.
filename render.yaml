@@ -13,6 +13,8 @@ services:
         sync: false
       - key: APP_PASSWORD         # RECOMMENDED: change the default password (123456) here
         sync: false
+      - key: HIDDEN_PAGES         # optional: pages hidden for everyone, e.g. cameras,running (Settings > Pages can also change this)
+        sync: false
       - key: TIMETABLE_TOKEN      # optional but recommended: protects planned-timetable upload/clear
         sync: false
       - key: BUNCHING_ADMIN_TOKEN # optional: protects Bunching settings / Service Headway Master edits (falls back to TIMETABLE_TOKEN)

@@ -75,7 +75,7 @@
   /* ------------------------------------------------------------------ preferences (applied before paint) */
   var PKEY = "sgtp.prefs";
   var DEFAULT_PREFS = {theme:"dark", density:"comfortable", sidebar:"expanded", reduceMotion:false, mapFx:"normal", textSize:"normal", highContrast:false, colourBlind:false,
-                       timeFormat:"24", dateFormat:"dmy", landing:"/command", sound:false, displayName:"", staffId:"", role:"", department:"", avatar:""};
+                       timeFormat:"24", dateFormat:"dmy", landing:"/command", sound:false, hiddenPages:[], blockHidden:true, displayName:"", staffId:"", role:"", department:"", avatar:""};
   function prefs(){ var p = {}; try{ p = JSON.parse(localStorage.getItem(PKEY) || "{}") || {}; }catch(e){} var o = {}; for(var k in DEFAULT_PREFS) o[k] = DEFAULT_PREFS[k]; for(var k2 in p) o[k2] = p[k2]; return o; }
   function savePrefs(patch){ var p = prefs(); for(var k in patch) p[k] = patch[k]; try{ localStorage.setItem(PKEY, JSON.stringify(p)); }catch(e){} applyPrefs(p); return p; }
   function applyPrefs(p){
@@ -99,6 +99,11 @@
     return "";
   }
   function mod(id){ for(var i = 0; i < MODULES.length; i++) if(MODULES[i].id === id) return MODULES[i]; return null; }
+  // V16.8: pages hidden in Settings > Pages (for everyone). Settings itself can never be hidden.
+  // The list comes from the server (window.__SGTP_HIDDEN, put at the top of this file by /app-shell.js) so it is the same for everyone.
+  function hiddenIds(){ return Array.isArray(window.__SGTP_HIDDEN) ? window.__SGTP_HIDDEN : (prefs().hiddenPages || []); }
+  function blockOn(){ return typeof window.__SGTP_BLOCK === "boolean" ? window.__SGTP_BLOCK : prefs().blockHidden !== false; }
+  function hid(m){ return !!m && m.id !== "settings" && hiddenIds().indexOf(m.id) >= 0; }
 
   /* ------------------------------------------------------------------ renderers (all from MODULES) */
   function linkHTML(m, cls){
@@ -109,7 +114,7 @@
     var h = '<a class="ds-brand" href="/command" aria-label="SG Transport Pulse \u2014 Command Centre"><span class="ds-logo">' + icon("logo", ' stroke-width="2"') + '</span>'
       + '<span class="ds-brand-t"><b>SG TRANSPORT PULSE</b><small>Operational Intelligence Platform</small></span></a><nav class="ds-nav" aria-label="Primary">';
     GROUPS.forEach(function(g){
-      var items = MODULES.filter(function(m){ return m.group === g; }); if(!items.length) return;
+      var items = MODULES.filter(function(m){ return m.group === g && !hid(m); }); if(!items.length) return;
       h += '<div class="ds-grp">' + g + '</div>' + items.map(function(m){ return linkHTML(m, "ds-link"); }).join("");
     });
     h += '</nav><div class="ds-side-foot"><i class="ds-dot" id="dsSideDot"></i><span id="dsSideTxt">Checking data feeds\u2026</span>'
@@ -119,7 +124,7 @@
   function launcherHTML(){
     var h = '<h4>APPS <a href="/settings">Settings</a></h4>';
     GROUPS.forEach(function(g){
-      var items = MODULES.filter(function(m){ return m.group === g; }); if(!items.length) return;
+      var items = MODULES.filter(function(m){ return m.group === g && !hid(m); }); if(!items.length) return;
       h += '<div class="ds-lgrp">' + g + '</div><div class="ds-lgrid">' + items.map(function(m){
         var inner = '<span class="ic">' + icon(m.enabled ? m.icon : "lock") + '</span>' + esc(m.name);
         return m.enabled ? '<a class="ds-app-tile' + (m.id === ACTIVE ? " active" : "") + '" href="' + m.route + '" title="' + esc(m.desc) + '">' + inner + '</a>'
@@ -129,13 +134,13 @@
     return h;
   }
   function bottomHTML(){
-    var h = BOTTOM.map(function(b){ var m = mod(b[1]);
+    var h = BOTTOM.filter(function(b){ return !hid(mod(b[1])); }).map(function(b){ var m = mod(b[1]);
       return '<a href="' + m.route + '" class="' + (m.id === ACTIVE ? "active" : "") + '"' + (m.id === ACTIVE ? ' aria-current="page"' : "") + '>' + icon(m.icon) + '<span>' + b[0].toUpperCase() + '</span></a>'; }).join("");
     var inMore = MODULES.some(function(m){ return m.mobile === "more" && m.id === ACTIVE; });
     return h + '<button type="button" id="dsMoreBtn" class="' + (inMore ? "active" : "") + '" aria-expanded="false" aria-controls="dsSheet">' + icon("more") + '<span>MORE</span></button>';
   }
   function sheetHTML(){
-    return '<h4>MORE</h4>' + MODULES.filter(function(m){ return m.mobile === "more"; }).map(function(m){
+    return '<h4>MORE</h4>' + MODULES.filter(function(m){ return m.mobile === "more" && !hid(m); }).map(function(m){
       return m.enabled ? '<a href="' + m.route + '" class="' + (m.id === ACTIVE ? "active" : "") + '">' + icon(m.icon) + esc(m.name) + '</a>'
                        : '<a class="locked" aria-disabled="true">' + icon("lock") + esc(m.name) + '<em class="ds-tag">SOON</em></a>';
     }).join("") + '<a href="#" data-ds-open="dsLaunch">' + icon("grid") + 'All apps</a>';
@@ -169,6 +174,15 @@
     b.classList.add("ds-app"); b.setAttribute("data-ds-module", ACTIVE || "");
     document.documentElement.classList.remove("shell-off");            // the V13.14 per-page hide-menu flag is replaced by the collapsible sidebar
     if(BARE) return;
+    if(ACTIVE && hid(mod(ACTIVE)) && blockOn()){                 // V16.7: a hidden page opened by link / bookmark
+      var alt = MODULES.filter(function(m){ return m.enabled && !hid(m) && m.id !== "settings"; })[0], ov = document.createElement("div");
+      ov.setAttribute("role", "alertdialog"); ov.setAttribute("aria-label", "Page hidden");
+      ov.style.cssText = "position:fixed;inset:0;z-index:2147483000;background:#0b1622;color:#e6eef7;display:flex;align-items:center;justify-content:center;text-align:center;font:16px/1.5 system-ui,sans-serif;padding:24px";
+      ov.innerHTML = '<div style="max-width:420px"><div style="font-size:20px;font-weight:700;margin-bottom:8px">This page is hidden</div><div style="opacity:.8;margin-bottom:18px">It was hidden in Settings \u203a Pages.</div>'
+        + (alt ? '<a href="' + alt.route + '" style="display:inline-block;margin:4px;padding:10px 16px;border-radius:8px;background:#1f6feb;color:#fff;text-decoration:none">Open ' + esc(alt.name) + '</a>' : "")
+        + '<a href="/settings#pages" style="display:inline-block;margin:4px;padding:10px 16px;border-radius:8px;border:1px solid #3b5573;color:#e6eef7;text-decoration:none">Settings \u203a Pages</a></div>';
+      b.appendChild(ov); return;
+    }
     // the legacy per-page navigation lists are no longer rendered; anything left over is hidden, never used
     document.querySelectorAll(".desktop-shell,.mobile-bottom-nav,.mobile-more,.mobile-top-menu,.mobile-menu-btn,nav.navl,header nav.nav,.shell-show,.shell-hide,.cmdbar,.ai-shell-card")
       .forEach(function(e){ e.classList.add("ds-dup"); e.setAttribute("aria-hidden", "true"); });
@@ -314,7 +328,7 @@
     (function f(t){ var k = Math.min(1, (t - t0) / ms), v = Math.round(from + (to - from) * (1 - Math.pow(1 - k, 3))); el.textContent = String(v); if(k < 1) requestAnimationFrame(f); })(t0);
   }
 
-  window.DS = {modules:MODULES, groups:GROUPS, module:mod, active:ACTIVE, icon:icon, esc:esc, api:api, prefs:prefs, savePrefs:savePrefs, defaults:DEFAULT_PREFS,
+  window.DS = {modules:MODULES.filter(function(m){ return !hid(m); }), allModules:MODULES, hiddenIds:hiddenIds, blockOn:blockOn, groups:GROUPS, module:mod, active:ACTIVE, icon:icon, esc:esc, api:api, prefs:prefs, savePrefs:savePrefs, defaults:DEFAULT_PREFS,
                status:function(){ return STATUS; }, refreshStatus:status, refreshNotes:notes, session:function(){ return AUTH; }, refreshSession:session,
                sev:sev, empty:empty, loading:loading, ai:ai, countUp:countUp, fmtTime:fmtTime, summarise:summarise};
   if(document.body) mount(); else document.addEventListener("DOMContentLoaded", mount);
