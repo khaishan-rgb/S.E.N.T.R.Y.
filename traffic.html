@@ -282,9 +282,10 @@ async function load(force){
   if(tok !== S.tok) return;
   if(j.error){ setLive("bad", "Error", j.error); $("feedBanner").hidden = false; $("feedBanner").textContent = j.error; schedule(10); return; }
   S.data = j; S.ev = Object.fromEntries((j.events || []).map(e => [e.id, e]));
-  const bad = Object.entries(j.feeds || {}).filter(([k, v]) => !v.ok);
+  // V16.3.1: waze is optional (no WAZE_FEED_URL = not an error) and "verify" has no ok flag, so only real failures show in the banner
+  const bad = Object.entries(j.feeds || {}).filter(([k, v]) => k === "waze" ? (v.configured && !v.ok) : k === "verify" ? !!v.error : !v.ok);
   $("feedBanner").hidden = !bad.length && !j.loading; $("feedBanner").innerHTML = j.loading ? "\u23F3 Loading disruption data for the first time \u2013 this can take a few seconds while LTA is queried\u2026" :
-    bad.map(([k, v]) => `\u26A0 ${esc({bands:"Traffic speed bands", incidents:"Traffic incidents", roadworks:"Road works", rain:"Rainfall", routes:"Bus routes"}[k] || k)} feed unavailable${v.error ? ": " + esc(v.error) : ""}. Its alerts are held, not cleared.`).join("<br>");
+    bad.map(([k, v]) => `\u26A0 ${esc({bands:"Traffic speed bands", incidents:"Traffic incidents", roadworks:"Road works", rain:"Rainfall", routes:"Bus routes", waze:"Waze", verify:"Second-source check"}[k] || k)} feed unavailable${v.error ? ": " + esc(v.error) : ""}. Its alerts are held, not cleared.`).join("<br>");
   setLive(j.loading ? "warn" : bad.length ? "warn" : "ok", j.loading ? "Loading\u2026" : bad.length ? "Some feeds unavailable" : "Live Data (LTA DataMall)", "Last refresh " + (j.updated || "?") + " \u00b7 answered in " + Math.round(performance.now() - t0) + "ms");
   $("engine").textContent = "Engine " + j.model + " \u00b7 " + j.updates + " updates";
   if(S.sel && !(j.rows || []).some(r => r.id === S.sel)) { S.sel = null; S.detail = null; }
