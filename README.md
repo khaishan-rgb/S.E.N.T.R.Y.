@@ -1,4 +1,10 @@
-# SG Transport Pulse V16.3 — Operational Intelligence & Service Recovery Platform
+# SG Transport Pulse V16.4 — Operational Intelligence & Service Recovery Platform
+
+## V16.4 — TomTom Traffic API as a second source
+* Set `TOMTOM_API_KEY` on the server (Render > Environment). The key is never in the code.
+* TomTom Flow checks the speed on each active LTA congestion stretch (cached 10 min, up to 10 stretches). TomTom Incidents adds accidents, closures, breakdowns and flooding (one call per 5 min).
+* `TOMTOM_DAILY_CAP` (default 2000) is the most calls per Singapore day. Set it below your plan's free limit.
+* Without the key, nothing changes.
 
 ## V16.3 — Second-source check for LTA congestion (our buses + optional Waze)
 

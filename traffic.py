@@ -1094,7 +1094,7 @@ def bus_speed_samples(obs, a_km, b_km, now, P):
     return out
 
 
-def verdict(bus_kmh_list, waze, P):
+def verdict(bus_kmh_list, waze, P, tt=None):
     """-> {"state": confirmed | unconfirmed | unverified, "text": ..., "bus_kmh", "bus_n", "waze"}.
     confirmed: our buses crawl through the stretch, or a Waze jam covers it. unconfirmed: our buses move at normal speed and Waze has no jam there.
     unverified: not enough evidence either way (the LTA reading stands as it is)."""
@@ -1109,13 +1109,17 @@ def verdict(bus_kmh_list, waze, P):
         bits.append(f"our buses {med:.0f} km/h ({n} reading{'s' if n != 1 else ''})")
     if waze and waze.get("live"):
         bits.append(f"Waze jam level {waze['level']} at {waze['kmh']:.0f} km/h over {waze['pct']:.0f}% of the stretch" if w_yes else "no Waze jam here")
-    if b_slow or w_yes:
+    t_yes = bool(tt and tt.get("jam"))
+    t_clear = bool(tt and tt.get("clear"))
+    if tt and tt.get("live"):
+        bits.append(f"TomTom {tt['cur']:.0f} km/h (normal {tt['free']:.0f})")
+    if b_slow or w_yes or t_yes:
         state = "confirmed"
-    elif b_clear:
+    elif b_clear or t_clear:
         state = "unconfirmed"
     else:
         state = "unverified"
-    return {"state": state, "text": "; ".join(bits) or "no second source yet", "bus_kmh": round(med, 1) if med is not None else None, "bus_n": n, "waze": waze}
+    return {"state": state, "text": "; ".join(bits) or "no second source yet", "bus_kmh": round(med, 1) if med is not None else None, "bus_n": n, "waze": waze, "tomtom": tt}
 
 
 def parse_waze(feed, P):

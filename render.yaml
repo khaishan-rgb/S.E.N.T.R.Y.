@@ -13,6 +13,10 @@ services:
         sync: false
       - key: BUNCHING_ADMIN_TOKEN # optional: protects Bunching settings / Service Headway Master edits (falls back to TIMETABLE_TOKEN)
         sync: false
+      - key: TOMTOM_API_KEY       # optional: TomTom Traffic API second source (set it in Render, not in the code)
+        sync: false
+      - key: TOMTOM_DAILY_CAP     # optional: most TomTom calls per day (default 2000)
+        sync: false
       - key: BUNCHING_SERVICES    # optional: default watch list, e.g. 32,145,65
         sync: false
       - key: BUNCHING_ALWAYS_ON   # optional: 1 = keep collecting when nobody has the page open (needed for an unattended event log; uses more LTA quota)
