@@ -22,7 +22,7 @@ import headway
 import routegeom
 import traffic
 
-VERSION = "V16.4.2"
+VERSION = "V16.4.3"
 LTA = os.getenv("LTA_BASE", "https://datamall2.mytransport.sg/ltaodataservice").rstrip("/")
 KEY = os.getenv("LTA_ACCOUNT_KEY", "")
 OSRM = os.getenv("OSRM_URL", "https://router.project-osrm.org").rstrip("/")
@@ -4720,7 +4720,7 @@ def waze_live():
 # ---- V16.4 TomTom Traffic API (optional second source). Set TOMTOM_API_KEY on the server (never put the key in the code).
 # Two uses: (1) Flow Segment Data checks the speed on each active LTA congestion stretch; (2) Incident Details adds accidents / closures / breakdowns.
 # Calls are cached and capped per day so the free tier is not used up. TOMTOM_DAILY_CAP (default 2000) is the most calls per Singapore day.
-TT = {"key": os.getenv("TOMTOM_API_KEY", "").strip(), "cap": int(os.getenv("TOMTOM_DAILY_CAP", "2000") or 2000), "day": "", "n": 0,
+TT = {"referer": os.getenv("TOMTOM_REFERER", "").strip(), "key": os.getenv("TOMTOM_API_KEY", "").strip(), "cap": int(os.getenv("TOMTOM_DAILY_CAP", "2000") or 2000), "day": "", "n": 0,
       "inc_at": 0.0, "inc_ok_at": 0.0, "alerts": [], "error": None, "flow": {}, "flow_error": None, "flow_ok_at": 0.0}
 TT_INC_TTL = 300                    # incidents: one call per 5 minutes for the whole island
 TT_FLOW_TTL = 600                   # flow: one reading per stretch point per 10 minutes
@@ -4730,6 +4730,11 @@ TT_CLEAR_RATIO = 0.8                # ... at or above this = traffic is flowing 
 TT_MIN_CONF = 0.5                   # TomTom confidence below this is ignored
 TT_BBOX = "103.60,1.15,104.10,1.48"  # Singapore
 TT_CATS = {1: "Accident", 7: "Lane closed", 8: "Road closed", 11: "Flooding", 14: "Broken down vehicle"}
+
+
+def tt_headers():
+    """If the TomTom key is limited to certain websites (Referer), send that website name. Set TOMTOM_REFERER, for example https://your-app.onrender.com/"""
+    return {"Referer": TT["referer"]} if TT["referer"] else {}
 
 
 def tt_spend():
@@ -4749,6 +4754,8 @@ def tt_err(e):
             code = e.response.status_code
             hint = {401: "key rejected", 403: "key is not enabled for this TomTom product", 429: "too many calls"}.get(code, "")
             body = " ".join((e.response.text or "").split())[:100]
+            if "InvalidReferer" in body:
+                hint = "key is limited to certain websites: in TomTom set Allowed Referers to *, or set TOMTOM_REFERER on the server"
             return f"HTTP {code} ({hint}) {body}".replace("()", "").strip()
     except Exception:
         pass
@@ -4771,7 +4778,7 @@ async def tomtom_incidents():
         TT["error"] = "daily call cap reached"
         return TT
     try:
-        r = await client().get("https://api.tomtom.com/traffic/services/5/incidentDetails", timeout=20, params={
+        r = await client().get("https://api.tomtom.com/traffic/services/5/incidentDetails", timeout=20, headers=tt_headers(), params={
             "key": TT["key"], "bbox": TT_BBOX, "language": "en-GB", "timeValidityFilter": "present",
             "fields": "{incidents{type,geometry{type,coordinates},properties{id,iconCategory,magnitudeOfDelay,events{description,code,iconCategory},from,to,roadNumbers}}}"})
         r.raise_for_status()
@@ -4818,7 +4825,7 @@ async def tomtom_flow(lat, lon):
         TT["flow_error"] = "daily call cap reached"
         return hit[1] if hit else None
     try:
-        r = await client().get("https://api.tomtom.com/traffic/services/4/flowSegmentData/absolute/10/json", timeout=15,
+        r = await client().get("https://api.tomtom.com/traffic/services/4/flowSegmentData/absolute/10/json", timeout=15, headers=tt_headers(),
                                params={"key": TT["key"], "point": f"{lat:.5f},{lon:.5f}", "unit": "KMPH"})
         r.raise_for_status()
         d = r.json().get("flowSegmentData") or {}
@@ -4846,13 +4853,14 @@ async def api_tomtom_test():
                                                                                           "fields": "{incidents{type,properties{iconCategory}}}"})}
     for name, (url, prm) in tests.items():
         try:
-            r = await client().get(url, params=dict(prm, key=TT["key"]), timeout=20)
+            r = await client().get(url, params=dict(prm, key=TT["key"]), timeout=20, headers=tt_headers())
             body = " ".join((r.text or "").split())[:160]
             out[name] = {"status": r.status_code, "ok": r.status_code == 200, "answer": body}
         except Exception as ex:
             out[name] = {"status": None, "ok": False, "answer": f"{type(ex).__name__}: {str(ex)[:100]}"}
     ok = all(v["ok"] for v in out.values())
-    hint = "" if ok else ("Status 403 = the key is not enabled for this product. In your TomTom account: open your app, then tick 'Traffic Flow' and 'Traffic Incidents'. Or create a new key with both ticked." if any(v["status"] == 403 for v in out.values()) else "See the answer text for each service.")
+    inv = any("InvalidReferer" in (v.get("answer") or "") for v in out.values())
+    hint = "" if ok else ("The key is limited to certain websites (InvalidReferer). In TomTom: open your key, set Allowed Referers to * (or remove the limit). Or set TOMTOM_REFERER on Render to your site address." if inv else "Status 403 = the key is not enabled for this product. In your TomTom account: open your app, then tick 'Traffic Flow' and 'Traffic Incidents'. Or create a new key with both ticked." if any(v["status"] == 403 for v in out.values()) else "See the answer text for each service.")
     return {"ok": ok, "results": out, "hint": hint}
 
 

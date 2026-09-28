@@ -4,6 +4,7 @@
 * Set `TOMTOM_API_KEY` on the server (Render > Environment). The key is never in the code.
 * TomTom Flow checks the speed on each active LTA congestion stretch (cached 10 min, up to 10 stretches). TomTom Incidents adds accidents, closures, breakdowns and flooding (one call per 5 min).
 * `TOMTOM_DAILY_CAP` (default 2000) is the most calls per Singapore day. Set it below your plan's free limit.
+* If TomTom answers `InvalidReferer`, the key is limited to certain websites. Set Allowed Referers to `*` in TomTom, or set `TOMTOM_REFERER` on the server to your site address.
 * Without the key, nothing changes.
 
 ## V16.3 — Second-source check for LTA congestion (our buses + optional Waze)
