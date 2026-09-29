@@ -8,59 +8,83 @@
 <link rel="stylesheet" href="/design-system.css">
 <script src="/app-shell.js" data-module="occlive"></script>
 <style>
-.ol-wrap{display:grid;grid-template-columns:minmax(0,2fr) minmax(320px,1fr);gap:var(--ds-gap);align-items:start}
-.ol-wrap.expand-left{grid-template-columns:1fr 0}
-.ol-wrap.expand-right{grid-template-columns:0 1fr}
+.ol-wrap{display:grid;grid-template-columns:minmax(320px,1fr) minmax(0,2fr);gap:var(--ds-gap);align-items:start}
+.ol-wrap.expand-left{grid-template-columns:1fr 0} .ol-wrap.expand-right{grid-template-columns:0 1fr}
 .ol-wrap.expand-left .ol-right,.ol-wrap.expand-right .ol-left{display:none}
-@media (max-width:1180px){.ol-wrap{grid-template-columns:1fr}.ol-right{order:-1}}
+@media (max-width:1180px){.ol-wrap{grid-template-columns:1fr}}
+.ol-mtabs{display:none;gap:6px;margin-bottom:10px}
+@media (max-width:1180px){.ol-mtabs{display:flex}.ol-left,.ol-right{display:none}.ol-left.on,.ol-right.on{display:block}}
+.ol-mtabs button{flex:1;height:34px;border-radius:8px;border:1px solid var(--ds-line-2);background:rgba(12,27,48,.6);color:var(--ds-text-2);font:600 12.5px var(--ds-font)}
+.ol-mtabs button[aria-pressed="true"]{color:#fff;border-color:var(--ds-edge);background:rgba(56,214,255,.14)}
+
 .ol-counters{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px}
-.ol-c{border-radius:10px;padding:10px 12px;border:1px solid var(--ds-line);background:rgba(8,18,33,.6);display:flex;flex-direction:column;gap:2px}
-.ol-c b{font:700 22px/1 var(--ds-display)}
-.ol-c small{color:var(--ds-mut);font-size:11px;letter-spacing:.02em}
+.ol-c{border-radius:10px;padding:9px 10px;border:1px solid var(--ds-line);background:rgba(8,18,33,.6)}
+.ol-c b{display:block;font:700 20px/1 var(--ds-display)} .ol-c small{color:var(--ds-mut);font-size:10.5px}
 .ol-c.crit b{color:var(--ds-red)} .ol-c.act b{color:var(--ds-amber)} .ol-c.mon b{color:#ffd76a} .ol-c.res b{color:var(--ds-green)}
-.ol-filters{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
-.ol-chip{height:28px;padding:0 11px;border-radius:999px;border:1px solid var(--ds-line-2);background:rgba(12,27,48,.6);color:var(--ds-text-2);font:600 12px var(--ds-font);cursor:pointer}
+
+.ol-chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.ol-chip{height:26px;padding:0 10px;border-radius:999px;border:1px solid var(--ds-line-2);background:rgba(12,27,48,.6);color:var(--ds-text-2);font:600 11.5px var(--ds-font);cursor:pointer}
 .ol-chip[aria-pressed="true"]{color:#fff;border-color:var(--ds-edge);background:rgba(56,214,255,.14)}
-.ol-search{margin-bottom:12px}
-.ol-sec-h{display:flex;align-items:center;gap:8px;font:600 12px var(--ds-font);letter-spacing:.1em;color:var(--ds-mut);margin:16px 0 8px}
-.ol-sec-h .n{color:#fff}
-.ol-card{position:relative;border-radius:10px;border:1px solid var(--ds-line);background:rgba(9,19,35,.7);padding:11px 12px;margin-bottom:8px;display:grid;gap:6px;transition:opacity .4s}
-.ol-card.sev-critical{border-left:3px solid var(--ds-red)}
-.ol-card.sev-high{border-left:3px solid var(--ds-amber)}
-.ol-card.sev-medium{border-left:3px solid #ffd76a}
-.ol-card.sev-low{border-left:3px solid var(--ds-grey)}
-.ol-card.ack{opacity:.62}
-.ol-card.esc{outline:1px solid var(--ds-red)}
+
+.tk-card{position:relative;border-radius:10px;border:1px solid var(--ds-line);background:rgba(9,19,35,.72);padding:10px 11px;margin-bottom:8px;cursor:pointer}
+.tk-card:hover{border-color:var(--ds-edge)}
+.tk-card.pri-critical{border-left:3px solid var(--ds-red)} .tk-card.pri-high{border-left:3px solid var(--ds-amber)}
+.tk-card.pri-normal{border-left:3px solid var(--ds-grey)} .tk-card.pri-fyi{border-left:3px solid #3d5f86}
+.tk-row1{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.tk-pri{font:700 10px var(--ds-font);letter-spacing:.05em;padding:2px 6px;border-radius:5px}
+.tk-pri.critical{background:var(--ds-red);color:#fff} .tk-pri.high{background:var(--ds-amber);color:#1a0f00}
+.tk-pri.normal{background:rgba(255,255,255,.1);color:var(--ds-text-2)} .tk-pri.fyi{background:rgba(56,214,255,.15);color:#bfeeff}
+.tk-cat{font:600 10.5px var(--ds-font);color:var(--ds-mut)}
+.tk-status{margin-left:auto;font:700 10px var(--ds-font);padding:2px 7px;border-radius:5px;background:rgba(255,255,255,.08);color:var(--ds-text-2)}
+.tk-status.resolved{background:rgba(46,229,157,.16);color:#9ff5d3}
+.tk-status.handover{background:rgba(160,123,255,.2);color:#ddd0ff}
+.tk-title{font:600 13.5px var(--ds-font);color:#fff;margin:4px 0 2px}
+.tk-meta{color:var(--ds-text-2);font-size:12px}
+.tk-foot{display:flex;align-items:center;gap:8px;margin-top:6px;color:var(--ds-mut);font-size:11px}
+.tk-foot .pin{color:#ffd76a}
+.ol-empty{padding:24px 10px;text-align:center;color:var(--ds-mut);font-size:13px}
+
+.ol-compose{border-radius:10px;border:1px dashed var(--ds-line-2);padding:10px;margin-bottom:12px}
+.ol-compose input,.ol-compose select,.ol-compose textarea{width:100%;border-radius:7px;border:1px solid var(--ds-line-2);background:#081426;color:#fff;padding:7px 9px;font:500 12.5px var(--ds-font);margin-top:5px}
+.ol-compose textarea{min-height:52px;resize:vertical}
+.ol-compose .g2{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.ol-compose .g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px}
+.ol-compose .row{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
+.ol-compose label{font-size:10.5px;color:var(--ds-mut);display:block;margin-top:7px}
+.ol-compose summary{cursor:pointer;color:var(--ds-cyan);font-size:12px;margin-top:6px}
+
+/* alert queue (right) */
+.ol-card{position:relative;border-radius:10px;border:1px solid var(--ds-line);background:rgba(9,19,35,.7);padding:11px 12px;margin-bottom:8px;display:grid;gap:6px}
+.ol-card.sev-critical{border-left:3px solid var(--ds-red)} .ol-card.sev-high{border-left:3px solid var(--ds-amber)}
+.ol-card.sev-medium{border-left:3px solid #ffd76a} .ol-card.sev-low{border-left:3px solid var(--ds-grey)}
+.ol-card.ack{opacity:.6}
 .ol-row1{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-.ol-badge{font:700 10.5px var(--ds-font);letter-spacing:.05em;padding:2px 7px;border-radius:6px;color:#0a0e16}
-.ol-badge.critical{background:var(--ds-red);color:#fff}
-.ol-badge.high{background:var(--ds-amber)}
-.ol-badge.medium{background:#ffd76a}
-.ol-badge.low{background:var(--ds-grey);color:#fff}
-.ol-badge.esc{background:var(--ds-red);color:#fff}
+.ol-badge{font:700 10.5px var(--ds-font);letter-spacing:.05em;padding:2px 7px;border-radius:6px}
+.ol-badge.critical{background:var(--ds-red);color:#fff} .ol-badge.high{background:var(--ds-amber);color:#1a0f00}
+.ol-badge.medium{background:#ffd76a;color:#1a0f00} .ol-badge.low{background:var(--ds-grey);color:#fff}
 .ol-title{font:600 14px var(--ds-font);color:#fff}
 .ol-age{margin-left:auto;color:var(--ds-mut);font-size:11.5px}
 .ol-det{color:var(--ds-text-2);font-size:12.5px}
 .ol-actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:2px}
-.ol-empty{padding:30px 10px;text-align:center;color:var(--ds-mut);font-size:13px}
-.ol-mon-acked{color:var(--ds-mut);font-size:11.5px}
+.ol-sec-h{display:flex;align-items:center;gap:8px;font:600 12px var(--ds-font);letter-spacing:.1em;color:var(--ds-mut);margin:16px 0 8px}
 
-.ol-tabs{display:flex;gap:4px;margin-bottom:10px;flex-wrap:wrap}
-.ol-tab{height:30px;padding:0 12px;border-radius:8px;border:1px solid transparent;background:transparent;color:var(--ds-mut);font:600 12px var(--ds-font);cursor:pointer}
-.ol-tab[aria-pressed="true"]{background:rgba(56,214,255,.12);color:#fff;border-color:var(--ds-edge)}
-.ol-note{border-radius:10px;border:1px solid var(--ds-line);background:rgba(9,19,35,.7);padding:10px 11px;margin-bottom:8px}
-.ol-note-h{display:flex;align-items:center;gap:6px;font:600 11px var(--ds-font);color:var(--ds-mut)}
-.ol-note-title{font:600 13.5px var(--ds-font);color:#fff;margin:3px 0 2px}
-.ol-note-body{color:var(--ds-text-2);font-size:12.5px;white-space:pre-wrap}
-.ol-note-tags{display:flex;gap:5px;flex-wrap:wrap;margin-top:6px}
+/* ticket detail drawer */
+.ol-drawer{position:fixed;inset:0;z-index:2000;display:none}
+.ol-drawer.on{display:block}
+.ol-drawer .bk{position:absolute;inset:0;background:rgba(2,6,12,.6)}
+.ol-drawer .pane{position:absolute;top:0;right:0;bottom:0;width:min(560px,100%);background:linear-gradient(180deg,#0b1626,#081221);border-left:1px solid var(--ds-line);overflow:auto;padding:18px}
+.ol-dhead{display:flex;align-items:center;gap:8px;margin-bottom:4px}
+.ol-dno{color:var(--ds-mut);font-size:11.5px}
+.ol-dtitle{font:700 18px var(--ds-display);color:#fff;margin:2px 0 8px}
+.ol-dmeta{display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12.5px;color:var(--ds-text-2);margin-bottom:10px}
+.ol-dmeta b{color:#fff;display:block;font-size:11px;color:var(--ds-mut);font-weight:600}
+.ol-dsec{border-top:1px solid var(--ds-line);padding-top:10px;margin-top:10px}
+.ol-dsec h4{font:600 11px var(--ds-font);letter-spacing:.12em;color:var(--ds-mut);margin:0 0 8px}
+.ol-act-item{display:flex;gap:8px;margin-bottom:8px;font-size:12.5px}
+.ol-act-item .t{color:var(--ds-mut);font-size:11px;min-width:42px}
+.ol-act-item .a{color:#fff;font-weight:600}
 .ol-tag{font:600 10.5px var(--ds-font);padding:2px 7px;border-radius:6px;background:rgba(56,214,255,.14);color:#bfeeff}
-.ol-note-reply{margin-top:6px;padding-top:6px;border-top:1px solid var(--ds-line);font-size:12px;color:var(--ds-text-2)}
-.ol-note-foot{display:flex;gap:6px;margin-top:8px;align-items:center}
-.ol-note-foot input{flex:1;height:30px;border-radius:7px;border:1px solid var(--ds-line-2);background:#081426;color:#fff;padding:0 9px;font:500 12.5px var(--ds-font)}
-.ol-compose{border-radius:10px;border:1px dashed var(--ds-line-2);padding:10px;margin-bottom:12px}
-.ol-compose textarea{width:100%;min-height:56px;border-radius:8px;border:1px solid var(--ds-line-2);background:#081426;color:#fff;padding:8px;font:500 13px var(--ds-font);resize:vertical}
-.ol-compose .row{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap}
-.ol-share{border-radius:10px;border:1px solid var(--ds-edge);background:rgba(56,214,255,.06);padding:10px;margin-bottom:10px}
+.ol-close{position:absolute;top:14px;right:14px}
 </style>
 </head>
 <body>
@@ -69,182 +93,258 @@
     <div class="ds-ph" style="margin:0"><b style="font:700 18px var(--ds-display);color:#fff">OCC LIVE</b><span class="sp"></span><small id="olTime"></small></div>
   </div>
 
+  <div class="ol-mtabs" id="olMTabs">
+    <button type="button" data-t="left" aria-pressed="true">Notes &amp; Actions</button>
+    <button type="button" data-t="right" aria-pressed="false">Live Alerts</button>
+  </div>
+
   <div class="ol-wrap" id="olWrap">
-    <section class="ds-panel ol-left" aria-labelledby="olQueueH">
-      <div class="ds-ph" id="olQueueH">LIVE OPERATIONAL ALERTS<span class="sp"></span>
-        <button type="button" class="ds-btn sm ghost" id="olExpandL">Expand</button>
-      </div>
+    <section class="ds-panel ol-left on" aria-labelledby="olNotesH">
+      <div class="ds-ph" id="olNotesH">OCC NOTES &amp; ACTIONS<span class="sp"></span><button type="button" class="ds-btn sm ghost" id="olExpandL">Expand</button></div>
       <div class="ol-counters">
         <div class="ol-c crit"><b id="cCrit">0</b><small>Critical</small></div>
-        <div class="ol-c act"><b id="cAct">0</b><small>Action required</small></div>
+        <div class="ol-c act"><b id="cAct">0</b><small>Action req.</small></div>
         <div class="ol-c mon"><b id="cMon">0</b><small>Monitoring</small></div>
         <div class="ol-c res"><b id="cRes">0</b><small>Resolved today</small></div>
       </div>
-      <div class="ol-search"><input class="ds-input" id="olSearch" placeholder="Search service, location, alert..."></div>
-      <div class="ol-filters" id="olFilters"></div>
-      <div id="olQueue"></div>
-      <div class="ol-sec-h">ACKNOWLEDGED / MONITORING <span class="n" id="olMonN"></span></div>
-      <div id="olMonitoring"></div>
+      <div style="margin-bottom:10px"><input class="ds-input" id="tkSearch" placeholder="Search service, bus, location, note ID..."></div>
+      <div class="ol-chips" id="tkChips"></div>
+
+      <details class="ol-compose" id="tkNew">
+        <summary style="color:#fff;font:600 13px var(--ds-font);cursor:pointer">+ New Note</summary>
+        <label>Title</label><input id="nTitle" placeholder="e.g. Svc 156 accident near Clementi Rd">
+        <div class="g2"><div><label>Category</label><select id="nCat"></select></div><div><label>Priority</label><select id="nPri"></select></div></div>
+        <div class="g3"><div><label>Service</label><input id="nSvc" placeholder="156"></div><div><label>Direction</label><input id="nDir" placeholder="1"></div><div><label>Bus reg.</label><input id="nBus" placeholder="SBS1234A"></div></div>
+        <label>Location</label><input id="nLoc" placeholder="Clementi Road">
+        <label>Description</label><textarea id="nDesc" placeholder="What happened, what's being done..."></textarea>
+        <div class="g2"><div><label>Owner</label><input id="nOwner" placeholder="Defaults to you"></div><div><label>Share with OCC</label><select id="nShare" multiple size="1"></select></div></div>
+        <label><input type="checkbox" id="nPersonal" style="width:auto;display:inline-block;margin-top:0"> Personal note (only visible to me)</label>
+        <div class="row"><button type="button" class="ds-btn sm pri" id="nSave">Create Note</button></div>
+      </details>
+
+      <div id="tkList"></div>
     </section>
 
-    <section class="ds-panel ol-right" aria-labelledby="olConnectH">
-      <div class="ds-ph" id="olConnectH">OCC CONNECT<span class="sp"></span>
-        <button type="button" class="ds-btn sm ghost" id="olExpandR">Expand</button>
-      </div>
-      <div class="ol-tabs" id="olTabs"></div>
-      <div class="ol-compose">
-        <textarea id="olNewBody" placeholder="Write a note, update or handover..."></textarea>
-        <div class="row">
-          <select class="ds-select" id="olNewTab" style="width:auto"><option value="mydesk">My Desk (private)</option><option value="shared">Shared</option><option value="handover">Handover</option></select>
-          <button type="button" class="ds-btn sm pri" id="olNewSend">Add Note</button>
-        </div>
-      </div>
-      <div id="olShareBox"></div>
-      <div id="olNotes"></div>
+    <section class="ds-panel ol-right" aria-labelledby="olQueueH">
+      <div class="ds-ph" id="olQueueH">LIVE OPERATIONAL ALERTS<span class="sp"></span><button type="button" class="ds-btn sm ghost" id="olExpandR">Expand</button></div>
+      <div class="ol-chips" id="olFilters"></div>
+      <div id="olQueue"></div>
+      <div class="ol-sec-h">ACKNOWLEDGED / MONITORING <span id="olMonN"></span></div>
+      <div id="olMonitoring"></div>
     </section>
   </div>
+
+  <div class="ol-drawer" id="olDrawer"><div class="bk"></div><div class="pane" id="olPane"></div></div>
 </main>
 <script>
 (function(){
   "use strict";
   var esc = window.DS && window.DS.esc ? window.DS.esc : function(s){ return String(s==null?"":s).replace(/[&<>"']/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];}); };
   var $ = function(id){ return document.getElementById(id); };
-  var GROUPS = [["all","All"],["bunching","Bunching"],["headway","Headway"],["traffic","Traffic"],["roadwork","Roadwork"],["incident","Incident"],["system","System"]];
-  var groupFilter = "all", q = "";
-  var TABS = [["shared","Shared"],["mydesk","My Desk"],["handover","Handover"],["pinned","Pinned"]];
-  var curTab = "shared";
-
   function api(url, opt){ return (window.DS ? DS.api(url, opt) : fetch(url, Object.assign({credentials:"same-origin"}, opt||{})).then(function(r){return r.json();})); }
-  function timeAgo(ts){
-    if(!ts) return "";
-    var s = Date.now()/1000 - ts;
-    if(s < 60) return Math.max(1,Math.round(s)) + "s ago";
-    if(s < 3600) return Math.round(s/60) + "m ago";
-    if(s < 86400) return Math.round(s/3600) + "h ago";
-    return Math.round(s/86400) + "d ago";
-  }
-  function whenClock(ts){ if(!ts) return ""; var d = new Date(ts*1000); return d.toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"}); }
+  function timeAgo(ts){ if(!ts) return ""; var s = Date.now()/1000 - ts; if(s < 60) return Math.max(1,Math.round(s)) + "s ago"; if(s < 3600) return Math.round(s/60) + "m ago"; if(s < 86400) return Math.round(s/3600) + "h ago"; return Math.round(s/86400) + "d ago"; }
+  function whenClock(ts){ if(!ts) return ""; return new Date(ts*1000).toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"}); }
 
-  /* ---------------- Live Operational Alert Queue (left) ---------------- */
-  function renderFilters(){
-    $("olFilters").innerHTML = GROUPS.map(function(g){
-      return '<button type="button" class="ol-chip" data-g="' + g[0] + '" aria-pressed="' + (groupFilter === g[0]) + '">' + esc(g[1]) + '</button>'; }).join("");
-    Array.prototype.forEach.call($("olFilters").querySelectorAll("[data-g]"), function(b){
-      b.onclick = function(){ groupFilter = b.dataset.g; renderFilters(); loadQueue(); }; });
-  }
+  var META = {teams:[], categories:[], priorities:[], statuses:[]};
 
-  function card(a){
-    var badge = a.status === "re-escalated" ? '<span class="ol-badge esc">RE-ESCALATED</span>' : '<span class="ol-badge ' + a.severity + '">' + a.severity.toUpperCase() + '</span>';
-    return '<div class="ol-card sev-' + a.severity + (a.status === "re-escalated" ? " esc" : "") + '" data-id="' + esc(a.id) + '">' +
-      '<div class="ol-row1">' + badge + '<span class="ol-title">' + esc(a.title) + '</span><span class="ol-age">' + timeAgo(a.since) + '</span></div>' +
-      '<div class="ol-det">' + esc(a.detail || "") + (a.location ? ' &middot; ' + esc(a.location) : "") + '</div>' +
-      '<div class="ol-actions">' +
-        '<button type="button" class="ds-btn sm pri" data-act="ack">Acknowledge</button>' +
-        '<a class="ds-btn sm ghost" href="' + esc(a.href) + '">Open</a>' +
-        '<button type="button" class="ds-btn sm ghost" data-act="share">Share</button>' +
-        '<button type="button" class="ds-btn sm ghost" data-act="note">Note</button>' +
-      '</div></div>';
-  }
-
-  function wireCards(root, items){
-    Array.prototype.forEach.call(root.querySelectorAll(".ol-card"), function(el){
-      var id = el.dataset.id, a = items.filter(function(x){ return x.id === id; })[0];
-      if(!a) return;
-      var ackBtn = el.querySelector('[data-act="ack"]');
-      if(ackBtn) ackBtn.onclick = function(){ api("/api/occ/ack", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({id:a.id})}).then(function(){ loadQueue(); }); };
-      var shareBtn = el.querySelector('[data-act="share"]');
-      if(shareBtn) shareBtn.onclick = function(){ openShare(a); };
-      var noteBtn = el.querySelector('[data-act="note"]');
-      if(noteBtn) noteBtn.onclick = function(){ $("olNewBody").value = "Re: " + a.title + " \u2014 "; $("olNewBody").focus(); };
-    });
-  }
-
-  function openShare(a){
-    $("olShareBox").innerHTML = '<div class="ol-share"><b style="color:#fff;font-size:13px">Share to OCC Connect</b>' +
-      '<div style="color:var(--ds-text-2);font-size:12px;margin:4px 0 6px">' + esc(a.title) + (a.location ? " \u2014 " + esc(a.location) : "") + ' &middot; detected ' + whenClock(a.since) + '</div>' +
-      '<textarea class="ds-input" id="olShareNote" style="height:56px;padding:8px" placeholder="Add a message for the team..."></textarea>' +
-      '<div class="row" style="margin-top:6px"><button type="button" class="ds-btn sm pri" id="olShareSend">Share</button><button type="button" class="ds-btn sm ghost" id="olShareCancel">Cancel</button></div></div>';
-    $("olShareCancel").onclick = function(){ $("olShareBox").innerHTML = ""; };
-    $("olShareSend").onclick = function(){
-      var body = ($("olShareNote").value || "").trim() || "Shared from the live alert queue.";
-      api("/api/occ/notes", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({tab:"shared", kind:a.group, title:a.title,
-        body:body + "\n\nSvc " + a.service + " \u00b7 " + (a.location || "") + " \u00b7 detected " + whenClock(a.since), services:[a.service], source_alert:a.id})})
-      .then(function(){ $("olShareBox").innerHTML = ""; curTab = "shared"; renderTabs(); loadNotes(); });
+  /* ===================== Mobile tabs ===================== */
+  Array.prototype.forEach.call($("olMTabs").querySelectorAll("button"), function(b){
+    b.onclick = function(){
+      Array.prototype.forEach.call($("olMTabs").querySelectorAll("button"), function(x){ x.setAttribute("aria-pressed", x === b); });
+      document.querySelector(".ol-left").classList.toggle("on", b.dataset.t === "left");
+      document.querySelector(".ol-right").classList.toggle("on", b.dataset.t === "right");
     };
-  }
-
-  var lastQueueJson = "";
-  function loadQueue(){
-    api("/api/occ/queue").then(function(j){
-      if(j.error){ $("olQueue").innerHTML = '<div class="ol-empty">Alerts unavailable: ' + esc(j.error) + '</div>'; return; }
-      $("cCrit").textContent = j.counts.critical; $("cAct").textContent = j.counts.action;
-      $("cMon").textContent = j.counts.monitoring; $("cRes").textContent = j.counts.resolved_today;
-      var items = j.items.filter(function(a){ return groupFilter === "all" || a.group === groupFilter; })
-                          .filter(function(a){ return !q || (a.title + " " + a.detail + " " + a.location + " " + a.service).toLowerCase().indexOf(q) >= 0; });
-      var active = items.filter(function(a){ return a.status !== "acknowledged"; });
-      var mon = items.filter(function(a){ return a.status === "acknowledged"; });
-      var freshKey = active.map(function(a){ return a.id; }).join(",");
-      if(freshKey !== lastQueueJson){ $("olQueue").innerHTML = active.length ? active.map(card).join("") : '<div class="ol-empty">No active alerts. All clear.</div>'; wireCards($("olQueue"), items); lastQueueJson = freshKey; }
-      $("olMonN").textContent = "(" + mon.length + ")";
-      $("olMonitoring").innerHTML = mon.length ? mon.map(function(a){
-        return '<div class="ol-card sev-' + a.severity + ' ack" data-id="' + esc(a.id) + '"><div class="ol-row1"><span class="ol-title">' + esc(a.title) + '</span><span class="ol-age">' + timeAgo(a.last) + '</span></div>' +
-          '<div class="ol-det">' + esc(a.detail || "") + (a.location ? ' &middot; ' + esc(a.location) : "") + '</div>' +
-          '<div class="ol-mon-acked">Acknowledged' + (a.acked_by ? " by " + esc(a.acked_by) : "") + (a.acked_at ? " \u00b7 " + whenClock(a.acked_at) : "") + '</div>' +
-          '<div class="ol-actions"><a class="ds-btn sm ghost" href="' + esc(a.href) + '">Open</a></div></div>'; }).join("") : '<div class="ol-empty">Nothing being monitored.</div>';
-    });
-  }
-  $("olSearch").addEventListener("input", function(){ q = this.value.trim().toLowerCase(); loadQueue(); });
-
-  /* ---------------- OCC Connect (right) ---------------- */
-  function renderTabs(){
-    $("olTabs").innerHTML = TABS.map(function(t){ return '<button type="button" class="ol-tab" data-t="' + t[0] + '" aria-pressed="' + (curTab === t[0]) + '">' + esc(t[1]) + '</button>'; }).join("");
-    Array.prototype.forEach.call($("olTabs").querySelectorAll("[data-t]"), function(b){ b.onclick = function(){ curTab = b.dataset.t; renderTabs(); loadNotes(); }; });
-  }
-  var NOTE_ICON = {shared:"\ud83d\udcac", mydesk:"\ud83d\udccc", handover:"\ud83d\udd04"};
-  function noteCard(n){
-    var last = n.replies.length ? n.replies[n.replies.length - 1] : null;
-    return '<div class="ol-note" data-id="' + n.id + '">' +
-      '<div class="ol-note-h">' + (NOTE_ICON[n.tab] || "\u2139") + ' ' + esc(n.author) + ' &middot; ' + whenClock(n.created) + (n.pinned ? ' &middot; \ud83d\udccc pinned' : '') + '</div>' +
-      '<div class="ol-note-title">' + esc(n.title) + '</div>' +
-      '<div class="ol-note-body">' + esc(n.body) + '</div>' +
-      (n.services.length ? '<div class="ol-note-tags">' + n.services.map(function(s){ return '<span class="ol-tag">' + esc(s) + '</span>'; }).join("") + '</div>' : "") +
-      (last ? '<div class="ol-note-reply"><b>' + esc(last.author) + ':</b> ' + esc(last.body) + '</div>' : "") +
-      (n.replies.length > 1 ? '<div class="ol-note-reply" style="opacity:.7">+' + (n.replies.length - 1) + ' more update(s)</div>' : "") +
-      '<div class="ol-note-foot"><input placeholder="Reply..." data-reply="' + n.id + '">' +
-        '<button type="button" class="ds-btn sm ghost" data-pin="' + n.id + '" data-pinned="' + (n.pinned?1:0) + '">' + (n.pinned ? "Unpin" : "Pin") + '</button>' +
-        (n.tab !== "handover" ? '<button type="button" class="ds-btn sm ghost" data-hand="' + n.id + '">Handover</button>' : '') +
-      '</div></div>';
-  }
-  function loadNotes(){
-    api("/api/occ/notes?tab=" + encodeURIComponent(curTab)).then(function(j){
-      if(j.error){ $("olNotes").innerHTML = '<div class="ol-empty">Notes unavailable: ' + esc(j.error) + '</div>'; return; }
-      $("olNotes").innerHTML = j.notes.length ? j.notes.map(noteCard).join("") : '<div class="ol-empty">No notes here yet.</div>';
-      Array.prototype.forEach.call($("olNotes").querySelectorAll("[data-reply]"), function(inp){
-        inp.addEventListener("keydown", function(e){ if(e.key !== "Enter" || !this.value.trim()) return;
-          api("/api/occ/notes/" + inp.dataset.reply + "/reply", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({body:this.value.trim()})}).then(loadNotes); }); });
-      Array.prototype.forEach.call($("olNotes").querySelectorAll("[data-pin]"), function(btn){
-        btn.onclick = function(){ api("/api/occ/notes/" + btn.dataset.pin + "/pin", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({pinned: btn.dataset.pinned !== "1"})}).then(loadNotes); }; });
-      Array.prototype.forEach.call($("olNotes").querySelectorAll("[data-hand]"), function(btn){
-        btn.onclick = function(){ api("/api/occ/notes/" + btn.dataset.hand + "/tab", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({tab:"handover"})}).then(loadNotes); }; });
-    });
-  }
-  $("olNewSend").onclick = function(){
-    var body = $("olNewBody").value.trim();
-    if(!body) return;
-    var title = body.split("\n")[0].slice(0, 60);
-    api("/api/occ/notes", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({tab:$("olNewTab").value, title:title, body:body})})
-      .then(function(){ $("olNewBody").value = ""; curTab = $("olNewTab").value === "mydesk" ? "mydesk" : $("olNewTab").value; renderTabs(); loadNotes(); });
-  };
-
-  /* ---------------- expand / collapse ---------------- */
+  });
   $("olExpandL").onclick = function(){ var on = $("olWrap").classList.toggle("expand-left"); $("olWrap").classList.remove("expand-right"); this.textContent = on ? "Standard view" : "Expand"; $("olExpandR").textContent = "Expand"; };
   $("olExpandR").onclick = function(){ var on = $("olWrap").classList.toggle("expand-right"); $("olWrap").classList.remove("expand-left"); this.textContent = on ? "Standard view" : "Expand"; $("olExpandL").textContent = "Expand"; };
 
+  /* ===================== OCC Notes & Actions (left) ===================== */
+  var CHIPS = [["all","All"],["mine","My Notes"],["watching","Watching"],["critical","Critical"],["action","Action Req."],["handover","Handover"],["resolved","Resolved"],["today","Today"]];
+  var chip = "all", tq = "";
+
+  function loadMeta(){
+    api("/api/occ/meta").then(function(j){
+      META = j;
+      $("nCat").innerHTML = j.categories.map(function(c){ return '<option>' + esc(c) + '</option>'; }).join("");
+      $("nPri").innerHTML = j.priorities.map(function(p){ return '<option value="' + p + '">' + esc(p.toUpperCase()) + '</option>'; }).join("");
+      $("nShare").innerHTML = j.teams.map(function(t){ return '<option value="' + t + '">' + t + '</option>'; }).join("");
+    });
+  }
+  function renderChips(){
+    $("tkChips").innerHTML = CHIPS.map(function(c){ return '<button type="button" class="ol-chip" data-c="' + c[0] + '" aria-pressed="' + (chip === c[0]) + '">' + esc(c[1]) + '</button>'; }).join("");
+    Array.prototype.forEach.call($("tkChips").querySelectorAll("[data-c]"), function(b){ b.onclick = function(){ chip = b.dataset.c; renderChips(); loadTickets(); }; });
+  }
+  function chipParams(){
+    var p = new URLSearchParams();
+    if(chip === "mine") p.set("mine", "1");
+    if(chip === "watching") p.set("watching", "1");
+    if(chip === "handover"){ p.set("handover", "1"); p.set("include_resolved", "1"); }
+    if(chip === "resolved"){ p.set("status", "resolved"); p.set("include_resolved", "1"); }
+    if(tq) p.set("q", tq);
+    return p.toString();
+  }
+  function ticketCard(t){
+    var svcLine = [t.service ? "Svc " + t.service + (t.direction ? " D" + t.direction : "") : "", t.location].filter(Boolean).join(" \u00b7 ");
+    return '<div class="tk-card pri-' + t.priority + '" data-id="' + t.id + '">' +
+      '<div class="tk-row1"><span class="tk-pri ' + t.priority + '">' + t.priority.toUpperCase() + '</span><span class="tk-cat">' + esc(t.category) + '</span>' +
+        '<span class="tk-status ' + t.status + '">' + t.status.toUpperCase().replace("_"," ") + '</span></div>' +
+      '<div class="tk-title">' + esc(t.title) + '</div>' +
+      (svcLine ? '<div class="tk-meta">' + esc(svcLine) + '</div>' : '') +
+      '<div class="tk-foot">' + (t.pinned ? '<span class="pin">\ud83d\udccc</span>' : '') + '<span>' + esc(t.owner || "Unassigned") + '</span><span>&middot;</span>' +
+        '<span>' + whenClock(t.updated) + '</span><span>&middot;</span><span>' + t.activity_n + ' updates</span>' +
+        (t.shared && t.shared.length ? '<span>&middot;</span><span>' + t.shared.join(", ") + '</span>' : '') + '</div></div>';
+  }
+  var lastTicketsKey = "";
+  function loadTickets(){
+    api("/api/occ/tickets?" + chipParams()).then(function(j){
+      if(j.error){ $("tkList").innerHTML = '<div class="ol-empty">' + esc(j.error) + '</div>'; return; }
+      $("cCrit").textContent = j.counts.critical; $("cAct").textContent = j.counts.action; $("cMon").textContent = j.counts.monitoring; $("cRes").textContent = j.counts.resolved_today;
+      var today0 = Date.now()/1000 - (Date.now()/1000 % 86400);
+      var list = j.tickets.filter(function(t){ return chip !== "today" || t.updated >= today0; })
+                           .filter(function(t){ return chip !== "critical" || (t.priority === "critical" && t.status !== "resolved"); })
+                           .filter(function(t){ return chip !== "action" || (t.status === "new" || t.status === "action"); });
+      list.forEach(function(t){ t.activity_n = t.activity ? t.activity.length : (t._n || 0); });
+      var key = list.map(function(t){ return t.id + ":" + t.updated; }).join(",");
+      if(key === lastTicketsKey) return;
+      lastTicketsKey = key;
+      $("tkList").innerHTML = list.length ? list.map(ticketCard).join("") : '<div class="ol-empty">No notes here.</div>';
+      Array.prototype.forEach.call($("tkList").querySelectorAll(".tk-card"), function(el){ el.onclick = function(){ openTicket(el.dataset.id); }; });
+    });
+  }
+  $("tkSearch").addEventListener("input", function(){ tq = this.value.trim(); loadTickets(); });
+
+  $("nSave").onclick = function(){
+    var title = $("nTitle").value.trim();
+    if(!title){ $("nTitle").focus(); return; }
+    var shared = Array.prototype.slice.call($("nShare").selectedOptions).map(function(o){ return o.value; });
+    api("/api/occ/tickets", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({
+      title:title, category:$("nCat").value, priority:$("nPri").value, service:$("nSvc").value.trim(), direction:parseInt($("nDir").value)||0,
+      bus_reg:$("nBus").value.trim(), location:$("nLoc").value.trim(), description:$("nDesc").value.trim(), owner:$("nOwner").value.trim(), shared:shared,
+      personal:$("nPersonal").checked
+    })}).then(function(j){
+      if(j.error) return;
+      ["nTitle","nSvc","nDir","nBus","nLoc","nDesc","nOwner"].forEach(function(id){ $(id).value = ""; });
+      $("nPersonal").checked = false; $("tkNew").open = false; lastTicketsKey = ""; loadTickets();
+    });
+  };
+
+  /* ---------------- Ticket detail drawer ---------------- */
+  function actLine(a){
+    var body = a.action === "comment" ? esc(a.detail) : ('<i>' + esc(a.detail) + '</i>');
+    return '<div class="ol-act-item"><div class="t">' + whenClock(a.ts) + '</div><div><span class="a">' + esc(a.actor) + '</span> \u2014 ' + body + '</div></div>';
+  }
+  function drawerHTML(t){
+    var svc = [t.service ? "Svc " + t.service : "", t.direction ? "Dir " + t.direction : "", t.bus_reg].filter(Boolean).join(" \u00b7 ");
+    return '<button type="button" class="ds-btn sm ghost ol-close" id="olDClose">Close</button>' +
+      '<div class="ol-dhead"><span class="tk-pri ' + t.priority + '">' + t.priority.toUpperCase() + '</span><span class="tk-cat">' + esc(t.category) + '</span>' +
+        '<span class="tk-status ' + t.status + '">' + t.status.toUpperCase() + '</span></div>' +
+      '<div class="ol-dno">' + t.no + (t.personal ? ' \u00b7 PERSONAL' : '') + '</div>' +
+      '<div class="ol-dtitle">' + esc(t.title) + '</div>' +
+      (svc ? '<div class="tk-meta" style="margin-bottom:6px">' + esc(svc) + (t.location ? ' \u00b7 ' + esc(t.location) : '') + '</div>' : (t.location ? '<div class="tk-meta" style="margin-bottom:6px">' + esc(t.location) + '</div>' : '')) +
+      '<div class="ol-dmeta"><div><b>Owner</b>' + esc(t.owner || "Unassigned") + '</div><div><b>Created</b>' + whenClock(t.created) + '</div>' +
+        '<div><b>Shared</b>' + (t.shared.length ? t.shared.map(function(s){return '<span class="ol-tag">'+esc(s)+'</span>';}).join(" ") : "\u2014") + '</div>' +
+        '<div><b>Watching</b>' + (t.watchers.length ? esc(t.watchers.join(", ")) : "\u2014") + '</div></div>' +
+      (t.description ? '<div class="tk-meta" style="white-space:pre-wrap">' + esc(t.description) + '</div>' : '') +
+      (t.resolution ? '<div class="ol-dsec"><h4>RESOLUTION</h4><div class="tk-meta"><b style="color:#fff">Outcome:</b> ' + esc(t.resolution.outcome||"\u2014") + '<br><b style="color:#fff">Action:</b> ' + esc(t.resolution.action||"\u2014") + (t.resolution.notes ? '<br><b style="color:#fff">Notes:</b> ' + esc(t.resolution.notes) : '') + '</div></div>' : '') +
+      '<div class="ol-dsec"><h4>ACKNOWLEDGED</h4><div class="tk-meta">' + (t.acks.length ? t.acks.map(function(a){ return '\u2713 ' + esc(a.who) + ' ' + whenClock(a.ts); }).join(" &middot; ") : "Not yet acknowledged") + '</div></div>' +
+      '<div class="ol-dsec"><h4>ACTIVITY</h4><div id="olActList">' + t.activity.map(actLine).join("") + '</div>' +
+        '<textarea class="ds-input" id="olComment" style="height:50px;padding:8px;margin-top:6px" placeholder="Write an update..."></textarea>' +
+        '<div class="row" style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap">' +
+          '<button type="button" class="ds-btn sm pri" id="olSend">Send</button>' +
+          (t.status !== "resolved" ? '<button type="button" class="ds-btn sm ghost" id="olAck">Acknowledge</button>' : '') +
+          '<select class="ds-select" id="olStatusSel" style="width:auto">' + META.statuses.map(function(s){ return '<option value="'+s+'"'+(s===t.status?" selected":"")+'>'+s.toUpperCase()+'</option>'; }).join("") + '</select>' +
+          '<button type="button" class="ds-btn sm ghost" id="olPinBtn">' + (t.pinned ? "Unpin" : "Pin") + '</button>' +
+          (t.status !== "handover" && t.status !== "resolved" ? '<button type="button" class="ds-btn sm ghost" id="olHandBtn">Add to Handover</button>' : '') +
+          (t.personal ? '<button type="button" class="ds-btn sm ghost" id="olPersonalBtn">Convert to OCC Note</button>' : '') +
+          (t.status !== "resolved" ? '<button type="button" class="ds-btn sm pri" id="olResolveBtn">Resolve</button>' : '<button type="button" class="ds-btn sm ghost" id="olReopenBtn">Reopen</button>') +
+        '</div>' +
+        '<div class="row" style="margin-top:8px;gap:6px;flex-wrap:wrap;align-items:center">' +
+          '<input class="ds-input" id="olOwnerInp" placeholder="Reassign owner..." style="width:150px">' +
+          '<select class="ds-select" id="olShareSel" style="width:auto"><option value="">Share with OCC...</option>' + META.teams.map(function(x){return '<option value="'+x+'">'+x+'</option>';}).join("") + '</select>' +
+        '</div>' +
+      '</div>';
+  }
+  function openTicket(id){
+    api("/api/occ/tickets/" + id).then(function(j){
+      if(j.error) return;
+      var t = j.ticket;
+      $("olPane").innerHTML = drawerHTML(t);
+      $("olDrawer").classList.add("on");
+      $("olDClose").onclick = closeDrawer;
+      $("olSend").onclick = function(){ var v = $("olComment").value.trim(); if(!v) return;
+        api("/api/occ/tickets/" + id + "/comment", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({body:v})}).then(function(){ openTicket(id); lastTicketsKey=""; loadTickets(); }); };
+      var ackBtn = $("olAck"); if(ackBtn) ackBtn.onclick = function(){ api("/api/occ/tickets/" + id + "/ack", {method:"POST", headers:{"Content-Type":"application/json"}, body:"{}"}).then(function(){ openTicket(id); lastTicketsKey=""; loadTickets(); }); };
+      $("olStatusSel").onchange = function(){ api("/api/occ/tickets/" + id + "/status", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({status:this.value})}).then(function(){ openTicket(id); lastTicketsKey=""; loadTickets(); }); };
+      $("olPinBtn").onclick = function(){ api("/api/occ/tickets/" + id + "/pin", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({pinned: !t.pinned})}).then(function(){ openTicket(id); lastTicketsKey=""; loadTickets(); }); };
+      var handBtn = $("olHandBtn"); if(handBtn) handBtn.onclick = function(){ api("/api/occ/tickets/" + id + "/handover", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({include:true})}).then(function(){ openTicket(id); lastTicketsKey=""; loadTickets(); }); };
+      var persBtn = $("olPersonalBtn"); if(persBtn) persBtn.onclick = function(){ api("/api/occ/tickets/" + id + "/personal", {method:"POST", headers:{"Content-Type":"application/json"}, body:"{}"}).then(function(){ openTicket(id); lastTicketsKey=""; loadTickets(); }); };
+      var resBtn = $("olResolveBtn"); if(resBtn) resBtn.onclick = function(){
+        var outcome = prompt("Outcome:"); if(outcome === null) return;
+        var action = prompt("Action taken:") || ""; var notes = prompt("Notes (optional):") || "";
+        api("/api/occ/tickets/" + id + "/resolve", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({outcome:outcome, action:action, notes:notes})}).then(function(){ openTicket(id); lastTicketsKey=""; loadTickets(); }); };
+      var reopenBtn = $("olReopenBtn"); if(reopenBtn) reopenBtn.onclick = function(){ var reason = prompt("Reason for reopening:") || ""; api("/api/occ/tickets/" + id + "/reopen", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({reason:reason})}).then(function(){ openTicket(id); lastTicketsKey=""; loadTickets(); }); };
+      $("olOwnerInp").addEventListener("keydown", function(e){ if(e.key !== "Enter" || !this.value.trim()) return;
+        api("/api/occ/tickets/" + id + "/owner", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({owner:this.value.trim()})}).then(function(){ openTicket(id); lastTicketsKey=""; loadTickets(); }); });
+      $("olShareSel").onchange = function(){ if(!this.value) return;
+        api("/api/occ/tickets/" + id + "/share", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({occ:this.value})}).then(function(){ openTicket(id); }); };
+    });
+  }
+  function closeDrawer(){ $("olDrawer").classList.remove("on"); }
+  $("olDrawer").querySelector(".bk").onclick = closeDrawer;
+
+  /* ===================== Live Operational Alerts (right) ===================== */
+  var GROUPS = [["all","All"],["bunching","Bunching"],["headway","Headway"],["traffic","Traffic"],["roadwork","Roadwork"],["incident","Incident"],["system","System"]];
+  var groupFilter = "all";
+  function renderFilters(){
+    $("olFilters").innerHTML = GROUPS.map(function(g){ return '<button type="button" class="ol-chip" data-g="' + g[0] + '" aria-pressed="' + (groupFilter === g[0]) + '">' + esc(g[1]) + '</button>'; }).join("");
+    Array.prototype.forEach.call($("olFilters").querySelectorAll("[data-g]"), function(b){ b.onclick = function(){ groupFilter = b.dataset.g; renderFilters(); loadQueue(); }; });
+  }
+  function card(a){
+    return '<div class="ol-card sev-' + a.severity + '" data-id="' + esc(a.id) + '">' +
+      '<div class="ol-row1"><span class="ol-badge ' + a.severity + '">' + a.severity.toUpperCase() + '</span><span class="ol-title">' + esc(a.title) + '</span><span class="ol-age">' + timeAgo(a.since) + '</span></div>' +
+      '<div class="ol-det">' + esc(a.detail || "") + (a.location ? ' &middot; ' + esc(a.location) : "") + '</div>' +
+      '<div class="ol-actions"><button type="button" class="ds-btn sm pri" data-act="ack">Acknowledge</button>' +
+        '<a class="ds-btn sm ghost" href="' + esc(a.href) + '">Open</a><button type="button" class="ds-btn sm ghost" data-act="note">Create Note</button></div></div>';
+  }
+  function wireCards(root, items){
+    Array.prototype.forEach.call(root.querySelectorAll(".ol-card"), function(el){
+      var id = el.dataset.id, a = items.filter(function(x){ return x.id === id; })[0]; if(!a) return;
+      var ackBtn = el.querySelector('[data-act="ack"]'); if(ackBtn) ackBtn.onclick = function(){ api("/api/occ/ack", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({id:a.id})}).then(loadQueue); };
+      var noteBtn = el.querySelector('[data-act="note"]'); if(noteBtn) noteBtn.onclick = function(){ createNoteFromAlert(a); };
+    });
+  }
+  function createNoteFromAlert(a){
+    var catMap = {bunching:"Bunching", headway:"Long Headway", traffic:"Traffic", roadwork:"Diversion", incident:"Incident", system:"General"};
+    $("tkNew").open = true; $("tkNew").scrollIntoView({behavior:"smooth", block:"start"});
+    $("nTitle").value = a.title; $("nCat").value = catMap[a.group] || "General";
+    $("nPri").value = a.severity === "critical" ? "critical" : (a.severity === "high" ? "high" : "normal");
+    $("nSvc").value = a.service || ""; $("nLoc").value = a.location || "";
+    $("nDesc").value = (a.detail || "") + "\nDetected " + whenClock(a.since) + (a.location ? " \u00b7 " + a.location : "");
+    api("/api/occ/tickets", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({
+      title:$("nTitle").value, category:$("nCat").value, priority:$("nPri").value, service:$("nSvc").value, location:$("nLoc").value, description:$("nDesc").value, source_alert:a.id})})
+      .then(function(){ $("tkNew").open = false; lastTicketsKey = ""; loadTickets(); });
+  }
+  var lastQueueKey = "";
+  function loadQueue(){
+    api("/api/occ/queue").then(function(j){
+      if(j.error){ $("olQueue").innerHTML = '<div class="ol-empty">Alerts unavailable: ' + esc(j.error) + '</div>'; return; }
+      var items = j.items.filter(function(a){ return groupFilter === "all" || a.group === groupFilter; });
+      var active = items.filter(function(a){ return a.status !== "acknowledged"; });
+      var mon = items.filter(function(a){ return a.status === "acknowledged"; });
+      var key = active.map(function(a){ return a.id; }).join(",");
+      if(key !== lastQueueKey){ $("olQueue").innerHTML = active.length ? active.map(card).join("") : '<div class="ol-empty">No active alerts. All clear.</div>'; wireCards($("olQueue"), items); lastQueueKey = key; }
+      $("olMonN").textContent = "(" + mon.length + ")";
+      $("olMonitoring").innerHTML = mon.length ? mon.map(function(a){
+        return '<div class="ol-card sev-' + a.severity + ' ack" data-id="' + esc(a.id) + '"><div class="ol-row1"><span class="ol-title">' + esc(a.title) + '</span><span class="ol-age">' + timeAgo(a.last) + '</span></div>' +
+          '<div class="ol-det">' + esc(a.detail || "") + '</div><div class="ol-actions"><a class="ds-btn sm ghost" href="' + esc(a.href) + '">Open</a></div></div>'; }).join("") : '<div class="ol-empty">Nothing being monitored.</div>';
+    });
+  }
+
   function tickClock(){ $("olTime").textContent = new Date().toLocaleString([], {weekday:"short", day:"2-digit", month:"short", hour:"2-digit", minute:"2-digit", second:"2-digit"}); }
-  renderFilters(); renderTabs(); loadQueue(); loadNotes(); tickClock();
+  loadMeta(); renderChips(); renderFilters(); loadTickets(); loadQueue(); tickClock();
   setInterval(tickClock, 1000);
   setInterval(loadQueue, 15000);
-  setInterval(loadNotes, 30000);
+  setInterval(loadTickets, 20000);
 })();
 </script>
 </body>

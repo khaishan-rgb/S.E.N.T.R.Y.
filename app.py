@@ -22,7 +22,7 @@ import headway
 import routegeom
 import traffic
 
-VERSION = "V16.10"
+VERSION = "V16.11"
 # V16.8: pages hidden for everyone (see Settings > Pages). Defined here because bb_init() reads the saved value while the module loads.
 SITE_PAGE_IDS = ("command", "route", "headway", "bunching", "recovery", "halfplan", "trafficaware", "running", "ewt", "cameras")     # "settings" can never be hidden
 SITE = {"hidden": [x.strip() for x in os.getenv("HIDDEN_PAGES", "").split(",") if x.strip() in SITE_PAGE_IDS], "block": True}
@@ -1834,6 +1834,319 @@ async def api_occ_notes_tab(note_id: int, request: Request):
     bb_sql("UPDATE occ_note SET tab=?, updated_ts=? WHERE id=?", (tab, time.time(), note_id))
     return {"ok": True}
 # ---------------------------------------------------------------------------
+
+
+# ---------------------------------------------------------------------------
+# V16.11: OCC Notes & Actions - a lightweight OCC ticket. One operational matter (accident, bunching,
+# traffic, handover, reminder ...) becomes one persistent record: owner, shared OCCs, watchers, a
+# timestamped activity log, deliberate acknowledgement (separate from just opening it), handover and
+# resolution. The old /api/occ/notes (sticky notes) endpoints above are kept so nothing already saved is
+# lost, but OCC Live now uses this instead.
+OCC_TEAMS = tuple(x.strip() for x in os.getenv("OCC_TEAMS", "SE1,SE2,UP1,UP2,SWOCC").split(",") if x.strip())
+OCC_CATEGORIES = ("Accident", "Incident", "Breakdown", "Traffic", "Bunching", "Long Headway", "Service Regulation",
+                   "Diversion", "Handover", "Reminder", "Instruction", "Equipment", "General")
+OCC_PRIORITIES = ("critical", "high", "normal", "fyi")
+OCC_STATUSES = ("new", "acknowledged", "action", "monitoring", "handover", "resolved")
+
+
+def occ_log(ticket_id, actor, action, detail=""):
+    bb_sql("INSERT INTO occ_activity(ticket_id, ts, actor, action, detail) VALUES (?,?,?,?,?)", (ticket_id, time.time(), actor, action, detail))
+
+
+def occ_no():
+    day = now_sgt().strftime("%y%m%d")
+    n = bb_sql("SELECT COUNT(*) n FROM occ_ticket WHERE no LIKE ?", (f"OCC-{day}-%",), fetch=True)
+    return f"OCC-{day}-{(n[0]['n'] if n else 0) + 1:03d}"
+
+
+def occ_public(t, activity=None, acks=None):
+    return {"id": t["id"], "no": t["no"], "title": t["title"], "category": t["category"], "priority": t["priority"], "status": t["status"],
+            "service": t["service"], "direction": t["direction"], "bus_reg": t["bus_reg"], "location": t["location"], "description": t["description"],
+            "owner": t["owner"], "shared": [x for x in (t["shared"] or "").split(",") if x], "watchers": [x for x in (t["watchers"] or "").split(",") if x],
+            "personal": bool(t["personal"]), "pinned": bool(t["pinned"]), "source_alert": t["source_alert"], "author": t["author"],
+            "created": t["created_ts"], "updated": t["updated_ts"], "resolved": t["resolved_ts"],
+            "resolution": {"outcome": t["resolution_outcome"], "action": t["resolution_action"], "notes": t["resolution_notes"]} if t["resolved_ts"] else None,
+            "activity": [{"ts": a["ts"], "actor": a["actor"], "action": a["action"], "detail": a["detail"]} for a in (activity or [])],
+            "acks": [{"who": a["who"], "ts": a["ts"]} for a in (acks or [])], "activity_n": len(activity) if activity is not None else None}
+
+
+def occ_get(ticket_id):
+    row = bb_sql("SELECT * FROM occ_ticket WHERE id=?", (ticket_id,), fetch=True)
+    return row[0] if row else None
+
+
+def occ_touch(ticket_id):
+    bb_sql("UPDATE occ_ticket SET updated_ts=? WHERE id=?", (time.time(), ticket_id))
+
+
+@app.get("/api/occ/meta")
+async def api_occ_meta():
+    return {"teams": list(OCC_TEAMS), "categories": list(OCC_CATEGORIES), "priorities": list(OCC_PRIORITIES), "statuses": list(OCC_STATUSES)}
+
+
+@app.get("/api/occ/tickets")
+async def api_occ_tickets(status: str = "", mine: int = 0, watching: int = 0, pinned: int = 0, handover: int = 0,
+                           include_resolved: int = 0, personal_only: int = 0, q: str = "", request: Request = None):
+    who = _who(request) if request else "Controller"
+    rows = bb_sql("SELECT * FROM occ_ticket ORDER BY pinned DESC, updated_ts DESC LIMIT 500", fetch=True)
+    out = []
+    for t in rows:
+        if t["personal"] and t["owner"] != who and who not in (t["watchers"] or "").split(","):
+            continue                                                            # a personal note is only visible to its owner unless shared/watched
+        if not include_resolved and t["status"] == "resolved" and not (status == "resolved" or handover):
+            continue
+        if status and t["status"] != status:
+            continue
+        if mine and t["owner"] != who:
+            continue
+        if watching and who not in (t["watchers"] or "").split(","):
+            continue
+        if pinned and not t["pinned"]:
+            continue
+        if handover and t["status"] != "handover":
+            continue
+        if personal_only and not t["personal"]:
+            continue
+        if q:
+            hay = " ".join(str(t[k] or "") for k in ("title", "description", "service", "location", "bus_reg", "no")).lower()
+            if q.lower() not in hay:
+                continue
+        out.append(t)
+    counts = {"critical": sum(1 for t in rows if t["priority"] == "critical" and t["status"] != "resolved"),
+              "action": sum(1 for t in rows if t["status"] in ("new", "action") and t["priority"] != "critical"),
+              "monitoring": sum(1 for t in rows if t["status"] == "monitoring"),
+              "handover": sum(1 for t in rows if t["status"] == "handover"),
+              "resolved_today": sum(1 for t in rows if t["resolved_ts"] and t["resolved_ts"] > time.time() - (time.time() % 86400))}
+    ids = [t["id"] for t in out]
+    acount = {}
+    if ids:
+        for r in bb_sql("SELECT ticket_id, COUNT(*) n FROM occ_activity WHERE ticket_id IN (%s) GROUP BY ticket_id" % ",".join("?" * len(ids)), ids, fetch=True):
+            acount[r["ticket_id"]] = r["n"]
+    pub = [dict(occ_public(t), activity_n=acount.get(t["id"], 0)) for t in out]
+    return {"tickets": pub, "counts": counts, "who": who}
+
+
+@app.post("/api/occ/tickets")
+async def api_occ_tickets_create(request: Request):
+    try:
+        body = json.loads((await request.body()).decode("utf-8") or "{}")
+    except ValueError:
+        return JSONResponse({"error": "Body must be JSON."}, status_code=400)
+    title = str(body.get("title") or "").strip()[:140]
+    if not title:
+        return JSONResponse({"error": "Title is required."}, status_code=400)
+    who = _who(request)
+    cat = body.get("category") if body.get("category") in OCC_CATEGORIES else "General"
+    pri = body.get("priority") if body.get("priority") in OCC_PRIORITIES else "normal"
+    personal = bool(body.get("personal"))
+    owner = str(body.get("owner") or who).strip()[:40]
+    shared = ",".join(str(x).strip()[:12] for x in (body.get("shared") or [])[:8] if str(x).strip() in OCC_TEAMS)
+    watchers = ",".join(str(x).strip()[:40] for x in (body.get("watchers") or [])[:12] if str(x).strip())
+    now = time.time()
+    no = occ_no()
+    bb_sql("""INSERT INTO occ_ticket(no, title, category, priority, status, service, direction, bus_reg, location, description, owner, shared, watchers,
+                                      personal, pinned, source_alert, created_ts, updated_ts, author)
+              VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,0,?,?,?,?)""",
+           (no, title, cat, pri, "new", str(body.get("service") or "").strip()[:12], int(body.get("direction") or 0) or None,
+            str(body.get("bus_reg") or "").strip()[:16], str(body.get("location") or "").strip()[:120], str(body.get("description") or "").strip()[:4000],
+            owner, shared, watchers, 1 if personal else 0, body.get("source_alert"), now, now, who))
+    tid = bb_sql("SELECT last_insert_rowid() id", fetch=True)[0]["id"]
+    occ_log(tid, who, "created", f"{'Personal note' if personal else 'OCC note'} created" + (f" from alert {body['source_alert']}" if body.get("source_alert") else ""))
+    if shared:
+        occ_log(tid, who, "shared", "Shared with " + shared.replace(",", ", "))
+    return {"ok": True, "ticket": occ_public(occ_get(tid)), "saved": bool(BB.get("db_ok"))}
+
+
+@app.get("/api/occ/tickets/{ticket_id}")
+async def api_occ_ticket_get(ticket_id: int):
+    t = occ_get(ticket_id)
+    if not t:
+        return JSONResponse({"error": "Note not found."}, status_code=404)
+    act = bb_sql("SELECT * FROM occ_activity WHERE ticket_id=? ORDER BY ts ASC", (ticket_id,), fetch=True)
+    acks = bb_sql("SELECT * FROM occ_ack WHERE ticket_id=? ORDER BY ts ASC", (ticket_id,), fetch=True)
+    return {"ticket": occ_public(t, act, acks)}
+
+
+def _occ_require(ticket_id):
+    t = occ_get(ticket_id)
+    if not t:
+        return None, JSONResponse({"error": "Note not found."}, status_code=404)
+    return t, None
+
+
+@app.post("/api/occ/tickets/{ticket_id}/comment")
+async def api_occ_comment(ticket_id: int, request: Request):
+    t, err = _occ_require(ticket_id)
+    if err:
+        return err
+    body = json.loads((await request.body()).decode("utf-8") or "{}")
+    text = str(body.get("body") or "").strip()[:4000]
+    if not text:
+        return JSONResponse({"error": "Comment text is required."}, status_code=400)
+    who = _who(request)
+    occ_log(ticket_id, who, "comment", text)
+    occ_touch(ticket_id)
+    return {"ok": True}
+
+
+@app.post("/api/occ/tickets/{ticket_id}/status")
+async def api_occ_status(ticket_id: int, request: Request):
+    t, err = _occ_require(ticket_id)
+    if err:
+        return err
+    body = json.loads((await request.body()).decode("utf-8") or "{}")
+    new = body.get("status")
+    if new not in OCC_STATUSES:
+        return JSONResponse({"error": "Unknown status."}, status_code=400)
+    who = _who(request)
+    bb_sql("UPDATE occ_ticket SET status=?, updated_ts=? WHERE id=?", (new, time.time(), ticket_id))
+    occ_log(ticket_id, who, "status", f"Status changed: {t['status'].upper()} → {new.upper()}")
+    return {"ok": True}
+
+
+@app.post("/api/occ/tickets/{ticket_id}/owner")
+async def api_occ_owner(ticket_id: int, request: Request):
+    t, err = _occ_require(ticket_id)
+    if err:
+        return err
+    body = json.loads((await request.body()).decode("utf-8") or "{}")
+    new = str(body.get("owner") or "").strip()[:40]
+    if not new:
+        return JSONResponse({"error": "Owner is required."}, status_code=400)
+    who = _who(request)
+    bb_sql("UPDATE occ_ticket SET owner=?, updated_ts=? WHERE id=?", (new, time.time(), ticket_id))
+    occ_log(ticket_id, who, "owner", f"Owner changed: {t['owner'] or '(none)'} → {new}")
+    return {"ok": True}
+
+
+@app.post("/api/occ/tickets/{ticket_id}/share")
+async def api_occ_share(ticket_id: int, request: Request):
+    t, err = _occ_require(ticket_id)
+    if err:
+        return err
+    body = json.loads((await request.body()).decode("utf-8") or "{}")
+    occ = str(body.get("occ") or "").strip()
+    if occ not in OCC_TEAMS:
+        return JSONResponse({"error": "Unknown OCC team."}, status_code=400)
+    cur = [x for x in (t["shared"] or "").split(",") if x]
+    if occ not in cur:
+        cur.append(occ)
+        bb_sql("UPDATE occ_ticket SET shared=?, updated_ts=? WHERE id=?", (",".join(cur), time.time(), ticket_id))
+        occ_log(ticket_id, _who(request), "shared", f"Shared with {occ}")
+    return {"ok": True}
+
+
+@app.post("/api/occ/tickets/{ticket_id}/watch")
+async def api_occ_watch(ticket_id: int, request: Request):
+    t, err = _occ_require(ticket_id)
+    if err:
+        return err
+    body = json.loads((await request.body()).decode("utf-8") or "{}")
+    who = _who(request)
+    cur = [x for x in (t["watchers"] or "").split(",") if x]
+    add = body.get("add", True)
+    if add and who not in cur:
+        cur.append(who)
+        occ_log(ticket_id, who, "watch", f"{who} started watching")
+    elif not add and who in cur:
+        cur.remove(who)
+        occ_log(ticket_id, who, "watch", f"{who} stopped watching")
+    bb_sql("UPDATE occ_ticket SET watchers=? WHERE id=?", (",".join(cur), ticket_id))
+    return {"ok": True}
+
+
+@app.post("/api/occ/tickets/{ticket_id}/ack")
+async def api_occ_ack2(ticket_id: int, request: Request):
+    t, err = _occ_require(ticket_id)
+    if err:
+        return err
+    who = _who(request)
+    if bb_sql("SELECT id FROM occ_ack WHERE ticket_id=? AND who=?", (ticket_id, who), fetch=True):
+        return {"ok": True, "already": True}
+    bb_sql("INSERT INTO occ_ack(ticket_id, who, ts) VALUES (?,?,?)", (ticket_id, who, time.time()))
+    occ_log(ticket_id, who, "ack", f"✓ Acknowledged by {who}")
+    if t["status"] == "new":
+        bb_sql("UPDATE occ_ticket SET status='acknowledged', updated_ts=? WHERE id=?", (time.time(), ticket_id))
+    return {"ok": True}
+
+
+@app.post("/api/occ/tickets/{ticket_id}/pin")
+async def api_occ_pin(ticket_id: int, request: Request):
+    t, err = _occ_require(ticket_id)
+    if err:
+        return err
+    body = json.loads((await request.body()).decode("utf-8") or "{}")
+    bb_sql("UPDATE occ_ticket SET pinned=? WHERE id=?", (1 if body.get("pinned", True) else 0, ticket_id))
+    return {"ok": True}
+
+
+@app.post("/api/occ/tickets/{ticket_id}/priority")
+async def api_occ_priority(ticket_id: int, request: Request):
+    t, err = _occ_require(ticket_id)
+    if err:
+        return err
+    body = json.loads((await request.body()).decode("utf-8") or "{}")
+    new = body.get("priority")
+    if new not in OCC_PRIORITIES:
+        return JSONResponse({"error": "Unknown priority."}, status_code=400)
+    who = _who(request)
+    bb_sql("UPDATE occ_ticket SET priority=?, updated_ts=? WHERE id=?", (new, time.time(), ticket_id))
+    occ_log(ticket_id, who, "priority", f"Priority changed: {t['priority'].upper()} → {new.upper()}")
+    return {"ok": True}
+
+
+@app.post("/api/occ/tickets/{ticket_id}/handover")
+async def api_occ_handover(ticket_id: int, request: Request):
+    t, err = _occ_require(ticket_id)
+    if err:
+        return err
+    body = json.loads((await request.body()).decode("utf-8") or "{}")
+    who = _who(request)
+    if body.get("include", True):
+        bb_sql("UPDATE occ_ticket SET status='handover', updated_ts=? WHERE id=?", (time.time(), ticket_id))
+        occ_log(ticket_id, who, "handover", "Added to shift handover")
+    else:
+        occ_log(ticket_id, who, "handover", f"Handover acknowledged by {who}")
+    return {"ok": True}
+
+
+@app.post("/api/occ/tickets/{ticket_id}/personal")
+async def api_occ_personal(ticket_id: int, request: Request):
+    t, err = _occ_require(ticket_id)
+    if err:
+        return err
+    who = _who(request)
+    bb_sql("UPDATE occ_ticket SET personal=0, updated_ts=? WHERE id=?", (time.time(), ticket_id))
+    occ_log(ticket_id, who, "status", "Converted: Personal note → OCC note")
+    return {"ok": True}
+
+
+@app.post("/api/occ/tickets/{ticket_id}/resolve")
+async def api_occ_resolve(ticket_id: int, request: Request):
+    t, err = _occ_require(ticket_id)
+    if err:
+        return err
+    body = json.loads((await request.body()).decode("utf-8") or "{}")
+    who = _who(request)
+    now = time.time()
+    bb_sql("UPDATE occ_ticket SET status='resolved', resolved_ts=?, resolution_outcome=?, resolution_action=?, resolution_notes=?, updated_ts=? WHERE id=?",
+           (now, str(body.get("outcome") or "")[:400], str(body.get("action") or "")[:800], str(body.get("notes") or "")[:800], now, ticket_id))
+    occ_log(ticket_id, who, "resolve", "Note resolved" + (f" — {body['outcome']}" if body.get("outcome") else ""))
+    return {"ok": True}
+
+
+@app.post("/api/occ/tickets/{ticket_id}/reopen")
+async def api_occ_reopen(ticket_id: int, request: Request):
+    t, err = _occ_require(ticket_id)
+    if err:
+        return err
+    body = json.loads((await request.body()).decode("utf-8") or "{}")
+    who = _who(request)
+    bb_sql("UPDATE occ_ticket SET status='monitoring', resolved_ts=NULL, updated_ts=? WHERE id=?", (time.time(), ticket_id))
+    occ_log(ticket_id, who, "reopen", "Note reopened" + (f" — {body['reason']}" if body.get("reason") else ""))
+    return {"ok": True}
+# ---------------------------------------------------------------------------
+
 
 
 
@@ -4614,6 +4927,12 @@ def tr_init():
     bb_sql("""CREATE TABLE IF NOT EXISTS occ_note(id INTEGER PRIMARY KEY AUTOINCREMENT, tab TEXT, kind TEXT, title TEXT, body TEXT,
                     services TEXT, author TEXT, pinned INTEGER DEFAULT 0, source_alert TEXT, created_ts REAL, updated_ts REAL)""")   # V16.10: OCC Connect notes
     bb_sql("CREATE TABLE IF NOT EXISTS occ_reply(id INTEGER PRIMARY KEY AUTOINCREMENT, note_id INTEGER, author TEXT, body TEXT, ts REAL)")
+    bb_sql("""CREATE TABLE IF NOT EXISTS occ_ticket(id INTEGER PRIMARY KEY AUTOINCREMENT, no TEXT, title TEXT, category TEXT, priority TEXT, status TEXT,
+                    service TEXT, direction INTEGER, bus_reg TEXT, location TEXT, description TEXT, owner TEXT, shared TEXT, watchers TEXT,
+                    personal INTEGER DEFAULT 0, pinned INTEGER DEFAULT 0, source_alert TEXT, created_ts REAL, updated_ts REAL, resolved_ts REAL,
+                    resolution_outcome TEXT, resolution_action TEXT, resolution_notes TEXT, author TEXT)""")                          # V16.11: OCC Notes & Actions
+    bb_sql("CREATE TABLE IF NOT EXISTS occ_activity(id INTEGER PRIMARY KEY AUTOINCREMENT, ticket_id INTEGER, ts REAL, actor TEXT, action TEXT, detail TEXT)")
+    bb_sql("CREATE TABLE IF NOT EXISTS occ_ack(id INTEGER PRIMARY KEY AUTOINCREMENT, ticket_id INTEGER, who TEXT, ts REAL)")
     for r in bb_sql("SELECT k, v FROM site_setting", fetch=True):
         if r["k"] == "hidden_pages":
             SITE["hidden"] = [x for x in str(r["v"]).split(",") if x in SITE_PAGE_IDS]
