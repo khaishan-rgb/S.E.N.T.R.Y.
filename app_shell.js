@@ -16,6 +16,8 @@
   // id, name, short (mobile label), icon, route, group, permission, shortcut (launcher + home cards), mobile (bottom bar slot or "more"),
   // enabled (false = shown grey + locked, never a dead link), desc (launcher / shortcut text), aliases (other URLs that are this module)
   var MODULES = [
+    {id:"occlive",  name:"OCC Live",                  short:"OCC Live", icon:"bell",    route:"/occ-live",     group:"COMMAND",   permission:"view", shortcut:true,  mobile:"more",     enabled:true,
+     desc:"Combined live alert queue and OCC Connect \u2014 the always-on Service Controller workspace."},
     {id:"command",  name:"Command Centre",           short:"Home",     icon:"home",    route:"/command",      group:"COMMAND",   permission:"view", shortcut:false, mobile:"home",     enabled:true,
      desc:"Network exceptions, attention queue and AI insights"},
     {id:"route",    name:"Route Traffic",            short:"Traffic",  icon:"route",   route:"/",             group:"COMMAND",   permission:"view", shortcut:true,  mobile:"traffic",  enabled:true,

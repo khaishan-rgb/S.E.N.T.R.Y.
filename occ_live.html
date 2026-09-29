@@ -1,0 +1,251 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#040a14">
+<title>OCC Live · SG Transport Pulse</title>
+<link rel="stylesheet" href="/design-system.css">
+<script src="/app-shell.js" data-module="occlive"></script>
+<style>
+.ol-wrap{display:grid;grid-template-columns:minmax(0,2fr) minmax(320px,1fr);gap:var(--ds-gap);align-items:start}
+.ol-wrap.expand-left{grid-template-columns:1fr 0}
+.ol-wrap.expand-right{grid-template-columns:0 1fr}
+.ol-wrap.expand-left .ol-right,.ol-wrap.expand-right .ol-left{display:none}
+@media (max-width:1180px){.ol-wrap{grid-template-columns:1fr}.ol-right{order:-1}}
+.ol-counters{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px}
+.ol-c{border-radius:10px;padding:10px 12px;border:1px solid var(--ds-line);background:rgba(8,18,33,.6);display:flex;flex-direction:column;gap:2px}
+.ol-c b{font:700 22px/1 var(--ds-display)}
+.ol-c small{color:var(--ds-mut);font-size:11px;letter-spacing:.02em}
+.ol-c.crit b{color:var(--ds-red)} .ol-c.act b{color:var(--ds-amber)} .ol-c.mon b{color:#ffd76a} .ol-c.res b{color:var(--ds-green)}
+.ol-filters{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+.ol-chip{height:28px;padding:0 11px;border-radius:999px;border:1px solid var(--ds-line-2);background:rgba(12,27,48,.6);color:var(--ds-text-2);font:600 12px var(--ds-font);cursor:pointer}
+.ol-chip[aria-pressed="true"]{color:#fff;border-color:var(--ds-edge);background:rgba(56,214,255,.14)}
+.ol-search{margin-bottom:12px}
+.ol-sec-h{display:flex;align-items:center;gap:8px;font:600 12px var(--ds-font);letter-spacing:.1em;color:var(--ds-mut);margin:16px 0 8px}
+.ol-sec-h .n{color:#fff}
+.ol-card{position:relative;border-radius:10px;border:1px solid var(--ds-line);background:rgba(9,19,35,.7);padding:11px 12px;margin-bottom:8px;display:grid;gap:6px;transition:opacity .4s}
+.ol-card.sev-critical{border-left:3px solid var(--ds-red)}
+.ol-card.sev-high{border-left:3px solid var(--ds-amber)}
+.ol-card.sev-medium{border-left:3px solid #ffd76a}
+.ol-card.sev-low{border-left:3px solid var(--ds-grey)}
+.ol-card.ack{opacity:.62}
+.ol-card.esc{outline:1px solid var(--ds-red)}
+.ol-row1{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.ol-badge{font:700 10.5px var(--ds-font);letter-spacing:.05em;padding:2px 7px;border-radius:6px;color:#0a0e16}
+.ol-badge.critical{background:var(--ds-red);color:#fff}
+.ol-badge.high{background:var(--ds-amber)}
+.ol-badge.medium{background:#ffd76a}
+.ol-badge.low{background:var(--ds-grey);color:#fff}
+.ol-badge.esc{background:var(--ds-red);color:#fff}
+.ol-title{font:600 14px var(--ds-font);color:#fff}
+.ol-age{margin-left:auto;color:var(--ds-mut);font-size:11.5px}
+.ol-det{color:var(--ds-text-2);font-size:12.5px}
+.ol-actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:2px}
+.ol-empty{padding:30px 10px;text-align:center;color:var(--ds-mut);font-size:13px}
+.ol-mon-acked{color:var(--ds-mut);font-size:11.5px}
+
+.ol-tabs{display:flex;gap:4px;margin-bottom:10px;flex-wrap:wrap}
+.ol-tab{height:30px;padding:0 12px;border-radius:8px;border:1px solid transparent;background:transparent;color:var(--ds-mut);font:600 12px var(--ds-font);cursor:pointer}
+.ol-tab[aria-pressed="true"]{background:rgba(56,214,255,.12);color:#fff;border-color:var(--ds-edge)}
+.ol-note{border-radius:10px;border:1px solid var(--ds-line);background:rgba(9,19,35,.7);padding:10px 11px;margin-bottom:8px}
+.ol-note-h{display:flex;align-items:center;gap:6px;font:600 11px var(--ds-font);color:var(--ds-mut)}
+.ol-note-title{font:600 13.5px var(--ds-font);color:#fff;margin:3px 0 2px}
+.ol-note-body{color:var(--ds-text-2);font-size:12.5px;white-space:pre-wrap}
+.ol-note-tags{display:flex;gap:5px;flex-wrap:wrap;margin-top:6px}
+.ol-tag{font:600 10.5px var(--ds-font);padding:2px 7px;border-radius:6px;background:rgba(56,214,255,.14);color:#bfeeff}
+.ol-note-reply{margin-top:6px;padding-top:6px;border-top:1px solid var(--ds-line);font-size:12px;color:var(--ds-text-2)}
+.ol-note-foot{display:flex;gap:6px;margin-top:8px;align-items:center}
+.ol-note-foot input{flex:1;height:30px;border-radius:7px;border:1px solid var(--ds-line-2);background:#081426;color:#fff;padding:0 9px;font:500 12.5px var(--ds-font)}
+.ol-compose{border-radius:10px;border:1px dashed var(--ds-line-2);padding:10px;margin-bottom:12px}
+.ol-compose textarea{width:100%;min-height:56px;border-radius:8px;border:1px solid var(--ds-line-2);background:#081426;color:#fff;padding:8px;font:500 13px var(--ds-font);resize:vertical}
+.ol-compose .row{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap}
+.ol-share{border-radius:10px;border:1px solid var(--ds-edge);background:rgba(56,214,255,.06);padding:10px;margin-bottom:10px}
+</style>
+</head>
+<body>
+<main class="ds-main" data-page="occlive">
+  <div class="ds-topbar">
+    <div class="ds-ph" style="margin:0"><b style="font:700 18px var(--ds-display);color:#fff">OCC LIVE</b><span class="sp"></span><small id="olTime"></small></div>
+  </div>
+
+  <div class="ol-wrap" id="olWrap">
+    <section class="ds-panel ol-left" aria-labelledby="olQueueH">
+      <div class="ds-ph" id="olQueueH">LIVE OPERATIONAL ALERTS<span class="sp"></span>
+        <button type="button" class="ds-btn sm ghost" id="olExpandL">Expand</button>
+      </div>
+      <div class="ol-counters">
+        <div class="ol-c crit"><b id="cCrit">0</b><small>Critical</small></div>
+        <div class="ol-c act"><b id="cAct">0</b><small>Action required</small></div>
+        <div class="ol-c mon"><b id="cMon">0</b><small>Monitoring</small></div>
+        <div class="ol-c res"><b id="cRes">0</b><small>Resolved today</small></div>
+      </div>
+      <div class="ol-search"><input class="ds-input" id="olSearch" placeholder="Search service, location, alert..."></div>
+      <div class="ol-filters" id="olFilters"></div>
+      <div id="olQueue"></div>
+      <div class="ol-sec-h">ACKNOWLEDGED / MONITORING <span class="n" id="olMonN"></span></div>
+      <div id="olMonitoring"></div>
+    </section>
+
+    <section class="ds-panel ol-right" aria-labelledby="olConnectH">
+      <div class="ds-ph" id="olConnectH">OCC CONNECT<span class="sp"></span>
+        <button type="button" class="ds-btn sm ghost" id="olExpandR">Expand</button>
+      </div>
+      <div class="ol-tabs" id="olTabs"></div>
+      <div class="ol-compose">
+        <textarea id="olNewBody" placeholder="Write a note, update or handover..."></textarea>
+        <div class="row">
+          <select class="ds-select" id="olNewTab" style="width:auto"><option value="mydesk">My Desk (private)</option><option value="shared">Shared</option><option value="handover">Handover</option></select>
+          <button type="button" class="ds-btn sm pri" id="olNewSend">Add Note</button>
+        </div>
+      </div>
+      <div id="olShareBox"></div>
+      <div id="olNotes"></div>
+    </section>
+  </div>
+</main>
+<script>
+(function(){
+  "use strict";
+  var esc = window.DS && window.DS.esc ? window.DS.esc : function(s){ return String(s==null?"":s).replace(/[&<>"']/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];}); };
+  var $ = function(id){ return document.getElementById(id); };
+  var GROUPS = [["all","All"],["bunching","Bunching"],["headway","Headway"],["traffic","Traffic"],["roadwork","Roadwork"],["incident","Incident"],["system","System"]];
+  var groupFilter = "all", q = "";
+  var TABS = [["shared","Shared"],["mydesk","My Desk"],["handover","Handover"],["pinned","Pinned"]];
+  var curTab = "shared";
+
+  function api(url, opt){ return (window.DS ? DS.api(url, opt) : fetch(url, Object.assign({credentials:"same-origin"}, opt||{})).then(function(r){return r.json();})); }
+  function timeAgo(ts){
+    if(!ts) return "";
+    var s = Date.now()/1000 - ts;
+    if(s < 60) return Math.max(1,Math.round(s)) + "s ago";
+    if(s < 3600) return Math.round(s/60) + "m ago";
+    if(s < 86400) return Math.round(s/3600) + "h ago";
+    return Math.round(s/86400) + "d ago";
+  }
+  function whenClock(ts){ if(!ts) return ""; var d = new Date(ts*1000); return d.toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"}); }
+
+  /* ---------------- Live Operational Alert Queue (left) ---------------- */
+  function renderFilters(){
+    $("olFilters").innerHTML = GROUPS.map(function(g){
+      return '<button type="button" class="ol-chip" data-g="' + g[0] + '" aria-pressed="' + (groupFilter === g[0]) + '">' + esc(g[1]) + '</button>'; }).join("");
+    Array.prototype.forEach.call($("olFilters").querySelectorAll("[data-g]"), function(b){
+      b.onclick = function(){ groupFilter = b.dataset.g; renderFilters(); loadQueue(); }; });
+  }
+
+  function card(a){
+    var badge = a.status === "re-escalated" ? '<span class="ol-badge esc">RE-ESCALATED</span>' : '<span class="ol-badge ' + a.severity + '">' + a.severity.toUpperCase() + '</span>';
+    return '<div class="ol-card sev-' + a.severity + (a.status === "re-escalated" ? " esc" : "") + '" data-id="' + esc(a.id) + '">' +
+      '<div class="ol-row1">' + badge + '<span class="ol-title">' + esc(a.title) + '</span><span class="ol-age">' + timeAgo(a.since) + '</span></div>' +
+      '<div class="ol-det">' + esc(a.detail || "") + (a.location ? ' &middot; ' + esc(a.location) : "") + '</div>' +
+      '<div class="ol-actions">' +
+        '<button type="button" class="ds-btn sm pri" data-act="ack">Acknowledge</button>' +
+        '<a class="ds-btn sm ghost" href="' + esc(a.href) + '">Open</a>' +
+        '<button type="button" class="ds-btn sm ghost" data-act="share">Share</button>' +
+        '<button type="button" class="ds-btn sm ghost" data-act="note">Note</button>' +
+      '</div></div>';
+  }
+
+  function wireCards(root, items){
+    Array.prototype.forEach.call(root.querySelectorAll(".ol-card"), function(el){
+      var id = el.dataset.id, a = items.filter(function(x){ return x.id === id; })[0];
+      if(!a) return;
+      var ackBtn = el.querySelector('[data-act="ack"]');
+      if(ackBtn) ackBtn.onclick = function(){ api("/api/occ/ack", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({id:a.id})}).then(function(){ loadQueue(); }); };
+      var shareBtn = el.querySelector('[data-act="share"]');
+      if(shareBtn) shareBtn.onclick = function(){ openShare(a); };
+      var noteBtn = el.querySelector('[data-act="note"]');
+      if(noteBtn) noteBtn.onclick = function(){ $("olNewBody").value = "Re: " + a.title + " \u2014 "; $("olNewBody").focus(); };
+    });
+  }
+
+  function openShare(a){
+    $("olShareBox").innerHTML = '<div class="ol-share"><b style="color:#fff;font-size:13px">Share to OCC Connect</b>' +
+      '<div style="color:var(--ds-text-2);font-size:12px;margin:4px 0 6px">' + esc(a.title) + (a.location ? " \u2014 " + esc(a.location) : "") + ' &middot; detected ' + whenClock(a.since) + '</div>' +
+      '<textarea class="ds-input" id="olShareNote" style="height:56px;padding:8px" placeholder="Add a message for the team..."></textarea>' +
+      '<div class="row" style="margin-top:6px"><button type="button" class="ds-btn sm pri" id="olShareSend">Share</button><button type="button" class="ds-btn sm ghost" id="olShareCancel">Cancel</button></div></div>';
+    $("olShareCancel").onclick = function(){ $("olShareBox").innerHTML = ""; };
+    $("olShareSend").onclick = function(){
+      var body = ($("olShareNote").value || "").trim() || "Shared from the live alert queue.";
+      api("/api/occ/notes", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({tab:"shared", kind:a.group, title:a.title,
+        body:body + "\n\nSvc " + a.service + " \u00b7 " + (a.location || "") + " \u00b7 detected " + whenClock(a.since), services:[a.service], source_alert:a.id})})
+      .then(function(){ $("olShareBox").innerHTML = ""; curTab = "shared"; renderTabs(); loadNotes(); });
+    };
+  }
+
+  var lastQueueJson = "";
+  function loadQueue(){
+    api("/api/occ/queue").then(function(j){
+      if(j.error){ $("olQueue").innerHTML = '<div class="ol-empty">Alerts unavailable: ' + esc(j.error) + '</div>'; return; }
+      $("cCrit").textContent = j.counts.critical; $("cAct").textContent = j.counts.action;
+      $("cMon").textContent = j.counts.monitoring; $("cRes").textContent = j.counts.resolved_today;
+      var items = j.items.filter(function(a){ return groupFilter === "all" || a.group === groupFilter; })
+                          .filter(function(a){ return !q || (a.title + " " + a.detail + " " + a.location + " " + a.service).toLowerCase().indexOf(q) >= 0; });
+      var active = items.filter(function(a){ return a.status !== "acknowledged"; });
+      var mon = items.filter(function(a){ return a.status === "acknowledged"; });
+      var freshKey = active.map(function(a){ return a.id; }).join(",");
+      if(freshKey !== lastQueueJson){ $("olQueue").innerHTML = active.length ? active.map(card).join("") : '<div class="ol-empty">No active alerts. All clear.</div>'; wireCards($("olQueue"), items); lastQueueJson = freshKey; }
+      $("olMonN").textContent = "(" + mon.length + ")";
+      $("olMonitoring").innerHTML = mon.length ? mon.map(function(a){
+        return '<div class="ol-card sev-' + a.severity + ' ack" data-id="' + esc(a.id) + '"><div class="ol-row1"><span class="ol-title">' + esc(a.title) + '</span><span class="ol-age">' + timeAgo(a.last) + '</span></div>' +
+          '<div class="ol-det">' + esc(a.detail || "") + (a.location ? ' &middot; ' + esc(a.location) : "") + '</div>' +
+          '<div class="ol-mon-acked">Acknowledged' + (a.acked_by ? " by " + esc(a.acked_by) : "") + (a.acked_at ? " \u00b7 " + whenClock(a.acked_at) : "") + '</div>' +
+          '<div class="ol-actions"><a class="ds-btn sm ghost" href="' + esc(a.href) + '">Open</a></div></div>'; }).join("") : '<div class="ol-empty">Nothing being monitored.</div>';
+    });
+  }
+  $("olSearch").addEventListener("input", function(){ q = this.value.trim().toLowerCase(); loadQueue(); });
+
+  /* ---------------- OCC Connect (right) ---------------- */
+  function renderTabs(){
+    $("olTabs").innerHTML = TABS.map(function(t){ return '<button type="button" class="ol-tab" data-t="' + t[0] + '" aria-pressed="' + (curTab === t[0]) + '">' + esc(t[1]) + '</button>'; }).join("");
+    Array.prototype.forEach.call($("olTabs").querySelectorAll("[data-t]"), function(b){ b.onclick = function(){ curTab = b.dataset.t; renderTabs(); loadNotes(); }; });
+  }
+  var NOTE_ICON = {shared:"\ud83d\udcac", mydesk:"\ud83d\udccc", handover:"\ud83d\udd04"};
+  function noteCard(n){
+    var last = n.replies.length ? n.replies[n.replies.length - 1] : null;
+    return '<div class="ol-note" data-id="' + n.id + '">' +
+      '<div class="ol-note-h">' + (NOTE_ICON[n.tab] || "\u2139") + ' ' + esc(n.author) + ' &middot; ' + whenClock(n.created) + (n.pinned ? ' &middot; \ud83d\udccc pinned' : '') + '</div>' +
+      '<div class="ol-note-title">' + esc(n.title) + '</div>' +
+      '<div class="ol-note-body">' + esc(n.body) + '</div>' +
+      (n.services.length ? '<div class="ol-note-tags">' + n.services.map(function(s){ return '<span class="ol-tag">' + esc(s) + '</span>'; }).join("") + '</div>' : "") +
+      (last ? '<div class="ol-note-reply"><b>' + esc(last.author) + ':</b> ' + esc(last.body) + '</div>' : "") +
+      (n.replies.length > 1 ? '<div class="ol-note-reply" style="opacity:.7">+' + (n.replies.length - 1) + ' more update(s)</div>' : "") +
+      '<div class="ol-note-foot"><input placeholder="Reply..." data-reply="' + n.id + '">' +
+        '<button type="button" class="ds-btn sm ghost" data-pin="' + n.id + '" data-pinned="' + (n.pinned?1:0) + '">' + (n.pinned ? "Unpin" : "Pin") + '</button>' +
+        (n.tab !== "handover" ? '<button type="button" class="ds-btn sm ghost" data-hand="' + n.id + '">Handover</button>' : '') +
+      '</div></div>';
+  }
+  function loadNotes(){
+    api("/api/occ/notes?tab=" + encodeURIComponent(curTab)).then(function(j){
+      if(j.error){ $("olNotes").innerHTML = '<div class="ol-empty">Notes unavailable: ' + esc(j.error) + '</div>'; return; }
+      $("olNotes").innerHTML = j.notes.length ? j.notes.map(noteCard).join("") : '<div class="ol-empty">No notes here yet.</div>';
+      Array.prototype.forEach.call($("olNotes").querySelectorAll("[data-reply]"), function(inp){
+        inp.addEventListener("keydown", function(e){ if(e.key !== "Enter" || !this.value.trim()) return;
+          api("/api/occ/notes/" + inp.dataset.reply + "/reply", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({body:this.value.trim()})}).then(loadNotes); }); });
+      Array.prototype.forEach.call($("olNotes").querySelectorAll("[data-pin]"), function(btn){
+        btn.onclick = function(){ api("/api/occ/notes/" + btn.dataset.pin + "/pin", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({pinned: btn.dataset.pinned !== "1"})}).then(loadNotes); }; });
+      Array.prototype.forEach.call($("olNotes").querySelectorAll("[data-hand]"), function(btn){
+        btn.onclick = function(){ api("/api/occ/notes/" + btn.dataset.hand + "/tab", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({tab:"handover"})}).then(loadNotes); }; });
+    });
+  }
+  $("olNewSend").onclick = function(){
+    var body = $("olNewBody").value.trim();
+    if(!body) return;
+    var title = body.split("\n")[0].slice(0, 60);
+    api("/api/occ/notes", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({tab:$("olNewTab").value, title:title, body:body})})
+      .then(function(){ $("olNewBody").value = ""; curTab = $("olNewTab").value === "mydesk" ? "mydesk" : $("olNewTab").value; renderTabs(); loadNotes(); });
+  };
+
+  /* ---------------- expand / collapse ---------------- */
+  $("olExpandL").onclick = function(){ var on = $("olWrap").classList.toggle("expand-left"); $("olWrap").classList.remove("expand-right"); this.textContent = on ? "Standard view" : "Expand"; $("olExpandR").textContent = "Expand"; };
+  $("olExpandR").onclick = function(){ var on = $("olWrap").classList.toggle("expand-right"); $("olWrap").classList.remove("expand-left"); this.textContent = on ? "Standard view" : "Expand"; $("olExpandL").textContent = "Expand"; };
+
+  function tickClock(){ $("olTime").textContent = new Date().toLocaleString([], {weekday:"short", day:"2-digit", month:"short", hour:"2-digit", minute:"2-digit", second:"2-digit"}); }
+  renderFilters(); renderTabs(); loadQueue(); loadNotes(); tickClock();
+  setInterval(tickClock, 1000);
+  setInterval(loadQueue, 15000);
+  setInterval(loadNotes, 30000);
+})();
+</script>
+</body>
+</html>

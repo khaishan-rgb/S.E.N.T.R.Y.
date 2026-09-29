@@ -22,7 +22,7 @@ import headway
 import routegeom
 import traffic
 
-VERSION = "V16.9"
+VERSION = "V16.10"
 # V16.8: pages hidden for everyone (see Settings > Pages). Defined here because bb_init() reads the saved value while the module loads.
 SITE_PAGE_IDS = ("command", "route", "headway", "bunching", "recovery", "halfplan", "trafficaware", "running", "ewt", "cameras")     # "settings" can never be hidden
 SITE = {"hidden": [x.strip() for x in os.getenv("HIDDEN_PAGES", "").split(",") if x.strip() in SITE_PAGE_IDS], "block": True}
@@ -584,6 +584,11 @@ async def on_error(request, exc):
 @app.get("/", response_class=HTMLResponse)
 async def home():
     return HTMLResponse((HERE / "index.html").read_text(encoding="utf-8"))
+
+
+@app.get("/occ-live", response_class=HTMLResponse)
+async def page_occ_live():
+    return HTMLResponse((HERE / "occ_live.html").read_text(encoding="utf-8"))
 
 
 @app.get("/api/health")
@@ -1666,6 +1671,170 @@ async def api_bb_alert_ack(request: Request):
         return JSONResponse({"error": "That alert is no longer active."}, status_code=404)
     e["acked_n"], e["acked_ts"] = len(e["alerts"]), time.time()
     return {"ok": True, "alert": bb_alert_public(e)}
+
+
+# ---------------------------------------------------------------------------
+# V16.10: OCC Live - one combined alert queue (bunching + long headway + traffic: congestion, incident,
+# roadworks, weather) plus OCC Connect (shift notes, handover, sharing). Nothing here invents alerts:
+# it reads the same bb_alerts() / traffic.overview() the Headway Control and Route Traffic pages already use.
+OCC_KIND_GROUP = {"bb": "bunching", "gap": "headway", "congestion": "traffic", "incident": "incident", "roadworks": "roadwork", "weather": "system"}
+
+
+def _who(request: Request) -> str:
+    sess = auth.read(request.cookies.get(auth.COOKIE, ""))
+    if sess:
+        u = sess.get("u") or {}
+        return u.get("display_name") or u.get("staff_id") or "Controller"
+    return "Controller"
+
+
+@app.get("/api/occ/queue")
+async def api_occ_queue():
+    now = time.time()
+    items = []
+    for a in bb_alerts():
+        sev = "critical" if (a["kind"] == "gap" or (a.get("level") or 0) >= 3) else "high"
+        items.append({"id": f"bb:{a['id']}", "src": "bunching", "group": OCC_KIND_GROUP[a["kind"]], "severity": sev,
+                      "status": "acknowledged" if a["acked"] else ("re-escalated" if (a["acked"] and a.get("count", 0) > 0) else "new"),
+                      "title": f"Svc {a['service']} – {a['label']}", "service": a["service"], "dir": a["direction"],
+                      "location": a.get("start_stop") or "", "detail": f"{a['stops']} stops" + (f" · min headway {a['min_hw']:.0f} min" if a.get("min_hw") else ""),
+                      "since": a["start"], "last": a.get("last") or a["start"], "acked_by": None, "acked_at": a.get("acked_ts"),
+                      "href": f"/bunching?svc={a['service']}&dir={a['direction']}", "raw_id": a["id"]})
+    try:
+        ov = traffic.overview(TR["book"], TR["params"], now, None, 0, 0, None, ["unacknowledged", "acknowledged"])
+        for r in ov["rows"]:
+            sev = "critical" if r["level"] == "critical" else "high" if r["level"] == "high" else "medium" if r["level"] == "monitor" else "low"
+            items.append({"id": f"tr:{r['id']}", "src": "traffic", "group": OCC_KIND_GROUP.get(r["kind"], "traffic"), "severity": sev,
+                          "status": "re-escalated" if r.get("worsened") else ("acknowledged" if r["status"] != "new" else "new"),
+                          "title": f"Svc {r['svc']} – {r['kind'].capitalize()}", "service": r["svc"], "dir": r["dir"],
+                          "location": r.get("location") or "", "detail": (f"+{r['delay_min']:.0f} min delay" if r.get("delay_min") else "") + (f" · {r['n_services']} services" if r.get("n_services", 1) > 1 else ""),
+                          "since": r["start"], "last": r["start"], "acked_by": r.get("acked_by"), "acked_at": r.get("acked_time"),
+                          "href": f"/?svc={r['svc']}&dir={r['dir']}", "raw_id": r["id"]})
+    except Exception:
+        pass
+    SEV_ORDER = {"critical": 0, "high": 1, "medium": 2, "low": 3}
+    items.sort(key=lambda x: (0 if x["status"] != "acknowledged" else 1, SEV_ORDER.get(x["severity"], 2), -(x["last"] or 0)))
+    resolved_today = bb_sql("SELECT COUNT(*) n FROM alert_acknowledgement WHERE ack_time > ?", (now - (now % 86400),), fetch=True)
+    return {"items": items, "counts": {"critical": sum(1 for x in items if x["status"] != "acknowledged" and x["severity"] == "critical"),
+            "action": sum(1 for x in items if x["status"] != "acknowledged" and x["severity"] in ("high", "medium")),
+            "monitoring": sum(1 for x in items if x["status"] == "acknowledged"),
+            "resolved_today": (resolved_today[0]["n"] if resolved_today else 0)}, "time": now_sgt().isoformat(timespec="seconds")}
+
+
+@app.post("/api/occ/ack")
+async def api_occ_ack(request: Request):
+    """One ACK button for the combined queue: routes to the bunching or traffic acknowledge logic by the item's id prefix (bb: / tr:)."""
+    try:
+        body = json.loads((await request.body()).decode("utf-8") or "{}")
+        oid = str(body.get("id") or "")
+    except (ValueError, TypeError):
+        return JSONResponse({"error": "Body must be JSON with the item id."}, status_code=400)
+    by = _who(request)
+    if oid.startswith("bb:"):
+        e = BB["open"].get(int(oid[3:]))
+        if not e or not e.get("alerts"):
+            return JSONResponse({"error": "That alert is no longer active."}, status_code=404)
+        e["acked_n"], e["acked_ts"] = len(e["alerts"]), time.time()
+        return {"ok": True}
+    if oid.startswith("tr:"):
+        done = traffic.acknowledge(TR["book"], [oid[3:]], by, time.time())
+        for aid in done:
+            p = aid.split(":")
+            bb_sql("INSERT INTO alert_acknowledgement(alert_id, event_id, service, direction, ack_time, ack_by, condition) VALUES (?,?,?,?,?,?,?)",
+                   (aid, p[0], p[1], int(p[2]), time.time(), by, json.dumps(TR["book"]["acks"][aid]["snap"])))
+        tr_save()
+        return {"ok": True, "acked": len(done)}
+    return JSONResponse({"error": "Unknown item id."}, status_code=400)
+
+
+def _note_public(n, replies):
+    return {"id": n["id"], "tab": n["tab"], "kind": n["kind"], "title": n["title"], "body": n["body"],
+            "services": [x for x in (n["services"] or "").split(",") if x], "author": n["author"], "pinned": bool(n["pinned"]),
+            "source_alert": n["source_alert"], "created": n["created_ts"], "updated": n["updated_ts"],
+            "replies": [{"author": r["author"], "body": r["body"], "ts": r["ts"]} for r in replies]}
+
+
+@app.get("/api/occ/notes")
+async def api_occ_notes(tab: str = "all"):
+    rows = bb_sql("SELECT * FROM occ_note ORDER BY pinned DESC, updated_ts DESC LIMIT 300", fetch=True)
+    if tab != "all":
+        rows = [r for r in rows if r["tab"] == tab or (tab == "pinned" and r["pinned"])]
+    ids = [r["id"] for r in rows]
+    reps = {}
+    if ids:
+        q = "SELECT * FROM occ_reply WHERE note_id IN (%s) ORDER BY ts ASC" % ",".join("?" * len(ids))
+        for r in bb_sql(q, ids, fetch=True):
+            reps.setdefault(r["note_id"], []).append(r)
+    return {"notes": [_note_public(r, reps.get(r["id"], [])) for r in rows], "saved": bool(BB.get("db_ok"))}
+
+
+@app.post("/api/occ/notes")
+async def api_occ_notes_create(request: Request):
+    try:
+        body = json.loads((await request.body()).decode("utf-8") or "{}")
+    except ValueError:
+        return JSONResponse({"error": "Body must be JSON."}, status_code=400)
+    tab = body.get("tab") if body.get("tab") in ("mydesk", "shared", "handover") else "mydesk"
+    title = str(body.get("title") or "").strip()[:120] or "Note"
+    text = str(body.get("body") or "").strip()[:2000]
+    if not text:
+        return JSONResponse({"error": "Note text is required."}, status_code=400)
+    services = ",".join(str(x).strip()[:12] for x in (body.get("services") or [])[:8] if str(x).strip())
+    kind = str(body.get("kind") or "general").strip()[:24]
+    remind = body.get("remind_at")
+    now = time.time()
+    bb_sql("INSERT INTO occ_note(tab, kind, title, body, services, author, pinned, source_alert, created_ts, updated_ts) VALUES (?,?,?,?,?,?,0,?,?,?)",
+           (tab, kind, title, text + (f"\n\u23f0 Reminder: {remind}" if remind else ""), services, _who(request), body.get("source_alert"), now, now))
+    rid = bb_sql("SELECT last_insert_rowid() id", fetch=True)[0]["id"]
+    row = bb_sql("SELECT * FROM occ_note WHERE id=?", (rid,), fetch=True)[0]
+    return {"ok": True, "note": _note_public(row, []), "saved": bool(BB.get("db_ok"))}
+
+
+@app.post("/api/occ/notes/{note_id}/reply")
+async def api_occ_notes_reply(note_id: int, request: Request):
+    try:
+        body = json.loads((await request.body()).decode("utf-8") or "{}")
+        text = str(body.get("body") or "").strip()[:2000]
+    except ValueError:
+        text = ""
+    if not text:
+        return JSONResponse({"error": "Reply text is required."}, status_code=400)
+    if not bb_sql("SELECT id FROM occ_note WHERE id=?", (note_id,), fetch=True):
+        return JSONResponse({"error": "Note not found."}, status_code=404)
+    now = time.time()
+    bb_sql("INSERT INTO occ_reply(note_id, author, body, ts) VALUES (?,?,?,?)", (note_id, _who(request), text, now))
+    bb_sql("UPDATE occ_note SET updated_ts=? WHERE id=?", (now, note_id))
+    return {"ok": True}
+
+
+@app.post("/api/occ/notes/{note_id}/pin")
+async def api_occ_notes_pin(note_id: int, request: Request):
+    try:
+        body = json.loads((await request.body()).decode("utf-8") or "{}")
+    except ValueError:
+        body = {}
+    row = bb_sql("SELECT id FROM occ_note WHERE id=?", (note_id,), fetch=True)
+    if not row:
+        return JSONResponse({"error": "Note not found."}, status_code=404)
+    bb_sql("UPDATE occ_note SET pinned=? WHERE id=?", (1 if body.get("pinned", True) else 0, note_id))
+    return {"ok": True}
+
+
+@app.post("/api/occ/notes/{note_id}/tab")
+async def api_occ_notes_tab(note_id: int, request: Request):
+    try:
+        body = json.loads((await request.body()).decode("utf-8") or "{}")
+        tab = body.get("tab")
+    except ValueError:
+        tab = None
+    if tab not in ("mydesk", "shared", "handover"):
+        return JSONResponse({"error": "tab must be mydesk, shared or handover."}, status_code=400)
+    if not bb_sql("SELECT id FROM occ_note WHERE id=?", (note_id,), fetch=True):
+        return JSONResponse({"error": "Note not found."}, status_code=404)
+    bb_sql("UPDATE occ_note SET tab=?, updated_ts=? WHERE id=?", (tab, time.time(), note_id))
+    return {"ok": True}
+# ---------------------------------------------------------------------------
+
 
 
 @app.get("/api/bunching/events")
@@ -4442,6 +4611,9 @@ async def page_traffic():
 def tr_init():
     bb_sql("CREATE TABLE IF NOT EXISTS traffic_setting(k TEXT PRIMARY KEY, v REAL)")
     bb_sql("CREATE TABLE IF NOT EXISTS site_setting(k TEXT PRIMARY KEY, v TEXT)")                      # V16.8: site-wide settings (hidden pages)
+    bb_sql("""CREATE TABLE IF NOT EXISTS occ_note(id INTEGER PRIMARY KEY AUTOINCREMENT, tab TEXT, kind TEXT, title TEXT, body TEXT,
+                    services TEXT, author TEXT, pinned INTEGER DEFAULT 0, source_alert TEXT, created_ts REAL, updated_ts REAL)""")   # V16.10: OCC Connect notes
+    bb_sql("CREATE TABLE IF NOT EXISTS occ_reply(id INTEGER PRIMARY KEY AUTOINCREMENT, note_id INTEGER, author TEXT, body TEXT, ts REAL)")
     for r in bb_sql("SELECT k, v FROM site_setting", fetch=True):
         if r["k"] == "hidden_pages":
             SITE["hidden"] = [x for x in str(r["v"]).split(",") if x in SITE_PAGE_IDS]
