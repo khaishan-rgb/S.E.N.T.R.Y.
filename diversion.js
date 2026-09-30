@@ -18,7 +18,16 @@
   };
 
   /* ------------------------------------------------------------------ helpers */
-  function post(url, body, timeout){ return DS.api(url, {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body || {}), timeout:timeout || 30000}); }
+  /* scope + data choices ride along with every diversion request (operator / services filter, LIVE or TEST data, traffic) */
+  var FLT = LS.get("dv.flt", {op:"", svcs:[], test:false});
+  if(!Array.isArray(FLT.svcs)) FLT.svcs = [];
+  var TRAFFIC = LS.get("dv.traffic", true) !== false;
+  function flags(){ return {operator:FLT.op, services_filter:FLT.svcs, test:!!FLT.test, traffic:TRAFFIC}; }
+  var FLAGGED = /\/api\/diversion\/(analyse|options|plan_all|plans$|plans\/\d+\/(confirm|update))/;
+  function post(url, body, timeout){
+    if(FLAGGED.test(url)) body = Object.assign({}, body || {}, flags());
+    return DS.api(url, {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body || {}), timeout:timeout || 30000});
+  }
   function toast(t){ var el = $("toast"); el.textContent = t; el.classList.add("on"); clearTimeout(toast._t); toast._t = setTimeout(function(){ el.classList.remove("on"); }, 2600); }
   function f0(x){ return x == null || isNaN(x) ? "\u2013" : String(Math.round(x)); }
   function f1(x){ return x == null || isNaN(x) ? "\u2013" : (Math.round(x * 10) / 10).toFixed(1); }
@@ -167,13 +176,16 @@
     btn.addEventListener("pointermove", function(e){
       if(!btn.hasPointerCapture || !btn.hasPointerCapture(e.pointerId)) return;
       if(!moved && Math.hypot(e.clientX - sx, e.clientY - sy) < 8) return;
-      if(!ghost){ ghost = document.createElement("div"); ghost.className = "dv-ghost"; ghost.innerHTML = '<div class="dv-mk-x">&#x2715;</div>'; document.body.appendChild(ghost); }
-      moved = true; ghost.style.left = e.clientX + "px"; ghost.style.top = e.clientY + "px";
+      if(!ghost){ ghost = document.createElement("div"); ghost.className = "dv-ghost"; ghost.innerHTML = '<div class="dv-mk-x">&#x2715;</div>'; document.body.appendChild(ghost); binShow("Drop here to cancel"); }
+      moved = true; ghost.style.left = e.clientX + "px"; ghost.style.top = e.clientY + "px"; binHot(e.clientX, e.clientY);
     });
     btn.addEventListener("pointerup", function(e){
       try{ btn.releasePointerCapture(e.pointerId); }catch(x){}
       if(ghost){ ghost.remove(); ghost = null; }
+      var inBin = moved && binHot(e.clientX, e.clientY); binHide();
       if(!moved) return;                              // a plain click is handled below
+      btn._skipClick = true; setTimeout(function(){ btn._skipClick = false; }, 60);
+      if(inBin){ toast("Cancelled \u2014 no blockage added."); return; }
       var r = map.getContainer().getBoundingClientRect();
       if(e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom){
         drop(map.containerPointToLatLng(L.point(e.clientX - r.left, e.clientY - r.top)));
@@ -183,7 +195,26 @@
     btn.addEventListener("click", function(){ if(btn._skipClick || lockedEdit()) return; arm(!armed); if(armed && S.mobile) sheetTo("peek"); });
   }
   map.on("click", function(e){ if(armed){ arm(false); drop(e.latlng); } });
+
+  /* the bin: shown while anything is being dragged; dropping on it cancels a new blockage or deletes one */
+  function binShow(t){ $("dvBinT").textContent = t; $("dvBin").classList.add("on"); $("dvBin").setAttribute("aria-hidden", "false"); }
+  function binHide(){ $("dvBin").classList.remove("on", "hot"); $("dvBin").setAttribute("aria-hidden", "true"); }
+  function binHot(x, y){
+    var el = $("dvBin"); if(!el.classList.contains("on")) return false;
+    var r = el.getBoundingClientRect(), pad = 18, hot = x >= r.left - pad && x <= r.right + pad && y >= r.top - pad && y <= r.bottom + pad;
+    el.classList.toggle("hot", hot); return hot;
+  }
+  function evXY(e){ var o = e && e.originalEvent; if(!o) return null; var t = o.touches && o.touches[0] || o.changedTouches && o.changedTouches[0] || o; return t && t.clientX != null ? [t.clientX, t.clientY] : null; }
+  var lastXY = null;
+  document.addEventListener("pointermove", function(e){ lastXY = [e.clientX, e.clientY]; }, {passive:true});
+  document.addEventListener("touchmove", function(e){ if(e.touches[0]) lastXY = [e.touches[0].clientX, e.touches[0].clientY]; }, {passive:true});
+  function dragBin(m, label, onDrop){
+    m.on("dragstart", function(){ binShow(label); });
+    m.on("drag", function(e){ var xy = evXY(e) || lastXY; if(xy) binHot(xy[0], xy[1]); });
+    m.on("dragend", function(e){ var xy = evXY(e) || lastXY, hot = xy ? binHot(xy[0], xy[1]) : false; binHide(); if(hot){ onDrop(); return true; } });
+  }
   document.addEventListener("keydown", function(e){ if(e.key === "Escape" && armed) arm(false); });
+  function lockedPlanQuiet(){ return !!(S.plan && ["active", "monitoring", "recovering"].indexOf(S.plan.status) >= 0 && !S.updating); }
   function lockedEdit(){
     if(S.plan && ["active", "monitoring", "recovering"].indexOf(S.plan.status) >= 0 && !S.updating){ toast("This diversion is " + S.plan.status.toUpperCase() + ". Press UPDATE to change the blockage."); return true; }
     return false;
@@ -233,9 +264,13 @@
       if(sel) L.polyline(b.corridor, {pane:"block", color:C.red, weight:2, opacity:.35, dashArray:"3 6", interactive:false}).addTo(G.blocked);
       b._line = rline(bl, RC.block, {pane:"block", weight:7, opacity:1, className:"dv-blockline", lineCap:"butt"}, G.blocked, false)
         .bindTooltip((many ? "Blockage " + (i + 1) + " \u00b7 " : "") + b.road + " \u00b7 " + km(b.b - b.a), {sticky:true});
-      b._x = L.marker(pointAt(b.corridor, b.cm, (b.a + b.b) / 2), {icon:divIcon('<div class="dv-mk-x" style="position:relative">&#x2715;' + (many ? '<sup>' + (i + 1) + '</sup>' : '') + '</div>'), pane:"bus", keyboard:false})
+      b._x = L.marker(pointAt(b.corridor, b.cm, (b.a + b.b) / 2), {draggable:!lockedPlanQuiet(), autoPan:false, icon:divIcon('<div class="dv-mk-x" style="position:relative">&#x2715;' + (many ? '<sup>' + (i + 1) + '</sup>' : '') + '</div>'), pane:"bus", keyboard:false})
         .addTo(G.blocked).bindTooltip(esc(b.road) + " \u2014 blocked" + (many ? " (" + (i + 1) + ")" : ""), {direction:"top"})
         .on("click", function(){ if(S.bi !== i){ S.bi = i; drawBlocks(); } });
+      (function(bb, mk){ var home = mk.getLatLng(), del = false;
+        dragBin(mk, "Drop here to delete this blockage", function(){ del = true; });
+        mk.on("dragend", function(){ if(del){ del = false; var k = S.blocks.indexOf(bb); removeBlock(k < 0 ? S.bi : k); } else { mk.setLatLng(home); toast("Drag the \u2715 to the bin to delete it; drag the START / END handles to resize."); } });
+      })(b, b._x);
       all = all ? all.extend(bl) : L.latLngBounds(bl);
     });
     var cb = curB();
@@ -254,7 +289,9 @@
       var p = e.target.getLatLng(), n = nearestOn([p.lat, p.lng], b.corridor, b.cm); set(n.s);
       if(b._line){ b._line.setLatLngs(bLine(b)); if(b._line._casing) b._line._casing.setLatLngs(bLine(b)); } if(b._x) b._x.setLatLng(pointAt(b.corridor, b.cm, (b.a + b.b) / 2)); renderBlockCard();
     });
-    m.on("dragend", function(){ drawBlocks(); resetAnalysis(); analyse(); });
+    var binned = false;
+    dragBin(m, "Drop here to delete this blockage", function(){ binned = true; });
+    m.on("dragend", function(){ if(binned){ binned = false; var i = S.blocks.indexOf(b); removeBlock(i < 0 ? S.bi : i); return; } drawBlocks(); resetAnalysis(); analyse(); });
     return m;
   }
   function renderBlockCard(){
@@ -322,9 +359,12 @@
   function renderServices(){
     var j = S.an, el = $("svcList");
     if(!j){ el.innerHTML = hasBlock() ? "" : DS.empty({icon:"route", title:"NO BLOCKAGE PLACED", text:"Affected services, directions and approaching buses appear here once a road block is on the map."}); $("svcSub").textContent = ""; return; }
-    $("svcSub").textContent = j.polled ? "live buses: LTA Bus Arrival" : "";
+    $("svcSub").textContent = j.test ? "TEST buses (synthetic)" : (j.polled ? "live buses: LTA Bus Arrival" : "");
+    var fi = j.filter || {}, filt = (fi.operator || (fi.services || []).length) ? '<p class="dv-muted" style="margin:0 0 8px">Showing ' + fi.shown + ' of ' + fi.total + ' affected service-directions'
+      + (fi.operator ? ' \u00b7 operator ' + esc(fi.operator) : '') + ((fi.services || []).length ? ' \u00b7 services ' + esc(fi.services.join(", ")) : '') + ' <button type="button" class="ds-btn sm ghost" id="fClear">Show all</button></p>' : '';
+    if(!j.entries.length && fi.total){ el.innerHTML = filt + DS.empty({icon:"route", title:"NO AFFECTED SERVICE MATCHES THE FILTER", text:fi.total + " service-direction(s) run along the blocked section, but none match the operator / services filter."}); var fc0 = $("fClear"); if(fc0) fc0.onclick = clearFlt; return; }
     if(!j.entries.length){ el.innerHTML = DS.empty({icon:"route", title:"NO SERVICE RUNS ALONG THIS SECTION", text:"No bus route runs along the blocked section (routes that only cross it are not counted). Matching basis: " + j.basis + "."}); return; }
-    var h = '<div class="dv-tot"><b>' + j.services + '</b>services affected<span style="margin-left:auto"><b style="font-size:20px">' + j.buses + '</b> buses</span></div>';
+    var h = filt + '<div class="dv-tot"><b>' + j.services + '</b>services affected<span style="margin-left:auto"><b style="font-size:20px">' + j.buses + '</b> buses</span></div>';
     j.entries.forEach(function(e){
       var k = key(e), n = (e.buses || []).filter(function(b){ return b.status !== "passed_block"; });
       var dots = n.slice(0, 8).map(function(b){ return '<i class="st-' + b.status + '" title="' + esc(b.label + " \u00b7 " + b.status_text) + '"></i>'; }).join("");
@@ -338,6 +378,7 @@
     if((j.incidents || []).length) h += '<div class="dv-lbl">NEAR THE BLOCK (LTA)</div>' + j.incidents.map(function(x){ return '<div class="dv-muted">\u26a0 ' + esc(x.type) + ' \u2014 ' + esc(x.message) + '</div>'; }).join("");
     h += '<p class="dv-muted" style="margin-top:8px">Matched on ' + esc(j.basis) + '. A service counts when it runs along the section, not when it only crosses it.</p>';
     el.innerHTML = h;
+    var fc = $("fClear"); if(fc) fc.onclick = clearFlt;
     el.querySelectorAll(".dv-svc").forEach(function(b){ b.onclick = function(){ selectService(b.dataset.k); if(S.mobile) sheetTab("opt"); }; });
   }
   function entryBy(k){ return S.an ? S.an.entries.filter(function(e){ return key(e) === k; })[0] : null; }
@@ -348,7 +389,8 @@
       var k = e.service + "|" + e.direction;
       var draw = function(line){ if(!line || S.sel && S.sel.indexOf(k + "|") === 0) return; rline(line, RC.other, {pane:"routes", weight:3, opacity:.7, casing:.35}, G.others, false).bindTooltip("Service " + e.service + " D" + e.direction, {sticky:true}).on("click", function(){ selectService(key(e)); }).addTo(G.others); };
       if(routeCache[k]) return draw(routeCache[k]);
-      DS.api("/api/traffic/route?service=" + encodeURIComponent(e.service) + "&direction=" + e.direction).then(function(r){ if(r.line && r.line.length){ routeCache[k] = r.line; draw(r.line); } });
+      var fp = hasBlock() ? bLine(S.blocks[0])[0] : null;
+      DS.api("/api/diversion/route?service=" + encodeURIComponent(e.service) + "&direction=" + e.direction + (fp ? "&lat=" + fp[0].toFixed(5) + "&lon=" + fp[1].toFixed(5) : ""), {timeout:60000}).then(function(r){ if(r.line && r.line.length){ routeCache[k] = r.line; draw(r.line); } });
     });
   }
   function renderPlaybook(){
@@ -536,7 +578,7 @@
     j.buses.concat(j.buses_on_diversion || []).forEach(function(b){
       var tr = (j.trapped || []).filter(function(x){ return x.label === b.label; })[0];
       var t = tr ? (tr.escape ? "ROUTE OUT" : "\u26d4 UNABLE TO MOVE") : b.min_to_exit != null ? f0(b.min_to_exit) + " MIN" : stTag(b.status);
-      L.marker([b.lat, b.lon], {pane:"bus", icon:L.divIcon({className:"", iconSize:[0, 0], html:'<div class="dv-bus" style="--c:' + (tr ? (tr.escape ? C.cyan : C.red) : stColor(b.status)) + '"><b>' + esc(j.service) + '</b>' + esc(b.label.slice(j.service.length)) + ' <em>' + esc(t) + '</em></div>'})})
+      L.marker([b.lat, b.lon], {pane:"bus", icon:L.divIcon({className:"", iconSize:[0, 0], html:'<div class="dv-bus' + (b.test ? ' test' : '') + '" style="--c:' + (tr ? (tr.escape ? C.cyan : C.red) : stColor(b.status)) + '"><b>' + esc(j.service) + '</b>' + esc(b.label.slice(j.service.length)) + (b.test ? ' <small>TEST</small>' : '') + ' <em>' + esc(t) + '</em></div>'})})
         .bindPopup('<b>Bus ' + esc(b.label) + '</b> \u00b7 D' + j.direction + '<br>' + esc(b.status_text) + (b.min_to_exit != null ? '<br>' + f1(b.min_to_exit) + ' min to the diversion point (' + esc(b.eta_basis) + ')' : '') + (b.gap_ahead_min != null ? '<br>Gap to bus ahead ' + f1(b.gap_ahead_min) + ' min' + (j.H ? ' (scheduled ' + f0(j.H) + ')' : '') : '') + (b.load ? '<br>Load ' + esc(b.load) : '') + '<br><small class="dv-muted">IDs are positional: LTA Bus Arrival gives no registration.</small>')
         .addTo(G.buses);
     });
@@ -861,7 +903,9 @@
     if(badWait.length) h += '<div class="dv-warn">Closure ' + esc(S.closure.label) + ': buses cannot wait. Choose a diversion for ' + badWait.map(function(c){ return esc(c.service + " D" + c.direction); }).join(", ") + ' before confirming.</div>';
     if(S.an){ var miss = S.an.entries.filter(function(e){ return !S.choices[key(e)]; }); if(miss.length && ch.length) h += '<p class="dv-muted">Not decided: ' + miss.map(function(e){ return esc(e.service + " D" + e.direction); }).join(", ") + '</p>'; }
     h += '<div class="dv-row" style="margin-top:10px">';
-    if(!p || ["detected", "planned"].indexOf(p.status) >= 0){
+    if(FLT.test && (!p || ["detected", "planned"].indexOf(p.status) >= 0)){
+      h += '<div class="dv-testbar" style="margin:0 0 6px"><b>TEST DATA</b> Plans built on synthetic buses cannot be saved, raised to OCC Live or confirmed. Switch Data to LIVE to act on this plan.</div>';
+    }else if(!p || ["detected", "planned"].indexOf(p.status) >= 0){
       if(!p) h += '<button type="button" class="ds-btn sm" id="pSave"' + (hasBlock() ? "" : " disabled") + '>SAVE & RAISE OCC ALERT</button>';
       h += '<button type="button" class="ds-btn sm pri" id="pConfirm"' + (ch.length && !badWait.length ? "" : " disabled") + '>CONFIRM DIVERSION\u2026</button>';
     }else if(p.status === "active" || p.status === "monitoring"){
@@ -1027,7 +1071,7 @@
   function renderDock(){ renderSim(); renderNext(); renderHeadway(); renderBuses(); renderRecovery(); }
 
   /* ------------------------------------------------------------------ phone: bottom sheet holds the same panels */
-  var HOMES = [], SHEET = {svc:["secBlock", "secServices", "secPlans", "secLayers"], all:["secNet"], opt:["secOptions"], sim:["paneSim"], imp:["secImpact", "paneHw"], tl:["paneNext"], plan:["secPlan", "paneBuses", "paneRec"]};
+  var HOMES = [], SHEET = {svc:["dvFilters", "secBlock", "secServices", "secPlans", "secLayers"], all:["secNet"], opt:["secOptions"], sim:["paneSim"], imp:["secImpact", "paneHw"], tl:["paneNext"], plan:["secPlan", "paneBuses", "paneRec"]};
   function layout(){
     var m = window.matchMedia("(max-width:699px)").matches; if(m === S.mobile) return; S.mobile = m;
     var sb = $("sheetBody");
@@ -1104,6 +1148,44 @@
     $("impList").querySelectorAll("[data-rm]").forEach(function(b){ b.onclick = function(){ post("/api/diversion/important", {code:b.dataset.rm, remove:true}).then(loadImp); }; }); }); }
   $("impAdd").onclick = function(){ post("/api/diversion/important", {code:$("impCode").value, reason:$("impWhy").value}).then(function(j){ if(j.error) return toast(j.error); $("impCode").value = ""; $("impWhy").value = ""; loadImp(); toast("Added. Re-run the analysis to include it."); }); };
 
+  /* ------------------------------------------------------------------ scope bar: operator, services, LIVE / TEST data */
+  function saveFlt(){ LS.set("dv.flt", FLT); }
+  function clearFlt(){ FLT.op = ""; FLT.svcs = []; saveFlt(); rerunAll(); }
+  function rerunAll(){ if(hasBlock()){ var k = S.sel && entryBy(S.sel); S.pending = k ? {service:k.service, direction:k.direction, signature:(S.choices[S.sel] || {}).sig} : S.pending; resetAnalysis(); analyse(); } renderScope(); }
+  function renderScope(){
+    $("fOp").value = FLT.op || "";
+    var box = $("fChips"), inp = $("fSvc");
+    box.querySelectorAll(".dv-chip").forEach(function(c){ c.remove(); });
+    FLT.svcs.forEach(function(v){ var c = document.createElement("span"); c.className = "dv-chip"; c.innerHTML = esc(v) + '<button type="button" aria-label="Remove service ' + esc(v) + '">\u00d7</button>';
+      c.querySelector("button").onclick = function(){ FLT.svcs = FLT.svcs.filter(function(x){ return x !== v; }); saveFlt(); rerunAll(); }; box.insertBefore(c, inp); });
+    inp.placeholder = FLT.svcs.length ? "Add another" : "All affected (add e.g. 165)";
+    document.querySelectorAll("#fData button").forEach(function(b){ b.setAttribute("aria-pressed", String((b.dataset.m === "test") === !!FLT.test)); });
+    $("testBar").hidden = !FLT.test;
+    var src = $("fSrc"); src.classList.toggle("test", !!FLT.test);
+    src.querySelector("span").textContent = FLT.test ? "TEST data (synthetic buses)" : "Live Data (LTA)";
+    $("trafficBtn").setAttribute("aria-pressed", String(TRAFFIC)); $("trafficT").textContent = TRAFFIC ? "ON" : "OFF";
+    $("trafficBtn").title = TRAFFIC ? "Live traffic is included on the map and in all time estimates. Press to exclude it." : "Live traffic is excluded: times use road-routing speeds. Press to include it.";
+  }
+  $("fOp").onchange = function(){ FLT.op = this.value; saveFlt(); rerunAll(); };
+  $("fSvc").addEventListener("keydown", function(e){
+    if(e.key === "Enter" || e.key === "," || e.key === " "){ e.preventDefault(); var v = this.value.trim().toUpperCase().replace(/[^0-9A-Z]/g, "");
+      if(v && FLT.svcs.indexOf(v) < 0 && FLT.svcs.length < 20){ FLT.svcs.push(v); saveFlt(); this.value = ""; rerunAll(); } else this.value = ""; }
+    else if(e.key === "Backspace" && !this.value && FLT.svcs.length){ FLT.svcs.pop(); saveFlt(); rerunAll(); }
+  });
+  $("fSvc").addEventListener("blur", function(){ var v = this.value.trim().toUpperCase().replace(/[^0-9A-Z]/g, ""); if(v && FLT.svcs.indexOf(v) < 0){ FLT.svcs.push(v); saveFlt(); this.value = ""; rerunAll(); } });
+  document.querySelectorAll("#fData button").forEach(function(b){ b.onclick = function(){
+    var t = b.dataset.m === "test"; if(t === !!FLT.test) return;
+    if(!t || !S.plan || ["detected", "planned", "ended"].indexOf(S.plan.status) >= 0){ FLT.test = t; saveFlt(); rerunAll(); toast(t ? "TEST data: synthetic buses \u2014 plans cannot be saved or confirmed." : "LIVE data from LTA."); }
+    else toast("An active diversion is open \u2014 TEST data is not available until it has ended.");
+  }; });
+  $("trafficBtn").onclick = function(){
+    TRAFFIC = !TRAFFIC; LS.set("dv.traffic", TRAFFIC);
+    lay.speed = TRAFFIC; var cb = document.querySelector('#layers input[data-l="speed"]'); if(cb) cb.checked = TRAFFIC;
+    if(!TRAFFIC){ lay.tomtom = false; var tb = document.querySelector('#layers input[data-l="tomtom"]'); if(tb) tb.checked = false; }
+    applyLayers(); if(TRAFFIC) loadSpeed();
+    toast(TRAFFIC ? "Live traffic included \u2014 re-estimating times." : "Live traffic excluded \u2014 times now use road-routing speeds."); rerunAll();
+  };
+
   /* bus types: which services run double-deckers (LTA Bus Arrival, OCC entries override) */
   function loadBT(){
     DS.api("/api/diversion/bustypes?q=" + encodeURIComponent($("btQ").value.trim())).then(function(j){
@@ -1136,7 +1218,8 @@
   /* ------------------------------------------------------------------ render + boot */
   function renderAll(){ renderServices(); renderNet(); renderOptions(); renderCompare(); renderPlan(); renderDock(); renderPlaybook(); setLife(); }
   layout(); window.addEventListener("resize", function(){ layout(); });
-  renderBlockCard(); renderAll(); applyLayers(); loadIncidents(); loadImp();
+  lay.speed = TRAFFIC; (function(){ var cb = document.querySelector('#layers input[data-l="speed"]'); if(cb) cb.checked = TRAFFIC; })();
+  renderScope(); renderBlockCard(); renderAll(); applyLayers(); loadIncidents(); loadImp();
   DS.api("/api/occ/meta").then(function(j){ if(j.teams){ S.teams = j.teams; fillOcc(); } loadPlans(); });
   setInterval(loadPlans, 20000); setInterval(loadIncidents, 120000); setInterval(setLife, 30000);
   var q = new URLSearchParams(location.search);

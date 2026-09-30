@@ -329,6 +329,43 @@ path.dv-blockline{filter:drop-shadow(0 0 6px rgba(255,85,102,.9))}
 .dv-ai-rev pre{white-space:pre-wrap;font:12.5px/1.5 var(--ds-font);color:var(--ds-text);margin:0} .dv-ai-rev small{display:block;margin-top:6px;color:var(--ds-mut)}
 .dv-netlbl{transform:translate(-50%,-130%);white-space:nowrap;font:700 10.5px var(--ds-font);padding:3px 7px;border-radius:6px;background:rgba(5,14,28,.92);border:1px solid;color:#fff}
 @media (min-width:700px) and (max-width:1199px){ #secNet{grid-column:1/-1} }
+
+/* V16.14 scope + data bar */
+.dv-filters{display:flex;align-items:flex-end;gap:10px 14px;flex-wrap:wrap;padding:8px 12px;border:1px solid var(--ds-line);border-radius:12px;background:rgba(8,20,38,.72)}
+.dv-filters .fld{display:flex;flex-direction:column;gap:4px;min-width:0}
+.dv-filters label,.dv-filters #fDataL{font:700 10.5px var(--ds-font);letter-spacing:.12em;color:var(--ds-mut);text-transform:uppercase}
+.dv-filters select{min-width:150px}
+.dv-filters .fsvc{flex:1;min-width:200px;max-width:520px}
+.dv-chips{display:flex;flex-wrap:wrap;gap:5px;align-items:center;min-height:36px;padding:3px 6px;border:1px solid var(--ds-line-2);border-radius:9px;background:#081426}
+.dv-chips input{flex:1;min-width:110px;border:0;background:transparent;color:#e6f1ff;font:13px var(--ds-font);outline:none;padding:5px 2px}
+.dv-chip{display:inline-flex;align-items:center;gap:4px;padding:3px 4px 3px 9px;border-radius:999px;background:rgba(56,214,255,.14);border:1px solid rgba(56,214,255,.45);color:#dff6ff;font:600 12.5px var(--ds-font)}
+.dv-chip button{border:0;background:none;color:#9fdff5;cursor:pointer;font-size:14px;line-height:1;padding:0 4px;border-radius:50%}
+.dv-chip button:focus-visible{outline:2px solid var(--ds-cyan)}
+.dv-src{display:inline-flex;align-items:center;gap:7px;margin-left:auto;font:600 12px var(--ds-font);color:var(--ds-text-2);padding:6px 10px;border-radius:999px;border:1px solid var(--ds-line)}
+.dv-src i{width:8px;height:8px;border-radius:50%;background:var(--ds-green);box-shadow:0 0 0 3px rgba(46,229,157,.2)}
+.dv-src.test{color:#ffe0b0;border-color:rgba(255,181,71,.55)}.dv-src.test i{background:var(--ds-amber);box-shadow:0 0 0 3px rgba(255,181,71,.2)}
+.dv-testbar{padding:8px 12px;border-radius:10px;border:1px dashed rgba(255,181,71,.7);background:repeating-linear-gradient(135deg,rgba(255,181,71,.10) 0 12px,rgba(255,181,71,.04) 12px 24px);color:#ffe0b0;font-size:12.5px}
+.dv-testbar b{letter-spacing:.14em;margin-right:8px;color:#ffc56b}
+.dv-bus.test{border-style:dashed!important;opacity:.92}
+.dv-bus.test small{font:700 9px var(--ds-font);letter-spacing:.1em;color:#ffc56b;margin-left:2px}
+.dv-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+/* map tools: traffic include / exclude + drag bin */
+.dv-maptools{position:absolute;top:10px;right:10px;z-index:650;display:flex;flex-direction:column;align-items:flex-end;gap:8px;pointer-events:none}
+.dv-maptools > *{pointer-events:auto}
+.dv-tbtn{display:inline-flex;align-items:center;gap:8px;height:36px;padding:0 12px;border-radius:10px;border:1px solid var(--ds-line-2);background:rgba(5,15,30,.9);color:#e6f1ff;font:700 11px var(--ds-font);letter-spacing:.1em;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.4)}
+.dv-tbtn i{width:18px;height:6px;border-radius:3px;background:linear-gradient(90deg,#22d36a 0 33%,#ffc21a 33% 66%,#ff4d55 66%)}
+.dv-tbtn[aria-pressed="false"]{color:var(--ds-mut)}.dv-tbtn[aria-pressed="false"] i{background:#4a5b70}
+.dv-tbtn[aria-pressed="false"] b{color:#ffc3ca}.dv-tbtn b{color:#c6f9e3}
+.dv-tbtn:focus-visible{outline:2px solid var(--ds-cyan);outline-offset:2px}
+.dv-bin{display:none;align-items:center;gap:8px;padding:10px 14px;border-radius:14px;border:2px dashed rgba(255,85,102,.75);background:rgba(40,8,16,.92);color:#ffc3ca;font:700 12px var(--ds-font);letter-spacing:.06em;box-shadow:0 6px 20px rgba(0,0,0,.5);transition:transform .12s,background .12s}
+.dv-bin.on{display:inline-flex}
+.dv-bin.hot{transform:scale(1.12);background:#c81e36;color:#fff;border-style:solid;border-color:#fff}
+@media (max-width:699px){
+  .dv-maptools{top:auto;bottom:calc(var(--sheet,112px) + 76px);right:12px}
+  .dv-filters{border:0;background:none;padding:0 0 10px}
+  .dv-filters .fsvc{max-width:none}
+  .dv-src{margin-left:0}
+}
 </style>
 </head>
 <body>
@@ -340,6 +377,18 @@ path.dv-blockline{filter:drop-shadow(0 0 6px rgba(255,85,102,.9))}
     </ol>
     <span class="dv-life" id="dvLife" data-s="none"><i></i><span id="dvLifeT">NO BLOCKAGE</span><small id="dvLifeS"></small></span>
   </div>
+
+  <div class="dv-filters" id="dvFilters" role="region" aria-label="Scope and data source">
+    <div class="fld"><label for="fOp">Transport Operator</label>
+      <select class="ds-input" id="fOp"><option value="">All operators</option><option value="SBST">SBS Transit</option><option value="SMRT">SMRT</option><option value="TTS">Tower Transit</option><option value="GAS">Go-Ahead</option></select></div>
+    <div class="fld fsvc"><label for="fSvc">Services</label>
+      <div class="dv-chips" id="fChips"><input id="fSvc" placeholder="All affected (add e.g. 165)" maxlength="5" autocapitalize="characters" aria-describedby="fSvcHint"></div>
+      <small id="fSvcHint" class="dv-sr">Type a service number and press Enter to add it. Leave empty for every affected service.</small></div>
+    <div class="fld"><label id="fDataL">Data</label>
+      <div class="ds-segm" id="fData" role="group" aria-labelledby="fDataL"><button type="button" data-m="live" aria-pressed="true">LIVE</button><button type="button" data-m="test" aria-pressed="false">TEST</button></div></div>
+    <span class="dv-src" id="fSrc"><i></i><span>Live Data (LTA)</span></span>
+  </div>
+  <div class="dv-testbar" id="testBar" hidden role="status"><b>TEST DATA</b> Synthetic buses at the scheduled headway on the real route — not live. Road routing, bus roads and traffic are real. Plans cannot be saved, raised or confirmed.</div>
 
   <div class="dv-body">
     <!-- LEFT: road blockage controls, affected services, closure duration, layers -->
@@ -404,6 +453,10 @@ path.dv-blockline{filter:drop-shadow(0 0 6px rgba(255,85,102,.9))}
 
     <!-- CENTRE: map -->
     <div class="dv-mapwrap" id="mapWrap">
+      <div class="dv-maptools">
+        <div class="dv-bin" id="dvBin" aria-hidden="true"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6"/></svg><span id="dvBinT">Drop here to cancel</span></div>
+        <button type="button" class="dv-tbtn" id="trafficBtn" aria-pressed="true" title="Include live traffic in the map and in all time estimates"><i aria-hidden="true"></i><span>TRAFFIC <b id="trafficT">ON</b></span></button>
+      </div>
       <div id="dvMap" role="application" aria-label="Diversion map"></div>
       <div class="dv-mapchip" id="mapChipHome"></div>
       <div class="dv-hint" id="dvHint" role="status">Tap the road where it is blocked</div>

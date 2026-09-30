@@ -6286,6 +6286,7 @@ def dv_init():
               ticket_id INTEGER, notice TEXT, started_ts REAL, ended_ts REAL, recovery TEXT, alert_acked_ts REAL, alert_acked_by TEXT, log TEXT, summary TEXT)""")
     bb_sql("CREATE TABLE IF NOT EXISTS diversion_ack(id INTEGER PRIMARY KEY AUTOINCREMENT, plan_id INTEGER, occ TEXT, who TEXT, ts REAL, revision INTEGER)")
     bb_sql("CREATE TABLE IF NOT EXISTS important_stop(code TEXT PRIMARY KEY, reason TEXT, by_name TEXT, ts REAL)")
+    bb_sql("CREATE TABLE IF NOT EXISTS dv_line_fix(service TEXT, direction INTEGER, key TEXT, data TEXT, ts REAL, PRIMARY KEY(service, direction))")
     bb_sql("CREATE TABLE IF NOT EXISTS bus_type_seen(service TEXT, type TEXT, n INTEGER, last_ts REAL, PRIMARY KEY(service, type))")
     bb_sql("CREATE TABLE IF NOT EXISTS bus_type_override(service TEXT PRIMARY KEY, types TEXT, note TEXT, by_name TEXT, ts REAL)")
     DV["init"] = True
@@ -6309,6 +6310,61 @@ def dv_clean_line(v, max_pts=600):
         if in_sg(lat, lon):
             out.append((lat, lon))
     return out
+
+
+def dv_flags(body):
+    """page-wide choices sent with every request: TEST data (synthetic buses), include live traffic, operator / services filter"""
+    svcs = body.get("services_filter") or []
+    if isinstance(svcs, str):
+        svcs = re.split(r"[\s,;]+", svcs)
+    return {"test": bool(body.get("test")), "traffic": body.get("traffic") is not False,
+            "operator": str(body.get("operator") or "").strip().upper()[:6],
+            "services": {str(x).strip().upper() for x in svcs if str(x).strip()}}
+
+
+def dv_test_buses(line, cum, prof, stop_s, lo_s, hi_s, A, H, bus_type="DD"):
+    """TEST data: a synthetic fleet at the scheduled headway on the service's real route (same record shape as live buses).
+    First bus 0.3 headway before the block, then every headway upstream; one bus just past the block. Never shown as live."""
+    H = H or 10.0
+    t_blk = diversion.t_at(prof, A)
+    ts = prof["t"]
+    out = []
+
+    cm_ = prof["cum"]
+
+    def s_at(t):          # position (m) reached at running time t (min): inverse of the time profile
+        if not ts or t < ts[0] or t > ts[-1]:
+            return None
+        lo, hi = 0, len(ts) - 1
+        while hi - lo > 1:
+            m_ = (lo + hi) // 2
+            if ts[m_] <= t:
+                lo = m_
+            else:
+                hi = m_
+        f = 0.0 if ts[hi] == ts[lo] else (t - ts[lo]) / (ts[hi] - ts[lo])
+        return cm_[lo] + (cm_[hi] - cm_[lo]) * f
+    k = 0
+    while k < 12:
+        t = t_blk - (0.3 + k) * H
+        if t < 0:
+            break
+        s_ = s_at(t)
+        if s_ is None or s_ < lo_s:
+            break
+        out.append(s_)
+        k += 1
+    t_after = t_blk + 0.6 * H
+    if ts and t_after <= ts[-1]:
+        s_ = s_at(t_after)
+        if s_ is not None and s_ <= hi_s + 300:
+            out.append(s_)
+    res = []
+    for s_ in out:
+        p_ = diversion.point_at(line, cum, s_)
+        res.append({"lat": round(p_[0], 6), "lon": round(p_[1], 6), "s": round(s_, 1), "off_m": 0.0, "on_diversion": False,
+                    "load": "SEA", "type": bus_type, "wab": True, "monitored": True, "eta_anchor": None, "test": True})
+    return res
 
 
 def dv_speed_fn(idx):
@@ -6335,7 +6391,119 @@ def dv_marked():
     return {r["code"]: (r["reason"] or "listed") for r in bb_sql("SELECT code, reason FROM important_stop", fetch=True)}
 
 
-async def dv_line(st, svc, d):
+DV_LINES = {}          # (svc, d) -> verified-line state (checked against LTA stop distances, bad segments re-routed)
+
+
+async def dv_line(st, svc, d, focus=None, focus_km=3.0, max_fix=24):
+    """the service's CORRECT road line -> (line, source label). The real-road line (busrouter.sg fitted to LTA stops) is
+    checked against LTA BusRoutes: every stop must lie on it in order, and each stop-to-stop length must match LTA's
+    official distance. Segments that fail are re-routed stop to stop on real roads (no U-turn), keeping the route whose
+    length matches LTA best. With a focus point, segments near it are fixed first; fixes are cached and stored."""
+    base, src = await dv_line_base(st, svc, d)
+    if not base:
+        return base, src
+    stops = route_stops(st, svc, d)
+    if len(stops) < 2:
+        return base, src
+    key = f"{len(base)}:{round(base[0][0], 5)}:{round(base[-1][1], 5)}:{len(stops)}"
+    ent = DV_LINES.get((svc, d))
+    if not ent or ent["key"] != key:
+        ent = dv_line_load(svc, d, key)
+        if ent is None:
+            chk = await asyncio.to_thread(diversion.check_line, base, stops)
+            ent = {"key": key, "chk": chk, "fixed": {}, "tried": set()}
+        DV_LINES[(svc, d)] = ent
+        if len(DV_LINES) > 600:
+            DV_LINES.pop(next(iter(DV_LINES)))
+    chk = ent["chk"]
+    bad = [g for g in chk["segs"] if not g["ok"] and g["i"] not in ent["tried"]]
+    if focus is not None and bad:
+        fx = focus
+
+        def dist_focus(g):
+            a_, b_ = stops[g["i"]], stops[g["i"] + 1]
+            return min(diversion.dist_m(fx, (a_["lat"], a_["lon"])), diversion.dist_m(fx, (b_["lat"], b_["lon"])))
+        bad = sorted([g for g in bad if dist_focus(g) <= focus_km * 1000.0], key=dist_focus)
+    bad = bad[:max_fix]
+    if bad:
+        res = await asyncio.gather(*[dv_fix_segment(base, chk, stops, g) for g in bad])
+        for g, f in zip(bad, res):
+            ent["tried"].add(g["i"])
+            if f:
+                ent["fixed"][g["i"]] = f
+        dv_line_save(svc, d, ent)
+    nbad = sum(1 for g in chk["segs"] if not g["ok"])
+    if not nbad:
+        ent["line"], ent["label"] = base, src + " \u00b7 checked against LTA stop distances"
+        return base, ent["label"]
+    if ent.get("built") != len(ent["fixed"]):
+        ent["line"] = await asyncio.to_thread(diversion.assemble_line, base, chk, stops, ent["fixed"])
+        ent["built"] = len(ent["fixed"])
+    good_fix = sum(1 for f in ent["fixed"].values() if f.get("ok"))
+    left = nbad - good_fix
+    ent["label"] = (f"{src} \u00b7 {nbad} of {len(chk['segs'])} stop-to-stop segments did not match LTA; {good_fix} re-routed on real roads"
+                    + (f", {left} still unverified" if left else ""))
+    ent["unverified"] = left
+    return ent["line"], ent["label"]
+
+
+async def dv_fix_segment(base, chk, stops, g):
+    """re-route one stop-to-stop segment on real roads, heading the way the bus travels, no U-turn;
+    keep the road route whose length is closest to LTA's official distance"""
+    i, P = g["i"], diversion.PARAMS
+    tol = P["line_stop_tol_m"]
+    ends = []
+    for k in (i, i + 1):
+        if chk["lat"][k] <= tol:
+            ends.append(diversion.point_at(base, chk["cum"], chk["pos"][k]))
+        else:
+            ends.append((stops[k]["lat"], stops[k]["lon"]))
+    a, b = ends
+    hb = diversion.bearing(a, b)
+    try:
+        rr = await dv_osrm([a, b], 2, [hb if chk["lat"][i] > tol else diversion.nearest_on_line(a, base, chk["cum"])[3], None])
+    except Exception:
+        return None
+    D = g["D"]
+    best = None
+    for r in rr.get("routes") or []:
+        if diversion.uturns(r["line"], r.get("steps")):
+            continue
+        m = r["km"] * 1000.0
+        err = abs(m - D) if D else m
+        if best is None or err < best[0]:
+            best = (err, r["line"], m)
+    if not best:
+        return None
+    ok = D is None or best[0] <= max(P["line_len_abs_m"], P["line_len_rel"] * D)
+    base_err = abs(g["L"] - D) if D else None
+    if not ok and base_err is not None and base_err <= best[0] and "stop off the line" not in g["why"]:
+        return None                 # the original is no worse: keep it (still marked unverified)
+    return {"line": [(round(p_[0], 6), round(p_[1], 6)) for p_ in best[1]], "ok": ok, "m": round(best[2]), "D": D}
+
+
+def dv_line_load(svc, d, key):
+    try:
+        dv_init()
+        r = bb_sql("SELECT * FROM dv_line_fix WHERE service=? AND direction=? AND key=?", (svc, d, key), fetch=True)
+        if not r:
+            return None
+        x = json.loads(r[0]["data"])
+        return {"key": key, "chk": x["chk"], "fixed": {int(k): v for k, v in x["fixed"].items()}, "tried": set(x["tried"])}
+    except Exception:
+        return None
+
+
+def dv_line_save(svc, d, ent):
+    try:
+        dv_init()
+        data = json.dumps({"chk": ent["chk"], "fixed": ent["fixed"], "tried": sorted(ent["tried"])})
+        bb_sql("INSERT OR REPLACE INTO dv_line_fix(service, direction, key, data, ts) VALUES(?,?,?,?,?)", (svc, d, ent["key"], data, time.time()))
+    except Exception:
+        pass
+
+
+async def dv_line_base(st, svc, d):
     """the service's real-road line (the same line the traffic engine matches) -> (line, source label)"""
     fit = TR_LINES["lines"].get((svc, d))
     if fit and len(fit.get("line") or []) >= 2:
@@ -6589,9 +6757,10 @@ async def dv_entries(st, blocks):
                 near.add(code)
         keys = sorted({(svc, d) for code in near for svc in st["at_stop"].get(code, ()) for d in st["dirs"].get(svc, [])})[:40]
         basis = "road geometry per service (network lines not built yet)"
+    focus = blocks[0]["line"][len(blocks[0]["line"]) // 2] if blocks else None
     for k in keys:
         svc, d = k
-        line, src = await dv_line(st, svc, d)
+        line, src = await dv_line(st, svc, d, focus=focus)
         if not line:
             continue
         secs = await dv_sections(line, blocks)
@@ -6630,7 +6799,13 @@ async def api_dv_analyse(request: Request):
     tr_lines_kick(st)
     fq = await freq_table()
     opmap = await occ_operator_map()
+    fl = dv_flags(body)
     entries, basis = await dv_entries(st, blocks)
+    all_n = len(entries)
+    if fl["operator"]:
+        entries = [e for e in entries if opmap.get(e["service"], "").upper() == fl["operator"]]
+    if fl["services"]:
+        entries = [e for e in entries if e["service"] in fl["services"]]
     now = now_sgt()
     polled = 0
     errs = []
@@ -6640,13 +6815,16 @@ async def api_dv_analyse(request: Request):
         e["buses"], e["buses_polled"] = [], False
         if polled >= DV_MAX_POLL:
             continue
-        line, _ = await dv_line(st, e["service"], e["direction"])
+        line, _ = await dv_line(st, e["service"], e["direction"], focus=block[len(block) // 2])
         stops = route_stops(st, e["service"], e["direction"])
         pr = dv_prep(e["service"], e["direction"], line, stops)
         bands = await bands_state()
-        prof = diversion.profile(line, dv_speed_fn(bands.get("idx")), pr["stop_s"])
-        buses, n, err = await dv_buses(st, e["service"], e["direction"], line, pr["cum"], stops, pr["stop_s"],
-                                       e["a"] - diversion.PARAMS["approach_km"] * 1000, e["b"], anchor_s=e["a"])
+        prof = diversion.profile(line, dv_speed_fn(bands.get("idx")) if fl["traffic"] else None, pr["stop_s"])
+        if fl["test"]:
+            buses, n, err = dv_test_buses(line, pr["cum"], prof, pr["stop_s"], e["a"] - diversion.PARAMS["approach_km"] * 1000, e["b"], e["a"], H), 0, None
+        else:
+            buses, n, err = await dv_buses(st, e["service"], e["direction"], line, pr["cum"], stops, pr["stop_s"],
+                                           e["a"] - diversion.PARAMS["approach_km"] * 1000, e["b"], anchor_s=e["a"])
         polled += 1
         if err:
             errs.append(err)
@@ -6659,7 +6837,7 @@ async def api_dv_analyse(request: Request):
                 m = b["eta_anchor"]                     # LTA Bus Arrival ETA at the last stop before the block
                 b["eta_basis"] = "LTA arrival time"
             else:
-                b["eta_basis"] = "estimated from speed bands"
+                b["eta_basis"] = "TEST data (synthetic bus)" if fl["test"] else ("estimated from speed bands" if fl["traffic"] else "estimated without traffic")
             b["min_to_block"] = round(m, 1) if m is not None else None
             b["status"], b["status_text"] = diversion.bus_status(m, b["s"], None, e["a"], e["b"])
         e["buses"] = [b for b in buses if b["s"] is None or b["s"] <= e["b"] + 50]
@@ -6683,7 +6861,10 @@ async def api_dv_analyse(request: Request):
             "polled": polled, "not_polled": max(0, len(entries) - polled), "poll_cap": DV_MAX_POLL, "basis": basis,
             "lines": TR_LINES["info"], "arrival_error": errs[0] if errs and len(errs) == polled else None,
             "incidents": inc[:10], "roadworks": rw[:10], "playbook": dv_playbook_rows(mid[0], mid[1], blk["road"]),
-            "updated": now.isoformat(timespec="seconds")}
+            "updated": now.isoformat(timespec="seconds"),
+            "filter": {"operator": fl["operator"], "services": sorted(fl["services"]), "shown": len(entries), "total": all_n},
+            "test": fl["test"], "traffic": fl["traffic"],
+            "source": "TEST DATA \u00b7 synthetic buses at the scheduled headway on the real route (not live)" if fl["test"] else "LTA DataMall Bus Arrival (live)"}
 
 
 # ---- 4. diversion options for one service-direction
@@ -6862,24 +7043,25 @@ async def api_dv_options(request: Request):
     if not blocks or not svc:
         return JSONResponse({"error": "A placed block and a service are required."}, status_code=400)
     st = await static()
-    return await dv_options_cached(st, blocks, svc, d, run_i, closure, bus, dims, body.get("others") or [], True, allow_small)
+    fl = dv_flags(body)
+    return await dv_options_cached(st, blocks, svc, d, run_i, closure, bus, dims, body.get("others") or [], True, allow_small, fl["test"], fl["traffic"])
 
 
-async def dv_options_cached(st, blocks, svc, d, run_i, closure, bus, dims, others, poll, allow_small):
+async def dv_options_cached(st, blocks, svc, d, run_i, closure, bus, dims, others, poll, allow_small, test=False, traffic=True):
     """options are reused for 90 s so the network plan and the per-service view never compute the same thing twice"""
-    key = "dvopt:" + hashlib.sha1(json.dumps([[b["line"], b["directed"]] for b in blocks] + [svc, d, run_i, closure, bus, dims, poll, allow_small],
+    key = "dvopt:" + hashlib.sha1(json.dumps([[b["line"], b["directed"]] for b in blocks] + [svc, d, run_i, closure, bus, dims, poll, allow_small, test, traffic],
                                              default=str).encode()).hexdigest()[:24]
 
     async def factory():
-        r = await dv_options_core(st, blocks, svc, d, run_i, closure, bus, dims, others, poll, allow_small)
+        r = await dv_options_core(st, blocks, svc, d, run_i, closure, bus, dims, others, poll, allow_small, test, traffic)
         return r, 90, bool(r.get("ok"))
     r = await cached(key, factory)
     return copy.deepcopy(r)
 
 
-async def dv_options_core(st, blocks, svc, d, run_i, closure, bus, dims, others, poll=True, allow_small=False):
+async def dv_options_core(st, blocks, svc, d, run_i, closure, bus, dims, others, poll=True, allow_small=False, test=False, traffic=True):
     P = diversion.PARAMS
-    line, src = await dv_line(st, svc, d)
+    line, src = await dv_line(st, svc, d, focus=blocks[0]["line"][len(blocks[0]["line"]) // 2] if blocks else None)
     if not line:
         return {"ok": False, "error": f"No route for service {svc} direction {d}."}
     stops = route_stops(st, svc, d)
@@ -6893,7 +7075,7 @@ async def dv_options_core(st, blocks, svc, d, run_i, closure, bus, dims, others,
     road_txt = dv_roads_txt(blocks, run["blocks"])
     bands = await bands_state()
     idx = bands.get("idx")
-    sfn = dv_speed_fn(idx)
+    sfn = dv_speed_fn(idx) if traffic else None       # traffic excluded: road-routing times only
     prof = diversion.profile(line, sfn, stop_s)
     fq = await freq_table()
     now = now_sgt()
@@ -7042,12 +7224,12 @@ async def dv_options_core(st, blocks, svc, d, run_i, closure, bus, dims, others,
     for c, osm in zip(cands, osms):
         dep, seg, r = c["dep"], c["seg"], c["r"]
         leave_s, rejoin_s = dep["leave_s"], dep["rejoin_s"]
-        fb = (r["km"] / (r["osrm_min"] * offservice.PARAMS["bus_time_factor"] / 60.0)) if r.get("osrm_min") else None
+        fb = (r["km"] / (r["osrm_min"] * offservice.PARAMS["bus_time_factor"] / 60.0)) if (traffic and r.get("osrm_min")) else None   # traffic off: same standard speed as the normal route
         dprof = diversion.profile(seg, sfn, None, fallback_kmh=fb)
         div_min = dprof["t"][-1]
         normal_min = diversion.t_at(prof, rejoin_s) - diversion.t_at(prof, leave_s)
         runs_, tinfo = color_route(seg, idx) if idx else ([], {"km": {"none": c["div_m"] / 1000.0}})
-        tl, tl_basis = dv_traffic_label(tinfo["km"])
+        tl, tl_basis = dv_traffic_label(tinfo["km"]) if traffic else ("NOT INCLUDED", "live traffic switched off on the map")
         skipped = []
         for i in diversion.stops_in(stop_s, leave_s + 1.0, rejoin_s - 1.0):
             s_ = stops[i]
@@ -7076,7 +7258,8 @@ async def dv_options_core(st, blocks, svc, d, run_i, closure, bus, dims, others,
                      "leave_before_block_m": round(A - leave_s), "rejoin_after_block_m": round(rejoin_s - B),
                      "div_km": round(c["div_m"] / 1000, 2), "normal_km": round((rejoin_s - leave_s) / 1000, 2), "added_km": round(added_m / 1000, 2),
                      "div_min": round(div_min, 1), "normal_min": round(normal_min, 1), "added_min": round(div_min - normal_min, 1),
-                     "time_src": "LTA speed bands" if dprof["known_share"] >= 0.5 else f"routing time x {offservice.PARAMS['bus_time_factor']:g} (little live speed data)",
+                     "time_src": ("LTA speed bands" if dprof["known_share"] >= 0.5 else f"routing time x {offservice.PARAMS['bus_time_factor']:g} (little live speed data)") if traffic
+                                 else f"standard bus speed {P['fallback_kmh']:g} km/h on both routes (live traffic excluded)",
                      "skipped": skipped, "skipped_n": len(skipped), "important_n": sum(1 for x in skipped if x["important"]),
                      "traffic": tl, "traffic_basis": tl_basis, "traffic_runs": [{"b": x["b"], "pts": x["pts"]} for x in runs_][:80],
                      "status": status, "status_text": status_text, "feasibility": feas, "feasibility_text": feas_text, "excessive": excessive,
@@ -7099,7 +7282,10 @@ async def dv_options_core(st, blocks, svc, d, run_i, closure, bus, dims, others,
 
     # live buses (LTA Bus Arrival) on the approach, with their minutes to the last diversion point
     anchor_s = last["leave_s"] if last else A
-    if poll:
+    if test:
+        buses, n_polled, arr_err = dv_test_buses(line, cum, prof, stop_s, A - P["approach_km"] * 1000, max([o["rejoin_s"] for o in opts] + [B + 300]), A, H,
+                                                 "DD" if bus == "dd" else "SD"), 0, None
+    elif poll:
         buses, n_polled, arr_err = await dv_buses(st, svc, d, line, cum, stops, stop_s, A - P["approach_km"] * 1000, max([o["rejoin_s"] for o in opts] + [B + 300]),
                                                   anchor_s=anchor_s, div_lines=[o["_seg"] for o in opts])
     else:
@@ -7274,6 +7460,7 @@ async def api_dv_plan_all(request: Request):
     if not blocks:
         return JSONResponse({"error": "Place the road block on the map first."}, status_code=400)
     closure, bus, dims, allow_small = dv_opt_params(body)
+    fl = dv_flags(body)
     st = await static()
     if not st["stops"] or not st["routes"]:
         return {"ok": False, "error": f"Bus routes could not be loaded from LTA ({st.get('error') or 'no data'})."}
@@ -7287,7 +7474,7 @@ async def api_dv_plan_all(request: Request):
     async def one(i, e):
         async with sem:
             try:
-                return await dv_options_cached(st, blocks, e["service"], e["direction"], e["run"], closure, bus, dims, others, i < DV_MAX_POLL, allow_small)
+                return await dv_options_cached(st, blocks, e["service"], e["direction"], e["run"], closure, bus, dims, others, i < DV_MAX_POLL, allow_small, fl["test"], fl["traffic"])
             except Exception as ex:
                 return {"ok": False, "error": f"{type(ex).__name__}: {ex}"}
     res = await asyncio.gather(*[one(i, e) for i, e in enumerate(ents)])
@@ -7497,10 +7684,18 @@ def dv_block_json(blocks):
                                   for b in blocks]})
 
 
+def dv_test_refusal(body):
+    if body.get("test"):
+        return JSONResponse({"error": "TEST data is on: plans built on synthetic buses cannot be saved, raised to OCC Live or confirmed. Switch the data to LIVE."}, status_code=400)
+    return None
+
+
 @app.post("/api/diversion/plans")
 async def api_dv_create(request: Request):
     dv_init()
     body = _dv_body(await request.body())
+    if dv_test_refusal(body):
+        return dv_test_refusal(body)
     blocks = dv_blocks(body)
     if not blocks:
         return JSONResponse({"error": "A placed road block is required."}, status_code=400)
@@ -7551,6 +7746,8 @@ async def api_dv_confirm(pid: int, request: Request):
     if not r:
         return JSONResponse({"error": "Diversion not found."}, status_code=404)
     body = _dv_body(await request.body())
+    if dv_test_refusal(body):
+        return dv_test_refusal(body)
     who = _who(request)
     occ = str(body.get("occ") or r["created_occ"] or "").strip()
     occ = occ if occ in OCC_TEAMS else ""
@@ -8088,3 +8285,18 @@ async def api_dv_bustypes_set(request: Request):
     for k in [k for k in CACHE if str(k).startswith("dvopt:")]:      # options depend on bus types: recompute
         CACHE.pop(k, None)
     return {"ok": True, "service": svc, "class": bt_class(svc)}
+
+
+
+@app.get("/api/diversion/route")
+async def api_dv_route(service: str = "", direction: int = 1, lat: float = None, lon: float = None):
+    """a service's CORRECT road line for the map (checked against LTA stop distances; segments near lat/lon fixed first)"""
+    svc = service.strip().upper()
+    st = await static()
+    if not svc or not st.get("routes"):
+        return {"line": [], "error": "unknown service"}
+    focus = (lat, lon) if lat is not None and lon is not None else None
+    line, label = await dv_line(st, svc, direction, focus=focus, max_fix=12)
+    ent = DV_LINES.get((svc, direction)) or {}
+    return {"service": svc, "direction": direction, "line": [[round(p[0], 6), round(p[1], 6)] for p in diversion.simplify(line, 400)] if line else [],
+            "source": label, "unverified": ent.get("unverified", 0)}

@@ -17,6 +17,9 @@ import math
 import re
 
 PARAMS = {
+    "line_stop_tol_m": 45.0,    # route-line check: a stop further than this from the line means the line is wrong there
+    "line_len_abs_m": 150.0,    # ...or a stop-to-stop length differing from LTA's official distance by more than this
+    "line_len_rel": 0.15,       # ...and by more than this share of it
     "busroad_tol_m": 20.0,      # rule 1: a service's route line within this distance, same direction, proves the road is a bus road
     "busroad_stop_tol_m": 35.0,  # ...or the chord between two consecutive stops of a service (when it has no route line)
     "busroad_ang": 35.0,        # heading tolerance (degrees) - the opposite carriageway never counts
@@ -1034,3 +1037,57 @@ def bus_road_check(seg, groups, net, svc_class, bus, P=PARAMS):
         text = "Bus road all the way (services " + ", ".join(services[:6]) + ")"
     return {"ok": ok, "dd": dd, "coverage": round(cov, 3), "services": services, "dd_services": dd_svcs,
             "gaps": gaps, "sd_only": sd_only, "unknown": unknown, "text": text}
+
+
+
+# ------------------------------------------------------------------------------------------------ correct bus route
+def check_line(line, stops, P=PARAMS):
+    """Check a service's road line against LTA BusRoutes: every stop must lie on it, in order, and every stop-to-stop
+    length must match LTA's official distance. -> {"cum", "pos", "lat", "segs": [{i, a, b, L, D, ok, why}]}"""
+    cum = cum_m(line)
+    pos, lat, prev = [], [], 0.0
+    for s_ in stops:
+        d, p_ = project_window((s_["lat"], s_["lon"]), line, cum, prev - 5.0, 1e18)
+        if p_ is None:
+            d, p_ = 1e9, prev
+        p_ = max(p_, prev)
+        pos.append(p_)
+        lat.append(d)
+        prev = p_
+    segs = []
+    for i in range(len(stops) - 1):
+        L = pos[i + 1] - pos[i]
+        da, db = stops[i].get("dist"), stops[i + 1].get("dist")
+        D = (db - da) * 1000.0 if (da is not None and db is not None and db > da) else None
+        why = []
+        if lat[i] > P["line_stop_tol_m"] or lat[i + 1] > P["line_stop_tol_m"]:
+            why.append("stop off the line")
+        if D is not None and abs(L - D) > max(P["line_len_abs_m"], P["line_len_rel"] * D):
+            why.append(f"{L:.0f} m on the line vs {D:.0f} m by LTA")
+        if L < 1.0 and (D or 0) > 30:
+            why.append("stops out of order")
+        segs.append({"i": i, "a": pos[i], "b": pos[i + 1], "L": L, "D": D, "ok": not why, "why": "; ".join(why)})
+    return {"cum": cum, "pos": pos, "lat": lat, "segs": segs}
+
+
+def assemble_line(base, chk, stops, fixed, P=PARAMS):
+    """rebuild the line: the original where it matches LTA, re-routed stop-to-stop pieces where it did not"""
+    cum, pos, lat = chk["cum"], chk["pos"], chk["lat"]
+    out = list(cut(base, cum, 0.0, pos[0])) if pos and pos[0] > 1 else []
+
+    def add(pts):
+        for p_ in pts:
+            p_ = (p_[0], p_[1])
+            if not out or dist_m(out[-1], p_) > 0.5:
+                out.append(p_)
+    for g in chk["segs"]:
+        f = fixed.get(g["i"])
+        if f and f.get("line"):
+            add(f["line"])
+        elif g["b"] > g["a"]:
+            add(cut(base, cum, g["a"], g["b"]))
+        else:
+            add([(stops[g["i"]]["lat"], stops[g["i"]]["lon"]), (stops[g["i"] + 1]["lat"], stops[g["i"] + 1]["lon"])])
+    if pos and pos[-1] < cum[-1] - 1:
+        add(cut(base, cum, pos[-1], cum[-1]))
+    return out
