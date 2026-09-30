@@ -1,0 +1,664 @@
+"""Diversion Maps - OCC Diversion Decision Engine (V16.14). Pure logic, no I/O (same pattern as offservice.py).
+
+app.py does all the fetching (LTA DataMall stops / routes / bus arrival / speed bands / incidents / road works, OSRM road routes,
+OpenStreetMap restriction tags via Overpass) and hands plain lists to the functions below. Nothing here invents data:
+
+  * where a service runs along the blocked road   -> the service's real-road line (busrouter.sg fitted to LTA stops) vs the block line
+  * where a bus can leave / rejoin its route       -> where an OSRM road route actually departs from / returns to the service line
+  * running time                                   -> LTA speed bands along the line (+ stop dwell); OSRM time x factor where bands are missing
+  * which buses are coming                         -> LTA Bus Arrival positions projected onto the route
+  * important stops                                -> LTA stop descriptions (Stn / Int / Ter / Hosp), number of services at the stop,
+                                                      and the OCC's own list. The reason is always shown.
+  * road suitability                               -> offservice.findings / suitability (OpenStreetMap tags only; never assumed)
+
+Every figure is an estimate for decision support. The controller confirms the operational diversion.
+"""
+import math
+import re
+
+PARAMS = {
+    "on_road_m": 32.0,          # a service runs ALONG the blocked road when its line is within this distance of the block line...
+    "parallel_deg": 35.0,       # ...and runs parallel to it (undirected when both directions are blocked)
+    "min_overlap_m": 40.0,      # shortest run along the block that counts (shorter = the route only crosses the road)
+    "on_route_m": 25.0,         # a diversion road route is "on the service route" within this distance (and in the same direction)
+    "uses_block_m": 22.0,       # a candidate diversion that runs within this distance of the block, parallel, for >= 30 m uses the blocked road
+    "cross_block_m": 10.0,      # ...or crosses the blocked section (both directions blocked) closer than this, away from its ends
+    "exit_offsets_km": (0.15, 0.4, 0.8, 1.5),
+    "rejoin_offsets_km": (0.15, 0.4, 0.8, 1.5),
+    "via_offsets_m": (350.0, 800.0),
+    "dwell_min": 0.33,          # minutes lost per bus stop (the same figure Route Traffic uses)
+    "fallback_kmh": 22.0,       # bus running speed where LTA speed bands do not cover a stretch
+    "bus_time_factor": 1.25,    # OSRM car time -> bus time where no speed-band data covers the diversion
+    "red_min": 3.0,             # bus status: minutes to the diversion point
+    "amber_min": 10.0,
+    "approach_km": 9.0,         # buses up to this far before the block are "approaching"
+    "bunch_ratio": 0.5,         # predicted headway < 0.5 x scheduled = bunching
+    "close_ratio": 0.75,
+    "gap_ratio": 1.5,           # > 1.5 x scheduled = gap
+    "max_hold_min": 6.0,        # longest regulation hold the recovery suggestion proposes
+    "queue_discharge_min": 0.5, # buses released from a queue at the block leave this far apart
+    "excess_km": 3.0,           # added distance above which a diversion is flagged "excessive detour"
+    "excess_ratio": 3.0,
+    "hub_services": 8,          # a stop served by at least this many services is a transfer hub
+    "max_options": 4,
+}
+
+REF_LAT = 1.35
+KX = 111320.0 * math.cos(math.radians(REF_LAT))
+KY = 110574.0
+
+
+# ============================================================================ geometry (local metres; accurate to well under 1 % across Singapore)
+def xy(p):
+    return (p[1] * KX, p[0] * KY)
+
+
+def ll(q):
+    return (q[1] / KY, q[0] / KX)
+
+
+def dist_m(a, b):
+    return math.hypot((a[1] - b[1]) * KX, (a[0] - b[0]) * KY)
+
+
+def line_m(line):
+    return sum(dist_m(a, b) for a, b in zip(line, line[1:]))
+
+
+def cum_m(line):
+    out = [0.0]
+    for a, b in zip(line, line[1:]):
+        out.append(out[-1] + dist_m(a, b))
+    return out
+
+
+def bearing(a, b):
+    return math.degrees(math.atan2((b[1] - a[1]) * KX, (b[0] - a[0]) * KY)) % 360
+
+
+def angdiff(a, b, undirected=False):
+    d = abs((a - b + 180) % 360 - 180)
+    return min(d, 180 - d) if undirected else d
+
+
+def densify(line, step_m=20.0):
+    """-> [(lat, lon)] with no gap longer than step_m (keeps the original vertices)."""
+    if len(line) < 2:
+        return list(line)
+    out = [tuple(line[0])]
+    for a, b in zip(line, line[1:]):
+        L = dist_m(a, b)
+        n = max(1, int(math.ceil(L / step_m)))
+        for k in range(1, n + 1):
+            f = k / n
+            out.append((a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f))
+    return out
+
+
+def nearest_on_line(p, line, cum=None):
+    """-> (distance m, position m along line, segment index, bearing of that segment)"""
+    if cum is None:
+        cum = cum_m(line)
+    px, py = xy(p)
+    best = (1e18, 0.0, 0, 0.0)
+    for i in range(len(line) - 1):
+        ax, ay = xy(line[i])
+        bx, by = xy(line[i + 1])
+        dx, dy = bx - ax, by - ay
+        L2 = dx * dx + dy * dy
+        t = 0.0 if L2 < 1e-9 else max(0.0, min(1.0, ((px - ax) * dx + (py - ay) * dy) / L2))
+        d = math.hypot(px - (ax + t * dx), py - (ay + t * dy))
+        if d < best[0]:
+            best = (d, cum[i] + t * (cum[i + 1] - cum[i]), i, bearing(line[i], line[i + 1]))
+    return best
+
+
+def project_window(p, line, cum, lo=-1e18, hi=1e18):
+    """nearest point on `line` restricted to positions [lo, hi] (m) -> (distance m, position m). Loop routes pass the same
+    place twice; the window (from where LTA says the bus is heading) picks the right passage."""
+    px, py = xy(p)
+    best = (1e18, None)
+    for i in range(len(line) - 1):
+        if cum[i + 1] < lo or cum[i] > hi:
+            continue
+        ax, ay = xy(line[i])
+        bx, by = xy(line[i + 1])
+        dx, dy = bx - ax, by - ay
+        L2 = dx * dx + dy * dy
+        t = 0.0 if L2 < 1e-9 else max(0.0, min(1.0, ((px - ax) * dx + (py - ay) * dy) / L2))
+        s = cum[i] + t * (cum[i + 1] - cum[i])
+        if s < lo or s > hi:
+            s = min(max(s, lo), hi)
+            q = point_at(line, cum, s)
+            d = dist_m(p, q)
+        else:
+            d = math.hypot(px - (ax + t * dx), py - (ay + t * dy))
+        if d < best[0]:
+            best = (d, s)
+    return best
+
+
+def stop_positions(line, cum, stops):
+    """position (m) of every stop along the line, walked forward so loop services stay in order"""
+    out, prev = [], 0.0
+    for s in stops:
+        d, pos = project_window((s["lat"], s["lon"]), line, cum, prev - 5.0, 1e18)
+        if pos is None:
+            pos = prev
+        pos = max(pos, prev)
+        out.append(pos)
+        prev = pos
+    return out
+
+
+def point_at(line, cum, s):
+    if not line:
+        return None
+    if len(line) == 1 or s <= 0:
+        return tuple(line[0])
+    if s >= cum[-1]:
+        return tuple(line[-1])
+    lo, hi = 0, len(cum) - 1
+    while hi - lo > 1:
+        mid = (lo + hi) // 2
+        if cum[mid] <= s:
+            lo = mid
+        else:
+            hi = mid
+    seg = cum[hi] - cum[lo]
+    f = 0.0 if seg <= 0 else (s - cum[lo]) / seg
+    a, b = line[lo], line[hi]
+    return (a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f)
+
+
+def cut(line, cum, a, b):
+    """part of a line between positions a and b (metres)"""
+    if len(line) < 2:
+        return list(line)
+    if b < a:
+        a, b = b, a
+    mid = [tuple(line[i]) for i in range(len(line)) if a < cum[i] < b]
+    return [point_at(line, cum, a)] + mid + [point_at(line, cum, b)]
+
+
+def bbox(line, pad_m=0.0):
+    la = [p[0] for p in line]
+    lo = [p[1] for p in line]
+    dy, dx = pad_m / KY, pad_m / KX
+    return (min(la) - dy, min(lo) - dx, max(la) + dy, max(lo) + dx)
+
+
+def bbox_hit(a, b):
+    return not (a[2] < b[0] or b[2] < a[0] or a[3] < b[1] or b[3] < a[1])
+
+
+def simplify(line, n=200):
+    if len(line) <= n:
+        return [[round(p[0], 6), round(p[1], 6)] for p in line]
+    step = (len(line) - 1) / (n - 1)
+    return [[round(line[round(i * step)][0], 6), round(line[round(i * step)][1], 6)] for i in range(n)]
+
+
+# ============================================================================ 1. which services run along the blocked section
+def overlap_runs(route_line, block_line, directed=False, P=None):
+    """Runs where `route_line` travels ALONG `block_line`.
+    -> [{"a": m, "b": m, "len": m}] positions along route_line (metres from its first vertex). Crossing the road is not an overlap."""
+    P = P or PARAMS
+    if len(route_line) < 2 or len(block_line) < 2:
+        return []
+    if not bbox_hit(bbox(route_line, P["on_road_m"] + 5), bbox(block_line, P["on_road_m"] + 5)):
+        return []
+    bcum = cum_m(block_line)
+    blen = bcum[-1]
+    need = min(P["min_overlap_m"], 0.6 * blen) if blen > 0 else P["min_overlap_m"]
+    bb = bbox(block_line, P["on_road_m"] + 30)
+    rcum = cum_m(route_line)
+    runs, cur = [], None
+    gap_ok = 40.0
+    for i in range(len(route_line) - 1):
+        a, b = route_line[i], route_line[i + 1]
+        seg = rcum[i + 1] - rcum[i]
+        if seg <= 0:
+            continue
+        sb = (min(a[0], b[0]), min(a[1], b[1]), max(a[0], b[0]), max(a[1], b[1]))
+        if not bbox_hit(sb, bb):
+            if cur and rcum[i] - cur["b"] > gap_ok:
+                runs.append(cur); cur = None
+            continue
+        brg = bearing(a, b)
+        n = max(1, int(math.ceil(seg / 15.0)))
+        for k in range(n):
+            f0, f1 = k / n, (k + 1) / n
+            m = (a[0] + (b[0] - a[0]) * (f0 + f1) / 2, a[1] + (b[1] - a[1]) * (f0 + f1) / 2)
+            d, _, _, bb_brg = nearest_on_line(m, block_line, bcum)
+            ok = d <= P["on_road_m"] and angdiff(brg, bb_brg, undirected=not directed) <= P["parallel_deg"]
+            s0, s1 = rcum[i] + seg * f0, rcum[i] + seg * f1
+            if ok:
+                if cur and s0 - cur["b"] <= gap_ok:
+                    cur["b"] = s1
+                else:
+                    if cur:
+                        runs.append(cur)
+                    cur = {"a": s0, "b": s1}
+            elif cur and s0 - cur["b"] > gap_ok:
+                runs.append(cur); cur = None
+    if cur:
+        runs.append(cur)
+    out = []
+    for r in runs:
+        r["len"] = r["b"] - r["a"]
+        if r["len"] >= need:
+            out.append(r)
+    return out
+
+
+def stops_in(stop_s, a, b, pad=0.0):
+    """indexes of stops whose position along the route lies in [a - pad, b + pad]"""
+    return [i for i, s in enumerate(stop_s) if a - pad <= s <= b + pad]
+
+
+# ============================================================================ 2. important stops (always with the reason)
+_IMP = (
+    (re.compile(r"\b(STN|STATION|MRT|LRT)\b"), "MRT / LRT connection"),
+    (re.compile(r"\b(INT|INTERCHANGE)\b"), "Bus interchange"),
+    (re.compile(r"\b(TER|TERMINAL|TERMINUS)\b"), "Bus terminal"),
+    (re.compile(r"\b(HOSP|HOSPITAL|POLYCLINIC|MED CTR|MEDICAL)\b"), "Hospital / medical"),
+)
+
+
+def stop_importance(name, n_services, marked=None, P=None):
+    """-> list of reasons ([] = normal stop). `marked`: the OCC's own reason for this stop, if it is on the OCC list."""
+    P = P or PARAMS
+    out = []
+    if marked:
+        out.append("OCC important stop" + (f" ({marked})" if isinstance(marked, str) and marked.strip() else ""))
+    up = (name or "").upper()
+    for rx, why in _IMP:
+        if rx.search(up):
+            out.append(why)
+    if n_services and n_services >= P["hub_services"]:
+        out.append(f"Transfer hub ({n_services} services)")
+    return out
+
+
+# ============================================================================ 3. running-time profile
+def profile(line, speed_fn, dwell_at=None, P=None, fallback_kmh=None):
+    """Cumulative minutes at every vertex of `line`.
+    speed_fn(lat, lon, bearing) -> km/h from LTA speed bands, or None where no band matches.
+    dwell_at: positions (m) of stops served along the line; each adds P["dwell_min"].
+    -> {"cum": [m], "t": [min], "known_share": 0..1}"""
+    P = P or PARAMS
+    fb = fallback_kmh or P["fallback_kmh"]
+    cum = cum_m(line)
+    t = [0.0]
+    known = 0.0
+    dw = sorted(dwell_at or [])
+    di = 0
+    for i in range(len(line) - 1):
+        a, b = line[i], line[i + 1]
+        seg = cum[i + 1] - cum[i]
+        kmh = None
+        if seg > 0:
+            try:
+                kmh = speed_fn((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, bearing(a, b)) if speed_fn else None
+            except Exception:
+                kmh = None
+        if kmh:
+            known += seg
+        v = max(5.0, kmh or fb)
+        add = (seg / 1000.0) / v * 60.0
+        while di < len(dw) and dw[di] <= cum[i + 1]:
+            if dw[di] >= cum[i] - 1e-6:
+                add += P["dwell_min"]
+            di += 1
+        t.append(t[-1] + add)
+    return {"cum": cum, "t": t, "known_share": (known / cum[-1]) if cum[-1] > 0 else 0.0}
+
+
+def t_at(prof, s):
+    cum, t = prof["cum"], prof["t"]
+    if not cum:
+        return 0.0
+    if s <= 0:
+        return t[0]
+    if s >= cum[-1]:
+        return t[-1]
+    lo, hi = 0, len(cum) - 1
+    while hi - lo > 1:
+        mid = (lo + hi) // 2
+        if cum[mid] <= s:
+            lo = mid
+        else:
+            hi = mid
+    seg = cum[hi] - cum[lo]
+    f = 0.0 if seg <= 0 else (s - cum[lo]) / seg
+    return t[lo] + (t[hi] - t[lo]) * f
+
+
+# ============================================================================ 4. candidate diversion geometry
+def uses_block(cand_line, block_line, directed=False, P=None):
+    """True when a candidate road route runs along the blocked section (or crosses it, if both directions are blocked)."""
+    P = P or PARAMS
+    if len(cand_line) < 2 or len(block_line) < 2:
+        return False
+    if not bbox_hit(bbox(cand_line, 40), bbox(block_line, 40)):
+        return False
+    bcum = cum_m(block_line)
+    blen = bcum[-1]
+    pts = densify(cand_line, 10.0)
+    run = 0.0
+    for p, q in zip(pts, pts[1:]):
+        d, s, _, bb = nearest_on_line(p, block_line, bcum)
+        seg = dist_m(p, q)
+        if d <= P["uses_block_m"] and angdiff(bearing(p, q), bb, undirected=not directed) <= P["parallel_deg"]:
+            run += seg
+            if run >= 30.0:
+                return True
+        else:
+            run = 0.0
+        if not directed and d <= P["cross_block_m"] and 25.0 < s < blen - 25.0:
+            return True
+    return False
+
+
+def departure(cand_line, svc_line, svc_cum, P=None):
+    """Where a road route from a point on the service route leaves it and where it comes back.
+    -> {"leave_s", "rejoin_s" (positions along the service line, m), "i0", "i1" (indexes into the densified candidate),
+        "pts": densified candidate} or None when it never leaves the service route."""
+    P = P or PARAMS
+    pts = densify(cand_line, 15.0)
+    if len(pts) < 3:
+        return None
+    on, pos = [], []
+    for k, p in enumerate(pts):
+        q = pts[k + 1] if k + 1 < len(pts) else None
+        pr = pts[k - 1] if k > 0 else None
+        d, s, _, sb = nearest_on_line(p, svc_line, svc_cum)
+        brg = bearing(p, q) if q else (bearing(pr, p) if pr else sb)
+        on.append(d <= P["on_route_m"] and angdiff(brg, sb) <= 60.0)
+        pos.append(s)
+    off = [k for k, x in enumerate(on) if not x]
+    if not off:
+        return None
+    i0 = max(0, off[0] - 1)
+    i1 = min(len(pts) - 1, off[-1] + 1)
+    return {"leave_s": pos[i0], "rejoin_s": pos[i1], "i0": i0, "i1": i1, "pts": pts,
+            "leave_pt": pts[i0], "rejoin_pt": pts[i1], "start_on": on[0], "end_on": on[-1]}
+
+
+def offset_point(p, brg_deg, dist):
+    r = math.radians(brg_deg)
+    return (p[0] + dist * math.cos(r) / KY, p[1] + dist * math.sin(r) / KX)
+
+
+def via_points(block_line, P=None):
+    """points either side of the middle of the block, perpendicular to it (used to push the road router round the block)"""
+    P = P or PARAMS
+    cum = cum_m(block_line)
+    mid = point_at(block_line, cum, cum[-1] / 2)
+    d, s, i, brg = nearest_on_line(mid, block_line, cum)
+    out = []
+    for off in P["via_offsets_m"]:
+        out.append(offset_point(mid, brg + 90, off))
+        out.append(offset_point(mid, brg - 90, off))
+    return out
+
+
+def road_signature(groups):
+    return " > ".join(g["road"] for g in groups if g.get("road"))
+
+
+# ============================================================================ 5. buses
+def bus_status(min_to_exit, pos_s, leave_s, block_a, block_b, P=None):
+    """-> (code, label). GREEN not yet approaching / AMBER approaching / RED act now / GREY passed the diversion point."""
+    P = P or PARAMS
+    if pos_s > block_b:
+        return "passed_block", "Past the blocked section"
+    if pos_s >= block_a:
+        return "inside", "Inside the affected section"
+    if leave_s is not None and pos_s > leave_s + 10:
+        return "passed_exit", "Passed the diversion point"
+    if min_to_exit is None:
+        return "unknown", "Position only"
+    if min_to_exit <= P["red_min"]:
+        return "red", "Immediate action"
+    if min_to_exit <= P["amber_min"]:
+        return "amber", "Approaching diversion point"
+    return "green", "Not yet approaching"
+
+
+def label_buses(buses, svc):
+    """Positional identifiers (LTA Bus Arrival carries no registration): nearest the block = A."""
+    order = sorted(range(len(buses)), key=lambda k: -(buses[k]["s"] if buses[k].get("s") is not None else 1e12))
+    for n, k in enumerate(order):
+        tag = ""
+        x = n
+        while True:
+            tag = chr(65 + x % 26) + tag
+            x = x // 26 - 1
+            if x < 0:
+                break
+        buses[k]["label"] = f"{svc}{tag}"
+    return buses
+
+
+# ============================================================================ 6. simulation of no action vs a diversion option
+def simulate(buses, svc_prof, block_a, block_b, ref_s, closure_min, H, option=None, P=None):
+    """Predicted minute (from now) each bus passes the reference point `ref_s` on its route (the rejoin point of the option,
+    or just after the block for No action).
+    buses: [{"label", "s" (m along route), "eta_exit" (optional, minutes, LTA-based)}]
+    option: {"leave_s", "rejoin_s", "div_min"} or None (= no action: buses queue at the block until it reopens).
+    closure_min: expected closure length, None = until further notice.
+    -> [{"label", "t_ref", "t_base", "mode": diverted | queued | normal | ahead | stuck, "wait", "t_exit"}] sorted by t_ref"""
+    P = P or PARAMS
+    out = []
+    reopen = closure_min if closure_min is not None else None
+    queue_last = None
+    t_ref_base = t_at(svc_prof, ref_s)
+    for b in sorted(buses, key=lambda x: -x["s"]):           # nearest the block first (queue order)
+        s = b["s"]
+        base = t_ref_base - t_at(svc_prof, s)                 # minutes to ref with the road open
+        rec = {"label": b["label"], "t_base": base, "wait": 0.0, "t_exit": None}
+        if s >= ref_s:
+            rec.update(mode="ahead", t_ref=base)              # already past the reference point (negative = passed that long ago)
+        elif s > block_b:
+            rec.update(mode="normal", t_ref=base)
+        elif option is not None and s <= option["leave_s"] + 10:
+            t_exit = b.get("eta_exit")
+            if t_exit is None:
+                t_exit = t_at(svc_prof, option["leave_s"]) - t_at(svc_prof, s)
+            t_ref = t_exit + option["div_min"] + (t_ref_base - t_at(svc_prof, option["rejoin_s"]))
+            rec.update(mode="diverted", t_ref=t_ref, t_exit=t_exit)
+        else:
+            t_block = max(0.0, t_at(svc_prof, block_a) - t_at(svc_prof, s))
+            if reopen is None:
+                rec.update(mode="stuck", t_ref=None, wait=None, t_block=t_block)
+            else:
+                release = max(t_block, reopen)
+                if queue_last is not None and release - queue_last < P["queue_discharge_min"] and t_block < reopen:
+                    release = queue_last + P["queue_discharge_min"]
+                if t_block < reopen:
+                    queue_last = release
+                rec.update(mode="queued" if t_block < reopen else "normal", t_block=t_block, wait=max(0.0, release - t_block),
+                           t_ref=release + (t_ref_base - t_at(svc_prof, block_a)))
+        out.append(rec)
+    out.sort(key=lambda r: (r["t_ref"] is None, r["t_ref"] if r["t_ref"] is not None else 0))
+    return out
+
+
+def headways(sim, H, P=None):
+    """headways between consecutive buses at the reference point -> {"gaps": [...], "max", "min", "risk", "pairs": [...]}"""
+    P = P or PARAMS
+    ts = [r for r in sim if r["t_ref"] is not None]
+    gaps = []
+    for a, b in zip(ts, ts[1:]):
+        gaps.append({"front": a["label"], "rear": b["label"], "t_front": a["t_ref"], "t_rear": b["t_ref"], "gap": b["t_ref"] - a["t_ref"]})
+    if not gaps:
+        return {"gaps": [], "max": None, "min": None, "risk": "unknown", "bunch_at": None}
+    mx = max(g["gap"] for g in gaps)
+    mn = min(g["gap"] for g in gaps)
+    risk = "unknown"
+    bunch_at = None
+    if H:
+        if mn < P["bunch_ratio"] * H:
+            risk = "high"
+            bunch_at = next(g["t_rear"] for g in gaps if g["gap"] < P["bunch_ratio"] * H)
+        elif mn < P["close_ratio"] * H:
+            risk = "moderate"
+        else:
+            risk = "low"
+    return {"gaps": gaps, "max": mx, "min": mn, "risk": risk, "bunch_at": bunch_at}
+
+
+def regulation(sim, H, P=None):
+    """Suggested holds at the first timing point after the rejoin point: spread the buses to the average spacing available
+    (or the scheduled headway if that is smaller). Holds are capped at P["max_hold_min"]. Suggestions only - never executed.
+    -> {"target", "holds": [{"label", "hold", "action"}], "after": headways(...)}"""
+    P = P or PARAMS
+    ts = [dict(r) for r in sim if r["t_ref"] is not None]
+    if len(ts) < 2 or not H:
+        return {"target": None, "holds": [{"label": r["label"], "hold": 0.0, "action": "Continue"} for r in ts], "after": headways(ts, H, P)}
+    span = ts[-1]["t_ref"] - ts[0]["t_ref"]
+    avg = span / (len(ts) - 1)
+    target = min(H, avg) if avg > 0 else H
+    new = [ts[0]["t_ref"]]
+    holds = [0.0]
+    for r in ts[1:]:
+        want = new[-1] + target
+        hold = min(P["max_hold_min"], max(0.0, want - r["t_ref"]))
+        if r["mode"] == "ahead":
+            hold = 0.0                                       # already past the regulation point
+        holds.append(hold)
+        new.append(r["t_ref"] + hold)
+    after = [dict(r, t_ref=t) for r, t in zip(ts, new)]
+    out = []
+    for r, h in zip(ts, holds):
+        act = "Continue" if h < 0.5 else f"Regulate +{round(h)} min"
+        out.append({"label": r["label"], "hold": round(h, 1), "action": act, "mode": r["mode"]})
+    return {"target": round(target, 1), "holds": out, "after": headways(after, H, P)}
+
+
+def recovery_minutes(sim, reg, H, P=None):
+    """minutes from now until the service is expected to be back within headway tolerance (None = not by regulation alone)"""
+    P = P or PARAMS
+    aff = [r for r in sim if r["mode"] in ("diverted", "queued") and r["t_ref"] is not None]
+    if not aff:
+        return 0.0
+    hold = {h["label"]: h["hold"] for h in reg["holds"]}
+    last = max(r["t_ref"] + hold.get(r["label"], 0.0) for r in aff)
+    a = reg["after"]
+    if H and a["gaps"] and (a["min"] < P["bunch_ratio"] * H or a["max"] > 2.0 * H):     # a gap this big cannot be closed by holding
+        return None
+    return max(0.0, last)
+
+
+def bus_minutes(sim):
+    """extra bus-minutes against the road being open (diverted / queued buses only)"""
+    return sum((r["t_ref"] - r["t_base"]) for r in sim if r["mode"] in ("diverted", "queued") and r["t_ref"] is not None)
+
+
+# ============================================================================ 7. what happens next
+def timeline(sim, hw, reg, recov, closure_min, road, option_name=None):
+    ev = [{"t": 0.0, "kind": "block", "text": f"{road} blocked"}]
+    div = [r for r in sim if r["mode"] == "diverted"]
+    qd = [r for r in sim if r["mode"] in ("queued", "stuck")]
+    for r in sorted(div, key=lambda x: x["t_exit"] or 0)[:4]:
+        ev.append({"t": max(0.0, r["t_exit"] or 0.0), "kind": "exit", "text": f"{r['label']} reaches the diversion point"})
+        ev.append({"t": max(0.0, r["t_ref"]), "kind": "rejoin", "text": f"{r['label']} rejoins the route"})
+    for r in qd[:3]:
+        tb = r.get("t_block")
+        if tb is not None:
+            ev.append({"t": max(0.0, tb), "kind": "queue", "text": f"{r['label']} reaches the blockage and has to wait"})
+    if closure_min is not None:
+        ev.append({"t": float(closure_min), "kind": "reopen", "text": "Road expected to reopen (controller's estimate)"})
+    if hw.get("bunch_at") is not None:
+        ev.append({"t": max(0.0, hw["bunch_at"]), "kind": "bunch", "text": "Bunching predicted after the rejoin point"})
+        if any(h["hold"] >= 0.5 for h in reg["holds"]):
+            ev.append({"t": max(0.0, hw["bunch_at"]) + 0.1, "kind": "regulate", "text": "Headway regulation required"})
+    if recov is not None:
+        ev.append({"t": recov, "kind": "stable", "text": "Service expected to stabilise"})
+    else:
+        ev.append({"t": max([e["t"] for e in ev] + [0.0]) + 0.2, "kind": "unstable",
+                   "text": "Headway not recovered by regulation alone - consider Halfway Planner"})
+    ev.sort(key=lambda e: e["t"])
+    for e in ev:
+        e["t"] = round(e["t"], 1)
+    return ev
+
+
+def wait_or_divert(sim_none, opts_eval, closure_min):
+    """Plain comparison of holding against diverting - no score, just the consequence of each."""
+    if closure_min is None:
+        return {"kind": "divert", "text": "Closure length unknown: without a diversion, buses reaching the block cannot continue."}
+    q = [r for r in sim_none if r["mode"] == "queued"]
+    if not q:
+        return {"kind": "wait", "text": f"No bus is expected to reach the block within the {closure_min:g}-minute closure: holding upstream / regulating may be enough."}
+    mx = max(r["wait"] for r in q)
+    best = min((o for o in opts_eval if o.get("added_min") is not None), key=lambda o: o["added_min"], default=None)
+    if best is None:
+        return {"kind": "wait", "text": f"No feasible diversion found; {len(q)} bus(es) would wait up to {mx:.0f} min at the block."}
+    if mx <= best["added_min"]:
+        return {"kind": "wait", "text": f"Waiting costs up to {mx:.0f} min per bus ({len(q)} bus(es)); the quickest diversion adds {best['added_min']:.0f} min and skips "
+                                        f"{best['skipped_n']} stop(s). WAIT / REGULATE is a reasonable alternative."}
+    return {"kind": "divert", "text": f"Without a diversion {len(q)} bus(es) would wait up to {mx:.0f} min at the block; the quickest diversion adds {best['added_min']:.0f} min."}
+
+
+# ============================================================================ 8. return to normal
+def return_to_normal(buses, leave_s, rejoin_s, block_a):
+    """buses: [{"label", "s", "on_diversion": bool, "eta_rejoin" (min, if on the diversion)}] -> per-bus instruction + normalisation minutes"""
+    rows = []
+    for b in sorted(buses, key=lambda x: -(x.get("s") or 0)):
+        if b.get("on_diversion"):
+            rows.append({"label": b["label"], "state": "On diversion", "action": "Complete diversion", "eta": b.get("eta_rejoin")})
+        elif b.get("s") is not None and b["s"] < leave_s:
+            rows.append({"label": b["label"], "state": "Approaching diversion point", "action": "Resume normal route", "eta": None})
+        elif b.get("s") is not None and b["s"] < block_a:
+            rows.append({"label": b["label"], "state": "Between diversion point and road", "action": "Resume normal route (road reopened)", "eta": None})
+        else:
+            rows.append({"label": b["label"], "state": "Past the section", "action": "No change", "eta": None})
+    on = [r["eta"] for r in rows if r["action"] == "Complete diversion" and r["eta"] is not None]
+    return {"rows": rows, "still_affected": sum(1 for r in rows if r["action"] != "No change"), "last_rejoin_min": max(on) if on else 0.0}
+
+
+# ============================================================================ 9. notice
+def notice(plan):
+    """Plain-text operational message from a confirmed plan (dict built by app.py)."""
+    L = [f"ROAD DIVERSION \u2014 {plan.get('road') or 'ROAD BLOCKAGE'}".upper(), ""]
+    for s in plan.get("services") or []:
+        L.append(f"Service: {s['service']}")
+        L.append(f"Direction: {s['direction']}")
+        L.append("")
+        route = s.get("roads") or []
+        if route:
+            L.append("Diversion:")
+            L.append(route[0])
+            for r in route[1:]:
+                L.append(f"\u2192 {r}")
+            L.append("\u2192 Rejoin normal route" + (f" at {s['rejoin_name']}" if s.get("rejoin_name") else ""))
+        else:
+            L.append(f"Action: {s.get('action') or 'Wait / regulate (no diversion)'}")
+        L.append("")
+        sk = s.get("skipped") or []
+        if sk:
+            L.append("Skipped Stops:")
+            for x in sk:
+                L.append(f"{x['code']}" + (f"  {x['name']}" if x.get("name") else "") + ("  (important)" if x.get("important") else ""))
+            L.append("")
+        hl = [h for h in (s.get("holds") or []) if h.get("action") and h.get("action") != "Continue"]
+        if hl:
+            L.append("Post-diversion regulation (controller to confirm):")
+            for h in hl:
+                L.append(f"{h['label']}  {h['action']}")
+            L.append("")
+        if s.get("buses") is not None:
+            L.append(f"Affected Buses: {s['buses']}")
+            L.append("")
+    L.append(f"Effective: {plan.get('effective') or '--:--'} hrs")
+    if plan.get("closure"):
+        L.append(f"Expected closure: {plan['closure']}")
+    L.append(f"Status: {str(plan.get('status') or 'ACTIVE').upper()}")
+    if plan.get("revision") and plan["revision"] > 1:
+        L.append(f"Revision: {plan['revision']}")
+    if plan.get("by"):
+        L.append(f"Issued by: {plan['by']}")
+    return "\n".join(L).strip() + "\n"

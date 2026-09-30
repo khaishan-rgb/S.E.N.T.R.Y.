@@ -111,6 +111,10 @@
       </div>
       <div style="margin-bottom:10px"><input class="ds-input" id="tkSearch" placeholder="Search service, bus, location, note ID..."></div>
       <div class="ol-chips" id="tkChips"></div>
+      <div class="ol-chips">
+        <select class="ds-select" id="tkOperator" style="width:auto"><option value="">All operators</option></select>
+        <input class="ds-input" id="tkService" placeholder="Service no." style="width:100px">
+      </div>
 
       <details class="ol-compose" id="tkNew">
         <summary style="color:#fff;font:600 13px var(--ds-font);cursor:pointer">+ New Note</summary>
@@ -130,6 +134,10 @@
     <section class="ds-panel ol-right" aria-labelledby="olQueueH">
       <div class="ds-ph" id="olQueueH">LIVE OPERATIONAL ALERTS<span class="sp"></span><button type="button" class="ds-btn sm ghost" id="olAckAll" style="display:none">Acknowledge all</button><button type="button" class="ds-btn sm ghost" id="olExpandR">Expand</button></div>
       <div class="ol-chips" id="olFilters"></div>
+      <div class="ol-chips">
+        <select class="ds-select" id="olOperator" style="width:auto"><option value="">All operators</option></select>
+        <input class="ds-input" id="olService" placeholder="Service no." style="width:100px">
+      </div>
       <div id="olQueue"></div>
       <div class="ol-sec-h">ACKNOWLEDGED / MONITORING <span id="olMonN"></span></div>
       <div id="olMonitoring"></div>
@@ -171,6 +179,10 @@
       $("nPri").innerHTML = j.priorities.map(function(p){ return '<option value="' + p + '">' + esc(p.toUpperCase()) + '</option>'; }).join("");
       $("nShare").innerHTML = j.teams.map(function(t){ return '<option value="' + t + '">' + t + '</option>'; }).join("");
     });
+    api("/api/occ/operators").then(function(j){
+      var opts = '<option value="">All operators</option>' + (j.operators || []).map(function(o){ return '<option value="' + esc(o) + '">' + esc(o) + '</option>'; }).join("");
+      $("tkOperator").innerHTML = opts; $("olOperator").innerHTML = opts;
+    });
   }
   function renderChips(){
     $("tkChips").innerHTML = CHIPS.map(function(c){ return '<button type="button" class="ol-chip" data-c="' + c[0] + '" aria-pressed="' + (chip === c[0]) + '">' + esc(c[1]) + '</button>'; }).join("");
@@ -183,6 +195,8 @@
     if(chip === "handover"){ p.set("handover", "1"); p.set("include_resolved", "1"); }
     if(chip === "resolved"){ p.set("status", "resolved"); p.set("include_resolved", "1"); }
     if(tq) p.set("q", tq);
+    if($("tkOperator").value) p.set("operator", $("tkOperator").value);
+    if($("tkService").value.trim()) p.set("service", $("tkService").value.trim());
     return p.toString();
   }
   function ticketCard(t){
@@ -214,6 +228,8 @@
     });
   }
   $("tkSearch").addEventListener("input", function(){ tq = this.value.trim(); loadTickets(); });
+  $("tkOperator").addEventListener("change", function(){ lastTicketsKey = ""; loadTickets(); });
+  $("tkService").addEventListener("input", function(){ lastTicketsKey = ""; loadTickets(); });
 
   $("nSave").onclick = function(){
     var title = $("nTitle").value.trim();
@@ -295,12 +311,14 @@
   $("olDrawer").querySelector(".bk").onclick = closeDrawer;
 
   /* ===================== Live Operational Alerts (right) ===================== */
-  var GROUPS = [["all","All"],["bunching","Bunching"],["headway","Headway"],["traffic","Traffic"],["roadwork","Roadwork"],["incident","Incident"],["system","System"]];
+  var GROUPS = [["all","All"],["diversion","Diversion"],["bunching","Bunching"],["headway","Headway"],["traffic","Traffic"],["roadwork","Roadwork"],["incident","Incident"],["system","System"]];
   var groupFilter = "all";
   function renderFilters(){
     $("olFilters").innerHTML = GROUPS.map(function(g){ return '<button type="button" class="ol-chip" data-g="' + g[0] + '" aria-pressed="' + (groupFilter === g[0]) + '">' + esc(g[1]) + '</button>'; }).join("");
-    Array.prototype.forEach.call($("olFilters").querySelectorAll("[data-g]"), function(b){ b.onclick = function(){ groupFilter = b.dataset.g; renderFilters(); loadQueue(); }; });
+    Array.prototype.forEach.call($("olFilters").querySelectorAll("[data-g]"), function(b){ b.onclick = function(){ groupFilter = b.dataset.g; renderFilters(); lastQueueKey=""; loadQueue(); }; });
   }
+  $("olOperator").addEventListener("change", function(){ lastQueueKey = ""; loadQueue(); });
+  $("olService").addEventListener("input", function(){ lastQueueKey = ""; loadQueue(); });
   function card(a){
     return '<div class="ol-card sev-' + a.severity + '" data-id="' + esc(a.id) + '">' +
       '<div class="ol-row1"><span class="ol-badge ' + a.severity + '">' + a.severity.toUpperCase() + '</span><span class="ol-title">' + esc(a.title) + '</span><span class="ol-age">' + timeAgo(a.since) + '</span></div>' +
@@ -316,7 +334,7 @@
     });
   }
   function createNoteFromAlert(a){
-    var catMap = {bunching:"Bunching", headway:"Long Headway", traffic:"Traffic", roadwork:"Diversion", incident:"Incident", system:"General"};
+    var catMap = {diversion:"Diversion", bunching:"Bunching", headway:"Long Headway", traffic:"Traffic", roadwork:"Diversion", incident:"Incident", system:"General"};
     $("tkNew").open = true; $("tkNew").scrollIntoView({behavior:"smooth", block:"start"});
     $("nTitle").value = a.title; $("nCat").value = catMap[a.group] || "General";
     $("nPri").value = a.severity === "critical" ? "critical" : (a.severity === "high" ? "high" : "normal");
@@ -330,7 +348,9 @@
   function loadQueue(){
     api("/api/occ/queue").then(function(j){
       if(j.error){ $("olQueue").innerHTML = '<div class="ol-empty">Alerts unavailable: ' + esc(j.error) + '</div>'; return; }
-      var items = j.items.filter(function(a){ return groupFilter === "all" || a.group === groupFilter; });
+      var items = j.items.filter(function(a){ return groupFilter === "all" || a.group === groupFilter; })
+                          .filter(function(a){ return !$("olOperator").value || a.operator === $("olOperator").value; })
+                          .filter(function(a){ return !$("olService").value.trim() || String(a.service||"").toUpperCase() === $("olService").value.trim().toUpperCase(); });
       var active = items.filter(function(a){ return a.status !== "acknowledged"; });
       var mon = items.filter(function(a){ return a.status === "acknowledged"; });
       var key = active.map(function(a){ return a.id; }).join(",");

@@ -22,9 +22,9 @@ import headway
 import routegeom
 import traffic
 
-VERSION = "V16.12"
+VERSION = "V16.14"
 # V16.8: pages hidden for everyone (see Settings > Pages). Defined here because bb_init() reads the saved value while the module loads.
-SITE_PAGE_IDS = ("command", "route", "headway", "bunching", "recovery", "halfplan", "trafficaware", "running", "ewt", "cameras")     # "settings" can never be hidden
+SITE_PAGE_IDS = ("command", "route", "headway", "bunching", "recovery", "halfplan", "trafficaware", "running", "ewt", "cameras", "diversion")     # "settings" can never be hidden
 SITE = {"hidden": [x.strip() for x in os.getenv("HIDDEN_PAGES", "").split(",") if x.strip() in SITE_PAGE_IDS], "block": True}
 LTA = os.getenv("LTA_BASE", "https://datamall2.mytransport.sg/ltaodataservice").rstrip("/")
 KEY = os.getenv("LTA_ACCOUNT_KEY", "")
@@ -562,6 +562,8 @@ async def lifespan(app):
         asyncio.create_task(tr_refresh(force=True))
         trtask = asyncio.create_task(tr_loop())
         trvtask = asyncio.create_task(tr_verify_loop())      # V16.3: second-source check of congestion (our buses + Waze)
+        if DV_AUTO:
+            asyncio.create_task(dv_auto_loop())              # V16.14: potential road blockages for Diversion Maps (suggestions only)
     yield
     if task is not None:
         task.cancel()
@@ -1084,6 +1086,19 @@ def bb_sql(sql, args=(), fetch=False):
     except Exception as e:
         BB["db_ok"], BB["db_err"] = False, f"{type(e).__name__}: {e}"
         return [] if fetch else None
+
+
+def bb_insert(sql, args=()):
+    """V16.14: INSERT and return the new row id. (\"SELECT last_insert_rowid()\" through bb_sql runs on a NEW connection and always returns 0.)"""
+    try:
+        with contextlib.closing(sqlite3.connect(BB_DB, timeout=10)) as c:
+            cur = c.execute(sql, args)
+            c.commit()
+            BB["db_ok"], BB["db_err"] = True, None
+            return cur.lastrowid
+    except Exception as e:
+        BB["db_ok"], BB["db_err"] = False, f"{type(e).__name__}: {e}"
+        return None
 
 
 def bb_init():
@@ -1688,8 +1703,26 @@ def _who(request: Request) -> str:
     return "Controller"
 
 
+async def occ_operator_map():
+    """service -> operator code (SBST, SMRT, TTS, GAS...), from the same timetable data the Route Traffic page uses."""
+    fq = await freq_table()
+    out = {}
+    for (svc, d), r in fq["freqs"].items():
+        op = r.get("Operator")
+        if op and svc not in out:
+            out[svc] = op
+    return out
+
+
+@app.get("/api/occ/operators")
+async def api_occ_operators():
+    m = await occ_operator_map()
+    return {"operators": sorted(set(m.values()))}
+
+
 @app.get("/api/occ/queue")
 async def api_occ_queue():
+    opmap = await occ_operator_map()
     now = time.time()
     items = []
     for a in bb_alerts():
@@ -1699,7 +1732,7 @@ async def api_occ_queue():
                       "title": f"Svc {a['service']} – {a['label']}", "service": a["service"], "dir": a["direction"],
                       "location": a.get("start_stop") or "", "detail": f"{a['stops']} stops" + (f" · min headway {a['min_hw']:.0f} min" if a.get("min_hw") else ""),
                       "since": a["start"], "last": a.get("last") or a["start"], "acked_by": None, "acked_at": a.get("acked_ts"),
-                      "href": f"/bunching?svc={a['service']}&dir={a['direction']}", "raw_id": a["id"]})
+                      "href": f"/bunching?svc={a['service']}&dir={a['direction']}", "raw_id": a["id"], "operator": opmap.get(a["service"], "")})
     try:
         ov = traffic.overview(TR["book"], TR["params"], now, None, 0, 0, None, ["unacknowledged", "acknowledged"])
         for r in ov["rows"]:
@@ -1709,7 +1742,11 @@ async def api_occ_queue():
                           "title": f"Svc {r['svc']} – {r['kind'].capitalize()}", "service": r["svc"], "dir": r["dir"],
                           "location": r.get("location") or "", "detail": (f"+{r['delay_min']:.0f} min delay" if r.get("delay_min") else "") + (f" · {r['n_services']} services" if r.get("n_services", 1) > 1 else ""),
                           "since": r["start"], "last": r["start"], "acked_by": r.get("acked_by"), "acked_at": r.get("acked_time"),
-                          "href": f"/?svc={r['svc']}&dir={r['dir']}", "raw_id": r["id"]})
+                          "href": f"/?svc={r['svc']}&dir={r['dir']}", "raw_id": r["id"], "operator": opmap.get(r["svc"], "")})
+    except Exception:
+        pass
+    try:
+        items += dv_queue_items()                                                     # V16.14: Diversion Maps (diversion impact / active diversions)
     except Exception:
         pass
     SEV_ORDER = {"critical": 0, "high": 1, "medium": 2, "low": 3}
@@ -1732,7 +1769,7 @@ async def api_occ_queue():
                        "location": "; ".join(locs[:3]) + (f" +{len(locs)-3} more" if len(locs) > 3 else ""),
                        "detail": " · ".join(dict.fromkeys(x["title"].split("–", 1)[-1].strip() for x in g)),
                        "since": min(x["since"] or now for x in g), "last": max(x["last"] or now for x in g),
-                       "acked_by": None, "acked_at": None, "href": g[0]["href"], "raw_id": None})
+                       "acked_by": None, "acked_at": None, "href": g[0]["href"], "raw_id": None, "operator": opmap.get(key[1], "")})
     items2 = merged + singles
     items2.sort(key=lambda x: (0 if x["status"] != "acknowledged" else 1, SEV_ORDER.get(x["severity"], 2), -(x["last"] or 0)))
     resolved_today = bb_sql("SELECT COUNT(*) n FROM alert_acknowledgement WHERE ack_time > ?", (now - (now % 86400),), fetch=True)
@@ -1744,6 +1781,11 @@ async def api_occ_queue():
 
 def _occ_ack_one(oid, by):
     """Acknowledge a single bb:/tr: item id. Returns True if something was acknowledged."""
+    if oid.startswith("dv:"):                                                       # V16.14: Diversion Maps alert
+        try:
+            return dv_ack_alert(int(oid[3:]), by)
+        except ValueError:
+            return False
     if oid.startswith("bb:"):
         e = BB["open"].get(int(oid[3:]))
         if not e or not e.get("alerts"):
@@ -1820,9 +1862,10 @@ async def api_occ_notes_create(request: Request):
     kind = str(body.get("kind") or "general").strip()[:24]
     remind = body.get("remind_at")
     now = time.time()
-    bb_sql("INSERT INTO occ_note(tab, kind, title, body, services, author, pinned, source_alert, created_ts, updated_ts) VALUES (?,?,?,?,?,?,0,?,?,?)",
-           (tab, kind, title, text + (f"\n\u23f0 Reminder: {remind}" if remind else ""), services, _who(request), body.get("source_alert"), now, now))
-    rid = bb_sql("SELECT last_insert_rowid() id", fetch=True)[0]["id"]
+    rid = bb_insert("INSERT INTO occ_note(tab, kind, title, body, services, author, pinned, source_alert, created_ts, updated_ts) VALUES (?,?,?,?,?,?,0,?,?,?)",
+                    (tab, kind, title, text + (f"\n\u23f0 Reminder: {remind}" if remind else ""), services, _who(request), body.get("source_alert"), now, now))
+    if not rid:
+        return JSONResponse({"error": "The note could not be saved (database unavailable)."}, status_code=503)
     row = bb_sql("SELECT * FROM occ_note WHERE id=?", (rid,), fetch=True)[0]
     return {"ok": True, "note": _note_public(row, []), "saved": bool(BB.get("db_ok"))}
 
@@ -1923,8 +1966,9 @@ async def api_occ_meta():
 
 @app.get("/api/occ/tickets")
 async def api_occ_tickets(status: str = "", mine: int = 0, watching: int = 0, pinned: int = 0, handover: int = 0,
-                           include_resolved: int = 0, personal_only: int = 0, q: str = "", request: Request = None):
+                           include_resolved: int = 0, personal_only: int = 0, q: str = "", operator: str = "", service: str = "", request: Request = None):
     who = _who(request) if request else "Controller"
+    opmap = await occ_operator_map()
     rows = bb_sql("SELECT * FROM occ_ticket ORDER BY pinned DESC, updated_ts DESC LIMIT 500", fetch=True)
     out = []
     for t in rows:
@@ -1944,6 +1988,10 @@ async def api_occ_tickets(status: str = "", mine: int = 0, watching: int = 0, pi
             continue
         if personal_only and not t["personal"]:
             continue
+        if service and str(t["service"] or "").upper() != service.strip().upper():
+            continue
+        if operator and opmap.get(str(t["service"] or "").upper(), "") != operator.strip().upper():
+            continue
         if q:
             hay = " ".join(str(t[k] or "") for k in ("title", "description", "service", "location", "bus_reg", "no")).lower()
             if q.lower() not in hay:
@@ -1959,7 +2007,7 @@ async def api_occ_tickets(status: str = "", mine: int = 0, watching: int = 0, pi
     if ids:
         for r in bb_sql("SELECT ticket_id, COUNT(*) n FROM occ_activity WHERE ticket_id IN (%s) GROUP BY ticket_id" % ",".join("?" * len(ids)), ids, fetch=True):
             acount[r["ticket_id"]] = r["n"]
-    pub = [dict(occ_public(t), activity_n=acount.get(t["id"], 0)) for t in out]
+    pub = [dict(occ_public(t), activity_n=acount.get(t["id"], 0), operator=opmap.get(str(t["service"] or "").upper(), "")) for t in out]
     return {"tickets": pub, "counts": counts, "who": who}
 
 
@@ -1981,13 +2029,14 @@ async def api_occ_tickets_create(request: Request):
     watchers = ",".join(str(x).strip()[:40] for x in (body.get("watchers") or [])[:12] if str(x).strip())
     now = time.time()
     no = occ_no()
-    bb_sql("""INSERT INTO occ_ticket(no, title, category, priority, status, service, direction, bus_reg, location, description, owner, shared, watchers,
+    tid = bb_insert("""INSERT INTO occ_ticket(no, title, category, priority, status, service, direction, bus_reg, location, description, owner, shared, watchers,
                                       personal, pinned, source_alert, created_ts, updated_ts, author)
               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,0,?,?,?,?)""",
            (no, title, cat, pri, "new", str(body.get("service") or "").strip()[:12], int(body.get("direction") or 0) or None,
             str(body.get("bus_reg") or "").strip()[:16], str(body.get("location") or "").strip()[:120], str(body.get("description") or "").strip()[:4000],
             owner, shared, watchers, 1 if personal else 0, body.get("source_alert"), now, now, who))
-    tid = bb_sql("SELECT last_insert_rowid() id", fetch=True)[0]["id"]
+    if not tid:
+        return JSONResponse({"error": "The note could not be saved (database unavailable)."}, status_code=503)
     occ_log(tid, who, "created", f"{'Personal note' if personal else 'OCC note'} created" + (f" from alert {body['source_alert']}" if body.get("source_alert") else ""))
     if shared:
         occ_log(tid, who, "shared", "Shared with " + shared.replace(",", ", "))
@@ -6180,5 +6229,1172 @@ async def api_system_notifications():
                         "acked": False, "ts": r.get("start"), "href": f"/?svc={r['svc']}&dir={r['dir']}"})
     except Exception:
         pass
+    try:
+        for x in dv_queue_items():                                                    # V16.14: Diversion Maps
+            out.append({"id": x["id"], "kind": "diversion", "severity": "critical" if x["severity"] == "critical" else "warning", "title": x["title"],
+                        "detail": x["detail"], "acked": x["status"] == "acknowledged", "ts": x["last"], "href": x["href"]})
+    except Exception:
+        pass
     out.sort(key=lambda x: (x["acked"], 0 if x["severity"] == "critical" else 1, -(x["ts"] or 0)))
     return {"items": out[:40], "unacknowledged": sum(1 for x in out if not x["acked"]), "time": now_sgt().isoformat(timespec="seconds")}
+
+
+# =========================================================================== V16.14 Diversion Maps - OCC Diversion Decision Engine
+# BLOCK -> ANALYSE -> PLAN -> SIMULATE -> CONFIRM -> MONITOR -> RECOVER. The logic is diversion.py (pure, no I/O). Everything below only
+# gathers data the platform already uses: LTA stops / routes / Bus Arrival / speed bands / incidents / road works, the real-road service
+# lines of the traffic engine (TR_LINES), OSRM road routes (os_osrm), OpenStreetMap restriction tags (os_overpass + offservice.findings),
+# the scheduled headway (bb_resolve_hw), OCC Notes & Actions tickets and the OCC Live alert queue. Decision support only: nothing is
+# executed and nothing is sent outside the platform; the controller confirms every step.
+import diversion  # noqa: E402
+
+DV_MAX_POLL = int(os.getenv("DIVERSION_MAX_POLL", "16"))            # service-directions whose live buses are polled per analysis (protects the LTA quota)
+DV_AUTO = os.getenv("DIVERSION_AUTO_DETECT", "").strip().lower() in ("1", "true", "yes")   # future mode: LTA incidents raise "potential road blockage" alerts
+DV_STATUSES = ("detected", "analysing", "planned", "active", "monitoring", "recovering", "ended")
+DV = {"init": False, "bbox": {}, "bbox_at": None, "prep": {}}
+DV_INCIDENT_TYPES = ("road block", "roadblock", "accident", "vehicle breakdown", "obstacle", "diversion", "heavy traffic", "road works", "roadworks", "unattended vehicle")
+
+
+def dv_init():
+    if DV["init"]:
+        return
+    bb_sql("""CREATE TABLE IF NOT EXISTS diversion_plan(id INTEGER PRIMARY KEY AUTOINCREMENT, created_ts REAL, updated_ts REAL, status TEXT, road TEXT, road_norm TEXT,
+              lat REAL, lon REAL, block TEXT, closure_min REAL, closure_label TEXT, services TEXT, created_by TEXT, created_occ TEXT, shared TEXT, revision INTEGER DEFAULT 1,
+              ticket_id INTEGER, notice TEXT, started_ts REAL, ended_ts REAL, recovery TEXT, alert_acked_ts REAL, alert_acked_by TEXT, log TEXT, summary TEXT)""")
+    bb_sql("CREATE TABLE IF NOT EXISTS diversion_ack(id INTEGER PRIMARY KEY AUTOINCREMENT, plan_id INTEGER, occ TEXT, who TEXT, ts REAL, revision INTEGER)")
+    bb_sql("CREATE TABLE IF NOT EXISTS important_stop(code TEXT PRIMARY KEY, reason TEXT, by_name TEXT, ts REAL)")
+    DV["init"] = True
+
+
+def _dv_body(raw):
+    try:
+        b = json.loads(raw.decode("utf-8") or "{}")
+        return b if isinstance(b, dict) else {}
+    except (ValueError, UnicodeDecodeError):
+        return {}
+
+
+def dv_clean_line(v, max_pts=600):
+    out = []
+    for p in (v or [])[:max_pts]:
+        try:
+            lat, lon = float(p[0]), float(p[1])
+        except (TypeError, ValueError, IndexError):
+            continue
+        if in_sg(lat, lon):
+            out.append((lat, lon))
+    return out
+
+
+def dv_speed_fn(idx):
+    if not idx:
+        return None
+
+    def f(lat, lon, brg):
+        s = idx.match(lat, lon, brg)
+        return speed_of(s[4], s[6], s[7]) if s else None
+    return f
+
+
+def dv_hhmm(ts=None):
+    return datetime.fromtimestamp(ts or time.time(), SGT).strftime("%H:%M")
+
+
+def dv_svc_key(s):
+    m = re.match(r"(\d+)(.*)", s or "")
+    return (0, int(m.group(1)), m.group(2)) if m else (1, 0, s or "")
+
+
+def dv_marked():
+    dv_init()
+    return {r["code"]: (r["reason"] or "listed") for r in bb_sql("SELECT code, reason FROM important_stop", fetch=True)}
+
+
+async def dv_line(st, svc, d):
+    """the service's real-road line (the same line the traffic engine matches) -> (line, source label)"""
+    fit = TR_LINES["lines"].get((svc, d))
+    if fit and len(fit.get("line") or []) >= 2:
+        return [tuple(p) for p in fit["line"]], "real road (busrouter.sg fitted to LTA stops)"
+    stops = route_stops(st, svc, d)
+    if len(stops) < 2:
+        return None, "no route"
+    g = await route_geometry(svc, d, stops)
+    src = g.get("source") or "stops"
+    return [tuple(p) for p in g["line"]], ("real road (" + src + ")" if src not in ("stops", "partial") else "approximate (straight lines between stops)")
+
+
+def dv_prep(svc, d, line, stops):
+    key = (svc, d, len(line), round(line[0][0], 5), round(line[-1][1], 5))
+    hit = DV["prep"].get(key)
+    if hit is None:
+        cum = diversion.cum_m(line)
+        hit = DV["prep"][key] = {"cum": cum, "stop_s": diversion.stop_positions(line, cum, stops)}
+        if len(DV["prep"]) > 400:
+            DV["prep"].pop(next(iter(DV["prep"])))
+    return hit
+
+
+def dv_bboxes():
+    """bounding box of every real-road service line, rebuilt when the traffic engine rebuilds its lines"""
+    if DV["bbox_at"] != TR_LINES["at"]:
+        DV["bbox"] = {k: diversion.bbox(v["line"]) for k, v in TR_LINES["lines"].items() if len(v.get("line") or []) >= 2}
+        DV["bbox_at"] = TR_LINES["at"]
+    return DV["bbox"]
+
+
+# ---- 1. snap a dropped block onto the road network (LTA speed-band road links; the bus network as a fallback)
+def dv_corridor_lta(idx, lat, lon, reach_m=1500.0):
+    if not idx:
+        return None
+    p = (lat, lon)
+    cx, cy = int(lat / GRID), int(lon / GRID)
+    best, bd = None, 1e9
+    for dx in (-1, 0, 1):
+        for dy in (-1, 0, 1):
+            for i in idx.grid.get((cx + dx, cy + dy), ()):
+                s = idx.segs[i]
+                d = offservice.seg_dist_m(p, (s[0], s[1]), (s[2], s[3]))
+                if d < bd:
+                    best, bd = i, d
+    if best is None or bd > 40.0:
+        return None
+    s0 = idx.segs[best]
+    road = s0[5] or ""
+    nr = offservice.norm_road(road)
+    pool = set()
+    for dx in range(-5, 6):
+        for dy in range(-5, 6):
+            for i in idx.grid.get((cx + dx, cy + dy), ()):
+                if offservice.norm_road(idx.segs[i][5] or "") == nr:
+                    pool.add(i)
+    used = {best}
+    chain = [(s0[0], s0[1]), (s0[2], s0[3])]
+
+    def brg_of(s):
+        return diversion.bearing((s[0], s[1]), (s[2], s[3]))
+
+    def extend(forward):
+        cur = best
+        tot = 0.0
+        while tot < reach_m:
+            c = idx.segs[cur]
+            end = (c[2], c[3]) if forward else (c[0], c[1])
+            cb = brg_of(c)
+            cand, cd = None, 1e9
+            for j in pool:
+                if j in used:
+                    continue
+                s = idx.segs[j]
+                start = (s[0], s[1]) if forward else (s[2], s[3])
+                d = diversion.dist_m(end, start)
+                if d <= 30.0 and diversion.angdiff(cb, brg_of(s)) <= 50.0 and d < cd:
+                    cand, cd = j, d
+            if cand is None:
+                break
+            used.add(cand)
+            s = idx.segs[cand]
+            nxt = (s[2], s[3]) if forward else (s[0], s[1])
+            tot += diversion.dist_m(end, nxt)
+            if forward:
+                chain.append(nxt)
+            else:
+                chain.insert(0, nxt)
+            cur = cand
+    extend(True)
+    extend(False)
+    return {"line": chain, "road": road, "source": "LTA road links (Traffic Speed Bands network)", "snap_m": round(bd, 1)}
+
+
+def dv_corridor_bus(lat, lon, reach_m=1500.0):
+    p, best = (lat, lon), None
+    for k, bb in dv_bboxes().items():
+        if not (bb[0] - 0.001 <= lat <= bb[2] + 0.001 and bb[1] - 0.001 <= lon <= bb[3] + 0.001):
+            continue
+        line = TR_LINES["lines"][k]["line"]
+        d, s, _, _ = diversion.nearest_on_line(p, line)
+        if d <= 35.0 and (best is None or d < best[0]):
+            best = (d, s, line, k)
+    if not best:
+        return None
+    d, s, line, k = best
+    cum = diversion.cum_m(line)
+    return {"line": diversion.cut(line, cum, max(0.0, s - reach_m), min(cum[-1], s + reach_m)), "road": "", "source": f"bus route line (service {k[0]})", "snap_m": round(d, 1)}
+
+
+async def dv_road_name(lat, lon):
+    async def factory():
+        try:
+            r = await client().get(f"{OSRM}/nearest/v1/driving/{lon:.6f},{lat:.6f}", params={"number": 1}, timeout=10)
+            r.raise_for_status()
+            w = (r.json().get("waypoints") or [{}])[0]
+            return {"name": w.get("name") or ""}, 3600, True
+        except Exception:
+            return {"name": ""}, 60, False
+    return (await cached(f"dvname:{lat:.4f},{lon:.4f}", factory)).get("name") or ""
+
+
+@app.get("/api/diversion/snap")
+async def api_dv_snap(lat: float = 0.0, lon: float = 0.0):
+    if not in_sg(lat, lon):
+        return {"ok": False, "error": "Drop the road block on a road in Singapore."}
+    bands = await bands_state()
+    cor = await asyncio.to_thread(dv_corridor_lta, bands.get("idx"), lat, lon)
+    if not cor:
+        cor = dv_corridor_bus(lat, lon)
+    if not cor:
+        return {"ok": False, "error": "No road found within 40 m of that point. Drop the block directly on the road."}
+    if not cor["road"]:
+        cor["road"] = await dv_road_name(lat, lon)
+    line = cor["line"]
+    cum = diversion.cum_m(line)
+    d, s, _, brg = diversion.nearest_on_line((lat, lon), line, cum)
+    a, b = max(0.0, s - 150.0), min(cum[-1], s + 150.0)
+    return {"ok": True, "road": cor["road"] or "Unnamed road", "source": cor["source"], "snap_m": cor["snap_m"],
+            "corridor": [[round(p[0], 6), round(p[1], 6)] for p in line], "corridor_m": [round(x, 1) for x in cum],
+            "at_m": round(s, 1), "start_m": round(a, 1), "end_m": round(b, 1), "bearing": round(brg), "length_m": round(cum[-1])}
+
+
+# ---- 2. live buses on one service-direction near the block (LTA Bus Arrival, projected onto the real-road line)
+async def dv_buses(st, svc, d, line, cum, stops, stop_s, lo_s, hi_s, anchor_s=None, div_lines=None):
+    n = len(stops)
+    win = [i for i in range(n) if lo_s - 400 <= stop_s[i] <= hi_s + 400]
+    if not win:
+        return [], 0, None
+    anchor = None
+    if anchor_s is not None:
+        before = [i for i in win if stop_s[i] <= anchor_s + 5]
+        anchor = before[-1] if before else None
+    step = max(1, math.ceil(len(win) / 7))
+    sample = sorted(set(win[::step] + [win[-1]] + ([anchor] if anchor is not None else [])))
+    results = await asyncio.gather(*[arrivals_raw(stops[i]["code"], svc) for i in sample])
+    now = now_sgt()
+    last_code = stops[-1]["code"]
+    is_loop = stops[0]["code"] == last_code
+    other_dir = {r["code"] for dd in st["dirs"].get(svc, []) if dd != d for r in st["routes"].get((svc, dd), [])}
+    cands = []
+    err = None
+    for i, r in zip(sample, results):
+        if r.get("_error"):
+            err = r["_error"]
+        shared = stops[i]["code"] in other_dir
+        for sv in parse_services(r, now, svc):
+            for b in sv["buses"]:
+                if b["lat"] is None:
+                    continue
+                if shared and not is_loop and b["dest"] and b["dest"] != last_code:
+                    continue
+                cands.append({**b, "src": i})
+    cands.sort(key=lambda c: c["etaf"])
+    clusters = []
+    for c in cands:
+        for cl in clusters:
+            if c["src"] not in cl["etas"] and hav_km(c["lat"], c["lon"], cl["lat"], cl["lon"]) < 0.25:
+                cl["etas"][c["src"]] = c["etaf"]
+                break
+        else:
+            clusters.append({**c, "etas": {c["src"]: c["etaf"]}})
+    out = []
+    for cl in clusters:
+        src_s = stop_s[cl["src"]]
+        dist, pos = diversion.project_window((cl["lat"], cl["lon"]), line, cum, src_s - 15000.0, src_s + 60.0)
+        on_div = False
+        if div_lines:
+            on_div = any(diversion.nearest_on_line((cl["lat"], cl["lon"]), dl)[0] <= 60.0 for dl in div_lines if len(dl) >= 2)
+        if (pos is None or dist > 80.0) and not on_div:
+            continue
+        if not on_div and not (lo_s - 500 <= pos <= hi_s + 800):
+            continue
+        on_d = bool(on_div and (dist is None or dist > 40.0))
+        out.append({"lat": round(cl["lat"], 6), "lon": round(cl["lon"], 6), "s": (round(pos, 1) if pos is not None else None) if not on_d else None, "off_m": round(dist, 1),
+                    "on_diversion": on_d, "load": cl["load"], "type": cl["type"], "wab": cl["wab"],
+                    "monitored": cl["monitored"], "eta_anchor": round(cl["etas"][anchor], 2) if anchor is not None and anchor in cl["etas"] else None})
+    out.sort(key=lambda b: -(b["s"] if b["s"] is not None else 1e12))
+    return out, len(sample), err
+
+
+# ---- 3. impact: which services run along the blocked section, which stops become inaccessible, which buses are coming
+async def dv_entries(st, block, directed):
+    """every service-direction that runs ALONG the block (possibly twice for a loop service)"""
+    marked = dv_marked()
+    hits = []
+    if TR_LINES["lines"]:
+        bb = diversion.bbox(block, 60)
+        keys = [k for k, b in dv_bboxes().items() if diversion.bbox_hit(b, bb)]
+        basis = "real-road service lines (busrouter.sg fitted to LTA stops)"
+    else:
+        near = set()
+        for code, s_ in st["stops"].items():
+            if min(diversion.dist_m((s_["lat"], s_["lon"]), p) for p in block) <= 500:
+                near.add(code)
+        keys = sorted({(svc, d) for code in near for svc in st["at_stop"].get(code, ()) for d in st["dirs"].get(svc, [])})[:40]
+        basis = "road geometry per service (network lines not built yet)"
+    for k in keys:
+        svc, d = k
+        line, src = await dv_line(st, svc, d)
+        if not line:
+            continue
+        runs = await asyncio.to_thread(diversion.overlap_runs, line, block, directed)
+        if not runs:
+            continue
+        stops = route_stops(st, svc, d)
+        pr = dv_prep(svc, d, line, stops)
+        for ri, r in enumerate(runs):
+            idxs = diversion.stops_in(pr["stop_s"], r["a"], r["b"], 35.0)
+            aff = []
+            for i in idxs:
+                s_ = stops[i]
+                if diversion.nearest_on_line((s_["lat"], s_["lon"]), block)[0] > 45.0:
+                    continue
+                why = diversion.stop_importance(s_["name"], len(st["at_stop"].get(s_["code"], ())), marked.get(s_["code"]))
+                aff.append({"code": s_["code"], "name": s_["name"], "important": why})
+            hits.append({"service": svc, "direction": d, "run": ri, "a": round(r["a"], 1), "b": round(r["b"], 1), "len_m": round(r["len"]),
+                         "first": stops[0]["name"], "last": stops[-1]["name"], "stops_inaccessible": aff, "line_source": src})
+    hits.sort(key=lambda h: (dv_svc_key(h["service"]), h["direction"], h["run"]))
+    return hits, basis
+
+
+@app.post("/api/diversion/analyse")
+async def api_dv_analyse(request: Request):
+    dv_init()
+    body = _dv_body(await request.body())
+    blk = body.get("block") or {}
+    block = dv_clean_line(blk.get("line"))
+    if len(block) < 2:
+        return JSONResponse({"error": "Place the road block on the map first."}, status_code=400)
+    directed = bool(blk.get("directed"))
+    st = await static()
+    if not st["stops"] or not st["routes"]:
+        return {"ok": False, "error": f"Bus routes could not be loaded from LTA ({st.get('error') or 'no data'})."}
+    tr_lines_kick(st)
+    fq = await freq_table()
+    opmap = await occ_operator_map()
+    entries, basis = await dv_entries(st, block, directed)
+    now = now_sgt()
+    polled = 0
+    errs = []
+    for e in entries:
+        H, H_src = bb_resolve_hw(e["service"], e["direction"], now, fq)
+        e["H"], e["H_src"], e["operator"] = H, H_src, opmap.get(e["service"], "")
+        e["buses"], e["buses_polled"] = [], False
+        if polled >= DV_MAX_POLL:
+            continue
+        line, _ = await dv_line(st, e["service"], e["direction"])
+        stops = route_stops(st, e["service"], e["direction"])
+        pr = dv_prep(e["service"], e["direction"], line, stops)
+        bands = await bands_state()
+        prof = diversion.profile(line, dv_speed_fn(bands.get("idx")), pr["stop_s"])
+        buses, n, err = await dv_buses(st, e["service"], e["direction"], line, pr["cum"], stops, pr["stop_s"],
+                                       e["a"] - diversion.PARAMS["approach_km"] * 1000, e["b"], anchor_s=e["a"])
+        polled += 1
+        if err:
+            errs.append(err)
+        diversion.label_buses(buses, e["service"])
+        for b in buses:
+            if b["s"] is None:
+                continue
+            m = diversion.t_at(prof, e["a"]) - diversion.t_at(prof, b["s"]) if b["s"] < e["a"] else None
+            if b.get("eta_anchor") is not None and m is not None:
+                m = b["eta_anchor"]                     # LTA Bus Arrival ETA at the last stop before the block
+                b["eta_basis"] = "LTA arrival time"
+            else:
+                b["eta_basis"] = "estimated from speed bands"
+            b["min_to_block"] = round(m, 1) if m is not None else None
+            b["status"], b["status_text"] = diversion.bus_status(m, b["s"], None, e["a"], e["b"])
+        e["buses"] = [b for b in buses if b["s"] is None or b["s"] <= e["b"] + 50]
+        e["buses_polled"] = True
+    bb_ = diversion.bbox(block, 400)
+    try:
+        inc = [x for x in (await api_incidents("", 1)).get("incidents", []) if bb_[0] <= x["lat"] <= bb_[2] and bb_[1] <= x["lon"] <= bb_[3]]
+    except Exception:
+        inc = []
+    try:
+        rw, _ = await tr_roadworks(time.time())
+        rw = [{"road": x["road"], "lat": x["lat"], "lon": x["lon"], "other": x.get("other")} for x in rw if x.get("lat") is not None and bb_[0] <= x["lat"] <= bb_[2] and bb_[1] <= x["lon"] <= bb_[3]]
+    except Exception:
+        rw = []
+    cum = diversion.cum_m(block)
+    mid = diversion.point_at(block, cum, cum[-1] / 2)
+    n_bus = sum(len([b for b in e["buses"] if b.get("status") not in ("passed_block",)]) for e in entries)
+    return {"ok": True, "road": str(blk.get("road") or "")[:80], "length_m": round(cum[-1]), "directed": directed, "entries": entries,
+            "services": len({e["service"] for e in entries}), "service_dirs": len(entries), "buses": n_bus,
+            "polled": polled, "not_polled": max(0, len(entries) - polled), "poll_cap": DV_MAX_POLL, "basis": basis,
+            "lines": TR_LINES["info"], "arrival_error": errs[0] if errs and len(errs) == polled else None,
+            "incidents": inc[:10], "roadworks": rw[:10], "playbook": dv_playbook_rows(mid[0], mid[1], blk.get("road") or ""),
+            "updated": now.isoformat(timespec="seconds")}
+
+
+# ---- 4. diversion options for one service-direction
+def dv_traffic_label(km):
+    tot = sum(km.values()) or 0.0
+    known = tot - km.get("none", 0.0)
+    if tot <= 0 or known < 0.3 * tot:
+        return "UNKNOWN", "no live speed data on most of this road"
+    slow, mod = km.get("slow", 0.0) / known, km.get("moderate", 0.0) / known
+    if slow >= 0.25:
+        return "HEAVY", f"{round(slow * 100)}% slow (LTA speed bands)"
+    if slow + mod >= 0.3:
+        return "MODERATE", f"{round((slow + mod) * 100)}% moderate or slow (LTA speed bands)"
+    return "NORMAL", "LTA speed bands"
+
+
+def dv_used_before(svc, d, sig):
+    rows = bb_sql("SELECT id, started_ts, services FROM diversion_plan WHERE started_ts IS NOT NULL ORDER BY started_ts DESC LIMIT 200", fetch=True)
+    for r in rows:
+        try:
+            for s_ in json.loads(r["services"] or "[]"):
+                if s_.get("service") == svc and int(s_.get("direction") or 0) == d and s_.get("signature") == sig:
+                    return {"id": r["id"], "date": datetime.fromtimestamp(r["started_ts"], SGT).strftime("%d %b %Y")}
+        except (ValueError, TypeError):
+            continue
+    return None
+
+
+@app.post("/api/diversion/options")
+async def api_dv_options(request: Request):
+    dv_init()
+    body = _dv_body(await request.body())
+    blk = body.get("block") or {}
+    block = dv_clean_line(blk.get("line"))
+    directed = bool(blk.get("directed"))
+    svc = str(body.get("service") or "").strip().upper()
+    try:
+        d = int(body.get("direction") or 1)
+        run_i = int(body.get("run") or 0)
+    except (TypeError, ValueError):
+        return JSONResponse({"error": "direction must be a number."}, status_code=400)
+    closure = body.get("closure_min")
+    try:
+        closure = float(closure) if closure not in (None, "", "open") else None
+    except (TypeError, ValueError):
+        closure = None
+    bus = body.get("bus_type") if body.get("bus_type") in offservice.BUS_TYPES else "dd"
+    dims = {}
+    for k_ in ("height_m", "width_m", "weight_t"):
+        try:
+            dims[k_] = float((body.get("dims") or {}).get(k_)) if (body.get("dims") or {}).get(k_) not in (None, "") else None
+        except (TypeError, ValueError):
+            dims[k_] = None
+    if len(block) < 2 or not svc:
+        return JSONResponse({"error": "A placed block and a service are required."}, status_code=400)
+    P = diversion.PARAMS
+    st = await static()
+    line, src = await dv_line(st, svc, d)
+    if not line:
+        return {"ok": False, "error": f"No route for service {svc} direction {d}."}
+    stops = route_stops(st, svc, d)
+    pr = dv_prep(svc, d, line, stops)
+    cum, stop_s = pr["cum"], pr["stop_s"]
+    runs = await asyncio.to_thread(diversion.overlap_runs, line, block, directed)
+    if not runs:
+        return {"ok": False, "error": f"Service {svc} direction {d} does not run along the blocked section."}
+    run = runs[min(run_i, len(runs) - 1)]
+    A, B = run["a"], run["b"]
+    bands = await bands_state()
+    idx = bands.get("idx")
+    sfn = dv_speed_fn(idx)
+    prof = diversion.profile(line, sfn, stop_s)
+    fq = await freq_table()
+    now = now_sgt()
+    H, H_src = bb_resolve_hw(svc, d, now, fq)
+    marked = dv_marked()
+
+    # candidate exit / rejoin points on the service route, and via points either side of the block
+    ex = sorted({round(max(0.0, A - o * 1000.0), 1) for o in P["exit_offsets_km"]}, reverse=True)
+    rj = sorted({round(min(cum[-1], B + o * 1000.0), 1) for o in P["rejoin_offsets_km"]})
+    pairs = list(zip(ex, rj))
+    reqs = [([diversion.point_at(line, cum, e), diversion.point_at(line, cum, r)], 2) for e, r in pairs]
+    if len(pairs) > 1:
+        e1, r1 = pairs[1]
+        for v in diversion.via_points(block):
+            reqs.append(([diversion.point_at(line, cum, e1), v, diversion.point_at(line, cum, r1)], 0))
+    res = await asyncio.gather(*[os_osrm(c, alternatives=a) for c, a in reqs])
+    routing_err = next((x.get("error") for x in res if x.get("error")), None)
+    raw = [r for x in res for r in (x.get("routes") or [])]
+    rejected = {"uses_block": 0, "no_bypass": 0, "duplicate": 0}
+    cands = []
+    for r in raw:
+        if await asyncio.to_thread(diversion.uses_block, r["line"], block, directed):
+            rejected["uses_block"] += 1
+            continue
+        dep = await asyncio.to_thread(diversion.departure, r["line"], line, cum)
+        if not dep or dep["leave_s"] > A + 5 or dep["rejoin_s"] < B - 5 or dep["rejoin_s"] <= dep["leave_s"]:
+            rejected["no_bypass"] += 1
+            continue
+        seg = dep["pts"][dep["i0"]:dep["i1"] + 1]
+        groups = offservice.group_roads(r["steps"])
+        keep = []
+        for g in groups:
+            gl = g["line"] or []
+            off = any(diversion.nearest_on_line(p, line, cum)[0] > P["on_route_m"] for p in gl[::max(1, len(gl) // 8)] if gl)
+            if off:
+                keep.append(g)
+        lead = next((g for g in groups if g["line"] and diversion.nearest_on_line(dep["leave_pt"], g["line"])[0] < 30), None)
+        if lead is not None and (not keep or keep[0] is not lead):
+            keep.insert(0, lead)
+        sig = diversion.road_signature(keep)
+        L = diversion.line_m(seg)
+        if any(c["signature"] == sig and abs(c["div_m"] - L) < 200 for c in cands):
+            rejected["duplicate"] += 1
+            continue
+        cands.append({"r": r, "dep": dep, "seg": seg, "groups": keep, "signature": sig, "div_m": L})
+    cands = cands[:8]
+    try:
+        rw, _ = await tr_roadworks(now.timestamp())
+    except Exception:
+        rw = []
+    try:
+        inc = (await api_incidents("", 1)).get("incidents", [])
+    except Exception:
+        inc = []
+    osms = await asyncio.gather(*[os_overpass(c["seg"]) for c in cands]) if cands else []
+    opts = []
+    for c, osm in zip(cands, osms):
+        dep, seg, r = c["dep"], c["seg"], c["r"]
+        leave_s, rejoin_s = dep["leave_s"], dep["rejoin_s"]
+        fb = (r["km"] / (r["osrm_min"] * offservice.PARAMS["bus_time_factor"] / 60.0)) if r.get("osrm_min") else None
+        dprof = diversion.profile(seg, sfn, None, fallback_kmh=fb)
+        div_min = dprof["t"][-1]
+        normal_min = diversion.t_at(prof, rejoin_s) - diversion.t_at(prof, leave_s)
+        runs_, tinfo = color_route(seg, idx) if idx else ([], {"km": {"none": c["div_m"] / 1000.0}})
+        tl, tl_basis = dv_traffic_label(tinfo["km"])
+        skipped = []
+        for i in diversion.stops_in(stop_s, leave_s + 1.0, rejoin_s - 1.0):
+            s_ = stops[i]
+            why = diversion.stop_importance(s_["name"], len(st["at_stop"].get(s_["code"], ())), marked.get(s_["code"]))
+            skipped.append({"code": s_["code"], "name": s_["name"], "important": why, "lat": s_["lat"], "lon": s_["lon"], "in_block": A - 35 <= stop_s[i] <= B + 35})
+        route_like = {"groups": c["groups"], "steps": r["steps"], "line": seg}
+        fnd = offservice.findings(route_like, osm, bus, dims, rw, inc, offservice.PARAMS)
+        status, status_text = offservice.suitability(fnd, bus, None)
+        added_m = c["div_m"] - (rejoin_s - leave_s)
+        excessive = added_m > P["excess_km"] * 1000 or (rejoin_s - leave_s > 0 and c["div_m"] / (rejoin_s - leave_s) > P["excess_ratio"] and added_m > 1000)
+        n_sharp = sum(g["sharp"] for g in c["groups"])
+        used = dv_used_before(svc, d, c["signature"])
+        reviews = [f for f in fnd if f["sev"] == "review"]
+        if status == "unsuitable":
+            feas, feas_text = "NOT SUITABLE", status_text
+        elif excessive:
+            feas, feas_text = "LOW", f"Excessive detour (+{added_m / 1000:.1f} km). " + status_text
+        elif used and not reviews:
+            feas, feas_text = "HIGH", f"Same roads used in a confirmed diversion on {used['date']}; no restriction or works found on them now. Still confirm on the ground."
+        else:
+            feas, feas_text = "VERIFICATION REQUIRED", "Operational verification required. " + status_text
+        opts.append({"signature": c["signature"], "roads": [g["road"] for g in c["groups"]],
+                     "groups": [{"road": g["road"], "km": round(g["km"], 2), "turns": g["turns"], "sharp": g["sharp"]} for g in c["groups"]],
+                     "leave_s": round(leave_s, 1), "rejoin_s": round(rejoin_s, 1), "leave_pt": [round(dep["leave_pt"][0], 6), round(dep["leave_pt"][1], 6)],
+                     "rejoin_pt": [round(dep["rejoin_pt"][0], 6), round(dep["rejoin_pt"][1], 6)],
+                     "leave_before_block_m": round(A - leave_s), "rejoin_after_block_m": round(rejoin_s - B),
+                     "div_km": round(c["div_m"] / 1000, 2), "normal_km": round((rejoin_s - leave_s) / 1000, 2), "added_km": round(added_m / 1000, 2),
+                     "div_min": round(div_min, 1), "normal_min": round(normal_min, 1), "added_min": round(div_min - normal_min, 1),
+                     "time_src": "LTA speed bands" if dprof["known_share"] >= 0.5 else f"routing time x {offservice.PARAMS['bus_time_factor']:g} (little live speed data)",
+                     "skipped": skipped, "skipped_n": len(skipped), "important_n": sum(1 for x in skipped if x["important"]),
+                     "traffic": tl, "traffic_basis": tl_basis, "traffic_runs": [{"b": x["b"], "pts": x["pts"]} for x in runs_][:80],
+                     "status": status, "status_text": status_text, "feasibility": feas, "feasibility_text": feas_text, "excessive": excessive,
+                     "n_turns": sum(g["turns"] for g in c["groups"]), "n_sharp": n_sharp, "used_before": used,
+                     "findings": [{"sev": f["sev"], "text": f["text"], "lat": f.get("lat"), "lon": f.get("lon")} for f in fnd][:12],
+                     "osm_ok": bool(osm and osm.get("ok")), "line": diversion.simplify(seg, 300),
+                     "prof_t": None, "_prof": dprof, "_seg": seg})
+    order = {"HIGH": 0, "VERIFICATION REQUIRED": 1, "LOW": 2, "NOT SUITABLE": 3}
+    opts.sort(key=lambda o: (order.get(o["feasibility"], 1), o["important_n"], o["added_min"]))
+    opts = opts[:P["max_options"]]
+    for i, o in enumerate(opts, 1):
+        o["n"] = i
+        o["name"] = f"OPTION {i}"
+
+    # last safe diversion point = the latest usable exit before the block
+    usable = [o for o in opts if o["feasibility"] != "NOT SUITABLE"] or opts
+    last = max(usable, key=lambda o: o["leave_s"]) if usable else None
+
+    # live buses (LTA Bus Arrival) on the approach, with their minutes to the last diversion point
+    anchor_s = last["leave_s"] if last else A
+    buses, n_polled, arr_err = await dv_buses(st, svc, d, line, cum, stops, stop_s, A - P["approach_km"] * 1000, max([o["rejoin_s"] for o in opts] + [B + 300]),
+                                              anchor_s=anchor_s, div_lines=[o["_seg"] for o in opts])
+    diversion.label_buses(buses, svc)
+    on_div = [dict(b, status="on_diversion", status_text="On a diversion route now") for b in buses if b["s"] is None]
+    buses = [b for b in buses if b["s"] is not None]
+    for b in buses:
+        mt = diversion.t_at(prof, anchor_s) - diversion.t_at(prof, b["s"]) if b["s"] <= anchor_s else None
+        if mt is not None and b.get("eta_anchor") is not None:
+            anchor_i = max([i for i, x in enumerate(stop_s) if x <= anchor_s + 5] or [0])
+            mt = b["eta_anchor"] + (diversion.t_at(prof, anchor_s) - diversion.t_at(prof, stop_s[anchor_i]))
+            b["eta_basis"] = "LTA arrival time"
+        else:
+            b["eta_basis"] = "estimated from speed bands"
+        b["min_to_exit"] = round(mt, 1) if mt is not None else None
+        b["m_to_exit"] = round(anchor_s - b["s"]) if b["s"] <= anchor_s else None
+        b["status"], b["status_text"] = diversion.bus_status(mt, b["s"], anchor_s, A, B)
+    ordered = sorted(buses, key=lambda b: -b["s"])
+    for k, b in enumerate(ordered):
+        if k > 0:
+            b["gap_ahead_min"] = round(diversion.t_at(prof, ordered[k - 1]["s"]) - diversion.t_at(prof, b["s"]), 1)
+    sim_buses = []
+    for b in buses:
+        x = {"label": b["label"], "s": b["s"]}
+        sim_buses.append(x)
+
+    def sim_for(o):
+        sb = []
+        for b in buses:
+            x = {"label": b["label"], "s": b["s"]}
+            if o is not None and b.get("min_to_exit") is not None:
+                x["eta_exit"] = b["min_to_exit"] + (diversion.t_at(prof, o["leave_s"]) - diversion.t_at(prof, anchor_s))
+            sb.append(x)
+        return sb
+
+    ref_none = min([o["rejoin_s"] for o in opts] + [min(cum[-1], B + 200.0)])
+    s_none = diversion.simulate(sim_buses, prof, A, B, ref_none, closure, H)
+    hw_none = diversion.headways(s_none, H)
+    reg_none = diversion.regulation(s_none, H)
+    rec_none = diversion.recovery_minutes(s_none, reg_none, H) if closure is not None else None
+    cols = [{"key": "none", "name": "NO ACTION", "skipped_n": 0, "important_n": 0, "added_km": 0.0,
+             "added_min": None, "affected": sum(1 for r in s_none if r["mode"] in ("queued", "stuck")),
+             "max_wait": max([r["wait"] for r in s_none if r["mode"] == "queued"] or [0.0]) if closure is not None else None,
+             "sim": s_none, "hw": hw_none, "reg": reg_none, "recovery_min": rec_none, "bus_min": round(diversion.bus_minutes(s_none), 1) if closure is not None else None,
+             "timeline": diversion.timeline(s_none, hw_none, reg_none, rec_none, closure, blk.get("road") or "Road")}]
+    for o in opts:
+        opt_ = {"leave_s": o["leave_s"], "rejoin_s": o["rejoin_s"], "div_min": o["div_min"]}
+        s_ = diversion.simulate(sim_for(o), prof, A, B, o["rejoin_s"], closure, H, opt_)
+        hw_ = diversion.headways(s_, H)
+        reg_ = diversion.regulation(s_, H)
+        rec_ = diversion.recovery_minutes(s_, reg_, H) if (closure is not None or not any(r["mode"] == "stuck" for r in s_)) else None
+        o["affected_buses"] = sum(1 for r in s_ if r["mode"] == "diverted")
+        cols.append({"key": f"o{o['n']}", "name": o["name"], "skipped_n": o["skipped_n"], "important_n": o["important_n"], "added_km": o["added_km"],
+                     "added_min": o["added_min"], "affected": o["affected_buses"], "max_wait": max([r["wait"] or 0 for r in s_ if r["mode"] == "queued"] or [0.0]),
+                     "sim": s_, "hw": hw_, "reg": reg_, "recovery_min": rec_, "bus_min": round(diversion.bus_minutes(s_), 1),
+                     "timeline": diversion.timeline(s_, hw_, reg_, rec_, closure, blk.get("road") or "Road", o["name"])})
+    wod = diversion.wait_or_divert(s_none, opts, closure)
+    # other affected services that could use the same diversion (their line passes the same exit and rejoin points, in that order)
+    also = []
+    for x in (body.get("others") or [])[:20]:
+        try:
+            s2, d2 = str(x.get("service")).upper(), int(x.get("direction"))
+        except (TypeError, ValueError, AttributeError):
+            continue
+        if (s2, d2) == (svc, d):
+            continue
+        l2, _ = await dv_line(st, s2, d2)
+        if not l2:
+            continue
+        c2 = diversion.cum_m(l2)
+        for o in opts:
+            de, pe, _, _ = diversion.nearest_on_line(tuple(o["leave_pt"]), l2, c2)
+            dr, prj, _, _ = diversion.nearest_on_line(tuple(o["rejoin_pt"]), l2, c2)
+            if de <= 30 and dr <= 30 and prj > pe:
+                o.setdefault("also", []).append(f"{s2} D{d2}")
+    # map + animation data: the service line around the section with its time profile, and each option's line with its own profile
+    lo = max(0.0, min([b["s"] for b in buses] + [A - 1500.0]) - 300.0)
+    hi = min(cum[-1], max([o["rejoin_s"] for o in opts] + [B + 300.0]) + 1200.0)
+    n_s = max(2, min(500, int((hi - lo) / 25)))
+    win_s = [lo + (hi - lo) * k / (n_s - 1) for k in range(n_s)]
+    win = {"s": [round(x, 1) for x in win_s], "t": [round(diversion.t_at(prof, x), 3) for x in win_s],
+           "pts": [[round(p[0], 6), round(p[1], 6)] for p in (diversion.point_at(line, cum, x) for x in win_s)]}
+    for o in opts:
+        dp = o.pop("_prof")
+        seg = o.pop("_seg")
+        k = max(1, len(seg) // 250)
+        o["anim"] = {"pts": [[round(seg[i][0], 6), round(seg[i][1], 6)] for i in range(0, len(seg), k)] + [[round(seg[-1][0], 6), round(seg[-1][1], 6)]],
+                     "t": [round(dp["t"][i], 3) for i in range(0, len(seg), k)] + [round(dp["t"][-1], 3)]}
+        o.pop("prof_t", None)
+    rejoin_stop = {}
+    for o in opts:
+        nxt = next((i for i, x in enumerate(stop_s) if x >= o["rejoin_s"]), None)
+        if nxt is not None:
+            o["rejoin_stop"] = {"code": stops[nxt]["code"], "name": stops[nxt]["name"]}
+            rejoin_stop[o["n"]] = o["rejoin_stop"]
+    blocked_stops = [{"code": stops[i]["code"], "name": stops[i]["name"], "lat": stops[i]["lat"], "lon": stops[i]["lon"]}
+                     for i in diversion.stops_in(stop_s, A, B, 35.0)]
+    last_pt = None
+    if last:
+        last_pt = {"lat": last["leave_pt"][0], "lon": last["leave_pt"][1], "s": last["leave_s"], "before_block_m": last["leave_before_block_m"], "option": last["n"],
+                   "road": last["roads"][1] if len(last["roads"]) > 1 else (last["roads"][0] if last["roads"] else "")}
+    return {"ok": True, "service": svc, "direction": d, "run": run_i, "block_a": round(A, 1), "block_b": round(B, 1), "H": H, "H_src": H_src,
+            "closure_min": closure, "bus_type": bus, "bus_label": offservice.BUS_TYPES[bus], "line_source": src,
+            "service_line": diversion.simplify(line, 700), "blocked_stops": blocked_stops,
+            "block_pts": [[round(p[0], 6), round(p[1], 6)] for p in diversion.cut(line, cum, A, B)],
+            "options": opts, "rejected": rejected, "candidates_tested": len(raw), "routing_error": routing_err if not opts else None,
+            "last_point": last_pt, "buses": buses, "buses_on_diversion": on_div, "stops_polled": n_polled, "arrival_error": arr_err,
+            "compare": cols, "wait_or_divert": wod, "window": win,
+            "time_basis": "LTA speed bands" if prof["known_share"] >= 0.5 else f"assumed {P['fallback_kmh']:g} km/h where no speed data (speed bands cover {round(prof['known_share'] * 100)}%)",
+            "important_basis": "LTA stop names (Stn / Int / Ter / Hosp), services at the stop, and the OCC important-stop list",
+            "updated": now.isoformat(timespec="seconds")}
+
+
+# ---- 5. plans: save, confirm, share, acknowledge per OCC, update, end, recover (+ OCC Notes & Actions ticket)
+def dv_row(pid):
+    dv_init()
+    r = bb_sql("SELECT * FROM diversion_plan WHERE id=?", (pid,), fetch=True)
+    return r[0] if r else None
+
+
+def dv_public(r, with_acks=True):
+    def j(v, dflt):
+        try:
+            return json.loads(v) if v else dflt
+        except (TypeError, ValueError):
+            return dflt
+    acks = []
+    if with_acks:
+        acks = bb_sql("SELECT occ, who, ts, revision FROM diversion_ack WHERE plan_id=? ORDER BY ts ASC", (r["id"],), fetch=True)
+    rev = r["revision"] or 1
+    latest = {}
+    for a in acks:
+        if a["revision"] == rev:
+            latest[a["occ"]] = {"who": a["who"], "ts": a["ts"]}
+    shared = [x for x in (r["shared"] or "").split(",") if x]
+    teams = list(dict.fromkeys(([r["created_occ"]] if r["created_occ"] else []) + shared))
+    return {"id": r["id"], "status": r["status"], "road": r["road"], "lat": r["lat"], "lon": r["lon"], "block": j(r["block"], {}),
+            "closure_min": r["closure_min"], "closure_label": r["closure_label"], "services": j(r["services"], []), "summary": j(r["summary"], {}),
+            "created_by": r["created_by"], "created_occ": r["created_occ"], "shared": shared, "revision": rev, "ticket_id": r["ticket_id"],
+            "notice": r["notice"], "created": r["created_ts"], "updated": r["updated_ts"], "started": r["started_ts"], "ended": r["ended_ts"],
+            "recovery": j(r["recovery"], None), "log": j(r["log"], []), "alert_acked": bool(r["alert_acked_ts"] and r["alert_acked_ts"] >= (r["updated_ts"] or 0) - 1),
+            "acks": [{"occ": t, "acked": t in latest, "who": latest.get(t, {}).get("who"), "ts": latest.get(t, {}).get("ts"), "involved": t in teams,
+                      "creator": t == r["created_occ"]} for t in OCC_TEAMS],
+            "teams": list(OCC_TEAMS)}
+
+
+def dv_log(pid, who, text):
+    r = dv_row(pid)
+    if not r:
+        return
+    try:
+        lg = json.loads(r["log"] or "[]")
+    except ValueError:
+        lg = []
+    lg.append({"ts": time.time(), "who": who, "text": text[:400]})
+    bb_sql("UPDATE diversion_plan SET log=? WHERE id=?", (json.dumps(lg[-120:]), pid))
+
+
+def dv_playbook_rows(lat, lon, road):
+    dv_init()
+    nr = offservice.norm_road(road or "")
+    out = []
+    for r in bb_sql("SELECT * FROM diversion_plan WHERE started_ts IS NOT NULL ORDER BY started_ts DESC LIMIT 300", fetch=True):
+        near = r["lat"] is not None and lat is not None and diversion.dist_m((lat, lon), (r["lat"], r["lon"])) <= 400
+        if not (near or (nr and r["road_norm"] == nr)):
+            continue
+        try:
+            svcs = json.loads(r["services"] or "[]")
+        except ValueError:
+            svcs = []
+        out.append({"id": r["id"], "road": r["road"], "last_used": datetime.fromtimestamp(r["started_ts"], SGT).strftime("%d %b %Y"),
+                    "services": [f"{s_['service']}" for s_ in svcs], "detail": [{"service": s_["service"], "direction": s_["direction"], "roads": s_.get("roads") or [],
+                                                                                   "signature": s_.get("signature"), "action": s_.get("action")} for s_ in svcs],
+                    "block": json.loads(r["block"] or "{}"), "closure_label": r["closure_label"], "status": r["status"]})
+        if len(out) >= 5:
+            break
+    return out
+
+
+@app.get("/api/diversion/playbook")
+async def api_dv_playbook(lat: float = 0.0, lon: float = 0.0, road: str = ""):
+    return {"items": dv_playbook_rows(lat if lat else None, lon if lon else None, road)}
+
+
+def dv_clean_services(v):
+    out = []
+    for s_ in (v or [])[:20]:
+        if not isinstance(s_, dict):
+            continue
+        out.append({"service": str(s_.get("service") or "")[:8].upper(), "direction": int(s_.get("direction") or 1) if str(s_.get("direction") or "1").isdigit() else 1,
+                    "run": int(s_.get("run") or 0) if str(s_.get("run") or "0").isdigit() else 0,
+                    "action": str(s_.get("action") or "")[:80], "option": s_.get("option") if isinstance(s_.get("option"), int) else None,
+                    "roads": [str(x)[:60] for x in (s_.get("roads") or [])[:12]], "signature": str(s_.get("signature") or "")[:400],
+                    "leave_pt": s_.get("leave_pt") if isinstance(s_.get("leave_pt"), list) else None, "rejoin_pt": s_.get("rejoin_pt") if isinstance(s_.get("rejoin_pt"), list) else None,
+                    "leave_s": s_.get("leave_s"), "rejoin_s": s_.get("rejoin_s"), "block_a": s_.get("block_a"), "block_b": s_.get("block_b"),
+                    "rejoin_name": str(s_.get("rejoin_name") or "")[:60], "line": dv_clean_line(s_.get("line"), 400) and [list(p) for p in dv_clean_line(s_.get("line"), 400)],
+                    "skipped": [{"code": str(x.get("code"))[:6], "name": str(x.get("name") or "")[:60], "important": bool(x.get("important"))} for x in (s_.get("skipped") or [])[:40] if isinstance(x, dict)],
+                    "buses": int(s_.get("buses") or 0) if str(s_.get("buses") or "0").isdigit() else 0,
+                    "holds": [{"label": str(h.get("label"))[:10], "action": str(h.get("action"))[:40]} for h in (s_.get("holds") or [])[:20] if isinstance(h, dict)]})
+    return out
+
+
+@app.post("/api/diversion/plans")
+async def api_dv_create(request: Request):
+    dv_init()
+    body = _dv_body(await request.body())
+    blk = body.get("block") or {}
+    line = dv_clean_line(blk.get("line"))
+    if len(line) < 2:
+        return JSONResponse({"error": "A placed road block is required."}, status_code=400)
+    who = _who(request)
+    occ = str(body.get("occ") or "").strip()
+    occ = occ if occ in OCC_TEAMS else ""
+    cum = diversion.cum_m(line)
+    mid = diversion.point_at(line, cum, cum[-1] / 2)
+    status = body.get("status") if body.get("status") in ("detected", "planned") else "detected"
+    road = str(blk.get("road") or "Road blockage")[:80]
+    now = time.time()
+    pid = bb_insert("""INSERT INTO diversion_plan(created_ts, updated_ts, status, road, road_norm, lat, lon, block, closure_min, closure_label, services, created_by, created_occ,
+              shared, revision, summary, log) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,?,?)""",
+           (now, now, status, road, offservice.norm_road(road), mid[0], mid[1], json.dumps({"line": [list(p) for p in line], "road": road, "directed": bool(blk.get("directed")),
+                                                                                             "length_m": round(cum[-1])}),
+            body.get("closure_min") if isinstance(body.get("closure_min"), (int, float)) else None, str(body.get("closure_label") or "")[:40],
+            json.dumps(dv_clean_services(body.get("services"))), who, occ, "", json.dumps(body.get("summary") if isinstance(body.get("summary"), dict) else {}),
+            json.dumps([{"ts": now, "who": who, "text": f"Road blockage placed on {road} ({status.upper()})" + (f" by {occ}" if occ else "")}])))
+    if not pid:
+        return JSONResponse({"error": "The diversion could not be saved (database unavailable)."}, status_code=503)
+    return {"ok": True, "plan": dv_public(dv_row(pid)), "saved": bool(BB.get("db_ok"))}
+
+
+@app.get("/api/diversion/plans")
+async def api_dv_list(include_ended: int = 0, limit: int = 50):
+    dv_init()
+    q = "SELECT * FROM diversion_plan" + ("" if include_ended else " WHERE status != 'ended'") + " ORDER BY updated_ts DESC LIMIT ?"
+    return {"plans": [dv_public(r) for r in bb_sql(q, (max(1, min(200, limit)),), fetch=True)], "teams": list(OCC_TEAMS), "saved": bool(BB.get("db_ok"))}
+
+
+@app.get("/api/diversion/plans/{pid}")
+async def api_dv_get(pid: int):
+    r = dv_row(pid)
+    if not r:
+        return JSONResponse({"error": "Diversion not found."}, status_code=404)
+    return {"plan": dv_public(r)}
+
+
+def dv_ticket_desc(r, notice):
+    return (notice or "") + f"\n\nOpen the plan: /diversion?id={r['id']}"
+
+
+@app.post("/api/diversion/plans/{pid}/confirm")
+async def api_dv_confirm(pid: int, request: Request):
+    """The controller confirms the operational diversion. Records it, prepares the notice and opens an OCC Notes & Actions ticket
+    (category Diversion). Nothing is sent outside the platform."""
+    r = dv_row(pid)
+    if not r:
+        return JSONResponse({"error": "Diversion not found."}, status_code=404)
+    body = _dv_body(await request.body())
+    who = _who(request)
+    occ = str(body.get("occ") or r["created_occ"] or "").strip()
+    occ = occ if occ in OCC_TEAMS else ""
+    services = dv_clean_services(body.get("services")) or json.loads(r["services"] or "[]")
+    share = [x for x in (body.get("share") or []) if x in OCC_TEAMS and x != occ]
+    now = time.time()
+    closure_label = str(body.get("closure_label") or r["closure_label"] or "")[:40]
+    plan = {"road": r["road"], "services": services, "effective": dv_hhmm(now), "status": "active", "closure": closure_label, "by": (occ + " \u00b7 " if occ else "") + who}
+    text = str(body.get("notice") or "").strip()[:6000] or diversion.notice(plan)
+    bb_sql("UPDATE diversion_plan SET status='active', services=?, notice=?, started_ts=COALESCE(started_ts, ?), updated_ts=?, created_occ=COALESCE(NULLIF(created_occ,''), ?), shared=?, closure_label=?, summary=? WHERE id=?",
+           (json.dumps(services), text, now, now, occ, ",".join(share), closure_label, json.dumps(body.get("summary") if isinstance(body.get("summary"), dict) else {}), pid))
+    dv_log(pid, who, "Diversion CONFIRMED and ACTIVE" + (f" by {occ}" if occ else ""))
+    if occ:
+        bb_sql("INSERT INTO diversion_ack(plan_id, occ, who, ts, revision) VALUES (?,?,?,?,?)", (pid, occ, who, now, r["revision"] or 1))
+    tid = r["ticket_id"]
+    if not tid:
+        svc0 = services[0] if services else {}
+        tid = bb_insert("""INSERT INTO occ_ticket(no, title, category, priority, status, service, direction, bus_reg, location, description, owner, shared, watchers,
+                  personal, pinned, source_alert, created_ts, updated_ts, author) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,0,1,?,?,?,?)""",
+               (occ_no(), f"Road diversion \u2014 {r['road']}"[:140], "Diversion", "high", "action", svc0.get("service") or "", svc0.get("direction"), "", r["road"][:120],
+                dv_ticket_desc(r, text)[:4000], who, ",".join(share), "", f"dv:{pid}", now, now, who))
+        if tid:
+            occ_log(tid, who, "created", f"Diversion plan #{pid} confirmed on Diversion Maps")
+            if share:
+                occ_log(tid, who, "shared", "Shared with " + ", ".join(share))
+            bb_sql("UPDATE diversion_plan SET ticket_id=? WHERE id=?", (tid, pid))
+    return {"ok": True, "plan": dv_public(dv_row(pid))}
+
+
+@app.post("/api/diversion/plans/{pid}/update")
+async def api_dv_update(pid: int, request: Request):
+    """New revision of an active diversion. Every OCC sees the latest revision and must acknowledge it again."""
+    r = dv_row(pid)
+    if not r:
+        return JSONResponse({"error": "Diversion not found."}, status_code=404)
+    body = _dv_body(await request.body())
+    who = _who(request)
+    rev = (r["revision"] or 1) + 1
+    services = dv_clean_services(body.get("services")) or json.loads(r["services"] or "[]")
+    closure_label = str(body.get("closure_label") or r["closure_label"] or "")[:40]
+    note = str(body.get("note") or "").strip()[:400]
+    plan = {"road": r["road"], "services": services, "effective": dv_hhmm(r["started_ts"] or time.time()), "status": r["status"], "closure": closure_label, "revision": rev,
+            "by": ((r["created_occ"] + " \u00b7 ") if r["created_occ"] else "") + who}
+    text = str(body.get("notice") or "").strip()[:6000] or diversion.notice(plan)
+    now = time.time()
+    bb_sql("UPDATE diversion_plan SET revision=?, services=?, notice=?, closure_label=?, updated_ts=? WHERE id=?", (rev, json.dumps(services), text, closure_label, now, pid))
+    dv_log(pid, who, f"Revision {rev}" + (f": {note}" if note else ""))
+    occ = str(body.get("occ") or "").strip()
+    if occ in OCC_TEAMS:
+        bb_sql("INSERT INTO diversion_ack(plan_id, occ, who, ts, revision) VALUES (?,?,?,?,?)", (pid, occ, who, now, rev))
+    if r["ticket_id"]:
+        occ_log(r["ticket_id"], who, "comment", f"Diversion revision {rev}" + (f" \u2014 {note}" if note else "") + "\n" + text[:3000])
+        occ_touch(r["ticket_id"])
+    return {"ok": True, "plan": dv_public(dv_row(pid))}
+
+
+@app.post("/api/diversion/notice")
+async def api_dv_notice(request: Request):
+    """Preview of the operational message (nothing is saved or sent)."""
+    body = _dv_body(await request.body())
+    plan = {"road": str(body.get("road") or "")[:80], "services": dv_clean_services(body.get("services")), "effective": str(body.get("effective") or dv_hhmm())[:5],
+            "status": str(body.get("status") or "active")[:12], "closure": str(body.get("closure_label") or "")[:40],
+            "revision": int(body.get("revision") or 1) if str(body.get("revision") or "1").isdigit() else 1, "by": str(body.get("by") or "")[:60]}
+    return {"text": diversion.notice(plan)}
+
+
+@app.post("/api/diversion/plans/{pid}/notify")
+async def api_dv_notify(pid: int, request: Request):
+    """NOTIFY OCC: posts the current notice to the diversion's OCC Notes & Actions ticket (seen in OCC Live by the shared OCCs).
+    Internal to the platform - nothing is sent externally."""
+    r = dv_row(pid)
+    if not r:
+        return JSONResponse({"error": "Diversion not found."}, status_code=404)
+    who = _who(request)
+    if not r["ticket_id"]:
+        return JSONResponse({"error": "Confirm the diversion first: the OCC ticket is created on confirmation."}, status_code=400)
+    occ_log(r["ticket_id"], who, "comment", f"Diversion notice (revision {r['revision'] or 1}) sent to OCCs\n" + (r["notice"] or "")[:3500])
+    occ_touch(r["ticket_id"])
+    dv_log(pid, who, "Notice posted to the OCC ticket")
+    return {"ok": True, "ticket_id": r["ticket_id"]}
+
+
+@app.post("/api/diversion/plans/{pid}/share")
+async def api_dv_share(pid: int, request: Request):
+    r = dv_row(pid)
+    if not r:
+        return JSONResponse({"error": "Diversion not found."}, status_code=404)
+    body = _dv_body(await request.body())
+    add = [x for x in (body.get("occs") or []) if x in OCC_TEAMS]
+    if not add:
+        return JSONResponse({"error": "Choose at least one OCC."}, status_code=400)
+    cur = [x for x in (r["shared"] or "").split(",") if x]
+    new = [x for x in add if x not in cur and x != r["created_occ"]]
+    cur += new
+    bb_sql("UPDATE diversion_plan SET shared=?, updated_ts=? WHERE id=?", (",".join(cur), time.time(), pid))
+    who = _who(request)
+    if new:
+        dv_log(pid, who, "Shared with " + ", ".join(new))
+        if r["ticket_id"]:
+            t = occ_get(r["ticket_id"])
+            if t:
+                tsh = [x for x in (t["shared"] or "").split(",") if x]
+                bb_sql("UPDATE occ_ticket SET shared=?, updated_ts=? WHERE id=?", (",".join(list(dict.fromkeys(tsh + new))), time.time(), r["ticket_id"]))
+                occ_log(r["ticket_id"], who, "shared", "Shared with " + ", ".join(new))
+    return {"ok": True, "plan": dv_public(dv_row(pid))}
+
+
+@app.post("/api/diversion/plans/{pid}/ack")
+async def api_dv_ack(pid: int, request: Request):
+    r = dv_row(pid)
+    if not r:
+        return JSONResponse({"error": "Diversion not found."}, status_code=404)
+    body = _dv_body(await request.body())
+    occ = str(body.get("occ") or "").strip()
+    if occ not in OCC_TEAMS:
+        return JSONResponse({"error": "Choose your OCC first."}, status_code=400)
+    who = _who(request)
+    rev = r["revision"] or 1
+    if not bb_sql("SELECT id FROM diversion_ack WHERE plan_id=? AND occ=? AND revision=?", (pid, occ, rev), fetch=True):
+        bb_sql("INSERT INTO diversion_ack(plan_id, occ, who, ts, revision) VALUES (?,?,?,?,?)", (pid, occ, who, time.time(), rev))
+        dv_log(pid, who, f"\u2713 Acknowledged by {occ} (revision {rev})")
+        if r["ticket_id"]:
+            occ_log(r["ticket_id"], who, "ack", f"\u2713 Diversion revision {rev} acknowledged by {occ} ({who})")
+    return {"ok": True, "plan": dv_public(dv_row(pid))}
+
+
+@app.post("/api/diversion/plans/{pid}/status")
+async def api_dv_status(pid: int, request: Request):
+    r = dv_row(pid)
+    if not r:
+        return JSONResponse({"error": "Diversion not found."}, status_code=404)
+    body = _dv_body(await request.body())
+    new = body.get("status")
+    allowed = {"detected": ("planned", "ended"), "planned": ("detected", "ended"), "active": ("monitoring",), "monitoring": ("active",)}   # ended = discard a plan never activated
+    if new not in allowed.get(r["status"], ()):
+        return JSONResponse({"error": f"Cannot change {r['status'].upper()} to {str(new).upper()} here."}, status_code=400)
+    who = _who(request)
+    if new == "ended":
+        bb_sql("UPDATE diversion_plan SET status='ended', ended_ts=?, updated_ts=? WHERE id=?", (time.time(), time.time(), pid))
+        dv_log(pid, who, "Plan discarded (never activated)")
+        if r["ticket_id"]:
+            occ_log(r["ticket_id"], who, "status", "Diversion plan discarded (never activated)")
+            bb_sql("UPDATE occ_ticket SET status='resolved', resolved_ts=?, updated_ts=? WHERE id=?", (time.time(), time.time(), r["ticket_id"]))
+        return {"ok": True, "plan": dv_public(dv_row(pid))}
+    bb_sql("UPDATE diversion_plan SET status=?, updated_ts=? WHERE id=?", (new, time.time(), pid))
+    dv_log(pid, who, f"Status {r['status'].upper()} \u2192 {new.upper()}")
+    if r["ticket_id"]:
+        occ_log(r["ticket_id"], who, "status", f"Diversion status {r['status'].upper()} \u2192 {new.upper()}")
+    return {"ok": True, "plan": dv_public(dv_row(pid))}
+
+
+@app.post("/api/diversion/plans/{pid}/end")
+async def api_dv_end(pid: int, request: Request):
+    """Road reopened: RETURN-TO-NORMAL analysis. Checks where every bus of every diverted service is now (LTA Bus Arrival) and proposes
+    who completes the diversion and who resumes the normal route. Status -> RECOVERING; the controller confirms the recovery plan."""
+    r = dv_row(pid)
+    if not r:
+        return JSONResponse({"error": "Diversion not found."}, status_code=404)
+    who = _who(request)
+    st = await static()
+    fq = await freq_table()
+    bands = await bands_state()
+    sfn = dv_speed_fn(bands.get("idx"))
+    now = now_sgt()
+    out = []
+    for s_ in json.loads(r["services"] or "[]"):
+        svc, d = s_["service"], int(s_["direction"])
+        line, _ = await dv_line(st, svc, d)
+        if not line or s_.get("leave_s") is None:
+            out.append({"service": svc, "direction": d, "rows": [], "note": "No diversion route recorded for this service (wait / regulate plan)."})
+            continue
+        stops = route_stops(st, svc, d)
+        pr = dv_prep(svc, d, line, stops)
+        prof = diversion.profile(line, sfn, pr["stop_s"])
+        dl = [tuple(p) for p in (s_.get("line") or [])]
+        A = float(s_.get("block_a") or s_["leave_s"])
+        buses, _, err = await dv_buses(st, svc, d, line, pr["cum"], stops, pr["stop_s"], float(s_["leave_s"]) - 6000, float(s_["rejoin_s"]), div_lines=[dl] if dl else None)
+        diversion.label_buses([b for b in buses if b["s"] is not None] or buses, svc)
+        rows_in = []
+        for b in buses:
+            eta = None
+            if b["on_diversion"] and dl:
+                dd_, pos, _, _ = diversion.nearest_on_line((b["lat"], b["lon"]), dl)
+                dprof = diversion.profile(dl, sfn, None)
+                eta = round(dprof["t"][-1] - diversion.t_at(dprof, pos), 1)
+            rows_in.append({"label": b.get("label") or "?", "s": b["s"] if not b["on_diversion"] else None, "on_diversion": b["on_diversion"], "eta_rejoin": eta})
+        rtn = diversion.return_to_normal(rows_in, float(s_["leave_s"]), float(s_["rejoin_s"]), A)
+        H, _ = bb_resolve_hw(svc, d, now, fq)
+        norm = rtn["last_rejoin_min"] + (H or 0) * 1.0
+        out.append({"service": svc, "direction": d, "rows": rtn["rows"], "still_affected": rtn["still_affected"],
+                    "normalise_min": round(norm, 0), "H": H, "arrival_error": err,
+                    "basis": "last bus on the diversion rejoins, then one scheduled headway to re-space (estimate)"})
+    rec = {"ts": time.time(), "by": who, "services": out, "normalise_min": max([x.get("normalise_min") or 0 for x in out] + [0])}
+    bb_sql("UPDATE diversion_plan SET status='recovering', recovery=?, updated_ts=? WHERE id=?", (json.dumps(rec), time.time(), pid))
+    dv_log(pid, who, "Road reopened \u2014 RETURN-TO-NORMAL analysis run (RECOVERING)")
+    if r["ticket_id"]:
+        occ_log(r["ticket_id"], who, "status", "Road reopened \u2014 diversion RECOVERING")
+        bb_sql("UPDATE occ_ticket SET status='monitoring', updated_ts=? WHERE id=?", (time.time(), r["ticket_id"]))
+    return {"ok": True, "recovery": rec, "plan": dv_public(dv_row(pid))}
+
+
+@app.post("/api/diversion/plans/{pid}/recovery")
+async def api_dv_recovery(pid: int, request: Request):
+    r = dv_row(pid)
+    if not r:
+        return JSONResponse({"error": "Diversion not found."}, status_code=404)
+    body = _dv_body(await request.body())
+    who = _who(request)
+    close = bool(body.get("close", True))
+    now = time.time()
+    if close:
+        bb_sql("UPDATE diversion_plan SET status='ended', ended_ts=?, updated_ts=? WHERE id=?", (now, now, pid))
+        dv_log(pid, who, "Recovery plan confirmed \u2014 diversion ENDED")
+        if r["ticket_id"]:
+            bb_sql("UPDATE occ_ticket SET status='resolved', resolved_ts=?, resolution_outcome=?, resolution_action=?, updated_ts=? WHERE id=?",
+                   (now, "Road reopened, service returned to normal route", "Diversion ended on Diversion Maps", now, r["ticket_id"]))
+            occ_log(r["ticket_id"], who, "resolve", "Diversion ended \u2014 service returned to normal route")
+    else:
+        dv_log(pid, who, "Recovery plan confirmed \u2014 monitoring headway")
+    return {"ok": True, "plan": dv_public(dv_row(pid))}
+
+
+# ---- 6. important stops maintained by the OCC (added to the automatic Stn / Int / Ter / Hosp / transfer-hub detection)
+@app.get("/api/diversion/important")
+async def api_dv_important():
+    dv_init()
+    st = await static()
+    rows = bb_sql("SELECT * FROM important_stop ORDER BY code", fetch=True)
+    return {"stops": [{"code": r["code"], "reason": r["reason"], "by": r["by_name"], "name": (st["stops"].get(r["code"]) or {}).get("name", "")} for r in rows]}
+
+
+@app.post("/api/diversion/important")
+async def api_dv_important_save(request: Request):
+    dv_init()
+    body = _dv_body(await request.body())
+    code = re.sub(r"\D", "", str(body.get("code") or ""))
+    if len(code) != 5:
+        return JSONResponse({"error": "Enter a 5-digit bus stop code."}, status_code=400)
+    if body.get("remove"):
+        bb_sql("DELETE FROM important_stop WHERE code=?", (code,))
+    else:
+        bb_sql("INSERT OR REPLACE INTO important_stop(code, reason, by_name, ts) VALUES (?,?,?,?)", (code, str(body.get("reason") or "")[:60], _who(request), time.time()))
+    return {"ok": True}
+
+
+# ---- 7. future automatic incident mode: LTA incidents / road works that MAY block a bus road. Suggestions only - never activates a diversion.
+async def dv_detect():
+    st = await static()
+    try:
+        raw = (await api_incidents("", 1)).get("incidents", [])
+    except Exception:
+        raw = []
+    out = []
+    for x in raw:
+        ty = (x.get("type") or "").lower()
+        if not any(k in ty for k in DV_INCIDENT_TYPES):
+            continue
+        near = [c for c, s_ in st["stops"].items() if abs(s_["lat"] - x["lat"]) < 0.004 and abs(s_["lon"] - x["lon"]) < 0.004
+                and diversion.dist_m((s_["lat"], s_["lon"]), (x["lat"], x["lon"])) <= 250]
+        svcs = sorted({v for c in near for v in st["at_stop"].get(c, ())}, key=dv_svc_key)
+        if not svcs:
+            continue
+        out.append({"id": "inc:" + hashlib.sha1(f"{x['lat']:.5f},{x['lon']:.5f},{x['type']}".encode()).hexdigest()[:10], "type": x["type"], "message": x["message"],
+                    "lat": x["lat"], "lon": x["lon"], "services_near": svcs[:12], "source": "LTA Traffic Incidents"})
+    return out[:20]
+
+
+@app.get("/api/diversion/detect")
+async def api_dv_detect():
+    return {"items": await dv_detect(), "auto_alerts": DV_AUTO,
+            "note": "Potential road blockages from LTA Traffic Incidents near bus stops. Review each one: nothing is diverted automatically."}
+
+
+# ---- 8. OCC Live alert queue + notification bell integration
+def dv_queue_items():
+    dv_init()
+    items = []
+    for r in bb_sql("SELECT * FROM diversion_plan WHERE status NOT IN ('ended') ORDER BY updated_ts DESC LIMIT 30", fetch=True):
+        p = dv_public(r, with_acks=False)
+        sm = p["summary"] or {}
+        svcs = p["services"] or []
+        chips = sm.get("chips") or [f"{s_['service']} D{s_['direction']}" for s_ in svcs]
+        n_svc = sm.get("services") if sm.get("services") is not None else len({s_["service"] for s_ in svcs})
+        n_bus = sm.get("buses")
+        acked = p["alert_acked"]
+        crit = p["status"] in ("detected", "planned") and not acked
+        title = ("Diversion impact detected" if p["status"] in ("detected", "planned") else f"Diversion {p['status']}") + f" \u2013 {p['road']}"
+        detail = f"{n_svc} services affected" + (f" \u00b7 {n_bus} buses potentially affected" if n_bus is not None else "") + (" \u00b7 " + " \u00b7 ".join(chips[:8]) if chips else "")
+        items.append({"id": f"dv:{p['id']}", "src": "diversion", "group": "diversion", "severity": "critical" if crit else "high",
+                      "status": "acknowledged" if acked else ("re-escalated" if r["alert_acked_ts"] else "new"),
+                      "title": title, "service": "", "dir": None, "location": p["road"], "detail": detail,
+                      "since": p["created"], "last": p["updated"], "acked_by": r["alert_acked_by"], "acked_at": r["alert_acked_ts"],
+                      "href": f"/diversion?id={p['id']}", "raw_id": p["id"], "operator": ""})
+    if DV_AUTO:
+        for x in DV.get("auto", []):
+            items.append({"id": x["id"], "src": "diversion", "group": "diversion", "severity": "high", "status": "new",
+                          "title": f"Potential road blockage \u2013 {x['type']}", "service": "", "dir": None, "location": x["message"][:80],
+                          "detail": "Services nearby: " + ", ".join(x["services_near"][:8]) + " \u00b7 review on Diversion Maps", "since": x.get("seen"), "last": x.get("seen"),
+                          "acked_by": None, "acked_at": None, "href": f"/diversion?lat={x['lat']}&lon={x['lon']}", "raw_id": None, "operator": ""})
+    return items
+
+
+def dv_ack_alert(pid, by):
+    r = dv_row(pid)
+    if not r:
+        return False
+    bb_sql("UPDATE diversion_plan SET alert_acked_ts=?, alert_acked_by=? WHERE id=?", (time.time(), by, pid))
+    dv_log(pid, by, f"OCC Live alert acknowledged by {by}")
+    return True
+
+
+async def dv_auto_loop():
+    """future automatic incident mode (DIVERSION_AUTO_DETECT=1): refreshes the potential-blockage list for the OCC Live queue every 2 min"""
+    while True:
+        try:
+            now = time.time()
+            prev = {x["id"]: x.get("seen") for x in DV.get("auto", [])}
+            items = await dv_detect()
+            for x in items:
+                x["seen"] = prev.get(x["id"]) or now
+            DV["auto"] = items
+        except Exception:
+            pass
+        await asyncio.sleep(120)
+
+
+@app.get("/diversion.js")
+async def diversion_js():
+    return Response((HERE / "diversion.js").read_text(encoding="utf-8"), media_type="application/javascript",
+                    headers={"Cache-Control": "no-cache"})
+
+
+@app.get("/diversion", response_class=HTMLResponse)
+async def diversion_page():
+    return _page("diversion.html")
+
+

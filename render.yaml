@@ -47,3 +47,7 @@ services:
         sync: false
       - key: ONEMAP_PASSWORD      # optional: OneMap account password
         sync: false
+      - key: DIVERSION_MAX_POLL   # optional: Diversion Maps — max service-directions polled for live buses per analysis (default 16)
+        sync: false
+      - key: DIVERSION_AUTO_DETECT # optional: 1 = suggest blockages from LTA incidents (never activates a diversion)
+        sync: false

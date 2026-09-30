@@ -1,4 +1,25 @@
-# SG Transport Pulse V16.8 — Operational Intelligence & Service Recovery Platform
+# SG Transport Pulse V16.14 — Operational Intelligence & Service Recovery Platform
+
+## V16.14 — Diversion Maps (OCC diversion decision engine)
+New module **Diversion Maps** (`/diversion`, App Launcher > Recovery). Workflow: BLOCK → ANALYSE → PLAN → SIMULATE → CONFIRM → MONITOR → RECOVER.
+
+* **Block** — drag the ❌ ROAD BLOCK onto the map (or tap it, then tap the road; phones use the floating ADD BLOCKAGE button). It snaps to the road (LTA speed-band links of the same road name; bus route line as fallback) and marks 300 m. Drag the START/END handles along the road to set the exact section; choose both directions or the drawn direction only.
+* **Analyse** — every service/direction that runs *along* the section (crossing it does not count), inaccessible stops (important ones flagged: MRT/LRT, interchanges, terminals, hospitals, major hubs, plus the OCC's own list), and approaching buses from LTA Bus Arrival with a status (ACT NOW / APPROACHING / NOT YET / PASSED DIVERSION POINT). Select a service to isolate it.
+* **Plan** — diversion options are real road routes (OSRM), never straight lines; routes that use the blocked road are rejected. Each card shows the road chain, rejoin point, skipped stops, added km and estimated minutes (LTA speed bands), affected buses, traffic, map findings (OpenStreetMap tags) and feasibility. Nothing is invented: unverified roads are marked *Operational verification required*. The **last diversion point** is shown for the nearest bus. WAIT / REGULATE is always an option, weighed against the expected closure (15/30/60 min, until further notice, custom).
+* **Simulate / compare** — NO DIVERSION vs the proposed option, side by side, at NOW/+5/+10/+15/+30 min. The comparison table shows consequences (skipped stops, time, buses, max gap, headway after rejoin, bunching risk, bus-minutes, recovery) with no combined score.
+* **Headway after rejoining** — predicted vs target headway at the rejoin point, bunching warning and suggested holds (spacing = min(scheduled headway, available average), holds capped at 6 min), with links to Headway Control, Bunching & Gap and Halfway Planner. Suggestions only; nothing is executed.
+* **Confirm / share** — SAVE raises an OCC Live alert (OPEN DIVERSION PLAN / ACKNOWLEDGE). CONFIRM shows an editable notice and activates the diversion, opens an OCC ticket (category *Diversion*) and shares it with chosen OCCs. Each OCC acknowledges each revision; UPDATE publishes a new revision and resets acknowledgements. COPY/SHARE/NOTIFY OCC stay inside the platform — nothing is sent externally.
+* **End / recover** — END DIVERSION runs a return-to-normal analysis per bus (complete diversion / resume normal route) with a predicted normalisation time; CONFIRM RECOVERY PLAN closes the diversion and resolves the ticket.
+* **Playbook** — confirmed diversions are remembered; placing a block on the same road shows PREVIOUS DIVERSION AVAILABLE (VIEW / LOAD AS STARTING POINT). Current conditions are always re-checked.
+
+**API:** `GET /api/diversion/snap`, `POST /api/diversion/analyse`, `POST /api/diversion/options`, `GET|POST /api/diversion/plans`, `GET /api/diversion/plans/{id}`, `POST /api/diversion/plans/{id}/confirm|update|share|ack|status|end|recovery|notify`, `POST /api/diversion/notice`, `GET /api/diversion/playbook`, `GET|POST /api/diversion/important`, `GET /api/diversion/detect`. Diversion alerts also appear in `/api/occ/queue` and `/api/system/notifications`.
+
+**Environment (optional):** `DIVERSION_MAX_POLL` (default 16) — max service-directions polled for live buses per analysis, protects the LTA quota. `DIVERSION_AUTO_DETECT=1` — background check of LTA Traffic Incidents near bus stops; it only *suggests* a blockage for review and never activates a diversion.
+
+**Data limits:** LTA Bus Arrival gives no vehicle registration, so bus IDs are positional (165A = nearest the block). Times are estimates from live positions and speed bands and are labelled as such. Road suitability for buses (height/width limits, turn bans) is only as good as OpenStreetMap tagging — the controller must verify.
+
+**Fix:** creating OCC tickets and notes (`POST /api/occ/tickets`, `POST /api/occ/notes`) could fail because the new row id was read on a different database connection (always 0). Inserts now return the id from the same connection.
+
 
 ## V16.8 — pages are hidden for everyone
 * Settings > Pages now saves on the server, so a hidden page is hidden for every user and device (V16.7 saved per browser).
