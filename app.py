@@ -22,7 +22,7 @@ import headway
 import routegeom
 import traffic
 
-VERSION = "V16.11"
+VERSION = "V16.12"
 # V16.8: pages hidden for everyone (see Settings > Pages). Defined here because bb_init() reads the saved value while the module loads.
 SITE_PAGE_IDS = ("command", "route", "headway", "bunching", "recovery", "halfplan", "trafficaware", "running", "ewt", "cameras")     # "settings" can never be hidden
 SITE = {"hidden": [x.strip() for x in os.getenv("HIDDEN_PAGES", "").split(",") if x.strip() in SITE_PAGE_IDS], "block": True}
@@ -1713,38 +1713,75 @@ async def api_occ_queue():
     except Exception:
         pass
     SEV_ORDER = {"critical": 0, "high": 1, "medium": 2, "low": 3}
-    items.sort(key=lambda x: (0 if x["status"] != "acknowledged" else 1, SEV_ORDER.get(x["severity"], 2), -(x["last"] or 0)))
+    # V16.12: several alerts on the same service+type (e.g. a bunching alert on two directions, or bunching + a
+    # traffic alert on the same service) become ONE card, so the SC is not asked to press Acknowledge many times
+    # for what is really one situation. Acknowledging a merged card acknowledges every alert inside it.
+    groups, singles = {}, []
+    for a in items:
+        key = (a["group"], a["service"]) if a["service"] else None
+        (groups.setdefault(key, []) if key else singles).append(a)
+    merged = []
+    for key, g in groups.items():
+        if len(g) == 1:
+            merged.append(g[0]); continue
+        g.sort(key=lambda x: SEV_ORDER.get(x["severity"], 2))
+        locs = list(dict.fromkeys(x["location"] for x in g if x["location"]))
+        merged.append({"id": "grp:" + "|".join(x["id"] for x in g), "src": "grouped", "group": key[0], "severity": g[0]["severity"],
+                       "status": "acknowledged" if all(x["status"] == "acknowledged" for x in g) else ("re-escalated" if any(x["status"] == "re-escalated" for x in g) else "new"),
+                       "title": f"Svc {key[1]} – {len(g)} alerts", "service": key[1], "dir": None,
+                       "location": "; ".join(locs[:3]) + (f" +{len(locs)-3} more" if len(locs) > 3 else ""),
+                       "detail": " · ".join(dict.fromkeys(x["title"].split("–", 1)[-1].strip() for x in g)),
+                       "since": min(x["since"] or now for x in g), "last": max(x["last"] or now for x in g),
+                       "acked_by": None, "acked_at": None, "href": g[0]["href"], "raw_id": None})
+    items2 = merged + singles
+    items2.sort(key=lambda x: (0 if x["status"] != "acknowledged" else 1, SEV_ORDER.get(x["severity"], 2), -(x["last"] or 0)))
     resolved_today = bb_sql("SELECT COUNT(*) n FROM alert_acknowledgement WHERE ack_time > ?", (now - (now % 86400),), fetch=True)
-    return {"items": items, "counts": {"critical": sum(1 for x in items if x["status"] != "acknowledged" and x["severity"] == "critical"),
-            "action": sum(1 for x in items if x["status"] != "acknowledged" and x["severity"] in ("high", "medium")),
-            "monitoring": sum(1 for x in items if x["status"] == "acknowledged"),
+    return {"items": items2, "counts": {"critical": sum(1 for x in items2 if x["status"] != "acknowledged" and x["severity"] == "critical"),
+            "action": sum(1 for x in items2 if x["status"] != "acknowledged" and x["severity"] in ("high", "medium")),
+            "monitoring": sum(1 for x in items2 if x["status"] == "acknowledged"),
             "resolved_today": (resolved_today[0]["n"] if resolved_today else 0)}, "time": now_sgt().isoformat(timespec="seconds")}
 
 
-@app.post("/api/occ/ack")
-async def api_occ_ack(request: Request):
-    """One ACK button for the combined queue: routes to the bunching or traffic acknowledge logic by the item's id prefix (bb: / tr:)."""
-    try:
-        body = json.loads((await request.body()).decode("utf-8") or "{}")
-        oid = str(body.get("id") or "")
-    except (ValueError, TypeError):
-        return JSONResponse({"error": "Body must be JSON with the item id."}, status_code=400)
-    by = _who(request)
+def _occ_ack_one(oid, by):
+    """Acknowledge a single bb:/tr: item id. Returns True if something was acknowledged."""
     if oid.startswith("bb:"):
         e = BB["open"].get(int(oid[3:]))
         if not e or not e.get("alerts"):
-            return JSONResponse({"error": "That alert is no longer active."}, status_code=404)
+            return False
         e["acked_n"], e["acked_ts"] = len(e["alerts"]), time.time()
-        return {"ok": True}
+        return True
     if oid.startswith("tr:"):
         done = traffic.acknowledge(TR["book"], [oid[3:]], by, time.time())
         for aid in done:
             p = aid.split(":")
             bb_sql("INSERT INTO alert_acknowledgement(alert_id, event_id, service, direction, ack_time, ack_by, condition) VALUES (?,?,?,?,?,?,?)",
                    (aid, p[0], p[1], int(p[2]), time.time(), by, json.dumps(TR["book"]["acks"][aid]["snap"])))
-        tr_save()
-        return {"ok": True, "acked": len(done)}
-    return JSONResponse({"error": "Unknown item id."}, status_code=400)
+        if done:
+            tr_save()
+        return bool(done)
+    return False
+
+
+@app.post("/api/occ/ack")
+async def api_occ_ack(request: Request):
+    """ACK for the combined queue. Body: {"id": "bb:12"} for one alert, {"id": "grp:bb:12|tr:x:0"} for a merged
+    card (acks every alert inside it), or {"ids": [...]} to acknowledge several cards/alerts at once ("Acknowledge all")."""
+    try:
+        body = json.loads((await request.body()).decode("utf-8") or "{}")
+    except (ValueError, TypeError):
+        return JSONResponse({"error": "Body must be JSON with the item id."}, status_code=400)
+    by = _who(request)
+    ids = body.get("ids") if isinstance(body.get("ids"), list) else ([body.get("id")] if body.get("id") else [])
+    if not ids:
+        return JSONResponse({"error": "Body must be JSON with the item id."}, status_code=400)
+    n = 0
+    for oid in ids:
+        oid = str(oid or "")
+        members = oid[4:].split("|") if oid.startswith("grp:") else [oid]
+        for m in members:
+            if _occ_ack_one(m, by):
+                n += 1
+    return {"ok": True, "acked": n}
 
 
 def _note_public(n, replies):

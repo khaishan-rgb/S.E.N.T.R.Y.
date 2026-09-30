@@ -72,7 +72,9 @@
 .ol-drawer{position:fixed;inset:0;z-index:2000;display:none}
 .ol-drawer.on{display:block}
 .ol-drawer .bk{position:absolute;inset:0;background:rgba(2,6,12,.6)}
-.ol-drawer .pane{position:absolute;top:0;right:0;bottom:0;width:min(560px,100%);background:linear-gradient(180deg,#0b1626,#081221);border-left:1px solid var(--ds-line);overflow:auto;padding:18px}
+.ol-drawer .pane{box-sizing:border-box;position:absolute;top:0;right:0;bottom:0;width:min(560px,100%);background:linear-gradient(180deg,#0b1626,#081221);border-left:1px solid var(--ds-line);overflow:auto;padding:18px;padding-top:calc(18px + env(safe-area-inset-top,0px));padding-bottom:calc(18px + env(safe-area-inset-bottom,0px))}
+.ol-drawer .pane *{box-sizing:border-box}
+@media (max-width:720px){.ol-drawer .pane{width:100%;border-left:none}}
 .ol-dhead{display:flex;align-items:center;gap:8px;margin-bottom:4px}
 .ol-dno{color:var(--ds-mut);font-size:11.5px}
 .ol-dtitle{font:700 18px var(--ds-display);color:#fff;margin:2px 0 8px}
@@ -126,7 +128,7 @@
     </section>
 
     <section class="ds-panel ol-right" aria-labelledby="olQueueH">
-      <div class="ds-ph" id="olQueueH">LIVE OPERATIONAL ALERTS<span class="sp"></span><button type="button" class="ds-btn sm ghost" id="olExpandR">Expand</button></div>
+      <div class="ds-ph" id="olQueueH">LIVE OPERATIONAL ALERTS<span class="sp"></span><button type="button" class="ds-btn sm ghost" id="olAckAll" style="display:none">Acknowledge all</button><button type="button" class="ds-btn sm ghost" id="olExpandR">Expand</button></div>
       <div class="ol-chips" id="olFilters"></div>
       <div id="olQueue"></div>
       <div class="ol-sec-h">ACKNOWLEDGED / MONITORING <span id="olMonN"></span></div>
@@ -332,6 +334,8 @@
       var active = items.filter(function(a){ return a.status !== "acknowledged"; });
       var mon = items.filter(function(a){ return a.status === "acknowledged"; });
       var key = active.map(function(a){ return a.id; }).join(",");
+      $("olAckAll").style.display = active.length > 1 ? "" : "none";
+      $("olAckAll").onclick = function(){ api("/api/occ/ack", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({ids: active.map(function(a){ return a.id; })})}).then(loadQueue); };
       if(key !== lastQueueKey){ $("olQueue").innerHTML = active.length ? active.map(card).join("") : '<div class="ol-empty">No active alerts. All clear.</div>'; wireCards($("olQueue"), items); lastQueueKey = key; }
       $("olMonN").textContent = "(" + mon.length + ")";
       $("olMonitoring").innerHTML = mon.length ? mon.map(function(a){
