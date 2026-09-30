@@ -17,7 +17,7 @@ import math
 import re
 
 PARAMS = {
-    "wait_max_min": 30.0,       # WAIT / REGULATE is only offered for a known closure this short; longer, until further notice or whole day = divert
+    "wait_max_min": 0.0,        # V16.16: 0 = WAIT / REGULATE is never proposed - the engine always proposes a diversion (set DIVERSION_WAIT_MAX_MIN > 0 on Render to bring waiting back)
     "sim_closure_max_min": 120.0,  # beyond this, buses that reach the block are treated as unable to move for the rest of the simulation
     "long_exit_offsets_km": (2.5, 4.0),    # long closures: also search diversions that leave / rejoin further from the block
     "long_rejoin_offsets_km": (2.5, 4.0),
@@ -613,7 +613,7 @@ def timeline(sim, hw, reg, recov, closure_min, road, option_name=None):
 def wait_allowed(closure_min, P=PARAMS):
     """Buses can only be held for a short, known closure. Until further notice, whole day or longer than
     wait_max_min: buses cannot wait at the block, so every bus must be diverted."""
-    return closure_min is not None and closure_min <= P["wait_max_min"]
+    return P["wait_max_min"] > 0 and closure_min is not None and closure_min <= P["wait_max_min"]
 
 
 def closure_desc(closure_min):
@@ -629,7 +629,7 @@ def wait_or_divert(sim_none, opts_eval, closure_min, P=PARAMS):
     if not wait_allowed(closure_min, P):
         found = any(o.get("added_min") is not None for o in opts_eval)
         return {"kind": "divert_only", "wait_allowed": False,
-                "text": f"Closure {closure_desc(closure_min)}: buses cannot wait at the block, so WAIT / REGULATE is not an option \u2014 every bus must be diverted."
+                "text": f"Closure {closure_desc(closure_min)}: WAIT / REGULATE is not proposed \u2014 every bus is diverted (LTA rules: main roads, fewest stops skipped, no U-turn)."
                         + ("" if found else " No bus-suitable diversion without a U-turn was found: escalate.")}
     q = [r for r in sim_none if r["mode"] == "queued"]
     if not q:
@@ -793,7 +793,7 @@ def recommend(opts, wod, closure_min):
                                 ["Hold / regulate upstream for this short closure and plan the diversion manually with the depot if it extends."]}
         return {"action": "manual", "option": None, "route_if_extended": None,
                 "headline": "NO BUS-SUITABLE DIVERSION FOUND \u2014 ESCALATE",
-                "reasons": [f"Closure {closure_desc(closure_min)}: buses cannot wait at the block.",
+                "reasons": [f"Closure {closure_desc(closure_min)}: a diversion is required (WAIT / REGULATE is not proposed).",
                             "Every road route found around the section either uses the blocked road, needs a U-turn, is unsuitable for this bus, or runs on small roads."],
                 "cautions": ([f"{len(small)} small-road route(s) found and held back by the main-roads policy \u2014 review them with the depot."] if small else []) +
                             ["Escalate to the Duty Operations Manager and depot.",

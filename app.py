@@ -22,7 +22,7 @@ import headway
 import routegeom
 import traffic
 
-VERSION = "V16.14"
+VERSION = "V16.16"
 # V16.8: pages hidden for everyone (see Settings > Pages). Defined here because bb_init() reads the saved value while the module loads.
 SITE_PAGE_IDS = ("command", "route", "headway", "bunching", "recovery", "halfplan", "trafficaware", "running", "ewt", "cameras", "diversion")     # "settings" can never be hidden
 SITE = {"hidden": [x.strip() for x in os.getenv("HIDDEN_PAGES", "").split(",") if x.strip() in SITE_PAGE_IDS], "block": True}
@@ -6256,7 +6256,7 @@ async def api_system_notifications():
 import diversion  # noqa: E402
 
 try:
-    diversion.PARAMS["wait_max_min"] = float(os.getenv("DIVERSION_WAIT_MAX_MIN", "30"))   # longest closure for which WAIT / REGULATE is offered
+    diversion.PARAMS["wait_max_min"] = float(os.getenv("DIVERSION_WAIT_MAX_MIN", "0"))   # V16.16: 0 = never propose WAIT / REGULATE; set > 0 to offer it for closures up to that many minutes
 except ValueError:
     pass
 DV_MAX_POLL = int(os.getenv("DIVERSION_MAX_POLL", "16"))            # service-directions whose live buses are polled per analysis (protects the LTA quota)
@@ -7391,9 +7391,8 @@ def dv_wait_block(body, r, services):
         return c, None
     waits = [f"{x['service']} D{x['direction']}" for x in services if not x.get("roads") and not x.get("option")]
     if waits:
-        return c, (f"Closure {diversion.closure_desc(c)}: buses cannot wait at the block. Choose a diversion for "
-                   + ", ".join(waits) + " (WAIT / REGULATE is only possible for closures up to "
-                   + f"{diversion.PARAMS['wait_max_min']:g} min), or remove the service from the plan.")
+        return c, (f"A diversion is required: WAIT / REGULATE is not proposed. Choose a diversion for "
+                   + ", ".join(waits) + ", or remove the service from the plan.")
     return c, None
 
 

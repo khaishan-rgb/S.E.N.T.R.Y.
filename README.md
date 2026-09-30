@@ -1,4 +1,10 @@
-# SG Transport Pulse V16.14 — Operational Intelligence & Service Recovery Platform
+# SG Transport Pulse V16.16 — Operational Intelligence & Service Recovery Platform
+
+## V16.16 — Diversion: always propose a diversion, never WAIT
+* WAIT / REGULATE is no longer proposed for any closure length (`DIVERSION_WAIT_MAX_MIN` now defaults to 0; set it above 0 on Render only if waiting must come back). The WAIT card is gone from the option list, and a plan that relies on waiting is refused.
+* Every closure now also searches the wider exit / rejoin points, so more diversion routes are found.
+* LTA rules order every proposed route: 1) safety - main roads only, small roads are never proposed; 2) fewest bus stops skipped, then fewest important stops; 3) no U-turn (routes with a U-turn are dropped). Then verification status and added running time.
+* If no route meets all three rules the answer is ESCALATE (Duty Operations Manager / depot), never wait.
 
 ## V16.14 — Diversion Maps (OCC diversion decision engine)
 New module **Diversion Maps** (`/diversion`, App Launcher > Recovery). Workflow: BLOCK → ANALYSE → PLAN → SIMULATE → CONFIRM → MONITOR → RECOVER.
