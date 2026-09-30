@@ -11,10 +11,10 @@
             set:function(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }};
 
   var S = {
-    corridor:null, cm:null, a:0, b:0, road:"", directed:false, snapSrc:"", editing:true,
+    blocks:[], bi:0, editing:true, allowSmall:false, net:null, showNet:true, netPending:false, autoSimDone:false,
     closure:{min:30, label:"30 MIN"}, bus:LS.get("dv.bus", "dd"), occ:LS.get("dv.occ", ""),
     an:null, sel:null, opts:null, optSel:null, choices:{}, plan:null, shownRev:null,
-    simT:0, simPlay:false, simSeen:false, teams:[], mobile:null, busy:{an:0, opt:0}, pending:null
+    simT:0, simPlay:false, simSeen:false, teams:[], mobile:null, busy:{an:0, opt:0, net:0}, pending:null
   };
 
   /* ------------------------------------------------------------------ helpers */
@@ -59,8 +59,12 @@
   function cutLine(line, cum, a, b){
     var out = [pointAt(line, cum, a)]; for(var i = 0; i < line.length; i++) if(cum[i] > a && cum[i] < b) out.push(line[i]); out.push(pointAt(line, cum, b)); return out;
   }
-  function blockLine(){ return S.corridor ? cutLine(S.corridor, S.cm, S.a, S.b) : null; }
-  function blockPayload(){ return {line:blockLine(), road:S.road, directed:S.directed}; }
+  /* several blockages: each {corridor, cm, a, b, road, directed, snapSrc}; S.bi = the one being edited */
+  function hasBlock(){ return S.blocks.length > 0; }
+  function curB(){ return S.blocks[S.bi] || null; }
+  function bLine(b){ return cutLine(b.corridor, b.cm, b.a, b.b); }
+  function roadsTxt(){ var seen = {}, out = []; S.blocks.forEach(function(b){ if(!seen[b.road]){ seen[b.road] = 1; out.push(b.road); } }); return out.join(" / "); }
+  function blocksPayload(){ return S.blocks.map(function(b){ return {line:bLine(b), road:b.road, directed:b.directed}; }); }
 
   /* ------------------------------------------------------------------ map */
   var map = L.map("dvMap", {zoomControl:true, preferCanvas:false, minZoom:10, maxZoom:19, maxBounds:[[1.10, 103.50], [1.55, 104.20]]}).setView([1.3521, 103.8198], 12);
@@ -69,16 +73,16 @@
   map.getPane("traffic").style.pointerEvents = "none";
   var canvasR = L.canvas({padding:.3, pane:"traffic"});
   var G = {};
-  ["speed", "incidents", "roadworks", "others", "route", "blocked", "alts", "sel", "pts", "buses", "handles", "prev"].forEach(function(k){ G[k] = L.layerGroup().addTo(map); });
+  ["speed", "incidents", "roadworks", "others", "net", "route", "blocked", "alts", "sel", "pts", "buses", "handles", "prev"].forEach(function(k){ G[k] = L.layerGroup().addTo(map); });
   var tomLayer = null;
   function divIcon(html, cls){ return L.divIcon({className:"", html:'<div class="' + (cls || "dv-mk") + '">' + html + '</div>', iconSize:[0, 0]}); }
 
-  var lay = {speed:true, tomtom:false, incidents:true, roadworks:true, buses:true, alts:true, others:true, legend:true};
+  var lay = {speed:true, tomtom:false, incidents:true, roadworks:true, buses:true, alts:true, others:true, net:true, legend:true};
   document.querySelectorAll("#layers input[data-l]").forEach(function(c){
     c.onchange = function(){ lay[c.dataset.l] = c.checked; applyLayers(); if(c.dataset.l === "speed" && c.checked) loadSpeed(); };
   });
   function applyLayers(){
-    [["speed", G.speed], ["incidents", G.incidents], ["roadworks", G.roadworks], ["buses", G.buses], ["alts", G.alts], ["others", G.others]].forEach(function(x){
+    [["speed", G.speed], ["incidents", G.incidents], ["roadworks", G.roadworks], ["buses", G.buses], ["alts", G.alts], ["others", G.others], ["net", G.net]].forEach(function(x){
       if(lay[x[0]] && !map.hasLayer(x[1])) x[1].addTo(map); if(!lay[x[0]] && map.hasLayer(x[1])) map.removeLayer(x[1]); });
     if(tomLayer){ if(lay.tomtom && !map.hasLayer(tomLayer)) tomLayer.addTo(map); if(!lay.tomtom && map.hasLayer(tomLayer)) map.removeLayer(tomLayer); }
     $("legend").classList.toggle("hid", !lay.legend);
@@ -160,105 +164,136 @@
   function drop(ll){
     $("blockSub").textContent = "Finding the road\u2026";
     DS.api("/api/diversion/snap?lat=" + ll.lat.toFixed(6) + "&lon=" + ll.lng.toFixed(6)).then(function(j){
-      if(!j.ok){ $("blockSub").textContent = ""; toast(j.error || "No road found there."); return; }
-      if(!S.updating && S.plan && ["detected", "planned", "ended"].indexOf(S.plan.status) >= 0) detachPlan();
-      S.corridor = j.corridor; S.cm = j.corridor_m; S.a = j.start_m; S.b = j.end_m; S.road = tc(j.road); S.snapSrc = j.source; S.editing = true;
-      resetAnalysis(); drawBlock(true); analyse();
+      if(!j.ok){ renderBlockCard(); toast(j.error || "No road found there."); return; }
+      if(S.plan && S.plan.status === "ended"){ detachPlan(); S.blocks = []; S.choices = {}; }
+      var nb = {corridor:j.corridor, cm:j.corridor_m, a:j.start_m, b:j.end_m, road:tc(j.road), snapSrc:j.source, directed:false};
+      var mid = pointAt(nb.corridor, nb.cm, (nb.a + nb.b) / 2);
+      var hit = S.blocks.map(function(b, i){ var l = bLine(b); return {i:i, d:nearestOn(mid, l, cumM(l)).d}; }).filter(function(x){ return x.d < 60; })[0];
+      if(hit){ S.bi = hit.i; S.editing = true; drawBlocks(hit.i); toast("That section is already blocked \u2014 drag its START / END handles to extend it."); return; }
+      S.blocks.push(nb); S.bi = S.blocks.length - 1; S.editing = true;
+      resetAnalysis(); drawBlocks(S.bi); analyse();
+      if(S.blocks.length > 1) toast("Blockage " + S.blocks.length + " added \u2014 all blockages are analysed together.");
     });
   }
-  function setBlockFromLine(line, road, directed){
-    var n = line.length, mid = line[Math.floor(n / 2)];
+  function snapSaved(bl){
+    var line = bl.line || [], n = line.length; if(n < 2) return Promise.resolve();
+    var mid = line[Math.floor(n / 2)];
     return DS.api("/api/diversion/snap?lat=" + mid[0] + "&lon=" + mid[1]).then(function(j){
-      if(!j.ok){ S.corridor = line; S.cm = cumM(line); S.a = 0; S.b = S.cm[S.cm.length - 1]; S.snapSrc = "saved block"; }
+      var b = {road:tc(bl.road || (j && j.road) || "Road"), directed:!!bl.directed};
+      if(!j || !j.ok){ b.corridor = line; b.cm = cumM(line); b.a = 0; b.b = b.cm[b.cm.length - 1]; b.snapSrc = "saved block"; }
       else{
-        S.corridor = j.corridor; S.cm = j.corridor_m;
-        var a = nearestOn(line[0], S.corridor, S.cm).s, b = nearestOn(line[n - 1], S.corridor, S.cm).s;
-        S.a = Math.min(a, b); S.b = Math.max(a, b); if(S.b - S.a < 30){ S.a = j.start_m; S.b = j.end_m; } S.snapSrc = j.source;
+        b.corridor = j.corridor; b.cm = j.corridor_m; b.snapSrc = j.source;
+        var a = nearestOn(line[0], b.corridor, b.cm).s, e = nearestOn(line[n - 1], b.corridor, b.cm).s;
+        b.a = Math.min(a, e); b.b = Math.max(a, e); if(b.b - b.a < 30){ b.a = j.start_m; b.b = j.end_m; }
       }
-      S.road = tc(road || j.road || "Road"); S.directed = !!directed; drawBlock(true);
+      S.blocks.push(b);
     });
   }
+  function loadBlocks(list){
+    S.blocks = []; S.bi = 0;
+    return (list || []).reduce(function(p, bl){ return p.then(function(){ return snapSaved(bl); }); }, Promise.resolve()).then(function(){ drawBlocks(-1); });
+  }
+  function savedBlocks(block){ return block && block.blocks && block.blocks.length ? block.blocks : (block && block.line ? [block] : []); }
 
-  var hA = null, hB = null, xMk = null;
-  function drawBlock(fit){
-    G.blocked.clearLayers(); G.handles.clearLayers(); hA = hB = xMk = null;
-    if(!S.corridor){ renderBlockCard(); setLife(); return; }
-    L.polyline(S.corridor, {pane:"block", color:C.red, weight:2, opacity:.28, dashArray:"3 6", interactive:false}).addTo(G.blocked);
-    var bl = blockLine();
-    L.polyline(bl, {pane:"block", color:C.red, weight:7, opacity:.95, className:"dv-blockline", lineCap:"butt"}).addTo(G.blocked)
-      .bindTooltip("Blocked section \u00b7 " + km(S.b - S.a), {sticky:true});
-    var mid = pointAt(S.corridor, S.cm, (S.a + S.b) / 2);
-    xMk = L.marker(mid, {icon:divIcon('<div class="dv-mk-x">&#x2715;</div>'), pane:"bus", keyboard:false}).addTo(G.blocked).bindTooltip(esc(S.road) + " \u2014 blocked", {direction:"top"});
-    if(S.editing){
-      hA = handle(S.a, "BLOCK START", function(s){ S.a = Math.min(s, S.b - 30); });
-      hB = handle(S.b, "BLOCK END", function(s){ S.b = Math.max(s, S.a + 30); });
+  var hA = null, hB = null;
+  function drawBlocks(fit){
+    G.blocked.clearLayers(); G.handles.clearLayers(); hA = hB = null;
+    if(!hasBlock()){ renderBlockCard(); setLife(); return; }
+    var all = null, many = S.blocks.length > 1;
+    S.blocks.forEach(function(b, i){
+      var bl = bLine(b), sel = i === S.bi && S.editing;
+      if(sel) L.polyline(b.corridor, {pane:"block", color:C.red, weight:2, opacity:.28, dashArray:"3 6", interactive:false}).addTo(G.blocked);
+      b._line = L.polyline(bl, {pane:"block", color:C.red, weight:7, opacity:.95, className:"dv-blockline", lineCap:"butt"}).addTo(G.blocked)
+        .bindTooltip((many ? "Blockage " + (i + 1) + " \u00b7 " : "") + b.road + " \u00b7 " + km(b.b - b.a), {sticky:true});
+      b._x = L.marker(pointAt(b.corridor, b.cm, (b.a + b.b) / 2), {icon:divIcon('<div class="dv-mk-x" style="position:relative">&#x2715;' + (many ? '<sup>' + (i + 1) + '</sup>' : '') + '</div>'), pane:"bus", keyboard:false})
+        .addTo(G.blocked).bindTooltip(esc(b.road) + " \u2014 blocked" + (many ? " (" + (i + 1) + ")" : ""), {direction:"top"})
+        .on("click", function(){ if(S.bi !== i){ S.bi = i; drawBlocks(); } });
+      all = all ? all.extend(bl) : L.latLngBounds(bl);
+    });
+    var cb = curB();
+    if(S.editing && cb){
+      hA = handle(cb, cb.a, "BLOCK START", function(s){ cb.a = Math.min(s, cb.b - 30); });
+      hB = handle(cb, cb.b, "BLOCK END", function(s){ cb.b = Math.max(s, cb.a + 30); });
     }
-    if(fit) map.fitBounds(L.latLngBounds(bl).pad(1.6), {maxZoom:17});
+    if(fit === -1 && all) map.fitBounds(all.pad(many ? .5 : 1.6), {maxZoom:17});
+    else if(typeof fit === "number" && S.blocks[fit]) map.fitBounds(L.latLngBounds(bLine(S.blocks[fit])).pad(1.6), {maxZoom:17});
     renderBlockCard(); setLife();
   }
-  function handle(s, label, set){
-    var m = L.marker(pointAt(S.corridor, S.cm, s), {draggable:true, pane:"bus", icon:divIcon('<div class="dv-handle' + (label === "BLOCK START" ? " st" : "") + '" role="slider" aria-label="' + label + ' (drag along the road)"><span>' + (label === "BLOCK START" ? "START" : "END") + '</span></div>', "dv-mk"), autoPan:true}).addTo(G.handles);
+  function handle(b, s, label, set){
+    var st = label === "BLOCK START";
+    var m = L.marker(pointAt(b.corridor, b.cm, s), {draggable:true, pane:"bus", icon:divIcon('<div class="dv-handle' + (st ? " st" : "") + '" role="slider" aria-label="' + label + ' (drag along the road)"><span>' + (st ? "START" : "END") + '</span></div>', "dv-mk"), autoPan:true}).addTo(G.handles);
     m.on("drag", function(e){
-      var p = e.target.getLatLng(), n = nearestOn([p.lat, p.lng], S.corridor, S.cm); set(n.s);
-      var bl = blockLine(); G.blocked.eachLayer(function(l){ if(l.options && l.options.weight === 7) l.setLatLngs(bl); });
-      if(xMk) xMk.setLatLng(pointAt(S.corridor, S.cm, (S.a + S.b) / 2)); renderBlockCard();
+      var p = e.target.getLatLng(), n = nearestOn([p.lat, p.lng], b.corridor, b.cm); set(n.s);
+      if(b._line) b._line.setLatLngs(bLine(b)); if(b._x) b._x.setLatLng(pointAt(b.corridor, b.cm, (b.a + b.b) / 2)); renderBlockCard();
     });
-    m.on("dragend", function(){ drawBlock(false); resetAnalysis(); analyse(); });
+    m.on("dragend", function(){ drawBlocks(); resetAnalysis(); analyse(); });
     return m;
   }
   function renderBlockCard(){
     var el = $("blockCard");
-    if(!S.corridor){ el.innerHTML = '<p class="dv-muted" style="margin:10px 0 0">Drag the road block onto the map where the road is obstructed. It snaps to the nearest road and marks 300 m as blocked; drag the two handles to set the exact section.</p>'; $("blockSub").textContent = ""; return; }
-    var startP = pointAt(S.corridor, S.cm, S.a), endP = pointAt(S.corridor, S.cm, S.b);
-    el.innerHTML = '<div class="dv-block-card"><div class="k">ROAD BLOCKAGE</div><b>' + esc(S.road) + '</b><dl>'
-      + '<dt>Affected section</dt><dd><b style="display:inline;font:inherit;color:#fff">' + km(S.b - S.a) + '</b></dd>'
-      + '<dt>Block start</dt><dd>' + startP[0].toFixed(5) + ', ' + startP[1].toFixed(5) + '</dd><dt>Block end</dt><dd>' + endP[0].toFixed(5) + ', ' + endP[1].toFixed(5) + '</dd>'
-      + '<dt>Road data</dt><dd>' + esc(S.snapSrc) + '</dd></dl>'
-      + '<div class="ds-segm" role="group" aria-label="Blocked direction" style="margin-bottom:8px"><button type="button" data-dir="0" aria-pressed="' + !S.directed + '">BOTH DIRECTIONS</button><button type="button" data-dir="1" aria-pressed="' + S.directed + '">DRAWN DIRECTION ONLY</button></div>'
-      + '<div class="dv-row"><button type="button" class="ds-btn sm" id="bEdit">' + (S.editing ? "LOCK BLOCKAGE" : "EDIT BLOCKAGE") + '</button><button type="button" class="ds-btn sm ghost" id="bRemove">REMOVE</button><button type="button" class="ds-btn sm ghost" id="bZoom">ZOOM</button></div></div>';
-    $("blockSub").textContent = km(S.b - S.a);
-    el.querySelectorAll("[data-dir]").forEach(function(b){ b.onclick = function(){ if(lockedEdit()) return; S.directed = b.dataset.dir === "1"; renderBlockCard(); resetAnalysis(); analyse(); }; });
-    $("bEdit").onclick = function(){ if(lockedEdit()) return; S.editing = !S.editing; drawBlock(false); };
-    $("bRemove").onclick = removeBlock;
-    $("bZoom").onclick = function(){ map.fitBounds(L.latLngBounds(blockLine()).pad(1.6), {maxZoom:17}); };
+    if(!hasBlock()){ el.innerHTML = '<p class="dv-muted" style="margin:10px 0 0">Drag the road block onto the map where the road is obstructed. It snaps to the nearest road and marks 300 m as blocked; drag the two handles to set the exact section. Drag it again to add more blockages \u2014 they are analysed together.</p>'; $("blockSub").textContent = ""; return; }
+    var tot = S.blocks.reduce(function(a, b){ return a + (b.b - b.a); }, 0), many = S.blocks.length > 1;
+    $("blockSub").textContent = (many ? S.blocks.length + " blockages \u00b7 " : "") + km(tot);
+    var h = "";
+    S.blocks.forEach(function(b, i){
+      if(i !== S.bi){ h += '<button type="button" class="dv-bl" data-sel="' + i + '" aria-label="Select blockage ' + (i + 1) + '"><span class="n">&#x2715; ' + (i + 1) + '</span><b>' + esc(b.road) + '</b><span>' + km(b.b - b.a) + (b.directed ? " \u00b7 one way" : "") + '</span></button>'; return; }
+      var sp = pointAt(b.corridor, b.cm, b.a), ep = pointAt(b.corridor, b.cm, b.b);
+      h += '<div class="dv-block-card"><div class="k">' + (many ? "BLOCKAGE " + (i + 1) + " OF " + S.blocks.length : "ROAD BLOCKAGE") + '</div><b>' + esc(b.road) + '</b><dl>'
+        + '<dt>Affected section</dt><dd><b style="display:inline;font:inherit;color:#fff">' + km(b.b - b.a) + '</b></dd>'
+        + '<dt>Block start</dt><dd>' + sp[0].toFixed(5) + ', ' + sp[1].toFixed(5) + '</dd><dt>Block end</dt><dd>' + ep[0].toFixed(5) + ', ' + ep[1].toFixed(5) + '</dd>'
+        + '<dt>Road data</dt><dd>' + esc(b.snapSrc) + '</dd></dl>'
+        + '<div class="ds-segm" role="group" aria-label="Blocked direction" style="margin-bottom:8px"><button type="button" data-dir="0" aria-pressed="' + !b.directed + '">BOTH DIRECTIONS</button><button type="button" data-dir="1" aria-pressed="' + b.directed + '">DRAWN DIRECTION ONLY</button></div>'
+        + '<div class="dv-row"><button type="button" class="ds-btn sm" id="bEdit">' + (S.editing ? "LOCK BLOCKAGE" : "EDIT BLOCKAGE") + '</button><button type="button" class="ds-btn sm ghost" id="bRemove">REMOVE</button><button type="button" class="ds-btn sm ghost" id="bZoom">ZOOM</button>'
+        + (many ? '<button type="button" class="ds-btn sm ghost" id="bAll">SHOW ALL</button>' : '') + '</div></div>';
+    });
+    h += '<p class="dv-muted" style="margin:8px 0 0">Drag the \u2715 ROAD BLOCK again to add another blockage. Blockages close together on one route are bypassed by one diversion.</p>';
+    el.innerHTML = h;
+    var cb = curB();
+    el.querySelectorAll("[data-sel]").forEach(function(x){ x.onclick = function(){ S.bi = +x.dataset.sel; drawBlocks(S.bi); }; });
+    el.querySelectorAll("[data-dir]").forEach(function(x){ x.onclick = function(){ if(lockedEdit()) return; cb.directed = x.dataset.dir === "1"; renderBlockCard(); resetAnalysis(); analyse(); }; });
+    $("bEdit").onclick = function(){ if(lockedEdit()) return; S.editing = !S.editing; drawBlocks(); };
+    $("bRemove").onclick = function(){ removeBlock(S.bi); };
+    $("bZoom").onclick = function(){ map.fitBounds(L.latLngBounds(bLine(cb)).pad(1.6), {maxZoom:17}); };
+    if($("bAll")) $("bAll").onclick = function(){ drawBlocks(-1); };
   }
-  function removeBlock(){
+  function removeBlock(i){
     if(lockedEdit()) return;
+    if(S.blocks.length > 1){ S.blocks.splice(i, 1); S.bi = Math.max(0, Math.min(S.bi, S.blocks.length - 1)); resetAnalysis(); drawBlocks(); analyse(); return; }
     if(S.plan && ["detected", "planned"].indexOf(S.plan.status) >= 0){
       if(!confirm("Discard the saved plan for " + S.plan.road + "? It will be closed without being activated.")) return;
       post("/api/diversion/plans/" + S.plan.id + "/status", {status:"ended"}).then(loadPlans);
     }
-    detachPlan(); S.corridor = null; resetAnalysis(); drawBlock(false); renderAll();
+    detachPlan(); S.blocks = []; S.choices = {}; resetAnalysis(); drawBlocks(); renderAll();
   }
 
   /* ------------------------------------------------------------------ ANALYSE: affected services + approaching buses */
   function resetAnalysis(){
-    S.an = null; S.sel = null; S.opts = null; S.optSel = null; S.simSeen = false;
-    ["others", "route", "alts", "sel", "pts", "buses", "prev"].forEach(function(k){ G[k].clearLayers(); });
+    S.an = null; S.sel = null; S.opts = null; S.optSel = null; S.simSeen = false; S.net = null; netSeq++;
+    ["others", "route", "alts", "sel", "pts", "buses", "prev", "net"].forEach(function(k){ G[k].clearLayers(); });
     stopSim(); renderAll();
   }
   var anSeq = 0;
   function analyse(){
-    if(!S.corridor) return;
+    if(!hasBlock()) return;
     var my = ++anSeq; S.busy.an++; setLife();
     var ld = DS.loading("svcList", ["Matching every bus route to the blocked road\u2026", "Finding stops that become inaccessible\u2026", "Locating approaching buses (LTA Bus Arrival)\u2026", "Checking previous diversions\u2026"], "ANALYSING NETWORK IMPACT");
-    post("/api/diversion/analyse", {block:blockPayload(), closure_min:S.closure.min}, 60000).then(function(j){
+    post("/api/diversion/analyse", {blocks:blocksPayload(), closure_min:S.closure.min}, 60000).then(function(j){
       ld.done(); S.busy.an--; if(my !== anSeq) return;
       if(j.error || !j.ok){ $("svcList").innerHTML = '<p class="dv-err">' + esc(j.error || "Analysis failed.") + '</p>'; setLife(); return; }
-      S.an = j; renderServices(); drawOtherRoutes(); renderPlaybook(); setLife();
+      S.an = j; S.netPending = true; renderServices(); drawOtherRoutes(); renderPlaybook(); setLife();
       var pick = S.pending && j.entries.filter(function(e){ return e.service === S.pending.service && e.direction === S.pending.direction; })[0];
       if(!pick){                                                      // most urgent first: the service with a bus closest to the block
         var best = null, bm = 1e9;
         j.entries.forEach(function(e){ (e.buses || []).forEach(function(b){ if(b.min_to_block != null && b.min_to_block < bm){ bm = b.min_to_block; best = e; } }); });
         pick = best || j.entries[0];
       }
-      if(pick) selectService(key(pick));
+      if(pick) selectService(key(pick)); else runNet();
       renderAll();
     });
   }
   function renderServices(){
     var j = S.an, el = $("svcList");
-    if(!j){ el.innerHTML = S.corridor ? "" : DS.empty({icon:"route", title:"NO BLOCKAGE PLACED", text:"Affected services, directions and approaching buses appear here once a road block is on the map."}); $("svcSub").textContent = ""; return; }
+    if(!j){ el.innerHTML = hasBlock() ? "" : DS.empty({icon:"route", title:"NO BLOCKAGE PLACED", text:"Affected services, directions and approaching buses appear here once a road block is on the map."}); $("svcSub").textContent = ""; return; }
     $("svcSub").textContent = j.polled ? "live buses: LTA Bus Arrival" : "";
     if(!j.entries.length){ el.innerHTML = DS.empty({icon:"route", title:"NO SERVICE RUNS ALONG THIS SECTION", text:"No bus route runs along the blocked section (routes that only cross it are not counted). Matching basis: " + j.basis + "."}); return; }
     var h = '<div class="dv-tot"><b>' + j.services + '</b>services affected<span style="margin-left:auto"><b style="font-size:20px">' + j.buses + '</b> buses</span></div>';
@@ -268,7 +303,7 @@
       var imp = e.stops_inaccessible.filter(function(s){ return s.important.length; }).length;
       h += '<button type="button" class="dv-svc" data-k="' + esc(k) + '" aria-pressed="' + (S.sel === k) + '"><b>' + esc(e.service) + '</b><span class="d">D' + e.direction + (e.run ? " \u00b7 pass " + (e.run + 1) : "") + '<span class="dv-dots">' + dots + '</span></span>'
         + '<span class="n">' + (e.buses_polled ? n.length + " bus" + (n.length === 1 ? "" : "es") : "not polled") + '</span>'
-        + '<span class="m">' + e.stops_inaccessible.length + ' stop(s) inaccessible' + (imp ? ' \u00b7 \u26a0 ' + imp + ' important' : '') + ' \u00b7 to ' + esc(e.last) + '</span></button>';
+        + '<span class="m">' + (S.blocks.length > 1 ? '\u2715 ' + e.blocks.map(function(x){ return x + 1; }).join(" + ") + ' \u00b7 ' : '') + e.stops_inaccessible.length + ' stop(s) inaccessible' + (imp ? ' \u00b7 \u26a0 ' + imp + ' important' : '') + ' \u00b7 to ' + esc(e.last) + '</span></button>';
     });
     if(j.not_polled) h += '<p class="dv-muted">' + j.not_polled + ' service-direction(s) not polled for live buses (limit ' + j.poll_cap + ' per analysis, protects the LTA quota). Select one to load its buses.</p>';
     if(j.arrival_error) h += '<p class="dv-err">Bus Arrival unavailable: ' + esc(j.arrival_error) + '</p>';
@@ -300,7 +335,7 @@
   }
   function viewPrevious(p){
     G.prev.clearLayers();
-    if(p.block && p.block.line) L.polyline(p.block.line, {pane:"block", color:C.cyan, weight:5, dashArray:"4 6", opacity:.8}).addTo(G.prev).bindTooltip("Previous blockage (" + p.last_used + ")");
+    savedBlocks(p.block).forEach(function(b){ L.polyline(b.line, {pane:"block", color:C.cyan, weight:5, dashArray:"4 6", opacity:.8}).addTo(G.prev).bindTooltip("Previous blockage (" + p.last_used + ")"); });
     modal('<h2 id="modalT">Previous diversion \u2014 ' + esc(p.road) + '</h2><p class="dv-muted">Used ' + esc(p.last_used) + (p.closure_label ? ' \u00b7 closure ' + esc(p.closure_label) : '') + '. Shown in cyan on the map.</p>'
       + p.detail.map(function(d){ return '<div class="dv-plan-row"><b>' + esc(d.service) + '</b><span>D' + d.direction + ' \u2014 ' + esc(d.roads.length ? d.roads.join(" \u2192 ") + " \u2192 rejoin" : (d.action || "wait / regulate")) + '</span></div>'; }).join("")
       + '<div class="foot"><button type="button" class="ds-btn" data-close>Close</button><button type="button" class="ds-btn pri" id="mLoadPrev">Load as starting point</button></div>');
@@ -309,7 +344,7 @@
   function loadAsStart(p){
     S.prevChoices = {}; p.detail.forEach(function(d){ S.prevChoices[d.service + "|" + d.direction] = d.signature || "wait"; });
     if(p.closure_label) setClosureLabel(p.closure_label);
-    if(p.block && p.block.line){ setBlockFromLine(p.block.line, p.road, p.block.directed).then(function(){ resetAnalysis(); analyse(); }); }
+    if(savedBlocks(p.block).length){ loadBlocks(savedBlocks(p.block)).then(function(){ resetAnalysis(); analyse(); }); }
     toast("Previous plan loaded as a starting point \u2014 check current conditions.");
   }
 
@@ -324,46 +359,72 @@
     DS.loading("optBody", ["Finding road routes around the block (OSRM)\u2026", "Locating where each route leaves and rejoins service " + e.service + "\u2026", "Timing each route on live LTA speed bands\u2026", "Checking restrictions, works and incidents\u2026", "Simulating buses and headway after rejoining\u2026"], "PLANNING DIVERSION \u00b7 " + e.service + " D" + e.direction);
     $("cmpBody").innerHTML = ""; renderDock();
     var others = S.an.entries.filter(function(x){ return key(x) !== k; }).map(function(x){ return {service:x.service, direction:x.direction}; });
-    post("/api/diversion/options", {block:blockPayload(), service:e.service, direction:e.direction, run:e.run, closure_min:S.closure.min, bus_type:S.bus, others:others}, 120000).then(function(j){
+    post("/api/diversion/options", {blocks:blocksPayload(), service:e.service, direction:e.direction, run:e.run, closure_min:S.closure.min, bus_type:S.bus, allow_small:S.allowSmall, others:others}, 150000).then(function(j){
       S.busy.opt--; if(my !== optSeq) return;
       if(j.error || !j.ok){ $("optBody").innerHTML = '<p class="dv-err">' + esc(j.error || "Options failed.") + '</p>'; setLife(); return; }
       S.opts = j;
       var prev = S.choices[k] || (S.prevChoices && S.prevChoices[e.service + "|" + e.direction] ? {sig:S.prevChoices[e.service + "|" + e.direction]} : null);
       if(S.pending && S.pending.service === e.service && S.pending.direction === e.direction){ prev = {sig:S.pending.signature || "wait"}; S.pending = null; }
       var match = prev && prev.sig && j.options.filter(function(o){ return o.signature === prev.sig; })[0];
-      S.optSel = match ? match.n : (prev && prev.sig === "wait" ? 0 : (j.options.length ? j.options[0].n : 0));
+      var rec = j.recommendation || {};
+      S.optSel = match ? match.n : (prev && prev.sig === "wait" ? 0 : (rec.option || rec.route_if_extended || (j.options.length ? j.options[0].n : 0)));
       S.prevMissing = !!(prev && prev.sig && prev.sig !== "wait" && !match);
       if(S.choices[k] && match) S.choices[k] = choiceFrom(e, j, match);
       drawOptions(true); renderAll();
+      if(!S.mobile && !S.autoSimDone && S.optSel){ S.autoSimDone = true; openSim(); }   // the recommended route is simulated straight away
+      if(S.netPending){ S.netPending = false; runNet(); }
     });
   }
   function optByN(n){ return S.opts ? S.opts.options.filter(function(o){ return o.n === n; })[0] : null; }
   function colFor(n){ return S.opts ? S.opts.compare.filter(function(c){ return c.key === (n ? "o" + n : "none"); })[0] || null : null; }
 
+  function rcBar(rc){
+    if(!rc) return "";
+    var w = function(x){ return Math.round((x || 0) * 100) + "%"; }, cls = rc.label.split(" ")[0];
+    return '<div class="dv-rc"><div class="top"><span class="lbl ' + cls + '">' + esc(rc.label) + '</span></div><div class="bar" role="img" aria-label="' + esc(rc.text) + '"><i class="ma" style="width:' + w(rc.major) + '"></i><i class="me" style="width:' + w(rc.medium) + '"></i><i class="sm" style="width:' + w(rc.small) + '"></i><i class="un" style="width:' + w(rc.unknown) + '"></i></div><small>' + esc(rc.text) + '</small></div>';
+  }
+  function recBox(j){
+    var rec = j.recommendation; if(!rec) return "";
+    var li = function(a, c){ return a.map(function(x){ return '<li' + (c ? ' class="c"' : '') + '>' + esc(x) + '</li>'; }).join(""); };
+    return '<div class="dv-recwrap">' + DS.ai({title:"AI DIVERSION RECOMMENDATION \u00b7 " + j.service + " D" + j.direction,
+      badge:rec.action === "divert" ? DS.sev("ok", "DIVERT") : rec.action === "wait" ? DS.sev("warn", "WAIT / REGULATE") : DS.sev("crit", "MANUAL"),
+      detected:esc(j.road || roadsTxt()) + " blocked \u2014 " + (j.blocked_stops.length ? j.blocked_stops.length + " stop(s) inaccessible" : "section with no stop"),
+      recommendation:'<b style="color:#fff">' + esc(rec.headline) + '</b><ul>' + li(rec.reasons) + li(rec.cautions, true) + '</ul>',
+      effect:j.wait_or_divert ? esc(j.wait_or_divert.text) : "",
+      basis:"Rules: suitability \u2192 main roads \u2192 important stops \u2192 added time. No score. Controller confirms."})
+      + '<div class="dv-row" style="margin:-4px 0 10px">' + (rec.option || rec.route_if_extended ? '<button type="button" class="ds-btn sm pri" id="recSim">\u25b6 SIMULATE RECOMMENDED ROUTE</button>' : '')
+      + '<button type="button" class="ds-btn sm" id="recAdopt">ADD RECOMMENDATION TO PLAN</button></div></div>';
+  }
+  function setMainOnly(on){ $("mainOnly").checked = on; S.allowSmall = !on; S.netPending = true; rerunOptions(); }
   function renderOptions(){
     var el = $("optBody"), j = S.opts;
-    if(!S.corridor){ el.innerHTML = DS.empty({icon:"route", title:"NO BLOCKAGE", text:"Place a road block to generate diversion options."}); $("optSub").textContent = ""; return; }
+    if(!hasBlock()){ el.innerHTML = DS.empty({icon:"route", title:"NO BLOCKAGE", text:"Place a road block to generate diversion options."}); $("optSub").textContent = ""; return; }
     if(!j){ if(!S.busy.opt) el.innerHTML = S.an && !S.an.entries.length ? '<p class="dv-muted">No service to divert.</p>' : '<p class="dv-muted">Select an affected service.</p>'; return; }
     $("optSub").textContent = j.service + " D" + j.direction + " \u00b7 " + j.options.length + " feasible";
-    var h = "";
+    var rec = j.recommendation || {}, h = recBox(j);
+    if(j.small_hidden) h += '<div class="dv-note">\u26d4 ' + j.small_hidden + ' shorter route(s) on small roads held back (' + esc(j.small_hidden_roads.map(tc).join("; ")) + '). Buses stay on main roads.'
+      + '<br><button type="button" class="ds-btn sm ghost" id="showSmall">Show them (not recommended)</button></div>';
+    else if(S.allowSmall) h += '<div class="dv-note">Small-road routes are shown for reference and are never recommended. <br><button type="button" class="ds-btn sm ghost" id="hideSmall">Main roads only</button></div>';
     if(j.last_point){ var lb = (j.buses || []).filter(function(b){ return b.m_to_exit != null; }).sort(function(a, b){ return a.m_to_exit - b.m_to_exit; })[0];
       h += '<div class="dv-last"><span class="ic" aria-hidden="true">&#x26a0;</span><div><b>LAST DIVERSION POINT</b><span>' + (lb ? km(lb.m_to_exit) + ' ahead of ' + esc(lb.label) + (lb.min_to_exit != null ? ' \u00b7 ' + (lb.min_to_exit < 1 ? 'under 1 min' : 'approx. ' + f0(lb.min_to_exit) + ' min') : '') : km(j.last_point.before_block_m) + ' before the block') + '</span>'
         + '<small>Turn into ' + esc(j.last_point.road || "the diversion") + ' (option ' + j.last_point.option + '). A bus past this junction can no longer use the proposed diversion.</small></div></div>'; }
     if(j.wait_or_divert) h += '<div class="dv-wod"><b>' + (j.wait_or_divert.kind === "wait" ? "WAIT / REGULATE vs DIVERT" : "DIVERT vs WAIT") + '</b>' + esc(j.wait_or_divert.text) + '</div>';
     if(S.prevMissing) h += '<div class="dv-warn">The previous plan\u2019s road sequence was not found among today\u2019s feasible routes. Check current conditions.</div>';
     if(!j.options.length){
-      h += '<div class="dv-warn">No feasible diversion found. ' + (j.routing_error ? "Road routing: " + esc(j.routing_error) + ". " : "") + j.candidates_tested + ' road route(s) tested; ' + j.rejected.uses_block + ' used the blocked road and ' + j.rejected.no_bypass + ' did not bypass it.</div>';
+      h += '<div class="dv-warn">No feasible diversion found. ' + (j.routing_error ? "Road routing: " + esc(j.routing_error) + ". " : "") + j.candidates_tested + ' road route(s) tested; ' + j.rejected.uses_block + ' used the blocked road, ' + (j.rejected.uturn || 0) + ' needed a U-turn and ' + j.rejected.no_bypass + ' did not bypass it.</div>';
     }
     j.options.forEach(function(o){
-      var sel = S.optSel === o.n;
-      h += '<article class="dv-opt ' + (sel ? "sel" : "alt") + '" aria-label="' + o.name + '"><h3>' + o.name + '<span class="sp"></span>' + (sel ? DS.sev("ok", "SELECTED") : "") + '</h3><ul class="dv-chain">'
+      var sel = S.optSel === o.n, isRec = rec.option === o.n, isExt = rec.route_if_extended === o.n;
+      h += '<article class="dv-opt ' + (sel ? "sel" : "alt") + (isRec ? " rec" : "") + '" aria-label="' + o.name + (isRec ? ", recommended" : "") + '"><h3>' + o.name + '<span class="sp"></span>'
+        + (isRec ? '<span class="dv-badge">\u2605 RECOMMENDED</span>' : isExt ? '<span class="dv-badge alt">READY IF EXTENDED</span>' : '') + (sel ? ' ' + DS.sev("ok", "SELECTED") : "") + '</h3>' + rcBar(o.road_class) + '<ul class="dv-chain">'
         + o.roads.map(function(r){ return '<li>' + esc(tc(r)) + '</li>'; }).join("") + '<li class="rj">\u21aa REJOIN NORMAL ROUTE' + (o.rejoin_stop ? ' \u00b7 ' + esc(o.rejoin_stop.name) : '') + '</li></ul>'
         + '<div class="dv-lbl" style="margin-top:0">SKIPPED STOPS: ' + o.skipped_n + '</div><div class="dv-skip">' + o.skipped.map(function(s){ return '<span class="' + (s.important.length ? "imp" : "") + '" title="' + esc(s.name + (s.important.length ? " \u2014 " + s.important.join(", ") : "")) + '">' + (s.important.length ? "\u26a0" : "\u2715") + ' ' + esc(s.code) + '</span>'; }).join("") + (o.skipped_n ? "" : '<span style="background:none;border-color:var(--ds-line);color:var(--ds-mut)">none</span>') + '</div>'
         + (o.important_n ? '<div class="dv-warn">\u26a0 ' + o.skipped.filter(function(s){ return s.important.length; }).map(function(s){ return esc(s.name) + " (" + esc(s.important.join(", ")) + ")"; }).join("; ") + '</div>' : '')
         + '<dl class="dv-kv"><dt>Added distance</dt><dd><b>' + sgn(o.added_km, 1) + ' km</b></dd><dt>Est. additional running time</dt><dd><b>' + sgn(o.added_min) + ' min</b></dd>'
         + '<dt>Affected buses (can divert)</dt><dd><b>' + o.affected_buses + '</b></dd><dt>Important stops skipped</dt><dd><b style="color:' + (o.important_n ? C.amber : "#fff") + '">' + o.important_n + '</b></dd>'
         + '<dt>Traffic condition</dt><dd><b style="color:' + (o.traffic === "HEAVY" ? C.red : o.traffic === "MODERATE" ? C.amber : o.traffic === "NORMAL" ? C.green : C.grey) + '">' + o.traffic + '</b></dd>'
-        + '<dt>Turns \u00b7 sharp / U-turns</dt><dd><b>' + o.n_turns + ' \u00b7 ' + o.n_sharp + '</b></dd>'
+        + '<dt>Turns \u00b7 sharp turns</dt><dd><b>' + o.n_turns + ' \u00b7 ' + o.n_sharp + '</b></dd>'
+        + '<dt>U-turns</dt><dd><b style="color:' + C.green + '">NONE \u2713</b></dd>'
         + '<dt>Operational feasibility</dt><dd><b style="color:' + (o.feasibility === "HIGH" ? C.green : o.feasibility === "NOT SUITABLE" ? C.red : C.amber) + '">' + o.feasibility + '</b></dd></dl>'
         + '<p class="dv-feas">' + esc(o.feasibility_text) + (o.findings.length ? ' ' + o.findings.length + ' map finding(s): ' + esc(o.findings.slice(0, 2).map(function(f){ return f.text; }).join(" \u00b7 ")) : '') + '<br>Time: ' + esc(o.time_src) + ' \u00b7 traffic: ' + esc(o.traffic_basis) + (o.also ? '<br>Same diversion also fits: ' + esc(o.also.join(", ")) : '') + '</p>'
         + '<div class="dv-acts"><button type="button" class="ds-btn sm ghost" data-v="' + o.n + '">VIEW ON MAP</button><button type="button" class="ds-btn sm ghost" data-s="' + o.n + '">SIMULATE</button><button type="button" class="ds-btn sm ' + (sel ? "pri" : "") + '" data-p="' + o.n + '">' + (sel ? "SELECTED" : "SELECT") + '</button></div></article>';
@@ -371,8 +432,13 @@
     h += '<article class="dv-opt ' + (S.optSel === 0 ? "sel" : "") + '"><h3>NO DIVERSION \u2014 WAIT / REGULATE<span class="sp"></span>' + (S.optSel === 0 ? DS.sev("ok", "SELECTED") : "") + '</h3>'
       + '<p class="dv-feas">Buses hold upstream or wait at the block until it reopens' + (S.closure.min == null ? ' (closure length unknown \u2014 buses cannot continue)' : '') + '. No stops skipped.</p>'
       + '<div class="dv-acts"><button type="button" class="ds-btn sm ghost" data-s="0">SIMULATE</button><button type="button" class="ds-btn sm ' + (S.optSel === 0 ? "pri" : "") + '" data-p="0">' + (S.optSel === 0 ? "SELECTED" : "SELECT") + '</button></div></article>';
-    h += '<p class="dv-muted">Ordered by suitability, then important stops skipped, then added running time \u2014 no combined score. ' + j.candidates_tested + ' road routes tested; ' + j.rejected.uses_block + ' rejected for using the blocked road.</p>';
+    h += '<p class="dv-muted">Ordered by suitability, then main roads, then important stops skipped, then added running time \u2014 no combined score. ' + j.candidates_tested + ' road routes tested; ' + j.rejected.uses_block + ' rejected for using the blocked road' + (j.rejected.uturn ? ', ' + j.rejected.uturn + ' for needing a U-turn' : '') + '. Buses are never routed through a U-turn (including turning back at a roundabout or round a block).</p>';
     el.innerHTML = h;
+    var sb = $("showSmall"), hb = $("hideSmall");
+    if(sb) sb.onclick = function(){ setMainOnly(false); }; if(hb) hb.onclick = function(){ setMainOnly(true); };
+    var rs = $("recSim"), ra = $("recAdopt");
+    if(rs) rs.onclick = function(){ S.optSel = rec.option || rec.route_if_extended || 0; drawOptions(false); renderAll(); openSim(); };
+    if(ra) ra.onclick = function(){ S.optSel = rec.option || 0; choose(); drawOptions(false); renderAll(); };
     el.querySelectorAll("[data-v]").forEach(function(b){ b.onclick = function(){ S.optSel = +b.dataset.v; drawOptions(true); renderAll(); if(S.mobile) sheetTo("peek"); }; });
     el.querySelectorAll("[data-s]").forEach(function(b){ b.onclick = function(){ S.optSel = +b.dataset.s; drawOptions(false); renderAll(); openSim(); }; });
     el.querySelectorAll("[data-p]").forEach(function(b){ b.onclick = function(){ S.optSel = +b.dataset.p; choose(); drawOptions(false); renderAll(); }; });
@@ -385,7 +451,7 @@
             block_a:j.block_a, block_b:j.block_b, line:o ? o.line : [], rejoin_name:o && o.rejoin_stop ? o.rejoin_stop.name : "",
             skipped:o ? o.skipped.map(function(s){ return {code:s.code, name:s.name, important:!!s.important.length}; }) : [],
             buses:o ? o.affected_buses : (col ? col.affected : 0), holds:col ? col.reg.holds.filter(function(h){ return h.hold >= .5; }).map(function(h){ return {label:h.label, action:h.action}; }) : [],
-            added_min:o ? o.added_min : null};
+            added_min:o ? o.added_min : null, road_class:o && o.road_class ? o.road_class.label : ""};
   }
   function choose(){
     var e = entryBy(S.sel); if(!e || !S.opts) return;
@@ -402,7 +468,8 @@
     var bounds = L.latLngBounds(j.block_pts);
     j.options.forEach(function(o){
       var sel = S.optSel === o.n;
-      var pl = L.polyline(o.line, {pane:sel ? "divsel" : "alts", color:sel ? C.green : C.amber, weight:sel ? 6 : 4, opacity:sel ? 1 : .75, dashArray:sel ? "12 8" : "6 8", className:sel ? "dv-sel" : ""})
+      var small = o.road_class && o.road_class.label === "SMALL ROADS";
+      var pl = L.polyline(o.line, {pane:sel ? "divsel" : "alts", color:sel ? C.green : small ? "#ff8a1f" : C.amber, weight:sel ? 6 : small ? 3 : 4, opacity:sel ? 1 : .75, dashArray:sel ? "12 8" : small ? "2 7" : "6 8", className:sel ? "dv-sel" : ""})
         .bindTooltip(o.name + ": " + o.roads.map(tc).join(" \u2192 ") + " (" + sgn(o.added_min) + " min)", {sticky:true}).on("click", function(){ S.optSel = o.n; drawOptions(false); renderAll(); });
       pl.addTo(sel ? G.sel : G.alts); bounds.extend(o.line);
       if(sel){
@@ -423,11 +490,98 @@
     if(fit) map.fitBounds(bounds.pad(.15), {maxZoom:17});
   }
 
+  /* ------------------------------------------------------------------ ALL SERVICES: network plan */
+  var NETC = ["#2ee59d", "#38d6ff", "#c792ff", "#ffd166", "#ff8fab", "#7bdff2", "#b8f35a", "#f7a072"];
+  var netSeq = 0;
+  function netColor(sig){ var g = S.net ? S.net.network.groups : []; for(var i = 0; i < g.length; i++) if(g[i].signature === sig) return NETC[i % NETC.length]; return C.grey; }
+  function runNet(){
+    if(!S.an || !S.an.entries.length){ S.net = null; renderNet(); return; }
+    var my = ++netSeq; S.busy.net = 1; setLife();
+    var ld = DS.loading("netBody", ["Planning a diversion for every affected service\u2026", "Keeping each route on expressways and arterial roads\u2026", "Finding services that can share one diversion\u2026", "Checking how many buses each diverted road takes\u2026"], "NETWORK PLAN \u00b7 " + S.an.entries.length + " SERVICE-DIRECTION" + (S.an.entries.length === 1 ? "" : "S"));
+    post("/api/diversion/plan_all", {blocks:blocksPayload(), closure_min:S.closure.min, bus_type:S.bus, allow_small:S.allowSmall,
+      entries:S.an.entries.map(function(e){ return {service:e.service, direction:e.direction, run:e.run}; })}, 300000).then(function(j){
+      ld.stop(); if(my !== netSeq) return; S.busy.net = 0;
+      if(!j.ok){ $("netBody").innerHTML = '<p class="dv-err">' + esc(j.error || "Network plan failed.") + '</p>'; setLife(); return; }
+      S.net = j; renderNet(); drawNet(); setLife();
+    });
+  }
+  function renderNet(){
+    var el = $("netBody"), j = S.net;
+    if(!hasBlock()){ el.innerHTML = DS.empty({icon:"route", title:"NO NETWORK PLAN YET", text:"Once a blockage is placed, every affected service gets a recommended main-road diversion here."}); $("netSub").textContent = ""; return; }
+    if(!j){ if(!S.busy.net) el.innerHTML = '<p class="dv-muted">' + (S.an && !S.an.entries.length ? "No service runs along the blocked section." : "Planning starts when the analysis finishes.") + '</p>'; $("netSub").textContent = ""; return; }
+    var t = j.totals, ACT = {divert:"DIVERT", wait:"WAIT / REGULATE", manual:"MANUAL"};
+    $("netSub").textContent = t.service_dirs + " service-direction" + (t.service_dirs === 1 ? "" : "s");
+    var shared = j.network.groups.filter(function(g){ return g.services.length > 1; });
+    var h = DS.ai({title:"AI NETWORK PLAN", badge:j.network.warnings.length ? DS.sev("warn", j.network.warnings.length + " WARNING" + (j.network.warnings.length > 1 ? "S" : "")) : DS.sev("ok", "READY TO REVIEW"),
+      detected:esc(j.road) + (j.blocks_n > 1 ? " \u2014 " + j.blocks_n + " blockages" : "") + ": " + t.service_dirs + " service-direction(s) affected",
+      recommendation:t.divert + " divert, " + t.wait + " wait / regulate" + (t.manual ? ", <b style=\"color:#ffc3ca\">" + t.manual + " need manual planning</b>" : "") + (shared.length ? "; " + shared.length + " route(s) shared by several services" : ""),
+      effect:S.closure.min != null ? "Extra bus-minutes over the " + esc(S.closure.label.toLowerCase()) + " closure: " + f0(t.bus_min) + " with this plan vs " + f0(t.bus_min_none) + " with no action (estimate)." : "Closure length unknown: without diversions, buses reaching a block cannot continue.",
+      basis:"Main roads only" + (j.allow_small ? " (small roads shown, never recommended)" : "") + ". Same rules as each service's options. Controller confirms."});
+    h += '<div class="dv-net-tot"><span><b>' + t.divert + '</b>DIVERT</span><span><b>' + t.wait + '</b>WAIT</span><span><b>' + t.manual + '</b>MANUAL</span><span><b>' + t.skipped + '</b>STOPS SKIPPED' + (t.important ? ' \u00b7 ' + t.important + ' IMP.' : '') + '</span></div>';
+    j.network.warnings.forEach(function(w){ h += '<div class="dv-warn">\u26a0 ' + esc(w) + '</div>'; });
+    if(shared.length) h += '<div class="dv-lbl">SHARED DIVERSIONS</div>' + shared.map(function(g){ return '<div class="dv-grp"><i style="background:' + netColor(g.signature) + '"></i><span><b style="color:#fff">' + esc(g.services.join(", ")) + '</b> \u2014 ' + esc(g.roads.map(tc).join(" \u2192 ")) + '</span></div>'; }).join("");
+    h += '<div class="dv-lbl">EVERY AFFECTED SERVICE</div>';
+    j.rows.forEach(function(r){
+      var k = r.service + "|" + r.direction + "|" + r.run, o = r.option, col = r.action === "divert" && o ? netColor(o.signature) : r.action === "wait" ? C.amber : C.red;
+      var route = !r.ok ? (r.error || "Could not plan") : r.action === "divert" && o ? o.roads.map(tc).join(" \u2192 ") + " \u2192 rejoin" + (o.rejoin_stop ? " (" + o.rejoin_stop.name + ")" : "")
+        : r.action === "wait" ? (o ? "Hold / regulate; ready if extended: " + o.roads.map(tc).join(" \u2192 ") : "Hold / regulate upstream") : "No main-road diversion found \u2014 plan with the depot";
+      var meta = r.action === "divert" && o ? [(o.added_min >= 0 ? "+" : "") + f0(o.added_min) + " min", (o.added_km >= 0 ? "+" : "") + f1(o.added_km) + " km", o.skipped_n + " stops skipped" + (o.important_n ? " (" + o.important_n + " important)" : ""), o.road_class ? o.road_class.label : "", "traffic " + o.traffic] : [];
+      if(r.ok) meta.push(r.polled ? r.buses + " bus" + (r.buses === 1 ? "" : "es") + " approaching" : "buses not polled");
+      if(r.small_hidden) meta.push(r.small_hidden + " small-road route(s) held back");
+      h += '<button type="button" class="dv-net-row" data-k="' + esc(k) + '" aria-pressed="' + (S.sel === k) + '"><i class="sw" style="background:' + col + '"></i><b>' + esc(r.service) + '</b><span class="d">D' + r.direction + (r.run ? " \u00b7 pass " + (r.run + 1) : "") + '</span><span class="act ' + r.action + '">' + (ACT[r.action] || "") + '</span>'
+        + '<span class="r">' + esc(route) + '</span><span class="m">' + esc(meta.filter(Boolean).join(" \u00b7 ")) + '</span></button>';
+    });
+    h += '<div class="dv-row" style="margin-top:10px"><button type="button" class="ds-btn sm pri" id="netAdopt"' + (lockedPlan() ? " disabled" : "") + '>ADOPT ALL INTO PLAN</button>'
+      + '<button type="button" class="ds-btn sm" id="netMap" aria-pressed="' + S.showNet + '">' + (S.showNet ? "HIDE ROUTES ON MAP" : "SHOW ALL ROUTES ON MAP") + '</button>'
+      + (j.ai ? '<button type="button" class="ds-btn sm" id="netAi">\u2728 AI REVIEW</button>' : '') + '<button type="button" class="ds-btn sm ghost" id="netRe">RE-PLAN</button></div><div id="aiBox"></div>'
+      + '<p class="dv-muted" style="margin-top:8px">' + esc(j.basis) + (j.rows.some(function(r){ return r.ok && !r.polled; }) ? ' Live buses are polled for the first ' + j.poll_cap + ' service-directions (LTA quota).' : '') + '</p>';
+    el.innerHTML = h;
+    el.querySelectorAll(".dv-net-row").forEach(function(b){ b.onclick = function(){ selectService(b.dataset.k); if(S.mobile) sheetTab("opt"); }; });
+    $("netAdopt").onclick = adoptAll;
+    $("netMap").onclick = function(){ S.showNet = !S.showNet; lay.net = S.showNet; var c = document.querySelector('#layers input[data-l="net"]'); if(c) c.checked = S.showNet; applyLayers(); renderNet(); };
+    $("netRe").onclick = runNet;
+    if($("netAi")) $("netAi").onclick = aiReview;
+  }
+  function drawNet(){
+    G.net.clearLayers(); if(!S.net) return;
+    var labelled = {};
+    S.net.rows.forEach(function(r){
+      var o = r.option; if(!r.ok || !o || r.action !== "divert" || !o.line || o.line.length < 2) return;
+      var c = netColor(o.signature);
+      L.polyline(o.line, {pane:"alts", color:c, weight:4, opacity:.85, dashArray:"10 6"}).bindTooltip(r.service + " D" + r.direction + ": " + o.roads.map(tc).join(" \u2192 "), {sticky:true})
+        .on("click", function(){ selectService(r.service + "|" + r.direction + "|" + r.run); }).addTo(G.net);
+      if(!labelled[o.signature]){
+        labelled[o.signature] = 1;
+        var g = S.net.network.groups.filter(function(x){ return x.signature === o.signature; })[0], mid = o.line[Math.floor(o.line.length / 2)];
+        L.marker(mid, {pane:"pts", interactive:false, icon:L.divIcon({className:"", iconSize:[0, 0], html:'<div class="dv-netlbl" style="border-color:' + c + '">' + esc((g ? g.services : [r.service + " D" + r.direction]).join(" \u00b7 ")) + '</div>'})}).addTo(G.net);
+      }
+    });
+  }
+  function adoptAll(){
+    if(!S.net || lockedPlan()) return;
+    var n = 0, manual = 0;
+    S.net.rows.forEach(function(r){
+      if(!r.ok || r.action === "manual" || !r.choice){ manual++; return; }
+      S.choices[r.service + "|" + r.direction + "|" + r.run] = r.choice; n++;
+    });
+    toast(n + " service-direction(s) added to the plan" + (manual ? " \u00b7 " + manual + " need manual planning" : ""));
+    if(S.sel && S.opts){ var c = S.choices[S.sel]; if(c){ var o = S.opts.options.filter(function(x){ return x.signature === c.signature; })[0]; S.optSel = o ? o.n : 0; drawOptions(false); } }
+    renderAll(); if(S.mobile) sheetTab("plan");
+  }
+  function aiReview(){
+    var box = $("aiBox"); if(!box || !S.net) return;
+    DS.loading(box, ["Sending the computed plan (no raw feeds)\u2026", "Reviewing conflicts between services\u2026", "Listing what to verify\u2026"], "AI REVIEW");
+    post("/api/diversion/ai_review", {plan:S.net}, 90000).then(function(j){
+      box.innerHTML = j.ok ? '<div class="dv-ai-rev"><div class="k">\u2728 AI REVIEW \u00b7 ' + esc(j.model) + '</div><pre>' + esc(j.text) + '</pre><small>' + esc(j.note) + '</small></div>'
+        : '<p class="dv-err">' + esc(j.error || "AI review unavailable.") + '</p>';
+    });
+  }
+
   /* ------------------------------------------------------------------ OPERATIONAL IMPACT comparison (no scores) */
   function hwChain(hw){ return hw && hw.gaps.length ? hw.gaps.slice(0, 6).map(function(g){ return f0(g.gap); }).join(" \u2014 ") + (hw.gaps.length > 6 ? " \u2026" : "") : "\u2013"; }
   function renderCompare(){
     var el = $("cmpBody"), j = S.opts;
-    if(!j){ el.innerHTML = S.corridor ? '<p class="dv-muted">Select a service to compare its options.</p>' : ""; $("impSub").textContent = ""; return; }
+    if(!j){ el.innerHTML = hasBlock() ? '<p class="dv-muted">Select a service to compare its options.</p>' : ""; $("impSub").textContent = ""; return; }
     $("impSub").textContent = j.service + " D" + j.direction + (j.H ? " \u00b7 scheduled " + f0(j.H) + " min" : " \u00b7 no scheduled headway");
     var cols = j.compare, H = j.H;
     function cls(v, bad, warn){ return v == null ? "" : v >= bad ? "bad" : v >= warn ? "warn" : "ok"; }
@@ -485,7 +639,7 @@
     [M.none, M.opt].forEach(function(x, i){
       x.g.clearLayers(); x.b.clearLayers();
       L.polyline(j.window.pts, {color:C.blue, weight:4, opacity:.85}).addTo(x.g);
-      L.polyline(j.block_pts, {color:C.red, weight:7, opacity:.95}).addTo(x.g);
+      (j.block_runs || [j.block_pts]).forEach(function(r){ L.polyline(r, {color:C.red, weight:7, opacity:.95}).addTo(x.g); });
       if(i === 1 && o) L.polyline(o.anim.pts, {color:C.green, weight:5, dashArray:"10 7", className:"dv-sel"}).addTo(x.g);
       x.markers = {};
       var col = i === 0 ? colFor(0) : oc;
@@ -614,8 +768,8 @@
   function detachPlan(){ S.plan = null; S.updating = false; S.shownRev = null; try{ history.replaceState(null, "", "/diversion"); }catch(e){} }
   function needOcc(){ if(S.occ) return false; toast("Choose your OCC first."); var el = $("myOcc"); if(S.mobile) sheetTab("svc"); el.focus(); return true; }
   function savePlan(status){
-    if(!S.corridor) return Promise.resolve(null);
-    return post("/api/diversion/plans", {block:blockPayload(), status:status || "planned", occ:S.occ, closure_min:S.closure.min, closure_label:S.closure.label, services:choicesList(), summary:summary()}).then(function(j){
+    if(!hasBlock()) return Promise.resolve(null);
+    return post("/api/diversion/plans", {blocks:blocksPayload(), status:status || "planned", occ:S.occ, closure_min:S.closure.min, closure_label:S.closure.label, services:choicesList(), summary:summary()}).then(function(j){
       if(j.error){ toast(j.error); return null; } attachPlan(j.plan); loadPlans(); renderAll();
       toast("Saved \u2014 OCC Live alert raised" + (j.saved ? "" : " (database unavailable: not persisted)")); return j.plan;
     });
@@ -624,7 +778,7 @@
 
   function renderPlan(){
     var el = $("planBody"), p = S.plan, ch = choicesList();
-    if(!S.corridor && !p){ el.innerHTML = DS.empty({icon:"engine", title:"NO PLAN", text:"Place a road block, choose an option per affected service, then confirm the diversion."}); $("planSub").textContent = ""; return; }
+    if(!hasBlock() && !p){ el.innerHTML = DS.empty({icon:"engine", title:"NO PLAN", text:"Place a road block, choose an option per affected service, then confirm the diversion."}); $("planSub").textContent = ""; return; }
     var h = "";
     if(p && S.shownRev != null && p.revision > S.shownRev) h += '<div class="dv-rev">Updated to revision ' + p.revision + ' \u2014 ' + esc((p.log[p.log.length - 1] || {}).text || "") + ' <button type="button" class="ds-btn sm" id="pReload">Load latest</button></div>';
     if(p && ["active", "monitoring", "recovering", "ended"].indexOf(p.status) >= 0){
@@ -643,7 +797,7 @@
     if(S.an){ var miss = S.an.entries.filter(function(e){ return !S.choices[key(e)]; }); if(miss.length && ch.length) h += '<p class="dv-muted">Not decided: ' + miss.map(function(e){ return esc(e.service + " D" + e.direction); }).join(", ") + '</p>'; }
     h += '<div class="dv-row" style="margin-top:10px">';
     if(!p || ["detected", "planned"].indexOf(p.status) >= 0){
-      if(!p) h += '<button type="button" class="ds-btn sm" id="pSave"' + (S.corridor ? "" : " disabled") + '>SAVE & RAISE OCC ALERT</button>';
+      if(!p) h += '<button type="button" class="ds-btn sm" id="pSave"' + (hasBlock() ? "" : " disabled") + '>SAVE & RAISE OCC ALERT</button>';
       h += '<button type="button" class="ds-btn sm pri" id="pConfirm"' + (ch.length ? "" : " disabled") + '>CONFIRM DIVERSION\u2026</button>';
     }else if(p.status === "active" || p.status === "monitoring"){
       if(S.updating) h += '<button type="button" class="ds-btn sm pri" id="pPublish">PUBLISH REVISION</button><button type="button" class="ds-btn sm ghost" id="pCancelUp">CANCEL</button>';
@@ -654,7 +808,7 @@
     }else{
       h += '<button type="button" class="ds-btn sm" id="pNew">START A NEW BLOCKAGE</button><button type="button" class="ds-btn sm ghost" id="pNotice">NOTICE</button>';
     }
-    if(S.corridor) h += '<button type="button" class="ds-btn sm ghost" id="pRefresh">REFRESH LIVE DATA</button>';
+    if(hasBlock()) h += '<button type="button" class="ds-btn sm ghost" id="pRefresh">REFRESH LIVE DATA</button>';
     h += '</div><p class="dv-muted" style="margin-top:8px">Decision support: nothing is executed and nothing is sent outside the platform. The controller confirms the operational diversion.</p>';
     el.innerHTML = h; $("planSub").textContent = p ? "#" + p.id : (ch.length ? "not saved" : "");
     var on = function(id, f){ var b = $(id); if(b) b.onclick = f; };
@@ -663,14 +817,14 @@
     on("pConfirm", openConfirm);
     on("pAck", function(){ if(needOcc()) return; post("/api/diversion/plans/" + p.id + "/ack", {occ:S.occ}).then(function(j){ if(j.error) return toast(j.error); attachPlan(j.plan); renderAll(); toast("Acknowledged revision " + j.plan.revision + " for " + S.occ); }); });
     on("pShare", openShare);
-    on("pUpdate", function(){ S.updating = true; S.editing = true; drawBlock(false); renderAll(); toast("Edit the blockage or options, then PUBLISH REVISION."); });
+    on("pUpdate", function(){ S.updating = true; S.editing = true; drawBlocks(); renderAll(); toast("Edit the blockage or options, then PUBLISH REVISION."); });
     on("pCancelUp", function(){ S.updating = false; openPlan(p.id); });
     on("pPublish", publishRevision);
     on("pNotice", function(){ noticeModal(p.notice || ""); });
     on("pMon", function(){ post("/api/diversion/plans/" + p.id + "/status", {status:p.status === "active" ? "monitoring" : "active"}).then(function(j){ if(j.error) return toast(j.error); attachPlan(j.plan); renderAll(); }); });
     on("pEnd", endDiversion);
     on("pRecTab", function(){ dockTab("rec"); openDock(true); if(S.mobile) sheetTab("plan"); });
-    on("pNew", function(){ detachPlan(); S.corridor = null; S.choices = {}; resetAnalysis(); drawBlock(false); renderAll(); });
+    on("pNew", function(){ detachPlan(); S.blocks = []; S.choices = {}; resetAnalysis(); drawBlocks(); renderAll(); });
     on("pReload", function(){ openPlan(p.id); });
     on("pRefresh", function(){ var k = S.sel; S.pending = k ? {service:entryBy(k).service, direction:entryBy(k).direction, signature:(S.choices[k] || {}).sig} : null; analyse(); });
   }
@@ -687,15 +841,15 @@
   function openConfirm(){
     if(needOcc()) return;
     var ch = choicesList(); if(!ch.length) return toast("Choose an option for at least one service.");
-    post("/api/diversion/notice", {road:S.road, services:ch, closure_label:S.closure.label, status:"active", by:S.occ}).then(function(j){
-      modal('<h2 id="modalT">Confirm diversion \u2014 ' + esc(S.road) + '</h2><p class="dv-muted">Check and edit the operational message. Confirming records the diversion as ACTIVE, opens an OCC ticket (category Diversion) and shows it to the OCCs you share with. Nothing is sent outside the platform.</p>'
+    post("/api/diversion/notice", {road:roadsTxt(), services:ch, closure_label:S.closure.label, status:"active", by:S.occ}).then(function(j){
+      modal('<h2 id="modalT">Confirm diversion \u2014 ' + esc(roadsTxt()) + '</h2><p class="dv-muted">Check and edit the operational message. Confirming records the diversion as ACTIVE, opens an OCC ticket (category Diversion) and shows it to the OCCs you share with. Nothing is sent outside the platform.</p>'
         + '<textarea id="mNotice" aria-label="Diversion notice">' + esc(j.text || "") + '</textarea><div class="dv-lbl">SHARE WITH OCCs</div>' + occChecks(S.occ)
         + '<div class="foot"><button type="button" class="ds-btn" data-close>Cancel</button><button type="button" class="ds-btn pri" id="mConfirm">Confirm &amp; activate</button></div>');
       $("mConfirm").onclick = function(){
         var share = Array.prototype.map.call($("modalBox").querySelectorAll("input[type=checkbox]:checked"), function(c){ return c.value; }), text = $("mNotice").value;
         var go = function(pl){ if(!pl) return;
-          post("/api/diversion/plans/" + pl.id + "/confirm", {occ:S.occ, services:ch, share:share, notice:text, closure_label:S.closure.label, summary:summary()}).then(function(r){
-            if(r.error) return toast(r.error); attachPlan(r.plan); S.editing = false; drawBlock(false); loadPlans(); renderAll(); noticeModal(r.plan.notice, true); }); };
+          post("/api/diversion/plans/" + pl.id + "/confirm", {occ:S.occ, services:ch, share:share, notice:text, closure_label:S.closure.label, summary:summary(), blocks:blocksPayload()}).then(function(r){
+            if(r.error) return toast(r.error); attachPlan(r.plan); S.editing = false; drawBlocks(); loadPlans(); renderAll(); noticeModal(r.plan.notice, true); }); };
         if(S.plan) go(S.plan); else savePlan("planned").then(go);
       };
     });
@@ -709,7 +863,7 @@
     $("mCopy").onclick = function(){ var t = $("mNotice"); (navigator.clipboard ? navigator.clipboard.writeText(t.value) : Promise.reject()).then(function(){ toast("Notice copied"); }, function(){ t.select(); document.execCommand("copy"); toast("Notice copied"); }); };
     $("mShare").onclick = function(){ closeModal(); openShare(); };
     $("mNotify").onclick = function(){ if(!p) return; post("/api/diversion/plans/" + p.id + "/notify", {}).then(function(j){ toast(j.error || "Notice posted to the OCC ticket (OCC Live)"); }); };
-    var u = $("mUpdate"); if(u) u.onclick = function(){ closeModal(); S.updating = true; S.editing = true; drawBlock(false); renderAll(); };
+    var u = $("mUpdate"); if(u) u.onclick = function(){ closeModal(); S.updating = true; S.editing = true; drawBlocks(); renderAll(); };
   }
   function openShare(){
     var p = S.plan; if(!p) return;
@@ -724,9 +878,9 @@
   function publishRevision(){
     var p = S.plan, note = prompt("What changed? (shown to every OCC)", "") ; if(note === null) return;
     var ch = choicesList();
-    post("/api/diversion/notice", {road:S.road, services:ch, closure_label:S.closure.label, status:p.status, revision:p.revision + 1, by:S.occ, effective:p.started ? DS.fmtTime(new Date(p.started * 1000)) : ""}).then(function(n){
-      post("/api/diversion/plans/" + p.id + "/update", {services:ch, note:note, occ:S.occ, closure_label:S.closure.label, notice:n.text}).then(function(j){
-        if(j.error) return toast(j.error); S.updating = false; S.editing = false; attachPlan(j.plan); drawBlock(false); renderAll(); noticeModal(j.plan.notice);
+    post("/api/diversion/notice", {road:roadsTxt(), services:ch, closure_label:S.closure.label, status:p.status, revision:p.revision + 1, by:S.occ, effective:p.started ? DS.fmtTime(new Date(p.started * 1000)) : ""}).then(function(n){
+      post("/api/diversion/plans/" + p.id + "/update", {services:ch, note:note, occ:S.occ, closure_label:S.closure.label, notice:n.text, blocks:blocksPayload()}).then(function(j){
+        if(j.error) return toast(j.error); S.updating = false; S.editing = false; attachPlan(j.plan); drawBlocks(); renderAll(); noticeModal(j.plan.notice);
       });
     });
   }
@@ -772,7 +926,7 @@
       (p.services || []).forEach(function(s){ S.choices[s.service + "|" + s.direction + "|" + (s.run || 0)] = Object.assign({sig:s.signature || "wait"}, s); });
       if(p.closure_label) setClosureLabel(p.closure_label);
       var first = (p.services || [])[0]; S.pending = first ? {service:first.service, direction:first.direction, signature:first.signature || "wait"} : null;
-      if(p.block && p.block.line) setBlockFromLine(p.block.line, p.road, p.block.directed).then(function(){ resetAnalysis(); analyse(); });
+      if(savedBlocks(p.block).length) loadBlocks(savedBlocks(p.block)).then(function(){ resetAnalysis(); analyse(); });
       renderAll(); loadPlans();
     });
   }
@@ -781,21 +935,21 @@
   var LIFE_TXT = {none:"NO BLOCKAGE", detected:"DETECTED", analysing:"ANALYSING", planned:"PLANNED", active:"ACTIVE", monitoring:"MONITORING", recovering:"RECOVERING", ended:"ENDED"};
   function lifeState(){
     if(S.plan && !S.updating) return S.plan.status;
-    if(S.busy.an || S.busy.opt) return "analysing";
+    if(S.busy.an || S.busy.opt || S.busy.net) return "analysing";
     if(S.plan) return S.plan.status;
     if(choicesList().length) return "planned";
-    return S.corridor ? "detected" : "none";
+    return hasBlock() ? "detected" : "none";
   }
   function setLife(){
     var s = lifeState(), el = $("dvLife"); el.dataset.s = s; $("dvLifeT").textContent = LIFE_TXT[s] || s.toUpperCase();
-    $("dvLifeS").textContent = S.plan && S.plan.started ? durTxt(S.plan) : (S.road && S.corridor ? S.road : "");
+    $("dvLifeS").textContent = S.plan && S.plan.started ? durTxt(S.plan) : (hasBlock() ? roadsTxt() : "");
     var st = S.plan ? S.plan.status : "", conf = ["active", "monitoring", "recovering", "ended"].indexOf(st) >= 0;
-    var done = {block:!!S.corridor || conf, analyse:!!S.an || conf, plan:choicesList().length > 0 || conf, simulate:S.simSeen || conf, confirm:conf,
+    var done = {block:!!hasBlock() || conf, analyse:!!S.an || conf, plan:choicesList().length > 0 || conf, simulate:S.simSeen || conf, confirm:conf,
       monitor:["recovering", "ended"].indexOf(st) >= 0, recover:st === "ended"};
     var order = ["block", "analyse", "plan", "simulate", "confirm", "monitor", "recover"], now = order.filter(function(k){ return !done[k]; })[0];
     if(st === "active" || st === "monitoring") now = "monitor"; if(st === "recovering") now = "recover";
     document.querySelectorAll("#dvFlow li").forEach(function(li){ var k = li.dataset.k; li.className = done[k] && k !== now ? "done" : k === now ? "now" : ""; });
-    var sum = $("sheetSum"); if(sum) sum.innerHTML = S.corridor ? '<b>' + esc(S.road) + '</b><span>' + (S.an ? S.an.services + " services \u00b7 " + S.an.buses + " buses" : "analysing\u2026") + '</span>' + (S.opts ? '<span>\u00b7 ' + esc(S.opts.service) + ' D' + S.opts.direction + '</span>' : '') : '<b>Add a road blockage</b><span>tap \u2715 then the road</span>';
+    var sum = $("sheetSum"); if(sum) sum.innerHTML = hasBlock() ? '<b>' + esc(roadsTxt()) + '</b><span>' + (S.an ? S.an.services + " services \u00b7 " + S.an.buses + " buses" : "analysing\u2026") + '</span>' + (S.net ? '<span>\u00b7 ' + S.net.totals.divert + ' to divert</span>' : S.opts ? '<span>\u00b7 ' + esc(S.opts.service) + ' D' + S.opts.direction + '</span>' : '') : '<b>Add a road blockage</b><span>tap \u2715 then the road</span>';
   }
 
   /* ------------------------------------------------------------------ bottom dock (desktop / tablet) */
@@ -808,7 +962,7 @@
   function renderDock(){ renderSim(); renderNext(); renderHeadway(); renderBuses(); renderRecovery(); }
 
   /* ------------------------------------------------------------------ phone: bottom sheet holds the same panels */
-  var HOMES = [], SHEET = {svc:["secBlock", "secServices", "secPlans", "secLayers"], opt:["secOptions"], sim:["paneSim"], imp:["secImpact", "paneHw"], tl:["paneNext"], plan:["secPlan", "paneBuses", "paneRec"]};
+  var HOMES = [], SHEET = {svc:["secBlock", "secServices", "secPlans", "secLayers"], all:["secNet"], opt:["secOptions"], sim:["paneSim"], imp:["secImpact", "paneHw"], tl:["paneNext"], plan:["secPlan", "paneBuses", "paneRec"]};
   function layout(){
     var m = window.matchMedia("(max-width:699px)").matches; if(m === S.mobile) return; S.mobile = m;
     var sb = $("sheetBody");
@@ -851,12 +1005,18 @@
     else{ var m = parseFloat(label); S.closure = {min:isNaN(m) ? null : m, label:label}; $("closureCustom").hidden = false; $("closureMin").value = isNaN(m) ? "" : m;
       document.querySelector('#closure [data-m="custom"]').setAttribute("aria-pressed", "true"); }
   }
-  function rerunOptions(){ if(S.sel && S.an){ var e = entryBy(S.sel); S.pending = {service:e.service, direction:e.direction, signature:(S.choices[S.sel] || {}).sig}; selectService(S.sel); } }
+  function rerunOptions(){
+    S.net = null; G.net.clearLayers(); netSeq++;
+    if(S.sel && S.an){ var e = entryBy(S.sel); S.pending = {service:e.service, direction:e.direction, signature:(S.choices[S.sel] || {}).sig}; S.netPending = true; selectService(S.sel); }
+    else if(S.an) runNet();
+    renderNet();
+  }
   document.querySelectorAll("#closure button").forEach(function(b){ b.onclick = function(){
     document.querySelectorAll("#closure button").forEach(function(x){ x.setAttribute("aria-pressed", String(x === b)); });
     if(b.dataset.m === "custom"){ $("closureCustom").hidden = false; $("closureMin").focus(); return; }
     $("closureCustom").hidden = true; S.closure = {min:b.dataset.m === "open" ? null : +b.dataset.m, label:b.textContent}; rerunOptions(); }; });
   $("closureMin").onchange = function(){ var m = +this.value; if(!(m > 0)) return; S.closure = {min:m, label:m + " MIN"}; rerunOptions(); };
+  $("mainOnly").onchange = function(){ S.allowSmall = !this.checked; rerunOptions(); };
   $("busType").value = S.bus; $("busType").onchange = function(){ S.bus = this.value; LS.set("dv.bus", S.bus); rerunOptions(); };
   function fillOcc(){ var sel = $("myOcc"); sel.innerHTML = '<option value="">Choose\u2026</option>' + S.teams.map(function(t){ return '<option' + (t === S.occ ? " selected" : "") + '>' + esc(t) + '</option>'; }).join(""); }
   $("myOcc").onchange = function(){ S.occ = this.value; LS.set("dv.occ", S.occ); renderPlan(); loadPlans(); };
@@ -869,7 +1029,7 @@
   /* future automatic incident mode: suggestions only */
   function loadDetect(){
     DS.api("/api/diversion/detect").then(function(j){
-      var it = j.items || [], el = $("detectBox"); if(!it.length || S.corridor){ el.innerHTML = ""; return; }
+      var it = j.items || [], el = $("detectBox"); if(!it.length || hasBlock()){ el.innerHTML = ""; return; }
       el.innerHTML = '<div class="dv-det"><div class="k">POTENTIAL ROAD BLOCKAGE DETECTED (' + it.length + ')</div>' + it.slice(0, 3).map(function(x, i){ return '<div class="dv-det-it"><span><b style="color:#fff">' + esc(x.type) + '</b> \u2014 ' + esc(x.message.slice(0, 90)) + '<br><small class="dv-muted">Near services ' + esc(x.services_near.slice(0, 6).join(", ")) + '</small></span><button type="button" class="ds-btn sm" data-i="' + i + '">REVIEW</button></div>'; }).join("")
         + '<p class="dv-muted" style="margin:8px 0 0">From LTA Traffic Incidents. Nothing is diverted automatically: review, place the exact section, then confirm.</p></div>';
       el.querySelectorAll("[data-i]").forEach(function(b){ b.onclick = function(){ var x = it[+b.dataset.i]; map.setView([x.lat, x.lon], 17); drop(L.latLng(x.lat, x.lon)); }; });
@@ -877,7 +1037,7 @@
   }
 
   /* ------------------------------------------------------------------ render + boot */
-  function renderAll(){ renderServices(); renderOptions(); renderCompare(); renderPlan(); renderDock(); renderPlaybook(); setLife(); }
+  function renderAll(){ renderServices(); renderNet(); renderOptions(); renderCompare(); renderPlan(); renderDock(); renderPlaybook(); setLife(); }
   layout(); window.addEventListener("resize", function(){ layout(); });
   renderBlockCard(); renderAll(); applyLayers(); loadIncidents(); loadImp();
   DS.api("/api/occ/meta").then(function(j){ if(j.teams){ S.teams = j.teams; fillOcc(); } loadPlans(); });

@@ -269,6 +269,42 @@ path.dv-blockline{filter:drop-shadow(0 0 6px rgba(255,85,102,.9))}
   .dv-maplegend{display:none}
   .leaflet-top.leaflet-left{top:48px}
 }
+
+/* ---------------- V16.15: several blockages, main roads, recommendation, network plan */
+.dv-chk{display:flex;gap:9px;align-items:flex-start;margin-top:10px;padding:9px 10px;border:1px solid var(--ds-line);border-radius:9px;background:rgba(46,229,157,.05);cursor:pointer}
+.dv-chk input{margin-top:3px;accent-color:var(--ds-green)} .dv-chk b{display:block;color:#fff;font-size:12.5px} .dv-chk small{color:var(--ds-mut);font-size:11.5px}
+.dv-bl{display:flex;align-items:center;gap:10px;width:100%;text-align:left;margin-top:8px;padding:8px 10px;border-radius:9px;border:1px solid rgba(255,85,102,.35);background:rgba(255,85,102,.06);color:var(--ds-text);font:inherit;cursor:pointer}
+.dv-bl .n{font:700 11px var(--ds-display);color:#ffc3ca;letter-spacing:.06em} .dv-bl b{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#fff;font-weight:600}
+.dv-bl span:last-child{color:var(--ds-mut);font-size:12px}
+.dv-mk-x sup{position:absolute;top:-7px;right:-7px;min-width:15px;height:15px;border-radius:8px;background:#fff;color:#b3122a;font:700 10px/15px var(--ds-font);text-align:center}
+.dv-rc{margin:6px 0 8px} .dv-rc .top{display:flex;align-items:center;gap:8px;margin-bottom:4px}
+.dv-rc .lbl{font:700 10.5px var(--ds-font);letter-spacing:.08em;padding:2px 7px;border-radius:5px;border:1px solid}
+.dv-rc .lbl.MAIN{color:#8ff5c7;border-color:rgba(46,229,157,.5);background:rgba(46,229,157,.1)} .dv-rc .lbl.SMALL{color:#ffc3ca;border-color:rgba(255,85,102,.5);background:rgba(255,85,102,.1)}
+.dv-rc .lbl.NOT{color:#ffd9a0;border-color:rgba(255,181,71,.5);background:rgba(255,181,71,.1)}
+.dv-rc .bar{display:flex;height:6px;border-radius:3px;overflow:hidden;background:rgba(255,255,255,.06)} .dv-rc .bar i{display:block;height:100%}
+.dv-rc .bar .ma{background:var(--ds-green)} .dv-rc .bar .me{background:var(--ds-cyan)} .dv-rc .bar .sm{background:var(--ds-red)} .dv-rc .bar .un{background:#56687d}
+.dv-rc small{display:block;color:var(--ds-mut);font-size:11.5px;margin-top:3px}
+.dv-badge{display:inline-flex;align-items:center;gap:4px;font:700 10px var(--ds-font);letter-spacing:.08em;padding:3px 7px;border-radius:5px;background:var(--ds-green);color:#03261a}
+.dv-badge.alt{background:rgba(255,181,71,.18);color:#ffd9a0;border:1px solid rgba(255,181,71,.45)}
+.dv-opt.rec{box-shadow:0 0 0 1px rgba(46,229,157,.55),0 0 22px rgba(46,229,157,.12)}
+.dv-recwrap .ds-ai{margin-bottom:10px} .dv-recwrap ul{margin:4px 0 0;padding-left:16px} .dv-recwrap li{margin:2px 0} .dv-recwrap li.c{color:#ffd9a0}
+.dv-note{margin:0 0 10px;padding:8px 10px;border-radius:9px;border:1px dashed rgba(255,85,102,.45);color:var(--ds-text-2);font-size:12.5px}
+.dv-note .ds-btn{margin-top:6px}
+.dv-net-tot{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:8px}
+.dv-net-tot span{border:1px solid var(--ds-line);border-radius:9px;padding:7px 8px;font:600 10px var(--ds-font);letter-spacing:.07em;color:var(--ds-mut)}
+.dv-net-tot b{display:block;font:600 20px var(--ds-display);color:#fff;letter-spacing:0}
+.dv-net-row{display:grid;grid-template-columns:12px auto auto 1fr;grid-template-areas:"sw s d a" "sw r r r" "sw m m m";gap:2px 8px;width:100%;text-align:left;padding:8px 10px;margin-top:6px;border-radius:9px;border:1px solid var(--ds-line);background:rgba(8,20,38,.55);color:var(--ds-text);font:inherit;cursor:pointer}
+.dv-net-row:hover,.dv-net-row[aria-pressed="true"]{border-color:rgba(56,214,255,.55);background:rgba(56,214,255,.07)}
+.dv-net-row .sw{grid-area:sw;width:6px;border-radius:3px;align-self:stretch} .dv-net-row b{grid-area:s;font:600 16px var(--ds-display);color:#fff}
+.dv-net-row .d{grid-area:d;color:var(--ds-mut);font-size:12px;align-self:center} .dv-net-row .act{grid-area:a;justify-self:end;align-self:center;font:700 10px var(--ds-font);letter-spacing:.08em;padding:2px 7px;border-radius:5px}
+.dv-net-row .act.divert{background:rgba(46,229,157,.14);color:#8ff5c7} .dv-net-row .act.wait{background:rgba(255,181,71,.14);color:#ffd9a0} .dv-net-row .act.manual{background:rgba(255,85,102,.14);color:#ffc3ca}
+.dv-net-row .r{grid-area:r;font-size:12.5px;color:var(--ds-text)} .dv-net-row .m{grid-area:m;font-size:11.5px;color:var(--ds-mut)}
+.dv-grp{display:flex;gap:8px;align-items:flex-start;font-size:12.5px;margin-top:5px} .dv-grp i{flex:0 0 14px;height:4px;border-radius:2px;margin-top:7px}
+.dv-ai-rev{margin-top:10px;padding:10px 12px;border-radius:10px;border:1px solid rgba(168,139,255,.4);background:rgba(120,90,255,.07)}
+.dv-ai-rev .k{font:700 10.5px var(--ds-font);letter-spacing:.1em;color:#cdb9ff;margin-bottom:6px}
+.dv-ai-rev pre{white-space:pre-wrap;font:12.5px/1.5 var(--ds-font);color:var(--ds-text);margin:0} .dv-ai-rev small{display:block;margin-top:6px;color:var(--ds-mut)}
+.dv-netlbl{transform:translate(-50%,-130%);white-space:nowrap;font:700 10.5px var(--ds-font);padding:3px 7px;border-radius:6px;background:rgba(5,14,28,.92);border:1px solid;color:#fff}
+@media (min-width:700px) and (max-width:1199px){ #secNet{grid-column:1/-1} }
 </style>
 </head>
 <body>
@@ -297,6 +333,7 @@ path.dv-blockline{filter:drop-shadow(0 0 6px rgba(255,85,102,.9))}
           <div class="ds-field" style="flex:1"><label for="busType">Bus type</label><select class="ds-select" id="busType"><option value="dd">Double deck</option><option value="sd">Single deck</option><option value="art">Articulated</option></select></div>
           <div class="ds-field" style="flex:1"><label for="myOcc">Your OCC</label><select class="ds-select" id="myOcc"><option value="">Choose…</option></select></div>
         </div>
+        <label class="dv-chk"><input type="checkbox" id="mainOnly" checked> <span><b>Main roads only</b><small>Expressways and arterial roads. Small-road shortcuts are never recommended.</small></span></label>
       </section>
 
       <section class="ds-panel" id="secServices" aria-labelledby="hSvc">
@@ -320,6 +357,7 @@ path.dv-blockline{filter:drop-shadow(0 0 6px rgba(255,85,102,.9))}
           <label><input type="checkbox" class="ds-switch" data-l="roadworks" checked> Road works</label>
           <label><input type="checkbox" class="ds-switch" data-l="buses" checked> Buses</label>
           <label><input type="checkbox" class="ds-switch" data-l="alts" checked> Alternative diversions</label>
+          <label><input type="checkbox" class="ds-switch" data-l="net" checked> All services’ recommended routes</label>
           <label><input type="checkbox" class="ds-switch" data-l="others" checked> Other affected routes</label>
           <label><input type="checkbox" class="ds-switch" data-l="legend" checked> Legend</label>
         </div>
@@ -349,6 +387,10 @@ path.dv-blockline{filter:drop-shadow(0 0 6px rgba(255,85,102,.9))}
 
     <!-- RIGHT: diversion options, operational impact, actions -->
     <aside class="dv-col r" aria-label="Diversion options and actions">
+      <section class="ds-panel" id="secNet" aria-labelledby="hNet">
+        <div class="ds-ph" id="hNet">ALL SERVICES · NETWORK PLAN<span class="sp"></span><small id="netSub"></small></div>
+        <div id="netBody"></div>
+      </section>
       <section class="ds-panel" id="secOptions" aria-labelledby="hOpt">
         <div class="ds-ph" id="hOpt">DIVERSION OPTIONS<span class="sp"></span><small id="optSub"></small></div>
         <div id="optBody"></div>
@@ -392,6 +434,7 @@ path.dv-blockline{filter:drop-shadow(0 0 6px rgba(255,85,102,.9))}
   <div class="dv-sheet-sum" id="sheetSum"><b>Add a road blockage</b></div>
   <div class="dv-sheet-tabs" role="tablist" id="sheetTabs">
     <button type="button" class="dv-tab" data-t="svc" aria-selected="true">SERVICES</button>
+    <button type="button" class="dv-tab" data-t="all" aria-selected="false">ALL SERVICES</button>
     <button type="button" class="dv-tab" data-t="opt" aria-selected="false">OPTIONS</button>
     <button type="button" class="dv-tab" data-t="sim" aria-selected="false">SIMULATION</button>
     <button type="button" class="dv-tab" data-t="imp" aria-selected="false">IMPACT</button>

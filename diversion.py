@@ -17,6 +17,9 @@ import math
 import re
 
 PARAMS = {
+    "uturn_near_m": 20.0,       # U-turn test: the route comes back within this distance of where it has already been...
+    "uturn_deg": 150.0,         # ...heading the opposite way (U-turn at a junction, at a roundabout, or round a block)
+    "uturn_min_m": 15.0,        # ignore wiggles shorter than this along the route
     "on_road_m": 32.0,          # a service runs ALONG the blocked road when its line is within this distance of the block line...
     "parallel_deg": 35.0,       # ...and runs parallel to it (undirected when both directions are blocked)
     "min_overlap_m": 40.0,      # shortest run along the block that counts (shorter = the route only crosses the road)
@@ -41,7 +44,24 @@ PARAMS = {
     "excess_ratio": 3.0,
     "hub_services": 8,          # a stop served by at least this many services is a transfer hub
     "max_options": 4,
+    # V16.15 — several blockages, major-road policy, recommendation, network plan
+    "merge_gap_m": 1500.0,      # two blocked runs on one service line closer than this are bypassed by ONE diversion
+    "class_step_m": 20.0,       # road-class sampling interval along a diversion
+    "small_max_share": 0.10,    # a "main roads" diversion may use small roads for at most 10 % of its length...
+    "small_max_run_m": 250.0,   # ...and no single small-road stretch longer than this (junction connectors only)
+    "unknown_max_share": 0.35,  # above this share of unclassified road the road class is "not verified"
+    "junction_search_km": 3.0,  # look this far before/after the section for a major-road junction to divert at
+    "junction_min_gap_m": 150.0,
+    "major_via_reach_m": 700.0, # a via point is moved onto the nearest major road within this distance
+    "road_load_buses_hr": 20.0, # added buses per hour on one road above which the network plan warns
 }
+
+# LTA Traffic Speed Bands RoadCategory: A Expressway, B Major Arterial, C Arterial, D Minor Arterial, E Small Road, F Slip Road, G no category
+LTA_CLASS = {"A": "major", "B": "major", "C": "major", "F": "major", "D": "medium", "E": "small"}
+LTA_CAT_NAME = {"A": "expressway", "B": "major arterial", "C": "arterial", "D": "minor arterial", "E": "small road", "F": "slip road"}
+OSM_CLASS = {"motorway": "major", "motorway_link": "major", "trunk": "major", "trunk_link": "major", "primary": "major", "primary_link": "major",
+             "secondary": "major", "secondary_link": "major", "tertiary": "medium", "tertiary_link": "medium",
+             "residential": "small", "unclassified": "small", "service": "small", "living_street": "small", "track": "small", "road": "small"}
 
 REF_LAT = 1.35
 KX = 111320.0 * math.cos(math.radians(REF_LAT))
@@ -662,3 +682,165 @@ def notice(plan):
     if plan.get("by"):
         L.append(f"Issued by: {plan['by']}")
     return "\n".join(L).strip() + "\n"
+
+
+# ============================================================================ 10. several blockages on one service line
+def merge_runs(runs, gap_m=None):
+    """runs: [{"a","b","len","block"}] from every blockage on ONE service line -> sections [{"a","b","len","blocks":[i..]}]
+    Runs closer than gap_m along the line become one section, bypassed by one diversion (a bus cannot usefully rejoin between them)."""
+    gap_m = PARAMS["merge_gap_m"] if gap_m is None else gap_m
+    out = []
+    for r in sorted(runs, key=lambda x: x["a"]):
+        if out and r["a"] - out[-1]["b"] <= gap_m:
+            o = out[-1]
+            o["b"] = max(o["b"], r["b"]); o["len"] += r["len"]
+            if r["block"] not in o["blocks"]:
+                o["blocks"].append(r["block"])
+            o["parts"].append((r["a"], r["b"], r["block"]))
+        else:
+            out.append({"a": r["a"], "b": r["b"], "len": r["len"], "blocks": [r["block"]], "parts": [(r["a"], r["b"], r["block"])]})
+    return out
+
+
+# ============================================================================ 11. road class (main roads vs small roads)
+def road_mix(classes, step_m=None, P=None):
+    """classes: one class per sample along the diversion ("major" | "medium" | "small" | None=unknown).
+    -> shares, longest small-road stretch, and a label. MAIN ROADS / SMALL ROADS / NOT VERIFIED."""
+    P = P or PARAMS
+    step_m = step_m or P["class_step_m"]
+    n = len(classes) or 1
+    cnt = {"major": 0, "medium": 0, "small": 0, None: 0}
+    run = best = 0
+    for c in classes:
+        cnt[c if c in cnt else None] += 1
+        run = run + 1 if c == "small" else 0
+        best = max(best, run)
+    sh = {k: cnt[k] / n for k in ("major", "medium", "small")}
+    sh["unknown"] = cnt[None] / n
+    small_run = best * step_m
+    if sh["small"] > P["small_max_share"] or small_run > P["small_max_run_m"]:
+        label = "SMALL ROADS"
+        text = f"{round(sh['small'] * 100)}% on small roads (longest stretch {round(small_run)} m) \u2014 not suitable as a bus diversion by policy"
+    elif sh["unknown"] > P["unknown_max_share"]:
+        label = "NOT VERIFIED"
+        text = f"road class unknown for {round(sh['unknown'] * 100)}% of the route (not in LTA road network or OpenStreetMap) \u2014 verify"
+    else:
+        label = "MAIN ROADS"
+        text = f"{round((sh['major']) * 100)}% expressway / arterial, {round(sh['medium'] * 100)}% minor arterial" + \
+               (f", {round(sh['small'] * 100)}% small-road connector" if sh["small"] > 0 else "")
+    return {"label": label, "text": text, "major": round(sh["major"], 3), "medium": round(sh["medium"], 3), "small": round(sh["small"], 3),
+            "unknown": round(sh["unknown"], 3), "small_run_m": round(small_run)}
+
+
+# ============================================================================ 12. recommendation (rules, not a score)
+FEAS_ORDER = {"HIGH": 0, "VERIFICATION REQUIRED": 1, "LOW": 2, "NOT SUITABLE": 3}
+CLASS_ORDER = {"MAIN ROADS": 0, "NOT VERIFIED": 1, "SMALL ROADS": 2}
+
+
+def option_order(o):
+    """suitability first, then main roads, then important stops skipped, then added running time"""
+    return (FEAS_ORDER.get(o.get("feasibility"), 1), CLASS_ORDER.get((o.get("road_class") or {}).get("label"), 1),
+            o.get("important_n", 0), o.get("added_min") if o.get("added_min") is not None else 99)
+
+
+def recommend(opts, wod, closure_min):
+    """-> {"action": "divert"|"wait"|"manual", "option": n|None, "route_if_extended": n|None, "headline", "reasons": [..], "cautions": [..]}
+    Always proposes a route when any acceptable one exists. Small-road routes are never recommended."""
+    ok = [o for o in opts if o.get("feasibility") != "NOT SUITABLE" and (o.get("road_class") or {}).get("label") != "SMALL ROADS"]
+    small = [o for o in opts if (o.get("road_class") or {}).get("label") == "SMALL ROADS"]
+    if not ok:
+        return {"action": "wait" if closure_min is not None else "manual", "option": None, "route_if_extended": None,
+                "headline": "NO MAIN-ROAD DIVERSION FOUND",
+                "reasons": ["Every road route found around the section either uses the blocked road, is unsuitable for this bus, or runs on small roads."],
+                "cautions": ([f"{len(small)} small-road route(s) found and held back by the main-roads policy."] if small else []) +
+                            ["Hold / regulate upstream and plan the diversion manually with the depot."]}
+    best = sorted(ok, key=option_order)[0]
+    rc = best.get("road_class") or {}
+    reasons = [f"{best['name']} uses main roads: {rc.get('text', '')}" if rc.get("label") == "MAIN ROADS" else f"{best['name']}: {rc.get('text', '')}",
+               f"{best['added_km']:+.1f} km, about {best['added_min']:+.0f} min per trip ({best.get('time_src', '')})",
+               f"{best['skipped_n']} stop(s) skipped" + (f", including {best['important_n']} important" if best.get("important_n") else ", none important"),
+               f"Traffic on the route: {best.get('traffic', 'UNKNOWN')}"]
+    if best.get("used_before"):
+        reasons.append(f"Same roads used in a confirmed diversion on {best['used_before']['date']}")
+    cautions = []
+    if best.get("feasibility") != "HIGH":
+        cautions.append("Operational verification required before buses use it.")
+    if rc.get("label") == "NOT VERIFIED":
+        cautions.append("Road class not fully verified.")
+    if small:
+        cautions.append(f"{len(small)} shorter route(s) on small roads were not recommended.")
+    if wod and wod.get("kind") == "wait" and closure_min is not None:
+        return {"action": "wait", "option": None, "route_if_extended": best["n"], "headline": "WAIT / REGULATE \u2014 DIVERSION READY IF THE CLOSURE EXTENDS",
+                "reasons": [wod["text"]] + reasons, "cautions": cautions}
+    return {"action": "divert", "option": best["n"], "route_if_extended": None, "headline": f"RECOMMENDED: {best['name']} VIA " + " \u2192 ".join(best["roads"][:4]).upper(),
+            "reasons": reasons, "cautions": cautions}
+
+
+# ============================================================================ 13. network plan (all services together)
+def network_plan(results):
+    """results: [{"service","direction","H", "rec", "option": opt|None, "buses": n}] -> groups sharing one diversion + road load warnings"""
+    groups, load = {}, {}
+    for r in results:
+        o = r.get("option")
+        if not o:
+            continue
+        k = o["signature"]
+        g = groups.setdefault(k, {"signature": k, "roads": o["roads"], "services": [], "added_min": o["added_min"], "road_class": (o.get("road_class") or {}).get("label")})
+        g["services"].append(f"{r['service']} D{r['direction']}")
+        bph = 60.0 / r["H"] if r.get("H") else None
+        for road in dict.fromkeys(o["roads"][1:-1] or o["roads"]):
+            x = load.setdefault(road, {"road": road, "services": [], "buses_hr": 0.0, "unknown": 0, "traffic": set()})
+            x["services"].append(f"{r['service']} D{r['direction']}")
+            if bph:
+                x["buses_hr"] += bph
+            else:
+                x["unknown"] += 1
+            x["traffic"].add(o.get("traffic") or "UNKNOWN")
+    warn = []
+    for x in load.values():
+        x["buses_hr"] = round(x["buses_hr"], 1)
+        x["traffic"] = sorted(x["traffic"])
+        heavy = "HEAVY" in x["traffic"]
+        if x["buses_hr"] >= PARAMS["road_load_buses_hr"] or (heavy and len(x["services"]) >= 2):
+            warn.append(f"{x['road']}: {len(x['services'])} diverted services add about {x['buses_hr']:g} buses/hour" + (" on a road already HEAVY" if heavy else "")
+                        + " \u2014 consider splitting services across different diversions.")
+    return {"groups": sorted(groups.values(), key=lambda g: -len(g["services"])), "road_load": sorted(load.values(), key=lambda x: -x["buses_hr"]), "warnings": warn}
+
+
+def uturns(line, steps=None, P=PARAMS):
+    """U-turns on a route: OSRM "uturn" manoeuvres, plus any place where the route doubles back
+    along the road it came from (U-turn at a junction or roundabout, or a loop round a block that
+    returns the opposite way). A bus diversion must never need one. -> [(lat, lon)] (empty = none)."""
+    out = []
+    for st in steps or []:
+        if st.get("mod") == "uturn" and st.get("man") not in ("depart", "arrive") and st.get("line"):
+            out.append(tuple(st["line"][0]))
+    pts = densify(line, 8.0)
+    if len(pts) < 3:
+        return out
+    c = cum_m(pts)
+    hd = [bearing(pts[i], pts[i + 1]) for i in range(len(pts) - 1)]
+    cell = P["uturn_near_m"]
+    grid, prev = {}, False
+    for i in range(len(hd)):
+        if dist_m(pts[i], pts[i + 1]) < 0.5:
+            continue
+        x, y = xy(pts[i])
+        gx, gy = int(x // cell), int(y // cell)
+        hit = False
+        for dx in (-1, 0, 1):
+            for dy in (-1, 0, 1):
+                for j in grid.get((gx + dx, gy + dy), ()):
+                    if c[i] - c[j] >= P["uturn_min_m"] and dist_m(pts[i], pts[j]) <= P["uturn_near_m"] \
+                            and angdiff(hd[i], hd[j]) >= P["uturn_deg"]:
+                        hit = True
+                        break
+                if hit:
+                    break
+            if hit:
+                break
+        if hit and not prev and not any(dist_m(pts[i], q) < 60 for q in out):   # one entry per doubling-back
+            out.append(tuple(pts[i]))
+        prev = hit
+        grid.setdefault((gx, gy), []).append(i)
+    return out
