@@ -100,6 +100,24 @@
 .dv-opt.sel .dv-chain li:before{background:var(--ds-green)} .dv-opt.sel .dv-chain li:not(:last-child):after{background:rgba(46,229,157,.35)}
 .dv-chain li.rj{color:var(--ds-green);font-size:11.5px;letter-spacing:.1em}
 .dv-kv{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 10px;font-size:12.5px;color:var(--ds-text-2);margin:0 0 8px}
+.dv-opt.na{opacity:.75;border-style:dashed}
+.dv-rules{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:0 0 10px;padding:8px 10px;border:1px solid var(--ds-line-2);border-radius:10px;background:rgba(56,214,255,.05);font-size:11.5px;color:var(--ds-text-2)}
+.dv-rules b{font:700 10.5px var(--ds-font);letter-spacing:.12em;color:var(--ds-cyan);width:100%}
+.dv-rules span{padding:2px 8px;border-radius:999px;border:1px solid var(--ds-line-2)}
+.dv-rchk{display:flex;flex-wrap:wrap;gap:5px;margin:2px 0 8px}
+.dv-rchk span{font:600 11px var(--ds-font);padding:2px 8px;border-radius:999px;border:1px solid}
+.dv-rchk .ok{color:#c6f9e3;border-color:rgba(46,229,157,.5);background:rgba(46,229,157,.08)}
+.dv-rchk .warn{color:#ffe0b0;border-color:rgba(255,181,71,.5);background:rgba(255,181,71,.08)}
+.dv-rchk .no{color:#ffc3ca;border-color:rgba(255,85,102,.55);background:rgba(255,85,102,.1)}
+.dv-opt.na h3{color:var(--ds-mut)}
+.dv-wod.only{border-color:rgba(255,85,102,.55);background:rgba(255,85,102,.08)}
+.dv-wod.only b{color:#ffc3ca}
+.dv-trap{border:1px solid rgba(255,85,102,.5);background:rgba(255,85,102,.07);border-radius:10px;padding:10px 12px;margin:0 0 10px}
+.dv-trap .k{font:700 11px var(--ds-font);letter-spacing:.12em;color:#ffc3ca;margin-bottom:6px}
+.dv-trap .it{display:grid;grid-template-columns:auto 1fr;gap:2px 10px;padding:6px 0;border-top:1px solid var(--ds-line);font-size:12.5px;color:var(--ds-text-2)}
+.dv-trap .it:first-of-type{border-top:0}
+.dv-trap .it b{color:#fff}
+.dv-trap .ok{color:#c6f9e3}.dv-trap .no{color:#ffc3ca}
 .dv-kv dt,.dv-kv dd{margin:0} .dv-kv dd{text-align:right;max-width:10.5em}
 .dv-kv b{color:#fff;font-weight:600;text-align:right;font-variant-numeric:tabular-nums}
 .dv-skip{display:flex;flex-wrap:wrap;gap:4px;margin:0 0 8px}
@@ -211,7 +229,11 @@ path.dv-blockline{filter:drop-shadow(0 0 6px rgba(255,85,102,.9))}
 .leaflet-popup-content-wrapper,.leaflet-popup-tip{background:#0c1b30!important;color:#e6f1ff!important;border:1px solid var(--ds-line-2)}
 .leaflet-popup-content{font:13px/1.4 var(--ds-font)!important;margin:10px 12px!important}
 .dv-maplegend{position:absolute;right:10px;bottom:22px;z-index:600;display:grid;grid-template-columns:auto 1fr;gap:4px 8px;align-items:center;padding:8px 10px;border-radius:9px;background:rgba(5,11,21,.88);border:1px solid var(--ds-line);font-size:11px;color:var(--ds-text-2)}
-.dv-maplegend i{display:inline-block;width:22px;border-top:3px solid}
+.dv-maplegend i{display:inline-block;width:24px;height:0;border-top:5px solid;outline:1.5px solid #fff;outline-offset:0;border-radius:1px;position:relative}
+.dv-maplegend i.ar::after{content:"";position:absolute;left:8px;top:-6px;width:0;height:0;border-left:6px solid #fff;border-top:3.5px solid transparent;border-bottom:3.5px solid transparent}
+/* direction arrows along route lines (rotated by bearing: 0 = north) */
+.dv-arr{width:16px;height:16px;border-radius:50%;background:var(--c);border:1.5px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.6);position:relative;pointer-events:none}
+.dv-arr::after{content:"";position:absolute;left:50%;top:50%;width:0;height:0;margin:-5px 0 0 -4px;border-left:4px solid transparent;border-right:4px solid transparent;border-bottom:8px solid #fff}
 .dv-maplegend.hid{display:none}
 
 /* modal */
@@ -326,14 +348,14 @@ path.dv-blockline{filter:drop-shadow(0 0 6px rgba(255,85,102,.9))}
         <div id="blockCard"></div>
         <div class="dv-lbl">EXPECTED CLOSURE</div>
         <div class="ds-segm" id="closure" role="group" aria-label="Expected closure duration">
-          <button type="button" data-m="15">15 MIN</button><button type="button" data-m="30" aria-pressed="true">30 MIN</button><button type="button" data-m="60">60 MIN</button><button type="button" data-m="open">UNTIL FURTHER NOTICE</button><button type="button" data-m="custom">CUSTOM</button>
+          <button type="button" data-m="15">15 MIN</button><button type="button" data-m="30" aria-pressed="true">30 MIN</button><button type="button" data-m="60">60 MIN</button><button type="button" data-m="open">UNTIL FURTHER NOTICE</button><button type="button" data-m="day">WHOLE DAY</button><button type="button" data-m="custom">CUSTOM</button>
         </div>
-        <div id="closureCustom" hidden style="margin-top:6px"><input class="ds-input" id="closureMin" type="number" min="5" max="600" step="5" placeholder="Minutes, e.g. 45" aria-label="Custom closure minutes"></div>
+        <div id="closureCustom" hidden style="margin-top:6px"><input class="ds-input" id="closureMin" type="number" min="5" max="1440" step="5" placeholder="Minutes, e.g. 45" aria-label="Custom closure minutes"></div>
         <div class="dv-row" style="margin-top:10px">
           <div class="ds-field" style="flex:1"><label for="busType">Bus type</label><select class="ds-select" id="busType"><option value="dd">Double deck</option><option value="sd">Single deck</option><option value="art">Articulated</option></select></div>
           <div class="ds-field" style="flex:1"><label for="myOcc">Your OCC</label><select class="ds-select" id="myOcc"><option value="">Choose…</option></select></div>
         </div>
-        <label class="dv-chk"><input type="checkbox" id="mainOnly" checked> <span><b>Main roads only</b><small>Expressways and arterial roads. Small-road shortcuts are never recommended.</small></span></label>
+        <label class="dv-chk"><input type="checkbox" id="mainOnly" checked> <span><b>Main roads only</b><small>LTA rule 1 (safety): expressways and arterial roads only. Small roads are never permitted; untick only to view them for reference.</small></span></label>
       </section>
 
       <section class="ds-panel" id="secServices" aria-labelledby="hSvc">
@@ -375,10 +397,11 @@ path.dv-blockline{filter:drop-shadow(0 0 6px rgba(255,85,102,.9))}
       <div class="dv-mapchip" id="mapChipHome"></div>
       <div class="dv-hint" id="dvHint" role="status">Tap the road where it is blocked</div>
       <div class="dv-maplegend" id="legend" aria-label="Map legend">
-        <i style="border-color:#2f8cff"></i><span>Normal route</span>
-        <i style="border-color:#ff5566"></i><span>Blocked section</span>
-        <i style="border-color:#2ee59d;border-top-style:dashed"></i><span>Selected diversion</span>
-        <i style="border-color:#ffb547;border-top-style:dashed"></i><span>Alternative diversion</span>
+        <i class="ar" style="border-color:#1257d6"></i><span>Normal route (arrows = direction)</span>
+        <i style="border-color:#c81e36"></i><span>Blocked section</span>
+        <i class="ar" style="border-color:#00955a;border-top-style:dashed"></i><span>Selected diversion</span>
+        <i class="ar" style="border-color:#c96a00;border-top-style:dashed"></i><span>Alternative diversion</span>
+        <i style="border-color:#a8430f;border-top-style:dotted"></i><span>Small roads (not permitted)</span>
         <span style="color:#ff5566;font-weight:800;text-align:center">&#x2715;</span><span>Skipped / blocked stop</span>
         <span style="color:#ffb547;text-align:center">&#x26a0;</span><span>Last diversion point</span>
         <span style="color:#2ee59d;text-align:center">&#x21aa;</span><span>Rejoin point</span>

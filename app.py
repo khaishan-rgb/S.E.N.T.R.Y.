@@ -6255,6 +6255,10 @@ async def api_system_notifications():
 # executed and nothing is sent outside the platform; the controller confirms every step.
 import diversion  # noqa: E402
 
+try:
+    diversion.PARAMS["wait_max_min"] = float(os.getenv("DIVERSION_WAIT_MAX_MIN", "30"))   # longest closure for which WAIT / REGULATE is offered
+except ValueError:
+    pass
 DV_MAX_POLL = int(os.getenv("DIVERSION_MAX_POLL", "16"))            # service-directions whose live buses are polled per analysis (protects the LTA quota)
 DV_AUTO = os.getenv("DIVERSION_AUTO_DETECT", "").strip().lower() in ("1", "true", "yes")   # future mode: LTA incidents raise "potential road blockage" alerts
 DV_STATUSES = ("detected", "analysing", "planned", "active", "monitoring", "recovering", "ended")
@@ -6883,8 +6887,11 @@ async def dv_options_core(st, blocks, svc, d, run_i, closure, bus, dims, others,
     marked = dv_marked()
 
     # candidate exit / rejoin points on the service route, and via points either side of the block
-    ex = sorted({round(max(0.0, A - o * 1000.0), 1) for o in P["exit_offsets_km"]}, reverse=True)
-    rj = sorted({round(min(cum[-1], B + o * 1000.0), 1) for o in P["rejoin_offsets_km"]})
+    long_closure = not diversion.wait_allowed(closure, P)
+    ex_off = tuple(P["exit_offsets_km"]) + (tuple(P["long_exit_offsets_km"]) if long_closure else ())        # long closure: buses cannot wait,
+    rj_off = tuple(P["rejoin_offsets_km"]) + (tuple(P["long_rejoin_offsets_km"]) if long_closure else ())    # so search further out too
+    ex = sorted({round(max(0.0, A - o * 1000.0), 1) for o in ex_off}, reverse=True)
+    rj = sorted({round(min(cum[-1], B + o * 1000.0), 1) for o in rj_off})
     pairs = list(zip(ex, rj))
     reqs = [([diversion.point_at(line, cum, e), diversion.point_at(line, cum, r)], 2) for e, r in pairs]
     sec_line = diversion.cut(line, cum, A, B)
@@ -7006,13 +7013,16 @@ async def dv_options_core(st, blocks, svc, d, run_i, closure, bus, dims, others,
                      "osm_ok": bool(osm and osm.get("ok")), "line": diversion.simplify(seg, 300),
                      "prof_t": None, "_prof": dprof, "_seg": seg})
     opts.sort(key=diversion.option_order)
+    for o in opts:
+        o["permitted"] = diversion.permitted(o)
+        o["rules"] = {"main_roads": (o.get("road_class") or {}).get("label") == "MAIN ROADS", "no_uturn": True}
     opts = opts[:P["max_options"]]
     for i, o in enumerate(opts, 1):
         o["n"] = i
         o["name"] = f"OPTION {i}"
 
     # last safe diversion point = the latest usable exit before the block
-    usable = [o for o in opts if o["feasibility"] != "NOT SUITABLE" and o["road_class"]["label"] != "SMALL ROADS"] or opts
+    usable = [o for o in opts if o["permitted"]]          # never anchored on a small-road route (LTA rule 1)
     last = max(usable, key=lambda o: o["leave_s"]) if usable else None
 
     # live buses (LTA Bus Arrival) on the approach, with their minutes to the last diversion point
@@ -7055,6 +7065,9 @@ async def dv_options_core(st, blocks, svc, d, run_i, closure, bus, dims, others,
         return sb
 
     ref_none = min([o["rejoin_s"] for o in opts] + [min(cum[-1], B + 200.0)])
+    closure_real = closure
+    if closure is not None and closure > P["sim_closure_max_min"]:
+        closure = None          # whole day / many hours: a bus that reaches the block is unable to move (simulated as stuck)
     s_none = diversion.simulate(sim_buses, prof, A, B, ref_none, closure, H)
     hw_none = diversion.headways(s_none, H)
     reg_none = diversion.regulation(s_none, H)
@@ -7075,8 +7088,36 @@ async def dv_options_core(st, blocks, svc, d, run_i, closure, bus, dims, others,
                      "added_min": o["added_min"], "affected": o["affected_buses"], "max_wait": max([r["wait"] or 0 for r in s_ if r["mode"] == "queued"] or [0.0]),
                      "sim": s_, "hw": hw_, "reg": reg_, "recovery_min": rec_, "bus_min": round(diversion.bus_minutes(s_), 1),
                      "timeline": diversion.timeline(s_, hw_, reg_, rec_, closure, road_txt, o["name"])})
+    closure = closure_real
     wod = diversion.wait_or_divert(s_none, opts, closure)
     rec = diversion.recommend(opts, wod, closure)
+    cols[0]["viable"] = diversion.wait_allowed(closure, P)
+    # buses already past the last diversion point: with no waiting possible, find each a way out from where it is now
+    # (road route forward from its position, avoiding every blockage, no U-turn), or flag it as unable to move
+    trapped = []
+    if long_closure:
+        best = next((o for o in opts if o["n"] == rec.get("option")), opts[0] if opts else None)
+        tgt_s = best["rejoin_s"] if best else min(cum[-1], B + 400.0)
+        tgt = diversion.point_at(line, cum, tgt_s)
+        for b in [b for b in buses if b.get("status") in ("passed_exit", "inside")][:4]:
+            t = {"label": b["label"], "lat": b["lat"], "lon": b["lon"], "status": b["status"], "escape": None}
+            if b["status"] == "inside":
+                t["note"] = "Inside the closed section: on-site instruction needed (no routing through a closure)."
+            else:
+                start = (b["lat"], b["lon"])
+                hdg = [diversion.nearest_on_line(start, line, cum)[3], diversion.nearest_on_line(tgt, line, cum)[3]]
+                rr = await dv_osrm([start, tgt], 2, hdg)
+                for r in rr.get("routes") or []:
+                    if await dv_uses_any(r["line"], blocks) or await asyncio.to_thread(diversion.uturns, r["line"], r.get("steps")):
+                        continue
+                    roads = [g["road"] for g in offservice.group_roads(r["steps"]) if g.get("road")]
+                    t["escape"] = {"roads": roads[:8], "km": round(r["km"], 2), "min": round(r["osrm_min"], 1),
+                                   "line": [[round(p[0], 6), round(p[1], 6)] for p in diversion.simplify(r["line"], 200)],
+                                   "time_src": "OSRM road time (estimate)"}
+                    break
+                if not t["escape"]:
+                    t["note"] = "No road route forward without a U-turn and avoiding the block: unable to move until reopened. Escalate (LTA / Traffic Police assistance)."
+            trapped.append(t)
     # other affected services that could use the same diversion (their line passes the same exit and rejoin points, in that order)
     also = []
     for x in (others or [])[:20]:
@@ -7133,6 +7174,8 @@ async def dv_options_core(st, blocks, svc, d, run_i, closure, bus, dims, others,
             "options": opts, "rejected": rejected, "candidates_tested": len(raw), "routing_error": routing_err if not opts else None,
             "last_point": last_pt, "buses": buses, "buses_on_diversion": on_div, "stops_polled": n_polled, "arrival_error": arr_err,
             "compare": cols, "wait_or_divert": wod, "window": win,
+            "wait_allowed": diversion.wait_allowed(closure, P), "wait_max_min": P["wait_max_min"], "closure_desc": diversion.closure_desc(closure),
+            "long_closure": long_closure, "trapped": trapped,
             "time_basis": "LTA speed bands" if prof["known_share"] >= 0.5 else f"assumed {P['fallback_kmh']:g} km/h where no speed data (speed bands cover {round(prof['known_share'] * 100)}%)",
             "important_basis": "LTA stop names (Stn / Int / Ter / Hosp), services at the stop, and the OCC important-stop list",
             "updated": now.isoformat(timespec="seconds")}
@@ -7211,12 +7254,13 @@ async def api_dv_plan_all(request: Request):
            "manual": sum(1 for x in rows if x["action"] == "manual"),
            "skipped": sum((x["option"] or {}).get("skipped_n") or 0 for x in ok_rows if x["action"] == "divert"),
            "important": sum((x["option"] or {}).get("important_n") or 0 for x in ok_rows if x["action"] == "divert"),
-           "bus_min": round(sum(x["bus_min"] or 0 for x in ok_rows), 1), "bus_min_none": round(sum(x["bus_min_none"] or 0 for x in ok_rows), 1),
+           "bus_min": round(sum(x["bus_min"] or 0 for x in ok_rows), 1), "bus_min_none": None if any(x["bus_min_none"] is None for x in ok_rows) else round(sum(x["bus_min_none"] or 0 for x in ok_rows), 1),   # None = buses unable to move: not measurable
+           "wait_allowed": diversion.wait_allowed(closure),
            "shared_routes": sum(1 for g in net["groups"] if len(g["services"]) > 1)}
     return {"ok": True, "road": dv_roads_txt(blocks), "blocks_n": len(blocks), "closure_min": closure, "allow_small": allow_small, "rows": rows,
             "network": net, "totals": tot, "poll_cap": DV_MAX_POLL, "ai": bool(DV_AI_KEY),
             "basis": "Each service: road routes (OSRM) that avoid every blockage, timed on LTA speed bands, road class from LTA road category / "
-                     "OpenStreetMap. Chosen by rules (suitability, main roads, important stops, added time) \u2014 no score.",
+                     "OpenStreetMap. Chosen by the LTA diversion rules: 1 safety (main roads only), 2 fewest bus stops skipped, 3 no U-turn \u2014 no score.",
             "updated": now_sgt().isoformat(timespec="seconds")}
 
 
@@ -7334,6 +7378,25 @@ async def api_dv_playbook(lat: float = 0.0, lon: float = 0.0, road: str = ""):
     return {"items": dv_playbook_rows(lat if lat else None, lon if lon else None, road)}
 
 
+def dv_wait_block(body, r, services):
+    """WAIT / REGULATE is only allowed for a short, known closure. -> (closure_min, error or None)"""
+    if "closure_min" in body:
+        c, _, _, _ = dv_opt_params(body)
+    else:
+        c = r["closure_min"] if "closure_min" in r.keys() else None
+    small = [f"{x['service']} D{x['direction']}" for x in services if x.get("roads") and str(x.get("road_class") or "").upper() == "SMALL ROADS"]
+    if small:
+        return c, ("LTA rule 1 (safety): a bus diversion may not use small roads. Choose a main-road diversion for " + ", ".join(small) + ".")
+    if diversion.wait_allowed(c):
+        return c, None
+    waits = [f"{x['service']} D{x['direction']}" for x in services if not x.get("roads") and not x.get("option")]
+    if waits:
+        return c, (f"Closure {diversion.closure_desc(c)}: buses cannot wait at the block. Choose a diversion for "
+                   + ", ".join(waits) + " (WAIT / REGULATE is only possible for closures up to "
+                   + f"{diversion.PARAMS['wait_max_min']:g} min), or remove the service from the plan.")
+    return c, None
+
+
 def dv_clean_services(v):
     out = []
     for s_ in (v or [])[:30]:
@@ -7419,6 +7482,11 @@ async def api_dv_confirm(pid: int, request: Request):
     occ = occ if occ in OCC_TEAMS else ""
     services = dv_clean_services(body.get("services")) or json.loads(r["services"] or "[]")
     share = [x for x in (body.get("share") or []) if x in OCC_TEAMS and x != occ]
+    closure_c, werr = dv_wait_block(body, r, services)
+    if werr:
+        return JSONResponse({"error": werr}, status_code=400)
+    if "closure_min" in body:
+        bb_sql("UPDATE diversion_plan SET closure_min=? WHERE id=?", (closure_c, pid))
     now = time.time()
     closure_label = str(body.get("closure_label") or r["closure_label"] or "")[:40]
     nb = dv_blocks(body) if (body.get("blocks") or body.get("block")) else []
@@ -7457,6 +7525,11 @@ async def api_dv_update(pid: int, request: Request):
     who = _who(request)
     rev = (r["revision"] or 1) + 1
     services = dv_clean_services(body.get("services")) or json.loads(r["services"] or "[]")
+    closure_c, werr = dv_wait_block(body, r, services)
+    if werr:
+        return JSONResponse({"error": werr}, status_code=400)
+    if "closure_min" in body:
+        bb_sql("UPDATE diversion_plan SET closure_min=? WHERE id=?", (closure_c, pid))
     closure_label = str(body.get("closure_label") or r["closure_label"] or "")[:40]
     note = str(body.get("note") or "").strip()[:400]
     plan = {"road": r["road"], "services": services, "effective": dv_hhmm(r["started_ts"] or time.time()), "status": r["status"], "closure": closure_label, "revision": rev,

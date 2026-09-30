@@ -17,6 +17,10 @@ import math
 import re
 
 PARAMS = {
+    "wait_max_min": 30.0,       # WAIT / REGULATE is only offered for a known closure this short; longer, until further notice or whole day = divert
+    "sim_closure_max_min": 120.0,  # beyond this, buses that reach the block are treated as unable to move for the rest of the simulation
+    "long_exit_offsets_km": (2.5, 4.0),    # long closures: also search diversions that leave / rejoin further from the block
+    "long_rejoin_offsets_km": (2.5, 4.0),
     "uturn_near_m": 20.0,       # U-turn test: the route comes back within this distance of where it has already been...
     "uturn_deg": 150.0,         # ...heading the opposite way (U-turn at a junction, at a roundabout, or round a block)
     "uturn_min_m": 15.0,        # ignore wiggles shorter than this along the route
@@ -606,10 +610,27 @@ def timeline(sim, hw, reg, recov, closure_min, road, option_name=None):
     return ev
 
 
-def wait_or_divert(sim_none, opts_eval, closure_min):
-    """Plain comparison of holding against diverting - no score, just the consequence of each."""
+def wait_allowed(closure_min, P=PARAMS):
+    """Buses can only be held for a short, known closure. Until further notice, whole day or longer than
+    wait_max_min: buses cannot wait at the block, so every bus must be diverted."""
+    return closure_min is not None and closure_min <= P["wait_max_min"]
+
+
+def closure_desc(closure_min):
     if closure_min is None:
-        return {"kind": "divert", "text": "Closure length unknown: without a diversion, buses reaching the block cannot continue."}
+        return "until further notice"
+    if closure_min >= 120:
+        return f"about {closure_min / 60:.0f} hours"
+    return f"{closure_min:g} minutes"
+
+
+def wait_or_divert(sim_none, opts_eval, closure_min, P=PARAMS):
+    """Plain comparison of holding against diverting - no score, just the consequence of each."""
+    if not wait_allowed(closure_min, P):
+        found = any(o.get("added_min") is not None for o in opts_eval)
+        return {"kind": "divert_only", "wait_allowed": False,
+                "text": f"Closure {closure_desc(closure_min)}: buses cannot wait at the block, so WAIT / REGULATE is not an option \u2014 every bus must be diverted."
+                        + ("" if found else " No bus-suitable diversion without a U-turn was found: escalate.")}
     q = [r for r in sim_none if r["mode"] == "queued"]
     if not q:
         return {"kind": "wait", "text": f"No bus is expected to reach the block within the {closure_min:g}-minute closure: holding upstream / regulating may be enough."}
@@ -737,10 +758,25 @@ FEAS_ORDER = {"HIGH": 0, "VERIFICATION REQUIRED": 1, "LOW": 2, "NOT SUITABLE": 3
 CLASS_ORDER = {"MAIN ROADS": 0, "NOT VERIFIED": 1, "SMALL ROADS": 2}
 
 
+LTA_RULES = ("1. Safety: main roads only, never small roads",
+             "2. Skip as few bus stops as possible",
+             "3. No U-turn")
+
+
 def option_order(o):
-    """suitability first, then main roads, then important stops skipped, then added running time"""
-    return (FEAS_ORDER.get(o.get("feasibility"), 1), CLASS_ORDER.get((o.get("road_class") or {}).get("label"), 1),
-            o.get("important_n", 0), o.get("added_min") if o.get("added_min") is not None else 99)
+    """LTA diversion rules, in order (no score):
+    1. safety - usable for this bus, then main roads before unverified roads (small roads are never permitted)
+    2. fewest bus stops skipped, then fewest important stops skipped
+    3. no U-turn (hard rule: routes with a U-turn never reach this point)
+    then verified before verification-required, then least added running time."""
+    return (o.get("feasibility") == "NOT SUITABLE", CLASS_ORDER.get((o.get("road_class") or {}).get("label"), 1),
+            o.get("skipped_n", 0), o.get("important_n", 0),
+            FEAS_ORDER.get(o.get("feasibility"), 1), o.get("added_min") if o.get("added_min") is not None else 99)
+
+
+def permitted(o):
+    """LTA rule 1: a route on small roads is never a permitted bus diversion"""
+    return (o.get("road_class") or {}).get("label") != "SMALL ROADS" and o.get("feasibility") != "NOT SUITABLE"
 
 
 def recommend(opts, wod, closure_min):
@@ -749,14 +785,26 @@ def recommend(opts, wod, closure_min):
     ok = [o for o in opts if o.get("feasibility") != "NOT SUITABLE" and (o.get("road_class") or {}).get("label") != "SMALL ROADS"]
     small = [o for o in opts if (o.get("road_class") or {}).get("label") == "SMALL ROADS"]
     if not ok:
-        return {"action": "wait" if closure_min is not None else "manual", "option": None, "route_if_extended": None,
-                "headline": "NO MAIN-ROAD DIVERSION FOUND",
-                "reasons": ["Every road route found around the section either uses the blocked road, is unsuitable for this bus, or runs on small roads."],
-                "cautions": ([f"{len(small)} small-road route(s) found and held back by the main-roads policy."] if small else []) +
-                            ["Hold / regulate upstream and plan the diversion manually with the depot."]}
+        if wait_allowed(closure_min):
+            return {"action": "wait", "option": None, "route_if_extended": None,
+                    "headline": "NO MAIN-ROAD DIVERSION FOUND",
+                    "reasons": ["Every road route found around the section either uses the blocked road, needs a U-turn, is unsuitable for this bus, or runs on small roads."],
+                    "cautions": ([f"{len(small)} small-road route(s) found and held back by the main-roads policy."] if small else []) +
+                                ["Hold / regulate upstream for this short closure and plan the diversion manually with the depot if it extends."]}
+        return {"action": "manual", "option": None, "route_if_extended": None,
+                "headline": "NO BUS-SUITABLE DIVERSION FOUND \u2014 ESCALATE",
+                "reasons": [f"Closure {closure_desc(closure_min)}: buses cannot wait at the block.",
+                            "Every road route found around the section either uses the blocked road, needs a U-turn, is unsuitable for this bus, or runs on small roads."],
+                "cautions": ([f"{len(small)} small-road route(s) found and held back by the main-roads policy \u2014 review them with the depot."] if small else []) +
+                            ["Escalate to the Duty Operations Manager and depot.",
+                             "Options to consider (operational verification required): short-working \u2014 terminate before the block and restart after it, "
+                             "using a turning facility that needs no U-turn; a wider diversion planned with the depot; LTA / Traffic Police assistance for buses already past the diversion point."]}
     best = sorted(ok, key=option_order)[0]
     rc = best.get("road_class") or {}
-    reasons = [f"{best['name']} uses main roads: {rc.get('text', '')}" if rc.get("label") == "MAIN ROADS" else f"{best['name']}: {rc.get('text', '')}",
+    fewest = min(o.get("skipped_n", 0) for o in ok)
+    reasons = [f"Rule 1 (safety): {best['name']} uses main roads \u2014 {rc.get('text', '')}" if rc.get("label") == "MAIN ROADS" else f"Rule 1 (safety): {best['name']} \u2014 {rc.get('text', '')}",
+               f"Rule 2: skips {best['skipped_n']} stop(s)" + (" \u2014 the fewest of the safe routes" if best.get("skipped_n", 0) == fewest else ""),
+               "Rule 3: no U-turn (checked)",
                f"{best['added_km']:+.1f} km, about {best['added_min']:+.0f} min per trip ({best.get('time_src', '')})",
                f"{best['skipped_n']} stop(s) skipped" + (f", including {best['important_n']} important" if best.get("important_n") else ", none important"),
                f"Traffic on the route: {best.get('traffic', 'UNKNOWN')}"]

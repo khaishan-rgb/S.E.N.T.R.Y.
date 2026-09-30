@@ -51,3 +51,5 @@ services:
         sync: false
       - key: DIVERSION_AUTO_DETECT # optional: 1 = suggest blockages from LTA incidents (never activates a diversion)
         sync: false
+      - key: DIVERSION_WAIT_MAX_MIN # optional: Diversion Maps — longest closure (min) for which WAIT / REGULATE is offered (default 30)
+        sync: false

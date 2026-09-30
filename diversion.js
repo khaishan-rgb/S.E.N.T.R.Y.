@@ -72,6 +72,33 @@
   [["traffic", 330], ["tomtom", 340], ["routes", 410], ["alts", 420], ["divsel", 430], ["block", 440], ["pts", 620], ["bus", 640]].forEach(function(p){ map.createPane(p[0]).style.zIndex = p[1]; });
   map.getPane("traffic").style.pointerEvents = "none";
   var canvasR = L.canvas({padding:.3, pane:"traffic"});
+  map.createPane("arrows").style.zIndex = 450;
+  /* route drawing: darker, saturated colours with a white outline (readable on the dark basemap) and white direction arrows */
+  var RC = {route:"#1257d6", other:"#1a4fa8", sel:"#00955a", alt:"#c96a00", small:"#a8430f", block:"#c81e36", esc:"#0a7ea8", prev:"#0a7ea8"};
+  var ARROWS = [];
+  function rline(pts, color, o, grp, withArrows){
+    o = o || {}; var w = o.weight || 5;
+    var cs = L.polyline(pts, {pane:o.pane, color:"#ffffff", weight:w + 4, opacity:o.casing == null ? .9 : o.casing, interactive:false, lineCap:o.lineCap || "round", lineJoin:"round"}).addTo(grp);
+    var core = L.polyline(pts, Object.assign({lineJoin:"round"}, o, {color:color, weight:w})).addTo(grp);
+    core._casing = cs;
+    if(withArrows){ var ag = L.layerGroup().addTo(grp), sp = {pts:pts, color:color, grp:grp, ag:ag}; ARROWS.push(sp); arrowsFor(sp); }
+    return core;
+  }
+  function arrowsFor(sp){
+    sp.ag.clearLayers();
+    var pts = sp.pts; if(!pts || pts.length < 2) return;
+    var cm = cumM(pts), total = cm[cm.length - 1], lat = pts[0][0];
+    var mpp = 40075016.686 * Math.cos(lat * Math.PI / 180) / (256 * Math.pow(2, map.getZoom()));
+    var step = Math.max(80, 150 * mpp);
+    if(total < step * .6) return;
+    for(var d = step / 2; d < total; d += step){
+      var a = pointAt(pts, cm, Math.max(0, d - 4)), b = pointAt(pts, cm, Math.min(total, d + 4));
+      var brg = Math.atan2((b[1] - a[1]) * KX, (b[0] - a[0]) * KY) * 180 / Math.PI;
+      L.marker(pointAt(pts, cm, d), {pane:"arrows", interactive:false, keyboard:false,
+        icon:L.divIcon({className:"", iconSize:[0, 0], html:'<div class="dv-arr" style="--c:' + sp.color + ';transform:translate(-50%,-50%) rotate(' + brg.toFixed(0) + 'deg)"></div>'})}).addTo(sp.ag);
+    }
+  }
+  function redrawArrows(){ ARROWS = ARROWS.filter(function(sp){ return sp.grp.hasLayer(sp.ag) && (map.hasLayer(sp.grp) || true); }); ARROWS.forEach(arrowsFor); }
   var G = {};
   ["speed", "incidents", "roadworks", "others", "net", "route", "blocked", "alts", "sel", "pts", "buses", "handles", "prev"].forEach(function(k){ G[k] = L.layerGroup().addTo(map); });
   var tomLayer = null;
@@ -105,6 +132,7 @@
     }, 350);
   }
   map.on("moveend", loadSpeed);
+  map.on("zoomend", redrawArrows);
   function loadIncidents(){
     DS.api("/api/incidents").then(function(j){
       G.incidents.clearLayers();
@@ -202,8 +230,8 @@
     var all = null, many = S.blocks.length > 1;
     S.blocks.forEach(function(b, i){
       var bl = bLine(b), sel = i === S.bi && S.editing;
-      if(sel) L.polyline(b.corridor, {pane:"block", color:C.red, weight:2, opacity:.28, dashArray:"3 6", interactive:false}).addTo(G.blocked);
-      b._line = L.polyline(bl, {pane:"block", color:C.red, weight:7, opacity:.95, className:"dv-blockline", lineCap:"butt"}).addTo(G.blocked)
+      if(sel) L.polyline(b.corridor, {pane:"block", color:C.red, weight:2, opacity:.35, dashArray:"3 6", interactive:false}).addTo(G.blocked);
+      b._line = rline(bl, RC.block, {pane:"block", weight:7, opacity:1, className:"dv-blockline", lineCap:"butt"}, G.blocked, false)
         .bindTooltip((many ? "Blockage " + (i + 1) + " \u00b7 " : "") + b.road + " \u00b7 " + km(b.b - b.a), {sticky:true});
       b._x = L.marker(pointAt(b.corridor, b.cm, (b.a + b.b) / 2), {icon:divIcon('<div class="dv-mk-x" style="position:relative">&#x2715;' + (many ? '<sup>' + (i + 1) + '</sup>' : '') + '</div>'), pane:"bus", keyboard:false})
         .addTo(G.blocked).bindTooltip(esc(b.road) + " \u2014 blocked" + (many ? " (" + (i + 1) + ")" : ""), {direction:"top"})
@@ -224,7 +252,7 @@
     var m = L.marker(pointAt(b.corridor, b.cm, s), {draggable:true, pane:"bus", icon:divIcon('<div class="dv-handle' + (st ? " st" : "") + '" role="slider" aria-label="' + label + ' (drag along the road)"><span>' + (st ? "START" : "END") + '</span></div>', "dv-mk"), autoPan:true}).addTo(G.handles);
     m.on("drag", function(e){
       var p = e.target.getLatLng(), n = nearestOn([p.lat, p.lng], b.corridor, b.cm); set(n.s);
-      if(b._line) b._line.setLatLngs(bLine(b)); if(b._x) b._x.setLatLng(pointAt(b.corridor, b.cm, (b.a + b.b) / 2)); renderBlockCard();
+      if(b._line){ b._line.setLatLngs(bLine(b)); if(b._line._casing) b._line._casing.setLatLngs(bLine(b)); } if(b._x) b._x.setLatLng(pointAt(b.corridor, b.cm, (b.a + b.b) / 2)); renderBlockCard();
     });
     m.on("dragend", function(){ drawBlocks(); resetAnalysis(); analyse(); });
     return m;
@@ -318,7 +346,7 @@
     G.others.clearLayers(); if(!S.an) return;
     S.an.entries.forEach(function(e){
       var k = e.service + "|" + e.direction;
-      var draw = function(line){ if(!line || S.sel && S.sel.indexOf(k + "|") === 0) return; L.polyline(line, {pane:"routes", color:C.blue, weight:3, opacity:.35}).bindTooltip("Service " + e.service + " D" + e.direction, {sticky:true}).on("click", function(){ selectService(key(e)); }).addTo(G.others); };
+      var draw = function(line){ if(!line || S.sel && S.sel.indexOf(k + "|") === 0) return; rline(line, RC.other, {pane:"routes", weight:3, opacity:.7, casing:.35}, G.others, false).bindTooltip("Service " + e.service + " D" + e.direction, {sticky:true}).on("click", function(){ selectService(key(e)); }).addTo(G.others); };
       if(routeCache[k]) return draw(routeCache[k]);
       DS.api("/api/traffic/route?service=" + encodeURIComponent(e.service) + "&direction=" + e.direction).then(function(r){ if(r.line && r.line.length){ routeCache[k] = r.line; draw(r.line); } });
     });
@@ -335,7 +363,7 @@
   }
   function viewPrevious(p){
     G.prev.clearLayers();
-    savedBlocks(p.block).forEach(function(b){ L.polyline(b.line, {pane:"block", color:C.cyan, weight:5, dashArray:"4 6", opacity:.8}).addTo(G.prev).bindTooltip("Previous blockage (" + p.last_used + ")"); });
+    savedBlocks(p.block).forEach(function(b){ rline(b.line, RC.prev, {pane:"block", weight:5, dashArray:"4 6", opacity:1}, G.prev, false).bindTooltip("Previous blockage (" + p.last_used + ")"); });
     modal('<h2 id="modalT">Previous diversion \u2014 ' + esc(p.road) + '</h2><p class="dv-muted">Used ' + esc(p.last_used) + (p.closure_label ? ' \u00b7 closure ' + esc(p.closure_label) : '') + '. Shown in cyan on the map.</p>'
       + p.detail.map(function(d){ return '<div class="dv-plan-row"><b>' + esc(d.service) + '</b><span>D' + d.direction + ' \u2014 ' + esc(d.roads.length ? d.roads.join(" \u2192 ") + " \u2192 rejoin" : (d.action || "wait / regulate")) + '</span></div>'; }).join("")
       + '<div class="foot"><button type="button" class="ds-btn" data-close>Close</button><button type="button" class="ds-btn pri" id="mLoadPrev">Load as starting point</button></div>');
@@ -367,7 +395,10 @@
       if(S.pending && S.pending.service === e.service && S.pending.direction === e.direction){ prev = {sig:S.pending.signature || "wait"}; S.pending = null; }
       var match = prev && prev.sig && j.options.filter(function(o){ return o.signature === prev.sig; })[0];
       var rec = j.recommendation || {};
-      S.optSel = match ? match.n : (prev && prev.sig === "wait" ? 0 : (rec.option || rec.route_if_extended || (j.options.length ? j.options[0].n : 0)));
+      if(j.wait_max_min != null) S.waitMax = j.wait_max_min;
+      if(match && match.permitted === false) match = null;
+      S.optSel = match ? match.n : (prev && prev.sig === "wait" && j.wait_allowed ? 0 : (rec.option || rec.route_if_extended || (j.options.length ? j.options[0].n : 0)));
+      if(S.choices[k] && !j.wait_allowed && !S.choices[k].option && !(S.choices[k].roads || []).length) delete S.choices[k];
       S.prevMissing = !!(prev && prev.sig && prev.sig !== "wait" && !match);
       if(S.choices[k] && match) S.choices[k] = choiceFrom(e, j, match);
       drawOptions(true); renderAll();
@@ -391,7 +422,7 @@
       detected:esc(j.road || roadsTxt()) + " blocked \u2014 " + (j.blocked_stops.length ? j.blocked_stops.length + " stop(s) inaccessible" : "section with no stop"),
       recommendation:'<b style="color:#fff">' + esc(rec.headline) + '</b><ul>' + li(rec.reasons) + li(rec.cautions, true) + '</ul>',
       effect:j.wait_or_divert ? esc(j.wait_or_divert.text) : "",
-      basis:"Rules: suitability \u2192 main roads \u2192 important stops \u2192 added time. No score. Controller confirms."})
+      basis:"LTA diversion rules: 1 safety \u2014 main roads only \u2192 2 fewest bus stops skipped \u2192 3 no U-turn. Then added time. No score. Controller confirms."})
       + '<div class="dv-row" style="margin:-4px 0 10px">' + (rec.option || rec.route_if_extended ? '<button type="button" class="ds-btn sm pri" id="recSim">\u25b6 SIMULATE RECOMMENDED ROUTE</button>' : '')
       + '<button type="button" class="ds-btn sm" id="recAdopt">ADD RECOMMENDATION TO PLAN</button></div></div>';
   }
@@ -403,20 +434,29 @@
     $("optSub").textContent = j.service + " D" + j.direction + " \u00b7 " + j.options.length + " feasible";
     var rec = j.recommendation || {}, h = recBox(j);
     if(j.small_hidden) h += '<div class="dv-note">\u26d4 ' + j.small_hidden + ' shorter route(s) on small roads held back (' + esc(j.small_hidden_roads.map(tc).join("; ")) + '). Buses stay on main roads.'
-      + '<br><button type="button" class="ds-btn sm ghost" id="showSmall">Show them (not recommended)</button></div>';
-    else if(S.allowSmall) h += '<div class="dv-note">Small-road routes are shown for reference and are never recommended. <br><button type="button" class="ds-btn sm ghost" id="hideSmall">Main roads only</button></div>';
+      + '<br><button type="button" class="ds-btn sm ghost" id="showSmall">Show them for reference (not permitted)</button></div>';
+    else if(S.allowSmall) h += '<div class="dv-note">Small-road routes are shown for reference only. LTA rule 1 (safety): they cannot be selected. <br><button type="button" class="ds-btn sm ghost" id="hideSmall">Main roads only</button></div>';
+    var fewest = Math.min.apply(null, j.options.filter(function(o){ return o.permitted; }).map(function(o){ return o.skipped_n; }).concat([1e9]));
+    h += '<div class="dv-rules" aria-label="LTA diversion rules"><b>LTA DIVERSION RULES</b><span>1 \u00b7 Safety: main roads only</span><span>2 \u00b7 Fewest bus stops skipped</span><span>3 \u00b7 No U-turn</span></div>';
     if(j.last_point){ var lb = (j.buses || []).filter(function(b){ return b.m_to_exit != null; }).sort(function(a, b){ return a.m_to_exit - b.m_to_exit; })[0];
       h += '<div class="dv-last"><span class="ic" aria-hidden="true">&#x26a0;</span><div><b>LAST DIVERSION POINT</b><span>' + (lb ? km(lb.m_to_exit) + ' ahead of ' + esc(lb.label) + (lb.min_to_exit != null ? ' \u00b7 ' + (lb.min_to_exit < 1 ? 'under 1 min' : 'approx. ' + f0(lb.min_to_exit) + ' min') : '') : km(j.last_point.before_block_m) + ' before the block') + '</span>'
         + '<small>Turn into ' + esc(j.last_point.road || "the diversion") + ' (option ' + j.last_point.option + '). A bus past this junction can no longer use the proposed diversion.</small></div></div>'; }
-    if(j.wait_or_divert) h += '<div class="dv-wod"><b>' + (j.wait_or_divert.kind === "wait" ? "WAIT / REGULATE vs DIVERT" : "DIVERT vs WAIT") + '</b>' + esc(j.wait_or_divert.text) + '</div>';
+    if(j.wait_or_divert) h += '<div class="dv-wod' + (j.wait_or_divert.kind === "divert_only" ? " only" : "") + '"><b>' + (j.wait_or_divert.kind === "wait" ? "WAIT / REGULATE vs DIVERT" : j.wait_or_divert.kind === "divert_only" ? "DIVERT \u2014 BUSES CANNOT WAIT" : "DIVERT vs WAIT") + '</b>' + esc(j.wait_or_divert.text) + '</div>';
+    if((j.trapped || []).length) h += '<div class="dv-trap"><div class="k">\u26a0 PAST THE LAST DIVERSION POINT (' + j.trapped.length + ')</div>'
+      + j.trapped.map(function(t){ return '<div class="it"><b>' + esc(t.label) + '</b>' + (t.escape ? '<span class="ok">Route out, no U-turn: ' + esc(t.escape.roads.map(tc).join(" \u2192 ")) + ' \u2192 rejoin \u00b7 ' + f1(t.escape.km) + ' km, ~' + f0(t.escape.min) + ' min (' + esc(t.escape.time_src) + ')</span>' : '<span class="no">' + esc(t.note || "Unable to move") + '</span>') + '</div>'; }).join("")
+      + '<small class="dv-muted">' + (j.trapped.some(function(t){ return t.escape; }) ? 'Routes out are shown dashed cyan on the map. ' : '') + 'Driver instruction by OCC; operational verification required.</small></div>';
     if(S.prevMissing) h += '<div class="dv-warn">The previous plan\u2019s road sequence was not found among today\u2019s feasible routes. Check current conditions.</div>';
     if(!j.options.length){
-      h += '<div class="dv-warn">No feasible diversion found. ' + (j.routing_error ? "Road routing: " + esc(j.routing_error) + ". " : "") + j.candidates_tested + ' road route(s) tested; ' + j.rejected.uses_block + ' used the blocked road, ' + (j.rejected.uturn || 0) + ' needed a U-turn and ' + j.rejected.no_bypass + ' did not bypass it.</div>';
+      h += '<div class="dv-warn">' + (j.wait_allowed ? '' : '<b>Buses cannot wait (closure ' + esc(j.closure_desc) + ') and no bus-suitable diversion was found \u2014 escalate.</b><br>') + 'No feasible diversion found. ' + (j.routing_error ? "Road routing: " + esc(j.routing_error) + ". " : "") + j.candidates_tested + ' road route(s) tested; ' + j.rejected.uses_block + ' used the blocked road, ' + (j.rejected.uturn || 0) + ' needed a U-turn and ' + j.rejected.no_bypass + ' did not bypass it.</div>';
     }
     j.options.forEach(function(o){
-      var sel = S.optSel === o.n, isRec = rec.option === o.n, isExt = rec.route_if_extended === o.n;
-      h += '<article class="dv-opt ' + (sel ? "sel" : "alt") + (isRec ? " rec" : "") + '" aria-label="' + o.name + (isRec ? ", recommended" : "") + '"><h3>' + o.name + '<span class="sp"></span>'
-        + (isRec ? '<span class="dv-badge">\u2605 RECOMMENDED</span>' : isExt ? '<span class="dv-badge alt">READY IF EXTENDED</span>' : '') + (sel ? ' ' + DS.sev("ok", "SELECTED") : "") + '</h3>' + rcBar(o.road_class) + '<ul class="dv-chain">'
+      var sel = S.optSel === o.n, isRec = rec.option === o.n, isExt = rec.route_if_extended === o.n, np = o.permitted === false;
+      var r1 = (o.road_class || {}).label === "MAIN ROADS", r1u = (o.road_class || {}).label === "NOT VERIFIED";
+      var rules = '<div class="dv-rchk"><span class="' + (r1 ? "ok" : r1u ? "warn" : "no") + '">' + (r1 ? "\u2713" : r1u ? "?" : "\u2715") + ' 1 Main roads' + (r1u ? " (verify)" : "") + '</span>'
+        + '<span class="' + (o.skipped_n <= fewest ? "ok" : "warn") + '">' + (o.skipped_n <= fewest ? "\u2713" : "\u2022") + ' 2 Skips ' + o.skipped_n + ' stop' + (o.skipped_n === 1 ? "" : "s") + (o.skipped_n <= fewest && !np ? " (fewest)" : "") + '</span>'
+        + '<span class="ok">\u2713 3 No U-turn</span></div>';
+      h += '<article class="dv-opt ' + (np ? "na" : sel ? "sel" : "alt") + (isRec ? " rec" : "") + '" aria-label="' + o.name + (isRec ? ", recommended" : "") + '"><h3>' + o.name + '<span class="sp"></span>'
+        + (np ? DS.sev("crit", "NOT PERMITTED \u2014 SMALL ROADS") : isRec ? '<span class="dv-badge">\u2605 RECOMMENDED</span>' : isExt ? '<span class="dv-badge alt">READY IF EXTENDED</span>' : '') + (sel && !np ? ' ' + DS.sev("ok", "SELECTED") : "") + '</h3>' + rules + rcBar(o.road_class) + '<ul class="dv-chain">'
         + o.roads.map(function(r){ return '<li>' + esc(tc(r)) + '</li>'; }).join("") + '<li class="rj">\u21aa REJOIN NORMAL ROUTE' + (o.rejoin_stop ? ' \u00b7 ' + esc(o.rejoin_stop.name) : '') + '</li></ul>'
         + '<div class="dv-lbl" style="margin-top:0">SKIPPED STOPS: ' + o.skipped_n + '</div><div class="dv-skip">' + o.skipped.map(function(s){ return '<span class="' + (s.important.length ? "imp" : "") + '" title="' + esc(s.name + (s.important.length ? " \u2014 " + s.important.join(", ") : "")) + '">' + (s.important.length ? "\u26a0" : "\u2715") + ' ' + esc(s.code) + '</span>'; }).join("") + (o.skipped_n ? "" : '<span style="background:none;border-color:var(--ds-line);color:var(--ds-mut)">none</span>') + '</div>'
         + (o.important_n ? '<div class="dv-warn">\u26a0 ' + o.skipped.filter(function(s){ return s.important.length; }).map(function(s){ return esc(s.name) + " (" + esc(s.important.join(", ")) + ")"; }).join("; ") + '</div>' : '')
@@ -424,21 +464,23 @@
         + '<dt>Affected buses (can divert)</dt><dd><b>' + o.affected_buses + '</b></dd><dt>Important stops skipped</dt><dd><b style="color:' + (o.important_n ? C.amber : "#fff") + '">' + o.important_n + '</b></dd>'
         + '<dt>Traffic condition</dt><dd><b style="color:' + (o.traffic === "HEAVY" ? C.red : o.traffic === "MODERATE" ? C.amber : o.traffic === "NORMAL" ? C.green : C.grey) + '">' + o.traffic + '</b></dd>'
         + '<dt>Turns \u00b7 sharp turns</dt><dd><b>' + o.n_turns + ' \u00b7 ' + o.n_sharp + '</b></dd>'
-        + '<dt>U-turns</dt><dd><b style="color:' + C.green + '">NONE \u2713</b></dd>'
         + '<dt>Operational feasibility</dt><dd><b style="color:' + (o.feasibility === "HIGH" ? C.green : o.feasibility === "NOT SUITABLE" ? C.red : C.amber) + '">' + o.feasibility + '</b></dd></dl>'
         + '<p class="dv-feas">' + esc(o.feasibility_text) + (o.findings.length ? ' ' + o.findings.length + ' map finding(s): ' + esc(o.findings.slice(0, 2).map(function(f){ return f.text; }).join(" \u00b7 ")) : '') + '<br>Time: ' + esc(o.time_src) + ' \u00b7 traffic: ' + esc(o.traffic_basis) + (o.also ? '<br>Same diversion also fits: ' + esc(o.also.join(", ")) : '') + '</p>'
-        + '<div class="dv-acts"><button type="button" class="ds-btn sm ghost" data-v="' + o.n + '">VIEW ON MAP</button><button type="button" class="ds-btn sm ghost" data-s="' + o.n + '">SIMULATE</button><button type="button" class="ds-btn sm ' + (sel ? "pri" : "") + '" data-p="' + o.n + '">' + (sel ? "SELECTED" : "SELECT") + '</button></div></article>';
+        + '<div class="dv-acts"><button type="button" class="ds-btn sm ghost" data-v="' + o.n + '">VIEW ON MAP</button><button type="button" class="ds-btn sm ghost" data-s="' + o.n + '">SIMULATE</button>' + (np ? '<span class="dv-muted" style="align-self:center">Reference only \u2014 LTA rule 1</span>' : '<button type="button" class="ds-btn sm ' + (sel ? "pri" : "") + '" data-p="' + o.n + '">' + (sel ? "SELECTED" : "SELECT") + '</button>') + '</div></article>';
     });
-    h += '<article class="dv-opt ' + (S.optSel === 0 ? "sel" : "") + '"><h3>NO DIVERSION \u2014 WAIT / REGULATE<span class="sp"></span>' + (S.optSel === 0 ? DS.sev("ok", "SELECTED") : "") + '</h3>'
-      + '<p class="dv-feas">Buses hold upstream or wait at the block until it reopens' + (S.closure.min == null ? ' (closure length unknown \u2014 buses cannot continue)' : '') + '. No stops skipped.</p>'
+    if(j.wait_allowed) h += '<article class="dv-opt ' + (S.optSel === 0 ? "sel" : "") + '"><h3>NO DIVERSION \u2014 WAIT / REGULATE<span class="sp"></span>' + (S.optSel === 0 ? DS.sev("ok", "SELECTED") : "") + '</h3>'
+      + '<p class="dv-feas">Short closure (' + esc(j.closure_desc) + '): buses hold upstream or wait at the block until it reopens. No stops skipped.</p>'
       + '<div class="dv-acts"><button type="button" class="ds-btn sm ghost" data-s="0">SIMULATE</button><button type="button" class="ds-btn sm ' + (S.optSel === 0 ? "pri" : "") + '" data-p="0">' + (S.optSel === 0 ? "SELECTED" : "SELECT") + '</button></div></article>';
-    h += '<p class="dv-muted">Ordered by suitability, then main roads, then important stops skipped, then added running time \u2014 no combined score. ' + j.candidates_tested + ' road routes tested; ' + j.rejected.uses_block + ' rejected for using the blocked road' + (j.rejected.uturn ? ', ' + j.rejected.uturn + ' for needing a U-turn' : '') + '. Buses are never routed through a U-turn (including turning back at a roundabout or round a block).</p>';
+    else h += '<article class="dv-opt na" aria-disabled="true"><h3>NO DIVERSION \u2014 WAIT / REGULATE<span class="sp"></span>' + DS.sev("crit", "NOT POSSIBLE") + '</h3>'
+      + '<p class="dv-feas">Closure ' + esc(j.closure_desc) + ': buses cannot wait at the block' + (S.closure.min == null || S.closure.min > 120 ? ' \u2014 any bus that reaches it is unable to move' : '') + '. WAIT / REGULATE is only offered for closures up to ' + f0(j.wait_max_min) + ' min.</p>'
+      + '<div class="dv-acts"><button type="button" class="ds-btn sm ghost" data-s="0">SIMULATE NO ACTION</button></div></article>';
+    h += '<p class="dv-muted">Ordered by the LTA rules: safety (main roads) first, then fewest stops skipped, then important stops, then added running time \u2014 no combined score. ' + j.candidates_tested + ' road routes tested; ' + j.rejected.uses_block + ' rejected for using the blocked road' + (j.rejected.uturn ? ', ' + j.rejected.uturn + ' for needing a U-turn' : '') + '. Buses are never routed through a U-turn (including turning back at a roundabout or round a block).</p>';
     el.innerHTML = h;
     var sb = $("showSmall"), hb = $("hideSmall");
     if(sb) sb.onclick = function(){ setMainOnly(false); }; if(hb) hb.onclick = function(){ setMainOnly(true); };
     var rs = $("recSim"), ra = $("recAdopt");
     if(rs) rs.onclick = function(){ S.optSel = rec.option || rec.route_if_extended || 0; drawOptions(false); renderAll(); openSim(); };
-    if(ra) ra.onclick = function(){ S.optSel = rec.option || 0; choose(); drawOptions(false); renderAll(); };
+    if(ra) ra.onclick = function(){ if(rec.action === "manual"){ toast("No diversion to add \u2014 escalate to the Duty Operations Manager."); return; } S.optSel = rec.option || 0; choose(); drawOptions(false); renderAll(); };
     el.querySelectorAll("[data-v]").forEach(function(b){ b.onclick = function(){ S.optSel = +b.dataset.v; drawOptions(true); renderAll(); if(S.mobile) sheetTo("peek"); }; });
     el.querySelectorAll("[data-s]").forEach(function(b){ b.onclick = function(){ S.optSel = +b.dataset.s; drawOptions(false); renderAll(); openSim(); }; });
     el.querySelectorAll("[data-p]").forEach(function(b){ b.onclick = function(){ S.optSel = +b.dataset.p; choose(); drawOptions(false); renderAll(); }; });
@@ -455,6 +497,9 @@
   }
   function choose(){
     var e = entryBy(S.sel); if(!e || !S.opts) return;
+    var so = optByN(S.optSel);
+    if(so && so.permitted === false){ toast("LTA rule 1 (safety): " + so.name + " uses small roads and cannot be selected."); return; }
+    if(!optByN(S.optSel) && !S.opts.wait_allowed){ toast("Closure " + S.closure.label + ": buses cannot wait. Choose a diversion" + (S.opts.options.length ? "." : " \u2014 none found, escalate.")); return; }
     S.choices[S.sel] = choiceFrom(e, S.opts, optByN(S.optSel));
     toast(e.service + " D" + e.direction + ": " + S.choices[S.sel].action + " added to the plan");
   }
@@ -463,13 +508,14 @@
   function drawOptions(fit){
     ["route", "alts", "sel", "pts", "buses"].forEach(function(x){ G[x].clearLayers(); });
     var j = S.opts; if(!j) return;
-    L.polyline(j.service_line, {pane:"routes", color:C.blue, weight:5, opacity:.9}).bindTooltip("Service " + j.service + " D" + j.direction + " \u2014 normal route", {sticky:true}).addTo(G.route);
+    rline(j.service_line, RC.route, {pane:"routes", weight:6, opacity:1}, G.route, true).bindTooltip("Service " + j.service + " D" + j.direction + " \u2014 normal route", {sticky:true}).addTo(G.route);
     j.blocked_stops.forEach(function(s){ L.marker([s.lat, s.lon], {pane:"pts", icon:divIcon("\u2715", "dv-stopx")}).bindTooltip("Inaccessible: " + s.code + " " + s.name).addTo(G.pts); });
     var bounds = L.latLngBounds(j.block_pts);
     j.options.forEach(function(o){
       var sel = S.optSel === o.n;
       var small = o.road_class && o.road_class.label === "SMALL ROADS";
-      var pl = L.polyline(o.line, {pane:sel ? "divsel" : "alts", color:sel ? C.green : small ? "#ff8a1f" : C.amber, weight:sel ? 6 : small ? 3 : 4, opacity:sel ? 1 : .75, dashArray:sel ? "12 8" : small ? "2 7" : "6 8", className:sel ? "dv-sel" : ""})
+      var pl = rline(o.line, sel ? RC.sel : small ? RC.small : RC.alt, {pane:sel ? "divsel" : "alts", weight:sel ? 7 : small ? 4 : 5, opacity:sel ? 1 : .9, casing:sel ? .95 : .75,
+          dashArray:sel ? "14 8" : small ? "2 8" : "8 8", className:sel ? "dv-sel" : ""}, sel ? G.sel : G.alts, !small)
         .bindTooltip(o.name + ": " + o.roads.map(tc).join(" \u2192 ") + " (" + sgn(o.added_min) + " min)", {sticky:true}).on("click", function(){ S.optSel = o.n; drawOptions(false); renderAll(); });
       pl.addTo(sel ? G.sel : G.alts); bounds.extend(o.line);
       if(sel){
@@ -482,16 +528,20 @@
       L.marker([j.last_point.lat, j.last_point.lon], {pane:"bus", icon:divIcon('<i>\u26a0</i>LAST DIVERSION POINT', "dv-lastpt")}).bindTooltip(km(j.last_point.before_block_m) + " before the block").addTo(G.pts);
     else if(j.last_point){ G.pts.eachLayer(function(m){ if(m.options.icon && m.options.icon.options.html.indexOf("LEAVE ROUTE") > 0) m.setIcon(divIcon('<i>\u26a0</i>LAST DIVERSION POINT', "dv-lastpt")); }); }
     j.buses.concat(j.buses_on_diversion || []).forEach(function(b){
-      var t = b.min_to_exit != null ? f0(b.min_to_exit) + " MIN" : stTag(b.status);
-      L.marker([b.lat, b.lon], {pane:"bus", icon:L.divIcon({className:"", iconSize:[0, 0], html:'<div class="dv-bus" style="--c:' + stColor(b.status) + '"><b>' + esc(j.service) + '</b>' + esc(b.label.slice(j.service.length)) + ' <em>' + esc(t) + '</em></div>'})})
+      var tr = (j.trapped || []).filter(function(x){ return x.label === b.label; })[0];
+      var t = tr ? (tr.escape ? "ROUTE OUT" : "\u26d4 UNABLE TO MOVE") : b.min_to_exit != null ? f0(b.min_to_exit) + " MIN" : stTag(b.status);
+      L.marker([b.lat, b.lon], {pane:"bus", icon:L.divIcon({className:"", iconSize:[0, 0], html:'<div class="dv-bus" style="--c:' + (tr ? (tr.escape ? C.cyan : C.red) : stColor(b.status)) + '"><b>' + esc(j.service) + '</b>' + esc(b.label.slice(j.service.length)) + ' <em>' + esc(t) + '</em></div>'})})
         .bindPopup('<b>Bus ' + esc(b.label) + '</b> \u00b7 D' + j.direction + '<br>' + esc(b.status_text) + (b.min_to_exit != null ? '<br>' + f1(b.min_to_exit) + ' min to the diversion point (' + esc(b.eta_basis) + ')' : '') + (b.gap_ahead_min != null ? '<br>Gap to bus ahead ' + f1(b.gap_ahead_min) + ' min' + (j.H ? ' (scheduled ' + f0(j.H) + ')' : '') : '') + (b.load ? '<br>Load ' + esc(b.load) : '') + '<br><small class="dv-muted">IDs are positional: LTA Bus Arrival gives no registration.</small>')
         .addTo(G.buses);
+    });
+    (j.trapped || []).forEach(function(t){
+      if(t.escape){ rline(t.escape.line, RC.esc, {pane:"divsel", weight:5, dashArray:"5 7", opacity:1}, G.sel, true).bindTooltip(t.label + " route out (no U-turn): " + t.escape.roads.map(tc).join(" \u2192 "), {sticky:true}).addTo(G.sel); bounds.extend(t.escape.line); }
     });
     if(fit) map.fitBounds(bounds.pad(.15), {maxZoom:17});
   }
 
   /* ------------------------------------------------------------------ ALL SERVICES: network plan */
-  var NETC = ["#2ee59d", "#38d6ff", "#c792ff", "#ffd166", "#ff8fab", "#7bdff2", "#b8f35a", "#f7a072"];
+  var NETC = ["#00955a", "#0a7ea8", "#7b3fd4", "#b58a00", "#c2185b", "#00838f", "#5b8f00", "#c25a00"];
   var netSeq = 0;
   function netColor(sig){ var g = S.net ? S.net.network.groups : []; for(var i = 0; i < g.length; i++) if(g[i].signature === sig) return NETC[i % NETC.length]; return C.grey; }
   function runNet(){
@@ -515,7 +565,8 @@
     var h = DS.ai({title:"AI NETWORK PLAN", badge:j.network.warnings.length ? DS.sev("warn", j.network.warnings.length + " WARNING" + (j.network.warnings.length > 1 ? "S" : "")) : DS.sev("ok", "READY TO REVIEW"),
       detected:esc(j.road) + (j.blocks_n > 1 ? " \u2014 " + j.blocks_n + " blockages" : "") + ": " + t.service_dirs + " service-direction(s) affected",
       recommendation:t.divert + " divert, " + t.wait + " wait / regulate" + (t.manual ? ", <b style=\"color:#ffc3ca\">" + t.manual + " need manual planning</b>" : "") + (shared.length ? "; " + shared.length + " route(s) shared by several services" : ""),
-      effect:S.closure.min != null ? "Extra bus-minutes over the " + esc(S.closure.label.toLowerCase()) + " closure: " + f0(t.bus_min) + " with this plan vs " + f0(t.bus_min_none) + " with no action (estimate)." : "Closure length unknown: without diversions, buses reaching a block cannot continue.",
+      effect:t.bus_min_none == null ? "Closure " + esc(S.closure.label.toLowerCase()) + ": with no action, every bus that reaches a block is unable to move until it reopens. This plan: " + f0(t.bus_min) + " extra bus-minutes (estimate)."
+        : "Extra bus-minutes over the " + esc(S.closure.label.toLowerCase()) + " closure: " + f0(t.bus_min) + " with this plan vs " + f0(t.bus_min_none) + " with no action (estimate).",
       basis:"Main roads only" + (j.allow_small ? " (small roads shown, never recommended)" : "") + ". Same rules as each service's options. Controller confirms."});
     h += '<div class="dv-net-tot"><span><b>' + t.divert + '</b>DIVERT</span><span><b>' + t.wait + '</b>WAIT</span><span><b>' + t.manual + '</b>MANUAL</span><span><b>' + t.skipped + '</b>STOPS SKIPPED' + (t.important ? ' \u00b7 ' + t.important + ' IMP.' : '') + '</span></div>';
     j.network.warnings.forEach(function(w){ h += '<div class="dv-warn">\u26a0 ' + esc(w) + '</div>'; });
@@ -548,7 +599,7 @@
     S.net.rows.forEach(function(r){
       var o = r.option; if(!r.ok || !o || r.action !== "divert" || !o.line || o.line.length < 2) return;
       var c = netColor(o.signature);
-      L.polyline(o.line, {pane:"alts", color:c, weight:4, opacity:.85, dashArray:"10 6"}).bindTooltip(r.service + " D" + r.direction + ": " + o.roads.map(tc).join(" \u2192 "), {sticky:true})
+      rline(o.line, c, {pane:"alts", weight:5, opacity:1, dashArray:"10 6"}, G.net, false).bindTooltip(r.service + " D" + r.direction + ": " + o.roads.map(tc).join(" \u2192 "), {sticky:true})
         .on("click", function(){ selectService(r.service + "|" + r.direction + "|" + r.run); }).addTo(G.net);
       if(!labelled[o.signature]){
         labelled[o.signature] = 1;
@@ -561,7 +612,7 @@
     if(!S.net || lockedPlan()) return;
     var n = 0, manual = 0;
     S.net.rows.forEach(function(r){
-      if(!r.ok || r.action === "manual" || !r.choice){ manual++; return; }
+      if(!r.ok || r.action === "manual" || !r.choice || (r.action === "wait" && !waitOK())){ manual++; return; }
       S.choices[r.service + "|" + r.direction + "|" + r.run] = r.choice; n++;
     });
     toast(n + " service-direction(s) added to the plan" + (manual ? " \u00b7 " + manual + " need manual planning" : ""));
@@ -598,7 +649,7 @@
       ["Estimated recovery", function(c){ return c.recovery_min == null ? '<span class="warn">not by holding</span>' : "+" + f0(c.recovery_min) + " min"; }]
     ];
     var selKey = S.optSel ? "o" + S.optSel : "none";
-    el.innerHTML = '<div class="dv-scroll"><table class="dv-cmp"><thead><tr><th></th>' + cols.map(function(c){ return '<th class="' + (c.key === selKey ? "on" : "") + '">' + esc(c.name) + '</th>'; }).join("") + '</tr></thead><tbody>'
+    el.innerHTML = '<div class="dv-scroll"><table class="dv-cmp"><thead><tr><th></th>' + cols.map(function(c){ return '<th class="' + (c.key === selKey ? "on" : "") + '">' + esc(c.name) + (c.key === "none" && c.viable === false ? '<br><small style="color:#ffc3ca;letter-spacing:.06em">NOT VIABLE</small>' : '') + '</th>'; }).join("") + '</tr></thead><tbody>'
       + rows.map(function(r){ return '<tr><td>' + r[0] + '</td>' + cols.map(function(c){ return '<td class="' + (c.key === selKey ? "on" : "") + '">' + r[1](c) + '</td>'; }).join("") + '</tr>'; }).join("")
       + '</tbody></table></div><p class="dv-muted">Headways at the rejoin point, predicted from live bus positions and LTA speed bands (' + esc(j.time_basis) + '). Closure: ' + esc(S.closure.label) + '. Consequences only \u2014 the controller decides.</p>';
   }
@@ -638,9 +689,9 @@
     var M = simMaps();
     [M.none, M.opt].forEach(function(x, i){
       x.g.clearLayers(); x.b.clearLayers();
-      L.polyline(j.window.pts, {color:C.blue, weight:4, opacity:.85}).addTo(x.g);
-      (j.block_runs || [j.block_pts]).forEach(function(r){ L.polyline(r, {color:C.red, weight:7, opacity:.95}).addTo(x.g); });
-      if(i === 1 && o) L.polyline(o.anim.pts, {color:C.green, weight:5, dashArray:"10 7", className:"dv-sel"}).addTo(x.g);
+      L.polyline(j.window.pts, {color:"#fff", weight:8, opacity:.85}).addTo(x.g); L.polyline(j.window.pts, {color:RC.route, weight:5}).addTo(x.g);
+      (j.block_runs || [j.block_pts]).forEach(function(r){ L.polyline(r, {color:"#fff", weight:11, opacity:.9}).addTo(x.g); L.polyline(r, {color:RC.block, weight:7}).addTo(x.g); });
+      if(i === 1 && o){ L.polyline(o.anim.pts, {color:"#fff", weight:9, opacity:.9}).addTo(x.g); L.polyline(o.anim.pts, {color:RC.sel, weight:6, dashArray:"12 7", className:"dv-sel"}).addTo(x.g); }
       x.markers = {};
       var col = i === 0 ? colFor(0) : oc;
       (col ? col.sim : []).forEach(function(r){
@@ -648,7 +699,7 @@
       });
       x.map.invalidateSize(); x.map.fitBounds(L.latLngBounds(j.window.pts.concat(o && i === 1 ? o.anim.pts : [])).pad(.08));
     });
-    $("simNote").textContent = "Bus movement from live positions and LTA speed bands (" + j.time_basis + "); queued buses leave the block " + "30 s apart once it reopens. Estimate only.";
+    $("simNote").textContent = "Bus movement from live positions and LTA speed bands (" + j.time_basis + "). " + (j.wait_allowed ? "Queued buses leave the block 30 s apart once it reopens." : (S.closure.min == null || S.closure.min > 120 ? "Closure " + S.closure.label.toLowerCase() + ": a bus that reaches the block cannot move for the rest of the simulation." : "Closure " + S.closure.label.toLowerCase() + ": buses cannot wait; queued buses only leave when it reopens.")) + " Estimate only.";
     frame();
   }
   function tick(t){
@@ -694,8 +745,8 @@
         if(pos.st === "queue") maxw = Math.max(maxw, T - (r.t_block || 0));
       });
       $(x[0] === "none" ? "statNone" : "statOpt").innerHTML = x[0] === "none" || !o
-        ? (n.queue ? '<b style="color:#ffc3ca">' + n.queue + ' bus(es) waiting at the block</b> \u00b7 longest wait ' + f0(maxw) + ' min' : 'No bus held at the block at this time')
-        : '<b style="color:#c6f9e3">' + n.div + ' on diversion \u00b7 ' + n.rejoined + ' rejoined</b>' + (n.queue ? ' \u00b7 ' + n.queue + ' waiting (passed the diversion point)' : '');
+        ? (n.queue ? '<b style="color:#ffc3ca">' + n.queue + ' bus(es) ' + (waitOK() ? 'waiting at the block' : 'unable to move at the block') + '</b> \u00b7 ' + (waitOK() ? 'longest wait ' : 'stuck for ') + f0(maxw) + ' min so far' : 'No bus held at the block at this time')
+        : '<b style="color:#c6f9e3">' + n.div + ' on diversion \u00b7 ' + n.rejoined + ' rejoined</b>' + (n.queue ? ' \u00b7 ' + n.queue + (waitOK() ? ' waiting' : ' unable to move') + ' (passed the diversion point)' : '');
     });
   }
 
@@ -791,16 +842,18 @@
     }
     if(S.updating) h += '<div class="dv-warn">Editing revision ' + ((p && p.revision) || 1) + ': change the blockage or options, then publish. Every OCC must acknowledge the new revision.</div>';
     h += '<div class="dv-lbl"' + (p ? '' : ' style="margin-top:0"') + '>SERVICES IN THE PLAN</div>';
-    h += ch.length ? ch.map(function(c){ return '<div class="dv-plan-row"><b>' + esc(c.service) + '</b><span>D' + c.direction + ' \u2014 ' + esc(c.roads.length ? c.roads.join(" \u2192 ") + " \u2192 rejoin" : c.action) + (c.skipped.length ? ' \u00b7 ' + c.skipped.length + ' stops skipped' : '') + '</span>'
+    var badWait = ch.filter(function(c){ return !c.roads.length && !c.option && !waitOK(); });
+    h += ch.length ? ch.map(function(c){ var bad = badWait.indexOf(c) >= 0; return '<div class="dv-plan-row"><b>' + esc(c.service) + '</b><span' + (bad ? ' style="color:#ffc3ca"' : '') + '>D' + c.direction + ' \u2014 ' + esc(c.roads.length ? c.roads.join(" \u2192 ") + " \u2192 rejoin" : c.action) + (bad ? ' \u2014 NOT POSSIBLE: closure ' + esc(S.closure.label) + ', buses cannot wait' : '') + (c.skipped.length ? ' \u00b7 ' + c.skipped.length + ' stops skipped' : '') + '</span>'
       + (lockedPlan() ? '' : '<button type="button" class="ds-btn sm ghost" data-rm="' + esc(c.service + "|" + c.direction + "|" + (c.run || 0)) + '" aria-label="Remove ' + esc(c.service) + ' from the plan">\u2715</button>') + '</div>'; }).join("")
-      : '<p class="dv-muted">No option chosen yet. Press SELECT on an option (or on WAIT / REGULATE) for each affected service.</p>';
+      : '<p class="dv-muted">No option chosen yet. Press SELECT on an option' + (waitOK() ? ' (or on WAIT / REGULATE)' : '') + ' for each affected service.</p>';
+    if(badWait.length) h += '<div class="dv-warn">Closure ' + esc(S.closure.label) + ': buses cannot wait. Choose a diversion for ' + badWait.map(function(c){ return esc(c.service + " D" + c.direction); }).join(", ") + ' before confirming.</div>';
     if(S.an){ var miss = S.an.entries.filter(function(e){ return !S.choices[key(e)]; }); if(miss.length && ch.length) h += '<p class="dv-muted">Not decided: ' + miss.map(function(e){ return esc(e.service + " D" + e.direction); }).join(", ") + '</p>'; }
     h += '<div class="dv-row" style="margin-top:10px">';
     if(!p || ["detected", "planned"].indexOf(p.status) >= 0){
       if(!p) h += '<button type="button" class="ds-btn sm" id="pSave"' + (hasBlock() ? "" : " disabled") + '>SAVE & RAISE OCC ALERT</button>';
-      h += '<button type="button" class="ds-btn sm pri" id="pConfirm"' + (ch.length ? "" : " disabled") + '>CONFIRM DIVERSION\u2026</button>';
+      h += '<button type="button" class="ds-btn sm pri" id="pConfirm"' + (ch.length && !badWait.length ? "" : " disabled") + '>CONFIRM DIVERSION\u2026</button>';
     }else if(p.status === "active" || p.status === "monitoring"){
-      if(S.updating) h += '<button type="button" class="ds-btn sm pri" id="pPublish">PUBLISH REVISION</button><button type="button" class="ds-btn sm ghost" id="pCancelUp">CANCEL</button>';
+      if(S.updating) h += '<button type="button" class="ds-btn sm pri" id="pPublish"' + (badWait.length ? " disabled" : "") + '>PUBLISH REVISION</button><button type="button" class="ds-btn sm ghost" id="pCancelUp">CANCEL</button>';
       else h += '<button type="button" class="ds-btn sm pri" id="pAck">ACKNOWLEDGE' + (S.occ ? " (" + esc(S.occ) + ")" : "") + '</button><button type="button" class="ds-btn sm" id="pShare">SHARE</button><button type="button" class="ds-btn sm" id="pUpdate">UPDATE</button>'
         + '<button type="button" class="ds-btn sm" id="pNotice">NOTICE</button><button type="button" class="ds-btn sm" id="pMon">' + (p.status === "active" ? "SET MONITORING" : "SET ACTIVE") + '</button><button type="button" class="ds-btn sm" id="pEnd" style="border-color:rgba(255,85,102,.6)">END DIVERSION</button>';
     }else if(p.status === "recovering"){
@@ -848,7 +901,7 @@
       $("mConfirm").onclick = function(){
         var share = Array.prototype.map.call($("modalBox").querySelectorAll("input[type=checkbox]:checked"), function(c){ return c.value; }), text = $("mNotice").value;
         var go = function(pl){ if(!pl) return;
-          post("/api/diversion/plans/" + pl.id + "/confirm", {occ:S.occ, services:ch, share:share, notice:text, closure_label:S.closure.label, summary:summary(), blocks:blocksPayload()}).then(function(r){
+          post("/api/diversion/plans/" + pl.id + "/confirm", {occ:S.occ, services:ch, share:share, notice:text, closure_label:S.closure.label, closure_min:S.closure.min, summary:summary(), blocks:blocksPayload()}).then(function(r){
             if(r.error) return toast(r.error); attachPlan(r.plan); S.editing = false; drawBlocks(); loadPlans(); renderAll(); noticeModal(r.plan.notice, true); }); };
         if(S.plan) go(S.plan); else savePlan("planned").then(go);
       };
@@ -879,7 +932,7 @@
     var p = S.plan, note = prompt("What changed? (shown to every OCC)", "") ; if(note === null) return;
     var ch = choicesList();
     post("/api/diversion/notice", {road:roadsTxt(), services:ch, closure_label:S.closure.label, status:p.status, revision:p.revision + 1, by:S.occ, effective:p.started ? DS.fmtTime(new Date(p.started * 1000)) : ""}).then(function(n){
-      post("/api/diversion/plans/" + p.id + "/update", {services:ch, note:note, occ:S.occ, closure_label:S.closure.label, notice:n.text, blocks:blocksPayload()}).then(function(j){
+      post("/api/diversion/plans/" + p.id + "/update", {services:ch, note:note, occ:S.occ, closure_label:S.closure.label, closure_min:S.closure.min, notice:n.text, blocks:blocksPayload()}).then(function(j){
         if(j.error) return toast(j.error); S.updating = false; S.editing = false; attachPlan(j.plan); drawBlocks(); renderAll(); noticeModal(j.plan.notice);
       });
     });
@@ -998,10 +1051,23 @@
   $("mLayBtn").onclick = function(){ sheetTab("svc"); sheetTo("full"); setTimeout(function(){ $("secLayers").scrollIntoView({behavior:"smooth", block:"start"}); }, 250); };
 
   /* ------------------------------------------------------------------ inputs */
+  /* buses can only be held for a short, known closure; until further notice / whole day / long = divert */
+  function waitOK(){ return S.closure.min != null && S.closure.min <= (S.waitMax || 30); }
+  function wholeDayMin(){             // minutes to the end of today's service (about 01:00)
+    var n = new Date(), end = new Date(n); end.setHours(n.getHours() < 1 ? 1 : 25, 0, 0, 0);
+    return Math.max(120, Math.round((end - n) / 60000));
+  }
+  function closureFor(m, label){ return m === "open" ? {min:null, label:label} : m === "day" ? {min:wholeDayMin(), label:label} : {min:+m, label:label}; }
+  function dropWaits(){
+    if(waitOK()) return;
+    var gone = Object.keys(S.choices).filter(function(k){ var c = S.choices[k]; return !(c.roads && c.roads.length) && !c.option; });
+    gone.forEach(function(k){ delete S.choices[k]; });
+    if(gone.length) toast("Closure " + S.closure.label + ": buses cannot wait. WAIT / REGULATE removed for " + gone.map(function(k){ return k.split("|").slice(0, 2).join(" D"); }).join(", ") + " \u2014 choose a diversion.");
+  }
   function setClosureLabel(label){
     var btn = Array.prototype.filter.call(document.querySelectorAll("#closure button"), function(b){ return b.textContent === label; })[0];
     document.querySelectorAll("#closure button").forEach(function(b){ b.setAttribute("aria-pressed", String(b === btn)); });
-    if(btn && btn.dataset.m !== "custom"){ S.closure = {min:btn.dataset.m === "open" ? null : +btn.dataset.m, label:label}; $("closureCustom").hidden = true; }
+    if(btn && btn.dataset.m !== "custom"){ S.closure = closureFor(btn.dataset.m, label); $("closureCustom").hidden = true; }
     else{ var m = parseFloat(label); S.closure = {min:isNaN(m) ? null : m, label:label}; $("closureCustom").hidden = false; $("closureMin").value = isNaN(m) ? "" : m;
       document.querySelector('#closure [data-m="custom"]').setAttribute("aria-pressed", "true"); }
   }
@@ -1014,8 +1080,8 @@
   document.querySelectorAll("#closure button").forEach(function(b){ b.onclick = function(){
     document.querySelectorAll("#closure button").forEach(function(x){ x.setAttribute("aria-pressed", String(x === b)); });
     if(b.dataset.m === "custom"){ $("closureCustom").hidden = false; $("closureMin").focus(); return; }
-    $("closureCustom").hidden = true; S.closure = {min:b.dataset.m === "open" ? null : +b.dataset.m, label:b.textContent}; rerunOptions(); }; });
-  $("closureMin").onchange = function(){ var m = +this.value; if(!(m > 0)) return; S.closure = {min:m, label:m + " MIN"}; rerunOptions(); };
+    $("closureCustom").hidden = true; S.closure = closureFor(b.dataset.m, b.textContent); dropWaits(); rerunOptions(); }; });
+  $("closureMin").onchange = function(){ var m = +this.value; if(!(m > 0)) return; S.closure = {min:m, label:m + " MIN"}; dropWaits(); rerunOptions(); };
   $("mainOnly").onchange = function(){ S.allowSmall = !this.checked; rerunOptions(); };
   $("busType").value = S.bus; $("busType").onchange = function(){ S.bus = this.value; LS.set("dv.bus", S.bus); rerunOptions(); };
   function fillOcc(){ var sel = $("myOcc"); sel.innerHTML = '<option value="">Choose\u2026</option>' + S.teams.map(function(t){ return '<option' + (t === S.occ ? " selected" : "") + '>' + esc(t) + '</option>'; }).join(""); }
