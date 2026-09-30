@@ -108,6 +108,8 @@
 .dv-rchk span{font:600 11px var(--ds-font);padding:2px 8px;border-radius:999px;border:1px solid}
 .dv-rchk .ok{color:#c6f9e3;border-color:rgba(46,229,157,.5);background:rgba(46,229,157,.08)}
 .dv-rchk .warn{color:#ffe0b0;border-color:rgba(255,181,71,.5);background:rgba(255,181,71,.08)}
+.dv-brtext{font-size:12px;color:var(--ds-text-2);margin:0 0 8px;padding:6px 8px;border-left:3px solid var(--c,#2ee59d);background:rgba(255,255,255,.03);border-radius:0 6px 6px 0}
+.dv-btrow{display:grid;grid-template-columns:48px 1fr auto;gap:6px;align-items:center;padding:4px 0;border-top:1px solid var(--ds-line)}
 .dv-rchk .no{color:#ffc3ca;border-color:rgba(255,85,102,.55);background:rgba(255,85,102,.1)}
 .dv-opt.na h3{color:var(--ds-mut)}
 .dv-wod.only{border-color:rgba(255,85,102,.55);background:rgba(255,85,102,.08)}
@@ -355,7 +357,7 @@ path.dv-blockline{filter:drop-shadow(0 0 6px rgba(255,85,102,.9))}
           <div class="ds-field" style="flex:1"><label for="busType">Bus type</label><select class="ds-select" id="busType"><option value="dd">Double deck</option><option value="sd">Single deck</option><option value="art">Articulated</option></select></div>
           <div class="ds-field" style="flex:1"><label for="myOcc">Your OCC</label><select class="ds-select" id="myOcc"><option value="">Choose…</option></select></div>
         </div>
-        <label class="dv-chk"><input type="checkbox" id="mainOnly" checked> <span><b>Main roads only</b><small>LTA rule 1 (safety): expressways and arterial roads only. Small roads are never permitted; untick only to view them for reference.</small></span></label>
+        <label class="dv-chk"><input type="checkbox" id="mainOnly" checked> <span><b>Only roads buses already use</b><small>LTA rule 1 (safety): every part of the diversion must be a road where bus services already run in this direction (their bus stops / their route); for a double-decker, only where double-deck services run. Untick only to view other routes for reference — they cannot be selected.</small></span></label>
       </section>
 
       <section class="ds-panel" id="secServices" aria-labelledby="hSvc">
@@ -388,6 +390,15 @@ path.dv-blockline{filter:drop-shadow(0 0 6px rgba(255,85,102,.9))}
           <div class="dv-row"><input class="ds-input" id="impCode" inputmode="numeric" maxlength="5" placeholder="Stop code" style="width:96px" aria-label="Stop code"><input class="ds-input" id="impWhy" placeholder="Reason" style="flex:1;min-width:90px" aria-label="Reason"><button type="button" class="ds-btn sm" id="impAdd">Add</button></div>
           <div id="impList" class="dv-muted" style="margin-top:6px"></div>
         </details>
+        <details style="margin-top:12px" id="btBox">
+          <summary class="dv-muted" style="cursor:pointer">Bus types (double-deck check)</summary>
+          <p class="dv-muted">Which services run double-deckers decides whether a road is safe for a double-deck diversion. Learned automatically from the bus type in LTA Bus Arrival; set or correct a service here after checking <a href="https://landtransportguru.net/" target="_blank" rel="noopener" style="color:var(--ds-cyan)">landtransportguru.net</a>. Your entry overrides what LTA has shown.</p>
+          <div class="dv-row"><input class="ds-input" id="btSvc" maxlength="5" placeholder="Service" style="width:84px" aria-label="Service number">
+            <select class="ds-input" id="btType" aria-label="Bus type" style="width:auto"><option value="DD">Runs double-deckers</option><option value="SD">Single-deck only</option><option value="BD">Articulated only</option></select>
+            <input class="ds-input" id="btNote" placeholder="Note (e.g. source)" style="flex:1;min-width:90px" aria-label="Note"><button type="button" class="ds-btn sm" id="btSave">Save</button></div>
+          <input class="ds-input" id="btQ" placeholder="Find service…" style="margin-top:8px;width:100%" aria-label="Find service">
+          <div id="btList" class="dv-muted" style="margin-top:6px;max-height:220px;overflow:auto"></div>
+        </details>
       </section>
     </aside>
 
@@ -401,7 +412,7 @@ path.dv-blockline{filter:drop-shadow(0 0 6px rgba(255,85,102,.9))}
         <i style="border-color:#c81e36"></i><span>Blocked section</span>
         <i class="ar" style="border-color:#00955a;border-top-style:dashed"></i><span>Selected diversion</span>
         <i class="ar" style="border-color:#c96a00;border-top-style:dashed"></i><span>Alternative diversion</span>
-        <i style="border-color:#a8430f;border-top-style:dotted"></i><span>Small roads (not permitted)</span>
+        <i style="border-color:#a8430f;border-top-style:dotted"></i><span>Not permitted (LTA rule 1)</span>
         <span style="color:#ff5566;font-weight:800;text-align:center">&#x2715;</span><span>Skipped / blocked stop</span>
         <span style="color:#ffb547;text-align:center">&#x26a0;</span><span>Last diversion point</span>
         <span style="color:#2ee59d;text-align:center">&#x21aa;</span><span>Rejoin point</span>

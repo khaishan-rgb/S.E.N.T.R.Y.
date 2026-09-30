@@ -17,7 +17,17 @@ import math
 import re
 
 PARAMS = {
-    "wait_max_min": 0.0,        # V16.16: 0 = WAIT / REGULATE is never proposed - the engine always proposes a diversion (set DIVERSION_WAIT_MAX_MIN > 0 on Render to bring waiting back)
+    "busroad_tol_m": 20.0,      # rule 1: a service's route line within this distance, same direction, proves the road is a bus road
+    "busroad_stop_tol_m": 35.0,  # ...or the chord between two consecutive stops of a service (when it has no route line)
+    "busroad_ang": 35.0,        # heading tolerance (degrees) - the opposite carriageway never counts
+    "busroad_gap_m": 80.0,      # an unproven stretch longer than this makes the diversion not permitted
+    "busroad_edge_m": 40.0,     # ignore the turn in / out at each end (the junction itself)
+    "wait_max_min": 0.0,        # buses are never held at a blockage: every affected bus is diverted (WAIT / REGULATE is not used)
+    "search_stages": (          # diversion search widens stage by stage until a main-road route that meets the LTA rules is found
+        {"exit_km": (0.15, 0.4, 0.8, 1.5), "rejoin_km": (0.15, 0.4, 0.8, 1.5), "via_m": ()},
+        {"exit_km": (2.5, 4.0), "rejoin_km": (2.5, 4.0), "via_m": (1500.0, 3000.0)},
+        {"exit_km": (6.0, 8.0, 10.0), "rejoin_km": (6.0, 8.0, 10.0), "via_m": (3000.0, 5000.0)},
+    ),
     "sim_closure_max_min": 120.0,  # beyond this, buses that reach the block are treated as unable to move for the rest of the simulation
     "long_exit_offsets_km": (2.5, 4.0),    # long closures: also search diversions that leave / rejoin further from the block
     "long_rejoin_offsets_km": (2.5, 4.0),
@@ -611,8 +621,8 @@ def timeline(sim, hw, reg, recov, closure_min, road, option_name=None):
 
 
 def wait_allowed(closure_min, P=PARAMS):
-    """Buses can only be held for a short, known closure. Until further notice, whole day or longer than
-    wait_max_min: buses cannot wait at the block, so every bus must be diverted."""
+    """Buses are never held at a blockage (default wait_max_min = 0): a diversion is always required.
+    Kept as a setting so an operator could allow holding for very short, known closures."""
     return P["wait_max_min"] > 0 and closure_min is not None and closure_min <= P["wait_max_min"]
 
 
@@ -629,8 +639,9 @@ def wait_or_divert(sim_none, opts_eval, closure_min, P=PARAMS):
     if not wait_allowed(closure_min, P):
         found = any(o.get("added_min") is not None for o in opts_eval)
         return {"kind": "divert_only", "wait_allowed": False,
-                "text": f"Closure {closure_desc(closure_min)}: WAIT / REGULATE is not proposed \u2014 every bus is diverted (LTA rules: main roads, fewest stops skipped, no U-turn)."
-                        + ("" if found else " No bus-suitable diversion without a U-turn was found: escalate.")}
+                "text": "Buses are never held at a blockage \u2014 even a whole-day closure would leave them unable to move. Every affected bus is diverted, following the LTA rules: "
+                        "1 safety (main roads only), 2 fewest bus stops skipped, 3 no U-turn."
+                        + ("" if found else " No route meeting all three rules was found in the widest search: escalate.")}
     q = [r for r in sim_none if r["mode"] == "queued"]
     if not q:
         return {"kind": "wait", "text": f"No bus is expected to reach the block within the {closure_min:g}-minute closure: holding upstream / regulating may be enough."}
@@ -676,6 +687,9 @@ def notice(plan):
             for r in route[1:]:
                 L.append(f"\u2192 {r}")
             L.append("\u2192 Rejoin normal route" + (f" at {s['rejoin_name']}" if s.get("rejoin_name") else ""))
+            if s.get("bus_road"):
+                L.append(f"Safety (LTA rule 1): {s['bus_road']}")
+            L.append("No U-turn on this diversion.")
         else:
             L.append(f"Action: {s.get('action') or 'Wait / regulate (no diversion)'}")
         L.append("")
@@ -758,7 +772,7 @@ FEAS_ORDER = {"HIGH": 0, "VERIFICATION REQUIRED": 1, "LOW": 2, "NOT SUITABLE": 3
 CLASS_ORDER = {"MAIN ROADS": 0, "NOT VERIFIED": 1, "SMALL ROADS": 2}
 
 
-LTA_RULES = ("1. Safety: main roads only, never small roads",
+LTA_RULES = ("1. Safety: only roads bus services already use (with bus stops); double-deckers only where double-deck services run",
              "2. Skip as few bus stops as possible",
              "3. No U-turn")
 
@@ -769,40 +783,54 @@ def option_order(o):
     2. fewest bus stops skipped, then fewest important stops skipped
     3. no U-turn (hard rule: routes with a U-turn never reach this point)
     then verified before verification-required, then least added running time."""
-    return (o.get("feasibility") == "NOT SUITABLE", CLASS_ORDER.get((o.get("road_class") or {}).get("label"), 1),
+    br = o.get("bus_road") or {}
+    return (not permitted(o), DD_ORDER.get(br.get("dd"), 0),
             o.get("skipped_n", 0), o.get("important_n", 0),
+            CLASS_ORDER.get((o.get("road_class") or {}).get("label"), 1),
             FEAS_ORDER.get(o.get("feasibility"), 1), o.get("added_min") if o.get("added_min") is not None else 99)
 
 
+DD_ORDER = {"PROVEN": 0, "N/A": 0, "UNCONFIRMED": 1, "SD_ONLY": 2}
+
+
 def permitted(o):
-    """LTA rule 1: a route on small roads is never a permitted bus diversion"""
-    return (o.get("road_class") or {}).get("label") != "SMALL ROADS" and o.get("feasibility") != "NOT SUITABLE"
+    """LTA rule 1 (safety): only roads bus services already use in this direction (with their bus stops / on their
+    route); for a double-decker, only where double-deck services run. Falls back to "no small roads" if the bus
+    network could not be checked."""
+    if o.get("feasibility") == "NOT SUITABLE":
+        return False
+    br = o.get("bus_road")
+    if br:
+        return bool(br.get("ok")) and br.get("dd") != "SD_ONLY"
+    return (o.get("road_class") or {}).get("label") != "SMALL ROADS"
 
 
 def recommend(opts, wod, closure_min):
     """-> {"action": "divert"|"wait"|"manual", "option": n|None, "route_if_extended": n|None, "headline", "reasons": [..], "cautions": [..]}
     Always proposes a route when any acceptable one exists. Small-road routes are never recommended."""
-    ok = [o for o in opts if o.get("feasibility") != "NOT SUITABLE" and (o.get("road_class") or {}).get("label") != "SMALL ROADS"]
-    small = [o for o in opts if (o.get("road_class") or {}).get("label") == "SMALL ROADS"]
+    ok = [o for o in opts if permitted(o)]
+    small = [o for o in opts if not permitted(o) and o.get("feasibility") != "NOT SUITABLE"]
     if not ok:
         if wait_allowed(closure_min):
             return {"action": "wait", "option": None, "route_if_extended": None,
                     "headline": "NO MAIN-ROAD DIVERSION FOUND",
                     "reasons": ["Every road route found around the section either uses the blocked road, needs a U-turn, is unsuitable for this bus, or runs on small roads."],
-                    "cautions": ([f"{len(small)} small-road route(s) found and held back by the main-roads policy."] if small else []) +
+                    "cautions": ([f"{len(small)} route(s) found but not permitted by LTA rule 1."] if small else []) +
                                 ["Hold / regulate upstream for this short closure and plan the diversion manually with the depot if it extends."]}
         return {"action": "manual", "option": None, "route_if_extended": None,
-                "headline": "NO BUS-SUITABLE DIVERSION FOUND \u2014 ESCALATE",
-                "reasons": [f"Closure {closure_desc(closure_min)}: a diversion is required (WAIT / REGULATE is not proposed).",
+                "headline": "NO DIVERSION MEETING THE LTA RULES FOUND \u2014 ESCALATE",
+                "reasons": ["Buses are never held at a blockage, so a diversion is required.",
+                            "Searched routes leaving and rejoining up to 10 km either side of the block.",
                             "Every road route found around the section either uses the blocked road, needs a U-turn, is unsuitable for this bus, or runs on small roads."],
-                "cautions": ([f"{len(small)} small-road route(s) found and held back by the main-roads policy \u2014 review them with the depot."] if small else []) +
+                "cautions": ([f"{len(small)} route(s) found but not permitted by LTA rule 1 (not a bus road, or no double-deck service there) \u2014 review them with the depot."] if small else []) +
                             ["Escalate to the Duty Operations Manager and depot.",
                              "Options to consider (operational verification required): short-working \u2014 terminate before the block and restart after it, "
                              "using a turning facility that needs no U-turn; a wider diversion planned with the depot; LTA / Traffic Police assistance for buses already past the diversion point."]}
     best = sorted(ok, key=option_order)[0]
     rc = best.get("road_class") or {}
     fewest = min(o.get("skipped_n", 0) for o in ok)
-    reasons = [f"Rule 1 (safety): {best['name']} uses main roads \u2014 {rc.get('text', '')}" if rc.get("label") == "MAIN ROADS" else f"Rule 1 (safety): {best['name']} \u2014 {rc.get('text', '')}",
+    br = best.get("bus_road") or {}
+    reasons = [f"Rule 1 (safety): {best['name']} \u2014 {br['text']}" if br.get("text") else (f"Rule 1 (safety): {best['name']} uses main roads \u2014 {rc.get('text', '')}" if rc.get("label") == "MAIN ROADS" else f"Rule 1 (safety): {best['name']} \u2014 {rc.get('text', '')}"),
                f"Rule 2: skips {best['skipped_n']} stop(s)" + (" \u2014 the fewest of the safe routes" if best.get("skipped_n", 0) == fewest else ""),
                "Rule 3: no U-turn (checked)",
                f"{best['added_km']:+.1f} km, about {best['added_min']:+.0f} min per trip ({best.get('time_src', '')})",
@@ -892,3 +920,117 @@ def uturns(line, steps=None, P=PARAMS):
         prev = hit
         grid.setdefault((gx, gy), []).append(i)
     return out
+
+
+
+# ------------------------------------------------------------------------------------------------ LTA rule 1: bus roads
+class BusNet:
+    """Where bus services already run, and in which direction. Built from each service's real-road route line
+    (busrouter.sg fitted to LTA stops) and, for services without one, the chord between consecutive LTA stops."""
+
+    def __init__(self, lines, chords=(), P=PARAMS, cell=50.0):
+        self.cell, self.grid, self.P = cell, {}, P
+        for sd, ln in lines.items():
+            self._add(sd, densify(ln, 20.0), P["busroad_tol_m"])
+        for sd, a, b in chords:
+            self._add(sd, densify([a, b], 20.0), P["busroad_stop_tol_m"])
+
+    def _add(self, sd, pts, tol):
+        for i in range(len(pts) - 1):
+            x, y = xy(pts[i])
+            self.grid.setdefault((int(x // self.cell), int(y // self.cell)), []).append((sd, bearing(pts[i], pts[i + 1]), x, y, tol))
+
+    def at(self, p, brg):
+        x, y = xy(p)
+        gx, gy = int(x // self.cell), int(y // self.cell)
+        out = set()
+        for dx in (-1, 0, 1):
+            for dy in (-1, 0, 1):
+                for sd, b, ex, ey, tol in self.grid.get((gx + dx, gy + dy), ()):
+                    if sd not in out and math.hypot(x - ex, y - ey) <= tol and angdiff(b, brg) <= self.P["busroad_ang"]:
+                        out.add(sd)
+        return out
+
+
+def bus_road_check(seg, groups, net, svc_class, bus, P=PARAMS):
+    """Rule 1 (safety): every part of the diversion must be a road that bus services already use in the same direction
+    (a road with their bus stops / on their route). For a double-decker, the services there must run double-deckers.
+    svc_class(service) -> "DD" | "SD" | None (unknown). -> dict"""
+    pts = densify(seg, 25.0)
+    if len(pts) < 2:
+        return {"ok": True, "dd": "N/A", "coverage": 1.0, "services": [], "gaps": [], "sd_only": [], "unknown": [], "text": "Too short to check."}
+    c = cum_m(pts)
+    total = c[-1]
+    edge = min(P["busroad_edge_m"], total / 4)
+    samples = []
+    for i in range(len(pts) - 1):
+        if c[i] < edge or c[i] > total - edge:
+            continue
+        sds = net.at(pts[i], bearing(pts[i], pts[i + 1]))
+        svcs = sorted({s_ for s_, d_ in sds})
+        cls = [svc_class(x) for x in svcs]
+        dd = "DD" if "DD" in cls else ("SD" if cls and all(k == "SD" for k in cls) else ("UNKNOWN" if svcs else None))
+        samples.append((c[i], tuple(pts[i]), svcs, dd))
+    step = 25.0
+
+    def road_at(p):
+        best, bd = "", 1e9
+        for g in groups or []:
+            gl = g.get("line") or []
+            if len(gl) >= 2:
+                d = nearest_on_line(p, gl)[0]
+                if d < bd:
+                    best, bd = g.get("road") or "", d
+        return best or "unnamed road"
+
+    def stretches(pred):
+        out, cur = [], None
+        for s_, p_, sv, dd in samples:
+            if pred(sv, dd):
+                if cur and s_ - cur[1] <= step * 1.5:
+                    cur[1] = s_
+                    cur[3].append(p_)
+                else:
+                    if cur:
+                        out.append(cur)
+                    cur = [s_, s_, None, [p_]]
+            elif cur and s_ - cur[1] > step * 1.5:
+                out.append(cur)
+                cur = None
+        if cur:
+            out.append(cur)
+        res = []
+        for a_, b_, _, pp in out:
+            ln = b_ - a_ + step
+            if ln >= P["busroad_gap_m"]:
+                mid = pp[len(pp) // 2]
+                res.append({"road": road_at(mid), "m": round(ln), "lat": mid[0], "lon": mid[1]})
+        return res
+
+    gaps = stretches(lambda sv, dd: not sv)
+    sd_only = stretches(lambda sv, dd: dd == "SD")
+    unknown = stretches(lambda sv, dd: dd == "UNKNOWN")
+    counts = {}
+    for _, _, sv, _ in samples:
+        for x in sv:
+            counts[x] = counts.get(x, 0) + 1
+    services = [k for k, _ in sorted(counts.items(), key=lambda kv: -kv[1])][:10]
+    dd_svcs = [x for x in services if svc_class(x) == "DD"]
+    cov = (sum(1 for _, _, sv, _ in samples if sv) / len(samples)) if samples else 1.0
+    ok = not gaps
+    if bus != "dd":
+        dd = "N/A"
+    else:
+        dd = "SD_ONLY" if sd_only else ("UNCONFIRMED" if unknown else "PROVEN")
+    if not ok:
+        text = "Not a bus road: " + "; ".join(f"{g['road']} ({g['m']} m) has no bus service in this direction" for g in gaps[:3])
+    elif dd == "SD_ONLY":
+        text = "Bus road, but only single-deck services run on " + ", ".join(f"{g['road']} ({g['m']} m)" for g in sd_only[:3]) + " \u2014 not permitted for a double-decker"
+    elif dd == "UNCONFIRMED":
+        text = "Bus road (services " + ", ".join(services[:6]) + "); double-deck operation not yet confirmed on " + ", ".join(f"{g['road']}" for g in unknown[:3]) + " \u2014 verify"
+    elif dd == "PROVEN":
+        text = "Bus road all the way; double-deckers already run here (services " + ", ".join(dd_svcs[:6]) + ")"
+    else:
+        text = "Bus road all the way (services " + ", ".join(services[:6]) + ")"
+    return {"ok": ok, "dd": dd, "coverage": round(cov, 3), "services": services, "dd_services": dd_svcs,
+            "gaps": gaps, "sd_only": sd_only, "unknown": unknown, "text": text}
