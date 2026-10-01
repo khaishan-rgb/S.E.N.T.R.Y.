@@ -20,10 +20,11 @@ PARAMS = {
     "line_stop_tol_m": 45.0,    # route-line check: a stop further than this from the line means the line is wrong there
     "line_len_abs_m": 150.0,    # ...or a stop-to-stop length differing from LTA's official distance by more than this
     "line_len_rel": 0.15,       # ...and by more than this share of it
-    "busroad_tol_m": 20.0,      # rule 1: a service's route line within this distance, same direction, proves the road is a bus road
+    "busroad_tol_m": 25.0,      # rule 1: a service's route line within this distance, same direction, proves the road is a bus road
     "busroad_stop_tol_m": 35.0,  # ...or the chord between two consecutive stops of a service (when it has no route line)
     "busroad_ang": 35.0,        # heading tolerance (degrees) - the opposite carriageway never counts
-    "busroad_gap_m": 80.0,      # an unproven stretch longer than this makes the diversion not permitted
+    "busroad_gap_m": 120.0,     # an unproven stretch longer than this makes the diversion not permitted
+    "busroad_turn_m": 35.0,     # junction corners: samples this close to a turn are neutral (the corner joins two bus roads)
     "busroad_edge_m": 40.0,     # ignore the turn in / out at each end (the junction itself)
     "wait_max_min": 0.0,        # buses are never held at a blockage: every affected bus is diverted (WAIT / REGULATE is not used)
     "search_stages": (          # diversion search widens stage by stage until a main-road route that meets the LTA rules is found
@@ -398,27 +399,52 @@ def uses_block(cand_line, block_line, directed=False, P=None):
     return False
 
 
-def departure(cand_line, svc_line, svc_cum, P=None):
+def departure(cand_line, svc_line, svc_cum, P=None, start_window=None):
     """Where a road route from a point on the service route leaves it and where it comes back.
+    Positions are tracked FORWARD along the service route from where the route starts, never by a global nearest-point
+    search: loop services pass the same road twice, and a global search can snap the rejoin onto the wrong passage
+    (giving impossible results such as -17 km). After leaving, the rejoin may be at most a plausible distance ahead.
     -> {"leave_s", "rejoin_s" (positions along the service line, m), "i0", "i1" (indexes into the densified candidate),
-        "pts": densified candidate} or None when it never leaves the service route."""
+        "pts": densified candidate} or None when it never leaves the service route / never comes back in order."""
     P = P or PARAMS
     pts = densify(cand_line, 15.0)
     if len(pts) < 3:
         return None
+    ccum = cum_m(pts)
+    lo0, hi0 = start_window if start_window else (-1e18, 1e18)
+    d0, cur = project_window(pts[0], svc_line, svc_cum, lo0, hi0)
+    if cur is None:
+        return None
+
+    def seg_brg(s_):
+        a_, b_ = point_at(svc_line, svc_cum, max(0.0, s_ - 6)), point_at(svc_line, svc_cum, min(svc_cum[-1], s_ + 6))
+        return bearing(a_, b_)
     on, pos = [], []
+    left_k = None
     for k, p in enumerate(pts):
         q = pts[k + 1] if k + 1 < len(pts) else None
         pr = pts[k - 1] if k > 0 else None
-        d, s, _, sb = nearest_on_line(p, svc_line, svc_cum)
-        brg = bearing(p, q) if q else (bearing(pr, p) if pr else sb)
-        on.append(d <= P["on_route_m"] and angdiff(brg, sb) <= 60.0)
-        pos.append(s)
+        brg = bearing(p, q) if q else bearing(pr, p)
+        if left_k is None:
+            lo, hi = cur - 40.0, cur + 200.0
+        else:     # off the route: the normal route from the leave point to the rejoin can't be implausibly long
+            lo, hi = cur - 40.0, cur + 2.5 * (ccum[k] - ccum[left_k]) + 800.0
+        d, s_ = project_window(p, svc_line, svc_cum, lo, hi)
+        ok = s_ is not None and d <= P["on_route_m"] and angdiff(brg, seg_brg(s_)) <= 60.0
+        on.append(ok)
+        pos.append(s_ if ok else None)
+        if ok:
+            cur = s_
+            left_k = None
+        elif left_k is None:
+            left_k = k
     off = [k for k, x in enumerate(on) if not x]
     if not off:
         return None
     i0 = max(0, off[0] - 1)
     i1 = min(len(pts) - 1, off[-1] + 1)
+    if pos[i0] is None or pos[i1] is None or pos[i1] <= pos[i0]:
+        return None
     return {"leave_s": pos[i0], "rejoin_s": pos[i1], "i0": i0, "i1": i1, "pts": pts,
             "leave_pt": pts[i0], "rejoin_pt": pts[i1], "start_on": on[0], "end_on": on[-1]}
 
@@ -933,6 +959,7 @@ class BusNet:
 
     def __init__(self, lines, chords=(), P=PARAMS, cell=50.0):
         self.cell, self.grid, self.P = cell, {}, P
+        self.n_lines, self.n_chords = len(lines), len({c[0] for c in chords})
         for sd, ln in lines.items():
             self._add(sd, densify(ln, 20.0), P["busroad_tol_m"])
         for sd, a, b in chords:
@@ -965,9 +992,22 @@ def bus_road_check(seg, groups, net, svc_class, bus, P=PARAMS):
     c = cum_m(pts)
     total = c[-1]
     edge = min(P["busroad_edge_m"], total / 4)
+    # junction corners (heading changes by > 35 deg within 30 m): neutral, they join one bus road to the next
+    turns = []
+    for i in range(1, len(pts) - 1):
+        j0 = max(0, i - 1)
+        j1 = min(len(pts) - 1, i + 1)
+        while j0 > 0 and c[i] - c[j0] < 30:
+            j0 -= 1
+        while j1 < len(pts) - 1 and c[j1] - c[i] < 30:
+            j1 += 1
+        if angdiff(bearing(pts[j0], pts[i]), bearing(pts[i], pts[j1])) > 35:
+            turns.append(c[i])
     samples = []
     for i in range(len(pts) - 1):
         if c[i] < edge or c[i] > total - edge:
+            continue
+        if any(abs(c[i] - t) <= P["busroad_turn_m"] for t in turns):
             continue
         sds = net.at(pts[i], bearing(pts[i], pts[i + 1]))
         svcs = sorted({s_ for s_, d_ in sds})
@@ -1020,6 +1060,12 @@ def bus_road_check(seg, groups, net, svc_class, bus, P=PARAMS):
     services = [k for k, _ in sorted(counts.items(), key=lambda kv: -kv[1])][:10]
     dd_svcs = [x for x in services if svc_class(x) == "DD"]
     cov = (sum(1 for _, _, sv, _ in samples if sv) / len(samples)) if samples else 1.0
+    # bus network partly unknown (service route lines not loaded, only stop-to-stop chords): a gap is "verify", not a fail
+    partial = getattr(net, "n_chords", 0) > 0.2 * max(1, getattr(net, "n_lines", 0) + getattr(net, "n_chords", 0))
+    unverified_gaps = gaps if partial else []
+    if partial:
+        unknown = unknown + gaps
+        gaps = []
     ok = not gaps
     if bus != "dd":
         dd = "N/A"
@@ -1027,6 +1073,11 @@ def bus_road_check(seg, groups, net, svc_class, bus, P=PARAMS):
         dd = "SD_ONLY" if sd_only else ("UNCONFIRMED" if unknown else "PROVEN")
     if not ok:
         text = "Not a bus road: " + "; ".join(f"{g['road']} ({g['m']} m) has no bus service in this direction" for g in gaps[:3])
+    elif unverified_gaps:
+        text = ("Bus road check incomplete \u2014 bus route lines not loaded for some services; no service confirmed on "
+                + ", ".join(f"{g['road']} ({g['m']} m)" for g in unverified_gaps[:3]) + " \u2014 verify")
+        if dd == "PROVEN":
+            dd = "UNCONFIRMED" if bus == "dd" else dd
     elif dd == "SD_ONLY":
         text = "Bus road, but only single-deck services run on " + ", ".join(f"{g['road']} ({g['m']} m)" for g in sd_only[:3]) + " \u2014 not permitted for a double-decker"
     elif dd == "UNCONFIRMED":
@@ -1035,7 +1086,7 @@ def bus_road_check(seg, groups, net, svc_class, bus, P=PARAMS):
         text = "Bus road all the way; double-deckers already run here (services " + ", ".join(dd_svcs[:6]) + ")"
     else:
         text = "Bus road all the way (services " + ", ".join(services[:6]) + ")"
-    return {"ok": ok, "dd": dd, "coverage": round(cov, 3), "services": services, "dd_services": dd_svcs,
+    return {"ok": ok, "dd": dd, "coverage": round(cov, 3), "verified": not unverified_gaps, "services": services, "dd_services": dd_svcs,
             "gaps": gaps, "sd_only": sd_only, "unknown": unknown, "text": text}
 
 

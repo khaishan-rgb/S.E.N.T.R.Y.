@@ -53,3 +53,7 @@ services:
         sync: false
       - key: DIVERSION_WAIT_MAX_MIN # optional: Diversion Maps — 0 (default) = buses are never held, always divert
         sync: false
+      - key: DIVERSION_ROUTER     # optional: Diversion Maps road routing — tomtom (default when TOMTOM_API_KEY is set) | osrm
+        sync: false
+      - key: DIVERSION_TOMTOM_MODE # optional: TomTom travel mode for diversions — bus (default) | truck
+        sync: false

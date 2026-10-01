@@ -6896,15 +6896,104 @@ def dv_used_before(svc, d, sig):
 DV_OSRM_SEM = asyncio.Semaphore(4)
 
 
+import contextvars
+DV_BUS = contextvars.ContextVar("dv_bus", default="dd")      # bus type of the plan being computed (TomTom vehicle dimensions)
+DV_ROUTER = os.getenv("DIVERSION_ROUTER", "tomtom").strip().lower()          # tomtom (when TOMTOM_API_KEY is set) | osrm
+DV_TT_MODE = os.getenv("DIVERSION_TOMTOM_MODE", "bus").strip().lower()      # TomTom travelMode: bus | truck
+DV_TT_STATS = {"ok": 0, "fail": 0, "capped": 0, "error": None}
+# vehicle dimensions sent to TomTom (m, kg): double-deck 4.4 m high; articulated 18 m long
+DV_TT_DIMS = {"dd": (4.4, 2.55, 12.0, 18000), "sd": (3.2, 2.55, 12.0, 16000), "bd": (3.2, 2.55, 18.0, 25000)}
+_TT_MAN = {"DEPART": ("depart", ""), "ARRIVE": ("arrive", ""), "ARRIVE_LEFT": ("arrive", ""), "ARRIVE_RIGHT": ("arrive", ""),
+           "STRAIGHT": ("continue", "straight"), "KEEP_RIGHT": ("fork", "slight right"), "KEEP_LEFT": ("fork", "slight left"),
+           "BEAR_RIGHT": ("turn", "slight right"), "BEAR_LEFT": ("turn", "slight left"), "TURN_RIGHT": ("turn", "right"),
+           "TURN_LEFT": ("turn", "left"), "SHARP_RIGHT": ("turn", "sharp right"), "SHARP_LEFT": ("turn", "sharp left"),
+           "MAKE_UTURN": ("turn", "uturn"), "ENTER_MOTORWAY": ("on ramp", ""), "ENTER_FREEWAY": ("on ramp", ""), "ENTER_HIGHWAY": ("on ramp", ""),
+           "TAKE_EXIT": ("off ramp", ""), "MOTORWAY_EXIT_LEFT": ("off ramp", "slight left"), "MOTORWAY_EXIT_RIGHT": ("off ramp", "slight right"),
+           "SWITCH_MOTORWAY_LEFT": ("fork", "slight left"), "SWITCH_MOTORWAY_RIGHT": ("fork", "slight right")}
+
+
+def tt_parse_route(j):
+    """TomTom Routing calculateRoute response -> the same route shape as offservice.parse_osrm
+    {line, km, osrm_min, steps:[{road, ref, km, min, man, mod, line}], router}"""
+    out = []
+    for r in (j or {}).get("routes") or []:
+        pts = [(p["latitude"], p["longitude"]) for leg in r.get("legs") or [] for p in leg.get("points") or []]
+        if len(pts) < 2:
+            continue
+        sm = r.get("summary") or {}
+        L, T = float(sm.get("lengthInMeters") or 0), float(sm.get("travelTimeInSeconds") or 0)
+        ins = (r.get("guidance") or {}).get("instructions") or []
+        steps = []
+        for k, a in enumerate(ins):
+            b = ins[k + 1] if k + 1 < len(ins) else None
+            i0 = int(a.get("pointIndex") or 0)
+            i1 = int(b.get("pointIndex")) if b and b.get("pointIndex") is not None else len(pts) - 1
+            mn = a.get("maneuver") or ""
+            man, mod = _TT_MAN.get(mn, ("roundabout", "") if mn.startswith("ROUNDABOUT") else ("turn", ""))
+            road = (a.get("street") or "").strip() or ", ".join(a.get("roadNumbers") or [])
+            o0 = float(a.get("routeOffsetInMeters") or 0)
+            o1 = float(b.get("routeOffsetInMeters")) if b and b.get("routeOffsetInMeters") is not None else L
+            t0 = float(a.get("travelTimeInSeconds") or 0)
+            t1 = float(b.get("travelTimeInSeconds")) if b and b.get("travelTimeInSeconds") is not None else T
+            steps.append({"road": road, "ref": ", ".join(a.get("roadNumbers") or []), "km": max(0.0, o1 - o0) / 1000.0,
+                          "min": max(0.0, t1 - t0) / 60.0, "man": man, "mod": mod, "line": pts[i0:max(i0 + 1, i1) + 1]})
+        if not steps:
+            steps = [{"road": "", "ref": "", "km": L / 1000.0, "min": T / 60.0, "man": "depart", "mod": "", "line": pts}]
+        out.append({"line": pts, "km": L / 1000.0 or offservice.line_km(pts), "osrm_min": T / 60.0, "steps": steps,
+                    "router": "TomTom (" + DV_TT_MODE + ")", "traffic_s": float(sm.get("trafficDelayInSeconds") or 0)})
+    return out
+
+
+def dv_use_tomtom():
+    return DV_ROUTER == "tomtom" and bool(TT["key"])
+
+
+async def tt_route(coords, alternatives=0, bearings=None, bus="dd"):
+    """TomTom Routing API: bus / truck routing with vehicle dimensions (respects height, width and turn restrictions in
+    TomTom's map) and live traffic. Cached 10 min; counts against TOMTOM_DAILY_CAP like the traffic calls."""
+    locs = ":".join(f"{lat:.6f},{lon:.6f}" for lat, lon in coords)
+    h, w, l_, kg = DV_TT_DIMS.get(bus, DV_TT_DIMS["dd"])
+    prm = {"key": TT["key"], "travelMode": DV_TT_MODE, "routeType": "fastest", "traffic": "true", "instructionsType": "coded",
+           "routeRepresentation": "polyline", "computeTravelTimeFor": "all", "vehicleHeight": h, "vehicleWidth": w, "vehicleLength": l_,
+           "vehicleWeight": kg, "vehicleCommercial": "true"}
+    if alternatives and len(coords) == 2:          # TomTom computes alternatives only without waypoints
+        prm["maxAlternatives"] = min(5, int(alternatives))
+    if bearings and bearings[0] is not None:
+        prm["vehicleHeading"] = int(round(bearings[0])) % 360
+    key = "tt_route:" + hashlib.sha1(json.dumps([locs, {k: v for k, v in prm.items() if k != "key"}]).encode()).hexdigest()[:24]
+
+    async def factory():
+        if not tt_spend():
+            DV_TT_STATS["capped"] += 1
+            return {"routes": [], "error": "TomTom daily cap reached"}, 60, False
+        try:
+            r = await client().get(f"https://api.tomtom.com/routing/1/calculateRoute/{locs}/json", params=prm, headers=tt_headers(), timeout=25)
+            r.raise_for_status()
+            routes = tt_parse_route(r.json())
+            DV_TT_STATS["ok"] += 1
+            return {"routes": routes, "error": None}, 600, True
+        except Exception as e:
+            DV_TT_STATS["fail"] += 1
+            DV_TT_STATS["error"] = tt_err(e)
+            return {"routes": [], "error": tt_err(e)}, 60, False
+    return await cached(key, factory)
+
+
 async def dv_osrm(coords, alternatives, bearings=None):
-    """OSRM with a small concurrency cap (the network plan asks for many routes at once).
-    Buses may not U-turn: no turning back at via points, and the route must start and end
-    heading the way the bus travels (bearings). If OSRM rejects the bearings, retry without them;
-    any U-turn in the result is still rejected by diversion.uturns()."""
+    """Road routing for diversions, with a small concurrency cap (the network plan asks for many routes at once).
+    TomTom Routing (bus mode, vehicle dimensions, live traffic) when TOMTOM_API_KEY is set; OSRM (OpenStreetMap) otherwise
+    or when TomTom fails / its daily cap is reached. Buses may not U-turn: OSRM gets no turning back at via points and the
+    start / end heading; any U-turn left in a result from either router is rejected by diversion.uturns()."""
     async with DV_OSRM_SEM:
+        if dv_use_tomtom():
+            res = await tt_route(coords, alternatives, bearings, DV_BUS.get())
+            if res.get("routes"):
+                return res
         res = await os_osrm(coords, alternatives=alternatives, bearings=bearings, continue_straight=True)
         if bearings and not res.get("routes"):
             res = await os_osrm(coords, alternatives=alternatives, continue_straight=True)
+        for r in res.get("routes") or []:
+            r.setdefault("router", "OSRM (OpenStreetMap)")
         return res
 
 
@@ -7047,9 +7136,40 @@ async def api_dv_options(request: Request):
     return await dv_options_cached(st, blocks, svc, d, run_i, closure, bus, dims, body.get("others") or [], True, allow_small, fl["test"], fl["traffic"])
 
 
+DV_DONORS = {}      # blockage key -> {(svc, d): permitted diversion corridor found for that service}
+
+
+def dv_block_key(blocks):
+    return hashlib.sha1(json.dumps([[[round(p[0], 5), round(p[1], 5)] for p in b["line"]] for b in blocks]).encode()).hexdigest()[:16]
+
+
+def dv_donors(blocks, exclude=None):
+    """permitted diversion corridors other services already have for this blockage (30 min)"""
+    now = time.time()
+    reg = DV_DONORS.get(dv_block_key(blocks)) or {}
+    return [v for k, v in sorted(reg.items()) if k != exclude and now - v["ts"] < 1800]
+
+
+def dv_register_donors(blocks, svc, d, opts):
+    key = dv_block_key(blocks)
+    reg = DV_DONORS.setdefault(key, {})
+    best = [o for o in opts if o.get("permitted") and o.get("_seg")]
+    if not best:
+        return
+    o = best[0]
+    seg = o["_seg"]
+    cm = diversion.cum_m(seg)
+    vias = [diversion.point_at(seg, cm, cm[-1] * f) for f in (0.2, 0.4, 0.6, 0.8)] if cm[-1] > 0 else []
+    reg[(svc, d)] = {"service": svc, "direction": d, "vias": vias, "seg": diversion.simplify(seg, 120), "roads": list(o["roads"]),
+                     "signature": o["signature"], "ts": time.time(), "label": f"{svc} D{d}"}
+    if len(DV_DONORS) > 50:
+        DV_DONORS.pop(next(iter(DV_DONORS)))
+
+
 async def dv_options_cached(st, blocks, svc, d, run_i, closure, bus, dims, others, poll, allow_small, test=False, traffic=True):
     """options are reused for 90 s so the network plan and the per-service view never compute the same thing twice"""
-    key = "dvopt:" + hashlib.sha1(json.dumps([[b["line"], b["directed"]] for b in blocks] + [svc, d, run_i, closure, bus, dims, poll, allow_small, test, traffic],
+    key = "dvopt:" + hashlib.sha1(json.dumps([[b["line"], b["directed"]] for b in blocks] + [svc, d, run_i, closure, bus, dims, poll, allow_small, test, traffic,
+                                              sorted(x["label"] for x in dv_donors(blocks, (svc, d)))],
                                              default=str).encode()).hexdigest()[:24]
 
     async def factory():
@@ -7061,6 +7181,8 @@ async def dv_options_cached(st, blocks, svc, d, run_i, closure, bus, dims, other
 
 async def dv_options_core(st, blocks, svc, d, run_i, closure, bus, dims, others, poll=True, allow_small=False, test=False, traffic=True):
     P = diversion.PARAMS
+    tr_lines_kick(st)          # the bus-road check (LTA rule 1) needs every service's route line
+    DV_BUS.set(bus)
     line, src = await dv_line(st, svc, d, focus=blocks[0]["line"][len(blocks[0]["line"]) // 2] if blocks else None)
     if not line:
         return {"ok": False, "error": f"No route for service {svc} direction {d}."}
@@ -7130,11 +7252,27 @@ async def dv_options_core(st, blocks, svc, d, run_i, closure, bus, dims, others,
                     out.append(([at(max(0.0, A - 400.0)), v, at(min(cum[-1], B + 400.0))], 0))
         return out
 
+    donors = dv_donors(blocks, (svc, d))
+
+    def adopt_reqs():
+        """routes that follow a corridor another service already diverts by (same order, and reversed for the opposite
+        direction); the usual checks then decide whether this service may use it"""
+        out = []
+        pairs_ = [(max(0.0, A - 400.0), min(cum[-1], B + 400.0)), (max(0.0, A - 1000.0), min(cum[-1], B + 1000.0)),
+                  (max(0.0, A - 1000.0), min(cum[-1], B + 1500.0))]
+        for dn in donors[:5]:
+            for vv in (dn["vias"], list(reversed(dn["vias"]))):
+                if len(vv) < 2:
+                    continue
+                for e_, r_ in pairs_:
+                    out.append(([at(e_)] + [tuple(v) for v in vv] + [at(r_)], 0))
+        return out
+
     raw, cands, seen, routing_err, stage_used = [], [], set(), None, 0
     rejected = {"uses_block": 0, "no_bypass": 0, "duplicate": 0, "uturn": 0}
     for si, stg in enumerate(P["search_stages"]):
         reqs = []
-        for c_, a_ in await stage_reqs(stg, si == 0):
+        for c_, a_ in (await stage_reqs(stg, si == 0)) + (adopt_reqs() if si == 0 else []):
             k_ = (tuple((round(p_[0], 5), round(p_[1], 5)) for p_ in c_), a_)
             if k_ not in seen:
                 seen.add(k_)
@@ -7152,7 +7290,7 @@ async def dv_options_core(st, blocks, svc, d, run_i, closure, bus, dims, others,
             if await asyncio.to_thread(diversion.uturns, r["line"], r.get("steps")):   # rule 3: never a U-turn
                 rejected["uturn"] += 1
                 continue
-            dep = await asyncio.to_thread(diversion.departure, r["line"], line, cum)
+            dep = await asyncio.to_thread(diversion.departure, r["line"], line, cum, None, (A - 16000.0, A + 50.0))   # must start before the block
             if not dep or dep["leave_s"] > A + 5 or dep["rejoin_s"] < B - 5 or dep["rejoin_s"] <= dep["leave_s"]:
                 rejected["no_bypass"] += 1
                 continue
@@ -7252,6 +7390,7 @@ async def dv_options_core(st, blocks, svc, d, run_i, closure, bus, dims, others,
         else:
             feas, feas_text = "VERIFICATION REQUIRED", "Operational verification required. " + status_text
         opts.append({"signature": c["signature"], "roads": [g["road"] for g in c["groups"]], "road_class": c["road_class"], "bus_road": c.get("bus_road"),
+                     "router": r.get("router", "OSRM (OpenStreetMap)"),
                      "groups": [{"road": g["road"], "km": round(g["km"], 2), "turns": g["turns"], "sharp": g["sharp"]} for g in c["groups"]],
                      "leave_s": round(leave_s, 1), "rejoin_s": round(rejoin_s, 1), "leave_pt": [round(dep["leave_pt"][0], 6), round(dep["leave_pt"][1], 6)],
                      "rejoin_pt": [round(dep["rejoin_pt"][0], 6), round(dep["rejoin_pt"][1], 6)],
@@ -7401,6 +7540,16 @@ async def dv_options_core(st, blocks, svc, d, run_i, closure, bus, dims, others,
     win_s = [lo + (hi - lo) * k / (n_s - 1) for k in range(n_s)]
     win = {"s": [round(x, 1) for x in win_s], "t": [round(diversion.t_at(prof, x), 3) for x in win_s],
            "pts": [[round(p[0], 6), round(p[1], 6)] for p in (diversion.point_at(line, cum, x) for x in win_s)]}
+    dv_register_donors(blocks, svc, d, opts)
+    for o in opts:
+        shared = []
+        for dn in donors:
+            dseg = dn["seg"]
+            smp = o["_seg"][::max(1, len(o["_seg"]) // 30)]
+            near = sum(1 for p_ in smp if diversion.nearest_on_line(p_, dseg)[0] <= 35.0)
+            if smp and near >= 0.6 * len(smp):
+                shared.append(dn["label"])
+        o["shared_with"] = shared
     for o in opts:
         dp = o.pop("_prof")
         seg = o.pop("_seg")
@@ -7434,6 +7583,8 @@ async def dv_options_core(st, blocks, svc, d, run_i, closure, bus, dims, others,
             "compare": cols, "wait_or_divert": wod, "window": win,
             "wait_allowed": diversion.wait_allowed(closure, P), "wait_max_min": P["wait_max_min"], "closure_desc": diversion.closure_desc(closure),
             "long_closure": long_closure, "trapped": trapped, "search": search,
+            "router": ("TomTom Routing (" + DV_TT_MODE + " mode, vehicle dimensions, live traffic) \u00b7 OSRM fallback") if dv_use_tomtom() else "OSRM (OpenStreetMap)",
+            "router_stats": dict(DV_TT_STATS) if dv_use_tomtom() else None,
             "time_basis": "LTA speed bands" if prof["known_share"] >= 0.5 else f"assumed {P['fallback_kmh']:g} km/h where no speed data (speed bands cover {round(prof['known_share'] * 100)}%)",
             "important_basis": "LTA stop names (Stn / Int / Ter / Hosp), services at the stop, and the OCC important-stop list",
             "updated": now.isoformat(timespec="seconds")}
@@ -7444,7 +7595,8 @@ def dv_opt_compact(o, full=False):
     if not o:
         return None
     x = {k_: o.get(k_) for k_ in ("n", "name", "signature", "roads", "road_class", "added_km", "added_min", "div_km", "skipped_n", "important_n", "traffic",
-                                  "feasibility", "feasibility_text", "leave_pt", "rejoin_pt", "rejoin_stop", "also", "used_before", "affected_buses")}
+                                  "feasibility", "feasibility_text", "leave_pt", "rejoin_pt", "rejoin_stop", "also", "used_before", "affected_buses",
+                                  "shared_with", "permitted")}
     x["line"] = diversion.simplify([tuple(p_) for p_ in o["line"]], 160) if o.get("line") else []
     x["skipped"] = [{"code": s_["code"], "name": s_["name"], "important": s_["important"]} for s_ in o.get("skipped", [])] if full else None
     return x
@@ -7478,6 +7630,13 @@ async def api_dv_plan_all(request: Request):
             except Exception as ex:
                 return {"ok": False, "error": f"{type(ex).__name__}: {ex}"}
     res = await asyncio.gather(*[one(i, e) for i, e in enumerate(ents)])
+    retry = [i for i, (e, r) in enumerate(zip(ents, res)) if r.get("ok") and r["recommendation"]["action"] == "manual"
+             and dv_donors(blocks, (e["service"], e["direction"]))]
+    if retry:       # adopt corridors other services divert by (each still checked against the LTA rules)
+        again = await asyncio.gather(*[one(i, ents[i]) for i in retry])
+        for i, r in zip(retry, again):
+            if r.get("ok"):
+                res[i] = r
     rows, net_in = [], []
     for e, r in zip(ents, res):
         if not r.get("ok"):
@@ -7498,8 +7657,10 @@ async def api_dv_plan_all(request: Request):
                   "skipped": [{"code": x["code"], "name": x["name"], "important": bool(x["important"])} for x in o["skipped"]] if div else [],
                   "buses": o.get("affected_buses", 0) if div else ((none or {}).get("affected") or 0),
                   "holds": [{"label": h["label"], "action": h["action"]} for h in ((col or {}).get("reg") or {}).get("holds", []) if h.get("hold", 0) >= .5],
-                  "added_min": o["added_min"] if div else None, "road_class": (o.get("road_class") or {}).get("label", "") if div else ""}
+                  "added_min": o["added_min"] if div else None, "road_class": (o.get("road_class") or {}).get("label", "") if div else "",
+                  "shared_with": o.get("shared_with", []) if div else []}
         rows.append({**e, "ok": True, "road": r.get("road"), "H": r["H"], "action": rec["action"], "choice": choice, "headline": rec["headline"], "reasons": rec["reasons"],
+                     "donors_checked": [x["label"] for x in dv_donors(blocks, (e["service"], e["direction"]))] if rec["action"] == "manual" else [],
                      "cautions": rec["cautions"], "option": dv_opt_compact(o), "options_n": len(r["options"]), "small_hidden": r["small_hidden"],
                      "buses": len([b for b in r["buses"] if b.get("status") not in ("passed_block",)]), "polled": r["polled"],
                      "bus_min": col["bus_min"] if col else None, "bus_min_none": none["bus_min"] if none else None,
