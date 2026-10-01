@@ -22,7 +22,7 @@
   var FLT = LS.get("dv.flt", {op:"", svcs:[], test:false});
   if(!Array.isArray(FLT.svcs)) FLT.svcs = [];
   var TRAFFIC = LS.get("dv.traffic", true) !== false;
-  function flags(){ return {operator:FLT.op, services_filter:FLT.svcs, test:!!FLT.test, traffic:TRAFFIC}; }
+  function flags(){ var f = {operator:FLT.op, services_filter:FLT.svcs, test:!!FLT.test, traffic:TRAFFIC}; if(S && S.manual && S.manual.length) f.manual_vias = S.manual; return f; }
   var FLAGGED = /\/api\/diversion\/(analyse|options|plan_all|plans$|plans\/\d+\/(confirm|update))/;
   function post(url, body, timeout){
     if(FLAGGED.test(url)) body = Object.assign({}, body || {}, flags());
@@ -109,7 +109,7 @@
   }
   function redrawArrows(){ ARROWS = ARROWS.filter(function(sp){ return sp.grp.hasLayer(sp.ag) && (map.hasLayer(sp.grp) || true); }); ARROWS.forEach(arrowsFor); }
   var G = {};
-  ["speed", "incidents", "roadworks", "others", "net", "route", "blocked", "alts", "sel", "pts", "buses", "handles", "prev"].forEach(function(k){ G[k] = L.layerGroup().addTo(map); });
+  ["speed", "incidents", "roadworks", "others", "net", "route", "blocked", "alts", "sel", "pts", "buses", "handles", "prev", "draw", "rej"].forEach(function(k){ G[k] = L.layerGroup().addTo(map); });
   var tomLayer = null;
   function divIcon(html, cls){ return L.divIcon({className:"", html:'<div class="' + (cls || "dv-mk") + '">' + html + '</div>', iconSize:[0, 0]}); }
 
@@ -224,6 +224,7 @@
     $("blockSub").textContent = "Finding the road\u2026";
     DS.api("/api/diversion/snap?lat=" + ll.lat.toFixed(6) + "&lon=" + ll.lng.toFixed(6)).then(function(j){
       if(!j.ok){ renderBlockCard(); toast(j.error || "No road found there."); return; }
+      S.manual = null; G.draw.clearLayers();
       if(S.plan && S.plan.status === "ended"){ detachPlan(); S.blocks = []; S.choices = {}; }
       var nb = {corridor:j.corridor, cm:j.corridor_m, a:j.start_m, b:j.end_m, road:tc(j.road), snapSrc:j.source, directed:false};
       var mid = pointAt(nb.corridor, nb.cm, (nb.a + nb.b) / 2);
@@ -323,6 +324,7 @@
   }
   function removeBlock(i){
     if(lockedEdit()) return;
+    S.manual = null; G.draw.clearLayers();
     if(S.blocks.length > 1){ S.blocks.splice(i, 1); S.bi = Math.max(0, Math.min(S.bi, S.blocks.length - 1)); resetAnalysis(); drawBlocks(); analyse(); return; }
     if(S.plan && ["detected", "planned"].indexOf(S.plan.status) >= 0){
       if(!confirm("Discard the saved plan for " + S.plan.road + "? It will be closed without being activated.")) return;
@@ -334,7 +336,7 @@
   /* ------------------------------------------------------------------ ANALYSE: affected services + approaching buses */
   function resetAnalysis(){
     S.an = null; S.sel = null; S.opts = null; S.optSel = null; S.simSeen = false; S.net = null; netSeq++;
-    ["others", "route", "alts", "sel", "pts", "buses", "prev", "net"].forEach(function(k){ G[k].clearLayers(); });
+    ["others", "route", "alts", "sel", "pts", "buses", "prev", "net", "rej"].forEach(function(k){ G[k].clearLayers(); });
     stopSim(); renderAll();
   }
   var anSeq = 0;
@@ -364,7 +366,8 @@
       + (fi.operator ? ' \u00b7 operator ' + esc(fi.operator) : '') + ((fi.services || []).length ? ' \u00b7 services ' + esc(fi.services.join(", ")) : '') + ' <button type="button" class="ds-btn sm ghost" id="fClear">Show all</button></p>' : '';
     if(!j.entries.length && fi.total){ el.innerHTML = filt + DS.empty({icon:"route", title:"NO AFFECTED SERVICE MATCHES THE FILTER", text:fi.total + " service-direction(s) run along the blocked section, but none match the operator / services filter."}); var fc0 = $("fClear"); if(fc0) fc0.onclick = clearFlt; return; }
     if(!j.entries.length){ el.innerHTML = DS.empty({icon:"route", title:"NO SERVICE RUNS ALONG THIS SECTION", text:"No bus route runs along the blocked section (routes that only cross it are not counted). Matching basis: " + j.basis + "."}); return; }
-    var h = filt + '<div class="dv-tot"><b>' + j.services + '</b>services affected<span style="margin-left:auto"><b style="font-size:20px">' + j.buses + '</b> buses</span></div>';
+    var far = (j.far_apart || []).map(function(x){ return '<div class="dv-far">\u26a0 Blockages ' + x.km + ' km apart (' + esc(tc(x.a)) + ' and ' + esc(tc(x.b)) + '). They are planned together as one incident \u2014 if one is left over from earlier, drag its \u2715 to the bin.</div>'; }).join("");
+    var h = filt + far + '<div class="dv-tot"><b>' + j.services + '</b>services affected<span style="margin-left:auto"><b style="font-size:20px">' + j.buses + '</b> buses</span></div>';
     j.entries.forEach(function(e){
       var k = key(e), n = (e.buses || []).filter(function(b){ return b.status !== "passed_block"; });
       var dots = n.slice(0, 8).map(function(b){ return '<i class="st-' + b.status + '" title="' + esc(b.label + " \u00b7 " + b.status_text) + '"></i>'; }).join("");
@@ -481,7 +484,10 @@
     else if(S.allowSmall) h += '<div class="dv-note">Routes that fail LTA rule 1 (not a bus road, or no double-deck service there) are shown for reference only and cannot be selected. <br><button type="button" class="ds-btn sm ghost" id="hideSmall">Main roads only</button></div>';
     var fewest = Math.min.apply(null, j.options.filter(function(o){ return o.permitted; }).map(function(o){ return o.skipped_n; }).concat([1e9]));
     h += '<div class="dv-rules" aria-label="LTA diversion rules"><b>LTA DIVERSION RULES</b><span>1 \u00b7 Safety: only roads buses already use (bus stops on it); double-deckers only where DD services run</span><span>2 \u00b7 Fewest bus stops skipped</span><span>3 \u00b7 No U-turn</span>'
-      + (j.search ? '<small style="width:100%;margin-top:2px">Search ' + (j.search.stage > 1 ? 'widened to ' : '') + 'stage ' + j.search.stage + ' of ' + j.search.stages + ': routes leaving and rejoining up to ' + j.search.max_km + ' km from the block \u00b7 ' + j.search.routes_tested + ' road routes tested</small>' : '') + '</div>';
+      + (j.search ? '<small style="width:100%;margin-top:2px">' + (j.search.mode === "ladder"
+          ? 'Stop ladder: bus stop ' + esc(j.search.leave_stop) + ' \u2192 ' + esc(j.search.rejoin_stop) + ' first, then skipping one more stop at a time \u2014 tried up to ' + j.search.skip_max + ' extra stop' + (j.search.skip_max === 1 ? '' : 's') + ' skipped'
+          : (j.search.ladder_tried ? 'Stop ladder found nothing up to ' + j.search.skip_max + ' extra stops skipped; wide search ' : 'Search ') + 'stage ' + j.search.stage + ' of ' + j.search.stages + ': up to ' + j.search.max_km + ' km from the block')
+        + ' \u00b7 ' + j.search.routes_tested + ' road routes tested</small>' : '') + '</div>';
     if(j.last_point){ var lb = (j.buses || []).filter(function(b){ return b.m_to_exit != null; }).sort(function(a, b){ return a.m_to_exit - b.m_to_exit; })[0];
       h += '<div class="dv-last"><span class="ic" aria-hidden="true">&#x26a0;</span><div><b>LAST DIVERSION POINT</b><span>' + (lb ? km(lb.m_to_exit) + ' ahead of ' + esc(lb.label) + (lb.min_to_exit != null ? ' \u00b7 ' + (lb.min_to_exit < 1 ? 'under 1 min' : 'approx. ' + f0(lb.min_to_exit) + ' min') : '') : km(j.last_point.before_block_m) + ' before the block') + '</span>'
         + '<small>Turn into ' + esc(j.last_point.road || "the diversion") + ' (option ' + j.last_point.option + '). A bus past this junction can no longer use the proposed diversion.</small></div></div>'; }
@@ -499,12 +505,13 @@
       if(br){ r1 = br.ok && (br.dd === "PROVEN" || br.dd === "N/A"); r1u = br.ok && br.dd === "UNCONFIRMED";
         r1t = !br.ok ? "Not a bus road" : br.dd === "SD_ONLY" ? "Single-deck road only" : br.dd === "PROVEN" ? "Bus road \u00b7 DD runs here" : br.dd === "UNCONFIRMED" ? "Bus road \u00b7 DD to verify" : "Bus road"; }
       else { r1 = (o.road_class || {}).label === "MAIN ROADS"; r1u = (o.road_class || {}).label === "NOT VERIFIED"; r1t = "Main roads" + (r1u ? " (verify)" : ""); }
+      var lad = o.ladder ? '<div class="dv-brtext" style="--c:#38d6ff">Leaves after <b>' + esc(o.ladder.leave_name) + '</b> (' + esc(o.ladder.leave_code) + ') \u2192 rejoins at <b>' + esc(o.ladder.rejoin_name) + '</b> (' + esc(o.ladder.rejoin_code) + ') \u00b7 skips ' + o.skipped_n + ' stop' + (o.skipped_n === 1 ? '' : 's') + '</div>' : '';
       var rules = '<div class="dv-rchk"><span class="' + (r1 ? "ok" : r1u ? "warn" : "no") + '">' + (r1 ? "\u2713" : r1u ? "?" : "\u2715") + ' 1 ' + r1t + '</span>'
         + '<span class="' + (o.skipped_n <= fewest ? "ok" : "warn") + '">' + (o.skipped_n <= fewest ? "\u2713" : "\u2022") + ' 2 Skips ' + o.skipped_n + ' stop' + (o.skipped_n === 1 ? "" : "s") + (o.skipped_n <= fewest && !np ? " (fewest)" : "") + '</span>'
-        + '<span class="ok">\u2713 3 No U-turn</span></div>'
+        + '<span class="ok">\u2713 3 No U-turn</span></div>' + lad
         + (br ? '<div class="dv-brtext" style="--c:' + (r1 ? C.green : r1u ? C.amber : C.red) + '">' + esc(br.text) + '</div>' : '');
       h += '<article class="dv-opt ' + (np ? "na" : sel ? "sel" : "alt") + (isRec ? " rec" : "") + '" aria-label="' + o.name + (isRec ? ", recommended" : "") + '"><h3>' + o.name + '<span class="sp"></span>'
-        + ((o.shared_with || []).length && !np ? '<span class="dv-badge alt" title="The same diversion corridor another affected service uses">SAME AS ' + esc(o.shared_with.join(", ")) + '</span> ' : '') + (np ? DS.sev("crit", "NOT PERMITTED \u2014 LTA RULE 1") : isRec ? '<span class="dv-badge">\u2605 RECOMMENDED</span>' : isExt ? '<span class="dv-badge alt">READY IF EXTENDED</span>' : '') + (sel && !np ? ' ' + DS.sev("ok", "SELECTED") : "") + '</h3>' + rules + rcBar(o.road_class) + '<ul class="dv-chain">'
+        + (o.controller_route ? '<span class="dv-badge" title="The route you drew, checked against the LTA rules">CONTROLLER ROUTE</span> ' : '') + ((o.shared_with || []).length && !np && !o.controller_route ? '<span class="dv-badge alt" title="The same diversion corridor another affected service uses">SAME AS ' + esc(o.shared_with.join(", ")) + '</span> ' : '') + (np ? DS.sev("crit", "NOT PERMITTED \u2014 LTA RULE 1") : isRec ? '<span class="dv-badge">\u2605 RECOMMENDED</span>' : isExt ? '<span class="dv-badge alt">READY IF EXTENDED</span>' : '') + (sel && !np ? ' ' + DS.sev("ok", "SELECTED") : "") + '</h3>' + rules + rcBar(o.road_class) + '<ul class="dv-chain">'
         + o.roads.map(function(r){ return '<li>' + esc(tc(r)) + '</li>'; }).join("") + '<li class="rj">\u21aa REJOIN NORMAL ROUTE' + (o.rejoin_stop ? ' \u00b7 ' + esc(o.rejoin_stop.name) : '') + '</li></ul>'
         + '<div class="dv-lbl" style="margin-top:0">SKIPPED STOPS: ' + o.skipped_n + '</div><div class="dv-skip">' + o.skipped.map(function(s){ return '<span class="' + (s.important.length ? "imp" : "") + '" title="' + esc(s.name + (s.important.length ? " \u2014 " + s.important.join(", ") : "")) + '">' + (s.important.length ? "\u26a0" : "\u2715") + ' ' + esc(s.code) + '</span>'; }).join("") + (o.skipped_n ? "" : '<span style="background:none;border-color:var(--ds-line);color:var(--ds-mut)">none</span>') + '</div>'
         + (o.important_n ? '<div class="dv-warn">\u26a0 ' + o.skipped.filter(function(s){ return s.important.length; }).map(function(s){ return esc(s.name) + " (" + esc(s.important.join(", ")) + ")"; }).join("; ") + '</div>' : '')
@@ -520,6 +527,7 @@
       + '<p class="dv-feas">Short closure (' + esc(j.closure_desc) + '): buses hold upstream or wait at the block until it reopens. No stops skipped.</p>'
       + '<div class="dv-acts"><button type="button" class="ds-btn sm ghost" data-s="0">SIMULATE</button><button type="button" class="ds-btn sm ' + (S.optSel === 0 ? "pri" : "") + '" data-p="0">' + (S.optSel === 0 ? "SELECTED" : "SELECT") + '</button></div></article>';
 
+    h += whyPanel(j);
     h += '<p class="dv-muted">Ordered by the LTA rules: safety first (bus roads only; double-deck only where DD services run), then fewest stops skipped, then important stops, then added running time \u2014 no combined score. ' + j.candidates_tested + ' road routes tested; ' + j.rejected.uses_block + ' rejected for using the blocked road' + (j.rejected.uturn ? ', ' + j.rejected.uturn + ' for needing a U-turn' : '') + '. Buses are never routed through a U-turn (including turning back at a roundabout or round a block).</p>';
     el.innerHTML = h;
     var sb = $("showSmall"), hb = $("hideSmall");
@@ -1149,6 +1157,59 @@
   function loadImp(){ DS.api("/api/diversion/important").then(function(j){ $("impList").innerHTML = (j.stops || []).length ? j.stops.map(function(s){ return '<div>' + esc(s.code) + ' ' + esc(s.name) + (s.reason ? ' \u2014 ' + esc(s.reason) : '') + ' <button type="button" class="ds-btn sm ghost" data-rm="' + esc(s.code) + '" aria-label="Remove ' + esc(s.code) + '">\u2715</button></div>'; }).join("") : "None added.";
     $("impList").querySelectorAll("[data-rm]").forEach(function(b){ b.onclick = function(){ post("/api/diversion/important", {code:b.dataset.rm, remove:true}).then(loadImp); }; }); }); }
   $("impAdd").onclick = function(){ post("/api/diversion/important", {code:$("impCode").value, reason:$("impWhy").value}).then(function(j){ if(j.error) return toast(j.error); $("impCode").value = ""; $("impWhy").value = ""; loadImp(); toast("Added. Re-run the analysis to include it."); }); };
+
+  /* ------------------------------------------------------------------ why not other routes (every route tested, and why it was not used) */
+  var SRC_TXT = {ladder:"the stop ladder", normal:"router", avoid:"TomTom, avoiding the block", busvia:"via a nearby bus road", adopt:"another service's corridor", manual:"your drawn route"};
+  function whyPanel(j){
+    var rj = j.rejects || [], st = j.status || {};
+    var stTxt = '<div class="st">Road router: <b>' + esc(st.router || "?") + '</b>' + (st.router === "TomTom" ? ' \u00b7 ' + f0(st.tomtom_calls_today) + ' of ' + f0(st.tomtom_cap) + ' calls today \u00b7 closed section avoided with ' + f0(st.avoid_areas) + ' area(s)' : (st.tomtom_key ? '' : ' \u00b7 no TomTom key set'))
+      + (st.tomtom_error ? ' \u00b7 <span style="color:#ffc3ca">TomTom error: ' + esc(st.tomtom_error) + '</span>' : '')
+      + '<br>Bus route lines loaded: <b>' + f0(st.bus_lines) + '</b>' + (st.bus_lines ? '' : ' (' + esc(st.bus_lines_info || "not built yet") + ' \u2014 bus-road check falls back to stops)')
+      + ' \u00b7 bus-road waypoints tried: <b>' + f0(st.busroad_waypoints) + '</b>' + (st.manual_waypoints ? ' \u00b7 your route: <b>' + st.manual_waypoints + ' points</b>' : '') + '</div>';
+    if(!rj.length) return '<details class="dv-why"><summary>How the routes were found</summary>' + stTxt + '</details>';
+    var groups = {}; rj.forEach(function(x){ groups[x.why] = (groups[x.why] || 0) + 1; });
+    return '<details class="dv-why"' + (j.options.length ? '' : ' open') + '><summary>Why not other routes? ' + rj.length + ' route(s) not used \u2014 ' + Object.keys(groups).map(function(k){ return groups[k] + ' ' + k; }).join("; ") + '</summary>' + stTxt
+      + rj.slice(0, 25).map(function(x, i){ return '<button type="button" class="dv-rej" data-rej="' + i + '" aria-pressed="false"><b>' + esc(x.why.toUpperCase()) + '</b>' + esc((x.roads || []).map(tc).join(" \u2192 ") || "unnamed roads") + ' \u00b7 ' + f1(x.km) + ' km \u00b7 found by ' + esc(SRC_TXT[x.src] || x.src) + (x.detail ? '<br><span>' + esc(x.detail) + '</span>' : '') + '</button>'; }).join("")
+      + '<p class="dv-muted">Tap one to see it on the map (dotted grey). If the right road is missing, use <b>DRAW ROUTE</b> on the map.</p></details>';
+  }
+  document.addEventListener("click", function(e){
+    var b = e.target.closest && e.target.closest(".dv-rej"); if(!b || !S.opts) return;
+    var x = (S.opts.rejects || [])[+b.dataset.rej]; if(!x) return;
+    var on = b.getAttribute("aria-pressed") !== "true";
+    document.querySelectorAll(".dv-rej").forEach(function(o){ o.setAttribute("aria-pressed", "false"); });
+    G.rej.clearLayers();
+    if(on){ b.setAttribute("aria-pressed", "true"); rline(x.line, "#8a97a8", {pane:"alts", weight:4, dashArray:"2 7", opacity:1, casing:.6}, G.rej, true); map.fitBounds(L.latLngBounds(x.line).pad(.2)); if(S.mobile) sheetTo("peek"); }
+  });
+
+  /* ------------------------------------------------------------------ DRAW ROUTE: the controller draws the diversion */
+  var DRAW = {on:false, pts:[]};
+  function drawRender(){
+    G.draw.clearLayers();
+    if(DRAW.pts.length > 1) rline(DRAW.pts, "#0a7ea8", {pane:"divsel", weight:5, dashArray:"6 6", opacity:1}, G.draw, false);
+    DRAW.pts.forEach(function(p, i){ L.marker(p, {pane:"bus", icon:divIcon(String(i + 1), "dv-wp"), keyboard:false}).addTo(G.draw); });
+    $("drawTxt").textContent = DRAW.pts.length ? DRAW.pts.length + " point" + (DRAW.pts.length === 1 ? "" : "s") + " \u2014 keep tapping along the roads, then CHECK THIS ROUTE." : "Tap along the roads the buses should take \u2014 start before the block, end after it.";
+    $("drawGo").disabled = DRAW.pts.length < 1;
+  }
+  function drawMode(on){
+    if(on && !hasBlock()){ toast("Place the road block first."); return; }
+    if(on && !S.sel){ toast("Select an affected service first."); return; }
+    DRAW.on = on; $("drawBar").hidden = !on; $("drawBtn").setAttribute("aria-pressed", String(on));
+    $("legend").classList.toggle("hid", on || !lay.legend);
+    map.getContainer().style.cursor = on ? "crosshair" : "";
+    if(on){ DRAW.pts = (S.manual || []).map(function(p){ return [p[0], p[1]]; }); if(S.mobile) sheetTo("peek"); arm(false); }
+    else if(!S.manual) G.draw.clearLayers();
+    drawRender();
+  }
+  $("drawBtn").onclick = function(){ drawMode(!DRAW.on); };
+  $("drawUndo").onclick = function(){ DRAW.pts.pop(); drawRender(); };
+  $("drawCancel").onclick = function(){ DRAW.pts = []; S.manual = null; drawMode(false); G.draw.clearLayers(); };
+  $("drawGo").onclick = function(){
+    S.manual = DRAW.pts.slice(0, 20); drawMode(false); drawRender();
+    toast("Checking your route against the LTA rules \u2014 it is also offered to every other affected service.");
+    var k = S.sel; resetAnalysisKeep(); if(k) selectService(k); runNet();
+  };
+  map.on("click", function(e){ if(!DRAW.on) return; if(DRAW.pts.length >= 20) return toast("Up to 20 points."); DRAW.pts.push([e.latlng.lat, e.latlng.lng]); drawRender(); });
+  function resetAnalysisKeep(){ S.opts = null; S.optSel = null; }
 
   /* ------------------------------------------------------------------ scope bar: operator, services, LIVE / TEST data */
   function saveFlt(){ LS.set("dv.flt", FLT); }

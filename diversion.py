@@ -17,6 +17,8 @@ import math
 import re
 
 PARAMS = {
+    "ladder": ((0, 1), (2, 3), (4, 6), (7, 9), (10, 12)),   # stop ladder: stops skipped tried per batch, fewest first
+    "ladder_pairs_per_level": 6,  # (leave stop, rejoin stop) pairs tried per number of skipped stops
     "line_stop_tol_m": 45.0,    # route-line check: a stop further than this from the line means the line is wrong there
     "line_len_abs_m": 150.0,    # ...or a stop-to-stop length differing from LTA's official distance by more than this
     "line_len_rel": 0.15,       # ...and by more than this share of it
@@ -415,6 +417,7 @@ def departure(cand_line, svc_line, svc_cum, P=None, start_window=None):
     d0, cur = project_window(pts[0], svc_line, svc_cum, lo0, hi0)
     if cur is None:
         return None
+    start_s = cur
 
     def seg_brg(s_):
         a_, b_ = point_at(svc_line, svc_cum, max(0.0, s_ - 6)), point_at(svc_line, svc_cum, min(svc_cum[-1], s_ + 6))
@@ -443,6 +446,8 @@ def departure(cand_line, svc_line, svc_cum, P=None, start_window=None):
         return None
     i0 = max(0, off[0] - 1)
     i1 = min(len(pts) - 1, off[-1] + 1)
+    if pos[i0] is None and i0 == 0 and d0 is not None and d0 <= P["on_route_m"]:
+        pos[0] = start_s        # leaves at its very first point (e.g. a blockage near the start of the route)
     if pos[i0] is None or pos[i1] is None or pos[i1] <= pos[i0]:
         return None
     return {"leave_s": pos[i0], "rejoin_s": pos[i1], "i0": i0, "i1": i1, "pts": pts,
