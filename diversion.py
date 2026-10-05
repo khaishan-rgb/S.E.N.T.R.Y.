@@ -17,6 +17,19 @@ import math
 import re
 
 PARAMS = {
+    # ---- V16.15 deterministic stop-to-stop engine
+    "block_buffer_m": 35.0,      # exclusion zone around the drawn blockage (30-50 m recommended); entering it = reject
+    "max_rejoin_stops": 12,      # downstream stops tried as the rejoin point (A->B, A->C, ...)
+    "max_exit_fallback": 2,      # earlier diversion points tried when nothing works from the last reachable stop
+    "alt_per_pair": 3,           # routing alternatives requested per stop pair
+    "backtrack_m": 30.0,         # coming back onto the original route this far upstream of the start = backtracking
+    "ends_tol_m": 60.0,          # a returned route must start / end this close to the requested stops
+    "detour_ratio_max": 4.0,     # diversion longer than this x the normal section (and > detour_abs_km extra) = unreasonable
+    "detour_abs_km": 6.0,
+    "next_leg_tol_abs_m": 200.0,  # next leg D->E: road length vs the original route length
+    "next_leg_tol_rel": 0.25,
+    "next_leg_on_route": 0.7,    # share of the next-leg route that must follow the original route
+    "score_w": {"busroad": 30, "roadclass": 20, "time": 15, "dist": 15, "skip": 10, "simple": 10},
     "ladder": ((0, 1), (2, 3), (4, 6), (7, 9), (10, 12)),   # stop ladder: stops skipped tried per batch, fewest first
     "ladder_pairs_per_level": 6,  # (leave stop, rejoin stop) pairs tried per number of skipped stops
     "line_stop_tol_m": 45.0,    # route-line check: a stop further than this from the line means the line is wrong there
@@ -448,6 +461,11 @@ def departure(cand_line, svc_line, svc_cum, P=None, start_window=None):
     i1 = min(len(pts) - 1, off[-1] + 1)
     if pos[i0] is None and i0 == 0 and d0 is not None and d0 <= P["on_route_m"]:
         pos[0] = start_s        # leaves at its very first point (e.g. a blockage near the start of the route)
+    if pos[i0] is not None and pos[i1] is None and i1 == len(pts) - 1:
+        # ends off the route: next to it but heading the other way = the opposite carriageway
+        de, _ = project_window(pts[-1], svc_line, svc_cum, pos[i0], 1e18)
+        return {"leave_s": pos[i0], "rejoin_s": None, "i0": i0, "i1": i1, "pts": pts, "leave_pt": pts[i0], "rejoin_pt": pts[i1],
+                "start_on": on[0], "end_on": False, "end_near": de is not None and de <= 40.0}
     if pos[i0] is None or pos[i1] is None or pos[i1] <= pos[i0]:
         return None
     return {"leave_s": pos[i0], "rejoin_s": pos[i1], "i0": i0, "i1": i1, "pts": pts,
@@ -1147,3 +1165,193 @@ def assemble_line(base, chk, stops, fixed, P=PARAMS):
     if pos and pos[-1] < cum[-1] - 1:
         add(cut(base, cum, pos[-1], cum[-1]))
     return out
+
+
+
+# ================================================================================================
+# V16.15 - deterministic stop-to-stop diversion engine. The routing engine (TomTom / OSRM) produces every
+# road geometry; these functions only find stops, validate (hard rejects first) and score. Nothing here
+# invents a road connection.
+# ================================================================================================
+RESTRICTED_HW = {"service", "track", "footway", "pedestrian", "path", "cycleway", "steps", "bridleway", "corridor", "construction", "proposed"}
+RESTRICTED_ACCESS = {"private", "no", "customers", "delivery", "destination", "agricultural", "forestry"}
+CONF_RANK = {"HIGH": 0, "MEDIUM": 1, "LOW": 2}
+
+
+def find_last_reachable_stop(stop_s, block_a, buffer_m=None, P=PARAMS):
+    """A = the last original stop the bus can still serve before the blockage: before the exclusion zone."""
+    buf = P["block_buffer_m"] if buffer_m is None else buffer_m
+    ok = [i for i, x in enumerate(stop_s) if x <= block_a - buf]
+    return ok[-1] if ok else None
+
+
+def get_downstream_rejoin_candidates(stop_s, block_b, buffer_m=None, max_n=None, P=PARAMS):
+    """B, C, D, ... = original stops after the blockage (beyond the exclusion zone), nearest first."""
+    buf = P["block_buffer_m"] if buffer_m is None else buffer_m
+    n = P["max_rejoin_stops"] if max_n is None else max_n
+    return [i for i, x in enumerate(stop_s) if x >= block_b + buf][:n]
+
+
+def validate_block_avoidance(route_line, block_lines, buffer_m=None, P=PARAMS):
+    """HARD: the route must never come within buffer_m of a blocked section (no travelling along it, crossing it,
+    entering it, or skirting round and re-entering it). -> (ok, detail)"""
+    buf = P["block_buffer_m"] if buffer_m is None else buffer_m
+    pts = densify(route_line, 8.0)
+    for item in block_lines:
+        # item: a block line (both directions blocked) or (line, directed) - directed = only the drawn direction is closed
+        bl, directed = (item[0], bool(item[1])) if (isinstance(item, tuple) and len(item) == 2 and isinstance(item[1], bool)) else (item, False)
+        if len(bl) < 2:
+            continue
+        if not bbox_hit(bbox(route_line, buf + 5), bbox(bl, buf + 5)):
+            continue
+        bc = cum_m(bl)
+        for k, p in enumerate(pts):
+            d, s_, _, bb = nearest_on_line(p, bl, bc)
+            if d > buf:
+                continue
+            if not directed:
+                return False, f"enters the {buf:.0f} m exclusion zone around the blockage"
+            q = pts[k + 1] if k + 1 < len(pts) else None
+            if q is None:
+                continue
+            a = angdiff(bearing(p, q), bb)
+            if a <= 60.0:
+                return False, "travels in the blocked direction"
+            if a < 120.0 and 15.0 < s_ < bc[-1] - 15.0 and d <= 12.0:
+                return False, "crosses the blocked carriageway"
+            # heading the other way on the open carriageway: allowed for a one-direction blockage
+    return True, ""
+
+
+def validate_no_uturn(route_line, steps, svc_line, svc_cum, start_s, P=PARAMS):
+    """HARD: no U-turn of any kind (explicit, at a junction or roundabout, round a block, doubling back) and no
+    backtracking onto the original route upstream of where the diversion starts. -> (ok, detail)"""
+    if uturns(route_line, steps, P):
+        return False, "requires a U-turn"
+    lim = start_s - P["backtrack_m"]
+    if lim > 0:
+        for p in densify(route_line, 15.0)[2:]:
+            d, s_ = project_window(p, svc_line, svc_cum, 0.0, lim)
+            if s_ is not None and d <= 15.0:
+                return False, "goes back towards the previous stop"
+    return True, ""
+
+
+def validate_rejoin_direction(dep, rejoin_stop_s, block_b, P=PARAMS):
+    """HARD: the route must end ON the original route, on the correct carriageway and heading the service's way,
+    after the blockage and no later than the rejoin stop (so the bus serves it). -> (ok, detail)"""
+    if not dep:
+        return False, "never leaves and rejoins the original route"
+    if not dep.get("end_on"):
+        return False, ("arrives on the opposite carriageway / wrong direction" if dep.get("end_near") or dep.get("rejoin_s") is not None
+                       else "does not reach the original route at the rejoin stop")
+    if dep["rejoin_s"] < block_b:
+        return False, "rejoins before the blockage"
+    if dep["rejoin_s"] > rejoin_stop_s + 30.0:
+        return False, "rejoins after the stop (stop not served)"
+    return True, ""
+
+
+def validate_detour(div_m, normal_m, P=PARAMS):
+    """HARD: physically valid but operationally impossible detours are rejected"""
+    if normal_m > 0 and div_m > P["detour_ratio_max"] * normal_m and div_m - normal_m > P["detour_abs_km"] * 1000:
+        return False, f"unreasonable detour ({div_m / 1000:.1f} km for a {normal_m / 1000:.1f} km section)"
+    return True, ""
+
+
+def validate_road_suitability(classes, osm_flags=None, P=PARAMS):
+    """Road class along the diversion (major / medium / small / unknown every class_step_m) plus OpenStreetMap
+    access tags. HARD reject: private / no-access / service / track / footway stretches. -> dict(ok, level 0..1, text)"""
+    for f in osm_flags or []:
+        return {"ok": False, "level": 0.0, "text": f"restricted road: {f}"}
+    n = max(1, len(classes))
+    w = {"major": 1.0, "medium": 0.7, "small": 0.25, None: 0.5}
+    level = sum(w.get(c, 0.5) for c in classes) / n
+    share = {k: sum(1 for c in classes if c == k) / n for k in ("major", "medium", "small", None)}
+    txt = f"{share['major'] * 100:.0f}% major / arterial, {share['medium'] * 100:.0f}% minor arterial, {share['small'] * 100:.0f}% small roads" \
+          + (f", {share[None] * 100:.0f}% unclassified" if share[None] > 0.05 else "")
+    return {"ok": True, "level": round(level, 3), "text": txt, "small_share": share["small"]}
+
+
+def validate_bus_road_evidence(busroad, stops_along, km, bus="dd"):
+    """LEVEL 1: another LTA service already runs this road in the same direction (strongest);
+    LEVEL 2: the road has bus stops along it; LEVEL 3: road class only. HARD reject: a double-decker on roads
+    where only single-deck services run. -> dict(ok, level, score 0..1, text)"""
+    br = busroad or {}
+    if bus == "dd" and br.get("dd") == "SD_ONLY":
+        return {"ok": False, "level": 0, "score": 0.0, "text": br.get("text", "only single-deck services run there")}
+    cov = float(br.get("coverage") or 0.0)
+    per_km = stops_along / km if km > 0.05 else 0.0
+    if cov >= 0.85 and br.get("ok"):
+        lvl, sc = 1, 1.0
+        txt = "another LTA service already runs these roads in this direction" + (f" (services {', '.join(br.get('services', [])[:5])})" if br.get("services") else "")
+    elif cov >= 0.5:
+        lvl, sc = 1, 0.75
+        txt = f"other services run {cov * 100:.0f}% of it in this direction"
+    elif stops_along >= 2 and per_km >= 1.0:       # length-weighted: a couple of stops on a long road is not evidence
+        lvl, sc = 2, 0.6
+        txt = f"{stops_along} LTA bus stop(s) along it"
+    else:
+        lvl, sc = 3, 0.25
+        txt = "no bus service or bus stop on these roads \u2014 road class only"
+    if bus == "dd" and br.get("dd") == "UNCONFIRMED" and lvl == 1:
+        txt += "; double-deck operation not yet confirmed"
+    return {"ok": True, "level": lvl, "score": sc, "text": txt, "coverage": round(cov, 2), "stops_along": stops_along,
+            "dd": br.get("dd")}
+
+
+def score_diversion_candidate(ev, suit, added_min, added_km, extra_skipped, n_turns, n_sharp, P=PARAMS):
+    """BUS DIVERSION SCORE 0-100 (validation has already passed): 30 bus-road confidence, 20 road class,
+    15 added time, 15 added distance, 10 skipped stops beyond the unavoidable, 10 simplicity (turns)."""
+    W = P["score_w"]
+    parts = {
+        "busroad": W["busroad"] * ev["score"],
+        "roadclass": W["roadclass"] * suit["level"],
+        "time": W["time"] * max(0.0, 1.0 - max(0.0, added_min or 0.0) / 20.0),
+        "dist": W["dist"] * max(0.0, 1.0 - max(0.0, added_km or 0.0) / 6.0),
+        "skip": W["skip"] * max(0.0, 1.0 - extra_skipped / 6.0),
+        "simple": W["simple"] * max(0.0, 1.0 - (n_turns + 2 * n_sharp) / 14.0),
+    }
+    return round(sum(parts.values()), 1), {k: round(v, 1) for k, v in parts.items()}
+
+
+def confidence_level(ev, suit, next_leg_ok, bus="dd"):
+    """HIGH / MEDIUM / LOW for a VALID diversion (validation passed)."""
+    dd_doubt = bus == "dd" and ev.get("dd") == "UNCONFIRMED"
+    if ev["level"] == 1 and ev["score"] >= 1.0 and suit["level"] >= 0.6 and next_leg_ok and not dd_doubt:
+        return "HIGH"
+    if (ev["level"] <= 2 and suit["level"] >= 0.45) or (suit["level"] >= 0.75):
+        return "MEDIUM"
+    return "LOW"
+
+
+def select_best_diversion(opts, search=None):
+    """highest score among HIGH / MEDIUM valid diversions (fewest stops skipped is already guaranteed by the search
+    order). LOW confidence is never recommended automatically. -> recommendation dict for the UI"""
+    good = [o for o in opts if o.get("confidence") in ("HIGH", "MEDIUM")]
+    low = [o for o in opts if o.get("confidence") == "LOW"]
+    sr = search or {}
+    if not good:
+        if low:
+            o = low[0]
+            return {"action": "review", "option": None, "route_if_extended": o["n"],
+                    "headline": "CONTROLLER REVIEW REQUIRED \u2014 ONLY A LOW-CONFIDENCE ROUTE",
+                    "reasons": [f"{o['name']} is routable but its roads are not proven bus roads ({o.get('evidence', {}).get('text', '')}).",
+                                "It is not recommended automatically."],
+                    "cautions": ["Check the roads on the ground or draw a route along bus roads (DRAW ROUTE)."]}
+        return {"action": "manual", "option": None, "route_if_extended": None,
+                "headline": "NO VALID DIVERSION FOUND",
+                "reasons": [sr.get("summary") or "No stop pair could be connected by a verified road route that meets every check."],
+                "cautions": ["A correct 'no valid diversion' is better than a wrong one: escalate to the Duty Operations Manager / depot.",
+                             "See ROUTE SEARCH for why each stop pair failed; DRAW ROUTE lets you propose roads for the engine to verify."]}
+    best = max(good, key=lambda o: (-CONF_RANK[o["confidence"]], o["score"]))
+    lr = best.get("ladder") or {}
+    reasons = [f"{best['confidence']} confidence \u00b7 score {best['score']:.0f}/100",
+               f"Leaves after {lr.get('leave_name', '?')} ({lr.get('leave_code', '')}), rejoins at {lr.get('rejoin_name', '?')} ({lr.get('rejoin_code', '')}) \u2014 skips {best['skipped_n']} stop(s), the fewest possible",
+               f"Bus-road evidence: {best.get('evidence', {}).get('text', '')}",
+               f"{best['added_km']:+.1f} km, about {best['added_min']:+.0f} min ({best.get('time_src', '')})"]
+    if best.get("earlier"):
+        reasons.insert(1, "Earlier diversion point required: no valid road exit after the last reachable stop.")
+    return {"action": "divert", "option": best["n"], "route_if_extended": None,
+            "headline": f"RECOMMENDED: {best['name']} VIA " + " \u2192 ".join(r.upper() for r in best["roads"][:4]),
+            "reasons": reasons, "cautions": [] if best["confidence"] == "HIGH" else ["MEDIUM confidence: limited bus-road evidence \u2014 confirm the roads."]}

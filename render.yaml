@@ -57,3 +57,5 @@ services:
         sync: false
       - key: DIVERSION_TOMTOM_MODE # optional: TomTom travel mode for diversions — bus (default) | truck
         sync: false
+      - key: DIVERSION_BLOCK_BUFFER_M # optional: Diversion Maps — exclusion zone around a blockage in metres (default 35; 30-50 recommended)
+        sync: false
