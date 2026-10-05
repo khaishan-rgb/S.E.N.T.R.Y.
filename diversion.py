@@ -18,7 +18,8 @@ import re
 
 PARAMS = {
     # ---- V16.15 deterministic stop-to-stop engine
-    "block_buffer_m": 35.0,      # exclusion zone around the drawn blockage (30-50 m recommended); entering it = reject
+    "block_buffer_m": 35.0,      # exclusion zone: this far either side of the blocked section (30-50 m recommended); entering it = reject
+    "block_end_margin_m": 10.0,  # ...but along the road only the blocked section itself: the junctions at its ends stay usable
     "max_rejoin_stops": 12,      # downstream stops tried as the rejoin point (A->B, A->C, ...)
     "max_exit_fallback": 2,      # earlier diversion points tried when nothing works from the last reachable stop
     "alt_per_pair": 3,           # routing alternatives requested per stop pair
@@ -1180,14 +1181,14 @@ CONF_RANK = {"HIGH": 0, "MEDIUM": 1, "LOW": 2}
 
 def find_last_reachable_stop(stop_s, block_a, buffer_m=None, P=PARAMS):
     """A = the last original stop the bus can still serve before the blockage: before the exclusion zone."""
-    buf = P["block_buffer_m"] if buffer_m is None else buffer_m
+    buf = P["block_end_margin_m"] if buffer_m is None else buffer_m
     ok = [i for i, x in enumerate(stop_s) if x <= block_a - buf]
     return ok[-1] if ok else None
 
 
 def get_downstream_rejoin_candidates(stop_s, block_b, buffer_m=None, max_n=None, P=PARAMS):
     """B, C, D, ... = original stops after the blockage (beyond the exclusion zone), nearest first."""
-    buf = P["block_buffer_m"] if buffer_m is None else buffer_m
+    buf = P["block_end_margin_m"] if buffer_m is None else buffer_m
     n = P["max_rejoin_stops"] if max_n is None else max_n
     return [i for i, x in enumerate(stop_s) if x >= block_b + buf][:n]
 
@@ -1205,10 +1206,13 @@ def validate_block_avoidance(route_line, block_lines, buffer_m=None, P=PARAMS):
         if not bbox_hit(bbox(route_line, buf + 5), bbox(bl, buf + 5)):
             continue
         bc = cum_m(bl)
+        m_end = P.get("block_end_margin_m", 10.0)
         for k, p in enumerate(pts):
             d, s_, _, bb = nearest_on_line(p, bl, bc)
             if d > buf:
                 continue
+            if not (m_end < s_ < bc[-1] - m_end):
+                continue        # at or beyond either end of the blocked section: the junctions there remain usable
             if not directed:
                 return False, f"enters the {buf:.0f} m exclusion zone around the blockage"
             q = pts[k + 1] if k + 1 < len(pts) else None
@@ -1245,7 +1249,7 @@ def validate_rejoin_direction(dep, rejoin_stop_s, block_b, P=PARAMS):
     if not dep.get("end_on"):
         return False, ("arrives on the opposite carriageway / wrong direction" if dep.get("end_near") or dep.get("rejoin_s") is not None
                        else "does not reach the original route at the rejoin stop")
-    if dep["rejoin_s"] < block_b:
+    if dep["rejoin_s"] < block_b - P.get("block_end_margin_m", 10.0):     # rejoining AT the end junction is fine
         return False, "rejoins before the blockage"
     if dep["rejoin_s"] > rejoin_stop_s + 30.0:
         return False, "rejoins after the stop (stop not served)"

@@ -6268,7 +6268,8 @@ async def api_system_notifications():
 import diversion  # noqa: E402
 
 try:
-    diversion.PARAMS["block_buffer_m"] = max(15.0, min(100.0, float(os.getenv("DIVERSION_BLOCK_BUFFER_M", "35"))))   # exclusion zone around a blockage
+    diversion.PARAMS["block_buffer_m"] = max(15.0, min(100.0, float(os.getenv("DIVERSION_BLOCK_BUFFER_M", "35"))))   # exclusion zone either side of a blockage
+    diversion.PARAMS["block_end_margin_m"] = max(0.0, min(50.0, float(os.getenv("DIVERSION_BLOCK_END_MARGIN_M", "10"))))  # usable junction at each end
 except ValueError:
     pass
 try:
@@ -6733,9 +6734,21 @@ def dv_roads_txt(blocks, idxs=None):
 async def dv_sections(line, blocks):
     """blocked runs of every blockage along one service line, merged into sections one diversion can bypass"""
     runs = []
+    cum = diversion.cum_m(line)
     for i, b in enumerate(blocks):
-        for r in await asyncio.to_thread(diversion.overlap_runs, line, b["line"], b["directed"]):
-            runs.append({"a": r["a"], "b": r["b"], "len": r["len"], "block": i})
+        bl = b["line"]
+        for r in await asyncio.to_thread(diversion.overlap_runs, line, bl, b["directed"]):
+            # overlap detection samples the line and rounds outwards (~30 m past each end); tighten the run to the exact
+            # projection of the drawn block's ends, so the junctions at the ends of the blockage are not treated as closed
+            ends = []
+            for q in (bl[0], bl[-1]):
+                d_, s_ = diversion.project_window(q, line, cum, r["a"] - 80.0, r["b"] + 80.0)
+                if s_ is not None and d_ <= 40.0:
+                    ends.append(s_)
+            a_, b_ = r["a"], r["b"]
+            if len(ends) == 2 and max(ends) - min(ends) > 5.0:
+                a_, b_ = max(a_, min(ends)), min(b_, max(ends))
+            runs.append({"a": a_, "b": b_, "len": b_ - a_, "block": i})
     return diversion.merge_runs(runs)
 
 
@@ -7177,16 +7190,23 @@ def dv_far_apart(blocks, km=2.0):
 
 
 def dv_avoid_rects(blocks, pad_m=12.0, max_n=10):
-    """the closed sections as small rectangles (TomTom avoidAreas, max 10): ~80 m pieces along each block, padded 12 m"""
+    """the closed sections as small rectangles (TomTom avoidAreas, max 10): ~80 m pieces along each block, padded pad_m.
+    The section is trimmed at both ends by pad + end margin, because an axis-aligned box padded in every direction would
+    otherwise also close the junctions at the ends of the blockage - which the bus may still use to divert or rejoin."""
     rects = []
+    m_end = diversion.PARAMS.get("block_end_margin_m", 10.0)
     total = sum(diversion.line_m(b["line"]) for b in blocks) or 1.0
     piece = max(80.0, total / max_n)
     for b in blocks:
         ln = b["line"]
         cm = diversion.cum_m(ln)
-        n = max(1, int(math.ceil(cm[-1] / piece)))
+        trim = min(pad_m + m_end, cm[-1] * 0.35)
+        lo, hi = trim, cm[-1] - trim
+        if hi <= lo:
+            lo, hi = cm[-1] * 0.4, cm[-1] * 0.6
+        n = max(1, int(math.ceil((hi - lo) / piece)))
         for k in range(n):
-            part = diversion.cut(ln, cm, cm[-1] * k / n, cm[-1] * (k + 1) / n)
+            part = diversion.cut(ln, cm, lo + (hi - lo) * k / n, lo + (hi - lo) * (k + 1) / n)
             la = [p[0] for p in part]
             lo = [p[1] for p in part]
             dla, dlo = pad_m / diversion.KY, pad_m / diversion.KX
@@ -7322,7 +7342,7 @@ async def dv_options_core(st, blocks, svc, d, run_i, closure, bus, dims, others,
     def at(s_):
         return diversion.point_at(line, cum, max(0.0, min(cum[-1], s_)))
     donors = dv_donors(blocks, (svc, d))
-    avoid = dv_avoid_rects(blocks, pad_m=P["block_buffer_m"]) if dv_use_tomtom() else None
+    avoid = dv_avoid_rects(blocks, pad_m=min(P["block_buffer_m"], 20.0)) if dv_use_tomtom() else None
     bvias = []
     if not avoid and len(sec_line) >= 2:
         try:
@@ -7341,7 +7361,7 @@ async def dv_options_core(st, blocks, svc, d, run_i, closure, bus, dims, others,
               "last_reachable": {"code": stops[ia_]["code"], "name": stops[ia_]["name"]} if ia_ is not None else None,
               "first_after": {"code": stops[sr["downstream"][0]]["code"], "name": stops[sr["downstream"][0]]["name"]} if sr["downstream"] else None,
               "buffer_m": P["block_buffer_m"], "stage": 1, "stages": 1, "max_km": 0}
-    unavoidable = sum(1 for x in stop_s if A - P["block_buffer_m"] < x < B + P["block_buffer_m"])
+    unavoidable = sum(1 for x in stop_s if A - P["block_end_margin_m"] < x < B + P["block_end_margin_m"])
     small_hidden = []          # every candidate here passed hard validation; rejected routes are in `rejects`
     cands = cands[:8]
     try:
@@ -8643,7 +8663,7 @@ async def dv_validate_route(ctx, r, i, j, s0=None):
     ok, why = diversion.validate_rejoin_direction(dep, stop_s[j], B, P)
     if not ok:
         return None, why
-    if dep["leave_s"] > A + 5.0:
+    if dep["leave_s"] > A + P.get("block_end_margin_m", 10.0):          # leaving AT the start junction is fine
         return None, "only leaves the route inside the blockage"
     seg = dep["pts"][dep["i0"]:dep["i1"] + 1]
     div_m = diversion.line_m(seg)
@@ -9069,7 +9089,7 @@ async def dv2_plan(st, blocks, svc, d, run_i, traffic=True):
     prof = diversion.profile(line, sfn, stop_s)
     bus = "sd" if bt_class(svc) == "SD" else "dd"
     DV_BUS.set(bus)
-    avoid = dv_avoid_rects(blocks, pad_m=P["block_buffer_m"]) if dv_use_tomtom() else None
+    avoid = dv_avoid_rects(blocks, pad_m=min(P["block_buffer_m"], 20.0)) if dv_use_tomtom() else None
     sec_line = diversion.cut(line, cum, A, B)
     bvias = []
     if not avoid and len(sec_line) >= 2:
@@ -9088,7 +9108,7 @@ async def dv2_plan(st, blocks, svc, d, run_i, traffic=True):
            "block_lines": [(b_["line"], bool(b_["directed"])) for b_ in blocks], "next_cache": DV_NEXT_CACHE, "bkey": dv_block_key(blocks)}
     ia = diversion.find_last_reachable_stop(stop_s, A, None, P)
     down = diversion.get_downstream_rejoin_candidates(stop_s, B, None, None, P)
-    unavoidable = sum(1 for x in stop_s if A - P["block_buffer_m"] < x < B + P["block_buffer_m"])
+    unavoidable = sum(1 for x in stop_s if A - P["block_end_margin_m"] < x < B + P["block_end_margin_m"])
     base = {"ok": True, "service": svc, "direction": d, "destination": stops[-1]["name"] if stops else "", "bus_type": bus.upper(),
             "line_source": src, "router": "TomTom" if dv_use_tomtom() else "OSRM", "traffic": traffic,
             "last_reachable": {"code": stops[ia]["code"], "name": stops[ia]["name"]} if ia is not None else None,
@@ -9097,7 +9117,7 @@ async def dv2_plan(st, blocks, svc, d, run_i, traffic=True):
     win = diversion.cut(line, cum, max(0.0, A - 3000.0), min(cum[-1], B + 3000.0))
     base["original_line"] = [[round(p[0], 6), round(p[1], 6)] for p in diversion.simplify(win, 500)]
     base["stops"] = [{"code": stops[k]["code"], "name": stops[k]["name"], "lat": stops[k]["lat"], "lon": stops[k]["lon"], "s": round(stop_s[k]),
-                      "in_block": A - P["block_buffer_m"] < stop_s[k] < B + P["block_buffer_m"]}
+                      "in_block": A - P["block_end_margin_m"] < stop_s[k] < B + P["block_end_margin_m"]}
                      for k in range(len(stops)) if A - 3000.0 <= stop_s[k] <= B + 3000.0]
     if ia is None or not down:
         base.update(status="none", headline="NO VERIFIED DIVERSION FOUND", attempts=[], candidates=[],
@@ -9110,7 +9130,7 @@ async def dv2_plan(st, blocks, svc, d, run_i, traffic=True):
     def probes(i):
         """junction probes after stop i: points further along the ORIGINAL route (latest first, short of the exclusion zone
         and of the next stop) - the bus keeps following its normal path and may only turn off at a later junction"""
-        lim = min(A - P["block_buffer_m"] - 25.0, (stop_s[i + 1] - 20.0) if i + 1 < len(stop_s) else 1e18)
+        lim = min(A - P["block_end_margin_m"] - 25.0, (stop_s[i + 1] - 20.0) if i + 1 < len(stop_s) else 1e18)
         pts = [stop_s[i] + off for off in (150.0, 300.0, 450.0) if stop_s[i] + off < lim]
         return sorted(pts, reverse=True)
 
@@ -9185,7 +9205,7 @@ async def dv2_plan(st, blocks, svc, d, run_i, traffic=True):
         m = {"leave_index": li, "rejoin_index": rj, "leave_name": stops[li]["name"], "leave_code": stops[li]["code"],
              "rejoin_name": stops[rj]["name"], "rejoin_code": stops[rj]["code"], "earlier": li < ia, "leave_after_ia": li - ia,
              "skipped": [{"code": stops[k]["code"], "name": stops[k]["name"], "lat": stops[k]["lat"], "lon": stops[k]["lon"],
-                          "in_block": A - P["block_buffer_m"] < stop_s[k] < B + P["block_buffer_m"]} for k in sk],
+                          "in_block": A - P["block_end_margin_m"] < stop_s[k] < B + P["block_end_margin_m"]} for k in sk],
              "skipped_n": len(sk), "unavoidable": unavoidable, "extra_skipped": max(0, len(sk) - unavoidable),
              "div_km": round(c["div_m"] / 1000.0, 2), "normal_km": round((rejoin_s - leave_s) / 1000.0, 2),
              "added_km": round((c["div_m"] - (rejoin_s - leave_s)) / 1000.0, 2), "added_min": round(div_min - normal_min, 1),
