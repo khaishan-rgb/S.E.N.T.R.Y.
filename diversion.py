@@ -415,7 +415,7 @@ def uses_block(cand_line, block_line, directed=False, P=None):
     return False
 
 
-def departure(cand_line, svc_line, svc_cum, P=None, start_window=None):
+def departure(cand_line, svc_line, svc_cum, P=None, start_window=None, free_start=False, start_s0=None):
     """Where a road route from a point on the service route leaves it and where it comes back.
     Positions are tracked FORWARD along the service route from where the route starts, never by a global nearest-point
     search: loop services pass the same road twice, and a global search can snap the rejoin onto the wrong passage
@@ -462,6 +462,8 @@ def departure(cand_line, svc_line, svc_cum, P=None, start_window=None):
     i1 = min(len(pts) - 1, off[-1] + 1)
     if pos[i0] is None and i0 == 0 and d0 is not None and d0 <= P["on_route_m"]:
         pos[0] = start_s        # leaves at its very first point (e.g. a blockage near the start of the route)
+    if pos[i0] is None and i0 == 0 and free_start:
+        pos[0] = start_s0 if start_s0 is not None else start_s   # leaves an interchange / terminal by another exit
     if pos[i0] is not None and pos[i1] is None and i1 == len(pts) - 1:
         # ends off the route: next to it but heading the other way = the opposite carriageway
         de, _ = project_window(pts[-1], svc_line, svc_cum, pos[i0], 1e18)
@@ -1227,10 +1229,13 @@ def validate_block_avoidance(route_line, block_lines, buffer_m=None, P=PARAMS):
     return True, ""
 
 
-def validate_no_uturn(route_line, steps, svc_line, svc_cum, start_s, P=PARAMS):
+def validate_no_uturn(route_line, steps, svc_line, svc_cum, start_s, P=PARAMS, skip_start_m=0.0):
     """HARD: no U-turn of any kind (explicit, at a junction or roundabout, round a block, doubling back) and no
     backtracking onto the original route upstream of where the diversion starts. -> (ok, detail)"""
-    if uturns(route_line, steps, P):
+    ut = uturns(route_line, steps, P)
+    if skip_start_m:        # leaving an interchange: circulating inside the bus park is not a U-turn on the road
+        ut = [p for p in ut if dist_m(p, route_line[0]) > skip_start_m]
+    if ut:
         return False, "requires a U-turn"
     lim = start_s - P["backtrack_m"]
     if lim > 0:

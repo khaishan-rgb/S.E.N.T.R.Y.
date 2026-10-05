@@ -196,6 +196,8 @@ def why_this(best, ctx_m):
         out.append(f"Continues the normal route as long as practical \u2014 serves every reachable stop up to {m['leave_name']}")
     elif m["earlier"]:
         out.append(f"Earlier diversion point needed: no practical escape after {ctx_m['ia_name']}, so the bus leaves after {m['leave_name']}")
+    if m.get("free_start") and m["leave_index"] == 0 or (m.get("free_start") and "INT" in (m.get("leave_name") or "").upper()):
+        out.append(f"Leaves {m['leave_name']} by a different exit \u2014 the normal exit leads straight into the blockage")
     if m.get("probe"):
         out.append("Keeps to the normal route past the stop and turns off at a later junction (the immediate turn-off does not work)")
     if m["preserved_vs_early"] > 0:

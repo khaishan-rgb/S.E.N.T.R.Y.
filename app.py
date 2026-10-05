@@ -8574,15 +8574,31 @@ def dv_stops_along(st, seg, tol=25.0, ends_m=60.0):
     return n
 
 
+_TERMINAL_RX = re.compile(r"\b(INT|INTERCHANGE|TER|TERMINAL|BUS PK|BUS PARK|DEPOT)\b", re.I)
+
+
+def dv_free_start(ctx, i):
+    """A bus at an interchange / terminal, or at the first stop of its trip, can leave by ANY exit (e.g. turn right
+    out of the interchange instead of the normal left). Stops named "Opp / Aft / Bef ... Int" are on the road outside."""
+    if i == 0:
+        return True
+    nm = (ctx["stops"][i].get("name") or "").strip().upper()
+    if nm.startswith(("OPP ", "AFT ", "BEF ", "BEFORE ", "AFTER ")):
+        return False
+    return bool(_TERMINAL_RX.search(nm))
+
+
 async def route_between_stops(ctx, i, j, s0=None):
     """road routes from (just after) stop i to (just before) stop j, from the routing engine only: TomTom with the
     blockage + buffer as avoid areas and up to 3 alternatives; OSRM alternatives and routes via nearby bus roads;
     the controller's drawn points and other services' corridors as extra waypoint sets. -> [route]"""
     P, at, stop_s = ctx["P"], ctx["at"], ctx["stop_s"]
     st0 = stop_s[i] + 5.0 if s0 is None else s0       # s0: a junction probe further along the original route
-    a_ = at(st0)
+    free = s0 is None and dv_free_start(ctx, i)
+    # free start: from the stop itself (inside the interchange), no forced heading - the routing engine picks the exit
+    a_ = (ctx["stops"][i]["lat"], ctx["stops"][i]["lon"]) if free else at(st0)
     b_ = at(max(stop_s[j] - 5.0, st0 + 10.0))
-    h0, h1 = ctx["heading"](a_), ctx["heading"](b_)
+    h0, h1 = (None if free else ctx["heading"](a_)), ctx["heading"](b_)
     reqs = [([a_, b_], P["alt_per_pair"], True, "router")]          # source codes: router | busvia | manual | adopt
     if not ctx["avoid"]:
         mid = ((a_[0] + b_[0]) / 2, (a_[1] + b_[1]) / 2)
@@ -8650,16 +8666,18 @@ async def dv_validate_route(ctx, r, i, j, s0=None):
     if len(r.get("line") or []) < 2:
         return None, "No verified road connection found"
     st0 = stop_s[i] + 5.0 if s0 is None else s0
-    a_, b_ = ctx["at"](st0), ctx["at"](stop_s[j] - 5.0)
+    free = s0 is None and dv_free_start(ctx, i)
+    a_ = (ctx["stops"][i]["lat"], ctx["stops"][i]["lon"]) if free else ctx["at"](st0)
+    b_ = ctx["at"](stop_s[j] - 5.0)
     if diversion.dist_m(r["line"][0], a_) > P["ends_tol_m"] or diversion.dist_m(r["line"][-1], b_) > P["ends_tol_m"]:
         return None, "route cannot physically reach the stops (road network not connected there)"
     ok, why = diversion.validate_block_avoidance(r["line"], ctx["block_lines"], None, P)
     if not ok:
         return None, why
-    ok, why = await asyncio.to_thread(diversion.validate_no_uturn, r["line"], r.get("steps"), line, cum, st0 - 5.0, P)
+    ok, why = await asyncio.to_thread(diversion.validate_no_uturn, r["line"], r.get("steps"), line, cum, st0 - 5.0, P, 150.0 if free else 0.0)
     if not ok:
         return None, why
-    dep = await asyncio.to_thread(diversion.departure, r["line"], line, cum, None, (st0 - 45.0, st0 + 60.0))
+    dep = await asyncio.to_thread(diversion.departure, r["line"], line, cum, None, (st0 - 45.0, st0 + 60.0), free, stop_s[i])
     ok, why = diversion.validate_rejoin_direction(dep, stop_s[j], B, P)
     if not ok:
         return None, why
@@ -8695,7 +8713,7 @@ async def dv_validate_route(ctx, r, i, j, s0=None):
     li = max([k for k, x in enumerate(stop_s) if x <= dep["leave_s"] + 1.0], default=i)
     rj = min([k for k, x in enumerate(stop_s) if x >= dep["rejoin_s"] - 1.0], default=j)
     c = {"r": r, "dep": dep, "seg": seg, "groups": keep, "signature": diversion.road_signature(keep), "div_m": div_m,
-         "src": r.get("_src", "router"), "pair": (li, rj), "asked": (i, j), "road_class": diversion.road_mix(cl)}
+         "src": r.get("_src", "router"), "pair": (li, rj), "asked": (i, j), "road_class": diversion.road_mix(cl), "free": free}
     br = await asyncio.to_thread(dv_bus_road, c, net, ctx["bus"], bt_table())
     if ctx["bus"] == "dd" and br.get("dd") == "UNCONFIRMED":
         unk = [sv for sv in br.get("services", []) if bt_class(sv) is None]
@@ -9173,7 +9191,7 @@ async def dv2_plan(st, blocks, svc, d, run_i, traffic=True):
             if c is None:
                 reasons.append(why)
                 continue
-            ap = diversion.nearest_on_line(c["dep"]["leave_pt"], line, cum)[3]
+            ap = None if c.get("free") else diversion.nearest_on_line(c["dep"]["leave_pt"], line, cum)[3]
             dp = diversion.bearing(at(c["dep"]["rejoin_s"]), at(c["dep"]["rejoin_s"] + 25.0))
             rj_road = dv2._road_starting_near(r.get("steps"), c["dep"]["rejoin_pt"], 40.0)     # the road the bus rejoins
             instr = dv2.instructions(r.get("steps"), c["seg"], ap, dp, rj_road)
@@ -9214,7 +9232,7 @@ async def dv2_plan(st, blocks, svc, d, run_i, traffic=True):
              "busroad_label": bl, "busroad_score": bsc, "dd_doubt": dd_doubt, "evidence_text": c["evidence"]["text"],
              "route_conf": (1.0 if str(r.get("router", "")).startswith("TomTom") else 0.8) - (0.2 if c["evidence"]["level"] == 3 else 0.0),
              "next_ok": bool(c["next_leg"]["ok"]), "next_name": c["next_leg"]["next_name"], "next_code": c["next_leg"]["next_code"],
-             "instructions": c["instr"], "router": r.get("router", ""), "probe": bool(c.get("probe"))}
+             "instructions": c["instr"], "router": r.get("router", ""), "probe": bool(c.get("probe")), "free_start": bool(c.get("free"))}
         return m
 
     # progressive search: nearest combinations first; stop expanding soon after a strong valid diversion
