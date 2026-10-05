@@ -7201,12 +7201,12 @@ def dv_avoid_rects(blocks, pad_m=12.0, max_n=10):
         ln = b["line"]
         cm = diversion.cum_m(ln)
         trim = min(pad_m + m_end, cm[-1] * 0.35)
-        lo, hi = trim, cm[-1] - trim
-        if hi <= lo:
-            lo, hi = cm[-1] * 0.4, cm[-1] * 0.6
-        n = max(1, int(math.ceil((hi - lo) / piece)))
+        s_lo, s_hi = trim, cm[-1] - trim          # (not lo / hi: lo is reused below for longitudes)
+        if s_hi <= s_lo:
+            s_lo, s_hi = cm[-1] * 0.4, cm[-1] * 0.6
+        n = max(1, int(math.ceil((s_hi - s_lo) / piece)))
         for k in range(n):
-            part = diversion.cut(ln, cm, lo + (hi - lo) * k / n, lo + (hi - lo) * (k + 1) / n)
+            part = diversion.cut(ln, cm, s_lo + (s_hi - s_lo) * k / n, s_lo + (s_hi - s_lo) * (k + 1) / n)
             la = [p[0] for p in part]
             lo = [p[1] for p in part]
             dla, dlo = pad_m / diversion.KY, pad_m / diversion.KX
@@ -8593,7 +8593,7 @@ async def route_between_stops(ctx, i, j, s0=None):
     blockage + buffer as avoid areas and up to 3 alternatives; OSRM alternatives and routes via nearby bus roads;
     the controller's drawn points and other services' corridors as extra waypoint sets. -> [route]"""
     P, at, stop_s = ctx["P"], ctx["at"], ctx["stop_s"]
-    st0 = stop_s[i] + 5.0 if s0 is None else s0       # s0: a junction probe further along the original route
+    st0 = stop_s[i] + 1.0 if s0 is None else s0   # right at the stop: a junction just after it stays usable       # s0: a junction probe further along the original route
     free = s0 is None and dv_free_start(ctx, i)
     # free start: from the stop itself (inside the interchange), no forced heading - the routing engine picks the exit
     a_ = (ctx["stops"][i]["lat"], ctx["stops"][i]["lon"]) if free else at(st0)
@@ -8665,7 +8665,7 @@ async def dv_validate_route(ctx, r, i, j, s0=None):
     P, line, cum, stop_s, A, B = ctx["P"], ctx["line"], ctx["cum"], ctx["stop_s"], ctx["A"], ctx["B"]
     if len(r.get("line") or []) < 2:
         return None, "No verified road connection found"
-    st0 = stop_s[i] + 5.0 if s0 is None else s0
+    st0 = stop_s[i] + 1.0 if s0 is None else s0   # right at the stop: a junction just after it stays usable
     free = s0 is None and dv_free_start(ctx, i)
     a_ = (ctx["stops"][i]["lat"], ctx["stops"][i]["lon"]) if free else ctx["at"](st0)
     b_ = ctx["at"](stop_s[j] - 5.0)

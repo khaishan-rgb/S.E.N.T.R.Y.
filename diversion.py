@@ -1232,6 +1232,16 @@ def validate_block_avoidance(route_line, block_lines, buffer_m=None, P=PARAMS):
 def validate_no_uturn(route_line, steps, svc_line, svc_cum, start_s, P=PARAMS, skip_start_m=0.0):
     """HARD: no U-turn of any kind (explicit, at a junction or roundabout, round a block, doubling back) and no
     backtracking onto the original route upstream of where the diversion starts. -> (ok, detail)"""
+    if not skip_start_m and len(route_line) >= 2 and start_s is not None:
+        # heading backwards at the very start (against the bus's direction) is a U-turn, however short
+        rc = cum_m(route_line)
+        if rc[-1] > 25.0:
+            a_ = point_at(route_line, rc, 0.0)
+            b_ = point_at(route_line, rc, min(20.0, rc[-1]))
+            s_ = max(0.0, min(svc_cum[-1] - 1.0, start_s + 5.0))
+            svc_b = bearing(point_at(svc_line, svc_cum, s_), point_at(svc_line, svc_cum, min(svc_cum[-1], s_ + 10.0)))
+            if angdiff(bearing(a_, b_), svc_b) > 120.0:
+                return False, "requires a U-turn (turns back at the start)"
     ut = uturns(route_line, steps, P)
     if skip_start_m:        # leaving an interchange: circulating inside the bus park is not a U-turn on the road
         ut = [p for p in ut if dist_m(p, route_line[0]) > skip_start_m]
