@@ -1,63 +1,25 @@
+# Render Blueprint: New > Blueprint > pick this repo.
 services:
   - type: web
-    name: sg-transport-pulse
+    name: sentry-options
     runtime: python
-    plan: free
+    plan: starter            # free plans sleep when idle, which pauses the background worker
     buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn app:app --host 0.0.0.0 --port $PORT
-    healthCheckPath: /api/health
+    startCommand: gunicorn app:app --workers 1 --threads 8 --timeout 180 --bind 0.0.0.0:$PORT
+    healthCheckPath: /health
     envVars:
-      - key: LTA_ACCOUNT_KEY
-        sync: false
-      - key: APP_USERNAME         # optional: login name (default Admin)
-        sync: false
-      - key: APP_PASSWORD         # RECOMMENDED: change the default password (123456) here
-        sync: false
-      - key: HIDDEN_PAGES         # optional: pages hidden for everyone, e.g. cameras,running (Settings > Pages can also change this)
-        sync: false
-      - key: TIMETABLE_TOKEN      # optional but recommended: protects planned-timetable upload/clear
-        sync: false
-      - key: BUNCHING_ADMIN_TOKEN # optional: protects Bunching settings / Service Headway Master edits (falls back to TIMETABLE_TOKEN)
-        sync: false
-      - key: TOMTOM_API_KEY       # optional: TomTom Traffic API second source (set it in Render, not in the code)
-        sync: false
-      - key: TOMTOM_REFERER       # optional: only if your TomTom key is limited to certain websites (Referer), e.g. https://your-app.onrender.com/
-        sync: false
-      - key: CONGESTION_FIRST     # optional: tomtom (default when TOMTOM_API_KEY is set) = TomTom finds congestion first, LTA speed bands check it; lta = old order
-        sync: false
-      - key: TOMTOM_DAILY_CAP     # optional: most TomTom calls per day (default 2000)
-        sync: false
-      - key: BUNCHING_SERVICES    # optional: default watch list, e.g. 32,145,65
-        sync: false
-      - key: BUNCHING_ALWAYS_ON   # optional: 1 = keep collecting when nobody has the page open (needed for an unattended event log; uses more LTA quota)
-        sync: false
-      - key: CARTO_API_KEY        # CARTO basemap key (tiles). Optional: the app has a built-in default; set your own here to rotate it without a code change
-        sync: false
-      - key: OVERPASS_URL         # optional: road-restriction data for the off-service route check (default public overpass-api.de)
-        sync: false
-      - key: RT_POLL_SEC          # optional: running-time polling interval when unattended (default 60)
-        sync: false
-      - key: RT_MAX_SERVICES      # optional: services measured round the clock (default 8)
-        sync: false
-      - key: RT_KEEP_DAYS         # optional: days of measured trips kept (default 180)
-        sync: false
-      - key: DATAGOV_API_KEY      # optional: data.gov.sg API key for higher rate limits
-        sync: false
-      - key: ONEMAP_EMAIL         # optional: OneMap account, used to draw a bus route when busrouter.sg has no matching line
-        sync: false
-      - key: ONEMAP_PASSWORD      # optional: OneMap account password
-        sync: false
-      - key: DIVERSION_MAX_POLL   # optional: Diversion Maps — max service-directions polled for live buses per analysis (default 16)
-        sync: false
-      - key: DIVERSION_AUTO_DETECT # optional: 1 = suggest blockages from LTA incidents (never activates a diversion)
-        sync: false
-      - key: DIVERSION_WAIT_MAX_MIN # optional: Diversion Maps — 0 (default) = buses are never held, always divert
-        sync: false
-      - key: DIVERSION_ROUTER     # optional: Diversion Maps road routing — tomtom (default when TOMTOM_API_KEY is set) | osrm
-        sync: false
-      - key: DIVERSION_TOMTOM_MODE # optional: TomTom travel mode for diversions — bus (default) | truck
-        sync: false
-      - key: DIVERSION_BLOCK_BUFFER_M # optional: Diversion Maps — exclusion zone around a blockage in metres (default 35; 30-50 recommended)
-        sync: false
-      - key: DIVERSION_BLOCK_END_MARGIN_M # optional: Diversion Planner — usable junction margin at each end of a blockage in metres (default 10)
-        sync: false
+      - key: PYTHON_VERSION
+        value: 3.12.3
+      - key: DATA_MODE
+        value: live
+      - key: DATABASE_URL
+        fromDatabase:
+          name: sentry-db
+          property: connectionString
+      - key: SEC_USER_AGENT
+        sync: false          # e.g. "Your Name you@email.com"
+      - key: FINNHUB_API_KEY
+        sync: false          # optional, free at finnhub.io
+databases:
+  - name: sentry-db
+    plan: free
