@@ -1,4 +1,24 @@
-# SG Transport Pulse V16.16 — Operational Intelligence & Service Recovery Platform
+# SG Transport Pulse V16.18 — Operational Intelligence & Service Recovery Platform
+
+## V16.18 — Diversion Planner: how the proposed diversion is chosen
+Goal: the smallest, simplest, least disruptive bus diversion that returns the bus to its normal route as early as practical - optimised like an OCC controller briefing a Bus Captain, not like a car GPS.
+* **Hard validation first** (unchanged): blocked road / direction, U-turn, wrong-way or prohibited movement, impossible turn, private / restricted road, correct-direction rejoin and onward movement to the next original stop. Only valid routes are scored.
+* **BC COMPLEXITY (LOW / MEDIUM / HIGH)** — turns, right turns (across traffic), sharp turns, roundabouts, closely spaced turns (< 150 m), number of roads, small roads and roads no bus service uses (unfamiliar).
+* **DIVERSION FOOTPRINT (SMALL / MEDIUM / LARGE)** — off-route distance, original route lost, stops skipped, how far before the blockage the bus leaves and after it rejoins, roads and turns.
+* **Score priorities** (defaults, SETTINGS): smallest footprint 25, minimum stops affected 20, Bus Captain simplicity 20, earliest practical rejoin 10, proven bus roads 10, fewest / easiest turns 5, running time 5, distance 5. Earlier custom weights are replaced by these defaults (stored under a new key).
+* **Safeguards, not blind rejects**: 3 km extra, 10 min extra, 3× the normal section, 8 stops skipped are warnings with a penalty proportional to the excess, so an excellent +3.2 km simple arterial diversion can beat a complicated +2.8 km one. Exceeded safeguards are shown on the recommendation.
+* **Final human check**: if the best verified route is both HIGH complexity and a LARGE footprint, the result is "NO SUITABLE DIVERSION FOUND — CONTROLLER REVIEW REQUIRED" (route shown for reference only).
+* **Brief for the Bus Captain** on every recommendation: "After Stop A, turn left into Road X, ... and resume the normal route at Stop D." Why-this / why-not explanations now include footprint and BC complexity.
+
+
+## V16.17 — Diversion Planner: several roads, several blockages, operator filter, bin, limits
+* **Highlight several roads**: each road picked from search is added in its own colour with a name label (chips under the search box, × to remove), so junctions are visible where the colours cross. Search "Road A / Road B" (or "&", "and") to highlight both roads and mark the junction. Road search understands abbreviations ("Clementi Ave 3" = "Clementi Avenue 3").
+* **Several blockages**: + ADD ANOTHER BLOCKAGE, then tap the next road. Each blockage has its own direction; the list shows each one (tap to select and adjust). Services affected by any blockage are found, and every diversion must avoid all of them (`blocks: [...]` in the API).
+* **Delete by bin**: hold a blockage's ✕ (or a handle) and drag it onto the bin at the top right of the map.
+* **Transport operator filter** on the affected services (SBS Transit / SMRT / Tower Transit / Go-Ahead); only the shown services are analysed.
+* **Diversion limits (hard, in SETTINGS)**: max extra distance (default 3 km), max extra running time (10 min), max length vs the normal section (3×), max stops skipped (8). A diversion over any limit is rejected during the search (with the reason in Route search) and the search looks for a tighter one. Previously the only cap was "more than 4× the normal section AND more than 6 km extra", which let diversions go far round. Score weights (same dialog) only rank routes that passed every check and limit. `GET|POST /api/dv2/limits`.
+* "Leaves by a different exit" applies only at a real interchange / terminal (name, or a bus bay well off the road); a trip starting at a roadside stop gets its normal first turn instruction.
+
 
 ## V16.16 — Diversion Planner rebuilt (page + engine)
 `/diversion` is a new one-page OCC planner: **search → tap the blocked road → choose the blocked direction → affected services → easiest practical diversion**. The previous page is kept at `/diversion/classic` for OCC plan lifecycle work (confirm, share, acknowledge, recovery); OCC Live / ticket links with `?id=` open there automatically.

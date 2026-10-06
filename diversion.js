@@ -95,14 +95,40 @@
     ul.querySelectorAll("li[data-i]").forEach(function(li){ li.onclick = function(){ pick(S.q[+li.dataset.i]); }; });
   }
   function closeList(){ $("qList").hidden = true; $("qBox").setAttribute("aria-expanded", "false"); }
+  /* ---------------------------------------------------------------- 1. search: highlight one or more roads (see the junctions) */
+  var HLC = ["#38d6ff", "#ffb547", "#c792ff", "#7bdff2", "#ff8fab", "#b8f35a"];
+  S.hl = [];
+  function hlAdd(name, label){
+    if(S.hl.some(function(h){ return h.name === name; })) return;
+    var h = {name:name, label:label || tc(name), color:HLC[S.hl.length % HLC.length], grp:L.layerGroup().addTo(G.road)};
+    S.hl.push(h); paintHl();
+    get("/api/dv2/roadgeom?name=" + encodeURIComponent(name)).then(function(j){
+      var segs = j.segments || []; if(!segs.length || S.hl.indexOf(h) < 0) return;
+      segs.forEach(function(sg){ L.polyline([[sg[0], sg[1]], [sg[2], sg[3]]], {pane:"road", color:h.color, weight:7, opacity:.55, interactive:false}).addTo(h.grp); });
+      var md = segs[Math.floor(segs.length / 2)];
+      L.marker([(md[0] + md[2]) / 2, (md[1] + md[3]) / 2], {pane:"marks", interactive:false, keyboard:false,
+        icon:L.divIcon({className:"", iconSize:[0, 0], html:'<div class="dp-rlbl" style="--c:' + h.color + '">' + esc(h.label) + '</div>'})}).addTo(h.grp);
+    });
+  }
+  function hlRemove(i){ var h = S.hl.splice(i, 1)[0]; if(h) G.road.removeLayer(h.grp); paintHl(); }
+  function paintHl(){
+    $("hlBox").hidden = !S.hl.length;
+    $("hlList").innerHTML = S.hl.map(function(h, i){ return '<span class="dp-chip" style="--c:' + h.color + '"><i></i>' + esc(h.label) + '<button type="button" data-i="' + i + '" aria-label="Remove highlight ' + esc(h.label) + '">\u00d7</button></span>'; }).join("")
+      + (S.hl.length > 1 ? '<button type="button" class="ds-btn sm ghost" id="hlClear">CLEAR</button>' : '');
+    $("hlList").querySelectorAll("[data-i]").forEach(function(b){ b.onclick = function(){ hlRemove(+b.dataset.i); }; });
+    var c = $("hlClear"); if(c) c.onclick = function(){ while(S.hl.length) hlRemove(0); };
+  }
   function pick(r){
-    if(!r) return; closeList(); $("q").value = r.label; G.find.clearLayers(); G.road.clearLayers();
+    if(!r) return; closeList(); $("q").value = ""; G.find.clearLayers();
     if(r.type === "road"){
-      get("/api/dv2/roadgeom?name=" + encodeURIComponent(r.road)).then(function(j){
-        (j.segments || []).forEach(function(s){ L.polyline([[s[0], s[1]], [s[2], s[3]]], {pane:"road", color:"#38d6ff", weight:7, opacity:.45, interactive:false}).addTo(G.road); });
-      });
+      hlAdd(r.road, r.label);
       if(r.bbox) map.fitBounds([[r.bbox[0], r.bbox[1]], [r.bbox[2], r.bbox[3]]], {padding:[30, 30], maxZoom:17});
-      hint("Tap the blocked part of " + r.label + " on the map");
+      hint(S.hl.length > 1 ? "Roads highlighted in different colours \u2014 they meet where the colours cross. Tap the blocked road." : "Tap the blocked part of " + r.label + " on the map");
+    }else if(r.type === "junction"){
+      (r.roads || []).forEach(function(n){ hlAdd(n); });
+      map.setView([r.lat, r.lon], r.found ? 18 : 16);
+      if(r.found) L.marker([r.lat, r.lon], {pane:"marks", icon:icon("\u2716", "dp-jx")}).bindTooltip("Junction " + esc(r.label)).addTo(G.find);
+      hint(r.found ? "Junction " + r.label + " \u2014 tap the blocked road" : r.label + ": these roads do not meet");
     }else{
       map.setView([r.lat, r.lon], r.type === "stop" ? 18 : 17);
       L.marker([r.lat, r.lon], {pane:"marks", icon:icon(r.type === "stop" ? "BS" : "\u2022", "dp-lbl")}).addTo(G.find);
@@ -111,61 +137,110 @@
   }
   function hint(t){ $("mapHint").textContent = t; $("mapHint").hidden = !t; }
 
-  /* ---------------------------------------------------------------- 2. blockage (a road SEGMENT with adjustable ends) */
-  map.on("click", function(e){ placeBlock(e.latlng); });
+  /* ---------------------------------------------------------------- 2. blockages: one or more road SEGMENTS with adjustable ends */
+  S.blocks = []; S.bi = -1; S.adding = false;
+  function AB(){ return S.blocks[S.bi] || null; }
+  function bLineOf(b){ return cutLine(b.cor, b.cm, b.a, b.b); }
+  function allDirs(){ return S.blocks.length > 0 && S.blocks.every(function(b){ return !!b.dir; }); }
+  map.on("click", function(e){ if(!BIN.drag) placeBlock(e.latlng); });
   function placeBlock(ll){
+    var replace = S.blocks.length > 0 && !S.adding;
     hint("Finding the road\u2026");
     get("/api/dv2/block?lat=" + ll.lat.toFixed(6) + "&lon=" + ll.lng.toFixed(6)).then(function(j){
       if(!j.ok){ hint(""); toast(j.error || "No road there \u2014 tap directly on the road."); return; }
-      S.block = {cor:j.corridor, cm:j.corridor_m, a:j.start_m, b:j.end_m, road:tc(j.road), labels:j.dir_labels || {}};
-      S.dir = null; resetServices(); G.road.clearLayers(); G.find.clearLayers();
-      paintBlockCard(); drawBlock(true); hint("Choose the blocked direction (step 3)");
+      var nb = {cor:j.corridor, cm:j.corridor_m, a:j.start_m, b:j.end_m, road:tc(j.road), labels:j.dir_labels || {}, dir:null};
+      if(replace) S.blocks[S.bi] = nb; else { S.blocks.push(nb); S.bi = S.blocks.length - 1; }
+      S.adding = false; $("bAdd").setAttribute("aria-pressed", "false");
+      resetServices(); G.find.clearLayers();
+      paintBlockCard(); drawBlocks(true); hint("Choose the blocked direction" + (S.blocks.length > 1 ? " for blockage " + (S.bi + 1) : "") + " (step 3)");
     });
   }
-  function blockLine(){ return cutLine(S.block.cor, S.block.cm, S.block.a, S.block.b); }
-  var hA = null, hB = null, bLineL = null, bCase = null, bX = null;
-  function drawBlock(fit){
-    G.block.clearLayers(); ARR = ARR.filter(function(s){ return s.grp !== G.block; });
-    if(!S.block) return;
-    var bl = blockLine();
-    bCase = L.polyline(bl, {pane:"block", color:"#fff", weight:13, opacity:.9, interactive:false}).addTo(G.block);
-    bLineL = L.polyline(bl, {pane:"block", color:COL.block, weight:9, opacity:1}).addTo(G.block).bindTooltip(esc(S.block.road) + " \u2014 blocked", {sticky:true});
-    if(S.dir === "fwd" || S.dir === "both") arrows(G.block, bl, "#fff", "arrows", 60);
-    if(S.dir === "rev" || S.dir === "both") arrows(G.block, bl.slice().reverse(), "#fff", "arrows", S.dir === "both" ? 85 : 60);
-    var mid = pointAt(S.block.cor, S.block.cm, (S.block.a + S.block.b) / 2);
-    bX = L.marker(mid, {pane:"marks", icon:icon("\u2715", "dp-x"), keyboard:false}).addTo(G.block).bindTooltip("BLOCKED", {direction:"top", permanent:false});
-    hA = handle(S.block.a, function(s){ S.block.a = Math.min(s, S.block.b - 30); });
-    hB = handle(S.block.b, function(s){ S.block.b = Math.max(s, S.block.a + 30); });
-    if(fit) map.fitBounds(L.latLngBounds(bl).pad(1.2), {maxZoom:18});
+  function selectBlock(i){ S.bi = i; paintBlockCard(); drawBlocks(false); }
+  function removeBlock(i){
+    if(i < 0 || i >= S.blocks.length) return;
+    S.blocks.splice(i, 1);
+    S.bi = S.blocks.length ? Math.min(Math.max(S.bi, 0), S.blocks.length - 1) : -1;
+    resetServices(); paintBlockCard(); drawBlocks(false);
+    if(allDirs()) runAffected(); else hint(S.blocks.length ? "Choose the blocked direction" : "Tap the road where it is blocked");
   }
-  function handle(s, set){
-    var m = L.marker(pointAt(S.block.cor, S.block.cm, s), {draggable:true, pane:"marks", autoPan:true, icon:icon("", "dp-handle"), keyboard:true, title:"Drag along the road to set the end of the blocked section"}).addTo(G.block);
+  function drawBlocks(fit){
+    G.block.clearLayers(); ARR = ARR.filter(function(sp){ return !(sp.grp && sp.grp._dpBlock); });
+    S.blocks.forEach(function(b, i){
+      var act = i === S.bi, bl = bLineOf(b), g = L.layerGroup().addTo(G.block); g._dpBlock = true;
+      b._case = L.polyline(bl, {pane:"block", color:"#fff", weight:act ? 13 : 11, opacity:.9, interactive:false}).addTo(g);
+      b._line = L.polyline(bl, {pane:"block", color:COL.block, weight:act ? 9 : 7, opacity:act ? 1 : .85}).addTo(g)
+        .bindTooltip((S.blocks.length > 1 ? (i + 1) + ". " : "") + esc(b.road) + " \u2014 blocked", {sticky:true}).on("click", function(ev){ L.DomEvent.stopPropagation(ev); selectBlock(i); });
+      if(b.dir === "fwd" || b.dir === "both") arrows(g, bl, "#fff", "arrows", 60);
+      if(b.dir === "rev" || b.dir === "both") arrows(g, bl.slice().reverse(), "#fff", "arrows", b.dir === "both" ? 85 : 60);
+      var mid = pointAt(b.cor, b.cm, (b.a + b.b) / 2);
+      b._x = L.marker(mid, {pane:"marks", draggable:true, autoPan:false, keyboard:false, title:"Tap to select \u00b7 hold and drag to the bin to delete",
+        icon:icon(S.blocks.length > 1 ? String(i + 1) : "\u2715", "dp-x" + (act ? "" : " off"))}).addTo(g);
+      b._x.on("click", function(){ selectBlock(i); });
+      binDrag(b._x, function(){ removeBlock(S.blocks.indexOf(b)); }, function(m){ m.setLatLng(mid); toast("Drag the \u2715 onto the bin to delete \u00b7 drag the white handles to resize"); });
+      if(act){ handle(b, g, "a"); handle(b, g, "b"); }
+    });
+    if(fit && AB()) map.fitBounds(L.latLngBounds(bLineOf(AB())).pad(1.2), {maxZoom:18});
+  }
+  function handle(b, g, end){
+    var m = L.marker(pointAt(b.cor, b.cm, b[end]), {draggable:true, pane:"marks", autoPan:true, icon:icon("", "dp-handle"), keyboard:true,
+      title:"Drag along the road to set this end \u00b7 drop on the bin to delete the blockage"}).addTo(g);
     m.on("drag", function(e){
-      var p = e.target.getLatLng(), n = nearestOn([p.lat, p.lng], S.block.cor, S.block.cm); set(n.s);
-      var bl = blockLine(); bLineL.setLatLngs(bl); bCase.setLatLngs(bl); bX.setLatLng(pointAt(S.block.cor, S.block.cm, (S.block.a + S.block.b) / 2)); paintLen();
+      var p = e.target.getLatLng(), n = nearestOn([p.lat, p.lng], b.cor, b.cm);
+      if(end === "a") b.a = Math.min(n.s, b.b - 30); else b.b = Math.max(n.s, b.a + 30);
+      var bl = bLineOf(b); b._line.setLatLngs(bl); b._case.setLatLngs(bl); b._x.setLatLng(pointAt(b.cor, b.cm, (b.a + b.b) / 2)); paintLen();
     });
-    m.on("dragend", function(){ drawBlock(false); if(S.dir) runAffected(); });
+    binDrag(m, function(){ removeBlock(S.blocks.indexOf(b)); }, function(){ drawBlocks(false); paintBlockCard(); if(allDirs()) runAffected(); });
     return m;
   }
-  function paintLen(){ $("bLen").textContent = km(S.block.b - S.block.a) + " blocked \u00b7 drag the handles to adjust"; }
+  /* the bin: shown while a blockage's X or handle is held and dragged; dropping on it deletes that blockage */
+  var BIN = {drag:false, hot:false, xy:null};
+  document.addEventListener("pointermove", function(e){ BIN.xy = [e.clientX, e.clientY]; if(BIN.drag) binHot(); }, {passive:true});
+  document.addEventListener("touchmove", function(e){ if(e.touches[0]){ BIN.xy = [e.touches[0].clientX, e.touches[0].clientY]; if(BIN.drag) binHot(); } }, {passive:true});
+  function binHot(){
+    var el = $("dpBin"), r = el.getBoundingClientRect(), x = BIN.xy;
+    BIN.hot = !!x && r.width > 0 && x[0] >= r.left - 24 && x[0] <= r.right + 24 && x[1] >= r.top - 24 && x[1] <= r.bottom + 24;
+    el.classList.toggle("hot", BIN.hot); return BIN.hot;
+  }
+  function binDrag(m, onDelete, onEnd){
+    m.on("dragstart", function(){ BIN.drag = true; BIN.hot = false; $("dpBin").classList.add("on"); });
+    m.on("drag", function(e){ var o = e.originalEvent; if(o){ var t = (o.touches && o.touches[0]) || o; if(t && t.clientX != null) BIN.xy = [t.clientX, t.clientY]; } binHot(); });
+    m.on("dragend", function(){
+      var hot = binHot(); $("dpBin").classList.remove("on", "hot"); setTimeout(function(){ BIN.drag = false; }, 80);
+      if(hot){ onDelete(); toast("Blockage deleted"); } else onEnd(m);
+    });
+  }
+  function paintLen(){ var b = AB(); $("bLen").textContent = b ? km(b.b - b.a) + " blocked \u00b7 drag the handles to adjust" : ""; }
+  function dirTxt(b){ return !b.dir ? '<span style="color:#ffc56b">direction?</span>' : b.dir === "both" ? "both directions" : esc(String(b.labels[b.dir] || b.dir).split(" \u00b7 ")[0]); }
   function paintBlockCard(){
-    $("cBlock").hidden = !S.block; if(!S.block) return;
-    $("bRoad").textContent = S.block.road; paintLen();
-    var lb = S.block.labels;
+    var b = AB();
+    $("cBlock").hidden = !S.blocks.length; if(!b) return;
+    $("bCount").textContent = S.blocks.length > 1 ? S.blocks.length + " blockages" : "";
+    $("bList").innerHTML = S.blocks.length > 1 ? S.blocks.map(function(x, i){ return '<button type="button" class="dp-bchip" role="listitem" data-i="' + i + '" aria-pressed="' + (i === S.bi) + '"><b>' + (i + 1) + '</b>' + esc(x.road) + '<small>' + km(x.b - x.a) + ' \u00b7 ' + dirTxt(x) + '</small></button>'; }).join("") : "";
+    $("bList").querySelectorAll("[data-i]").forEach(function(c){ c.onclick = function(){ selectBlock(+c.dataset.i); }; });
+    $("bRoad").textContent = (S.blocks.length > 1 ? (S.bi + 1) + ". " : "") + b.road; paintLen();
+    var lb = b.labels;
     $("lblFwd").textContent = lb.fwd || "This direction"; $("lblRev").textContent = lb.rev || "Opposite direction";
     $("arrFwd").style.transform = "rotate(" + ((lb.fwd_bearing || 90) - 90) + "deg)"; $("arrRev").style.transform = "rotate(" + ((lb.rev_bearing || 270) - 90) + "deg)";
-    document.querySelectorAll("#bDir button").forEach(function(b){ b.setAttribute("aria-checked", String(b.dataset.d === S.dir)); });
-    $("bAsk").hidden = !!S.dir;
+    document.querySelectorAll("#bDir button").forEach(function(x){ x.setAttribute("aria-checked", String(x.dataset.d === b.dir)); });
+    $("bAsk").hidden = !!b.dir;
   }
-  /* ---------------------------------------------------------------- 3. direction */
-  document.querySelectorAll("#bDir button").forEach(function(b){ b.onclick = function(){ S.dir = b.dataset.d; paintBlockCard(); drawBlock(false); hint(""); runAffected(); }; });
-  $("bZoom").onclick = function(){ if(S.block) map.fitBounds(L.latLngBounds(blockLine()).pad(1.2), {maxZoom:18}); };
-  $("bClear").onclick = function(){ S.block = null; S.dir = null; resetServices(); G.block.clearLayers(); paintBlockCard(); hint("Tap the road where it is blocked"); };
+  /* ---------------------------------------------------------------- 3. direction (per blockage) */
+  document.querySelectorAll("#bDir button").forEach(function(x){ x.onclick = function(){
+    var b = AB(); if(!b) return; b.dir = x.dataset.d; paintBlockCard(); drawBlocks(false); hint("");
+    var miss = S.blocks.map(function(y, i){ return y.dir ? null : i + 1; }).filter(Boolean);
+    if(miss.length) hint("Choose the blocked direction for blockage " + miss.join(", ")); else runAffected();
+  }; });
+  $("bAdd").onclick = function(){ S.adding = !S.adding; this.setAttribute("aria-pressed", String(S.adding)); hint(S.adding ? "Tap the road for the next blockage" : ""); };
+  $("bZoom").onclick = function(){ if(!S.blocks.length) return; var bb = L.latLngBounds(bLineOf(S.blocks[0])); S.blocks.forEach(function(b){ bb.extend(bLineOf(b)); }); map.fitBounds(bb.pad(.8), {maxZoom:18}); };
+  $("bClear").onclick = function(){ S.blocks = []; S.bi = -1; S.adding = false; resetServices(); G.block.clearLayers(); paintBlockCard(); hint("Tap the road where it is blocked"); };
 
   /* ---------------------------------------------------------------- 4. affected services, each analysed automatically */
   function resetServices(){ S.run++; S.services = []; S.plans = {}; S.sel = null; S.view = null; $("cSvc").hidden = true; clearServiceMap(); paintRec(); }
   function keyOf(x){ return x.service + "|" + x.direction + "|" + (x.run || 0); }
-  function payload(){ return {line:blockLine(), dir:S.dir, road:S.block.road}; }
+  function payload(){ return {blocks:S.blocks.map(function(b){ return {line:bLineOf(b), dir:b.dir, road:b.road}; })}; }
+  S.op = "";
+  function visibleServices(){ return S.services.filter(function(x){ return !S.op || String(x.operator || "").toUpperCase() === S.op; }); }
+  $("fOp").onchange = function(){ S.op = this.value; if(S.sel && !visibleServices().some(function(x){ return keyOf(x) === S.sel; })){ S.sel = null; clearServiceMap(); paintRec(); } paintServices(); if(S.services.length) analyseAll(S.run); };
   function runAffected(){
     var run = ++S.run; S.services = []; S.plans = {}; S.sel = null; S.view = null; clearServiceMap(); paintRec();
     $("cSvc").hidden = false; $("svcList").innerHTML = '<p class="dp-muted"><span class="dp-spin"></span>Finding services whose route runs along the blocked section in the blocked direction\u2026</p>';
@@ -175,12 +250,12 @@
       S.services = j.services || [];
       $("svcCount").textContent = S.services.length ? S.services.length + " service-direction" + (S.services.length === 1 ? "" : "s") : "";
       $("svcNote").textContent = S.services.length ? "Each service-direction is analysed on its own. Tap one to see its diversion." : "";
-      if(!S.services.length){ $("svcList").innerHTML = '<p class="dp-empty">No bus service runs along this section in the blocked direction' + (S.dir !== "both" ? " (services on the other carriageway are not affected)" : "") + '.</p>'; return; }
+      if(!S.services.length){ $("svcList").innerHTML = '<p class="dp-empty">No bus service runs along this section in the blocked direction' + (S.blocks.some(function(b){ return b.dir !== "both"; }) ? " (services on the other carriageway are not affected)" : "") + '.</p>'; return; }
       paintServices(); analyseAll(run);
     });
   }
   function analyseAll(run){
-    var queue = S.services.slice(), busy = 0;
+    var queue = visibleServices().filter(function(x){ return !S.plans[keyOf(x)]; }), busy = 0;   // only what the operator filter shows
     function next(){
       if(run !== S.run) return;
       while(busy < 2 && queue.length){
@@ -208,7 +283,10 @@
     return ['<span class="dp-st no">NO VERIFIED ROUTE</span>', "Controller review required"];
   }
   function paintServices(){
-    $("svcList").innerHTML = S.services.map(function(x){ var k = keyOf(x), t = stTxt(S.plans[k]);
+    var vis = visibleServices();
+    $("svcCount").textContent = S.services.length ? (S.op ? vis.length + " of " : "") + S.services.length + " service-direction" + (S.services.length === 1 ? "" : "s") : "";
+    if(S.services.length && !vis.length){ $("svcList").innerHTML = '<p class="dp-empty">None of the ' + S.services.length + ' affected service-directions is operated by ' + esc($("fOp").selectedOptions[0].text) + '.</p>'; return; }
+    $("svcList").innerHTML = vis.map(function(x){ var k = keyOf(x), t = stTxt(S.plans[k]);
       return '<button type="button" class="dp-svc" role="listitem" data-k="' + esc(k) + '" aria-pressed="' + (S.sel === k) + '"><span class="num">' + esc(x.service) + '</span><span class="to">D' + x.direction + ' \u00b7 to ' + esc(x.destination || "") + (x.operator ? ' \u00b7 ' + esc(x.operator) : '') + '</span>' + t[0] + '<span class="rs">' + t[1] + '</span></button>'; }).join("");
     $("svcList").querySelectorAll(".dp-svc").forEach(function(b){ b.onclick = function(){ selectService(b.dataset.k); }; });
   }
@@ -220,7 +298,8 @@
   function candOf(p){ if(!p || !p.candidates) return null; return S.view ? (p.candidates.filter(function(c){ return c.id === S.view; })[0] || p.best) : p.best; }
   function drawService(p){
     clearServiceMap(); if(!p || p.pending || !p.ok) return;
-    var c = candOf(p), b = p.best, bounds = L.latLngBounds(blockLine());
+    var c = candOf(p), b = p.best, bounds = L.latLngBounds(bLineOf(AB() || S.blocks[0]));
+    S.blocks.forEach(function(x){ bounds.extend(bLineOf(x)); });
     rline(p.original_line, COL.orig, {pane:"orig", weight:5, casing:.6}, G.orig); arrows(G.orig, p.original_line, COL.orig, "arrows", 140);
     if(c){
       if(c !== b && b) rline(b.line, COL.div, {pane:"alt", weight:4, opacity:.45, casing:.3}, G.alt);
@@ -249,10 +328,12 @@
   /* ---------------------------------------------------------------- 5. the recommendation panel */
   function pill(t, c){ return '<span class="dp-pill" style="--c:' + c + '">' + esc(t) + '</span>'; }
   var CONF = {HIGH:"#2ee59d", MEDIUM:"#ffb547", LOW:"#8a97a8", "VERY HIGH":"#2ee59d"};
+  var LVL = {LOW:"#2ee59d", MEDIUM:"#ffb547", HIGH:"#ff5566"};          // BC complexity: low is good
+  var FPC = {SMALL:"#2ee59d", MEDIUM:"#ffb547", LARGE:"#ff5566"};
   function paintRec(){
     var el = $("recBody"), p = S.sel ? S.plans[S.sel] : null, x = S.services.filter(function(s){ return keyOf(s) === S.sel; })[0];
-    if(!S.block){ el.innerHTML = '<p class="dp-empty">Search a road, tap the blocked segment and choose the blocked direction. Every affected service is then analysed automatically and the easiest practical diversion appears here.</p>'; return; }
-    if(!S.dir){ el.innerHTML = '<p class="dp-empty">Choose the blocked direction to find the affected services.</p>'; return; }
+    if(!S.blocks.length){ el.innerHTML = '<p class="dp-empty">Search a road, tap the blocked segment and choose the blocked direction. Every affected service is then analysed automatically and the easiest practical diversion appears here.</p>'; return; }
+    if(!allDirs()){ el.innerHTML = '<p class="dp-empty">Choose the blocked direction' + (S.blocks.length > 1 ? ' for every blockage' : '') + ' to find the affected services.</p>'; return; }
     if(!x){ el.innerHTML = '<p class="dp-empty">Select an affected service.</p>'; return; }
     var head = '<div class="dp-rec-h"><span class="no">' + esc(x.service) + '</span><div class="meta"><b>Service ' + esc(x.service) + ' \u00b7 Direction ' + x.direction + '</b>to ' + esc(x.destination || "") + (p && p.bus_type ? ' \u00b7 ' + (p.bus_type === "DD" ? "double-deck" : "single-deck") : '') + '</div></div>';
     if(!p || p.pending){ el.innerHTML = head + '<p class="dp-muted"><span class="dp-spin"></span>Analysing: how far the bus can keep its normal route, where it must leave it, and the nearest stop it can rejoin correctly\u2026</p>'; return; }
@@ -265,7 +346,9 @@
       el.innerHTML = h; return;
     }
     h += p.status === "divert" ? '<div class="dp-banner ok"><b>RECOMMENDED DIVERSION</b>Easiest practical diversion that keeps the most useful part of the route.</div>'
-      : '<div class="dp-banner rev"><b>CONTROLLER REVIEW REQUIRED</b>Only a low-confidence route was found \u2014 not recommended automatically.</div>';
+      : '<div class="dp-banner rev"><b>NO SUITABLE DIVERSION FOUND \u2014 CONTROLLER REVIEW REQUIRED</b>' + esc(String(p.headline || "").replace(/^.*REQUIRED\s*/, "") || "Only a low-confidence route was found") + ' \u2014 shown for reference, not recommended.</div>';
+    if(c.bc_brief) h += '<div class="dp-brief"><div class="dp-k" style="margin:0 0 4px">Brief for the Bus Captain</div>' + esc(c.bc_brief) + '</div>';
+    if(c.warnings && c.warnings.length) h += '<div class="dp-banner rev" style="border-style:dashed"><b>SAFEGUARD' + (c.warnings.length > 1 ? 'S' : '') + ' EXCEEDED</b>' + c.warnings.map(esc).join(" \u00b7 ") + ' \u2014 still the best verified option; please confirm.</div>';
     if(c !== b) h += '<div class="dp-banner rev"><b>SHOWING AN ALTERNATIVE</b><button type="button" class="ds-btn sm" id="backRec" style="margin-top:6px">BACK TO RECOMMENDED</button></div>';
     var lr = p.last_reachable || {}, earlier = c.earlier;
     h += '<dl class="dp-kv">'
@@ -280,7 +363,9 @@
       + '<dt>Stops skipped</dt><dd><b>' + c.skipped_n + '</b>' + (c.skipped.length ? ' \u00b7 ' + c.skipped.map(function(s){ return esc(s.code) + (s.in_block ? "*" : ""); }).join(", ") : '') + (c.unavoidable ? ' <span class="dp-muted">(* inside the blockage)</span>' : '') + '</dd>'
       + '<dt>Extra distance</dt><dd>' + sgn(c.added_km, 1) + ' km</dd>'
       + '<dt>Extra time</dt><dd>' + sgn(c.added_min) + ' min</dd>'
-      + '<dt>Turns</dt><dd>' + c.turns + (c.sharp ? ' (' + c.sharp + ' sharp)' : '') + '</dd>'
+      + '<dt>Turns</dt><dd>' + c.turns + (c.sharp ? ' (' + c.sharp + ' sharp)' : '') + (c.bc && c.bc.right ? ' \u00b7 ' + c.bc.right + ' right' : '') + (c.bc && c.bc.close_turns ? ' \u00b7 ' + c.bc.close_turns + ' close together' : '') + '</dd>'
+      + '<dt>BC complexity</dt><dd>' + pill(c.bc_label || "\u2013", LVL[c.bc_label] || "#8a97a8") + ' <span class="dp-muted">' + (c.bc ? c.bc.roads + ' road' + (c.bc.roads === 1 ? '' : 's') + (c.bc.unfamiliar_share > 0.5 ? ' \u00b7 mostly roads no bus uses' : '') + (c.bc.minor_share > 0.3 ? ' \u00b7 small roads' : '') : '') + '</span></dd>'
+      + '<dt>Diversion footprint</dt><dd>' + pill(c.footprint_label || "\u2013", FPC[c.footprint_label] || "#8a97a8") + ' <span class="dp-muted">' + f1(c.div_km) + ' km off route \u00b7 leaves ' + km(c.leave_before_m || 0) + ' before, rejoins ' + km(Math.max(0, c.rejoin_after_m || 0)) + ' after the blockage</span></dd>'
       + '<dt>Bus-road confidence</dt><dd>' + pill(c.busroad_label, CONF[c.busroad_label] || "#8a97a8") + ' <span class="dp-muted">' + esc(c.evidence_text) + '</span></dd>'
       + '<dt>Overall confidence</dt><dd>' + pill(c.confidence, CONF[c.confidence]) + ' <span class="dp-muted">OCC score ' + f0(c.score) + '/100</span></dd></dl>';
     if(c === b && p.why && p.why.length) h += '<div class="dp-k">Why this route?</div><ul class="dp-why">' + p.why.map(function(t){ return '<li>' + esc(t) + '</li>'; }).join("") + '</ul>';
@@ -306,19 +391,31 @@
   /* ---------------------------------------------------------------- weights + legend */
   $("lgBtn").onclick = function(){ var on = $("legend").hidden; $("legend").hidden = !on; this.setAttribute("aria-pressed", String(on)); };
   $("wBtn").onclick = function(){
-    get("/api/dv2/weights").then(function(j){
-      var w = j.weights || {}, lb = j.labels || {};
-      $("wRows").innerHTML = Object.keys(w).map(function(k){ return '<label class="dp-w"><span>' + esc(lb[k] || k) + '</span><input type="range" min="0" max="50" step="1" value="' + w[k] + '" data-k="' + k + '" aria-label="' + esc(lb[k] || k) + '"><b data-v="' + k + '">' + f0(w[k]) + '</b></label>'; }).join("");
+    Promise.all([get("/api/dv2/limits"), get("/api/dv2/weights")]).then(function(r){
+      var lj = r[0] || {}, wj = r[1] || {}, L_ = lj.limits || {}, ll = lj.labels || {}, w = wj.weights || {}, lb = wj.labels || {};
+      $("lRows").innerHTML = Object.keys(L_).map(function(k){ var d = ll[k] || [k, "", 0, 100, 1];
+        return '<label class="dp-lim"><span>' + esc(d[0]) + ' <small>(default ' + esc(String((lj.defaults || {})[k])) + ')</small></span><input type="number" min="' + d[2] + '" max="' + d[3] + '" step="' + d[4] + '" value="' + L_[k] + '" data-l="' + k + '" aria-label="' + esc(d[0]) + '"><small>' + esc(d[1]) + '</small></label>'; }).join("");
+      $("wRows").innerHTML = Object.keys(w).map(function(k){ return '<label class="dp-w"><span>' + esc(lb[k] || k) + ' <small style="color:var(--ds-mut)">(default ' + f0((wj.defaults || {})[k]) + ')</small></span><input type="range" min="0" max="50" step="1" value="' + w[k] + '" data-k="' + k + '" aria-label="' + esc(lb[k] || k) + '"><b data-v="' + k + '">' + f0(w[k]) + '</b></label>'; }).join("");
       $("wRows").querySelectorAll("input").forEach(function(i){ i.oninput = function(){ $("wRows").querySelector('[data-v="' + i.dataset.k + '"]').textContent = i.value; }; });
-      $("wModal").hidden = false; $("wRows").querySelector("input").focus();
+      $("wModal").hidden = false; $("lRows").querySelector("input").focus();
     });
   };
   function closeW(){ $("wModal").hidden = true; $("wBtn").focus(); }
   $("wCancel").onclick = closeW;
   $("wModal").addEventListener("keydown", function(e){ if(e.key === "Escape") closeW(); });
-  function saveW(body){ post("/api/dv2/weights", body).then(function(j){ if(j.error) return toast(j.error); closeW(); toast("Weights saved \u2014 re-analysing"); if(S.block && S.dir) runAffected(); }); }
-  $("wSave").onclick = function(){ var w = {}; $("wRows").querySelectorAll("input").forEach(function(i){ w[i.dataset.k] = +i.value; }); saveW({weights:w}); };
-  $("wReset").onclick = function(){ saveW({reset:true}); };
+  function saveW(lim, wts){
+    Promise.all([post("/api/dv2/limits", lim), post("/api/dv2/weights", wts)]).then(function(r){
+      var err = (r[0] || {}).error || (r[1] || {}).error; if(err) return toast(err);
+      closeW(); toast("Settings saved \u2014 re-analysing"); if(allDirs()) runAffected();
+    });
+  }
+  $("wSave").onclick = function(){
+    var l = {}, w = {};
+    $("lRows").querySelectorAll("input").forEach(function(i){ l[i.dataset.l] = +i.value; });
+    $("wRows").querySelectorAll("input").forEach(function(i){ w[i.dataset.k] = +i.value; });
+    saveW({limits:l}, {weights:w});
+  };
+  $("wReset").onclick = function(){ saveW({reset:true}, {reset:true}); };
 
   hint("Tap the road where it is blocked");
   paintRec();

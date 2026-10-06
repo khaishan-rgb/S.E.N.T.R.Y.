@@ -143,6 +143,31 @@ path.dp-anim{stroke-dasharray:14 9;animation:dpdash 1.2s linear infinite}
   .dp-classic{order:6}
   .dp-legend{display:none}
 }
+
+/* V16.17: several roads / blockages, operator filter, bin, limits */
+.dp-hlist{display:flex;flex-wrap:wrap;gap:6px}
+.dp-chip{display:inline-flex;align-items:center;gap:6px;padding:3px 4px 3px 8px;border-radius:999px;border:1px solid var(--c);background:rgba(255,255,255,.04);color:#e6f1ff;font:600 12px var(--ds-font)}
+.dp-chip i{width:14px;height:4px;border-radius:2px;background:var(--c)}
+.dp-chip button{border:0;background:none;color:#cfe3f7;cursor:pointer;font-size:14px;padding:0 4px}
+.dp-rlbl{transform:translate(-50%,-140%);white-space:nowrap;padding:2px 7px;border-radius:6px;background:rgba(5,15,30,.9);border:1px solid var(--c,#38d6ff);color:#fff;font:700 11px var(--ds-font)}
+.dp-jx{transform:translate(-50%,-50%);width:26px;height:26px;border-radius:50%;background:#fff;color:#0a1a2e;display:flex;align-items:center;justify-content:center;font:700 14px var(--ds-font);box-shadow:0 0 0 4px rgba(255,255,255,.3)}
+.dp-blist{display:flex;flex-direction:column;gap:6px;margin:4px 0 8px}
+.dp-blist:empty{display:none}
+.dp-bchip{display:grid;grid-template-columns:26px 1fr;gap:0 8px;align-items:center;text-align:left;padding:7px 9px;border-radius:9px;border:1px solid var(--ds-line-2);background:rgba(255,255,255,.03);color:#fff;font:600 13px var(--ds-font);cursor:pointer}
+.dp-bchip b{grid-row:span 2;width:24px;height:24px;border-radius:6px;background:#c81e36;display:flex;align-items:center;justify-content:center;font-size:12px}
+.dp-bchip small{color:var(--ds-mut);font-weight:400}
+.dp-bchip[aria-pressed="true"]{border-color:#ff8a96;background:rgba(200,30,54,.12)}
+.dp-x.off{opacity:.75;transform:translate(-50%,-50%) scale(.85)}
+.dp-bin{position:absolute;top:56px;right:10px;z-index:700;display:none;align-items:center;gap:8px;padding:10px 14px;border-radius:12px;border:2px dashed rgba(255,85,102,.8);background:rgba(40,8,16,.94);color:#ffc3ca;font:700 12px var(--ds-font);box-shadow:0 6px 20px rgba(0,0,0,.5);transition:transform .12s,background .12s}
+.dp-bin.on{display:inline-flex}
+.dp-bin.hot{transform:scale(1.12);background:#c81e36;color:#fff;border-style:solid;border-color:#fff}
+.dp-op{display:flex;align-items:center;gap:8px;margin:6px 0 8px;font-size:12px;color:var(--ds-mut)}
+.dp-op select{flex:1;min-width:0;padding:6px 8px;border-radius:8px;border:1px solid var(--ds-line-2);background:#081426;color:#e6f1ff;font:13px var(--ds-font)}
+.dp-h3{margin:12px 0 4px;font:700 11px var(--ds-font);letter-spacing:.12em;text-transform:uppercase;color:var(--ds-cyan)}
+.dp-lim{display:grid;grid-template-columns:1fr 90px 44px;gap:8px;align-items:center;margin:4px 0;font-size:13px;color:var(--ds-text)}
+.dp-lim input{padding:5px 8px;border-radius:7px;border:1px solid var(--ds-line-2);background:#081426;color:#fff;font:13px var(--ds-font);width:100%}
+.dp-lim small{color:var(--ds-mut)}
+.dp-brief{margin:0 0 10px;padding:10px 12px;border-radius:10px;border:1px solid rgba(56,214,255,.45);background:rgba(56,214,255,.07);color:#e6f6ff;font-size:13.5px;line-height:1.45}
 </style>
 </head>
 <body>
@@ -155,10 +180,12 @@ path.dp-anim{stroke-dasharray:14 9;animation:dpdash 1.2s linear infinite}
         <input id="q" class="ds-input" type="search" autocomplete="off" placeholder="Search road, junction, bus stop, landmark…" aria-label="Search road, junction, bus stop or landmark" aria-autocomplete="list" aria-controls="qList">
         <ul id="qList" class="dp-res" role="listbox" hidden></ul>
       </div>
-      <p class="dp-hint" id="hint"><span class="dp-step">1</span> Search a road or place, then <b>tap the blocked road on the map</b>.</p>
+      <p class="dp-hint" id="hint"><span class="dp-step">1</span> Search a road or place, then <b>tap the blocked road on the map</b>. Search more roads (or "Road A / Road B") to highlight several and see where they meet.</p>
+      <div id="hlBox" hidden><div class="dp-k" style="margin-top:8px">Highlighted roads</div><div id="hlList" class="dp-hlist"></div></div>
     </section>
     <section class="dp-card" id="cBlock" hidden aria-label="Blockage">
-      <div class="dp-k"><span class="dp-step">2</span> Blocked road segment</div>
+      <div class="dp-k"><span class="dp-step">2</span> Blocked road segment <span class="sp"></span><span id="bCount"></span></div>
+      <div id="bList" class="dp-blist" role="list"></div>
       <div class="dp-road" id="bRoad"></div>
       <div class="dp-sub" id="bLen"></div>
       <div class="dp-k"><span class="dp-step">3</span> Blocked direction</div>
@@ -168,11 +195,12 @@ path.dp-anim{stroke-dasharray:14 9;animation:dpdash 1.2s linear infinite}
         <button type="button" role="radio" aria-checked="false" data-d="rev"><span class="dp-arr" id="arrRev">&#x279C;</span><span id="lblRev"></span></button>
         <button type="button" role="radio" aria-checked="false" data-d="both"><span class="dp-arr">&#x2194;</span><span>Both directions</span></button>
       </div>
-      <div class="dp-row"><button type="button" class="ds-btn sm" id="bZoom">ZOOM TO BLOCK</button><button type="button" class="ds-btn sm ghost" id="bClear">CLEAR</button></div>
-      <p class="dp-hint">Drag the white handles on the map to set where the blocked section starts and ends.</p>
+      <div class="dp-row"><button type="button" class="ds-btn sm" id="bAdd" aria-pressed="false">+ ADD ANOTHER BLOCKAGE</button><button type="button" class="ds-btn sm ghost" id="bZoom">ZOOM</button><button type="button" class="ds-btn sm ghost" id="bClear">CLEAR ALL</button></div>
+      <p class="dp-hint">Drag the white handles to set where a blocked section starts and ends. <b>Hold the &#x2715; and drag it to the bin</b> (top right of the map) to delete a blockage.</p>
     </section>
     <section class="dp-card" id="cSvc" hidden aria-label="Affected services">
       <div class="dp-k"><span class="dp-step">4</span> Affected services <span class="sp"></span><span id="svcCount"></span></div>
+      <label class="dp-op"><span>Transport operator</span><select id="fOp" aria-label="Transport operator"><option value="">All operators</option><option value="SBST">SBS Transit</option><option value="SMRT">SMRT</option><option value="TTS">Tower Transit</option><option value="GAS">Go-Ahead</option></select></label>
       <div id="svcList" role="list"></div>
       <p class="dp-hint" id="svcNote"></p>
     </section>
@@ -182,7 +210,8 @@ path.dp-anim{stroke-dasharray:14 9;animation:dpdash 1.2s linear infinite}
   <section class="dp-map" aria-label="Map">
     <div id="map"></div>
     <div class="dp-maphint" id="mapHint">Tap the road where it is blocked</div>
-    <div class="dp-mapbtn"><button type="button" id="wBtn" title="OCC diversion score weights" aria-label="Scoring weights">WEIGHTS</button><button type="button" id="lgBtn" aria-pressed="true">LEGEND</button></div>
+    <div class="dp-bin" id="dpBin" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6"/></svg><span>Drop here to delete</span></div>
+    <div class="dp-mapbtn"><button type="button" id="wBtn" title="Diversion limits and score weights" aria-label="Diversion settings">SETTINGS</button><button type="button" id="lgBtn" aria-pressed="true">LEGEND</button></div>
     <div class="dp-legend" id="legend">
       <i style="border-color:#38d6ff"></i><span>Original service route</span>
       <i style="border-color:#e0263f"></i><span>Blocked road (arrows = blocked direction)</span>
@@ -205,8 +234,13 @@ path.dp-anim{stroke-dasharray:14 9;animation:dpdash 1.2s linear infinite}
 
 <div class="dp-modal" id="wModal" hidden role="dialog" aria-modal="true" aria-labelledby="wTitle">
   <div class="box">
-    <h2 id="wTitle" style="margin:0 0 6px;font-size:17px;color:#fff">OCC diversion score weights</h2>
-    <p class="dp-muted" style="margin:0 0 10px">Used only to rank diversions that already passed every hard check (no blocked road, no U-turn, correct rejoin, next stop reachable). Saved for everyone.</p>
+    <h2 id="wTitle" style="margin:0 0 6px;font-size:17px;color:#fff">Diversion settings</h2>
+    <p class="dp-muted" style="margin:0 0 10px">Saved for everyone.</p>
+    <h3 class="dp-h3">Safeguards</h3>
+    <p class="dp-muted" style="margin:0 0 8px">Warnings, not blind rejects: a diversion over a safeguard is flagged and loses points in proportion to how far it is over, so an excellent slightly longer route can still win over a complicated shorter one.</p>
+    <div id="lRows"></div>
+    <h3 class="dp-h3">Score weights</h3>
+    <p class="dp-muted" style="margin:0 0 8px">Only rank diversions that passed every hard check (no blocked road, U-turn, wrong-way or prohibited movement, restricted road; correct rejoin and onward movement). They cannot turn "no verified route" into a route.</p>
     <div id="wRows"></div>
     <div class="dp-row" style="justify-content:flex-end"><button type="button" class="ds-btn sm ghost" id="wReset">RESET</button><button type="button" class="ds-btn sm ghost" id="wCancel">CANCEL</button><button type="button" class="ds-btn sm pri" id="wSave">SAVE &amp; RE-ANALYSE</button></div>
   </div>

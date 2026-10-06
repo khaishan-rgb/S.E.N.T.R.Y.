@@ -22,7 +22,7 @@ import headway
 import routegeom
 import traffic
 
-VERSION = "V16.16"
+VERSION = "V16.18"
 # V16.8: pages hidden for everyone (see Settings > Pages). Defined here because bb_init() reads the saved value while the module loads.
 SITE_PAGE_IDS = ("command", "route", "headway", "bunching", "recovery", "halfplan", "trafficaware", "running", "ewt", "cameras", "diversion")     # "settings" can never be hidden
 SITE = {"hidden": [x.strip() for x in os.getenv("HIDDEN_PAGES", "").split(",") if x.strip() in SITE_PAGE_IDS], "block": True}
@@ -8868,7 +8868,7 @@ def dv2_db():
 def dv2_weights():
     try:
         dv2_db()
-        r = bb_sql("SELECT value FROM dv2_settings WHERE key='weights'", fetch=True)
+        r = bb_sql("SELECT value FROM dv2_settings WHERE key='weights_v3'", fetch=True)
         if r:
             w = json.loads(r[0]["value"])
             return {k: float(w.get(k, v)) for k, v in dv2.DEFAULT_WEIGHTS.items()}
@@ -8877,10 +8877,47 @@ def dv2_weights():
     return dict(dv2.DEFAULT_WEIGHTS)
 
 
+def dv2_limits():
+    try:
+        dv2_db()
+        r = bb_sql("SELECT value FROM dv2_settings WHERE key='safeguards_v3'", fetch=True)
+        if r:
+            w = json.loads(r[0]["value"])
+            return {k: float(w.get(k, v)) for k, v in dv2.DEFAULT_LIMITS.items()}
+    except Exception:
+        pass
+    return dict(dv2.DEFAULT_LIMITS)
+
+
+@app.get("/api/dv2/limits")
+async def api_dv2_limits_get():
+    return {"limits": dv2_limits(), "labels": dv2.LIMIT_LABELS, "defaults": dv2.DEFAULT_LIMITS}
+
+
+@app.post("/api/dv2/limits")
+async def api_dv2_limits_set(request: Request):
+    body = _dv_body(await request.body())
+    w = {}
+    for k, v in dv2.DEFAULT_LIMITS.items():
+        lo, hi = dv2.LIMIT_LABELS[k][2], dv2.LIMIT_LABELS[k][3]
+        try:
+            w[k] = max(lo, min(hi, float((body.get("limits") or {}).get(k, v))))
+        except (TypeError, ValueError):
+            w[k] = v
+    if body.get("reset"):
+        w = dict(dv2.DEFAULT_LIMITS)
+    dv2_db()
+    bb_sql("INSERT OR REPLACE INTO dv2_settings(key, value, by_name, ts) VALUES('safeguards_v3', ?, ?, ?)", (json.dumps(w), _who(request), time.time()))
+    for k in [k for k in CACHE if str(k).startswith("dv2plan:")]:
+        CACHE.pop(k, None)
+    return {"ok": True, "limits": w}
+
+
 @app.get("/api/dv2/config")
 async def api_dv2_config():
     return {"tomtom_map": bool(TT["key"]), "router": "TomTom Routing (bus mode)" if dv_use_tomtom() else "OSRM (OpenStreetMap)",
             "weights": dv2_weights(), "weight_labels": dv2.WEIGHT_LABELS, "default_weights": dv2.DEFAULT_WEIGHTS,
+            "limits": dv2_limits(), "limit_labels": dv2.LIMIT_LABELS, "default_limits": dv2.DEFAULT_LIMITS,
             "buffer_m": diversion.PARAMS["block_buffer_m"], "map_error": TT_MAP["error"]}
 
 
@@ -8896,7 +8933,7 @@ async def api_dv2_weights_set(request: Request):
     if body.get("reset"):
         w = dict(dv2.DEFAULT_WEIGHTS)
     dv2_db()
-    bb_sql("INSERT OR REPLACE INTO dv2_settings(key, value, by_name, ts) VALUES('weights', ?, ?, ?)", (json.dumps(w), _who(request), time.time()))
+    bb_sql("INSERT OR REPLACE INTO dv2_settings(key, value, by_name, ts) VALUES('weights_v3', ?, ?, ?)", (json.dumps(w), _who(request), time.time()))
     for k in [k for k in CACHE if str(k).startswith("dv2plan:")]:
         CACHE.pop(k, None)
     return {"ok": True, "weights": w}
@@ -8958,6 +8995,39 @@ async def dv2_places(q):
     return await cached(key, factory)
 
 
+_DV2_ABBR = {"ave": "avenue", "av": "avenue", "rd": "road", "st": "street", "dr": "drive", "cres": "crescent", "ctrl": "central",
+             "nth": "north", "sth": "south", "pl": "place", "cl": "close", "lor": "lorong", "jln": "jalan", "bt": "bukit",
+             "upp": "upper", "expy": "expressway", "hway": "highway", "hwy": "highway", "pk": "park", "c'wealth": "commonwealth",
+             "cwealth": "commonwealth", "terr": "terrace", "gdns": "gardens", "int": "interchange"}
+
+
+def dv2_norm(t):
+    """road-name text for matching: lower case, abbreviations expanded ("Clementi Ave 3" == "CLEMENTI AVENUE 3")"""
+    words = re.sub(r"[^a-z0-9' ]", " ", str(t).lower()).split()
+    return " ".join(_DV2_ABBR.get(w, w) for w in words)
+
+
+def dv2_match_roads(names, q, n=6):
+    qn = dv2_norm(q)
+    hit = [k for k in names if qn in dv2_norm(k)]
+    return sorted(hit, key=lambda k: (not dv2_norm(k).startswith(qn), dv2_norm(k) != qn, -names[k][4]))[:n]
+
+
+def dv2_junction(idx, a, b):
+    """where two roads meet: the closest pair of points between their LTA road links (<= 60 m) -> (lat, lon) | None"""
+    sa = [s_ for s_ in (idx.segs if idx else []) if s_[5] == a]
+    sb = [s_ for s_ in (idx.segs if idx else []) if s_[5] == b]
+    best, bd = None, 60.0
+    pb = [(s_[0], s_[1]) for s_ in sb] + [(s_[2], s_[3]) for s_ in sb]
+    for s_ in sa:
+        for pa in ((s_[0], s_[1]), (s_[2], s_[3])):
+            for q_ in pb:
+                d = diversion.dist_m(pa, q_)
+                if d < bd:
+                    best, bd = ((pa[0] + q_[0]) / 2, (pa[1] + q_[1]) / 2), d
+    return best
+
+
 @app.get("/api/dv2/search")
 async def api_dv2_search(q: str = ""):
     q = q.strip()
@@ -8971,12 +9041,23 @@ async def api_dv2_search(q: str = ""):
         out.append({"type": "stop", "label": f"{x['code']} {x['name']}", "sub": x.get("road", ""), "lat": x["lat"], "lon": x["lon"], "code": q})
     bands = await bands_state()
     names = dv2_road_index(bands.get("idx"))
-    rn = sorted([n for n in names if ql in n.lower()], key=lambda n: (not n.lower().startswith(ql), -names[n][4]))[:6]
+    parts = [x for x in re.split(r"\s*(?:/|&|\band\b|\bx\b)\s*", q, flags=re.I) if len(x.strip()) >= 2]
+    if len(parts) == 2:       # a junction: "Clementi Ave 3 / Commonwealth Ave West"
+        ra, rb = dv2_match_roads(names, parts[0], 1), dv2_match_roads(names, parts[1], 1)
+        if ra and rb and ra[0] != rb[0]:
+            jp = dv2_junction(bands.get("idx"), ra[0], rb[0])
+            ea, eb = names[ra[0]], names[rb[0]]
+            out.append({"type": "junction", "label": f"{dv2_title(ra[0])} / {dv2_title(rb[0])}", "roads": [ra[0], rb[0]],
+                        "sub": "Junction" if jp else "Both roads (they do not meet)", "lat": jp[0] if jp else (ea[0] + eb[2]) / 2,
+                        "lon": jp[1] if jp else (ea[1] + eb[3]) / 2, "found": bool(jp),
+                        "bbox": [min(ea[0], eb[0]), min(ea[1], eb[1]), max(ea[2], eb[2]), max(ea[3], eb[3])]})
+    rn = dv2_match_roads(names, q, 6) if len(parts) != 2 else []
     for n in rn:
         e = names[n]
         out.append({"type": "road", "label": dv2_title(n), "road": n, "sub": "Road", "lat": (e[0] + e[2]) / 2, "lon": (e[1] + e[3]) / 2,
                     "bbox": [e[0], e[1], e[2], e[3]]})
-    sm = [x for x in st["stops"].values() if ql in x["name"].lower() or ql in (x.get("road") or "").lower()]
+    qn = dv2_norm(q)
+    sm = [x for x in st["stops"].values() if ql in x["name"].lower() or qn in dv2_norm(x.get("road") or "") or qn in dv2_norm(x["name"])] if len(parts) != 2 else []
     sm.sort(key=lambda x: (not x["name"].lower().startswith(ql), x["name"]))
     for x in sm[:6]:
         if not any(o.get("code") == x["code"] for o in out):
@@ -9054,17 +9135,24 @@ async def api_dv2_block(lat: float = 0.0, lon: float = 0.0):
 
 
 def dv2_blocks(body):
-    """the blocked section as engine blocks: dir fwd (drawn order) / rev / both"""
-    line = [tuple(p) for p in (body.get("line") or []) if isinstance(p, (list, tuple)) and len(p) == 2]
-    if len(line) < 2:
-        return []
-    dirn = {"fwd": "fwd", "forward": "fwd", "rev": "rev", "back": "rev", "backward": "rev", "reverse": "rev", "both": "both"}.get(
-        str(body.get("dir") or "both").strip().lower())
-    if dirn is None:            # unknown direction: refuse rather than silently treat it as one-way
-        return []
-    if dirn == "rev":
-        line = list(reversed(line))
-    return [{"line": line, "directed": dirn != "both", "road": str(body.get("road") or "")[:80]}]
+    """the blocked sections as engine blocks. Either one section {line, dir, road} or several: {blocks: [{line, dir, road}, ...]}.
+    dir: fwd (drawn order) / rev / both. A section with an unknown direction is refused rather than guessed."""
+    items = body.get("blocks") if isinstance(body.get("blocks"), list) else [body]
+    out = []
+    for it in items[:8]:
+        if not isinstance(it, dict):
+            continue
+        line = [tuple(p) for p in (it.get("line") or []) if isinstance(p, (list, tuple)) and len(p) == 2]
+        if len(line) < 2:
+            continue
+        dirn = {"fwd": "fwd", "forward": "fwd", "rev": "rev", "back": "rev", "backward": "rev", "reverse": "rev", "both": "both"}.get(
+            str(it.get("dir") or "both").strip().lower())
+        if dirn is None:
+            continue
+        if dirn == "rev":
+            line = list(reversed(line))
+        out.append({"line": line, "directed": dirn != "both", "road": str(it.get("road") or "")[:80]})
+    return out
 
 
 @app.post("/api/dv2/affected")
@@ -9142,6 +9230,7 @@ async def dv2_plan(st, blocks, svc, d, run_i, traffic=True):
                     failures=["No original stop before the blockage the bus can still serve." if ia is None else "No original stop after the blockage to rejoin at."])
         return base
     weights = dv2_weights()
+    limits = dv2_limits()
     b0 = down[0]
     evaluated, attempts, valid_all = {}, [], []
 
@@ -9191,7 +9280,17 @@ async def dv2_plan(st, blocks, svc, d, run_i, traffic=True):
             if c is None:
                 reasons.append(why)
                 continue
-            ap = None if c.get("free") else diversion.nearest_on_line(c["dep"]["leave_pt"], line, cum)[3]
+            ap = diversion.nearest_on_line(c["dep"]["leave_pt"], line, cum)[3]
+            c["exit_differs"] = False
+            if c.get("free"):         # free start: a different exit only if the bus really sets off another way than its route
+                rl = c["r"]["line"]
+                rc_ = diversion.cum_m(rl)
+                h0 = diversion.bearing(rl[0], diversion.point_at(rl, rc_, min(rc_[-1], 30.0)))
+                nm_ = (stops[c["asked"][0]].get("name") or "").upper()
+                off_ = diversion.nearest_on_line((stops[c["asked"][0]]["lat"], stops[c["asked"][0]]["lon"]), line, cum)[0]
+                interchange_like = (bool(_TERMINAL_RX.search(nm_)) and not nm_.startswith(("OPP ", "AFT ", "BEF "))) or off_ >= 20.0
+                if interchange_like and diversion.angdiff(h0, diversion.nearest_on_line(rl[0], line, cum)[3]) > 60.0:
+                    ap, c["exit_differs"] = None, True
             dp = diversion.bearing(at(c["dep"]["rejoin_s"]), at(c["dep"]["rejoin_s"] + 25.0))
             rj_road = dv2._road_starting_near(r.get("steps"), c["dep"]["rejoin_pt"], 40.0)     # the road the bus rejoins
             instr = dv2.instructions(r.get("steps"), c["seg"], ap, dp, rj_road)
@@ -9217,7 +9316,7 @@ async def dv2_plan(st, blocks, svc, d, run_i, traffic=True):
         div_min = dprof["t"][-1]
         normal_min = diversion.t_at(prof, rejoin_s) - diversion.t_at(prof, leave_s)
         sk = diversion.stops_in(stop_s, leave_s + 1.0, rejoin_s - 1.0)
-        cx = dv2.complexity(c["instr"], c["groups"], c["suit"])
+        cx = dv2.bc_complexity(c["instr"], c["groups"], c["suit"], c["evidence"])
         bl, bsc = dv2.busroad_label(c["evidence"], c["suit"])
         dd_doubt = bus == "dd" and (c.get("bus_road") or {}).get("dd") == "UNCONFIRMED"
         m = {"leave_index": li, "rejoin_index": rj, "leave_name": stops[li]["name"], "leave_code": stops[li]["code"],
@@ -9228,11 +9327,15 @@ async def dv2_plan(st, blocks, svc, d, run_i, traffic=True):
              "div_km": round(c["div_m"] / 1000.0, 2), "normal_km": round((rejoin_s - leave_s) / 1000.0, 2),
              "added_km": round((c["div_m"] - (rejoin_s - leave_s)) / 1000.0, 2), "added_min": round(div_min - normal_min, 1),
              "rejoin_after_m": round(rejoin_s - B), "simplicity": cx["simplicity"], "turns": cx["turns"], "sharp": cx["sharp"],
-             "road_changes": cx["road_changes"], "minor_share": cx["minor_share"], "junction": dv2.junction_quality(c["instr"]),
+             "road_changes": max(0, cx["roads"] - 1), "minor_share": cx["minor_share"], "junction": dv2.junction_quality(c["instr"]),
              "busroad_label": bl, "busroad_score": bsc, "dd_doubt": dd_doubt, "evidence_text": c["evidence"]["text"],
              "route_conf": (1.0 if str(r.get("router", "")).startswith("TomTom") else 0.8) - (0.2 if c["evidence"]["level"] == 3 else 0.0),
              "next_ok": bool(c["next_leg"]["ok"]), "next_name": c["next_leg"]["next_name"], "next_code": c["next_leg"]["next_code"],
-             "instructions": c["instr"], "router": r.get("router", ""), "probe": bool(c.get("probe")), "free_start": bool(c.get("free"))}
+             "instructions": c["instr"], "router": r.get("router", ""), "probe": bool(c.get("probe")), "free_start": bool(c.get("exit_differs")),
+             "bc": cx, "bc_label": cx["label"], "bc_points": cx["points"], "roads": cx["roads"], "leave_before_m": round(max(0.0, A - leave_s))}
+        fp = dv2.footprint(m)
+        m.update(footprint_label=fp["label"], footprint_index=fp["index"], footprint_score=fp["score"])
+        m["warnings"], m["penalty"] = dv2.safeguards(m, limits)
         return m
 
     # progressive search: nearest combinations first; stop expanding soon after a strong valid diversion
@@ -9291,6 +9394,9 @@ async def dv2_plan(st, blocks, svc, d, run_i, traffic=True):
                 "skipped": m["skipped"], "skipped_n": m["skipped_n"], "unavoidable": m["unavoidable"], "extra_skipped": m["extra_skipped"],
                 "div_km": m["div_km"], "normal_km": m["normal_km"], "added_km": m["added_km"], "added_min": m["added_min"],
                 "turns": m["turns"], "sharp": m["sharp"], "earlier": m["earlier"], "router": m["router"],
+                "bc_label": m["bc_label"], "bc_points": m["bc_points"], "bc": m["bc"], "footprint_label": m["footprint_label"],
+                "footprint_index": m["footprint_index"], "warnings": m["warnings"], "bc_brief": dv2.bc_sentence(m, m["instructions"]),
+                "leave_before_m": m["leave_before_m"], "rejoin_after_m": m["rejoin_after_m"],
                 "line": [[round(p[0], 6), round(p[1], 6)] for p in diversion.simplify(seg, 400)],
                 "skip_line": [[round(p[0], 6), round(p[1], 6)] for p in diversion.simplify(skip_line, 200)],
                 "leave_pt": [round(c["dep"]["leave_pt"][0], 6), round(c["dep"]["leave_pt"][1], 6)],
@@ -9298,10 +9404,12 @@ async def dv2_plan(st, blocks, svc, d, run_i, traffic=True):
 
     pool = strong or uniq
     if not pool:
-        base.update(status="none", headline="NO VERIFIED DIVERSION FOUND", candidates=[], failures=dv2.explain_failure(attempts),
+        base.update(status="none", headline="NO SUITABLE DIVERSION FOUND \u2014 CONTROLLER REVIEW REQUIRED", candidates=[], failures=dv2.explain_failure(attempts),
                     why=[], why_not=[])
         return base
-    best = max(pool, key=lambda c: (c["confidence"] != "LOW", c["score"]))
+    def sensible(c):        # final human check: could OCC explain this to a Bus Captain who does not know the area?
+        return not (c["m"]["bc_label"] == "HIGH" and c["m"]["footprint_label"] == "LARGE")
+    best = max(pool, key=lambda c: (c["confidence"] != "LOW", sensible(c), c["score"]))
     early_alts = [c for c in uniq if c["m"]["leave_index"] < best["m"]["leave_index"]]
     best["m"]["preserved_vs_early"] = max([c["m"]["skipped_n"] - best["m"]["skipped_n"] for c in early_alts] + [0])
     tags = dv2.tag_alternatives(pool)
@@ -9309,14 +9417,16 @@ async def dv2_plan(st, blocks, svc, d, run_i, traffic=True):
     for t, c in tags.items():
         tag_of.setdefault(id(c), []).append(t)
     others = [c for c in uniq if c is not best][:5]
-    base["status"] = "divert" if best["confidence"] in ("HIGH", "MEDIUM") else "review"
-    base["headline"] = ("RECOMMENDED DIVERSION" if base["status"] == "divert" else "CONTROLLER REVIEW REQUIRED \u2014 LOW CONFIDENCE ONLY")
+    base["status"] = "divert" if best["confidence"] in ("HIGH", "MEDIUM") and sensible(best) else "review"
+    base["headline"] = ("RECOMMENDED DIVERSION" if base["status"] == "divert" else
+                        "NO SUITABLE DIVERSION FOUND \u2014 CONTROLLER REVIEW REQUIRED" + (" (best route is large and complex for a Bus Captain)" if not sensible(best) else " (low confidence only)"))
     base["best"] = summary(best, tag_of.get(id(best), []))
     base["candidates"] = [base["best"]] + [summary(c, tag_of.get(id(c), [])) for c in others]
     base["why"] = dv2.why_this(best, ctx_m)
     base["why_not"] = [dv2.why_not(best, c, ctx_m) for c in sorted(others, key=lambda c: c["m"]["leave_index"])[:4]]
     base["failures"] = dv2.explain_failure(attempts)
     base["weights"] = weights
+    base["limits"] = limits
     return base
 
 

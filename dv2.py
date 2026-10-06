@@ -11,10 +11,43 @@ import math
 import diversion as D
 
 # OCC DIVERSION SCORE weights (percent). Tunable from the page (stored by the server).
-DEFAULT_WEIGHTS = {"stops": 30, "simple": 20, "busroad": 15, "rejoin": 10, "time": 10, "dist": 5, "junction": 5, "confidence": 5}
-WEIGHT_LABELS = {"stops": "Original stops preserved", "simple": "Route simplicity", "busroad": "Bus-road confidence",
-                 "rejoin": "Earliest sensible rejoin", "time": "Additional running time", "dist": "Additional distance",
-                 "junction": "Junction / turn quality", "confidence": "Route confidence"}
+# HARD limits on a diversion (applied before scoring; a candidate over any limit is rejected, never ranked)
+DEFAULT_LIMITS = {"max_extra_km": 3.0, "max_extra_min": 10.0, "max_ratio": 3.0, "max_skipped": 8}
+LIMIT_LABELS = {"max_extra_km": ["Extra distance safeguard", "km", 0.5, 15.0, 0.5],
+                "max_extra_min": ["Extra running time safeguard", "min", 2.0, 40.0, 1.0],
+                "max_ratio": ["Length vs the normal section safeguard", "\u00d7", 1.5, 8.0, 0.5],
+                "max_skipped": ["Stops skipped safeguard", "stops", 1, 20, 1]}
+
+
+def safeguards(m, L):
+    """Safeguards, not blind rejects: every exceeded limit becomes a warning and a score penalty proportional to how far it is
+    exceeded (4 points + 30 x the excess fraction, max 15 each). An excellent +3.2 km simple arterial diversion can still beat a
+    complicated +2.8 km one. -> (warnings, penalty)"""
+    out, pen = [], 0.0
+
+    def hit(val, lim, txt):
+        nonlocal pen
+        if lim and val > lim:
+            out.append(txt)
+            pen += min(15.0, 4.0 + 30.0 * (val - lim) / lim)
+    hit(m["added_km"], L["max_extra_km"], f"{m['added_km']:+.1f} km extra (safeguard {L['max_extra_km']:g} km)")
+    hit(m["added_min"], L["max_extra_min"], f"{m['added_min']:+.0f} min extra (safeguard {L['max_extra_min']:g} min)")
+    if m["normal_km"] > 0 and m["added_km"] > 0.8:
+        hit(m["div_km"] / m["normal_km"], L["max_ratio"], f"{m['div_km'] / m['normal_km']:.1f}\u00d7 the normal section (safeguard {L['max_ratio']:g}\u00d7)")
+    hit(m["skipped_n"], L["max_skipped"], f"{m['skipped_n']} stops skipped (safeguard {int(L['max_skipped'])})")
+    return out, round(pen, 1)
+
+
+def over_limit(m, L):
+    """kept for compatibility: the first safeguard exceeded, or ''"""
+    w, _ = safeguards(m, L)
+    return w[0] if w else ""
+
+
+DEFAULT_WEIGHTS = {"footprint": 25, "stops": 20, "simple": 20, "rejoin": 10, "busroad": 10, "junction": 5, "time": 5, "dist": 5}
+WEIGHT_LABELS = {"footprint": "Smallest diversion footprint", "stops": "Minimum original stops affected",
+                 "simple": "Bus Captain simplicity", "rejoin": "Earliest practical rejoin", "busroad": "Proven bus-suitable roads",
+                 "junction": "Fewest / easiest turns", "time": "Additional running time", "dist": "Additional distance"}
 
 PARAMS = {
     "upstream_max": 4,        # diversion starts considered: the last reachable stop and up to 4 stops before it
@@ -112,6 +145,54 @@ def complexity(instr, groups, suit):
             "complexity": round(c, 1), "simplicity": round(max(0.0, 1.0 - c / 12.0), 3)}
 
 
+def bc_complexity(instr, groups, suit, ev):
+    """BC COMPLEXITY - how hard the diversion is for a Bus Captain who may not know the area: turns, right turns (across
+    traffic in Singapore), sharp turns, roundabouts, closely spaced turns (< 150 m apart), number of roads, small roads and
+    roads no bus service uses (unfamiliar). -> points (lower = easier), LOW / MEDIUM / HIGH, simplicity 0..1"""
+    tl = [x for x in instr if x["turn"] != "STRAIGHT" and not x["turn"].startswith("ROUNDABOUT (straight")]
+    turns = len(tl)
+    right = sum(1 for x in tl if "RIGHT" in x["turn"])
+    sharp = sum(1 for x in tl if x.get("sharp"))
+    rabout = sum(1 for x in tl if x["turn"].startswith("ROUNDABOUT"))
+    ss = sorted(x.get("s", 0) for x in tl)
+    close = sum(1 for a_, b_ in zip(ss, ss[1:]) if b_ - a_ < 150)
+    roads = len({g.get("road") for g in groups or [] if g.get("road")})
+    minor = float((suit or {}).get("small_share") or 0.0)
+    unfamiliar = max(0.0, 1.0 - float((ev or {}).get("coverage") or 0.0)) if (ev or {}).get("level", 3) != 2 else 0.4
+    pts = 1.0 * turns + 0.5 * right + 1.5 * sharp + 0.5 * rabout + 1.0 * close + 0.4 * max(0, roads - 1) + 2.5 * minor + 1.5 * unfamiliar
+    label = "LOW" if pts <= 5.0 else ("MEDIUM" if pts <= 8.5 else "HIGH")
+    return {"points": round(pts, 1), "label": label, "simplicity": round(max(0.0, 1.0 - pts / 14.0), 3), "turns": turns, "right": right,
+            "sharp": sharp, "roundabouts": rabout, "close_turns": close, "roads": roads, "minor_share": round(minor, 2),
+            "unfamiliar_share": round(unfamiliar, 2)}
+
+
+def footprint(m):
+    """DIVERSION FOOTPRINT - how much of the network the diversion disturbs: off-route distance, original route lost, stops
+    skipped, how far before the blockage the bus leaves and after it the bus rejoins, roads and turns. -> index (lower =
+    smaller), SMALL / MEDIUM / LARGE, score 0..1"""
+    idx = (m["div_km"] / 4.0 + m["normal_km"] / 3.0 + m["skipped_n"] / 6.0 + max(0.0, m["rejoin_after_m"]) / 2000.0
+           + max(0.0, m.get("leave_before_m", 0.0)) / 2000.0 + max(0, m.get("roads", 1) - 1) / 8.0 + m["turns"] / 12.0)
+    label = "SMALL" if idx <= 1.8 else ("MEDIUM" if idx <= 3.2 else "LARGE")
+    return {"index": round(idx, 2), "label": label, "score": round(max(0.0, 1.0 - idx / 6.0), 3)}
+
+
+def bc_sentence(m, instr):
+    """the brief an OCC controller reads to a Bus Captain: "After Stop A, turn left into Road X, ... and resume the normal
+    route at Stop D." """
+    words = {"LEFT": "turn left into", "RIGHT": "turn right into", "SLIGHT LEFT": "bear left into", "SLIGHT RIGHT": "bear right into",
+             "SHARP LEFT": "turn sharp left into", "SHARP RIGHT": "turn sharp right into", "STRAIGHT": "continue straight on"}
+    bits = []
+    for x in instr:
+        road = x.get("road") or "the next road"
+        if x["turn"].startswith("ROUNDABOUT"):
+            bits.append(f"at the roundabout {x['turn'].replace('ROUNDABOUT ', '').lower()} into {road}")
+        else:
+            bits.append(f"{words.get(x['turn'], x['turn'].lower())} {road}")
+    start = f"After {m['leave_name']} ({m['leave_code']})" if not m.get("free_start") else f"Leave {m['leave_name']} ({m['leave_code']})"
+    body = ", ".join(bits) if bits else "follow the diversion"
+    return f"{start}, {body} and resume the normal route at {m['rejoin_name']} ({m['rejoin_code']})."
+
+
 def impossible_turn(instr, P=PARAMS):
     for x in instr:
         if abs(x["deg"]) >= P["impossible_turn_deg"]:
@@ -140,27 +221,31 @@ def busroad_label(ev, suit):
 
 
 def occ_score(m, weights=None):
-    """OCC DIVERSION SCORE 0-100 for a VALID candidate. m: metrics dict. -> (score, parts)"""
+    """OCC DIVERSION SCORE 0-100 for a VALID candidate (feasibility already proven by the hard checks). Footprint, stops,
+    Bus Captain simplicity and early rejoin dominate; running time and distance are minor. Safeguard penalties are subtracted."""
     W = dict(DEFAULT_WEIGHTS)
     W.update({k: float(v) for k, v in (weights or {}).items() if k in W})
     tot = sum(W.values()) or 1.0
     f = {
+        "footprint": m["footprint_score"],
         "stops": max(0.0, 1.0 - m["extra_skipped"] / 6.0),
         "simple": m["simplicity"],
-        "busroad": m["busroad_score"],
         "rejoin": max(0.0, 1.0 - max(0.0, m["rejoin_after_m"]) / 2500.0),
+        "busroad": m["busroad_score"],
+        "junction": max(0.0, 1.0 - m["turns"] / 8.0) * m["junction"],
         "time": max(0.0, 1.0 - max(0.0, m["added_min"]) / 20.0),
         "dist": max(0.0, 1.0 - max(0.0, m["added_km"]) / 6.0),
-        "junction": m["junction"],
-        "confidence": m["route_conf"],
     }
     parts = {k: round(100.0 * W[k] / tot * f[k], 1) for k in W}
-    return round(sum(parts.values()), 1), parts
+    if m.get("penalty"):
+        parts["safeguards"] = -m["penalty"]
+    return round(max(0.0, sum(parts.values())), 1), parts
 
 
 def overall_confidence(m):
     """HIGH / MEDIUM / LOW for a valid candidate"""
-    if m["busroad_label"] in ("VERY HIGH", "HIGH") and m["simplicity"] >= 0.45 and m["next_ok"] and m["route_conf"] >= 0.9 and not m["dd_doubt"]:
+    if (m["busroad_label"] in ("VERY HIGH", "HIGH") and m["bc_label"] != "HIGH" and m["footprint_label"] != "LARGE" and m["next_ok"]
+            and m["route_conf"] >= 0.9 and not m["dd_doubt"] and not m.get("warnings")):
         return "HIGH"
     if m["busroad_label"] != "LOW" and m["next_ok"]:
         return "MEDIUM"
@@ -196,12 +281,15 @@ def why_this(best, ctx_m):
         out.append(f"Continues the normal route as long as practical \u2014 serves every reachable stop up to {m['leave_name']}")
     elif m["earlier"]:
         out.append(f"Earlier diversion point needed: no practical escape after {ctx_m['ia_name']}, so the bus leaves after {m['leave_name']}")
-    if m.get("free_start") and m["leave_index"] == 0 or (m.get("free_start") and "INT" in (m.get("leave_name") or "").upper()):
+    if m.get("free_start"):
         out.append(f"Leaves {m['leave_name']} by a different exit \u2014 the normal exit leads straight into the blockage")
     if m.get("probe"):
         out.append("Keeps to the normal route past the stop and turns off at a later junction (the immediate turn-off does not work)")
     if m["preserved_vs_early"] > 0:
         out.append(f"Preserves {m['preserved_vs_early']} more original stop(s) than the earliest diversion checked")
+    out.append(f"{m['footprint_label'].title()} diversion footprint \u2014 {m['div_km']:.1f} km off the route, rejoins {max(0, m['rejoin_after_m']):.0f} m after the blockage")
+    out.append(f"BC complexity {m['bc_label']} \u2014 {m['turns']} turn(s)" + (f", {m['bc']['close_turns']} close together" if m["bc"]["close_turns"] else "")
+               + (" on roads buses already use" if m["busroad_label"] == "VERY HIGH" else ""))
     out.append(f"Only {m['skipped_n']} stop(s) skipped" + (f" ({m['unavoidable']} inside the blockage)" if m["unavoidable"] else ""))
     out.append("No U-turn, no backtracking, blocked road avoided")
     out.append(f"{m['turns']} turn(s)" + (" \u2014 simple to follow" if m["simplicity"] >= 0.6 else "") + (f", {m['sharp']} sharp" if m["sharp"] else ""))
@@ -223,7 +311,11 @@ def why_not(best, other, ctx_m):
             bits.append(f"leaves the route earlier and bypasses {n} more original stop(s) that the bus can still serve")
         else:
             bits.append(f"skips {n} more original stop(s)")
-    if o["turns"] > b["turns"] + 1:
+    if o["footprint_index"] > b["footprint_index"] + 0.3:
+        bits.append(f"larger diversion footprint ({o['footprint_label'].lower()}: {o['div_km']:.1f} km off the route vs {b['div_km']:.1f} km)")
+    if o["bc_points"] > b["bc_points"] + 1.0:
+        bits.append(f"harder for the Bus Captain ({o['bc_label'].lower()} complexity: {o['turns']} turns" + (f", {o['bc']['close_turns']} close together" if o["bc"]["close_turns"] else "") + ")")
+    elif o["turns"] > b["turns"] + 1:
         bits.append(f"needs {o['turns']} turns instead of {b['turns']}")
     if o["busroad_score"] < b["busroad_score"] - 0.1:
         bits.append(f"weaker bus-road evidence ({o['busroad_label'].lower()})")
@@ -232,6 +324,8 @@ def why_not(best, other, ctx_m):
     if o["rejoin_index"] > b["rejoin_index"]:
         bits.append("rejoins the route later")
     shorter = o["div_km"] < b["div_km"] - 0.05
+    if o.get("warnings"):
+        bits.append("exceeds a safeguard (" + "; ".join(o["warnings"][:2]) + ")")
     lead = "Technically possible" + (" and shorter" if shorter else "") + ", but "
     if not bits:
         bits.append(f"lower overall OCC score ({other['score']:.0f} vs {best['score']:.0f})")
@@ -245,7 +339,7 @@ def why_not(best, other, ctx_m):
 _STAGES = [("reach the stops", 0), ("not connected", 0), ("blocked direction", 1), ("exclusion zone", 1), ("crosses the blocked", 1),
            ("U-turn", 2), ("back towards", 2), ("never leaves", 3), ("opposite carriageway", 4), ("does not reach the original", 4),
            ("rejoins before", 4), ("rejoins after", 4), ("only leaves", 4), ("unreasonable detour", 5), ("restricted road", 6),
-           ("single-deck", 7), ("impossible turn", 8), ("next-leg", 9)]
+           ("single-deck", 7), ("impossible turn", 8), ("next-leg", 9), ("too long", 10), ("too far round", 10), ("(limit", 10)]
 
 
 def best_reason(reasons):
