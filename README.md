@@ -1,6 +1,7 @@
 # SG Transport Pulse V16.18 — Operational Intelligence & Service Recovery Platform
 
 ## V16.18 — Diversion Planner: how the proposed diversion is chosen
+* **Blockage lock**: a blockage locks automatically once its direction is chosen — taps on the map no longer move or replace it, its handles are hidden, its ✕ cannot be dragged to the bin and its direction cannot be changed. 🔒 LOCKED · UNLOCK on the blockage card unlocks it deliberately; + ADD ANOTHER BLOCKAGE still works while locked, and CLEAR ALL asks for confirmation when anything is locked.
 Goal: the smallest, simplest, least disruptive bus diversion that returns the bus to its normal route as early as practical - optimised like an OCC controller briefing a Bus Captain, not like a car GPS.
 * **Hard validation first** (unchanged): blocked road / direction, U-turn, wrong-way or prohibited movement, impossible turn, private / restricted road, correct-direction rejoin and onward movement to the next original stop. Only valid routes are scored.
 * **BC COMPLEXITY (LOW / MEDIUM / HIGH)** — turns, right turns (across traffic), sharp turns, roundabouts, closely spaced turns (< 150 m), number of roads, small roads and roads no bus service uses (unfamiliar).

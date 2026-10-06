@@ -145,10 +145,14 @@
   map.on("click", function(e){ if(!BIN.drag) placeBlock(e.latlng); });
   function placeBlock(ll){
     var replace = S.blocks.length > 0 && !S.adding;
+    if(replace && AB() && AB().locked){
+      hint("Blockage locked \u2014 press UNLOCK to move it, or + ADD ANOTHER BLOCKAGE");
+      toast("Blockage locked \u2014 the tap was ignored"); return;
+    }
     hint("Finding the road\u2026");
     get("/api/dv2/block?lat=" + ll.lat.toFixed(6) + "&lon=" + ll.lng.toFixed(6)).then(function(j){
       if(!j.ok){ hint(""); toast(j.error || "No road there \u2014 tap directly on the road."); return; }
-      var nb = {cor:j.corridor, cm:j.corridor_m, a:j.start_m, b:j.end_m, road:tc(j.road), labels:j.dir_labels || {}, dir:null};
+      var nb = {cor:j.corridor, cm:j.corridor_m, a:j.start_m, b:j.end_m, road:tc(j.road), labels:j.dir_labels || {}, dir:null, locked:false};
       if(replace) S.blocks[S.bi] = nb; else { S.blocks.push(nb); S.bi = S.blocks.length - 1; }
       S.adding = false; $("bAdd").setAttribute("aria-pressed", "false");
       resetServices(); G.find.clearLayers();
@@ -173,11 +177,11 @@
       if(b.dir === "fwd" || b.dir === "both") arrows(g, bl, "#fff", "arrows", 60);
       if(b.dir === "rev" || b.dir === "both") arrows(g, bl.slice().reverse(), "#fff", "arrows", b.dir === "both" ? 85 : 60);
       var mid = pointAt(b.cor, b.cm, (b.a + b.b) / 2);
-      b._x = L.marker(mid, {pane:"marks", draggable:true, autoPan:false, keyboard:false, title:"Tap to select \u00b7 hold and drag to the bin to delete",
+      b._x = L.marker(mid, {pane:"marks", draggable:!b.locked, autoPan:false, keyboard:false, title:b.locked ? "Locked \u00b7 tap to select (UNLOCK to move or delete)" : "Tap to select \u00b7 hold and drag to the bin to delete",
         icon:icon(S.blocks.length > 1 ? String(i + 1) : "\u2715", "dp-x" + (act ? "" : " off"))}).addTo(g);
       b._x.on("click", function(){ selectBlock(i); });
-      binDrag(b._x, function(){ removeBlock(S.blocks.indexOf(b)); }, function(m){ m.setLatLng(mid); toast("Drag the \u2715 onto the bin to delete \u00b7 drag the white handles to resize"); });
-      if(act){ handle(b, g, "a"); handle(b, g, "b"); }
+      if(!b.locked) binDrag(b._x, function(){ removeBlock(S.blocks.indexOf(b)); }, function(m){ m.setLatLng(mid); toast("Drag the \u2715 onto the bin to delete \u00b7 drag the white handles to resize"); });
+      if(act && !b.locked){ handle(b, g, "a"); handle(b, g, "b"); }
     });
     if(fit && AB()) map.fitBounds(L.latLngBounds(bLineOf(AB())).pad(1.2), {maxZoom:18});
   }
@@ -209,13 +213,13 @@
       if(hot){ onDelete(); toast("Blockage deleted"); } else onEnd(m);
     });
   }
-  function paintLen(){ var b = AB(); $("bLen").textContent = b ? km(b.b - b.a) + " blocked \u00b7 drag the handles to adjust" : ""; }
+  function paintLen(){ var b = AB(); $("bLen").textContent = b ? km(b.b - b.a) + " blocked \u00b7 " + (b.locked ? "\ud83d\udd12 locked" : "drag the handles to adjust") : ""; }
   function dirTxt(b){ return !b.dir ? '<span style="color:#ffc56b">direction?</span>' : b.dir === "both" ? "both directions" : esc(String(b.labels[b.dir] || b.dir).split(" \u00b7 ")[0]); }
   function paintBlockCard(){
     var b = AB();
     $("cBlock").hidden = !S.blocks.length; if(!b) return;
     $("bCount").textContent = S.blocks.length > 1 ? S.blocks.length + " blockages" : "";
-    $("bList").innerHTML = S.blocks.length > 1 ? S.blocks.map(function(x, i){ return '<button type="button" class="dp-bchip" role="listitem" data-i="' + i + '" aria-pressed="' + (i === S.bi) + '"><b>' + (i + 1) + '</b>' + esc(x.road) + '<small>' + km(x.b - x.a) + ' \u00b7 ' + dirTxt(x) + '</small></button>'; }).join("") : "";
+    $("bList").innerHTML = S.blocks.length > 1 ? S.blocks.map(function(x, i){ return '<button type="button" class="dp-bchip" role="listitem" data-i="' + i + '" aria-pressed="' + (i === S.bi) + '"><b>' + (i + 1) + '</b>' + esc(x.road) + (x.locked ? '<span class="lk" aria-label="locked">\ud83d\udd12</span>' : '') + '<small>' + km(x.b - x.a) + ' \u00b7 ' + dirTxt(x) + '</small></button>'; }).join("") : "";
     $("bList").querySelectorAll("[data-i]").forEach(function(c){ c.onclick = function(){ selectBlock(+c.dataset.i); }; });
     $("bRoad").textContent = (S.blocks.length > 1 ? (S.bi + 1) + ". " : "") + b.road; paintLen();
     var lb = b.labels;
@@ -223,16 +227,28 @@
     $("arrFwd").style.transform = "rotate(" + ((lb.fwd_bearing || 90) - 90) + "deg)"; $("arrRev").style.transform = "rotate(" + ((lb.rev_bearing || 270) - 90) + "deg)";
     document.querySelectorAll("#bDir button").forEach(function(x){ x.setAttribute("aria-checked", String(x.dataset.d === b.dir)); });
     $("bAsk").hidden = !!b.dir;
+    document.querySelectorAll("#bDir button").forEach(function(x){ x.disabled = !!b.locked; });
+    $("bLock").setAttribute("aria-pressed", String(!!b.locked));
+    $("bLock").textContent = b.locked ? "\ud83d\udd12 LOCKED \u00b7 UNLOCK" : "\ud83d\udd13 LOCK";
+    $("bLock").title = b.locked ? "Unlock to move, resize, change direction or delete this blockage" : "Lock so map taps cannot move it by accident";
   }
   /* ---------------------------------------------------------------- 3. direction (per blockage) */
   document.querySelectorAll("#bDir button").forEach(function(x){ x.onclick = function(){
-    var b = AB(); if(!b) return; b.dir = x.dataset.d; paintBlockCard(); drawBlocks(false); hint("");
+    var b = AB(); if(!b) return;
+    if(b.locked){ toast("Blockage locked \u2014 press UNLOCK to change the direction"); return; }
+    b.dir = x.dataset.d; b.locked = true; toast("Blockage locked \u2014 map taps will not move it"); paintBlockCard(); drawBlocks(false); hint("");
     var miss = S.blocks.map(function(y, i){ return y.dir ? null : i + 1; }).filter(Boolean);
     if(miss.length) hint("Choose the blocked direction for blockage " + miss.join(", ")); else runAffected();
   }; });
   $("bAdd").onclick = function(){ S.adding = !S.adding; this.setAttribute("aria-pressed", String(S.adding)); hint(S.adding ? "Tap the road for the next blockage" : ""); };
   $("bZoom").onclick = function(){ if(!S.blocks.length) return; var bb = L.latLngBounds(bLineOf(S.blocks[0])); S.blocks.forEach(function(b){ bb.extend(bLineOf(b)); }); map.fitBounds(bb.pad(.8), {maxZoom:18}); };
-  $("bClear").onclick = function(){ S.blocks = []; S.bi = -1; S.adding = false; resetServices(); G.block.clearLayers(); paintBlockCard(); hint("Tap the road where it is blocked"); };
+  $("bLock").onclick = function(){
+    var b = AB(); if(!b) return;
+    b.locked = !b.locked; paintBlockCard(); drawBlocks(false);
+    hint(b.locked ? "" : "Unlocked \u2014 drag the handles, tap the road to move it, or drag the \u2715 to the bin");
+  };
+  $("bClear").onclick = function(){
+    if(S.blocks.some(function(b){ return b.locked; }) && !confirm("Clear all blockages, including locked ones?")) return; S.blocks = []; S.bi = -1; S.adding = false; resetServices(); G.block.clearLayers(); paintBlockCard(); hint("Tap the road where it is blocked"); };
 
   /* ---------------------------------------------------------------- 4. affected services, each analysed automatically */
   function resetServices(){ S.run++; S.services = []; S.plans = {}; S.sel = null; S.view = null; $("cSvc").hidden = true; clearServiceMap(); paintRec(); }

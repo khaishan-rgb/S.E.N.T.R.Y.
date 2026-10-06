@@ -168,6 +168,9 @@ path.dp-anim{stroke-dasharray:14 9;animation:dpdash 1.2s linear infinite}
 .dp-lim input{padding:5px 8px;border-radius:7px;border:1px solid var(--ds-line-2);background:#081426;color:#fff;font:13px var(--ds-font);width:100%}
 .dp-lim small{color:var(--ds-mut)}
 .dp-brief{margin:0 0 10px;padding:10px 12px;border-radius:10px;border:1px solid rgba(56,214,255,.45);background:rgba(56,214,255,.07);color:#e6f6ff;font-size:13.5px;line-height:1.45}
+.dp-lock[aria-pressed="true"]{border-color:#2ee59d;color:#c6f9e3;background:rgba(46,229,157,.1)}
+#bDir button:disabled{opacity:.55;cursor:not-allowed}
+.dp-bchip .lk{margin-left:4px;font-size:11px}
 </style>
 </head>
 <body>
@@ -195,8 +198,8 @@ path.dp-anim{stroke-dasharray:14 9;animation:dpdash 1.2s linear infinite}
         <button type="button" role="radio" aria-checked="false" data-d="rev"><span class="dp-arr" id="arrRev">&#x279C;</span><span id="lblRev"></span></button>
         <button type="button" role="radio" aria-checked="false" data-d="both"><span class="dp-arr">&#x2194;</span><span>Both directions</span></button>
       </div>
-      <div class="dp-row"><button type="button" class="ds-btn sm" id="bAdd" aria-pressed="false">+ ADD ANOTHER BLOCKAGE</button><button type="button" class="ds-btn sm ghost" id="bZoom">ZOOM</button><button type="button" class="ds-btn sm ghost" id="bClear">CLEAR ALL</button></div>
-      <p class="dp-hint">Drag the white handles to set where a blocked section starts and ends. <b>Hold the &#x2715; and drag it to the bin</b> (top right of the map) to delete a blockage.</p>
+      <div class="dp-row"><button type="button" class="ds-btn sm dp-lock" id="bLock" aria-pressed="false">&#x1F513; LOCK</button><button type="button" class="ds-btn sm" id="bAdd" aria-pressed="false">+ ADD ANOTHER BLOCKAGE</button><button type="button" class="ds-btn sm ghost" id="bZoom">ZOOM</button><button type="button" class="ds-btn sm ghost" id="bClear">CLEAR ALL</button></div>
+      <p class="dp-hint">Drag the white handles to set where a blocked section starts and ends. <b>Hold the &#x2715; and drag it to the bin</b> (top right of the map) to delete a blockage. A blockage <b>locks</b> once its direction is chosen, so taps on the map cannot move it by accident &mdash; press UNLOCK to change it.</p>
     </section>
     <section class="dp-card" id="cSvc" hidden aria-label="Affected services">
       <div class="dp-k"><span class="dp-step">4</span> Affected services <span class="sp"></span><span id="svcCount"></span></div>
