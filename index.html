@@ -2,31 +2,1605 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#030a18">
-<title>A.I. Options Command Centre</title>
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛰️</text></svg>">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#050d1a">
+<title>SG Transport Pulse</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;800&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/static/style.css">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css">
+<style>
+:root{
+  --bg:#050d1a; --bg2:#081426; --panel:#0a1a2e; --panel2:#0d2039; --line:#163250; --line2:#1f4468;
+  --text:#eaf3ff; --mut:#8ba3bd; --blue:#1785ff; --blue2:#0f6fe0; --cyan:#3cc8ff;
+  --green:#20d16a; --amber:#ffc21a; --red:#ff4d55; --route:#2f7dff;
+  --font:Inter,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:radial-gradient(1200px 500px at 20% -10%,#0b2140 0%,var(--bg) 60%);color:var(--text);font-family:var(--font);font-size:14px;line-height:1.35;min-height:100vh;
+  padding:env(safe-area-inset-top,0) env(safe-area-inset-right,0) env(safe-area-inset-bottom,0) env(safe-area-inset-left,0)}
+button,input{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+.i{width:1em;height:1em;flex:none;display:inline-block;vertical-align:middle}
+.app{max-width:1360px;margin:0 auto;padding:0 14px 18px}
+
+/* header */
+.top{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px 4px 12px;border-bottom:1px solid var(--line)}
+.brand{display:flex;align-items:center;gap:12px;min-width:0}
+.logo{width:40px;height:40px;border-radius:11px;background:linear-gradient(160deg,#2a95ff,#0d63d6);display:grid;place-items:center;font-size:24px;color:#fff;box-shadow:0 0 0 1px #4aa6ff55,0 6px 18px #0a63d655}
+.brand h1{margin:0;font-size:26px;font-weight:800;letter-spacing:-.4px;line-height:1.05}
+.brand p{margin:3px 0 0;color:var(--mut);font-size:14px}
+.brand p i{display:inline-block;width:4px;height:4px;border-radius:50%;background:var(--mut);margin:0 9px;vertical-align:middle}
+.navl{display:flex;gap:6px}.navl a{padding:8px 13px;border-radius:9px;border:1px solid var(--line2);color:#b9d0e6;font-weight:600;text-decoration:none;white-space:nowrap}.navl a.on{background:var(--blue);border-color:#4aa6ff;color:#fff}
+@media (max-width:760px){.navl{display:none}}
+.hdr-right{display:flex;align-items:center;gap:18px;text-align:right}
+.clock{font-size:13px;color:#cfe0f3;font-variant-numeric:tabular-nums}
+.live{display:flex;align-items:center;justify-content:flex-end;gap:7px;color:var(--mut);margin-top:3px}
+.live .dot{width:9px;height:9px;border-radius:50%;background:var(--mut)}
+.live.ok .dot{background:var(--green);box-shadow:0 0 8px var(--green)}.live.ok{color:#a7e9c4}
+.live.warn .dot{background:var(--amber);box-shadow:0 0 8px var(--amber)}.live.warn{color:#ffe08a}
+.live.bad .dot{background:var(--red);box-shadow:0 0 8px var(--red)}.live.bad{color:#ffb0b4}
+.view{border-left:1px solid var(--line2);padding-left:18px;font-size:14px;line-height:1.25;text-align:left}
+.view b{display:block;font-weight:600}.view span{color:var(--mut)}
+
+/* search */
+.search{display:grid;grid-template-columns:160px 1.1fr 1.1fr auto 150px 150px;gap:14px;align-items:end;padding:16px 2px 14px}
+.fld label{display:block;font-size:13px;color:var(--mut);margin:0 0 6px 2px}
+.fld label small{color:#6f88a3}
+.inp{position:relative}
+.inp input{width:100%;height:48px;background:var(--panel);border:1px solid var(--line2);border-radius:11px;padding:0 44px 0 14px;font-size:16px;color:var(--text)}
+.fld select{width:100%;height:48px;background:var(--panel);border:1px solid var(--line2);border-radius:11px;padding:0 14px;font-size:16px;color:var(--text)}
+.inp input::placeholder{color:#5f7a96}
+.inp .i{position:absolute;right:14px;top:50%;transform:translateY(-50%);font-size:20px;color:#b4cbe2;pointer-events:none}
+.seg{display:flex;height:48px;background:var(--panel);border:1px solid var(--line2);border-radius:11px;padding:3px;gap:3px}
+.seg button{border:0;background:transparent;color:#a9c2da;padding:0 20px;border-radius:8px;cursor:pointer;font-weight:600}
+.seg button[aria-pressed=true]{background:var(--cyan);color:#03203a}
+.btn{height:48px;border-radius:11px;border:1px solid var(--line2);font-weight:700;font-size:16px;cursor:pointer}
+.btn.go{background:linear-gradient(180deg,#1b8cff,#0c6be0);border-color:#4aa6ff;box-shadow:0 0 22px #0a75ff55;color:#fff}
+.btn.go:disabled{opacity:.7;cursor:progress}
+.btn.clr{background:var(--panel);color:var(--text)}
+.btn:hover{filter:brightness(1.1)}
+
+/* map */
+.mapcard{position:relative;border:1px solid var(--line2);border-radius:14px;overflow:hidden;height:min(64vh,640px);min-height:420px;background:#dfe6ee}
+#map{position:absolute;inset:0;background:#dfe6ee}
+.ov{position:absolute;z-index:800;background:rgba(6,17,32,.93);border:1px solid var(--line2);border-radius:12px;color:var(--text);box-shadow:0 8px 24px rgba(0,10,30,.4)}
+.svc-card{top:12px;left:12px;display:flex;gap:12px;align-items:center;padding:12px 16px 12px 12px;max-width:min(330px,calc(100% - 200px))}
+.svc-card .bb{width:42px;height:42px;border-radius:10px;background:linear-gradient(160deg,#2a95ff,#0d63d6);display:grid;place-items:center;font-size:26px;color:#fff;flex:none}
+.svc-card b{display:block;font-size:19px;font-weight:700;line-height:1.15}
+.svc-card b em{font-style:normal;margin-left:10px}
+.svc-card span{display:block;color:#b6c9de;font-size:13px;margin-top:2px}
+.layers{top:12px;right:12px;padding:10px 14px;min-width:170px}
+.layers .lay-h{display:none;background:none;border:0;width:100%;text-align:left;font-weight:600;cursor:pointer;padding:2px 0}
+.layers label{display:flex;align-items:center;gap:10px;padding:6px 0;font-size:14px;cursor:pointer;white-space:nowrap}
+.layers input{appearance:none;-webkit-appearance:none;width:20px;height:20px;border-radius:5px;border:1.5px solid #6d8aa8;background:transparent;display:grid;place-items:center;margin:0;cursor:pointer;flex:none}
+.layers input:checked{background:var(--blue);border-color:var(--blue)}
+.layers input:checked::after{content:"";width:5px;height:10px;border:solid #fff;border-width:0 2px 2px 0;transform:rotate(45deg) translate(-1px,-1px)}
+.legend{left:12px;bottom:34px;padding:12px 16px;min-width:250px}
+.legend h3{margin:0 0 9px;font-size:16px;font-weight:700}
+.legend .row{display:flex;align-items:center;gap:12px;padding:3px 0;font-size:14px;color:#dbe8f6}
+.legend .row small{color:#a8bdd3;font-size:13px}
+.legend .sw{width:38px;height:9px;border-radius:5px;flex:none;position:relative}
+.legend .sw.rt{background:var(--route)}.legend .sw.rt::after{content:"";position:absolute;left:50%;top:50%;width:11px;height:11px;margin:-5.5px;border-radius:50%;background:#fff;border:2.5px solid #06111f}
+.compass{right:12px;bottom:64px;width:54px;height:54px;border-radius:50%;display:grid;place-items:center;cursor:pointer;font-size:12px;font-weight:700;line-height:1;text-align:center;padding:0}
+.compass .i{font-size:18px;display:block;margin:0 auto 1px}
+.toast{position:absolute;left:50%;bottom:22px;transform:translateX(-50%);z-index:900;background:rgba(6,17,32,.96);border:1px solid var(--line2);border-radius:10px;padding:9px 14px;font-size:13px;max-width:min(92%,520px);text-align:center;display:none}
+.toast.show{display:block}
+.leaflet-top.leaflet-left .leaflet-control-zoom{margin-top:88px;margin-left:12px}
+.leaflet-bar{border:1px solid var(--line2)!important;border-radius:10px!important;overflow:hidden;box-shadow:0 6px 18px rgba(0,10,30,.35)!important}
+.leaflet-bar a{background:rgba(6,17,32,.95);color:#fff;border-bottom:1px solid var(--line2);width:38px;height:38px;line-height:38px;font-size:22px}
+.leaflet-bar a:hover{background:#0d2039;color:#fff}
+.leaflet-control-attribution{background:rgba(6,17,32,.8)!important;color:#c5d6e8!important;font-size:12px!important}
+.leaflet-control-attribution a{color:#8fd0ff!important}
+.leaflet-control-attribution img{height:14px;width:14px;vertical-align:-3px;margin-right:3px}
+.leaflet-control-scale-line{background:rgba(6,17,32,.85);color:#fff;border-color:#fff}
+.leaflet-popup.pp .leaflet-popup-content-wrapper{background:#fff;color:#0a1a2e;border-radius:12px;box-shadow:0 10px 30px rgba(0,10,30,.4)}
+.leaflet-popup.pp .leaflet-popup-tip{background:#fff}
+.leaflet-popup.pp .leaflet-popup-content{margin:12px 16px;font-family:var(--font);font-size:14px;line-height:1.45;min-width:190px}
+.pp b{font-weight:700}.pp .m{color:#6a7f96}.pp h4{margin:0 0 4px;font-size:15px;font-weight:600}
+.pp ul{list-style:none;margin:4px 0 0;padding:0}.pp li{padding:1px 0}
+.bm{width:32px;height:32px;border-radius:9px;background:linear-gradient(160deg,#2a95ff,#0d63d6);border:2px solid #fff;display:grid;place-items:center;color:#fff;font-size:19px;box-shadow:0 2px 10px rgba(6,40,110,.55)}
+.im{width:26px;height:26px;border-radius:50%;background:var(--red);border:2px solid #fff;color:#fff;font-weight:800;display:grid;place-items:center;font-size:15px;box-shadow:0 2px 8px rgba(120,0,10,.5)}
+
+/* panels */
+.panels{display:grid;grid-template-columns:minmax(330px,1.05fr) minmax(400px,1.4fr) minmax(300px,.95fr);gap:12px;margin-top:12px}
+.card{background:linear-gradient(180deg,var(--panel),#08172a);border:1px solid var(--line2);border-radius:14px;padding:16px 18px;min-width:0;container-type:inline-size}
+.card>header{display:flex;gap:12px;align-items:flex-start;margin-bottom:12px}
+.card .ic{width:38px;height:38px;border-radius:10px;background:linear-gradient(160deg,#2a95ff,#0d63d6);display:grid;place-items:center;font-size:23px;color:#fff;flex:none}
+.card h2{margin:0;font-size:19px;font-weight:700;line-height:1.2}
+.card header p{margin:3px 0 0;color:var(--mut);font-size:13.5px}
+.card .go-r{margin-left:auto;color:#c8dcf0;font-size:18px;align-self:center}
+.empty{color:var(--mut);font-size:14px;padding:14px 2px 6px}
+.warn{background:#3a2a06;border:1px solid #7a5a12;color:#ffe08a;border-radius:9px;padding:8px 11px;font-size:13px;margin-bottom:12px}
+.bar{display:flex;height:40px;border-radius:9px;overflow:hidden;gap:2px;background:#06111f}
+.bar div{display:grid;place-items:center;font-weight:700;font-size:15px;color:#04140b;min-width:0;overflow:hidden}
+.bar .smooth{background:var(--green)}.bar .moderate{background:var(--amber);color:#2a1c00}.bar .slow{background:var(--red);color:#fff}.bar .none{background:var(--route);color:#fff}
+.bar-l{display:grid;grid-template-columns:repeat(var(--n,3),1fr);text-align:center;color:#dbe8f6;font-size:14px;margin-top:6px;padding-bottom:14px;border-bottom:1px solid var(--line)}
+.stats{display:grid;grid-template-columns:1.1fr .8fr 1.3fr;padding-top:14px}
+.stats>div{padding:0 14px;border-left:1px solid var(--line);min-width:0}.stats>div:first-child{padding-left:0;border-left:0}
+.stat{display:flex;align-items:center;gap:9px}
+.stat .i{font-size:24px;color:var(--cyan)}
+.stat b{font-size:21px;font-weight:700;line-height:1;white-space:nowrap}
+.stat b small{font-size:15px;font-weight:600}
+.stats .cap{color:var(--mut);font-size:12.5px;margin-top:5px;padding-left:33px;line-height:1.25}
+@container (max-width:430px){.stats{grid-template-columns:1fr 1fr}.stats>div:last-child{grid-column:1/-1;border-left:0;padding:12px 0 0}}
+.nodata{color:var(--mut);font-size:12.5px;margin-top:8px}
+.tw{overflow-x:auto}
+table.tb{width:100%;border-collapse:collapse;font-size:14px}
+.tb th{color:#a8bdd3;font-weight:500;text-align:left;font-size:13px;padding:6px 8px 8px 0;border-bottom:1px solid var(--line)}
+.tb td{padding:9px 8px 9px 0;border-bottom:1px solid #12293f;vertical-align:middle}
+.tb tr:last-child td{border-bottom:0}
+.tb tbody tr[data-id]{cursor:pointer}.tb tbody tr[data-id]:hover td{background:#0d2340}
+.bi{display:inline-grid;place-items:center;width:26px;height:26px;border-radius:7px;background:linear-gradient(160deg,#2a95ff,#0d63d6);color:#fff;font-size:16px;margin-right:8px;vertical-align:middle}
+.tb small{display:block;color:var(--mut);font-size:12px;line-height:1.2}
+.sd{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;background:var(--mut)}.sd.live{background:var(--green)}
+.chip{display:inline-block;min-width:54px;text-align:center;padding:3px 10px;border-radius:7px;font-weight:700;font-size:12.5px;color:#04140b}
+.chip.ok{background:var(--green)}.chip.mid{background:var(--amber);color:#2a1c00}.chip.bad{background:var(--red);color:#fff}.chip.na{background:#33465c;color:#c8d6e6}
+.foot-n{text-align:right;color:var(--mut);font-size:13px;margin-top:8px}
+.selstop{display:flex;align-items:center;gap:10px;margin:-2px 0 10px}
+.selstop .pin{width:26px;height:26px;border-radius:50%;background:linear-gradient(160deg,#2a95ff,#0d63d6);display:grid;place-items:center;font-size:15px;color:#fff;flex:none}
+.selstop b{font-size:16px;font-weight:600}
+.selstop span{color:var(--cyan);font-weight:600;font-size:14px}
+.svcb{display:inline-block;min-width:44px;text-align:center;background:#12365e;border:1px solid #23568a;border-radius:7px;padding:2px 8px;font-weight:700}
+.sk{height:14px;border-radius:7px;background:linear-gradient(90deg,#10263f,#173657,#10263f);background-size:200% 100%;animation:sk 1.3s linear infinite;margin:10px 0}
+@keyframes sk{to{background-position:-200% 0}}
+@media (prefers-reduced-motion:reduce){.sk{animation:none}}
+.foot{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;color:#7f97b0;font-size:12.5px;padding:14px 4px 0}
+
+@media (max-width:1100px){
+  .panels{grid-template-columns:1fr 1fr}
+  #pBuses{grid-column:1/-1;order:3}
+  .search{grid-template-columns:130px 1fr 1fr auto 120px 120px}
+}
+@media (max-width:760px){
+  .app{padding:0 10px 14px}
+  .top{padding:10px 2px}
+  .brand h1{font-size:21px}.brand p{font-size:12.5px}.logo{width:36px;height:36px;font-size:21px}
+  .view{display:none}.hdr-right{gap:0}
+  .clock{font-size:12px}
+  .search{grid-template-columns:1fr 1fr;gap:10px;padding:12px 0}
+  .fld.dir{grid-column:1/-1}.seg{width:100%}.seg button{flex:1}
+  .mapcard{height:64vh;min-height:400px}
+  .svc-card{max-width:calc(100% - 132px);padding:9px 12px 9px 9px;gap:9px}.svc-card .bb{width:34px;height:34px;font-size:21px}.svc-card b{font-size:16px}.svc-card span{font-size:12px}
+  .layers{padding:8px 12px;min-width:0}.layers .lay-h{display:block}.layers .lay-list{display:none}.layers.open .lay-list{display:block;margin-top:4px}
+  .legend{min-width:0;padding:9px 12px;bottom:30px}.legend .row{font-size:12.5px;gap:8px}.legend .row small{display:none}.legend .sw{width:26px}.legend h3{font-size:13px;margin-bottom:5px}
+  .compass{width:46px;height:46px;bottom:58px}
+  .leaflet-top.leaflet-left .leaflet-control-zoom{display:none}
+  .panels{grid-template-columns:1fr}
+  #pBuses{order:0}
+  .stats{grid-template-columns:1fr 1fr}.stats>div:last-child{grid-column:1/-1;border-left:0;padding:12px 0 0}
+}
+
+/* ===== SG Transport Pulse responsive application shell v12 ===== */
+.desktop-shell{display:none}.mobile-bottom-nav{display:none}.mobile-more{display:none}.mobile-top-menu{display:none}.mobile-menu-btn{display:none}.module-intro{margin:14px 4px 10px}.module-intro h2{margin:0 0 4px;font-size:24px;letter-spacing:-.02em}.module-intro p{margin:0;color:var(--mut,#8ea6bd);font-size:13px}.ai-shell-card{border:1px solid rgba(67,160,255,.32);background:linear-gradient(135deg,rgba(13,48,83,.88),rgba(7,27,49,.92));border-radius:14px;padding:13px 15px;margin:12px 4px;display:flex;align-items:center;gap:12px}.ai-shell-icon{width:38px;height:38px;border-radius:11px;display:grid;place-items:center;background:rgba(41,169,255,.14);color:#55c7ff;font-size:19px;flex:0 0 auto}.ai-shell-card b{display:block;font-size:14px}.ai-shell-card span{display:block;color:var(--mut,#8ea6bd);font-size:12px;margin-top:2px}.ai-shell-badge{margin-left:auto;border:1px solid rgba(74,166,255,.45);border-radius:999px;padding:5px 9px;color:#8fd8ff;font-size:11px;font-weight:700;white-space:nowrap}
+@media(min-width:1000px){body{padding-left:232px}.app{max-width:none!important;margin:0!important;padding-left:22px!important;padding-right:22px!important}.desktop-shell{display:flex;position:fixed;left:0;top:0;bottom:0;width:232px;background:#061425;border-right:1px solid #17324d;z-index:10000;flex-direction:column;padding:18px 12px}.shell-brand{padding:7px 10px 18px;border-bottom:1px solid #17324d}.shell-brand strong{font-size:16px;color:#f3f8ff}.shell-brand small{display:block;color:#718da7;margin-top:4px}.shell-label{padding:20px 10px 8px;color:#607d98;font-size:10px;font-weight:800;letter-spacing:.12em}.shell-link{display:flex;align-items:center;gap:10px;color:#9eb6cc;text-decoration:none;padding:11px 12px;margin:2px 0;border-radius:10px;font-size:13px;font-weight:650;position:relative}.shell-link .si{width:24px;text-align:center;font-size:16px}.shell-link:hover{background:#0c2238;color:#fff}.shell-link.active{background:#0c3154;color:#fff}.shell-link.active:before{content:'';position:absolute;left:-12px;top:8px;bottom:8px;width:3px;border-radius:4px;background:#35bfff}.shell-foot{margin-top:auto;padding:12px 10px;color:#64819b;font-size:11px}.top nav.nav,.top nav.navl{display:none!important}.top .brand p{display:none}.module-intro{display:block}}
+@media(max-width:999px){body{padding-bottom:78px}.desktop-shell{display:none}.top{position:sticky!important;top:0;z-index:9000;background:rgba(5,18,33,.96);backdrop-filter:blur(12px);padding:9px 4px!important;min-height:56px;flex-wrap:nowrap!important}.top .brand{min-width:0;flex:1}.top .brand h1{font-size:18px!important;white-space:nowrap}.top .brand p,.top .view{display:none!important}.top .logo{width:36px!important;height:36px!important;min-width:36px!important}.top nav.nav,.top nav.navl{display:none!important}.hdr-right{gap:6px!important}.clock{font-size:10px!important}.live{font-size:11px!important}.mobile-menu-btn{display:grid;width:38px;height:38px;place-items:center;border:1px solid #244766;border-radius:10px;background:#0a2036;color:#fff;font-size:20px;cursor:pointer;order:-1}.mobile-bottom-nav{display:grid;grid-template-columns:repeat(4,1fr);position:fixed;left:0;right:0;bottom:0;z-index:12000;background:rgba(5,18,33,.98);border-top:1px solid #21415e;padding:7px max(6px,env(safe-area-inset-right)) calc(7px + env(safe-area-inset-bottom)) max(6px,env(safe-area-inset-left));box-shadow:0 -8px 24px rgba(0,0,0,.22)}.mbn{color:#829db5;text-decoration:none;text-align:center;font-size:10px;font-weight:650;padding:3px 2px;border-radius:9px}.mbn .mi{display:block;font-size:19px;line-height:22px}.mbn.active{color:#4bc7ff;background:#0a2945}.mobile-more{display:none;position:fixed;left:10px;right:10px;bottom:74px;z-index:13000;background:#091c30;border:1px solid #275176;border-radius:16px;padding:8px;box-shadow:0 18px 50px rgba(0,0,0,.5)}.mobile-more.open{display:block}.mobile-more a{display:flex;align-items:center;gap:12px;color:#d7e7f5;text-decoration:none;padding:13px;border-radius:10px;font-weight:650}.mobile-more a.active{background:#0d3559;color:#55c7ff}.mobile-top-menu{display:none;position:fixed;top:calc(56px + env(safe-area-inset-top) + 8px);left:8px;z-index:13000;min-width:230px;max-width:82vw;background:#091c30;border:1px solid #275176;border-radius:16px;padding:8px;box-shadow:0 18px 50px rgba(0,0,0,.5)}.mobile-top-menu.open{display:block}.mobile-top-menu a{display:flex;align-items:center;gap:12px;color:#d7e7f5;text-decoration:none;padding:13px;border-radius:10px;font-weight:650;white-space:nowrap}.mobile-top-menu a.active{background:#0d3559;color:#55c7ff}.module-intro{display:block}.module-intro h2{font-size:20px}.ai-shell-card{margin:10px 0;padding:11px 12px}.ai-shell-badge{display:none}.search,.filters{scroll-margin-top:70px}#map,.mapcard{max-width:100%}table{max-width:100%}}
+@media(max-width:600px){.app{padding-left:10px!important;padding-right:10px!important}.module-intro{margin:11px 2px 8px}.module-intro p{line-height:1.4}.ai-shell-card span{line-height:1.35}.top .hdr-right>div:first-child .clock{display:none}.top .brand h1{font-size:17px!important}}
+
+/* ===================== V13.9 OCC operational traffic intelligence ===================== */
+:root{--orange:#ff8a1f;--crit:#ff2d55}
+.occ-empty{margin:12px 0;padding:14px 16px;border:1px dashed var(--line2);border-radius:14px;color:var(--mut);background:var(--panel)}
+.occ-strip{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;margin:12px 0}
+.oc{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 12px;min-width:0}.oc>span{display:flex;justify-content:space-between;gap:6px;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--mut)}
+.oc>b{display:block;font-size:21px;margin-top:3px;font-variant-numeric:tabular-nums}.oc>small{display:block;color:var(--mut);font-size:12px;margin-top:1px}
+.oc.warn{border-color:#6b5a1a}.oc.bad{border-color:#7a2a33;background:linear-gradient(180deg,#2a1219,var(--panel))}.oc.crit{border-color:var(--crit);background:linear-gradient(180deg,#3a0e1a,var(--panel));box-shadow:0 0 0 1px rgba(255,45,85,.3)}
+.oc b.g{color:var(--green)}.oc b.y{color:var(--amber)}.oc b.o{color:var(--orange)}.oc b.r{color:var(--red)}.oc b.na{color:var(--mut);font-size:15px;font-weight:600}
+.oc .iss{display:grid;grid-template-columns:auto auto;gap:0 10px;font-size:12.5px;margin-top:4px}.oc .iss i{font-style:normal;color:var(--mut)}.oc .iss em{font-style:normal;font-weight:800;text-align:right}.oc .iss em.on{color:#fff}
+.ev .eg .dtag{font-size:8.5px;padding:0 4px;margin-left:2px}.dtag{display:inline-block;font-size:9.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;border-radius:5px;padding:1px 5px;vertical-align:1px;white-space:nowrap;border:1px solid}
+.dtag.live{color:#7df0a8;border-color:#1f6b40}.dtag.obs{color:#8cc6ff;border-color:#24507c}.dtag.calc{color:#c9b8ff;border-color:#4a3c85}.dtag.est{color:#ffd27a;border-color:#7a5d1a}.dtag.ai{color:#ff9fd0;border-color:#7a2a58}
+.occ-mapgrid{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:12px}.occ-mapgrid.noside{grid-template-columns:minmax(0,1fr)}
+.occ-side{background:var(--panel);border:1px solid var(--line2);border-radius:14px;padding:12px 14px;overflow-y:auto;max-height:min(64vh,640px);min-height:420px}
+.occ-side .sh{display:flex;align-items:flex-start;gap:10px}.occ-side .sh>div{flex:1;min-width:0}.occ-side h3{margin:0;font-size:16px}.occ-side .x{background:none;border:0;color:var(--mut);font-size:22px;cursor:pointer;line-height:1}
+.kv{display:grid;grid-template-columns:auto minmax(0,1fr);gap:6px 12px;font-size:13px;margin:10px 0}.kv>span{color:var(--mut)}.kv>b{font-weight:600;text-align:right;overflow-wrap:anywhere}
+.occ-btns{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}.ob{border:1px solid var(--line2);background:#0f2744;color:var(--text);border-radius:9px;padding:8px 12px;font:inherit;font-size:13px;font-weight:700;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px}
+.ob.pri{background:var(--blue);border-color:var(--blue)}.ob:disabled{opacity:.55;cursor:default}
+.lvl{display:inline-block;font-size:11px;font-weight:900;letter-spacing:.06em;border-radius:6px;padding:2px 8px}.lvl.low{background:#1b3148;color:#9fb6cf}.lvl.medium{background:#4a3a0c;color:#ffd35a}.lvl.high{background:#5a1c22;color:#ff8a92}.lvl.critical{background:var(--crit);color:#fff}
+.st{display:inline-block;font-size:11px;font-weight:800;border-radius:6px;padding:2px 7px}.st.new{background:#ff4d55;color:#fff}.st.acknowledged{background:#17385c;color:#8cc6ff}.st.cleared{background:#123a24;color:#7df0a8}
+.ev-no{display:inline-grid;place-items:center;width:24px;height:24px;border-radius:50%;font-weight:900;font-size:13px;color:#fff;border:2px solid #fff;flex:0 0 auto}
+.ev-no.low{background:#4f6b88}.ev-no.medium{background:#c99400}.ev-no.high{background:#e0353f}.ev-no.critical{background:var(--crit)}
+.evm{background:none;border:0}.evm .ev-no{box-shadow:0 2px 8px rgba(0,0,0,.45);width:28px;height:28px;font-size:14px}
+.cam{margin-top:10px;border:1px solid var(--line2);border-radius:10px;padding:10px;background:#08172a}.cam img{width:100%;border-radius:8px;display:block;margin:6px 0;background:#000;min-height:60px}
+.occ-main{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:12px;margin-top:12px}.occ-main .card h2{margin:0 0 2px;font-size:17px}.occ-main .card>p.s{margin:0 0 10px;color:var(--mut);font-size:12.5px}
+#occTimeline{grid-column:1/-1}
+.ev{border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-top:8px;background:#0a1a2e;cursor:pointer}.ev:hover{border-color:var(--line2)}.ev.sel{border-color:var(--blue);box-shadow:0 0 0 1px var(--blue)}
+.ev.high{border-left:4px solid #e0353f}.ev.critical{border-left:4px solid var(--crit);background:linear-gradient(90deg,#2a0c16,#0a1a2e 40%)}.ev.medium{border-left:4px solid #c99400}.ev.low,.ev.cl{opacity:.75}
+.ev .eh{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.ev .eh b{font-size:14.5px}.ev .eg{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px 12px;margin-top:8px;font-size:12.5px}.ev .eg span{display:block;color:var(--mut);font-size:11px}.ev .eg b{font-variant-numeric:tabular-nums}
+.hwbox{display:flex;align-items:center;gap:10px;margin-top:8px;padding:8px 10px;border-radius:9px;background:#0d2039;font-size:13px}.hwbox b{font-size:17px}.hwbox .arr{color:var(--mut)}
+.sug li{margin:6px 0;line-height:1.4}.sug small{display:block;color:var(--mut)}
+.btab{width:100%;border-collapse:collapse;font-size:13px}.btab th{text-align:left;color:var(--mut);font-weight:600;padding:6px;border-bottom:1px solid var(--line2)}.btab td{padding:7px 6px;border-bottom:1px solid var(--line)}.btab tr{cursor:pointer}.btab tr:hover td{background:#0f2744}
+.bst{font-size:11px;font-weight:800;border-radius:6px;padding:2px 7px;white-space:nowrap}.bst.inside{background:#5a1c22;color:#ff8a92}.bst.approaching{background:#4a3a0c;color:#ffd35a}.bst.cleared,.bst.clear{background:#123a24;color:#7df0a8}.bst.unk{background:#1b3148;color:#9fb6cf}
+.tl{position:relative;padding:34px 8px 44px}.tl .bar2{display:flex;height:10px;border-radius:5px;overflow:hidden;background:#1b3148}.tl .bar2 i{display:block;height:100%}
+.tl .stp{position:absolute;top:47px;transform:translateX(-50%);font-size:11px;color:#cfe0f3;text-align:center;white-space:nowrap;max-width:110px;overflow:hidden;text-overflow:ellipsis}.tl .stp::before{content:"";display:block;width:9px;height:9px;border-radius:50%;background:#fff;border:2px solid #06111f;margin:-12px auto 3px}
+.tl .ann{position:absolute;top:4px;transform:translateX(-50%);display:flex;align-items:center;gap:3px;font-size:11px;font-weight:700;white-space:nowrap}.tl .ann .ev-no{width:18px;height:18px;font-size:10px;border-width:1px}
+.tl .bus{position:absolute;top:30px;transform:translateX(-50%);width:8px;height:8px;border-radius:2px;background:#fff;box-shadow:0 0 0 2px #1785ff}
+.tl-key{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:11.5px;color:var(--mut)}.tl-key i{display:inline-block;width:14px;height:6px;border-radius:3px;margin-right:4px;vertical-align:1px}
+.occ-note{font-size:11.5px;color:var(--mut);margin-top:8px}
+@media(max-width:1100px){.occ-strip{grid-template-columns:repeat(3,minmax(0,1fr))}.occ-main{grid-template-columns:minmax(0,1fr)}.occ-mapgrid{grid-template-columns:minmax(0,1fr)}
+  .occ-side{position:fixed;left:0;right:0;bottom:0;z-index:9500;max-height:72vh;min-height:0;border-radius:16px 16px 0 0;box-shadow:0 -10px 30px rgba(0,0,0,.55);padding-bottom:calc(14px + env(safe-area-inset-bottom,0px))}
+  .occ-side::before{content:"";display:block;width:44px;height:4px;border-radius:2px;background:#39536e;margin:0 auto 10px}}
+@media(max-width:999px){.occ-side{bottom:calc(72px + env(safe-area-inset-bottom,0px));max-height:calc(100vh - 150px);padding-bottom:14px}}
+@media(max-width:640px){.occ-strip{grid-template-columns:1fr 1fr;gap:8px}.occ-strip .oc:first-child{grid-column:1/-1}.oc>b{font-size:18px}
+  .ev .eg{grid-template-columns:1fr 1fr}.btab thead{display:none}.btab,.btab tbody,.btab tr,.btab td{display:block;width:100%}.btab tr{border:1px solid var(--line);border-radius:10px;margin-bottom:8px;padding:6px 10px}.btab td{border:0;padding:2px 0;display:flex;justify-content:space-between;gap:10px}.btab td::before{content:attr(data-l);color:var(--mut)}
+  .tl .stp{font-size:10px;max-width:70px}}
+.ai-shell-card[hidden]{display:none!important}.panels[hidden]{display:none!important}
+.camm{background:none;border:0}.camm.camm-on span{background:#1785ff;border-color:#fff;box-shadow:0 0 0 3px rgba(23,133,255,.45),0 2px 6px rgba(0,0,0,.45)}.camm span{display:grid;place-items:center;width:26px;height:26px;border-radius:50%;background:#0a1a2e;border:2px solid #fff;font-size:13px;box-shadow:0 2px 6px rgba(0,0,0,.45)}
+.rwm{background:none;border:0}.rwm span{display:grid;place-items:center;width:24px;height:24px;border-radius:7px;background:#8a5a12;border:2px solid #fff;font-size:12px;box-shadow:0 2px 6px rgba(0,0,0,.45)}
+.marker-cluster-cam{background:rgba(23,133,255,.35)}.marker-cluster-cam div{background:#1785ff;color:#fff;font-weight:700}
+.marker-cluster-inc{background:rgba(255,77,85,.35)}.marker-cluster-inc div{background:var(--red);color:#fff;font-weight:700}
+.marker-cluster{background-clip:padding-box;border-radius:50%}.marker-cluster div{width:32px;height:32px;margin-left:4px;margin-top:4px;text-align:center;border-radius:50%;line-height:32px;font-size:13px}
+.dim-layer{opacity:.35}
+.islandcards[hidden]{display:none!important}
+.islandcards{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:10px 2px 0}
+.islandcards .ic-card{background:linear-gradient(180deg,var(--panel),#08172a);border:1px solid var(--line2);border-radius:12px;padding:12px 14px}
+.islandcards .ic-card b{display:block;font-size:24px;font-weight:800;line-height:1.1}
+.islandcards .ic-card span{color:var(--mut);font-size:12.5px}
+.islandcards .ic-card.warn2 b{color:var(--red)}
+@media (max-width:760px){.islandcards{grid-template-columns:1fr 1fr}}
+.camg{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px}.camc{background:#0a1a2e;border:1px solid var(--line);border-radius:12px;padding:0 0 8px;color:var(--text);text-align:left;cursor:pointer;overflow:hidden;font:inherit}.camc:hover{border-color:var(--line2)}
+.camc b{display:block;font-size:13px;padding:6px 10px 0}.camc small{display:block;font-size:11.5px;color:var(--mut);padding:1px 10px 0}
+.camim{position:relative;display:block;aspect-ratio:16/9;background:#04101f;overflow:hidden}.camim img{width:100%;height:100%;object-fit:cover;display:block}.camim em{display:none;position:absolute;inset:0;place-items:center;color:var(--mut);font-style:normal;font-size:12px;text-align:center;padding:10px}
+.camim.bad img{display:none}.camim.bad em{display:grid}.camim.big{border-radius:10px;margin:8px 0;aspect-ratio:auto;min-height:180px}.camim.big img{object-fit:contain;height:auto;max-height:62vh}
+.camv{position:fixed;inset:0;z-index:2147483000;background:rgba(2,8,16,.82);display:grid;place-items:center;padding:14px}.camv[hidden]{display:none}.camvb{width:min(920px,100%);max-height:calc(100vh - 28px);overflow-y:auto;background:var(--panel);border:1px solid var(--line2);border-radius:16px;padding:14px 16px}
+.camvh{display:flex;gap:10px;align-items:flex-start}.camvh>div{flex:1;min-width:0}.camvh b{font-size:16px;display:block}.camvh small{color:var(--mut);font-size:12px}.camvb .x{background:none;border:0;color:var(--mut);font-size:26px;cursor:pointer;line-height:1}
+.camkm{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;color:var(--mut);margin:0 0 10px}.camkm select{background:#08172a;color:var(--text);border:1px solid var(--line2);border-radius:8px;padding:4px 8px;font:inherit}
+#camLive[aria-pressed="true"]{background:#123a24;border-color:#1f6b40;color:#7df0a8}body.camopen{overflow:hidden}
+@media(max-width:640px){.camg{grid-template-columns:1fr 1fr;gap:8px}.camc b{font-size:12px}.camv{padding:0;place-items:end stretch}.camvb{border-radius:16px 16px 0 0;max-height:92vh}}
+
+/* ===================== V13.13 Route Traffic: OCC desktop layout ===================== */
+.occ-main[hidden],.occ-strip[hidden],.rt-impact[hidden],#occImpact[hidden]{display:none!important}
+.rt-work{display:flex;flex-direction:column}
+.rt-main{min-width:0}
+.occ-mapgrid,.occ-mapgrid.noside{grid-template-columns:minmax(0,1fr)!important}
+.rt-head{display:flex;align-items:flex-end;justify-content:space-between;gap:12px 20px;flex-wrap:wrap}
+.rt-head .module-intro{flex:1 1 280px}
+.rt-upd{margin-top:4px!important;font-size:12px!important;color:#6f88a3!important;font-variant-numeric:tabular-nums}
+.rt-upd:empty{display:none}
+
+/* counters: compact, number first, route share underneath */
+.islandcards{grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:0}
+.islandcards .ic-card{padding:7px 12px;border-radius:10px;background:var(--panel);border:1px solid var(--line);display:grid;grid-template-columns:auto minmax(0,1fr);column-gap:8px;align-items:baseline;min-width:0}
+.islandcards .ic-card b{font-size:22px;font-variant-numeric:tabular-nums;grid-row:span 2;line-height:1}
+.islandcards .ic-card span{color:#cfe0f3;font-size:12.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.islandcards .ic-card em{grid-column:2;font-style:normal;color:var(--mut);font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.islandcards .k-inc.has b{color:var(--red)}.islandcards .k-cong.has b,.islandcards .k-rw.has b{color:var(--amber)}.islandcards .k-cam b{color:var(--green)}
+.islandcards .ic-card.hot{border-color:#7a2a33}.islandcards .ic-card.hot em{color:#ff8a92;font-weight:700}
+
+/* layer chips above the map (all sizes; scroll sideways on phones) */
+.layers{top:10px;left:10px;right:10px;padding:0;background:none;border:0;box-shadow:none;min-width:0;pointer-events:none}
+.layers .lay-h{display:none!important}
+.layers .lay-list{display:flex!important;gap:5px;flex-wrap:wrap;overflow-x:auto;scrollbar-width:none;pointer-events:auto;width:max-content;max-width:100%}.layers .lay-list::-webkit-scrollbar{display:none}
+.layers label{flex:none;padding:5px 10px 5px 9px;border-radius:8px;background:rgba(6,17,32,.92);border:1px solid var(--line2);font-size:12px;font-weight:600;color:#9fb6cf;gap:6px}
+.layers label:has(input:checked){border-color:#3b8bff;color:#fff;background:#0e2c52}
+.layers label:has(input:focus-visible){outline:2px solid var(--cyan);outline-offset:1px}
+.layers input{position:absolute;opacity:0;width:1px;height:1px;pointer-events:none}
+.layers label{position:relative;--k:#8ba3bd}.layers label::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--k);opacity:.45;flex:none}
+.layers label:has(input:checked)::before{opacity:1;box-shadow:0 0 0 2px rgba(255,255,255,.15)}
+.layers .k-traffic{--k:var(--green)}.layers .k-inc{--k:var(--red)}.layers .k-rw{--k:var(--amber)}.layers .k-cam{--k:#6fb8ff}.layers .k-rain{--k:var(--cyan)}.layers .k-stop{--k:#fff}.layers .k-bus{--k:var(--blue)}.layers .k-route{--k:var(--route)}
+.svc-card{top:calc(var(--chips-h,32px) + 18px)}
+.leaflet-top.leaflet-left .leaflet-control-zoom{margin-top:calc(var(--chips-h,32px) + 92px)}
+
+/* impact below the map */
+.rt-impact{display:grid;grid-template-columns:minmax(0,1fr);gap:12px;margin-top:12px}
+.rt-imp-l .oc>span{flex-wrap:wrap;gap:2px 6px}
+.rt-impact .card{padding:12px 14px}
+.rt-imp-h{display:flex;align-items:center;gap:10px;margin-bottom:10px}.rt-imp-h h2{margin:0;font-size:16px;font-weight:700}.rt-imp-h>span:last-child,.rt-imp-h .dtag{margin-left:auto}
+.rt-imp-l .occ-strip{grid-template-columns:repeat(3,minmax(0,1fr));margin:0;gap:8px}
+.rt-imp-l .oc{background:#0b1c31}
+.lvl.ok{background:#123a24;color:#7df0a8}
+.stb td,.stb th{white-space:nowrap}.stb td:nth-child(3){white-space:normal}.stb .num{color:#ff8a92;font-weight:700;font-variant-numeric:tabular-nums}.stb .ev-no{width:20px;height:20px;font-size:11px;border-width:1px;vertical-align:middle}
+
+/* items need attention */
+.rt-attn{background:var(--panel);border:1px solid var(--line2);border-radius:14px;padding:12px;margin-top:12px;min-width:0}
+.attn-h{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 10px;padding:2px 2px 4px}
+.attn-h h2{margin:0;font-size:16px;font-weight:700}.attn-h small{color:var(--mut);font-size:12px;flex-basis:100%}
+.attn-n{color:var(--red);margin-right:8px;font-variant-numeric:tabular-nums}
+.attn-back{display:none;background:none;border:0;color:#8fd0ff;font:inherit;font-weight:600;cursor:pointer;padding:0 6px 0 0}
+.attn-ok{margin-top:10px;padding:12px;border:1px solid #1f6b40;border-radius:10px;background:#0b2219;color:#bfeed2;font-size:13px}
+.aitem{--x:#4f6b88;position:relative;border:1px solid var(--line);border-left:3px solid var(--x);border-radius:10px;padding:10px 11px;margin-top:8px;background:#0b1c31;cursor:pointer}
+.aitem:hover{border-color:var(--line2);border-left-color:var(--x)}.aitem.sel,.aitem.hl{box-shadow:0 0 0 1px var(--blue);border-color:var(--blue);border-left-color:var(--x)}
+.aitem.medium{--x:var(--amber)}.aitem.high{--x:var(--red)}.aitem.critical{--x:var(--crit);background:#1c0f1a}.aitem.cl{opacity:.6}
+.ai-top{display:flex;gap:10px;align-items:flex-start}
+.ai-ic{width:32px;height:32px;border-radius:8px;display:grid;place-items:center;font-size:18px;flex:none;background:#1b3148;color:#cfe0f3}
+.ai-ic.k-congestion{background:#4a1c22;color:#ff8a92}.ai-ic.k-incident{background:#4a2a0c;color:#ffb35a}.ai-ic.k-roadworks{background:#4a3a0c;color:var(--amber)}.ai-ic.k-weather{background:#12304f;color:#8cc6ff}
+.ai-t{flex:1;min-width:0}.ai-t b{display:block;font-size:14px;line-height:1.2}.ai-t span{display:block;font-size:12.5px;color:#cfe0f3;margin-top:1px;overflow-wrap:anywhere}.ai-t small{display:block;color:var(--mut);font-size:11.5px;margin-top:2px}
+.ai-tags{display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex:none}
+.tag{font-size:10.5px;font-weight:700;border-radius:5px;padding:1px 6px;border:1px solid #2c4a6a;color:#9fb6cf;white-space:nowrap}.tag.onr{color:#ff8a92;border-color:#7a2a33}
+.ai-m{display:grid;grid-template-columns:1fr 1fr;gap:6px 12px;margin-top:8px;padding-top:8px;border-top:1px solid var(--line)}
+.ai-m span{display:block;font-size:11px;color:var(--mut)}.ai-m b{font-size:15px;font-variant-numeric:tabular-nums}.ai-m b.r{color:var(--red)}.ai-m b.o{color:var(--orange)}.ai-m b.na{font-size:12.5px;color:var(--mut);font-weight:600}
+.ai-m span.dtag{display:inline-block;font-size:8.5px;padding:0 4px;margin-left:3px;vertical-align:1px}.ai-m b.q{font-size:13px;font-weight:600;color:#cfe0f3}
+.ai-cam{display:flex;gap:10px;align-items:center;width:100%;margin-top:8px;padding:0;background:#08172a;border:1px solid var(--line);border-radius:8px;overflow:hidden;cursor:pointer;text-align:left;color:var(--text);font:inherit}
+.ai-cam .camim{width:108px;flex:none;aspect-ratio:16/9}.ai-cam b{display:block;font-size:12.5px}.ai-cam small{display:block;font-size:11px;color:var(--mut)}
+.ai-svcs{display:flex;flex-wrap:wrap;gap:4px;margin-top:8px}
+.svcchip{border:1px solid #23568a;background:#12365e;color:#fff;border-radius:6px;padding:2px 7px;font:inherit;font-size:12px;font-weight:700;cursor:pointer}.svcchip small{font-weight:600;color:#8fb6dd;margin-left:3px;font-size:10px}.svcchip:hover{background:#1a4a7e}
+.ai-act{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:9px}
+.ob.sm{padding:5px 9px;font-size:12px;border-radius:8px}.ob.ghost{background:none;border-color:transparent;color:#8fd0ff;margin-left:auto;font-size:20px;line-height:1;padding:0 4px}
+.ai-act .st{font-size:11px;padding:3px 7px}
+.rt-sug{margin-top:12px;padding:12px 14px!important;background:#0b1c31!important;border-color:var(--line)!important}
+.rt-sug h2{margin:0 0 2px;font-size:15px}.rt-sug p.s{margin:0 0 8px;color:var(--mut);font-size:12px}.rt-sug .sug li{font-size:13px}
+.rt-sug:empty,.rt-attn:not(.svc) .rt-sug{display:none}
+
+/* dark compact popup for event markers */
+.leaflet-popup.ep .leaflet-popup-content-wrapper{background:#0d2039;color:var(--text);border:1px solid var(--line2);border-radius:10px}
+.leaflet-popup.ep .leaflet-popup-tip{background:#0d2039}
+.leaflet-popup.ep .leaflet-popup-content{margin:10px 12px}
+.leaflet-popup.ep a.leaflet-popup-close-button{color:#8ba3bd}
+.ep-b{border-left:3px solid #4f6b88;padding-left:9px}.ep-b.medium{border-color:var(--amber)}.ep-b.high{border-color:var(--red)}.ep-b.critical{border-color:var(--crit)}
+.ep-t{display:block;font-size:14px;padding-right:12px}.ep-k{color:#cfe0f3;font-size:12.5px;margin:2px 0 6px}
+.ep-r{display:flex;justify-content:space-between;gap:12px;font-size:12.5px;padding:1px 0}.ep-r span{color:var(--mut)}.ep-r b{color:#ff8a92}
+.ep-go{margin-top:8px;width:100%;justify-content:center}
+
+/* ---------- desktop: navigation | workspace ~60% | attention ~30% ---------- */
+@media(min-width:1000px){
+  body{background:var(--bg)}
+  .app{padding-bottom:12px!important}
+  .top{padding:8px 4px}.top .logo{width:32px;height:32px;font-size:18px;box-shadow:none}.brand h1{font-size:18px}
+  .rt-work{display:grid;grid-template-columns:minmax(0,1fr) clamp(320px,30vw,470px);gap:16px;align-items:start}
+  .rt-head .module-intro{margin:12px 2px 0;display:grid;grid-template-columns:auto minmax(0,1fr);align-items:baseline;column-gap:14px}.rt-head .module-intro h2{font-size:22px}.rt-head .module-intro p{font-size:12.5px;grid-column:1/-1}.rt-head .module-intro p:not(.rt-upd){display:none}.rt-head .module-intro p.rt-upd{grid-column:2;grid-row:1;margin:0!important}
+  .rt-head .islandcards{flex:1 1 100%;margin-top:8px}
+  .search{grid-template-columns:minmax(110px,.9fr) minmax(100px,1fr) auto minmax(120px,1.1fr) 80px 72px;gap:8px;padding:10px 0}
+  .search>*{order:9}.search>.fld:nth-child(1){order:1}.search>.fld:nth-child(2){order:2}.search>.fld.dir{order:3}.search>.fld:nth-child(3){order:4}.search>#go{order:5}.search>#clear{order:6}
+  .fld label{font-size:11.5px;margin-bottom:4px}
+  .inp input,.fld select{height:40px;font-size:14px;border-radius:9px}.inp .i{font-size:16px}
+  .seg{height:40px;border-radius:9px}.seg button{padding:0 12px;font-size:13.5px;white-space:nowrap}
+  .btn{height:40px;font-size:14px;border-radius:9px}.btn.go{background:var(--blue);box-shadow:none}
+  .mapcard{height:calc(100vh - 226px);min-height:500px;border-radius:12px}
+  .legend{padding:8px 12px;min-width:0;bottom:26px}.legend h3{font-size:12.5px;margin-bottom:5px}.legend .row{font-size:12px;gap:8px;padding:1px 0}.legend .row small{display:none}.legend .sw{width:24px;height:7px}
+  .svc-card{padding:8px 12px 8px 8px}.svc-card .bb{width:34px;height:34px;font-size:20px}.svc-card b{font-size:16px}.svc-card span{font-size:12px}
+  .card{background:var(--panel)}
+  .rt-attn{position:sticky;top:12px;max-height:calc(100vh - 24px);overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin}
+  .rt-attn .occ-side{position:static;max-height:none;min-height:0;border-radius:10px;box-shadow:none;padding:12px;margin-top:8px;background:#0b1c31;border-color:var(--line)}
+  .rt-attn .occ-side::before{display:none}
+  .rt-attn.detail .attn-list{display:none}.rt-attn.detail .attn-back{display:inline}
+  .occ-main{margin-top:12px}
+}
+@media(min-width:1700px){.rt-impact{grid-template-columns:minmax(0,1.2fr) minmax(0,1fr)}.rt-head .module-intro p:not(.rt-upd){display:block;grid-column:3;grid-row:1;margin:0!important;color:#6f88a3}}
+@media(min-width:1000px) and (max-width:1279px){
+  .rt-work{grid-template-columns:minmax(0,1fr) 300px;gap:12px}
+  .rt-impact{grid-template-columns:minmax(0,1fr)}
+  .rt-head .islandcards{flex-basis:100%}
+  .search{grid-template-columns:1fr 1fr auto;}.search>#go,.search>#clear{order:7}
+  .ai-m{grid-template-columns:1fr 1fr}.ai-cam .camim{width:88px}
+  .islandcards .ic-card{grid-template-columns:minmax(0,1fr)}.islandcards .ic-card b{grid-row:auto;font-size:20px}.islandcards .ic-card em{grid-column:1}
+}
+/* ---------- tablet / phone: filters -> status -> map -> attention items -> detail ---------- */
+@media(max-width:999px){
+  .rt-main,.rt-impact{display:contents}
+  .rt-head{order:1}.search{order:2}.rt-imp-l{order:3}.occ-mapgrid{order:4}.rt-attn{order:5}.rt-imp-r{order:6}#occMain{order:7}.panels{order:8}
+  .rt-head .islandcards{flex-basis:100%}
+  .rt-imp-l{margin-top:10px}.rt-imp-r{margin-top:12px}
+  .rt-imp-l .occ-strip{grid-template-columns:1fr 1fr}
+  .layers .lay-list{flex-wrap:nowrap;overflow-x:auto;width:auto;scrollbar-width:none;padding-bottom:2px}
+  .layers .lay-list::-webkit-scrollbar{display:none}
+  .layers label{flex:none}
+  .attn-back{display:none!important}
+}
+@media(max-width:640px){
+  .islandcards{grid-template-columns:1fr 1fr}
+  .islandcards .ic-card b{font-size:19px}
+  .rt-imp-l .occ-strip .oc:first-child{grid-column:auto}
+}
+/* V13.14: desktop navigation can be hidden to give the workspace more room (remembered per browser) */
+.shell-hide,.shell-show{display:none}
+@media(min-width:1000px){
+  .shell-brand{position:relative;padding-right:40px!important}
+  .shell-hide{display:grid;place-items:center;position:absolute;right:0;top:4px;width:30px;height:30px;border-radius:8px;border:1px solid #17324d;background:#0a2036;color:#9eb6cc;font-size:17px;line-height:1;cursor:pointer;padding:0}
+  .shell-hide:hover,.shell-show:hover{background:#0c3154;color:#fff}
+  html.shell-off body{padding-left:0!important}
+  html.shell-off .desktop-shell{display:none!important}
+  html.shell-off .shell-show{display:grid;place-items:center;flex:none;width:36px;height:36px;border-radius:10px;border:1px solid #244766;background:#0a2036;color:#fff;font-size:18px;line-height:1;cursor:pointer;padding:0}
+  html.shell-off .shell-show + .brand{margin-right:auto}
+  html.shell-off .shell-show.floating{position:absolute;left:10px;top:12px;z-index:10001}
+}
+</style>
+<link rel="stylesheet" href="/design-system.css">
+<script src="/app-shell.js" data-module="route"></script>
 </head>
 <body>
-<div class="wrap">
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-bus" viewBox="0 0 24 24"><path fill="currentColor" fill-rule="evenodd" d="M6 3h12a2.5 2.5 0 0 1 2.5 2.5v10.2c0 .7-.4 1.4-1 1.8V20a1 1 0 0 1-1 1h-1.4a1 1 0 0 1-1-1v-1.5H8.9V20a1 1 0 0 1-1 1H6.5a1 1 0 0 1-1-1v-2.5c-.6-.4-1-1.1-1-1.8V5.5A2.5 2.5 0 0 1 6 3zm-.5 2.5V10h13V5.5a.5.5 0 0 0-.5-.5H6a.5.5 0 0 0-.5.5zM8 13.3a1.3 1.3 0 1 0 0 2.6 1.3 1.3 0 0 0 0-2.6zm8 0a1.3 1.3 0 1 0 0 2.6 1.3 1.3 0 0 0 0-2.6z"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 5 5"/></g></symbol>
+  <symbol id="i-pin" viewBox="0 0 24 24"><path fill="currentColor" d="M12 2a7 7 0 0 0-7 7c0 5.2 7 13 7 13s7-7.8 7-13a7 7 0 0 0-7-7zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5z"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5.5l3.5 2"/></g></symbol>
+  <symbol id="i-route" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 4.5 20.5 12 16.5l7.5 4z"/></g></symbol>
+  <symbol id="i-chev" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" d="m9 5 7 7-7 7"/></symbol>
+  <symbol id="i-car" viewBox="0 0 24 24"><path fill="currentColor" d="M6.3 5.6A2 2 0 0 1 8.2 4.3h7.6a2 2 0 0 1 1.9 1.3L19.4 10H20a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1h-1v1.5a1 1 0 0 1-1 1h-1.5a1 1 0 0 1-1-1V18h-7v1.5a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V18H4a1 1 0 0 1-1-1v-6a1 1 0 0 1 1-1h.6zM7 10h10l-1.2-3.4a.5.5 0 0 0-.5-.3H8.7a.5.5 0 0 0-.5.3zm0 3a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zm10 0a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3z"/></symbol>
+  <symbol id="i-alert" viewBox="0 0 24 24"><path fill="currentColor" d="M10.3 3.6a2 2 0 0 1 3.4 0l8 13.8A2 2 0 0 1 20 20.4H4a2 2 0 0 1-1.7-3zM11 9v5h2V9zm0 7v2h2v-2z"/></symbol>
+  <symbol id="i-cone" viewBox="0 0 24 24"><path fill="currentColor" d="M10.2 3h3.6l1.1 4H9.1zM8.6 9h6.8l1.1 4H7.5zM7 15h10l1.2 4H21v2H3v-2h2.8z"/></symbol>
+  <symbol id="i-rain" viewBox="0 0 24 24"><path fill="currentColor" d="M7 14a5 5 0 0 1-.6-10A6 6 0 0 1 18 6a4 4 0 0 1-.5 8zm1 2 1.4.6-1.5 3.8-1.4-.6zm5 0 1.4.6-1.5 3.8-1.4-.6z"/></symbol>
+  <symbol id="i-cam" viewBox="0 0 24 24"><path fill="currentColor" d="M9 4h6l1.5 2H20a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h3.5zm3 4.5a4.5 4.5 0 1 0 0 9 4.5 4.5 0 0 0 0-9zm0 2a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5z"/></symbol>
+  <symbol id="i-north" viewBox="0 0 24 24"><path fill="currentColor" d="M12 2 6 20l6-4 6 4z"/></symbol>
+</svg>
+
+<div class="app">
   <header class="top">
-    <div class="logo">
-      <svg viewBox="0 0 64 64" aria-hidden="true"><polygon points="32,3 58,17 58,47 32,61 6,47 6,17" fill="none" stroke="#36a3ff" stroke-width="3"/>
-        <circle cx="32" cy="32" r="13" fill="none" stroke="#36a3ff" stroke-width="2.5"/><path d="M32 32 L46 18" stroke="#5fb3ff" stroke-width="3"/>
-        <circle cx="32" cy="32" r="3.5" fill="#5fb3ff"/></svg>
-      <div><b>S.E.N.T.R.Y</b><small>Options decision engine</small></div>
+    
+    <div class="brand">
+      <div class="logo"><svg class="i"><use href="#i-bus"/></svg></div>
+      <div>
+        <h1>SG Transport Pulse</h1>
+        <p>Live Buses<i></i>Live Traffic<i></i>Smarter Journeys</p>
+      </div>
     </div>
-    <div class="title"><h1>A.I. OPTIONS COMMAND CENTRE</h1><p>DATA · AI ANALYSIS · SIMULATION · TRADE MANAGEMENT</p></div>
-    <div class="status" id="status"></div>
+    <div class="hdr-right">
+      
+      <div>
+        <div class="clock" id="clock">&nbsp;</div>
+        <div class="live" id="live"><span class="dot"></span><span id="liveText">Connecting…</span></div>
+      </div>
+      <div class="view"><b>Singapore</b><span>OneMap View</span></div>
+    </div>
   </header>
-  <nav class="tabs" id="nav"></nav>
-  <main id="view"></main>
-  <footer>Research and decision-support tool. Not financial advice. Does not place real trades. Bought options can lose 100% of the premium.
-    Probabilities are simulated estimates, not guarantees.</footer>
+  <section class="ai-shell-card" aria-label="AI Operational Assistant" hidden><div class="ai-shell-icon">✦</div><div><b>AI Operational Assistant</b><span>Context-aware operational interpretation for route traffic; existing calculations remain authoritative.</span></div><div class="ai-shell-badge">AI READY</div></section>
+
+  <div class="rt-work">
+  <div class="rt-main">
+  <div class="rt-head">
+    <section class="module-intro"><h2>Route Traffic</h2><p>Detect &rarr; locate &rarr; impact on buses &amp; headway &rarr; consider action &rarr; acknowledge.</p><p class="rt-upd" id="rtUpd"></p></section>
+    <section class="islandcards" id="islandCards" aria-label="Live traffic summary"></section>
+  </div>
+  <form class="search" id="form" autocomplete="off">
+    <div class="fld"><label for="opSel">Transport Operator</label>
+      <select id="opSel"><option value="">All operators</option><option value="SBST">SBS Transit</option><option value="SMRT">SMRT</option><option value="TTS">Tower Transit</option><option value="GAS">Go-Ahead</option></select></div>
+    <div class="fld"><label for="svc">Service</label>
+      <div class="inp"><input id="svc" name="svc" list="svcList" inputmode="text" autocapitalize="characters" placeholder="e.g. 32" maxlength="6"><svg class="i"><use href="#i-search"/></svg></div><datalist id="svcList"></datalist></div>
+    <div class="fld"><label for="stop">Bus Stop <small>(optional)</small></label>
+      <div class="inp"><input id="stop" name="stop" inputmode="numeric" placeholder="e.g. 10009" list="stopList" maxlength="24"><svg class="i"><use href="#i-search"/></svg></div>
+      <datalist id="stopList"></datalist></div>
+    <div class="fld dir"><label id="dirLabel">Direction</label>
+      <div class="seg" role="group" aria-labelledby="dirLabel"><button type="button" id="d1" aria-pressed="true">Dir 1</button><button type="button" id="d2" aria-pressed="false">Dir 2</button></div></div>
+    <button class="btn go" id="go" type="submit">Show</button>
+    <button class="btn clr" id="clear" type="button">Clear</button>
+  </form>
+
+  <div class="occ-mapgrid noside">
+  <section class="mapcard" aria-label="Map">
+    <div id="map"></div>
+    <div class="ov svc-card"><div class="bb"><svg class="i"><use href="#i-bus"/></svg></div>
+      <div><b id="svcTitle">Pick a service</b><span id="svcSub">Enter a bus service and tap Show</span></div></div>
+    <div class="ov layers" id="layers">
+      <button type="button" class="lay-h" id="layH" aria-expanded="false">Layers</button>
+      <div class="lay-list">
+        <label class="k-traffic"><input type="checkbox" data-l="traffic" checked>Live traffic</label>
+        <label class="k-traffic" id="tomChip" hidden><input type="checkbox" data-l="tomtom">TomTom colours</label>
+        <label class="k-inc"><input type="checkbox" data-l="incidents">Incidents</label>
+        <label class="k-rw"><input type="checkbox" data-l="roadworks">Road works</label>
+        <label class="k-cam"><input type="checkbox" data-l="cams">Cameras</label>
+        <label class="k-rain"><input type="checkbox" data-l="rain">Rainfall</label>
+        <label class="k-stop"><input type="checkbox" data-l="stops" checked>Bus stops</label>
+        <label class="k-bus"><input type="checkbox" data-l="buses" checked>Live buses</label>
+        <label class="k-route"><input type="checkbox" data-l="route" checked>Service route</label>
+      </div>
+    </div>
+    <div class="ov legend"><h3 id="legendTitle">Traffic Speed (LTA)</h3>
+      <div id="legendSpeed">
+      <div class="row"><span class="sw" style="background:#22d36a"></span><span>Smooth <small>(≥ 40 km/h)</small></span></div>
+      <div class="row"><span class="sw" style="background:#ffc21a"></span><span>Moderate <small>(30 – 39 km/h)</small></span></div>
+      <div class="row"><span class="sw" style="background:#ff8a1f"></span><span>Slow <small>(20 – 29 km/h)</small></span></div>
+      <div class="row"><span class="sw" style="background:#ff4d55"></span><span>Congested <small>(&lt; 20 km/h)</small></span></div>
+      </div>
+      <div id="legendTom" hidden>
+        <div class="row"><span class="sw" style="background:#2fb34a"></span><span>Flowing <small>(normal speed)</small></span></div>
+        <div class="row"><span class="sw" style="background:#f5a623"></span><span>Slower than usual</span></div>
+        <div class="row"><span class="sw" style="background:#e0332e"></span><span>Slow</span></div>
+        <div class="row"><span class="sw" style="background:#7a0d0b"></span><span>Very slow / stopped</span></div>
+        <div class="row"><small>Colours as shown by TomTom</small></div>
+      </div>
+      <div class="row" title="Blue means the route has no LTA traffic reading on that stretch"><span class="sw rt"></span><span>Bus route &amp; stops</span></div>
+      <div id="legendExtra"></div>
+    </div>
+    <button class="ov compass" id="recenter" type="button" title="Fit map to route" aria-label="Fit map to route"><span><svg class="i"><use href="#i-north"/></svg>N</span></button>
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  </section>
+  </div>
+  <section class="rt-impact" id="rtImpact" hidden aria-label="Impact on the selected service">
+    <div class="card rt-imp-l"><div class="rt-imp-h"><h2 id="rtImpT">Impact on selected service</h2><span id="rtImpLv"></span></div>
+      <section class="occ-strip" id="occStrip" hidden aria-label="Route status"></section></div>
+    <div class="card rt-imp-r" id="rtStops"></div>
+  </section>
+  <section class="occ-main" id="occMain" hidden>
+    <article class="card" id="occImpact" hidden></article>
+    <article class="card" id="occBuses" style="grid-column:1/-1"></article>
+    <article class="card" id="occTimeline"></article>
+    <article class="card" id="occCams" style="grid-column:1/-1"></article>
+  </section>
+
+  <section class="panels" hidden>
+    <article class="card" id="pSummary">
+      <header><div class="ic"><svg class="i"><use href="#i-bus"/></svg></div>
+        <div><h2>Route Traffic Summary</h2><p id="sumSub">Traffic bands along the selected route</p></div></header>
+      <div id="sumBody"><div class="empty">Enter a service number and tap <b>Show</b> to see how traffic is flowing along its route.</div></div>
+    </article>
+    <article class="card" id="pBuses">
+      <header><div class="ic"><svg class="i"><use href="#i-bus"/></svg></div>
+        <div><h2 id="busTitle">Live Buses</h2><p id="busSub">Buses currently on this route • Tap a bus to view details</p></div></header>
+      <div id="busBody"><div class="empty">Live bus positions for the selected service will appear here.</div></div>
+    </article>
+    <article class="card" id="pArr">
+      <header><div class="ic"><svg class="i"><use href="#i-bus"/></svg></div>
+        <div><h2>Next Arrivals at Selected Stop</h2></div></header>
+      <div id="arrBody"><div class="empty">Tap a bus stop on the map, or enter a stop code, to see the next arrivals.</div></div>
+    </article>
+  </section>
+  </div><!-- /rt-main -->
+
+  <aside class="rt-attn" id="rtAttn" aria-label="Items need attention">
+    <div class="attn-h"><button type="button" class="attn-back" id="attnBack">&lsaquo; All items</button><h2><span class="attn-n" id="attnN"></span>Items need attention</h2><small id="attnSub"></small></div>
+    <div class="attn-list" id="attnList"></div>
+    <aside class="occ-side" id="occSide" hidden aria-label="Selected item"></aside>
+    <article class="card rt-sug" id="occSuggest"></article>
+  </aside>
+  </div><!-- /rt-work -->
+
+  <footer class="foot">
+    <span>Sources: LTA DataMall (Bus, Traffic), OneMap, NEA &nbsp;|&nbsp; Not for operational use</span>
+    <span>SG Transport Pulse V15.8 &nbsp;|&nbsp; Built for a smarter Singapore</span>
+  </footer>
 </div>
-<script src="/static/app.js"></script>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="/basemap.js"></script>
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const ico = (n, cls) => `<svg class="i ${cls || ""}"><use href="#i-${n}"/></svg>`;
+const COL = {smooth:"#22d36a", moderate:"#ffc21a", slow:"#ff4d55", none:"#2f7dff"};
+const bandCls = b => b == null ? "none" : b >= 5 ? "smooth" : b >= 3 ? "moderate" : "slow";
+const LOAD = {SEA:["Seats","ok","Seats available"], SDA:["Standing","mid","Standing available"], LSD:["Limited","bad","Limited standing"]};
+const loadChip = l => { const x = LOAD[l]; return x ? `<span class="chip ${x[1]}" title="${x[2]}">${x[0]}</span>` : `<span class="chip na">n/a</span>`; };
+const loadText = l => (LOAD[l] || [0,0,"not reported"])[2];
+const mins = m => m == null ? "--" : m <= 0 ? "Arr" : m + " min";
+const dur = m => m == null ? "--" : m >= 60 ? `${Math.floor(m/60)} h ${String(m%60).padStart(2,"0")} min` : `${m} min`;
+const sgTime = (d, sec) => new Intl.DateTimeFormat("en-GB", {timeZone:"Asia/Singapore", hour:"2-digit", minute:"2-digit", ...(sec ? {second:"2-digit"} : {}), hour12:false}).format(d);
+
+/* ---------- state ---------- */
+const S = {svc:"", dir:1, op:(function(){ try{ return localStorage.getItem("rt.op") || ""; }catch(e){ return ""; } })(), svcAll:null, route:null, buses:[], sel:null, token:0, bounds:null, busMarkers:{}, stopMarkers:{}, layers:{stops:true, buses:true, traffic:true, incidents:false, rain:false, cams:false, roadworks:false, route:true}, auto:false};
+
+/* ---------- header ---------- */
+function tickClock(){
+  const p = Object.fromEntries(new Intl.DateTimeFormat("en-GB", {timeZone:"Asia/Singapore", weekday:"short", day:"2-digit", month:"short", year:"numeric", hour:"2-digit", minute:"2-digit", hour12:false}).formatToParts(new Date()).map(x => [x.type, x.value]));
+  $("clock").textContent = `${p.weekday}, ${p.day} ${p.month} ${p.year}  ${p.hour}:${p.minute}`;
+}
+function setLive(state, text, title){ const e = $("live"); e.className = "live " + state; $("liveText").textContent = text; e.title = title || ""; }
+tickClock(); setInterval(tickClock, 15000);
+
+/* ---------- utilities ---------- */
+let toastT;
+function toast(msg, ms){ const t = $("toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove("show"), ms || 5000); }
+async function api(url, ms){
+  const c = new AbortController(), t = setTimeout(() => c.abort(), ms || 75000);
+  try{
+    const r = await fetch(url, {signal:c.signal});
+    const j = await r.json().catch(() => ({}));
+    if(!r.ok && !j.error) j.error = `Server error (${r.status})`;
+    return j;
+  }catch(e){ return {error: e.name === "AbortError" ? "Request timed out" : "Network error"}; }
+  finally{ clearTimeout(t); }
+}
+const q = o => Object.entries(o).map(([k, v]) => `${k}=${encodeURIComponent(v)}`).join("&");
+
+/* ---------- map ---------- */
+if(typeof L === "undefined"){ document.getElementById("map").innerHTML = '<div style="padding:24px;color:#0a1a2e">The map library could not be loaded. Check your internet connection and reload.</div>'; throw new Error("Leaflet missing"); }
+const map = L.map("map", {zoomControl:false, attributionControl:false, minZoom:11, maxZoom:19, maxBounds:[[1.10,103.50],[1.55,104.20]], maxBoundsViscosity:.8}).setView([1.3521,103.8198], 11);
+L.control.zoom({position:"topleft"}).addTo(map);
+(window.SGBasemap ? SGBasemap.add(map, {minZoom:11, maxZoom:19}) : L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {minZoom:11, maxZoom:19, attribution:"\u00a9 OpenStreetMap contributors"}).addTo(map));
+L.control.attribution({position:"bottomleft", prefix:false}).addTo(map);
+L.control.scale({position:"bottomright", imperial:false}).addTo(map);
+[["rain",402],["casing",405],["route",410],["stops",430]].forEach(([n, z]) => { map.createPane(n).style.zIndex = z; });
+const gRain = L.layerGroup(), gCasing = L.layerGroup().addTo(map), gRoute = L.layerGroup(), gBase = L.layerGroup(), gStops = L.layerGroup(), gSel = L.layerGroup().addTo(map), gBuses = L.layerGroup(), gInc = L.layerGroup();
+function syncLayers(){
+  const on = (g, v) => { if(v && !map.hasLayer(g)) map.addLayer(g); if(!v && map.hasLayer(g)) map.removeLayer(g); };
+  on(gRoute, S.layers.traffic); on(gBase, !S.layers.traffic); on(gStops, S.layers.stops); on(gBuses, S.layers.buses); on(gInc, S.layers.incidents); on(gRain, S.layers.rain);
+}
+syncLayers();
+const busIcon = () => L.divIcon({className:"", iconSize:[32,32], iconAnchor:[16,16], popupAnchor:[0,-16], html:`<div class="bm">${ico("bus")}</div>`});
+const incIcon = () => L.divIcon({className:"", iconSize:[26,26], iconAnchor:[13,13], popupAnchor:[0,-12], html:`<div class="im">!</div>`});
+const POP = {className:"pp", maxWidth:290};
+
+function fitRoute(){
+  if(!S.bounds) return;
+  const small = window.innerWidth < 760;
+  map.fitBounds(S.bounds, {paddingTopLeft:small ? [16,112] : [40,120], paddingBottomRight:small ? [16,72] : [40,60], maxZoom:15});
+}
+
+/* ---------- route drawing ---------- */
+function speedText(run){
+  if(run.b == null) return "No LTA traffic reading for this stretch";
+  const r = run.b >= 8 ? "70+ km/h" : (run.mn != null && run.mx != null ? `${run.mn}–${run.mx} km/h` : "");
+  return `${r} <span class="m">• LTA band ${run.b}</span>`;
+}
+function clearRoute(){
+  [gCasing, gRoute, gBase, gStops, gSel, gBuses].forEach(g => g.clearLayers());
+  S.route = null; S.bounds = null; S.buses = []; S.busMarkers = {}; S.stopMarkers = {}; S.sel = null;
+}
+function drawRoute(r){
+  [gCasing, gRoute, gBase, gStops, gSel].forEach(g => g.clearLayers());
+  S.stopMarkers = {};
+  const all = [];
+  r.runs.forEach(run => {
+    all.push(...run.pts);
+    L.polyline(run.pts, {pane:"casing", color:"#04101f", weight:10, opacity:.5, lineCap:"round", lineJoin:"round", interactive:false}).addTo(gCasing);
+    L.polyline(run.pts, {pane:"route", color:(typeof COL4 !== "undefined" ? COL4[band4(run.b)] : COL[bandCls(run.b)]), weight:7, opacity:.97, lineCap:"round", lineJoin:"round"}).bindPopup(`<h4>${esc(run.road || "Route")}</h4>${speedText(run)}`, POP).addTo(gRoute);
+    L.polyline(run.pts, {pane:"route", color:COL.none, weight:5, opacity:.95, lineCap:"round", lineJoin:"round", interactive:false}).addTo(gBase);
+  });
+  r.stops.forEach((s, i) => {
+    const end = i === 0 || i === r.stops.length - 1;
+    const m = L.circleMarker([s.lat, s.lon], {pane:"stops", radius:end ? 6.5 : 4.2, color:"#06111f", weight:end ? 3 : 2, fillColor:"#fff", fillOpacity:1});
+    m._end = end;
+    m.bindPopup("Loading…", POP).on("click", () => selectStop(s.code, true)).addTo(gStops);
+    S.stopMarkers[s.code] = m;
+  });
+  styleStops();
+  S.bounds = L.latLngBounds(all.length ? all : r.stops.map(s => [s.lat, s.lon]));
+}
+/* Stop dots shrink as the map zooms out, otherwise on a phone (whole route in view) they hide the traffic colours. */
+function styleStops(){
+  const z = map.getZoom();
+  const [r, w] = z >= 15 ? [4.6, 2] : z >= 14 ? [3.8, 2] : z >= 13 ? [3, 1.5] : z >= 12 ? [2.2, 1] : [1.6, 0];
+  Object.values(S.stopMarkers).forEach(m => { if(!m._end){ m.setRadius(r); m.setStyle({weight:w}); } });
+}
+map.on("zoomend", styleStops);
+function markSelected(stop){
+  gSel.clearLayers();
+  if(stop) L.circleMarker([stop.lat, stop.lon], {pane:"stops", radius:10, color:"#1785ff", weight:3, fillOpacity:0, interactive:false}).addTo(gSel);
+}
+
+/* ---------- panels ---------- */
+function skeleton(id, n){ $(id).innerHTML = Array.from({length:n || 3}, (_, i) => `<div class="sk" style="width:${92 - i * 14}%"></div>`).join(""); }
+function renderSummary(r){
+  const s = r.summary, p = s.pct, t = r.traffic;
+  const segs = [["smooth","Smooth"],["moderate","Moderate"],["slow","Slow"]].concat(p.none > 0 ? [["none","No data"]] : []);
+  const bar = segs.filter(([k]) => p[k] > 0).map(([k]) => `<div class="${k}" style="flex:${p[k]}">${p[k] >= 9 ? p[k] + "%" : ""}</div>`).join("");
+  const lab = segs.map(([k, n]) => `<div>${n}${p[k] < 9 && p[k] > 0 ? ` <b>${p[k]}%</b>` : ""}</div>`).join("");
+  const warn = t.ok ? "" : `<div class="warn"><b>Traffic feed unavailable.</b> Showing the route only, no traffic is estimated.<br><small>${esc(t.error || "")}</small></div>`;
+  const nod = t.ok && p.none > 0 ? `<div class="nodata">${p.none}% of the route has no LTA reading (small roads or gaps), drawn in blue.</div>` : "";
+  $("sumSub").textContent = `Based on traffic bands along Service ${r.service} (Dir ${r.direction})`;
+  $("sumBody").innerHTML = `${warn}${t.ok ? `<div class="bar">${bar}</div><div class="bar-l" style="--n:${segs.length}">${lab}</div>` : ""}${nod}
+    <div class="stats">
+      <div><div class="stat">${ico("route")}<b>${s.lengthKm} <small>km</small></b></div><div class="cap">Route length</div></div>
+      <div><div class="stat">${ico("pin")}<b>${s.stops}</b></div><div class="cap">Total stops</div></div>
+      <div><div class="stat">${ico("clock")}<b>${s.etaMin == null ? "--" : "~ " + dur(s.etaMin)}</b></div><div class="cap">Est. travel time<br>(${esc(s.etaBasis)})</div></div>
+    </div>`;
+}
+function renderBuses(res){
+  const b = res.buses || [];
+  $("busTitle").textContent = `Live Buses (Dir ${S.dir})`;
+  if(res.error && !b.length){ $("busBody").innerHTML = `<div class="warn">Live bus feed problem: ${esc(res.error)}</div>`; return; }
+  if(!b.length){ $("busBody").innerHTML = `<div class="empty">No buses reporting a position on this route right now.</div>`; return; }
+  const rows = b.map(x => `<tr data-id="${x.id}"><td><span class="bi">${ico("bus")}</span>#${x.id}${x.type ? ` <small style="display:inline">${esc(x.type)}</small>` : ""}</td>
+    <td>${esc(x.near.name)}<small>${esc(x.near.road)}</small></td>
+    <td>${loadChip(x.load)}</td>
+    <td><span class="sd ${x.monitored ? "live" : ""}" title="${x.monitored ? "Live tracking" : "Scheduled, not GPS-tracked"}"></span><b>${mins(x.eta)}</b><small>to ${esc(x.toStop.name)}</small></td></tr>`).join("");
+  $("busBody").innerHTML = `<div class="tw"><table class="tb"><thead><tr><th>Bus</th><th>Location (near)</th><th>Load</th><th>ETA</th></tr></thead><tbody>${rows}</tbody></table></div>
+    <div class="foot-n">${b.length} bus${b.length === 1 ? "" : "es"} shown • updated ${sgTime(new Date(res.updated || Date.now()), true)}</div>`;
+}
+function stopHeader(stop, svc, dir){
+  const nm = stop ? stop.name : "Selected stop", code = stop ? stop.code : "";
+  return `<div class="selstop"><span class="pin">${ico("pin")}</span><div><b>${esc(code)} ${esc(nm)}</b><br><span>${svc ? `Service ${esc(svc)} • Dir ${dir}` : "All services"}</span></div></div>`;
+}
+function renderArrivals(res, svc, dir){
+  const stop = res.stop;
+  if(res.error){ $("arrBody").innerHTML = `${stopHeader(stop, svc, dir)}<div class="warn">Could not load arrivals: ${esc(res.error)}</div>`; return; }
+  const list = res.services || [];
+  if(!list.length){ $("arrBody").innerHTML = `${stopHeader(stop, svc, dir)}<div class="empty">No buses due${svc ? " for Service " + esc(svc) : ""} right now.</div>`; return; }
+  if(svc){
+    const bs = list[0].buses;
+    const nth = ["Next", "2nd", "3rd"];
+    $("arrBody").innerHTML = `${stopHeader(stop, svc, dir)}<table class="tb"><thead><tr><th>Bus</th><th>Arrival</th><th>Est. Load</th></tr></thead><tbody>${bs.map((x, i) => `<tr><td><span class="bi">${ico("bus")}</span>${nth[i]}${x.type ? ` <small style="display:inline">${esc(x.type)}</small>` : ""}</td><td><b>${mins(x.eta)}</b></td><td>${loadChip(x.load)}</td></tr>`).join("")}</tbody></table>
+      <div class="foot-n">${bs.length} upcoming bus${bs.length === 1 ? "" : "es"}</div>`;
+  }else{
+    $("arrBody").innerHTML = `${stopHeader(stop, "", dir)}<table class="tb"><thead><tr><th>Service</th><th>Next buses</th><th>Load</th></tr></thead><tbody>${list.map(s => `<tr><td><span class="svcb">${esc(s.service)}</span></td><td><b>${s.buses.length ? s.buses.map(b => mins(b.eta)).join(" · ") : "--"}</b></td><td>${s.buses[0] ? loadChip(s.buses[0].load) : ""}</td></tr>`).join("")}</tbody></table>
+      <div class="foot-n">${list.length} service${list.length === 1 ? "" : "s"}</div>`;
+  }
+}
+function stopPopup(stop, res, svc, dir){
+  const head = `<h4><b>${esc(stop.code)}</b> &nbsp;${esc(stop.name)}</h4>`;
+  if(!res) return `${head}<span class="m">Loading arrivals…</span>`;
+  if(res.error) return `${head}<span class="m">Arrivals unavailable: ${esc(res.error)}</span>`;
+  const list = res.services || [];
+  if(!list.length) return `${head}<span class="m">No buses due right now.</span>`;
+  if(svc){
+    return `${head}<span class="m">Svc: ${esc(svc)}</span><br>Next buses (Dir ${dir}):<ul>${list[0].buses.map(b => `<li><b>${mins(b.eta)}</b> <span class="m">(est. load: ${esc(loadText(b.load))})</span></li>`).join("") || "<li class='m'>None</li>"}</ul>`;
+  }
+  return `${head}<ul>${list.slice(0, 8).map(s => `<li><b>${esc(s.service)}</b> &nbsp;${s.buses.map(b => mins(b.eta)).join(" · ") || "--"}</li>`).join("")}</ul>`;
+}
+
+/* ---------- actions ---------- */
+async function selectStop(code, fromMap){
+  const tok = S.token;
+  const stop = S.route ? S.route.stops.find(s => s.code === code) : null;
+  const svc = S.route ? S.svc : "";
+  if(!stop){ return; }
+  S.sel = code; markSelected(stop);
+  const m = S.stopMarkers[code];
+  if(m){ m.setPopupContent(stopPopup(stop, null)); if(!fromMap) { map.panTo([stop.lat, stop.lon]); } m.openPopup(); }
+  $("arrBody").innerHTML = `${stopHeader(stop, svc, S.dir)}${'<div class="sk"></div>'.repeat(3)}`;
+  const res = await api(`/api/arrivals?${q({stop:code, service:svc})}`);
+  if(tok !== S.token || S.sel !== code) return;
+  renderArrivals({...res, stop}, svc, S.dir);
+  if(m) m.setPopupContent(stopPopup(stop, res, svc, S.dir));
+}
+function drawBuses(res){
+  gBuses.clearLayers(); S.busMarkers = {};
+  (res.buses || []).forEach(b => {
+    const m = L.marker([b.lat, b.lon], {icon:busIcon(), keyboard:false}).bindPopup(
+      `<h4><b>Bus #${b.id}</b> • Svc ${esc(S.svc)}${b.type ? " • " + esc(b.type) : ""}</h4>Near ${esc(b.near.name)}<br>Reaches <b>${esc(b.toStop.name)}</b> in <b>${mins(b.eta)}</b><br><span class="m">Load: ${esc(loadText(b.load))}${b.wab ? " • Wheelchair accessible" : ""}</span><br><span class="m">${b.monitored ? "Live tracked" : "Scheduled (not GPS-tracked)"} • position estimated by LTA</span>`, POP).addTo(gBuses);
+    S.busMarkers[b.id] = m;
+  });
+}
+async function loadBuses(tok){
+  const res = await api(`/api/buses?${q({service:S.svc, direction:S.dir})}`);
+  if(tok !== S.token) return;
+  S.buses = res.buses || [];
+  drawBuses(res); renderBuses(res);
+}
+async function loadIncidents(){
+  gInc.clearLayers();
+  const res = await api(`/api/incidents?${q({service:S.route ? S.svc : "", direction:S.dir})}`);
+  if(res.error){ toast("Incidents unavailable: " + res.error); return; }
+  (res.incidents || []).forEach(x => L.marker([x.lat, x.lon], {icon:incIcon(), keyboard:false}).bindPopup(`<h4><b>${esc(x.type)}</b></h4>${esc(x.message)}`, POP).addTo(gInc));
+  if(!(res.incidents || []).length) toast(res.scoped ? "No traffic incidents reported near this route." : "No traffic incidents reported.");
+}
+async function loadRain(){
+  gRain.clearLayers();
+  const res = await api("/api/rain");
+  if(res.error){ toast(res.error); return; }
+  (res.stations || []).forEach(x => L.circle([x.lat, x.lon], {pane:"rain", radius:Math.min(3200, 900 + x.mm * 450), color:"#4aa8ff", weight:1, fillColor:"#4aa8ff", fillOpacity:.3}).bindPopup(`<h4><b>${esc(x.name)}</b></h4>${x.mm} mm in the last 5 minutes <span class="m">(NEA)</span>`, POP).addTo(gRain));
+  if(!(res.stations || []).length) toast("No rain reported at NEA stations right now.");
+}
+function setSvcCard(title, sub){ $("svcTitle").innerHTML = title; $("svcSub").textContent = sub; }
+function syncDir(){ $("d1").setAttribute("aria-pressed", S.dir === 1); $("d2").setAttribute("aria-pressed", S.dir === 2); }
+function urlState(svc, stop){ const p = new URLSearchParams(); if(svc) p.set("svc", svc); if(stop) p.set("stop", stop); if(svc) p.set("dir", S.dir); try{ history.replaceState(null, "", p.toString() ? "?" + p : location.pathname); }catch(e){} }
+function emptyPanels(){
+  $("sumBody").innerHTML = `<div class="empty">Enter a service number and tap <b>Show</b> to see how traffic is flowing along its route.</div>`;
+  $("busBody").innerHTML = `<div class="empty">Live bus positions for the selected service will appear here.</div>`;
+  $("arrBody").innerHTML = `<div class="empty">Tap a bus stop on the map, or enter a stop code, to see the next arrivals.</div>`;
+  $("busTitle").textContent = "Live Buses"; $("sumSub").textContent = "Traffic bands along the selected route";
+}
+
+async function showStopOnly(code, tok){
+  clearRoute(); gInc.clearLayers();
+  setSvcCard(`Stop ${esc(code)}`, "Next arrivals for all services");
+  skeleton("arrBody", 3);
+  const res = await api(`/api/arrivals?${q({stop:code})}`);
+  if(tok !== S.token) return;
+  if(!res.stop && !(res.services || []).length){ $("arrBody").innerHTML = `<div class="warn">${esc(res.error || "Bus stop " + code + " was not found.")}</div>`; return; }
+  if(res.stop){
+    setSvcCard(`${esc(res.stop.code)} ${esc(res.stop.name)}`, `${(res.servicesAtStop || []).length} services stop here`);
+    L.circleMarker([res.stop.lat, res.stop.lon], {pane:"stops", radius:8, color:"#1785ff", weight:3, fillColor:"#fff", fillOpacity:1, interactive:false}).addTo(gSel);
+    map.setView([res.stop.lat, res.stop.lon], 16);
+  }
+  renderArrivals(res, "", S.dir);
+}
+
+async function apply(o){
+  o = o || {};
+  const svc = $("svc").value.trim().toUpperCase(), stop = $("stop").value.trim();
+  if(!svc && !stop){ toast("Enter a bus service number or a bus stop code."); $("svc").focus(); return; }
+  const tok = ++S.token; S.svc = svc;
+  $("go").disabled = true; urlState(svc, stop);
+  try{
+    if(!svc){ await showStopOnly(stop, tok); return; }
+    clearRoute(); gInc.clearLayers(); emptyPanels();
+    setSvcCard(`Service ${esc(svc)} <em>Dir ${S.dir}</em>`, "Loading route and live traffic…");
+    skeleton("sumBody", 4); skeleton("busBody", 4);
+    const busesP = api(`/api/buses?${q({service:svc, direction:S.dir})}`);
+    const route = await api(`/api/route?${q({service:svc, direction:S.dir})}`);
+    if(tok !== S.token) return;
+    if(route.error){
+      const other = (route.availableDirections || []).filter(d => d !== S.dir);
+      if(other.length && !o.retried){ S.dir = other[0]; syncDir(); toast(`Service ${svc} only runs in direction ${S.dir}.`); $("go").disabled = false; return apply({retried:true}); }
+      setSvcCard(`Service ${esc(svc)}`, "Route not found"); emptyPanels();
+      $("sumBody").innerHTML = `<div class="warn">${esc(route.error)}</div>`;
+      $("busBody").innerHTML = ""; toast(route.error);
+      return;
+    }
+    S.route = route; drawRoute(route); syncLayers(); fitRoute();
+    $("svcTitle").innerHTML = `Service ${esc(svc)} <em>Dir ${route.direction}</em>`;
+    $("svcSub").innerHTML = `${route.summary.stops} stops<br>${route.traffic.ok ? "Showing traffic along bus route" : "Traffic feed unavailable"}`;
+    renderSummary(route);
+    setLive(route.traffic.ok ? "ok" : "warn", route.traffic.ok ? "Live Data (LTA/NEA)" : "Traffic feed unavailable", route.traffic.error || "");
+    if(route.geometry === "stops" || route.geometry === "partial") toast(route.geometry === "stops" ? "Road snapping unavailable: route is drawn stop to stop, so traffic matching is approximate." : "Part of the route is drawn stop to stop.", 7000);
+    const buses = await busesP;
+    if(tok !== S.token) return;
+    S.buses = buses.buses || []; drawBuses(buses); renderBuses(buses);
+    if(stop){
+      if(route.stops.some(s => s.code === stop)) selectStop(stop, false);
+      else toast(`Stop ${stop} is not on Service ${svc} (Dir ${route.direction}).`);
+    }
+    if(S.layers.incidents) loadIncidents();
+    if(S.layers.rain) loadRain();
+  } finally { if(tok === S.token) $("go").disabled = false; }
+}
+function clearAll(){
+  S.token++; S.svc = ""; clearRoute(); gInc.clearLayers();
+  $("svc").value = ""; $("stop").value = ""; emptyPanels(); urlState("", "");
+  setSvcCard("Pick a service", "Enter a bus service and tap Show");
+  map.setView([1.3521, 103.8198], 11); $("go").disabled = false;
+}
+
+/* ---------- wiring ---------- */
+$("form").addEventListener("submit", e => { e.preventDefault(); apply(); });
+$("clear").addEventListener("click", () => clearAll());   // call by name so the later wrappers (events, cameras, island view) all run
+$("recenter").addEventListener("click", () => S.bounds ? fitRoute() : map.setView([1.3521, 103.8198], 11));
+[["d1",1],["d2",2]].forEach(([id, d]) => $(id).addEventListener("click", () => { if(S.dir === d) return; S.dir = d; syncDir(); if($("svc").value.trim()) apply(); }));
+$("busBody").addEventListener("click", e => {
+  const tr = e.target.closest("tr[data-id]"); if(!tr) return;
+  const b = S.buses.find(x => String(x.id) === tr.dataset.id), m = S.busMarkers[tr.dataset.id];
+  if(!b) return;
+  map.flyTo([b.lat, b.lon], Math.max(map.getZoom(), 15), {duration:.6}); if(m) setTimeout(() => m.openPopup(), 650);
+});
+document.querySelectorAll("#layers input[data-l]").forEach(cb => { cb.checked = !!S.layers[cb.dataset.l]; cb.addEventListener("change", () => {
+  const k = cb.dataset.l; S.layers[k] = cb.checked; syncLayers();
+  if(cb.checked && k === "incidents") loadIncidents();
+  if(cb.checked && k === "rain") loadRain();
+  if(k === "cams"){ if(cb.checked && typeof camLoad === "function") camLoad(false); else { CAM.list = []; CAM.gl.clearLayers(); if(typeof camRender === "function") camRender(); } }
+  if(cb.checked && k === "roadworks" && typeof loadRoadworksLayer === "function") loadRoadworksLayer();
+  if(k === "traffic" && typeof loadIslandSpeed === "function") loadIslandSpeed();
+}); });
+$("layH").addEventListener("click", () => { const l = $("layers"); const o = l.classList.toggle("open"); $("layH").setAttribute("aria-expanded", o); });
+let sugT;
+$("stop").addEventListener("input", () => {
+  clearTimeout(sugT); const v = $("stop").value.trim();
+  if(v.length < 2) return;
+  sugT = setTimeout(async () => {
+    const r = await api("/api/stop-suggest?q=" + encodeURIComponent(v), 15000);
+    if(Array.isArray(r)) $("stopList").innerHTML = r.map(s => `<option value="${esc(s.code)}">${esc(s.name)} (${esc(s.road)})</option>`).join("");
+  }, 250);
+});
+$("svc").addEventListener("input", e => { e.target.value = e.target.value.toUpperCase(); });
+
+/* auto refresh: buses every 20 s (LTA's rate), traffic every 5 min (LTA's rate); paused while the tab is hidden */
+setInterval(async () => {
+  if(document.hidden || !S.route) return;
+  const tok = S.token; await loadBuses(tok);
+  if(S.sel && tok === S.token){ const stop = S.route.stops.find(s => s.code === S.sel); const res = await api(`/api/arrivals?${q({stop:S.sel, service:S.svc})}`); if(tok === S.token && stop){ renderArrivals({...res, stop}, S.svc, S.dir); } }
+}, 20000);
+setInterval(async () => {
+  if(document.hidden || !S.route) return;
+  const tok = S.token, r = await api(`/api/route?${q({service:S.svc, direction:S.dir})}`);
+  if(tok !== S.token || r.error) return;
+  S.route = r; const keep = S.sel; drawRoute(r); syncLayers(); renderSummary(r); if(keep) markSelected(r.stops.find(s => s.code === keep));
+  setLive(r.traffic.ok ? "ok" : "warn", r.traffic.ok ? "Live Data (LTA/NEA)" : "Traffic feed unavailable", r.traffic.error || "");
+}, 300000);
+
+/* ===================== V13.9 OCC operational traffic intelligence =====================
+   DETECT -> LOCATE -> IMPACT -> AFFECTED BUSES -> CONSIDER ACTION -> ACKNOWLEDGE.
+   Everything comes from the existing traffic-event engine (/api/traffic/overview, /detail, /ack) and the route / bus feeds; nothing is invented. */
+const OCC = {ov:null, rows:[], det:{}, sel:null, tok:0, timer:null, geo:null, g:L.layerGroup().addTo(map), gSeg:L.layerGroup().addTo(map), busUpd:null};
+const COL4 = {smooth:"#22d36a", moderate:"#ffc21a", slow:"#ff8a1f", congested:"#ff4d55", none:"#2f7dff"};
+const band4 = b => b == null ? "none" : b >= 5 ? "smooth" : b === 4 ? "moderate" : b === 3 ? "slow" : "congested";
+const LV = {normal:["low", "LOW"], monitor:["medium", "MEDIUM"], high:["high", "HIGH"], critical:["critical", "CRITICAL"]};
+const KIND = {congestion:"Congestion", incident:"Incident", roadworks:"Roadwork", weather:"Rain"};
+const SRC = {congestion:"LTA DataMall \u00b7 Traffic Speed Bands", incident:"LTA DataMall \u00b7 Traffic Incidents", roadworks:"LTA DataMall \u00b7 Road works", weather:"NEA rainfall (data.gov.sg)"};
+const TAG = {live:"LIVE", obs:"OBSERVED", calc:"CALCULATED", est:"ESTIMATED", ai:"SYSTEM INTERPRETATION"};
+const TS = {obs:"OBS", est:"EST", pred:"PRED"};
+const tgs = k => `<span class="dtag ${k === "pred" ? "est" : k}" title="${k === "obs" ? "Observed (live LTA reading)" : k === "est" ? "Estimated by the system" : "Predicted by the system"}">${TS[k]}</span>`;
+const tg = (k, extra) => `<span class="dtag ${k}">${TAG[k]}${extra ? " \u00b7 " + extra : ""}</span>`;
+const f1o = x => x == null ? "\u2013" : (Math.round(x * 10) / 10).toString();
+const NA = `<b class="na">Not available</b>`;
+const APPROACH_KM = 5;                                                     // a bus counts as "approaching" within this distance of the stretch
+function occNo(r){ return `<span class="ev-no ${LV[r.level][0]}">${r.n}</span>`; }
+function occKind(r){ const e = occEv(r); return r.kind === "incident" ? (e && e.type) || "Incident" : r.kind === "weather" ? (r.level_detail === "heavy" ? "Heavy rain" : "Rain") : KIND[r.kind] || r.kind; }
+function occEv(r){ return ((OCC.ov && OCC.ov.events) || []).find(e => e.id === r.event) || null; }
+/* ---- route geometry: km along the drawn route, stop km, sub-lines */
+function occGeo(){
+  if(!S.route) return null; if(OCC.geo && OCC.geo.route === S.route) return OCC.geo;
+  const pts = []; S.route.runs.forEach(run => run.pts.forEach(p => { const l = pts[pts.length - 1]; if(!l || l[0] !== p[0] || l[1] !== p[1]) pts.push(p); }));
+  const hv = (a, b) => { const R = 6371, dLa = (b[0] - a[0]) * Math.PI / 180, dLo = (b[1] - a[1]) * Math.PI / 180, x = Math.sin(dLa / 2) ** 2 + Math.cos(a[0] * Math.PI / 180) * Math.cos(b[0] * Math.PI / 180) * Math.sin(dLo / 2) ** 2; return 2 * R * Math.asin(Math.sqrt(x)); };
+  const cum = [0]; for(let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + hv(pts[i - 1], pts[i]));
+  let j0 = 0; const stopKm = S.route.stops.map(s => { let best = j0, bd = 1e9; for(let j = j0; j < pts.length; j++){ const d = hv(pts[j], [s.lat, s.lon]); if(d < bd){ bd = d; best = j; } if(d > bd + 1.5 && j > best + 50) break; } j0 = best; return cum[best] || 0; });
+  OCC.geo = {route:S.route, pts, cum, total:cum[cum.length - 1] || 0, stopKm, hv}; return OCC.geo;
+}
+function occSub(a, b){ const G = occGeo(); if(!G) return []; const out = []; G.pts.forEach((p, i) => { if(G.cum[i] >= a && G.cum[i] <= b) out.push(p); }); return out.length >= 2 ? out : []; }
+function occAtKm(k){ const G = occGeo(); if(!G || !G.pts.length) return null; let i = G.cum.findIndex(c => c >= k); if(i < 0) i = G.pts.length - 1; return G.pts[i]; }
+function occStopAt(k){ const G = occGeo(); if(!G) return null; let bi = 0, bd = 1e9; G.stopKm.forEach((x, i) => { const d = Math.abs(x - k); if(d < bd){ bd = d; bi = i; } }); return S.route.stops[bi]; }
+function occBusKm(b){ const G = occGeo(); return G && b.progress != null ? G.stopKm[Math.min(b.progress, G.stopKm.length - 1)] : null; }
+/* ---- data */
+async function occLoad(keepSel){
+  if(!S.svc || !S.route) return; const tok = ++OCC.tok;
+  const ov = await api(`/api/traffic/overview?${q({services:S.svc, direction:S.dir, status:"unacknowledged,acknowledged,cleared"})}`, 30000);
+  if(tok !== OCC.tok || !S.route) return;
+  OCC.ov = ov;
+  if(ov.loading){ occRender(); clearTimeout(OCC.retry); OCC.retry = setTimeout(() => occLoad(true), 20000); return; }
+  const rank = {critical:0, high:1, monitor:2, normal:3};
+  const rows = (ov.rows || []).filter(r => r.svc === S.svc && +r.dir === +S.dir)
+    .sort((a, b) => ((a.status === "cleared") - (b.status === "cleared")) || (rank[a.level] - rank[b.level]) || ((b.score || 0) - (a.score || 0)));
+  rows.forEach((r, i) => r.n = i + 1);
+  OCC.rows = rows;
+  const act = rows.filter(r => r.status !== "cleared").slice(0, 3);
+  const dd = await Promise.all(act.map(r => api(`/api/traffic/detail?${q({alert:r.id})}`, 45000)));
+  if(tok !== OCC.tok) return;
+  OCC.det = {}; act.forEach((r, i) => { OCC.det[r.id] = dd[i]; });
+  if(!keepSel || !rows.find(r => r.id === OCC.sel)) OCC.sel = null;
+  occRender();
+}
+async function occDetail(id){ if(!OCC.det[id]){ OCC.det[id] = await api(`/api/traffic/detail?${q({alert:id})}`, 45000); } return OCC.det[id]; }
+/* bus state vs every loaded event: worst of inside > approaching (within APPROACH_KM) > clear */
+function occBusStates(){
+  const out = {}; const G = occGeo();
+  (S.buses || []).forEach(b => { out[b.id] = {state:OCC.rows.some(r => r.status !== "cleared") ? "unk" : "clear", delay:null, ev:null}; });
+  const rk = {inside:3, approaching:2, cleared:1, clear:1, unk:0};
+  OCC.rows.filter(r => r.status !== "cleared").forEach(r => {
+    const d = OCC.det[r.id]; if(!d || d.error || !(d.buses || []).length) return;
+    (S.buses || []).forEach(b => {
+      const m = d.buses.map(x => [x, G ? G.hv([x.lat, x.lon], [b.lat, b.lon]) : 9]).sort((x, y) => x[1] - y[1])[0];
+      if(!m || m[1] > 0.2) return;
+      let st = m[0].state; if(st === "approaching" && (m[0].dist_to_km == null || m[0].dist_to_km > APPROACH_KM)) st = "clear";
+      if(st === "cleared") st = "clear";
+      const cur = out[b.id];
+      if(rk[st] > rk[cur.state] || (cur.state === "unk")){ out[b.id] = {state:st, delay:st === "clear" ? 0 : m[0].delay_min, ev:st === "clear" ? null : r, tti:m[0].tti_min, dist:m[0].dist_to_km}; }
+    });
+  });
+  return out;
+}
+/* ---- render everything */
+function occRender(){
+  const has = !!(S.svc && S.route);
+  $("islandCards").hidden = !!S.stopOnly; $("occStrip").hidden = !has; $("occMain").hidden = !has; $("rtImpact").hidden = !has;
+  document.querySelector(".panels").hidden = !has && !S.stopOnly;
+  if(!has){ OCC.g.clearLayers(); OCC.gSeg.clearLayers(); occSide(null); if(!S.stopOnly && typeof islandCardsLoad === "function") islandCardsLoad(); return; }
+  occStrip(); occMarkers(); occImpact(); occSuggest(); occBusTable(); occTimeline(); occSide(OCC.sel);
+}
+function occStrip(){
+  const r = S.route, ov = OCC.ov, act = OCC.rows.filter(x => x.status !== "cleared"), bs = occBusStates();
+  const km = r.summary.km || {}, tot = (km.smooth || 0) + (km.moderate || 0) + (km.slow || 0), slowShare = tot ? km.slow / tot : 0, modShare = tot ? km.moderate / tot : 0;
+  let rs = null;
+  if(r.traffic.ok && tot > 0){ rs = act.some(x => x.level === "critical") ? ["Severe", "r", "crit"] : (slowShare >= 0.2 || act.some(x => x.level === "high")) ? ["Congested", "r", "bad"] : (slowShare >= 0.05 || modShare >= 0.25) ? ["Moderate", "y", "warn"] : ["Smooth", "g", ""]; }
+  const nb = (S.buses || []).length, aff = Object.values(bs).filter(x => x.state === "inside" || x.state === "approaching").length, detOk = act.length === 0 || act.some(x => OCC.det[x.id] && !OCC.det[x.id].error);
+  const delays = act.map(x => x.delay_min).filter(v => v != null), worst = delays.length ? Math.max(...delays) : null;
+  const cnt = k => act.filter(x => x.kind === k).length, heavy = act.filter(x => x.kind === "weather" && x.level_detail === "heavy").length;
+  const d0 = act.map(x => OCC.det[x.id]).find(d => d && !d.error && d.sched_hw && !/unknown/i.test(d.sched_hw_src || ""));
+  const exp = d0 && r.summary.etaMin ? Math.round(r.summary.etaMin / d0.sched_hw) : null;
+  const card = (t, tag, body, sub, cls) => `<div class="oc ${cls || ""}"><span>${t}${tag}</span>${body}${sub ? `<small>${sub}</small>` : ""}</div>`;
+  $("occStrip").innerHTML =
+    card("Route status", tg("live", "LTA"), rs ? `<b class="${rs[1]}">${rs[0]}</b>` : NA, tot ? `${Math.round(100 * slowShare)}% of route slow (&lt; 20 km/h)` : "", rs ? rs[2] : "")
+  + card("Affected buses", tg("calc"), ov && ov.loading ? NA : act.length === 0 ? `<b class="g">0 / ${nb}</b>` : detOk ? `<b class="${aff ? "o" : "g"}">${aff} / ${nb}</b>` : NA, `inside or within ${APPROACH_KM} km of an event`, aff >= 3 ? "bad" : aff ? "warn" : "")
+  + card("Worst traffic impact", tg("est"), worst != null ? `<b class="${worst >= 5 ? "r" : worst >= 2 ? "o" : "y"}">+${f1o(worst)} min</b>` : act.length ? NA : `<b class="g">None detected</b>`, worst != null ? "extra running time on the stretch" : act.length ? "no speed-based estimate for these events" : "", worst >= 5 ? "bad" : worst >= 2 ? "warn" : "")
+  + card("Key issues", tg("live", "LTA/NEA"), `<div class="iss"><i>Congestion</i><em class="${cnt("congestion") ? "on" : ""}">${cnt("congestion")}</em><i>Incident</i><em class="${cnt("incident") ? "on" : ""}">${cnt("incident")}</em><i>Roadwork</i><em class="${cnt("roadworks") ? "on" : ""}">${cnt("roadworks")}</em><i>Heavy rain</i><em class="${heavy ? "on" : ""}">${heavy}</em></div>`, "", act.some(x => x.level === "critical") ? "crit" : act.some(x => x.level === "high") ? "bad" : "")
+  + (function(){ const hwi = act.map(x => occHw(OCC.det[x.id])).find(Boolean);
+      return card("Largest headway", tg("est"), hwi ? `<b class="${hwi.max_pred > hwi.max_now + 1 ? "r" : "g"}">${Math.round(hwi.max_now)} \u2192 ${Math.round(hwi.max_pred)} min</b>` : act.length ? NA : `<b class="g">No change</b>`,
+        hwi ? `now \u2192 predicted \u00b7 scheduled ${Math.round(hwi.sched_hw)} min` : act.length ? "no headway prediction for these events" : "no traffic event on this route", hwi && hwi.deterioration ? "bad" : ""); })()
+  + card("Live buses", tg("obs", "LTA"), `<b>${nb}${exp ? ` <small style="font-size:13px;color:var(--mut)">/ ~${exp} expected</small>` : ""}</b>`, exp ? `expected = run time \u00f7 scheduled headway ${tg("est")}` : "currently observed on this direction", "");
+}
+function occMarkers(){
+  OCC.g.clearLayers();
+  OCC.rows.forEach(r => {
+    const e = occEv(r); let pt = e && (e.center || (e.lat != null ? [e.lat, e.lon] : null)); if(!pt) pt = occAtKm(((r.a_km || 0) + (r.b_km || 0)) / 2); if(!pt) return;
+    const m = L.marker(pt, {icon:L.divIcon({className:"evm", html:`<span class="ev-no ${LV[r.level][0]}" style="${r.status === "cleared" ? "opacity:.5" : ""}">${r.n}</span>`, iconSize:[28, 28], iconAnchor:[14, 14]}), zIndexOffset:900, keyboard:false, title:`${r.n}. ${occKind(r)}`});
+    m.bindPopup(() => rtEvPopup(r), {className:"pp ep", maxWidth:270, minWidth:210}); m.on("click", () => attnHighlight(r.id)); m.addTo(OCC.g);
+  });
+}
+function occHw(d){ const im = d && !d.error && d.impact; return im && im.max_now != null && im.max_pred != null ? im : null; }
+function occImpact(){
+  const ov = OCC.ov;
+  let h = `<h2>Operational impact</h2><p class="s">Events on Service ${esc(S.svc)} Dir ${S.dir}, most serious first. Numbers match the map. ${ov && ov.updated ? `Traffic engine updated ${esc(ov.updated)}.` : ""}</p>`;
+  if(ov && ov.error && !ov.rows){ $("occImpact").innerHTML = h + `<div class="warn">Traffic events unavailable: ${esc(ov.error)}</div>`; return; }
+  if(ov && ov.loading){ $("occImpact").innerHTML = h + `<div class="empty">The traffic event engine is starting up \u2013 checking again shortly.</div>`; return; }
+  if(!OCC.rows.length){ $("occImpact").innerHTML = h + `<div class="empty">No congestion, incident, road work or rain event is affecting this route right now.</div>`; return; }
+  h += OCC.rows.map(r => {
+    const d = OCC.det[r.id], im = occHw(d), bs = d && !d.error ? (d.buses || []) : null, lv = LV[r.level];
+    const inside = bs ? bs.filter(b => b.state === "inside").length : null, appr = bs ? bs.filter(b => b.state === "approaching" && b.dist_to_km != null && b.dist_to_km <= APPROACH_KM).length : null;
+    const a = occStopAt(r.a_km || 0), b = occStopAt(r.b_km || 0);
+    return `<div class="ev ${r.status === "cleared" ? "cl" : lv[0]} ${OCC.sel === r.id ? "sel" : ""}" data-id="${esc(r.id)}" tabindex="0">
+      <div class="eh">${occNo(r)}<b>${esc(occKind(r))}</b><span class="lvl ${lv[0]}">${lv[1]}</span><span class="st ${r.status === "new" ? "new" : r.status}">${r.status === "new" ? "NEW" : r.status.toUpperCase()}</span>${r.planned ? `<span class="st acknowledged">PLANNED${r.starts_in_min != null ? ` \u00b7 in ${Math.round(r.starts_in_min)} min` : ""}</span>` : ""}</div>
+      <div style="font-size:13px;margin-top:4px">${a && b && a !== b ? `${esc(a.name)} \u2192 ${esc(b.name)}` : esc(r.location || "")}</div>
+      <div class="eg"><div><span>Length on route</span><b>${r.overlap_km ? f1o(r.overlap_km) + " km" : "\u2013"}</b></div><div><span>Traffic ${tgs("obs")}</span><b>${r.speed_kmh != null ? Math.round(r.speed_kmh) + " km/h" : "\u2013"}</b></div>
+        <div><span>Buses in / approaching</span><b>${bs ? `${inside} / ${appr}` : d && d.error ? "\u2013" : "tap to load"}</b></div>
+        <div><span>Extra running time ${tgs("est")}</span><b>${r.delay_min != null ? "+" + f1o(r.delay_min) + " min" : "Not available"}</b></div>
+        <div><span>Max headway now \u2192 ${tgs("pred")}</span><b>${im ? `${Math.round(im.max_now)} \u2192 ${Math.round(im.max_pred)} min` : "\u2013"}</b></div><div><span>Since</span><b>${esc(r.start_hhmm || "\u2013")}${r.duration_min != null ? ` (${Math.round(r.duration_min)} min)` : ""}</b></div></div>
+      ${im && im.deterioration ? `<div class="occ-note">\u26a0 Traffic condition may contribute to headway deterioration ${tg("ai")}</div>` : ""}</div>`; }).join("");
+  $("occImpact").innerHTML = h;
+  $("occImpact").querySelectorAll(".ev").forEach(el => { const go = () => occSelect(el.dataset.id, true); el.onclick = go; el.onkeydown = e => { if(e.key === "Enter"){ e.preventDefault(); go(); } }; });
+}
+function occSuggest(){
+  const act = OCC.rows.filter(r => r.status !== "cleared"), top = act[0], d = top && OCC.det[top.id], bs = occBusStates();
+  const items = [];
+  if(!act.length) items.push({t:"No traffic event is affecting this route. No action needed \u2013 keep monitoring.", b:"Re-checked with every traffic update."});
+  act.forEach(r => { const dd = OCC.det[r.id]; if(!dd || dd.error) return; const ins = (dd.buses || []).filter(b => b.state === "inside").length, ap = (dd.buses || []).filter(b => b.state === "approaching" && b.dist_to_km != null && b.dist_to_km <= APPROACH_KM).length;
+    if(ins >= 2) items.push({t:`Multiple buses (${ins}) are currently within the same affected stretch (event ${r.n}).`, b:"Buses placed on the route from live LTA positions."});
+    else if(ap) items.push({t:`Monitor the next ${ap} bus${ap > 1 ? "es" : ""} approaching event ${r.n}.`, b:`Within ${APPROACH_KM} km of the stretch.`}); });
+  if(d && !d.error) (d.recommendations || []).forEach(x => items.push({t:x.text, b:x.basis, k:x.key}));
+  const hw = act.map(r => occHw(OCC.det[r.id])).find(x => x && x.deterioration);
+  if(hw) items.push({t:`Headway deterioration may occur if the condition persists (largest headway ${Math.round(hw.max_now)} \u2192 ${Math.round(hw.max_pred)} min, scheduled ${Math.round(hw.sched_hw)}).`, b:"Predicted arrivals with the estimated traffic delay added."});
+  const seen = new Set(), list = items.filter(x => !seen.has(x.t) && seen.add(x.t)).slice(0, 5);
+  const svcQ = `svc=${encodeURIComponent(S.svc)}&dir=${S.dir}`;
+  $("occSuggest").innerHTML = `<h2>OCC suggestion</h2><p class="s">From the traffic engine for Service ${esc(S.svc)} Dir ${S.dir}. Decision support only \u2013 nothing is dispatched. ${tg("ai")}</p>
+    <ul class="sug" style="margin:0;padding-left:18px">${list.map(x => `<li>${esc(x.t)}${x.b ? `<small>${esc(x.b)}</small>` : ""}</li>`).join("")}</ul>
+    <div class="occ-btns">${top ? `<button class="ob pri" type="button" id="occAn">Analyse impact</button>` : ""}<a class="ob" href="/control?${svcQ}">Go to Headway Control</a><a class="ob" href="/halfway?${svcQ}">Go to Halfway Planner</a></div>`;
+  if($("occAn")) $("occAn").onclick = () => occSelect(top.id, true);
+}
+function occBusTable(){
+  const bs = occBusStates(), n = (S.buses || []).length;
+  const lab = {inside:"IN AFFECTED STRETCH", approaching:"APPROACHING", clear:"CLEAR", unk:"NOT PLACED"};
+  let h = `<h2>Live buses \u2013 Service ${esc(S.svc)}</h2><p class="s">${n} bus${n !== 1 ? "es" : ""} observed ${tg("live", "LTA")} \u00b7 tap a bus to show it on the map. Duty / bus plate numbers are not published by DataMall.</p>`;
+  if(!n){ $("occBuses").innerHTML = h + `<div class="empty">No live bus positions for this direction right now.</div>`; return; }
+  h += `<div class="tw" style="overflow-x:auto"><table class="btab"><thead><tr><th>Bus</th><th>Order</th><th>Last seen</th><th>Near</th><th>Traffic status</th><th>Impact ${tg("est")}</th></tr></thead><tbody>`;
+  h += S.buses.slice().sort((a, b) => b.progress - a.progress).map((b, i) => { const s = bs[b.id] || {state:"unk"};
+    return `<tr data-id="${b.id}"><td data-l="Bus"><b>#${b.id}</b></td><td data-l="Order">${i + 1} of ${n} <small style="color:var(--mut)">(front first)</small></td><td data-l="Last seen">${esc(OCC.busUpd || "live")}</td><td data-l="Near">${esc((b.near || {}).name || "")}</td>
+      <td data-l="Traffic status"><span class="bst ${s.state}">${lab[s.state]}${s.ev ? " \u00b7 " + s.ev.n : ""}</span>${s.state === "approaching" && s.dist != null ? ` <small style="color:var(--mut)">${f1o(s.dist)} km</small>` : ""}</td>
+      <td data-l="Impact">${s.state === "clear" ? "0 min" : s.delay != null && s.state !== "unk" ? "+" + f1o(s.delay) + " min" : "\u2013"}</td></tr>`; }).join("");
+  $("occBuses").innerHTML = h + `</tbody></table></div>${Object.values(bs).some(x => x.state === "unk") ? `<div class="occ-note">NOT PLACED = the bus could not be matched to the event's route position (no live GPS or off the route line).</div>` : ""}`;
+  $("occBuses").querySelectorAll("tr[data-id]").forEach(tr => tr.onclick = () => { const b = S.buses.find(x => String(x.id) === tr.dataset.id), m = S.busMarkers[tr.dataset.id]; if(!b) return;
+    document.querySelector(".mapcard").scrollIntoView({behavior:"smooth", block:"center"}); map.flyTo([b.lat, b.lon], Math.max(map.getZoom(), 15), {duration:.6}); if(m) setTimeout(() => m.openPopup(), 700); });
+}
+function occTimeline(){
+  const G = occGeo(); if(!G || !G.total){ $("occTimeline").innerHTML = ""; return; }
+  const T = G.total, pc = k => Math.max(0, Math.min(100, 100 * k / T));
+  let bar = S.route.runs.map(run => `<i style="width:${(100 * run.km / Math.max(T, 0.01)).toFixed(2)}%;background:${COL4[band4(run.b)]}" title="${esc(run.road || "")} ${esc(speedText(run).replace(/<[^>]+>/g, ""))}"></i>`).join("");
+  const n = S.route.stops.length, pick = [...new Set([0, Math.round(n * .2), Math.round(n * .4), Math.round(n * .6), Math.round(n * .8), n - 1].map(i => Math.min(n - 1, i)))];
+  const stops = pick.map(i => `<span class="stp" style="left:${pc(G.stopKm[i])}%">${esc(S.route.stops[i].name)}</span>`).join("");
+  const ann = OCC.rows.filter(r => r.status !== "cleared").map(r => `<span class="ann" style="left:${pc(((r.a_km || 0) + (r.b_km || r.a_km || 0)) / 2)}%">${occNo(r)}${r.delay_min != null ? `+${f1o(r.delay_min)} min` : esc(occKind(r))}</span>`).join("");
+  const buses = (S.buses || []).map(b => { const k = occBusKm(b); return k == null ? "" : `<span class="bus" style="left:${pc(k)}%" title="Bus #${b.id}"></span>`; }).join("");
+  $("occTimeline").innerHTML = `<h2>Route traffic timeline</h2><p class="s">${esc(S.route.stops[0].name)} \u2192 ${esc(S.route.stops[n - 1].name)} \u00b7 ${f1o(T)} km ${tg("live", "LTA speed bands")} \u00b7 \u25a1 = live bus</p>
+    <div class="tw" style="overflow-x:auto"><div class="tl" style="min-width:560px"><div class="bar2">${bar}</div>${ann}${buses}${stops}</div></div>
+    <div class="tl-key"><span><i style="background:${COL4.smooth}"></i>Smooth \u2265 40 km/h</span><span><i style="background:${COL4.moderate}"></i>Moderate 30\u201339</span><span><i style="background:${COL4.slow}"></i>Slow 20\u201329</span><span><i style="background:${COL4.congested}"></i>Congested &lt; 20</span><span><i style="background:${COL4.none}"></i>No reading</span></div>`;
+}
+/* ---- the selected event: side panel (desktop) / bottom sheet (mobile) */
+async function occSelect(id, focus){
+  OCC.sel = id; occImpact(); occSide(id);
+  const r = OCC.rows.find(x => x.id === id); if(!r) return;
+  if(focus) occFocus(r);
+  if(!OCC.det[id]){ await occDetail(id); if(OCC.sel === id){ occSide(id); occImpact(); occBusTable(); occStrip(); occSuggest(); } }
+}
+function occFocus(r, noFly){
+  OCC.gSeg.clearLayers(); if(!r || !r.id) return;
+  const seg = r.kind === "congestion" || (r.b_km - r.a_km) > 0.05 ? occSub(r.a_km, r.b_km) : [];
+  if(seg.length){ L.polyline(seg, {color:"#fff", weight:14, opacity:.35, interactive:false}).addTo(OCC.gSeg); L.polyline(seg, {color:"#fff", weight:3, dashArray:"6 6", opacity:.9, interactive:false}).addTo(OCC.gSeg); if(!noFly) map.flyToBounds(L.latLngBounds(seg), {padding:[50, 50], maxZoom:16, duration:.6}); }
+  else if(!noFly){ const e = occEv(r), pt = e && (e.center || (e.lat != null ? [e.lat, e.lon] : null)); if(pt) map.flyTo(pt, Math.max(map.getZoom(), 15), {duration:.6}); }
+  if(!noFly && window.innerWidth <= 1100) document.querySelector(".mapcard").scrollIntoView({behavior:"smooth", block:"start"});
+}
+function occSide(id){
+  const el = $("occSide"), grid = document.querySelector(".occ-mapgrid"), r = id && OCC.rows.find(x => x.id === id);
+  if(!r){ el.hidden = true; grid.classList.add("noside"); OCC.gSeg.clearLayers(); setTimeout(() => map.invalidateSize(), 50); return; }
+  const wasHidden = el.hidden; el.hidden = false; grid.classList.remove("noside"); if(wasHidden) setTimeout(() => map.invalidateSize(), 50);
+  const d = OCC.det[r.id], e = occEv(r) || {}, lv = LV[r.level], im = occHw(d), bs = d && !d.error ? (d.buses || []) : null;
+  const a = occStopAt(r.a_km || 0), b = occStopAt(r.b_km || 0), lastStop = S.route.stops[S.route.stops.length - 1];
+  const inside = bs ? bs.filter(x => x.state === "inside").length : null, appr = bs ? bs.filter(x => x.state === "approaching" && x.dist_to_km != null && x.dist_to_km <= APPROACH_KM).length : null;
+  const ack = r.status === "acknowledged" ? `\u2713 Acknowledged${r.acked_by && r.acked_by !== "controller" ? " by " + esc(r.acked_by) : ""} ${esc(r.acked_hhmm || "")}` : r.status === "cleared" ? "Cleared \u2013 condition no longer detected" : "";
+  let h = `<div class="sh">${occNo(r)}<div><h3>${esc(occKind(r))}</h3><div style="margin-top:3px"><span class="lvl ${lv[0]}">${lv[1]}</span> <span class="st ${r.status}">${r.status === "new" ? "NEW" : r.status.toUpperCase()}</span>${r.worsened ? ` <span class="st new">WORSENED</span>` : ""}</div></div><button class="x" type="button" id="occX" aria-label="Close">\u00d7</button></div>
+    <div class="kv"><span>Location</span><b>${esc(r.location || "")}</b><span>Direction</span><b>Dir ${r.dir} \u2192 ${esc(lastStop.name)}</b><span>Source</span><b>${esc(SRC[r.kind] || "")}</b>
+      <span>Latest update</span><b>${esc((OCC.ov && OCC.ov.updated) || "\u2013")} ${tg("live")}</b><span>First detected</span><b>${esc(r.start_hhmm || "\u2013")}${r.duration_min != null ? ` \u00b7 ${Math.round(r.duration_min)} min` : ""}</b>
+      <span>Affected route segment</span><b>${a && b && a !== b ? `${esc(a.name)} \u2192 ${esc(b.name)}` : a ? "near " + esc(a.name) : "\u2013"}${r.overlap_km ? ` \u00b7 ${f1o(r.overlap_km)} km` : ""}</b>
+      <span>Observed condition</span><b>${r.kind === "congestion" && r.speed_kmh != null ? `${Math.round(r.speed_kmh)} km/h (normal ~${Math.round(r.ref_kmh || 0)}) ${tg("obs")}` : r.kind === "incident" ? esc(e.message || e.type || "Reported by LTA") + " " + tg("obs") : r.kind === "roadworks" ? `${esc(e.road || "")}${e.start_date ? ` \u00b7 ${esc(e.start_date)}${e.end_date ? " \u2013 " + esc(e.end_date) : ""}` : ""}` : r.kind === "weather" ? `${e.max_mm != null ? e.max_mm + " mm / 5 min" : ""} ${tg("obs", "NEA")}` : "\u2013"}</b>
+      <span>Affected buses</span><b>${bs ? `${inside} inside \u00b7 ${appr} approaching (\u2264 ${APPROACH_KM} km)` : d && d.error ? esc(d.error) : "loading\u2026"}</b>
+      <span>Estimated impact</span><b>${r.delay_min != null ? `+${f1o(r.delay_min)} min running time ${tg("est")}` : "Not available"}</b>
+      <span>Priority basis</span><b>score ${Math.round(r.score || 0)} / 100 ${tg("calc")}</b></div>`;
+  if(im) h += `<div class="hwbox"><div><small style="color:var(--mut)">Largest headway now ${tg("est")}</small><br><b>${Math.round(im.max_now)} min</b></div><span class="arr">\u2192</span><div><small style="color:var(--mut)">After traffic effect ${tg("est", "predicted")}</small><br><b style="color:${im.max_pred > im.max_now + 1 ? "var(--red)" : "var(--green)"}">${Math.round(im.max_pred)} min</b></div><div><small style="color:var(--mut)">Change</small><br><b>${im.max_pred - im.max_now >= 0 ? "+" : ""}${Math.round(im.max_pred - im.max_now)} min</b></div></div>
+    <div class="occ-note">${im.deterioration ? "Traffic condition may contribute to headway deterioration." : "No headway deterioration predicted from this event yet."} Scheduled ${Math.round(im.sched_hw)} min. ${tg("ai")}</div>`;
+  if(d && !d.error){
+    if(d.camera) h += `<div class="cam"><b>\ud83d\udcf7 Traffic camera available</b><div class="kv" style="margin:6px 0"><span>Camera ID</span><b>${esc(d.camera.id)}</b><span>Distance from event</span><b>${f1o(d.camera.dist_km)} km</b><span>Image fetched</span><b id="camT">${esc(OCC.camAt || (OCC.ov && OCC.ov.now) || "")}</b><span>Source</span><b>LTA DataMall \u00b7 Traffic Images</b></div>
+      <img id="camImg" src="${esc(d.camera.image)}" alt="LTA traffic camera ${esc(d.camera.id)}" loading="lazy" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'occ-note',textContent:'The camera image could not be loaded right now.'}))">
+      <div class="occ-btns" style="margin-top:4px"><button class="ob" type="button" id="camRef">Refresh</button><a class="ob" href="${esc(d.camera.image)}" target="_blank" rel="noopener">View camera</a></div><div class="occ-note">Direction of view is not published by LTA.</div></div>`;
+    else h += `<div class="occ-note">No relevant LTA traffic camera available.</div>`;
+  }
+  h += `<div class="occ-btns"><button class="ob" type="button" id="occView">View on map</button>${ack ? `<span class="st ${r.status === "cleared" ? "cleared" : "acknowledged"}" style="padding:8px 10px">${ack}</span>` : `<input id="occBy" class="sel" placeholder="Your name (optional)" maxlength="40" value="${esc(localStorage.getItem("rt.by") || "")}" style="flex:1 1 120px;min-width:0;height:36px;border-radius:9px;border:1px solid var(--line2);background:#08172a;color:var(--text);padding:0 10px"><button class="ob pri" type="button" id="occAck">Acknowledge</button>`}</div>
+    <div class="occ-note">Acknowledging means the issue has been seen; it is not marked as resolved. It is raised again if the condition worsens.</div>`;
+  el.innerHTML = h;
+  $("occX").onclick = () => { OCC.sel = null; occSide(null); occImpact(); };
+  $("occView").onclick = () => occFocus(r);
+  if($("occAck")) $("occAck").onclick = async () => { const by = ($("occBy").value || "").trim(); try{ localStorage.setItem("rt.by", by); }catch(e){}
+    $("occAck").disabled = true; const res = await fetch("/api/traffic/ack", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({alerts:[r.id], by})}).then(x => x.json()).catch(() => ({error:"Network error"}));
+    if(res.error){ toast("Could not acknowledge: " + res.error); $("occAck").disabled = false; return; } toast("Acknowledged"); await occLoad(true); };
+  if($("camRef")) $("camRef").onclick = async () => { $("camRef").disabled = true; delete OCC.det[r.id]; await occDetail(r.id); const n = new Date(); OCC.camAt = sgTime(n); if(OCC.sel === r.id) occSide(r.id); };
+}
+/* ---- wiring into the existing page */
+(function(){
+  const fDraw = drawRoute; drawRoute = function(r){ fDraw(r); OCC.geo = null; S.route = r; if(S.svc && OCC.ov) setTimeout(() => { occMarkers(); occTimeline(); const sr = OCC.rows.find(x => x.id === OCC.sel); if(sr) occFocus(sr, true); }, 0); };
+  const fLoad = loadBuses; loadBuses = async function(tok){ await fLoad(tok); OCC.busUpd = sgTime(new Date()); if(S.route && S.svc) { occStrip(); occBusTable(); occTimeline(); } };
+  const fApply = apply; apply = async function(o){ S.stopOnly = !$("svc").value.trim() && !!$("stop").value.trim(); OCC.rows = []; OCC.det = {}; OCC.ov = null; OCC.sel = null; OCC.g.clearLayers(); OCC.gSeg.clearLayers();
+    await fApply(o); OCC.busUpd = sgTime(new Date()); occRender(); if(S.svc && S.route) occLoad(false); };
+  const fClear = clearAll; clearAll = function(){ fClear(); S.stopOnly = false; OCC.rows = []; OCC.det = {}; OCC.ov = null; OCC.sel = null; occRender(); };
+})();
+setInterval(() => { if(!document.hidden && S.svc && S.route) occLoad(true); }, 60000);
+$("svc").addEventListener("change", () => { clearTimeout(OCC.chT); OCC.chT = setTimeout(() => { const v = $("svc").value.trim().toUpperCase(); if(/^[0-9A-Z]{1,6}$/.test(v) && v !== S.svc && !$("go").disabled) apply(); }, 120); });
+occRender();
+
+/* ===================== V13.9 LTA traffic cameras (photos; LTA publishes no video) ===================== */
+const CAM = {list:[], all:[], near:false, res:null, island:false,
+  gl:L.layerGroup(),   // V13.10.2: no clustering - every LTA Annex G camera is its own marker at its own LTA coordinates
+  idx:-1, live:null, liveOn:false, t:null, km:(function(){ try{ return +localStorage.getItem("rt.camkm") || 0.35; }catch(e){ return 0.35; } })()};
+const camTaken = c => { if(!c || !c.taken) return null; const d = new Date(c.taken); return isNaN(d) ? null : sgTime(d); };
+const fSync = syncLayers; syncLayers = function(){ fSync(); const on = !!S.layers.cams; if(on && !map.hasLayer(CAM.gl)) map.addLayer(CAM.gl); if(!on && map.hasLayer(CAM.gl)) map.removeLayer(CAM.gl); };
+const camIcon = (onRoute) => L.divIcon({className:"camm" + (onRoute ? " camm-on" : ""), html:`<span>\ud83d\udcf7</span>`, iconSize:[26, 26], iconAnchor:[13, 13]});
+function camPopupHtml(c){
+  return `<h4>\ud83d\udcf7 LTA TRAFFIC CAMERA</h4><b>Camera ID:</b> ${esc(c.id)}<br><b>Location:</b> ${esc(c.desc || (c.near ? c.near.name : "Location description unavailable"))}<br>
+    <img src="${esc(c.image)}" alt="LTA traffic camera ${esc(c.id)}" style="width:100%;max-width:230px;border-radius:8px;margin:6px 0" loading="lazy" onerror="this.style.display='none'">
+    <b>Coordinates:</b> ${c.lat.toFixed(5)}, ${c.lon.toFixed(5)}<br><b>Last refreshed:</b> ${esc((CAM.res && CAM.res.fetched) || "\u2013")}<br><b>Source:</b> LTA DataMall \u00b7 Traffic Images
+    <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap"><button type="button" onclick="islandCamRefresh('${esc(c.id)}')" style="cursor:pointer">Refresh Image</button><button type="button" onclick="map.flyTo([${c.lat},${c.lon}],16,{duration:.5})" style="cursor:pointer">Centre on Map</button><a href="/cameras?road=${esc((c.road || 'all').toLowerCase())}">All cameras on this road</a></div>`;
+}
+async function camLoad(fresh){
+  if(!S.svc || !S.route){
+    CAM.island = true;
+    if(!S.layers.cams){ return; }
+    const r = await api(`/api/cameras?${q({refresh:fresh ? 1 : 0})}`, 30000);
+    if(S.svc || !S.layers.cams) return;                                    // a service was picked (or the layer was turned off) while this was loading
+    CAM.res = r; CAM.near = false; CAM.list = r.cameras || []; CAM.all = CAM.list;
+    CAM.gl.clearLayers();
+    CAM.list.forEach(c => L.marker([c.lat, c.lon], {icon:camIcon(), keyboard:false, title:`Camera ${c.id}`}).bindPopup(camPopupHtml(c), POP).addTo(CAM.gl));
+    if(r.error && !CAM.list.length) toast("Traffic cameras unavailable: " + r.error);
+    return;
+  }
+  CAM.island = false;
+  if(!S.layers.cams){ return; }
+  const svc = S.svc, dir = S.dir;
+  const r = await api(`/api/cameras?${q({service:svc, direction:dir, km:CAM.km, refresh:fresh ? 1 : 0})}`, 30000);
+  if(svc !== S.svc || dir !== S.dir) return;
+  CAM.res = r; CAM.near = !(r.cameras || []).length && (r.nearby || []).length > 0; CAM.list = CAM.near ? r.nearby : (r.cameras || []);
+  CAM.gl.clearLayers();
+  // V13.10.2: plot every camera LTA returns (Annex G, islandwide), not only the ones near this route.
+  // Cameras in the route list open the photo viewer; all others open the standard popup.
+  const all = await api(`/api/cameras?${q({refresh:0})}`, 30000);
+  if(svc !== S.svc || dir !== S.dir) return;
+  CAM.all = all.cameras || [];
+  const onRoute = new Map(CAM.list.map((c, i) => [String(c.id), i]));
+  CAM.all.forEach(c => {
+    const i = onRoute.get(String(c.id)), hit = i != null && !CAM.near;
+    const m = L.marker([c.lat, c.lon], {icon:camIcon(hit), keyboard:false, zIndexOffset:hit ? 500 : 0, title:`Camera ${c.id} \u00b7 ${c.desc || ""}`});
+    if(i != null) m.on("click", () => camOpen(i)); else m.bindPopup(camPopupHtml(c), POP);
+    m.addTo(CAM.gl);
+  });
+  syncLayers(); camRender();
+  if(CAM.idx >= 0) camShow();                                               // a refresh while the viewer is open: new signed image link
+}
+async function islandCamRefresh(id){
+  const r = await api(`/api/cameras?${q({refresh:1})}`, 30000);
+  CAM.res = r; const c = (r.cameras || []).find(x => String(x.id) === String(id));
+  if(c){ const m = CAM.list.find(x => String(x.id) === String(id)); if(m) Object.assign(m, c); CAM.gl.eachLayer(l => { if(l.getPopup() && l.getLatLng().lat === c.lat && l.getLatLng().lng === c.lon) l.setPopupContent(camPopupHtml(c)); }); }
+}
+function camTitle(c){ return c.desc_known ? esc(c.desc) : c.near ? `${esc(c.near.name)}${c.near.road ? ` \u00b7 ${esc(c.near.road)}` : ""}` : `Camera ${esc(c.id)}`; }
+function camRender(){
+  const el = $("occCams"); if(!el) return;
+  const r = CAM.res; if(!S.svc || !S.route){ el.innerHTML = ""; return; }
+  const kmSel = `<label class="camkm">Search within <select id="camKm">${[[0.35, "350 m"], [1, "1 km"], [3, "3 km"]].map(([v, t]) => `<option value="${v}" ${Math.abs(CAM.km - v) < 0.01 ? "selected" : ""}>${t}</option>`).join("")}</select> of the route</label>`;
+  let h = `<h2>\ud83d\udcf7 Traffic cameras on this route</h2><p class="s">Still photos from ${tg("live", esc((r && r.source) || "LTA DataMall \u00b7 Traffic Images"))} ${r && r.fetched ? `\u00b7 list fetched ${esc(r.fetched)}` : ""}. LTA publishes no video; each photo is updated by LTA about every 1\u20135 min. Tap a photo to enlarge.</p>${kmSel}`;
+  const wire = () => { if($("camKm")) $("camKm").onchange = () => { CAM.km = +$("camKm").value; try{ localStorage.setItem("rt.camkm", CAM.km); }catch(e){} camLoad(false); };
+    el.querySelectorAll(".camc").forEach(b => b.onclick = () => camOpen(+b.dataset.i)); if($("camAll")) $("camAll").onclick = async () => { $("camAll").disabled = true; await camLoad(true); }; };
+  if(!r){ el.innerHTML = h + `<div class="empty">Loading cameras\u2026</div>`; wire(); return; }
+  if(r.error && !r.total){ el.innerHTML = h + `<div class="warn"><b>No camera feed received.</b> ${esc(r.error)}<br><small>The app tried LTA DataMall (Traffic Images) and the public data.gov.sg copy. Check the LTA_ACCOUNT_KEY on the server and that the server can reach the internet, then press Retry.</small></div><div class="occ-btns"><button class="ob" type="button" id="camAll">Retry</button></div>`; wire(); return; }
+  const card = (c, i) => `<button class="camc" type="button" data-i="${i}"><span class="camim"><img src="${esc(c.image)}" alt="LTA camera ${esc(c.id)}" loading="lazy" onerror="this.parentNode.classList.add('bad')"><em>Image not available</em></span>
+      <b>${camTitle(c)}</b><small>Camera ${esc(c.id)}${c.route_km != null && !CAM.near ? ` \u00b7 ${c.route_km} km along route` : ""}${c.dist_km != null ? ` \u00b7 ${c.dist_km >= 1 ? c.dist_km.toFixed(1) + " km" : Math.round(c.dist_km * 1000) + " m"} ${CAM.near ? "from the route" : "off route"}` : ""}${camTaken(c) ? ` \u00b7 photo ${camTaken(c)}` : ""}</small></button>`;
+  if(!CAM.list.length){ el.innerHTML = h + `<div class="empty">No traffic camera within ${CAM.km >= 1 ? CAM.km + " km" : Math.round(CAM.km * 1000) + " m"} of Service ${esc(S.svc)} Dir ${S.dir}, and none within 5 km either. The feed has ${r.total} cameras in Singapore, mostly on expressways and at the checkpoints.</div>`; wire(); return; }
+  if(CAM.near) h += `<div class="warn" style="margin-bottom:10px">No camera within ${CAM.km >= 1 ? CAM.km + " km" : Math.round(CAM.km * 1000) + " m"} of this route. The nearest ${CAM.list.length} camera${CAM.list.length > 1 ? "s are" : " is"} shown below \u2013 they show nearby roads, not the bus route itself. Try a larger search distance.</div>`;
+  const ag = r.annex_g; if(ag) h += `<div class="occ-note" style="margin:0 0 8px">Map shows all ${r.total} live LTA cameras (Annex G: ${ag.live} of ${ag.listed} listed IDs live now${ag.missing.length ? `; not in today\u2019s feed: ${ag.missing.map(esc).join(", ")}` : ""}). Blue = near this route.</div>`;
+  h += `<div class="camg">${CAM.list.map(card).join("")}</div><div class="occ-btns"><button class="ob" type="button" id="camAll">Refresh photos</button></div>${r.line_approx ? `<div class="occ-note">The route line is drawn stop to stop right now (road snapping unavailable), so distances to cameras are approximate.</div>` : ""}`;
+  el.innerHTML = h; wire();
+}
+function camOpen(i){ CAM.idx = i; $("camV").hidden = false; document.body.classList.add("camopen"); camShow(); }
+function camClose(){ CAM.idx = -1; $("camV").hidden = true; document.body.classList.remove("camopen"); camLive(false); }
+function camShow(){
+  const c = CAM.list[CAM.idx]; if(!c){ camClose(); return; }
+  $("camVT").innerHTML = camTitle(c); $("camVS").innerHTML = `Camera ${esc(c.id)} \u00b7 ${CAM.idx + 1} of ${CAM.list.length}${c.route_km != null ? ` \u00b7 ${c.route_km} km along Service ${esc(S.svc)}` : ""}`;
+  const img = $("camVI"); img.parentNode.classList.remove("bad"); img.src = c.image; img.alt = `LTA traffic camera ${c.id}`;
+  $("camVK").innerHTML = `<span>Source</span><b>${esc((CAM.res && CAM.res.source) || "LTA DataMall \u00b7 Traffic Images")}</b>${CAM.near ? `<span>On this route?</span><b>No \u2013 ${c.dist_km} km from the route</b>` : ""}<span>Photo taken</span><b>${camTaken(c) || "not published by LTA"}</b><span>Photo link fetched</span><b>${esc((CAM.res && CAM.res.fetched) || "\u2013")}</b><span>Nearest bus stop</span><b>${c.near ? `${esc(c.near.code)} ${esc(c.near.name)} (${Math.round(c.near.km * 1000)} m)` : "\u2013"}</b><span>Location</span><b>${c.lat.toFixed(5)}, ${c.lon.toFixed(5)}</b><span>Camera direction</span><b>not published by LTA</b>`;
+  $("camPrev").disabled = CAM.idx <= 0; $("camNext").disabled = CAM.idx >= CAM.list.length - 1;
+}
+function camLive(on){ CAM.liveOn = on; $("camLive").setAttribute("aria-pressed", String(on)); $("camLive").textContent = on ? "\u25cf Live view on (every 60 s)" : "Live view (auto-refresh)"; clearInterval(CAM.live); if(on) CAM.live = setInterval(() => { if(!document.hidden && CAM.idx >= 0) camLoad(true); }, 60000); }
+document.body.insertAdjacentHTML("beforeend", `<div class="camv" id="camV" hidden role="dialog" aria-modal="true" aria-labelledby="camVT"><div class="camvb">
+  <div class="camvh"><div><b id="camVT"></b><small id="camVS"></small></div><button class="x" type="button" id="camX" aria-label="Close">\u00d7</button></div>
+  <div class="camim big"><img id="camVI" alt="" onerror="this.parentNode.classList.add('bad')"><em>The photo could not be loaded right now. Press Refresh for a new link.</em></div>
+  <div class="occ-btns"><button class="ob" type="button" id="camPrev">\u2039 Previous</button><button class="ob" type="button" id="camNext">Next \u203a</button><button class="ob pri" type="button" id="camVRef">Refresh</button><button class="ob" type="button" id="camLive" aria-pressed="false">Live view (auto-refresh)</button><button class="ob" type="button" id="camMap">Show on map</button></div>
+  <div class="kv" id="camVK"></div><div class="occ-note">Photos only \u2013 LTA does not provide video. Live view re-fetches the latest photo every 60 s while this window is open.</div></div></div>`);
+$("camX").onclick = camClose; $("camV").onclick = e => { if(e.target.id === "camV") camClose(); };
+document.addEventListener("keydown", e => { if(CAM.idx < 0) return; if(e.key === "Escape") camClose(); if(e.key === "ArrowRight" && CAM.idx < CAM.list.length - 1){ CAM.idx++; camShow(); } if(e.key === "ArrowLeft" && CAM.idx > 0){ CAM.idx--; camShow(); } });
+$("camPrev").onclick = () => { if(CAM.idx > 0){ CAM.idx--; camShow(); } }; $("camNext").onclick = () => { if(CAM.idx < CAM.list.length - 1){ CAM.idx++; camShow(); } };
+$("camVRef").onclick = async () => { $("camVRef").disabled = true; await camLoad(true); $("camVRef").disabled = false; };
+$("camLive").onclick = () => camLive(!CAM.liveOn);
+$("camMap").onclick = () => { const c = CAM.list[CAM.idx]; if(!c) return; camClose(); document.querySelector(".mapcard").scrollIntoView({behavior:"smooth", block:"center"}); map.flyTo([c.lat, c.lon], 16, {duration:.6}); };
+(function(){ const fA = apply; apply = async function(o){ CAM.list = []; CAM.res = null; CAM.gl.clearLayers(); await fA(o); if(S.svc && S.route) camLoad(false); else camRender(); };
+  const fC = clearAll; clearAll = function(){ fC(); CAM.list = []; CAM.res = null; CAM.gl.clearLayers(); camClose(); camRender(); if(S.layers.cams) camLoad(false); };
+  const fR = occRender; occRender = function(){ fR(); camRender(); }; })();
+function legendSync(){
+  const t = $("legendTitle"); if(t) t.textContent = S.svc && S.route ? "Traffic on Route (LTA)" : "Island Traffic Speed (LTA)";
+  const ex = $("legendExtra"); if(!ex) return;
+  const rows = [];
+  if(S.layers.incidents) rows.push(`<div class="row"><span class="im" style="width:16px;height:16px;font-size:10px;position:static">!</span><span>Traffic incident</span></div>`);
+  if(S.layers.cams) rows.push(`<div class="row"><span class="camm" style="position:static"><span style="width:16px;height:16px;font-size:10px">\ud83d\udcf7</span></span><span>Traffic camera</span></div>`);
+  if(S.layers.roadworks) rows.push(`<div class="row"><span class="rwm" style="position:static"><span style="width:16px;height:16px;font-size:10px">\ud83d\udea7</span></span><span>Road works</span></div>`);
+  ex.innerHTML = rows.join("");
+}
+(function(){ const fSync3 = syncLayers; syncLayers = function(){ fSync3(); legendSync(); }; legendSync(); })();
+setInterval(() => { if(!document.hidden && S.svc && S.route && CAM.idx < 0 && CAM.list.length) camLoad(true); }, 240000);   // signed photo links expire: renew every 4 min
+
+/* ===================== Whole-island Route Traffic (Mode A: no service selected) ===================== */
+map.createPane("rw").style.zIndex = 415;
+map.createPane("island").style.zIndex = 403;
+const gIslandSpeed = L.layerGroup(), gRW = L.layerGroup();
+const canvasR = L.canvas({padding:0.4});
+const rwIcon = () => L.divIcon({className:"rwm", html:`<span>\ud83d\udea7</span>`, iconSize:[24, 24], iconAnchor:[12, 12]});
+(function(){ const fSync2 = syncLayers; syncLayers = function(){ fSync2();
+  const on = (g, v) => { if(v && !map.hasLayer(g)) map.addLayer(g); if(!v && map.hasLayer(g)) map.removeLayer(g); };
+  on(gIslandSpeed, S.layers.traffic && !S.svc); on(gRW, S.layers.roadworks);
+}; })();
+let islandSpeedLoaded = false;
+async function loadIslandSpeed(force){
+  if(!S.layers.traffic || S.svc) return;
+  if(islandSpeedLoaded && !force) { syncLayers(); return; }
+  const r = await api("/api/speedbands", 30000);
+  if(S.svc) return;                                                      // a service was picked while this was loading
+  gIslandSpeed.clearLayers();
+  if(r.error && !(r.segments || []).length){ toast("Traffic speed bands unavailable: " + r.error); return; }
+  (r.segments || []).forEach(s => {
+    const [alat, alon, blat, blon, band, cls] = s;
+    L.polyline([[alat, alon], [blat, blon]], {renderer:canvasR, pane:"island", color:COL4[cls] || COL4.none, weight:cls === "congested" ? 3 : 2, opacity:.75, interactive:false}).addTo(gIslandSpeed);
+  });
+  islandSpeedLoaded = true; syncLayers();
+}
+async function loadRoadworksLayer(){
+  if(!S.layers.roadworks) return;
+  const r = await api("/api/roadworks", 30000);
+  gRW.clearLayers();
+  if(r.error && !(r.roadworks || []).length){ toast("Road works unavailable: " + r.error); return; }
+  (r.roadworks || []).forEach(x => L.marker([x.lat, x.lon], {icon:rwIcon(), pane:"rw", keyboard:false, title:x.road})
+    .bindPopup(`<h4>\ud83d\udea7 Road Works</h4><b>Road:</b> ${esc(x.road)}<br><b>Start:</b> ${esc(x.start || "\u2013")}<br><b>Expected end:</b> ${x.end ? esc(x.end) : "End time unavailable"}<br>${x.other ? esc(x.other) + "<br>" : ""}<span class="m">Source: LTA Road Works</span>`, POP)
+    .addTo(gRW));
+  if(!(r.roadworks || []).length) toast("No road works with a usable location right now.");
+}
+/* V13.13: the counters, the network attention list and the camera list all come from one refresh (see rtNetLoad below). */
+async function islandCardsLoad(){ if(window.rtReady) return rtNetLoad(); }
+(function(){ const fA2 = apply; apply = async function(o){ await fA2(o); if(!S.svc){ loadIslandSpeed(true); loadRoadworksLayer(); } };
+  const fC2 = clearAll; clearAll = function(){ fC2(); loadIslandSpeed(true); loadRoadworksLayer(); islandCardsLoad(); };
+  const fR2 = occRender; occRender = function(){ fR2(); if(!S.svc) syncLayers(); }; })();
+if(S.layers.traffic) loadIslandSpeed(true);
+if(S.layers.roadworks) loadRoadworksLayer();
+if(S.layers.cams) camLoad(false);
+islandCardsLoad();
+setInterval(() => { if(!document.hidden && !S.svc){ if(S.layers.traffic) loadIslandSpeed(false); if(S.layers.roadworks) loadRoadworksLayer(); if(S.layers.incidents) loadIncidents(); if(S.layers.cams) camLoad(true); islandCardsLoad(); } }, 90000);
+
+/* ===================== V13.13 OCC desktop layout =====================
+   Items need attention (right panel), compact counters, impact below the map, and map emphasis for the selected service.
+   Presentation only: every figure comes from endpoints and engine results already used above
+   (/api/incidents, /api/cameras, /api/roadworks, /api/traffic/overview, /detail, /ack). Nothing is estimated here. */
+const RT = {net:null, inc:null, cam:null, rw:null, camSvc:null, cams:[], at:null, tok:0};
+const KIC = {congestion:"car", incident:"alert", roadworks:"cone", weather:"rain"};
+const ORD = {critical:0, high:1, monitor:2, normal:3};
+const hvKm = (a, b) => { const R = 6371, dLa = (b[0] - a[0]) * Math.PI / 180, dLo = (b[1] - a[1]) * Math.PI / 180, x = Math.sin(dLa / 2) ** 2 + Math.cos(a[0] * Math.PI / 180) * Math.cos(b[0] * Math.PI / 180) * Math.sin(dLo / 2) ** 2; return 2 * R * Math.asin(Math.sqrt(x)); };
+const fmtKm = k => k == null ? "" : k >= 1 ? `${f1o(k)} km` : `${Math.round(k * 1000)} m`;
+const rtEvPt = e => e ? (e.center || (e.lat != null ? [e.lat, e.lon] : null)) : null;
+function rtNearCam(pt, km){ if(!pt || !RT.cams.length) return null; let best = null, bd = 1e9; RT.cams.forEach(c => { const d = hvKm(pt, [c.lat, c.lon]); if(d < bd){ bd = d; best = c; } }); return best && bd <= km ? {c:best, d:bd} : null; }
+
+/* ---- one refresh feeds the counters, the network attention list and the camera lookup */
+async function rtNetLoad(){
+  const tok = ++RT.tok, svc = S.svc && S.route ? S.svc : "", dir = S.dir;
+  const [inc, cam, rw, net, camSvc] = await Promise.all([
+    api("/api/incidents", 20000), api("/api/cameras", 20000), api("/api/roadworks", 20000),
+    api(`/api/traffic/overview?${q({operators:S.op || "", status:"unacknowledged,acknowledged"})}`, 30000),
+    svc ? api(`/api/cameras?${q({service:svc, direction:dir, km:CAM.km})}`, 20000) : Promise.resolve(null)]);
+  if(tok !== RT.tok) return;
+  RT.inc = inc; RT.cam = cam; RT.rw = rw; RT.net = net; RT.camSvc = svc && svc === S.svc && dir === S.dir ? camSvc : null; RT.cams = cam.cameras || []; RT.at = new Date();
+  rtCounters(); if(!(S.svc && S.route)) attnRender();
+  const nCam = (cam.total || RT.cams.length) || 0;
+  if(nCam > 0 && nCam < 15) toast(`Only ${nCam} cameras returned right now (${cam.source || "LTA"}) \u2013 hover the Cameras counter for details.`, 8000);
+}
+function rtCounters(){
+  const el = $("islandCards"); if(!el || el.hidden) return;
+  const svc = !!(S.svc && S.route), act = svc ? OCC.rows.filter(r => r.status !== "cleared") : [], on = k => act.filter(r => r.kind === k).length;
+  const c = (cls, n, label, sub, hot, title) => `<div class="ic-card ${cls}${hot ? " hot" : ""}" title="${esc(title || "")}"><b>${n == null ? "\u2013" : n}</b><span>${label}</span><em>${sub}</em></div>`;
+  if(!RT.inc){ el.innerHTML = c("k-inc", "\u2026", "Incidents", "&nbsp;") + c("k-cong", "\u2026", "Congestion", "&nbsp;") + c("k-cam", "\u2026", "Cameras", "&nbsp;") + c("k-rw", "\u2026", "Road works", "&nbsp;"); return; }
+  const {inc, cam, rw, net} = RT;
+  const nInc = inc.error && !(inc.incidents || []).length ? null : (inc.incidents || []).length;
+  const nCam = cam.error && !cam.total && !(cam.cameras || []).length ? null : (cam.total || (cam.cameras || []).length);
+  const nRw = rw.error && !(rw.roadworks || []).length ? null : (rw.with_location != null ? rw.with_location : (rw.roadworks || []).length);
+  const nCong = net && net.cards && net.cards.congestion ? net.cards.congestion.events : null;
+  const camNear = svc && RT.camSvc && !RT.camSvc.error ? (RT.camSvc.cameras || []).length : null;
+  el.innerHTML =
+    c("k-inc" + (nInc ? " has" : ""), nInc, "Incidents", svc ? `${on("incident")} on route` : "island-wide", svc && on("incident"), "LTA DataMall \u00b7 Traffic Incidents")
+  + c("k-cong" + (nCong ? " has" : ""), nCong, "Congestion", svc ? `${on("congestion")} on route` : net && net.loading ? "engine starting" : "on bus routes", svc && on("congestion"), "Congestion events the traffic engine has matched to bus routes")
+  + c("k-cam", nCam, "Cameras", svc ? (camNear == null ? "near route \u2013" : `${camNear} within ${fmtKm(CAM.km)}`) : "available", false, cam.diag || cam.source || "")
+  + c("k-rw" + (nRw ? " has" : ""), nRw, "Road works", svc ? `${on("roadworks")} on route` : "with a location", svc && on("roadworks"), "LTA DataMall \u00b7 Road Works");
+  $("rtUpd").textContent = RT.at ? `Updated ${sgTime(RT.at, true)} \u00b7 LTA DataMall / NEA` : "";
+}
+
+/* ---- Items need attention */
+function attnRender(){ const svc = !!(S.svc && S.route); $("rtAttn").classList.toggle("svc", svc); if(svc) attnSvc(); else attnNet(); }
+const attnLoading = () => `<div class="sk"></div><div class="sk" style="width:70%"></div><div class="sk" style="width:84%"></div>`;
+function attnSvc(){
+  const ov = OCC.ov, rows = OCC.rows, act = rows.filter(r => r.status !== "cleared"), el = $("attnList");
+  $("attnN").textContent = act.length || "";
+  $("attnSub").textContent = `Service ${S.svc} \u00b7 Dir ${S.dir}${ov && ov.updated ? ` \u00b7 engine ${ov.updated}` : ""}`;
+  if(!ov){ el.innerHTML = attnLoading(); return; }
+  if(ov.error && !ov.rows){ el.innerHTML = `<div class="warn">Traffic events unavailable: ${esc(ov.error)}</div>`; return; }
+  if(ov.loading){ el.innerHTML = `<div class="empty">The traffic event engine is starting up. Checking again shortly.</div>`; return; }
+  if(!rows.length){ el.innerHTML = `<div class="attn-ok">Nothing on Service ${esc(S.svc)} Dir ${S.dir} needs attention. Congestion, incidents, road works and heavy rain on this route appear here as soon as they are detected.</div>`; return; }
+  el.innerHTML = rows.map(attnItemSvc).join("");
+  attnWire(el, id => OCC.rows.find(r => r.id === id));
+}
+function attnItemSvc(r){
+  const d = OCC.det[r.id], ok = d && !d.error, im = occHw(d), bs = ok ? (d.buses || []) : null, lv = LV[r.level] || LV.normal, cl = r.status === "cleared";
+  const aff = bs ? bs.filter(b => b.state === "inside" || (b.state === "approaching" && b.dist_to_km != null && b.dist_to_km <= APPROACH_KM)).length : null;
+  const cam = ok && d.camera ? d.camera : null;
+  const met = [[`Est. delay ${tgs("est")}`, r.delay_min != null ? `<b class="r">+${f1o(r.delay_min)} min</b>` : `<b class="na">Not available</b>`],
+               ["Affected buses", aff != null ? `<b class="${aff ? "o" : ""}">${aff} bus${aff === 1 ? "" : "es"}</b>` : d && d.error ? "<b>\u2013</b>" : `<b class="na">Open for detail</b>`]];
+  if(im) met.push(["Largest headway now", `<b>${Math.round(im.max_now)} min</b>`], [`Predicted ${tgs("pred")}`, `<b class="${im.max_pred > im.max_now + 1 ? "r" : ""}">${Math.round(im.max_pred)} min</b>`]);
+  const stat = cl ? `<span class="st cleared">Cleared</span>` : r.status === "new" ? "" : `<span class="st acknowledged">\u2713 Acknowledged${r.acked_hhmm ? " " + esc(r.acked_hhmm) : ""}</span>`;
+  return `<div class="aitem ${cl ? "cl" : lv[0]}${OCC.sel === r.id ? " sel" : ""}" data-id="${esc(r.id)}" tabindex="0">
+    <div class="ai-top"><span class="ai-ic k-${esc(r.kind)}">${ico(KIC[r.kind] || "alert")}</span>
+      <div class="ai-t"><b>${esc(occKind(r))}</b><span>${esc(r.location || "")}</span><small>Event ${r.n} \u00b7 since ${esc(r.start_hhmm || "\u2013")}${r.duration_min != null ? ` (${Math.round(r.duration_min)} min)` : ""}</small></div>
+      <div class="ai-tags"><span class="tag onr">${r.planned ? "Planned" : "On route"}</span><span class="lvl ${lv[0]}">${lv[1]}</span></div></div>
+    <div class="ai-m">${met.map(([k, v]) => `<div><span>${k}</span>${v}</div>`).join("")}</div>
+    ${cam ? attnCam(cam.id, cam.image, `${fmtKm(cam.dist_km)} from the event`) : ""}
+    <div class="ai-act"><button type="button" class="ob sm" data-a="map">View on map</button>${cam ? `<button type="button" class="ob sm" data-a="cam" data-cam="${esc(cam.id)}">View camera</button>` : ""}${!cl && r.status === "new" ? `<button type="button" class="ob sm pri" data-a="ack">Acknowledge</button>` : stat}<button type="button" class="ob sm ghost" data-a="det" aria-label="Open details" title="Open details">\u203a</button></div></div>`;
+}
+const attnCam = (id, img, sub) => `<button type="button" class="ai-cam" data-a="cam" data-cam="${esc(id)}"><span class="camim"><img src="${esc(img)}" alt="LTA traffic camera ${esc(id)}" loading="lazy" onerror="this.parentNode.classList.add('bad')"><em>No image</em></span><span><b>Camera ${esc(id)}</b><small>${sub} \u00b7 LTA photo</small></span></button>`;
+function attnNetGroups(){
+  const ov = RT.net, by = new Map();
+  (ov && ov.rows || []).forEach(r => { let g = by.get(r.event); if(!g){ g = {event:r.event, kind:r.kind, location:r.location, rows:[], level:r.level, delay:null}; by.set(r.event, g); }
+    g.rows.push(r); if(ORD[r.level] < ORD[g.level]) g.level = r.level; if(r.delay_min != null) g.delay = Math.max(g.delay || 0, r.delay_min); });
+  return [...by.values()].map(g => { g.fresh = g.rows.filter(r => r.status === "new").map(r => r.id); return g; })
+    .sort((a, b) => ((b.fresh.length > 0) - (a.fresh.length > 0)) || (ORD[a.level] - ORD[b.level]) || (b.rows.length - a.rows.length));
+}
+function attnNet(){
+  const ov = RT.net, el = $("attnList"), opName = S.op ? ($("opSel").selectedOptions[0] || {}).textContent : "";
+  $("attnSub").textContent = `Whole network${opName ? " \u00b7 " + opName : ""}${ov && ov.updated ? " \u00b7 engine " + ov.updated : ""}`;
+  if(!ov){ $("attnN").textContent = ""; el.innerHTML = attnLoading(); return; }
+  if(ov.error && !ov.rows){ $("attnN").textContent = ""; el.innerHTML = `<div class="warn">Traffic events unavailable: ${esc(ov.error)}</div>`; return; }
+  if(ov.loading){ $("attnN").textContent = ""; el.innerHTML = `<div class="empty">The traffic event engine is starting up. Checking again shortly.</div>`; return; }
+  const gs = attnNetGroups(); $("attnN").textContent = gs.length || "";
+  if(!gs.length){ el.innerHTML = `<div class="attn-ok">No traffic event is affecting a bus route right now. Pick a service above to see its route in detail.</div>`; return; }
+  el.innerHTML = gs.slice(0, 20).map(attnItemNet).join("") + (gs.length > 20 ? `<div class="occ-note">${gs.length - 20} more lower-priority events. Pick a service to focus on one route.</div>` : "");
+  attnWire(el, id => gs.find(g => g.event === id));
+}
+function attnItemNet(g){
+  const e = ((RT.net && RT.net.events) || []).find(x => x.id === g.event) || {}, pt = rtEvPt(e), nc = rtNearCam(pt, 3), lv = LV[g.level] || LV.normal;
+  const title = g.kind === "incident" ? (e.type || "Incident") : g.kind === "weather" ? (g.rows[0].level_detail === "heavy" ? "Heavy rain" : "Rain") : KIND[g.kind] || g.kind;
+  const seen = new Set(), svcs = g.rows.filter(r => { const k = r.svc + "|" + r.dir; return !seen.has(k) && seen.add(k); });
+  const nSvc = new Set(svcs.map(r => r.svc)).size;
+  return `<div class="aitem ${lv[0]}" data-id="${esc(g.event)}" tabindex="0">
+    <div class="ai-top"><span class="ai-ic k-${esc(g.kind)}">${ico(KIC[g.kind] || "alert")}</span>
+      <div class="ai-t"><b>${esc(title)}</b><span>${esc(g.location || "")}</span><small>since ${esc(e.start || "\u2013")}</small></div>
+      <div class="ai-tags"><span class="tag">${nSvc} service${nSvc === 1 ? "" : "s"}</span><span class="lvl ${lv[0]}">${lv[1]}</span></div></div>
+    <div class="ai-m"><div><span>Est. delay ${tgs("est")}</span>${g.delay != null ? `<b class="r">up to +${f1o(g.delay)} min</b>` : `<b class="na">Not available</b>`}</div><div><span>Status</span><b class="q">${g.fresh.length ? `${g.fresh.length} not acknowledged` : "\u2713 Acknowledged"}</b></div></div>
+    <div class="ai-svcs">${svcs.slice(0, 12).map(r => `<button type="button" class="svcchip" data-svc="${esc(r.svc)}" data-dir="${r.dir}" title="Open Service ${esc(r.svc)} Dir ${r.dir}">${esc(r.svc)}<small>D${r.dir}</small></button>`).join("")}${svcs.length > 12 ? `<span class="occ-note">+${svcs.length - 12}</span>` : ""}</div>
+    ${nc ? attnCam(nc.c.id, nc.c.image, `${fmtKm(nc.d)} from the event`) : ""}
+    <div class="ai-act">${pt ? `<button type="button" class="ob sm" data-a="map">View on map</button>` : ""}${nc ? `<button type="button" class="ob sm" data-a="cam" data-cam="${esc(nc.c.id)}">View camera</button>` : ""}${g.fresh.length ? `<button type="button" class="ob sm pri" data-a="ack" title="Acknowledge for ${g.fresh.length} affected service direction${g.fresh.length > 1 ? "s" : ""}">Acknowledge</button>` : ""}</div></div>`;
+}
+function attnWire(el, find){
+  el.querySelectorAll(".aitem").forEach(card => {
+    const id = card.dataset.id, svcMode = !!(S.svc && S.route);
+    card.onclick = e => {
+      const b = e.target.closest("button"), x = find(id); if(!x) return;
+      if(b && b.classList.contains("svcchip")){ $("svc").value = b.dataset.svc; S.dir = +b.dataset.dir === 2 ? 2 : 1; syncDir(); apply(); return; }
+      const a = b ? b.dataset.a : (svcMode ? "det" : "map");
+      if(a === "det") return occSelect(id, true);
+      if(a === "map"){ if(svcMode) return occFocus(x); const e2 = ((RT.net && RT.net.events) || []).find(v => v.id === id), pt = rtEvPt(e2); if(!pt) return;
+        OCC.gSeg.clearLayers(); L.circleMarker(pt, {radius:20, color:"#fff", weight:2, dashArray:"4 4", fillOpacity:0, interactive:false}).addTo(OCC.gSeg);
+        map.flyTo(pt, Math.max(map.getZoom(), 15), {duration:.6}); if(window.innerWidth < 1000) document.querySelector(".mapcard").scrollIntoView({behavior:"smooth", block:"start"}); return; }
+      if(a === "cam") return rtCamById(b.dataset.cam, () => occSelect(id, false));
+      if(a === "ack") return rtAck(svcMode ? [id] : x.fresh, b);
+    };
+    card.onkeydown = e => { if(e.key === "Enter" && e.target === card){ e.preventDefault(); card.click(); } };
+  });
+}
+function attnHighlight(id){
+  const el = [...$("attnList").querySelectorAll(".aitem")].find(x => x.dataset.id === id); if(!el) return;
+  el.classList.add("hl"); setTimeout(() => el.classList.remove("hl"), 2500);
+  if(window.innerWidth >= 1000) el.scrollIntoView({block:"nearest", behavior:"smooth"});
+}
+async function rtAck(ids, btn){
+  if(!ids || !ids.length) return; let by = ""; try{ by = localStorage.getItem("rt.by") || ""; }catch(e){}
+  if(btn) btn.disabled = true;
+  const res = await fetch("/api/traffic/ack", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({alerts:ids, by})}).then(x => x.json()).catch(() => ({error:"Network error"}));
+  if(res.error){ toast("Could not acknowledge: " + res.error); if(btn) btn.disabled = false; return; }
+  toast(res.acked > 1 ? `Acknowledged (${res.acked} alerts)` : "Acknowledged");
+  if(S.svc && S.route) await occLoad(true); else await rtNetLoad();
+}
+
+/* ---- compact map popup for a numbered event marker */
+function rtEvPopup(r){
+  const d = OCC.det[r.id], bs = d && !d.error ? (d.buses || []) : null, lv = LV[r.level] || LV.normal;
+  const aff = bs ? bs.filter(b => b.state === "inside" || (b.state === "approaching" && b.dist_to_km != null && b.dist_to_km <= APPROACH_KM)).length : null;
+  return `<div class="ep-b ${lv[0]}"><b class="ep-t">${esc(r.location || occKind(r))}</b><div class="ep-k">${esc(occKind(r))} <span class="lvl ${lv[0]}">${lv[1]}</span></div>
+    ${r.delay_min != null ? `<div class="ep-r"><span>Est. delay</span><b>+${f1o(r.delay_min)} min</b></div>` : ""}
+    ${aff != null ? `<div class="ep-r"><span>Affected buses</span><b>${aff}</b></div>` : ""}
+    <button type="button" class="ob sm pri ep-go" data-id="${esc(r.id)}">View details</button></div>`;
+}
+map.on("popupopen", e => { const el = e.popup.getElement(), b = el && el.querySelector(".ep-go"); if(b) b.onclick = () => { map.closePopup(); occSelect(b.dataset.id, true); }; });
+
+/* ---- impact below the map + affected stops (stops inside each engine event's stretch) */
+function rtImpactRender(){
+  if(!(S.svc && S.route)) return;
+  const act = OCC.rows.filter(r => r.status !== "cleared"), top = act[0];
+  $("rtImpT").textContent = `Impact on Service ${S.svc} \u00b7 Dir ${S.dir}`;
+  $("rtImpLv").innerHTML = top ? `<span class="lvl ${LV[top.level][0]}">${LV[top.level][1]} IMPACT</span>` : OCC.ov && !OCC.ov.loading && !OCC.ov.error ? `<span class="lvl ok">NO IMPACT</span>` : "";
+  rtStops();
+}
+function rtStops(){
+  const el = $("rtStops"), G = occGeo(), act = OCC.rows.filter(r => r.status !== "cleared");
+  const h = `<div class="rt-imp-h"><h2>Affected bus stops</h2>${tg("calc")}</div>`;
+  if(!G || !act.length){ el.innerHTML = h + `<div class="empty">${OCC.ov && OCC.ov.loading ? "Waiting for the traffic engine." : "No stop on this route is inside a traffic event right now."}</div>`; return; }
+  const by = new Map();
+  act.forEach(r => {
+    const a = Math.min(r.a_km || 0, r.b_km == null ? r.a_km || 0 : r.b_km), b = Math.max(r.a_km || 0, r.b_km == null ? r.a_km || 0 : r.b_km);
+    let idx = []; G.stopKm.forEach((k, i) => { if(k >= a - 0.05 && k <= b + 0.05) idx.push(i); }); let how = "in";
+    if(!idx.length){ const s = occStopAt((a + b) / 2); if(s){ idx = [S.route.stops.indexOf(s)]; how = "near"; } }
+    idx.forEach(i => { const cur = by.get(i); if(!cur || (cur.how === "near" && how === "in") || (cur.how === how && (r.delay_min || 0) > (cur.r.delay_min || 0))) by.set(i, {i, r, how}); });
+  });
+  const list = [...by.values()].sort((x, y) => x.i - y.i);
+  const rows = list.slice(0, 8).map(x => { const s = S.route.stops[x.i];
+    return `<tr data-code="${esc(s.code)}"><td data-l="Seq">${x.i + 1}</td><td data-l="Stop">${esc(s.code)}</td><td data-l="Location">${esc(s.name)}</td><td data-l="Est. delay" class="num">${x.r.delay_min != null ? `+${f1o(x.r.delay_min)} min` : "\u2013"}</td><td data-l="Status">${occNo(x.r)} <span class="bst ${x.how === "in" ? "inside" : "approaching"}">${x.how === "in" ? "In stretch" : "Nearest stop"}</span></td></tr>`; }).join("");
+  el.innerHTML = h + `<div class="tw"><table class="btab stb"><thead><tr><th>Seq</th><th>Stop</th><th>Location</th><th>Est. delay</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table></div>
+    ${list.length > 8 ? `<div class="occ-note">+${list.length - 8} more stops in affected stretches.</div>` : ""}<div class="occ-note">Stops inside each event's stretch of the route; the delay shown is that event's estimated extra running time.</div>`;
+  el.querySelectorAll("tr[data-code]").forEach(tr => tr.onclick = () => selectStop(tr.dataset.code, false));
+}
+
+/* ---- service selected: route-related items stand out, the rest steps back */
+function rtEmphasis(){
+  const svc = !!(S.svc && S.route), G = svc ? occGeo() : null, pts = G ? G.pts.filter((p, i) => i % 3 === 0) : [];
+  const near = (ll, km) => pts.some(p => hvKm(p, [ll.lat, ll.lng]) <= km);
+  gRW.eachLayer(m => { if(!m.setOpacity) return; const on = !svc || near(m.getLatLng(), 0.3); m.setOpacity(on ? 1 : .35); m.setZIndexOffset(svc && on ? 400 : 0); });
+  CAM.gl.eachLayer(m => { if(!m.setOpacity) return; const cls = ((m.options.icon || {}).options || {}).className || ""; m.setOpacity(!svc || cls.includes("camm-on") ? 1 : .4); });
+}
+
+/* ---- camera viewer for a single camera opened from an attention item (reuses the existing viewer) */
+function rtCamOpen(c){ if(!c) return; let i = CAM._keep ? -1 : CAM.list.findIndex(x => String(x.id) === String(c.id)); if(i < 0){ if(!CAM._keep) CAM._keep = CAM.list; CAM.list = [c]; i = 0; } camOpen(i); }
+function rtCamById(id, fallback){ const c = RT.cams.find(x => String(x.id) === String(id)) || CAM.all.find(x => String(x.id) === String(id)); if(c) rtCamOpen(c); else fallback(); }
+async function rtCamSingleRefresh(){ const cur = CAM.list[0]; if(!cur) return; const r = await api(`/api/cameras?${q({refresh:1})}`, 30000); const c = (r.cameras || []).find(x => String(x.id) === String(cur.id)); if(c && CAM._keep){ CAM.list = [c]; camShow(); } }
+
+/* ---- wiring */
+(function(){
+  const fImp = occImpact; occImpact = function(){ fImp(); attnRender(); rtImpactRender(); };
+  const fRen = occRender; occRender = function(){ fRen(); attnRender(); rtImpactRender(); rtCounters(); rtEmphasis(); };
+  const fSide = occSide; occSide = function(id){ fSide(id); const open = !$("occSide").hidden; $("rtAttn").classList.toggle("detail", open); if(open && window.innerWidth >= 1000) $("rtAttn").scrollTop = 0; };
+  const fRw = loadRoadworksLayer; loadRoadworksLayer = async function(){ await fRw(); rtEmphasis(); };
+  const fCam = camLoad; camLoad = async function(fresh){ if(CAM._keep) return rtCamSingleRefresh(); await fCam(fresh); rtEmphasis(); };
+  const fDraw = drawRoute; drawRoute = function(r){ fDraw(r); setTimeout(rtEmphasis, 0); };
+  const fApply = apply; apply = async function(o){ RT.camSvc = null; await fApply(o); rtNetLoad(); };
+  const fClear = clearAll; clearAll = function(){ fClear(); rtEmphasis(); };
+  const fClose = camClose; camClose = function(){ fClose(); if(CAM._keep){ CAM.list = CAM._keep; CAM._keep = null; } };
+  $("camX").onclick = () => camClose();
+  $("camVRef").onclick = async () => { $("camVRef").disabled = true; if(CAM._keep) await rtCamSingleRefresh(); else await camLoad(true); $("camVRef").disabled = false; };
+  /* Service route chip: hides the route line (its traffic colours) and the selected-stretch outline; stops have their own chip */
+  const fSync = syncLayers; syncLayers = function(){ fSync(); const v = S.layers.route !== false;
+    [gCasing, gRoute, gBase, OCC.gSeg].forEach(g => { if(!v && map.hasLayer(g)) map.removeLayer(g); });
+    if(v){ if(!map.hasLayer(gCasing)) map.addLayer(gCasing); if(!map.hasLayer(OCC.gSeg)) map.addLayer(OCC.gSeg); } };
+  $("attnBack").onclick = () => { OCC.sel = null; occSide(null); occImpact(); };
+  $("opSel").addEventListener("change", () => { if(!S.svc) rtNetLoad(); });
+})();
+setInterval(() => { if(!document.hidden && S.svc && S.route) rtNetLoad(); }, 90000);   // network mode is refreshed by the island timer above
+(function(){ const ls = document.querySelector("#layers .lay-list"), mc = document.querySelector(".mapcard");
+  const fit = () => mc.style.setProperty("--chips-h", ls.offsetHeight + "px");
+  if(ls && mc){ fit(); if(window.ResizeObserver) new ResizeObserver(fit).observe(ls); } })();
+window.rtReady = true; attnRender(); rtCounters(); rtNetLoad();
+
+/* start */
+function fillSvcList(){
+  const list = S.op && S.svcAll ? S.svcAll.filter(x => !x.operators.length || x.operators.includes(S.op)) : (S.svcAll || []);
+  $("svcList").innerHTML = list.slice(0, 400).map(x => `<option value="${esc(x.svc)}">`).join("");
+}
+$("opSel").value = S.op;
+$("opSel").onchange = () => { S.op = $("opSel").value; try{ localStorage.setItem("rt.op", S.op); }catch(e){} fillSvcList(); };
+api("/api/traffic/services", 20000).then(j => { if(j.services){ S.svcAll = j.services; fillSvcList(); } });
+(async () => {
+  const h = await api("/api/health", 15000);
+  if(h.error) setLive("bad", "Server unreachable", h.error);
+  else if(!h.lta) setLive("bad", "LTA key missing", "Set LTA_ACCOUNT_KEY on the server");
+  else setLive("ok", "Live Data (LTA/NEA)", "");
+  const p = new URLSearchParams(location.search);
+  if(p.get("svc") || p.get("stop")){
+    $("svc").value = (p.get("svc") || "").toUpperCase(); $("stop").value = p.get("stop") || "";
+    S.dir = p.get("dir") === "2" ? 2 : 1; syncDir(); apply();
+  }
+})();
+setTimeout(() => map.invalidateSize(), 300);
+window.addEventListener("resize", () => map.invalidateSize());
+
+/* ===================== V16.9 TomTom road colours =====================
+   The colours of the roads follow TomTom's live traffic map (tiles from OUR server, so the key stays secret). With a service selected the route is
+   drawn as a plain line under the TomTom colours. Switch it off with the "TomTom colours" chip to see the LTA speed-band colours again.
+   Only the road colours change: the summary bar, timeline and counters still use LTA speed bands. */
+map.createPane("tomtom").style.zIndex = 412;
+const TOM = {ok:false};
+const tomLayer = L.tileLayer("/api/tomtom/tile/{z}/{x}/{y}.png", {pane:"tomtom", minZoom:10, maxZoom:19, maxNativeZoom:18, opacity:.95, updateWhenIdle:true, keepBuffer:2, attribution:"Traffic \u00a9 TomTom"});
+const tomOn = () => !!(TOM.ok && S.layers.tomtom && S.layers.traffic);
+(function(){ const fT = syncLayers; syncLayers = function(){ fT();
+  const on = (g, v) => { if(v && !map.hasLayer(g)) map.addLayer(g); if(!v && map.hasLayer(g)) map.removeLayer(g); };
+  const t = tomOn(); on(tomLayer, t);
+  if(t){ on(gRoute, false); on(gBase, true); on(gIslandSpeed, false); }
+  const ls = $("legendSpeed"), lt = $("legendTom"); if(ls) ls.hidden = t; if(lt) lt.hidden = !t;
+  const ti = $("legendTitle"); if(t && ti) ti.textContent = S.svc && S.route ? "Traffic on Route (TomTom)" : "Island Traffic (TomTom)";
+}; })();
+(function(){ const fD = drawRoute; drawRoute = function(r){ fD(r); syncLayers(); }; })();
+fetch("/api/health", {credentials:"same-origin"}).then(r => r.json()).then(j => {
+  if(!j || !j.tomtom) return;
+  TOM.ok = true; $("tomChip").hidden = false;
+  let pref = null; try{ pref = localStorage.getItem("rt.tomtom"); }catch(e){}
+  S.layers.tomtom = pref !== "0";
+  const cb = document.querySelector('#layers input[data-l="tomtom"]'); cb.checked = S.layers.tomtom;
+  cb.addEventListener("change", () => { try{ localStorage.setItem("rt.tomtom", cb.checked ? "1" : "0"); }catch(e){} if(!cb.checked && typeof loadIslandSpeed === "function") loadIslandSpeed(true); });
+  syncLayers();
+}).catch(() => {});
+setInterval(() => { if(!document.hidden && map.hasLayer(tomLayer)) tomLayer.redraw(); }, 120000);
+</script>
+
+
+<script>
+document.addEventListener("click", function(e){
+  var topMenu = document.getElementById("mobileTopMenu"), moreMenu = document.getElementById("mobileMore");
+  if(topMenu && topMenu.classList.contains("open") && !topMenu.contains(e.target) && !e.target.closest(".mobile-menu-btn")) topMenu.classList.remove("open");
+  if(moreMenu && moreMenu.classList.contains("open") && !moreMenu.contains(e.target) && !e.target.closest(".mbn")) moreMenu.classList.remove("open");
+}, true);
+</script>
+<script>
+/* V13.14: hide / show the desktop navigation; the choice is remembered in this browser */
+(function(){
+  var h = document.documentElement, shell = document.querySelector(".desktop-shell"); if(!shell) return;
+  function set(off){ h.classList.toggle("shell-off", off); try{ localStorage.setItem("shell.off", off ? "1" : "0"); }catch(e){} setTimeout(function(){ window.dispatchEvent(new Event("resize")); }, 60); }
+  var hide = document.createElement("button"); hide.type = "button"; hide.className = "shell-hide"; hide.innerHTML = "&laquo;";
+  hide.title = "Hide menu"; hide.setAttribute("aria-label", "Hide navigation menu");
+  var show = document.createElement("button"); show.type = "button"; show.className = "shell-show"; show.innerHTML = "&#9776;";
+  show.title = "Show menu"; show.setAttribute("aria-label", "Show navigation menu");
+  hide.onclick = function(){ set(true); show.focus(); };
+  show.onclick = function(){ set(false); hide.focus(); };
+  (shell.querySelector(".shell-brand") || shell).appendChild(hide);
+  var top = document.querySelector("header.top"), brand = top && top.querySelector(".brand"), mbtn = top && top.querySelector(".mobile-menu-btn");
+  if(brand) brand.parentNode.insertBefore(show, brand);
+  else if(mbtn) mbtn.parentNode.insertBefore(show, mbtn.nextSibling);
+  else if(top) top.insertBefore(show, top.firstChild);
+  else { show.classList.add("floating"); document.body.appendChild(show); }
+})();
+</script>
+<!-- V16.0 Route Traffic: ROUTE CONDITION STRIP. Built from the route and traffic-engine data this page already loaded (S.route runs, OCC.rows);
+     acknowledging uses the page's own rtAck(). Nothing new is estimated. -->
+<style>
+.rcs{margin:10px 0 0}
+.rcs .ds-panel{padding:12px 14px}
+.rcs-bar{position:relative;height:14px;border-radius:7px;overflow:hidden;display:flex;background:#0c1a2e;box-shadow:inset 0 0 0 1px var(--ds-line)}
+.rcs-bar i{display:block;height:100%}
+.rcs-wrap{position:relative;padding:22px 6px 26px;min-width:520px}
+.rcs-ev{position:absolute;top:14px;height:30px;border:2px solid #fff;border-radius:6px;background:rgba(255,85,102,.25);cursor:pointer;min-width:10px;box-shadow:0 0 14px rgba(255,85,102,.5)}
+.rcs-ev.warn{background:rgba(255,181,71,.22);box-shadow:0 0 12px rgba(255,181,71,.45)}
+.rcs-ev.acked{border-style:dashed;box-shadow:none;opacity:.7}
+.rcs-ev b{position:absolute;top:-19px;left:50%;transform:translateX(-50%);white-space:nowrap;font:700 11px var(--ds-font);color:#fff;background:#081426;border:1px solid var(--ds-line-2);border-radius:5px;padding:1px 5px}
+.rcs-stop{position:absolute;bottom:0;transform:translateX(-50%);font-size:11px;color:var(--ds-mut);white-space:nowrap;max-width:140px;overflow:hidden;text-overflow:ellipsis}
+.rcs-stop:before{content:"";position:absolute;left:50%;top:-12px;width:1px;height:8px;background:var(--ds-line-2)}
+.rcs-stop:first-child{transform:none}.rcs-stop:last-child{transform:translateX(-100%)}
+.rcs-det{margin-top:6px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:10px 12px;border-radius:10px;border:1px solid rgba(255,85,102,.35);background:rgba(255,85,102,.06);font-size:13px}
+.rcs-det b{color:#fff}.rcs-det .sp{flex:1}
+</style>
+<script>
+(function(){
+  "use strict";
+  if(!window.DS || typeof occRender !== "function") return;
+  var $ = function(id){ return document.getElementById(id); }, esc = DS.esc, SEL = null;
+  var host = $("occStrip"); if(!host) return;
+  var box = document.createElement("section"); box.className = "rcs"; box.id = "rcs"; box.setAttribute("aria-label", "Route condition strip"); box.hidden = true;
+  host.parentNode.insertBefore(box, host.nextSibling);
+  function render(){
+    var G = typeof occGeo === "function" ? occGeo() : null;
+    if(!S.route || !G || !G.total){ box.hidden = true; return; }
+    box.hidden = false;
+    var T = G.total, pc = function(k){ return Math.max(0, Math.min(100, 100 * k / T)); };
+    var bar = S.route.runs.map(function(run){ return '<i style="width:' + (100 * run.km / Math.max(T, .01)).toFixed(2) + '%;background:' + COL4[band4(run.b)] + '" title="' + esc((run.road || "") + " \u00b7 " + band4(run.b)) + '"></i>'; }).join("");
+    var n = S.route.stops.length, pick = Array.from(new Set([0, Math.round(n * .25), Math.round(n * .5), Math.round(n * .75), n - 1].map(function(i){ return Math.min(n - 1, i); })));
+    var stops = pick.map(function(i){ return '<span class="rcs-stop" style="left:' + pc(G.stopKm[i]) + '%">' + esc(S.route.stops[i].name) + '</span>'; }).join("");
+    var act = (OCC.rows || []).filter(function(r){ return r.status !== "cleared" && r.a_km != null; });
+    var evs = act.map(function(r){ var a = pc(r.a_km), b = pc(r.b_km != null ? r.b_km : r.a_km), crit = r.level === "critical" || r.level === "high";
+      return '<button type="button" class="rcs-ev' + (crit ? "" : " warn") + (r.status === "acknowledged" ? " acked" : "") + '" data-id="' + esc(r.id) + '" style="left:' + a + '%;width:' + Math.max(1.2, b - a) + '%" aria-label="' + esc((r.kind || "event") + " on route") + '"><b>' + (r.delay_min != null ? "+" + Math.round(r.delay_min) + " min" : esc(r.kind || "")) + '</b></button>'; }).join("");
+    var det = "";
+    var sel = SEL && act.filter(function(r){ return String(r.id) === String(SEL); })[0];
+    if(sel){ var bs = occBusStates(), aff = Object.keys(bs).filter(function(k){ return bs[k].ev && String(bs[k].ev.id) === String(sel.id) && (bs[k].state === "inside" || bs[k].state === "approaching"); }).length;
+      var from = occStopAt(sel.a_km || 0), to = occStopAt(sel.b_km || sel.a_km || 0);
+      det = '<div class="rcs-det">' + DS.sev(sel.level === "critical" ? "critical" : "warning", String(sel.kind || "event").toUpperCase() + " DETECTED")
+        + '<span><b>' + esc(from ? from.name : "") + (to && from && to.code !== from.code ? " \u2192 " + esc(to.name) : "") + '</b></span>'
+        + '<span>Expected delay <b>' + (sel.delay_min != null ? "+" + (Math.round(sel.delay_min * 10) / 10) + " min" : "not estimated") + '</b></span>'
+        + '<span><b>' + aff + '</b> bus' + (aff === 1 ? "" : "es") + ' affected</span><span class="sp"></span>'
+        + '<button class="ds-btn sm ghost" type="button" id="rcsView">Details</button>'
+        + (sel.status === "acknowledged" ? DS.sev("ok", "ACKNOWLEDGED") : '<button class="ds-btn sm pri" type="button" id="rcsAck">Acknowledge</button>') + '</div>'; }
+    box.innerHTML = '<div class="ds-panel"><div class="ds-ph">ROUTE CONDITION STRIP<span class="sp"></span><small>' + esc(S.route.stops[0].name) + ' \u2192 ' + esc(S.route.stops[n - 1].name) + (act.length ? ' \u00b7 select a highlighted stretch' : ' \u00b7 no traffic event on this route') + '</small></div>'
+      + '<div style="overflow-x:auto"><div class="rcs-wrap"><div class="rcs-bar">' + bar + '</div>' + evs + stops + '</div></div>' + det + '</div>';
+    box.querySelectorAll(".rcs-ev").forEach(function(e){ e.onclick = function(){ SEL = SEL === e.dataset.id ? null : e.dataset.id; if(SEL && typeof occDetail === "function") occDetail(SEL).then(render); render(); }; });
+    var ak = $("rcsAck"); if(ak) ak.onclick = function(){ rtAck([sel.id], ak); };
+    var vw = $("rcsView"); if(vw) vw.onclick = function(){ if(typeof occSelect === "function") occSelect(sel.id, true); };
+  }
+  var o = window.occRender; window.occRender = function(){ try{ return o.apply(this, arguments); } finally{ try{ render(); }catch(e){ console.error(e); } } };
+  var c = window.clearAll; if(typeof c === "function") window.clearAll = function(){ try{ return c.apply(this, arguments); } finally{ SEL = null; box.hidden = true; } };
+})();
+</script>
+
 </body>
 </html>
