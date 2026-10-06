@@ -1,4 +1,14 @@
-# SG Transport Pulse V16.18 — Operational Intelligence & Service Recovery Platform
+# SG Transport Pulse V16.19 — Operational Intelligence & Service Recovery Platform
+
+## V16.19 — AI-assisted route planning (AI Operational Review)
+Routing engine + operational rules + AI reasoning. Nothing in the routing, validation, blockage or service detection changed.
+* **Flow**: blockage → affected services → the engine searches diversion start × rejoin stops and keeps going until at least 5 distinct verified candidates exist where possible (up to 10 returned) → hard validation (blocked road / direction, U-turn, wrong-way or prohibited movement, restricted road, correct rejoin and onward movement) → operational scoring → **AI Operational Review** compares the verified candidates and recommends one → map and panel.
+* **`POST /api/diversion/ai_route_plan`** (same body as `/api/dv2/plan`): sends Claude (existing `ANTHROPIC_API_KEY`, model `DIVERSION_AI_MODEL`) each candidate as a letter with measured facts only — roads in order, turn-by-turn, turns / right turns / closely spaced turns, road types, bus-road evidence, skipped stops (names), extra km / min, distance off route, leave / rejoin distances, footprint, BC complexity, safeguards. No coordinates and no algorithm scores are sent; letters are assigned by extra distance, so the review is independent. Temperature 0; the decision is cached per blockage and candidate set (30 min).
+* The AI must answer with JSON (`recommended_candidate`, `confidence`, `ranking`, `reason`, `operational_advantages`, `concerns`), choosing one of the given letters. The server validates it; a missing / unknown letter, non-JSON text or invalid confidence is ignored and the best algorithm-ranked route is shown. The AI can never add a road, a turn or map geometry — the route drawn is always the routing engine's.
+* **Fallback**: no key, AI error or timeout → "AI Operational Review unavailable — displaying best algorithm-ranked route." OCC always gets a diversion.
+* **Panel**: 1 Routing Engine ("Generated N feasible diversion routes") → 2 AI Operational Review ("Compared N routes…") → 3 ⭐ AI Recommended: Route X, with confidence and whether the algorithm agreed ("the algorithm ranked Route Y first"); the AI's assessment, advantages and concerns; lettered alternatives (Route A, B, …) selectable by OCC. Labels say ALGORITHM RECOMMENDED whenever the AI did not decide. If the AI picks a route that is large and complex, or has LOW overall confidence, it is flagged for controller review.
+* **Map**: the recommended route highlighted, every other verified candidate drawn subdued (tap to view), skipped section and stops, rejoin point.
+
 
 ## V16.18 — Diversion Planner: how the proposed diversion is chosen
 * **Blockage lock**: a blockage locks automatically once its direction is chosen — taps on the map no longer move or replace it, its handles are hidden, its ✕ cannot be dragged to the bin and its direction cannot be changed. 🔒 LOCKED · UNLOCK on the blockage card unlocks it deliberately; + ADD ANOTHER BLOCKAGE still works while locked, and CLEAR ALL asks for confirmation when anything is locked.

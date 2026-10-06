@@ -55,6 +55,8 @@ PARAMS = {
     "max_level": 10,          # progressive search: combinations with up to this many extra stops given up
     "pairs_per_level": 6,
     "extra_levels": 1,        # after the first level with a strong valid diversion, look this much further for alternatives
+    "min_candidates": 5,      # ...and keep going (at most 2 more levels) until this many distinct verified candidates exist
+    "max_candidates": 10,     # candidates returned (recommendation + alternatives) - the AI operational review compares these
     "early_probe": 4,         # always also check this many earlier diversion starts (to prove or disprove an early turn-off)
     "early_window_m": 3000.0,  # ...and every stop back to the start of the route (e.g. an interchange) within this distance
     "impossible_turn_deg": 165.0,

@@ -251,7 +251,7 @@
     if(S.blocks.some(function(b){ return b.locked; }) && !confirm("Clear all blockages, including locked ones?")) return; S.blocks = []; S.bi = -1; S.adding = false; resetServices(); G.block.clearLayers(); paintBlockCard(); hint("Tap the road where it is blocked"); };
 
   /* ---------------------------------------------------------------- 4. affected services, each analysed automatically */
-  function resetServices(){ S.run++; S.services = []; S.plans = {}; S.sel = null; S.view = null; $("cSvc").hidden = true; clearServiceMap(); paintRec(); }
+  function resetServices(){ S.ai = {}; S.run++; S.services = []; S.plans = {}; S.sel = null; S.view = null; $("cSvc").hidden = true; clearServiceMap(); paintRec(); }
   function keyOf(x){ return x.service + "|" + x.direction + "|" + (x.run || 0); }
   function payload(){ return {blocks:S.blocks.map(function(b){ return {line:bLineOf(b), dir:b.dir, road:b.road}; })}; }
   S.op = "";
@@ -307,18 +307,42 @@
     $("svcList").querySelectorAll(".dp-svc").forEach(function(b){ b.onclick = function(){ selectService(b.dataset.k); }; });
   }
   function selectService(k){ S.sel = k; S.view = null; paintServices(); showSelected(); }
-  function showSelected(){ var p = S.plans[S.sel]; paintRec(); drawService(p); }
+  function showSelected(){ var p = S.plans[S.sel]; if(p && p.ok) fetchAI(S.sel); paintRec(); drawService(p); }
 
   /* ---------------------------------------------------------------- 5. the diversion on the map */
   function clearServiceMap(){ ["orig", "skip", "alt", "div", "stops", "marks"].forEach(function(k){ G[k].clearLayers(); }); ARR = ARR.filter(function(s){ return s.grp === G.block; }); }
-  function candOf(p){ if(!p || !p.candidates) return null; return S.view ? (p.candidates.filter(function(c){ return c.id === S.view; })[0] || p.best) : p.best; }
+  S.ai = {};
+  function aiOf(){ var a = S.ai[S.sel]; return a && !a.pending ? a : null; }
+  function recOf(p){
+    var a = aiOf();
+    if(a && a.status === "ai" && p && p.candidates){ var c = p.candidates.filter(function(x){ return x.id === a.candidate_id; })[0]; if(c) return c; }
+    return p ? p.best : null;
+  }
+  function letterOf(id){ var a = S.ai[S.sel], L_ = a && a.letters || {}; for(var k in L_){ if(L_[k] === id) return k; } return ""; }
+  function candOf(p){ if(!p || !p.candidates) return null; return S.view ? (p.candidates.filter(function(c){ return c.id === S.view; })[0] || recOf(p)) : recOf(p); }
+  function fetchAI(k){
+    var x = S.services.filter(function(s){ return keyOf(s) === k; })[0], p = S.plans[k];
+    if(!x || !p || !p.ok || !(p.candidates || []).length || S.ai[k]) return;
+    S.ai[k] = {pending:true}; var run = S.run;
+    post("/api/diversion/ai_route_plan", Object.assign(payload(), {service:x.service, direction:x.direction, run:x.run || 0}), 120000).then(function(r){
+      if(run !== S.run) return;
+      S.ai[k] = r && r.ok ? r : {status:"fallback", message:"AI Operational Review unavailable \u2014 displaying best algorithm-ranked route.", why:(r && r.error) || "no response"};
+      if(S.sel === k){ showSelected(); }
+    });
+  }
   function drawService(p){
     clearServiceMap(); if(!p || p.pending || !p.ok) return;
-    var c = candOf(p), b = p.best, bounds = L.latLngBounds(bLineOf(AB() || S.blocks[0]));
+    var c = candOf(p), b = recOf(p), bounds = L.latLngBounds(bLineOf(AB() || S.blocks[0]));
     S.blocks.forEach(function(x){ bounds.extend(bLineOf(x)); });
     rline(p.original_line, COL.orig, {pane:"orig", weight:5, casing:.6}, G.orig); arrows(G.orig, p.original_line, COL.orig, "arrows", 140);
     if(c){
-      if(c !== b && b) rline(b.line, COL.div, {pane:"alt", weight:4, opacity:.45, casing:.3}, G.alt);
+      (p.candidates || []).forEach(function(o){
+        if(o === c) return;
+        var lt = letterOf(o.id);
+        L.polyline(o.line, {pane:"alt", color:o === b ? COL.div : COL.alt, weight:o === b ? 5 : 4, opacity:o === b ? .5 : .32, dashArray:o === b ? null : "6 7"})
+          .bindTooltip((lt ? "Alternative " + lt + ": " : (o === b ? "Recommended: " : "Alternative: ")) + o.roads.join(" \u2192 ") + " \u2014 tap to view", {sticky:true})
+          .on("click", function(){ S.view = o.id === b.id ? null : o.id; showSelected(); }).addTo(G.alt);
+      });
       L.polyline(c.skip_line, {pane:"skip", color:"#fff", weight:11, opacity:.7, interactive:false}).addTo(G.skip);
       L.polyline(c.skip_line, {pane:"skip", color:COL.skip, weight:7, dashArray:"8 8"}).bindTooltip("Original section skipped", {sticky:true}).addTo(G.skip);
       var main = c === b ? COL.div : COL.alt;
@@ -341,6 +365,30 @@
     map.fitBounds(bounds.pad(.12), {maxZoom:17});
   }
 
+  /* ---------------------------------------------------------------- 5. AI Operational Review (chooses among VERIFIED routes only) */
+  function aiStages(p, ai, b){
+    var n = (p.candidates || []).length, h = '<div class="dp-stages">';
+    h += '<div class="st"><span class="n">1</span><div><b>Routing Engine</b>Generated ' + n + ' feasible diversion route' + (n === 1 ? '' : 's') + ' \u2014 every one hard-checked: no blocked road, U-turn, wrong-way or prohibited movement, correct rejoin and onward movement.</div></div>';
+    if(!ai || ai.pending){
+      h += '<div class="st"><span class="n">2</span><div><b>AI Operational Review</b><span class="dp-spin"></span>Comparing ' + n + ' routes as an OCC controller and Bus Captain would\u2026</div></div></div>';
+      return h;
+    }
+    if(ai.status === "ai"){
+      var a = ai.ai || {};
+      h += '<div class="st"><span class="n">2</span><div><b>AI Operational Review</b>' + esc((ai.review || {}).text || "") + (ai.model ? ' <span class="dp-muted">(' + esc(ai.model) + ')</span>' : '') + '</div></div>';
+      h += '<div class="st"><span class="n">3</span><div><b>\u2b50 AI Recommended: Route ' + esc(a.recommended_candidate) + '</b>confidence ' + Math.round((a.confidence || 0) * 100) + '%'
+        + (ai.agrees ? ' \u00b7 the algorithm ranked it first too' : ' \u00b7 <span style="color:#ffd391">the algorithm ranked Route ' + esc(ai.algorithm_letter || "?") + ' first</span>') + '</div></div></div>';
+      h += '<div class="dp-ai"><div class="dp-k" style="margin:0 0 4px">AI operational assessment</div><p>\u201c' + esc(a.reason || "") + '\u201d</p>'
+        + ((a.operational_advantages || []).length ? '<ul class="dp-why">' + a.operational_advantages.map(function(t){ return '<li>' + esc(t) + '</li>'; }).join("") + '</ul>' : '')
+        + ((a.concerns || []).length ? '<ul class="dp-why dp-fail">' + a.concerns.map(function(t){ return '<li>' + esc(t) + '</li>'; }).join("") + '</ul>' : '')
+        + '<p class="dp-muted" style="margin:6px 0 0">The AI chose among the verified routes only; every road and the map geometry come from the routing engine.</p></div>';
+      if(ai.flagged) h += '<div class="dp-banner rev"><b>CONTROLLER REVIEW REQUIRED</b>' + esc(ai.flagged) + '</div>';
+      return h;
+    }
+    return h + '<div class="st"><span class="n">2</span><div><b>AI Operational Review</b><span style="color:#ffd391">' + esc(ai.message || "AI Operational Review unavailable \u2014 displaying best algorithm-ranked route.") + '</span>'
+      + (ai.why ? ' <span class="dp-muted">(' + esc(ai.why) + ')</span>' : '') + '</div></div></div>';
+  }
+
   /* ---------------------------------------------------------------- 5. the recommendation panel */
   function pill(t, c){ return '<span class="dp-pill" style="--c:' + c + '">' + esc(t) + '</span>'; }
   var CONF = {HIGH:"#2ee59d", MEDIUM:"#ffb547", LOW:"#8a97a8", "VERY HIGH":"#2ee59d"};
@@ -354,14 +402,15 @@
     var head = '<div class="dp-rec-h"><span class="no">' + esc(x.service) + '</span><div class="meta"><b>Service ' + esc(x.service) + ' \u00b7 Direction ' + x.direction + '</b>to ' + esc(x.destination || "") + (p && p.bus_type ? ' \u00b7 ' + (p.bus_type === "DD" ? "double-deck" : "single-deck") : '') + '</div></div>';
     if(!p || p.pending){ el.innerHTML = head + '<p class="dp-muted"><span class="dp-spin"></span>Analysing: how far the bus can keep its normal route, where it must leave it, and the nearest stop it can rejoin correctly\u2026</p>'; return; }
     if(!p.ok){ el.innerHTML = head + '<div class="dp-banner no"><b>COULD NOT ANALYSE</b>' + esc(p.error || "") + '</div>'; return; }
-    var c = candOf(p), b = p.best, h = head;
+    var c = candOf(p), b = recOf(p), h = head, ai = S.ai[S.sel];
     if(p.status === "none" || !b){
       h += '<div class="dp-banner no"><b>\u26a0 NO VERIFIED DIVERSION FOUND</b>Controller review required. A correct \u201cno route\u201d is better than a wrong diversion.</div>'
         + (p.failures && p.failures.length ? '<div class="dp-k">Why</div><ul class="dp-why dp-fail">' + p.failures.map(function(f){ return '<li>' + esc(f) + '</li>'; }).join("") + '</ul>' : '')
         + attemptsHtml(p);
       el.innerHTML = h; return;
     }
-    h += p.status === "divert" ? '<div class="dp-banner ok"><b>RECOMMENDED DIVERSION</b>Easiest practical diversion that keeps the most useful part of the route.</div>'
+    h += aiStages(p, ai, b);
+    h += p.status === "divert" ? '<div class="dp-banner ok"><b>' + (ai && ai.status === "ai" ? "\u2b50 AI RECOMMENDED" + (letterOf(b.id) ? " \u00b7 ROUTE " + letterOf(b.id) : "") : "ALGORITHM RECOMMENDED") + '</b>Easiest practical diversion that keeps the most useful part of the route.</div>'
       : '<div class="dp-banner rev"><b>NO SUITABLE DIVERSION FOUND \u2014 CONTROLLER REVIEW REQUIRED</b>' + esc(String(p.headline || "").replace(/^.*REQUIRED\s*/, "") || "Only a low-confidence route was found") + ' \u2014 shown for reference, not recommended.</div>';
     if(c.bc_brief) h += '<div class="dp-brief"><div class="dp-k" style="margin:0 0 4px">Brief for the Bus Captain</div>' + esc(c.bc_brief) + '</div>';
     if(c.warnings && c.warnings.length) h += '<div class="dp-banner rev" style="border-style:dashed"><b>SAFEGUARD' + (c.warnings.length > 1 ? 'S' : '') + ' EXCEEDED</b>' + c.warnings.map(esc).join(" \u00b7 ") + ' \u2014 still the best verified option; please confirm.</div>';
@@ -386,10 +435,11 @@
       + '<dt>Overall confidence</dt><dd>' + pill(c.confidence, CONF[c.confidence]) + ' <span class="dp-muted">OCC score ' + f0(c.score) + '/100</span></dd></dl>';
     if(c === b && p.why && p.why.length) h += '<div class="dp-k">Why this route?</div><ul class="dp-why">' + p.why.map(function(t){ return '<li>' + esc(t) + '</li>'; }).join("") + '</ul>';
     if(c === b && p.why_not && p.why_not.length) h += '<div class="dp-k">Why not\u2026</div>' + p.why_not.map(function(w){ return '<div class="dp-not"><b>' + esc(tc(w.title)) + '</b>' + esc(w.text) + '</div>'; }).join("");
-    var alts = p.candidates || [];
+    var alts = (p.candidates || []).slice().sort(function(x, y){ return (letterOf(x.id) || "z").localeCompare(letterOf(y.id) || "z"); });
     if(alts.length > 1) h += '<details class="dp-det"' + (S.view ? ' open' : '') + '><summary>Show alternatives (' + (alts.length - 1) + ')</summary><div style="margin-top:6px">' + alts.map(function(a){
         var tg = (a.tags || []).map(function(t){ return {A:"MIN SKIPPED STOPS", B:"SIMPLEST", C:"FASTEST"}[t]; }).filter(Boolean).join(" \u00b7 ");
-        return '<button type="button" class="dp-alt" data-alt="' + esc(a.id) + '" aria-pressed="' + ((S.view || b.id) === a.id) + '"><b>' + esc(a.leave.code) + ' \u2192 ' + esc(a.rejoin.code) + '</b>' + (a.id === b.id ? '<span class="dp-tag" style="color:#2ee59d">RECOMMENDED</span>' : '') + (tg ? '<span class="dp-tag">' + tg + '</span>' : '')
+        return '<button type="button" class="dp-alt" data-alt="' + esc(a.id) + '" aria-pressed="' + ((S.view || b.id) === a.id) + '"><b>' + (letterOf(a.id) ? 'Route ' + letterOf(a.id) + ' \u00b7 ' : '') + esc(a.leave.code) + ' \u2192 ' + esc(a.rejoin.code) + '</b>'
+          + (ai && ai.status === "ai" && a.id === ai.candidate_id ? '<span class="dp-tag" style="color:#ffd34d">\u2b50 AI</span>' : '') + (a.id === p.best.id ? '<span class="dp-tag" style="color:#9fdff5">ALGORITHM #1</span>' : '') + (a.id === b.id ? '<span class="dp-tag" style="color:#2ee59d">RECOMMENDED</span>' : '') + (tg ? '<span class="dp-tag">' + tg + '</span>' : '')
           + '<br>' + esc(a.roads.join(" \u2192 ")) + '<br><span class="dp-muted">skips ' + a.skipped_n + ' \u00b7 ' + a.turns + ' turns \u00b7 ' + sgn(a.added_min) + ' min \u00b7 ' + sgn(a.added_km, 1) + ' km \u00b7 ' + esc(a.busroad_label) + ' bus-road \u00b7 ' + esc(a.confidence) + ' \u00b7 score ' + f0(a.score) + '</span></button>'; }).join("") + '</div></details>';
     h += '<details class="dp-det"><summary>OCC score ' + f0(c.score) + '/100 \u2014 how it is made</summary><div class="dp-muted" style="margin-top:6px">' + Object.keys(c.parts || {}).map(function(k){ return esc((S.cfg && S.cfg.weight_labels || {})[k] || k) + ' ' + f1(c.parts[k]); }).join(" \u00b7 ") + '. Scored only after every hard check passed (blocked road, U-turn, wrong-way, impossible turn, restricted road, rejoin direction, next original stop).</div></details>';
     h += attemptsHtml(p);

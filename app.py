@@ -22,7 +22,7 @@ import headway
 import routegeom
 import traffic
 
-VERSION = "V16.18"
+VERSION = "V16.19"
 # V16.8: pages hidden for everyone (see Settings > Pages). Defined here because bb_init() reads the saved value while the module loads.
 SITE_PAGE_IDS = ("command", "route", "headway", "bunching", "recovery", "halfplan", "trafficaware", "running", "ewt", "cameras", "diversion")     # "settings" can never be hidden
 SITE = {"hidden": [x.strip() for x in os.getenv("HIDDEN_PAGES", "").split(",") if x.strip() in SITE_PAGE_IDS], "block": True}
@@ -9354,7 +9354,9 @@ async def dv2_plan(st, blocks, svc, d, run_i, traffic=True):
         if strong_at is None and any(c["confidence"] in ("HIGH", "MEDIUM") for c in valid_all):
             strong_at = k
         if strong_at is not None and k >= strong_at + Q["extra_levels"]:
-            break
+            distinct = len({(c["signature"], c["pair"]) for c in valid_all})
+            if distinct >= Q["min_candidates"] or k >= strong_at + Q["extra_levels"] + 2:
+                break           # enough verified candidates for a real comparison (or the search has gone far enough)
     # prove or disprove an early diversion: earlier diversion starts towards the same rejoin stop
     if valid_all:
         best0 = max(valid_all, key=lambda c: c["score"])
@@ -9397,6 +9399,8 @@ async def dv2_plan(st, blocks, svc, d, run_i, traffic=True):
                 "bc_label": m["bc_label"], "bc_points": m["bc_points"], "bc": m["bc"], "footprint_label": m["footprint_label"],
                 "footprint_index": m["footprint_index"], "warnings": m["warnings"], "bc_brief": dv2.bc_sentence(m, m["instructions"]),
                 "leave_before_m": m["leave_before_m"], "rejoin_after_m": m["rejoin_after_m"],
+                "road_mix": (c.get("suit") or {}).get("text", ""), "sensible": not (m["bc_label"] == "HIGH" and m["footprint_label"] == "LARGE"),
+                "unavoidable": m["unavoidable"],
                 "line": [[round(p[0], 6), round(p[1], 6)] for p in diversion.simplify(seg, 400)],
                 "skip_line": [[round(p[0], 6), round(p[1], 6)] for p in diversion.simplify(skip_line, 200)],
                 "leave_pt": [round(c["dep"]["leave_pt"][0], 6), round(c["dep"]["leave_pt"][1], 6)],
@@ -9416,7 +9420,7 @@ async def dv2_plan(st, blocks, svc, d, run_i, traffic=True):
     tag_of = {}
     for t, c in tags.items():
         tag_of.setdefault(id(c), []).append(t)
-    others = [c for c in uniq if c is not best][:5]
+    others = [c for c in uniq if c is not best][:Q["max_candidates"] - 1]
     base["status"] = "divert" if best["confidence"] in ("HIGH", "MEDIUM") and sensible(best) else "review"
     base["headline"] = ("RECOMMENDED DIVERSION" if base["status"] == "divert" else
                         "NO SUITABLE DIVERSION FOUND \u2014 CONTROLLER REVIEW REQUIRED" + (" (best route is large and complex for a Bus Captain)" if not sensible(best) else " (low confidence only)"))
@@ -9450,3 +9454,142 @@ async def api_dv2_plan(request: Request):
         r = await dv2_plan(st, blocks, svc, d, run_i, traffic)
         return r, 120, bool(r.get("ok"))
     return copy.deepcopy(await cached(key, factory))
+
+
+
+# =========================================================================== V16.19 AI-assisted route planning (AI Operational Review)
+# Routing engine -> hard validation -> operational scoring -> the AI compares the VERIFIED candidates and recommends one.
+# The AI never sees or produces coordinates: it gets candidate letters with measured facts and must answer with one of those
+# letters. Its answer is validated server-side; anything invalid, or no AI configured, falls back to the algorithm's ranking.
+DV_AI_ROUTE_SYSTEM = """You are an experienced Singapore bus OCC (Operations Control Centre) controller who also trains Bus Captains.
+A road is blocked. A routing engine has already produced the candidate diversions below and a validator has already rejected
+every unsafe or impossible one (blocked road, U-turn, wrong-way or prohibited movement, restricted road, wrong-direction rejoin,
+bus unable to continue to the next original stop). Every candidate you see is physically valid. Your job is to choose the most
+operationally practical one - NOT the shortest.
+
+Judge in roughly this priority:
+1 safety and feasibility (all given candidates passed; prefer higher bus-road confidence when in doubt)
+2 the blocked section is avoided completely (all given candidates do)
+3 rejoin the original route as early as reasonably practical
+4 minimise skipped bus stops - and consider which stops (an MRT, interchange, hospital or school stop matters more)
+5 keep the diversion geographically small (small footprint, little distance off the route)
+6 simple for a Bus Captain to follow: few turns, few right turns across traffic, no closely spaced turns
+7 fewer turns
+8 major / recognisable roads and roads other buses already use, rather than small local streets
+9 avoid complicated local street networks, loops and backtracking
+10 additional running time, then additional distance.
+A slightly longer route with fewer turns on main roads that skips fewer stops and rejoins cleanly usually beats a shorter one
+through small streets. Skipping 2 stops is generally better than 6 unless there is a strong operational reason.
+
+Rules: use ONLY the facts given for each candidate - do not assume anything about roads from your own knowledge, and never
+mention a road, stop or turn that is not in the facts. You must choose one of the given candidate letters.
+Answer with ONE JSON object and nothing else:
+{"recommended_candidate": "<letter>", "confidence": <0..1>, "ranking": ["<letter>", ...],
+ "reason": "<2-3 sentences an OCC controller can read out>",
+ "operational_advantages": ["<short>", ...], "concerns": ["<short>", ...]}"""
+
+
+def dv_ai_facts(c):
+    """the measured facts of one VERIFIED candidate, in plain operational terms (no coordinates, no scores)"""
+    bc = c.get("bc") or {}
+    return {"diversion_starts_after_stop": f"{c['leave']['code']} {c['leave']['name']}",
+            "rejoins_at_stop": f"{c['rejoin']['code']} {c['rejoin']['name']}",
+            "next_original_stop_verified": c["next"]["ok"],
+            "roads_in_order": c["roads"], "turn_by_turn": c.get("instruction_text") or [],
+            "turns": c["turns"], "right_turns": bc.get("right", 0), "sharp_turns": c.get("sharp", 0),
+            "closely_spaced_turns": bc.get("close_turns", 0), "roundabouts": bc.get("roundabouts", 0),
+            "road_types": c.get("road_mix", ""), "share_on_roads_no_bus_uses": bc.get("unfamiliar_share"),
+            "bus_road_confidence": c.get("busroad_label"), "bus_road_evidence": c.get("evidence_text", ""),
+            "stops_skipped": c["skipped_n"], "stops_skipped_inside_blockage": c.get("unavoidable", 0),
+            "skipped_stop_names": [s_["name"] for s_ in c.get("skipped", [])][:12],
+            "extra_distance_km": c["added_km"], "extra_time_min": c["added_min"], "distance_off_route_km": c["div_km"],
+            "leaves_route_m_before_blockage": c.get("leave_before_m", 0), "rejoins_m_after_blockage": max(0, c.get("rejoin_after_m", 0)),
+            "diversion_footprint": c.get("footprint_label"), "bus_captain_complexity": c.get("bc_label"),
+            "safeguards_exceeded": c.get("warnings") or [], "u_turn": "none (validated)", "earlier_diversion_point": bool(c.get("earlier"))}
+
+
+def dv_ai_parse(text, letters):
+    """validate the AI answer -> (dict, None) or (None, why)"""
+    t = (text or "").strip()
+    t = re.sub(r"^```(?:json)?\s*|\s*```$", "", t)
+    a, b = t.find("{"), t.rfind("}")
+    if a < 0 or b <= a:
+        return None, "no JSON object in the answer"
+    try:
+        j = json.loads(t[a:b + 1])
+    except Exception:
+        return None, "the answer is not valid JSON"
+    rec = str(j.get("recommended_candidate") or "").strip().upper()[:2]
+    if rec not in letters:
+        return None, f"recommended candidate '{rec}' does not exist"
+    try:
+        conf = float(j.get("confidence"))
+    except (TypeError, ValueError):
+        return None, "confidence is not a number"
+    if 1.0 < conf <= 100.0:
+        conf /= 100.0
+    if not 0.0 <= conf <= 1.0:
+        return None, "confidence out of range"
+
+    def strs(v, n, ln):
+        return [str(x)[:ln] for x in (v or []) if isinstance(x, (str, int, float))][:n] if isinstance(v, list) else []
+    rank = [x for x in (str(y).strip().upper()[:2] for y in (j.get("ranking") or []) if isinstance(y, str)) if x in letters]
+    return {"recommended_candidate": rec, "confidence": round(conf, 2), "reason": str(j.get("reason") or "")[:800],
+            "operational_advantages": strs(j.get("operational_advantages"), 8, 200), "concerns": strs(j.get("concerns"), 8, 200),
+            "ranking": list(dict.fromkeys(rank))}, None
+
+
+@app.post("/api/diversion/ai_route_plan")
+async def api_dv_ai_route_plan(request: Request):
+    """Routing engine candidates -> AI Operational Review -> recommendation (with the algorithm's ranking as the fallback)."""
+    plan = await api_dv2_plan(request)
+    if not isinstance(plan, dict):
+        return plan
+    cands = plan.get("candidates") or []
+    best = plan.get("best") or {}
+    out = {"ok": True, "routing": {"generated": len(cands), "routes_checked": sum(a_.get("routes", 0) for a_ in plan.get("attempts") or []),
+                                   "text": f"Generated {len(cands)} feasible diversion route{'s' if len(cands) != 1 else ''}"},
+           "algorithm_choice": best.get("id"), "model": DV_AI_MODEL if DV_AI_KEY else None}
+    if not cands:
+        out.update(status="none", message="No verified diversion to review.", review={"compared": 0, "text": "Nothing to compare"})
+        return out
+    # neutral letters (by extra distance, not by the algorithm's ranking) so the review is independent
+    order = sorted(cands, key=lambda c: (c["added_km"], c["id"]))
+    letters = {chr(65 + i): c["id"] for i, c in enumerate(order[:26])}
+    out["letters"] = letters
+    out["review"] = {"compared": len(cands), "text": f"Compared {len(cands)} route{'s' if len(cands) != 1 else ''} on OCC and Bus Captain operational considerations"}
+    if not DV_AI_KEY:
+        out.update(status="fallback", message="AI Operational Review unavailable \u2014 displaying best algorithm-ranked route.", why="not configured (set ANTHROPIC_API_KEY)")
+        return out
+    packet = {"blockage": [b_.get("road") for b_ in dv2_blocks(_dv_body(await request.body()))],
+              "service": plan.get("service"), "direction": plan.get("direction"),
+              "candidates": {L_: dv_ai_facts(next(c for c in cands if c["id"] == cid)) for L_, cid in letters.items()}}
+    key = "dvai:" + hashlib.sha1(json.dumps([DV_AI_MODEL, packet], sort_keys=True, default=str).encode()).hexdigest()[:24]
+
+    async def factory():
+        try:
+            r = await client().post("https://api.anthropic.com/v1/messages", timeout=40,
+                                    headers={"x-api-key": DV_AI_KEY, "anthropic-version": "2023-06-01", "content-type": "application/json"},
+                                    json={"model": DV_AI_MODEL, "max_tokens": 900, "temperature": 0, "system": DV_AI_ROUTE_SYSTEM,
+                                          "messages": [{"role": "user", "content": "Candidates (JSON):\n" + json.dumps(packet, default=str)[:28000]}]})
+            j = r.json()
+            if r.status_code != 200:
+                return {"error": (j.get("error") or {}).get("message") or f"HTTP {r.status_code}"}, 60, False
+            return {"text": "".join(c_.get("text", "") for c_ in j.get("content", []) if c_.get("type") == "text")}, 1800, True
+        except Exception as e:
+            return {"error": f"AI service unavailable ({type(e).__name__})"}, 60, False
+    res = await cached(key, factory)
+    if res.get("error"):
+        out.update(status="fallback", message="AI Operational Review unavailable \u2014 displaying best algorithm-ranked route.", why=res["error"])
+        return out
+    ai, why = dv_ai_parse(res.get("text"), letters)
+    if not ai:
+        out.update(status="fallback", message="AI answer could not be used \u2014 displaying best algorithm-ranked route.", why=why)
+        return out
+    cid = letters[ai["recommended_candidate"]]
+    chosen = next(c for c in cands if c["id"] == cid)
+    out.update(status="ai", ai=ai, candidate_id=cid, agrees=cid == best.get("id"),
+               algorithm_letter=next((L_ for L_, v in letters.items() if v == best.get("id")), None),
+               flagged=("The AI's choice is large and complex for a Bus Captain \u2014 controller review required." if not chosen.get("sensible", True) else
+                        "The AI's choice has LOW overall confidence (weak bus-road evidence) \u2014 controller review required." if chosen.get("confidence") == "LOW" else ""))
+    return out
