@@ -1,5 +1,14 @@
 # SG Transport Pulse V16.19 — Operational Intelligence & Service Recovery Platform
 
+## Bunching & Gap — simpler dashboard (patch on V16.19; only bunching.html and bunching.py changed)
+* Filters unchanged (Transport Operator, Services, Direction, Time period, View by, Headway status, Bunching level). Engine, alert rules, Alerts / Settings tabs and APIs unchanged.
+* Four plain tiles (Bunching now, Long gaps, Alerts to acknowledge, Services watched); tap Bunching / Long gaps to filter.
+* Service status list: Service · Status in words · Headway now vs scheduled · In 30 min (follows Time period; "Getting worse / Steady / Improving") · Where. Replaces the +10 / +20 / +30 columns.
+* "What's happening" card for the selected service: headline, which buses (lettered A, B, C … from the front bus), how far apart, where, how long, next 30 min, one suggested action, Acknowledge / Headway Control / Recovery.
+* Headway diagram: Direction 1 unchanged, Direction 2 drawn right-to-left (front bus A on the right); very close buses get a minimum width so they stay readable.
+* Live bus positions: bus icons with an arrow for the travel direction, coloured by state; bunched road section highlighted red with a label, long gap dashed amber; smart zoom to the bunch, "Jump to" chips, All buses / Whole route; the map stops auto-moving once the controller zooms or drags it.
+* bunching.py: each bus in `seq` also carries `s_km` (position along the route) so heading arrows are correct on loop routes.
+
 ## V16.19 — AI-assisted route planning (AI Operational Review)
 Routing engine + operational rules + AI reasoning. Nothing in the routing, validation, blockage or service detection changed.
 * **Flow**: blockage → affected services → the engine searches diversion start × rejoin stops and keeps going until at least 5 distinct verified candidates exist where possible (up to 10 returned) → hard validation (blocked road / direction, U-turn, wrong-way or prohibited movement, restricted road, correct rejoin and onward movement) → operational scoring → **AI Operational Review** compares the verified candidates and recommends one → map and panel.

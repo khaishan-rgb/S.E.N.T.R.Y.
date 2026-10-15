@@ -117,6 +117,99 @@ tbody tr{cursor:pointer}tbody tr:hover{background:#0d2440}tbody tr.sel{backgroun
   html.shell-off .shell-show + .brand{margin-right:auto}
   html.shell-off .shell-show.floating{position:absolute;left:10px;top:12px;z-index:10001}
 }
+
+/* ===== V16.22 Bunching & Gap - simplified dashboard ===== */
+.kpis4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:4px 0 12px}
+.kt{display:flex;flex-direction:column;align-items:flex-start;gap:3px;text-align:left;background:linear-gradient(180deg,#0d2039,#0a1a2e);border:1px solid var(--line2);border-radius:13px;padding:12px 14px;min-width:0;color:var(--text);font:inherit}
+button.kt{cursor:pointer}button.kt:hover{border-color:#2f6ea6}
+.kt>span{font-size:12px;color:var(--mut);font-weight:600;letter-spacing:.02em}
+.kt>b{font-size:32px;font-weight:800;line-height:1.05;font-variant-numeric:tabular-nums}
+.kt>small{font-size:12px;color:var(--mut)}
+.kt>em{font-style:normal;font-size:11.5px;font-weight:700}.kt>em.up{color:#ff8a90}.kt>em.dn{color:#7be7a5}.kt>em.flat{color:var(--mut);font-weight:500}
+.kt.bb{border-color:#7a4a12}.kt.bb>b{color:#ffb547}.kt.gap{border-color:#7a2530}.kt.gap>b{color:#ff7a84}.kt.al>b{color:#8fd8ff}
+.kt.on{box-shadow:inset 0 0 0 1px #38d6ff}
+.pill{display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 10px;border-radius:999px;font-size:12px;font-weight:700;line-height:1;letter-spacing:.02em;white-space:nowrap;border:1px solid}
+.pill:before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor;flex:none}
+.pill.crit{color:#ffb3bb;background:rgba(255,85,102,.14);border-color:rgba(255,85,102,.5)}
+.pill.warn{color:#ffd59a;background:rgba(255,181,71,.12);border-color:rgba(255,181,71,.5)}
+.pill.watch{color:#ffe98a;background:rgba(255,210,63,.09);border-color:rgba(255,210,63,.4)}
+.pill.ok{color:#8ff0c4;background:rgba(46,229,157,.1);border-color:rgba(46,229,157,.35)}
+.pill.off{color:#a9bccf;background:rgba(111,131,153,.12);border-color:rgba(111,131,153,.4)}
+.bbtop{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(320px,1fr);gap:12px;align-items:start}
+.bbside{display:grid;gap:12px;align-content:start}
+.bbmap{display:grid;grid-template-columns:minmax(0,1.75fr) minmax(270px,1fr);gap:12px;margin-top:12px}
+#tbl td{vertical-align:middle}#tbl td small{display:block;color:var(--mut);font-size:11.5px;font-weight:500;margin-top:3px}
+#tbl td.sv b{font-size:18px;font-weight:800}#tbl td.where{white-space:normal;max-width:260px;font-size:13px}
+#tbl tr td:first-child{box-shadow:inset 4px 0 0 transparent}
+#tbl tr.r-crit td:first-child{box-shadow:inset 4px 0 0 #ff5566}#tbl tr.r-warn td:first-child{box-shadow:inset 4px 0 0 #ffb547}
+#tbl tr.r-watch td:first-child{box-shadow:inset 4px 0 0 #ffd23f}#tbl tr.r-ok td:first-child{box-shadow:inset 4px 0 0 #2ee59d55}
+.hwv{font-size:15px;font-weight:800;font-variant-numeric:tabular-nums}
+.ol{font-weight:700}.ol.worse{color:#ff8a90}.ol.better{color:#7be7a5}.ol.steady{color:var(--mut)}
+.vbtn.sm{padding:5px 12px}
+.bl{display:inline-grid;place-items:center;min-width:22px;height:22px;padding:0 5px;border-radius:6px;font-size:12px;font-weight:800;line-height:1;background:#2ee59d;color:#04121f;border:1.5px solid rgba(255,255,255,.35);vertical-align:middle}
+.bl.bunch{background:#ff5566;color:#fff}.bl.close{background:#ffb547}.bl.gap{background:#4aa6ff;color:#03142a}
+button.bl,.bl[data-o]{cursor:pointer}
+/* what's happening card */
+.fcard .fh{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.fcard .fsvc{font-size:30px;font-weight:800;line-height:1}.fcard .fdir{margin-left:8px;color:var(--mut);font-weight:700}
+.fcard .fhead{margin:10px 0 8px;font-size:19px;font-weight:800;letter-spacing:-.01em}
+.fcard .fhead.crit{color:#ff8a92}.fcard .fhead.warn{color:#ffc670}.fcard .fhead.watch{color:#ffe07a}.fcard .fhead.ok{color:#8ff0c4}
+.facts{display:grid;grid-template-columns:auto 1fr;gap:7px 14px;margin:0;font-size:14px}
+.facts dt{color:var(--mut);font-size:12.5px;padding-top:2px}.facts dd{margin:0;min-width:0}.facts dd .bl{margin-right:3px}
+.rec{margin-top:12px;padding:10px 12px;border-radius:10px;background:rgba(56,214,255,.07);border:1px solid rgba(56,214,255,.28);font-size:13.5px}
+.rec b{display:block;font-size:11px;letter-spacing:.12em;color:#8fd8ff;margin-bottom:3px}
+.facts-act{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;align-items:center}
+.fctx{margin-top:10px;color:var(--mut);font-size:12px}
+/* headway diagram */
+.bbdiag{margin-top:12px}.bbdiag .ds-hwline{height:92px}
+.ds-hwline .bus.close i{border-color:var(--ds-amber,#ffb547);box-shadow:0 0 10px rgba(255,181,71,.45)}
+.ds-hwline .bus.gapb i{border-color:#4aa6ff}
+.ds-hwline .bus b{font-size:12.5px!important;font-weight:800!important;color:#e6f1ff!important}
+.hwends{display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:11px;font-weight:700;letter-spacing:.08em;color:#8fd8ff;margin:2px 14px 0}
+.hwends .c{font-weight:500;letter-spacing:0;color:var(--mut);font-size:12px;text-align:center}
+.hwleg{display:flex;gap:16px;justify-content:center;flex-wrap:wrap;font-size:11.5px;color:var(--mut);margin-top:10px}
+.hwleg i{display:inline-block;width:16px;height:3px;border-radius:2px;margin-right:6px;vertical-align:middle}
+/* map */
+.maph{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;justify-content:space-between;margin-bottom:8px}
+.mtools{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.seg.sm{height:34px}.seg.sm button{padding:0 10px;font-size:12.5px}
+.tg{display:flex;align-items:center;gap:6px;font-size:12.5px;color:#cfe0f3;cursor:pointer;margin:0}.tg input{accent-color:#1785ff}
+.pchips{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:0 0 8px;min-height:28px;font-size:12.5px}
+.pchips .pl{color:var(--mut);margin-right:2px}.pchips .okm{color:#8ff0c4}
+.pc{height:28px;padding:0 10px;border-radius:8px;border:1px solid var(--line2);background:#0c2440;color:#dce9f7;font-weight:700;font-size:12.5px;cursor:pointer;white-space:nowrap}
+.pc.crit{border-color:rgba(255,85,102,.55);color:#ffc0c6}.pc.warn{border-color:rgba(255,181,71,.55);color:#ffdca6}.pc.watch{border-color:rgba(255,210,63,.45);color:#ffe98a}
+.pc.on{background:#1b3a5c;box-shadow:inset 0 0 0 1px #38d6ff}
+#map{height:470px}
+.mleg{position:absolute;z-index:500;left:8px;bottom:8px;background:rgba(6,18,33,.9);border:1px solid var(--line2);border-radius:9px;padding:6px 9px;display:flex;flex-wrap:wrap;gap:4px 10px;font-size:11.5px;color:#cfe0f3;max-width:calc(100% - 16px)}
+.mleg span{display:inline-flex;align-items:center;gap:5px}.mleg i{width:10px;height:10px;border-radius:3px;display:inline-block}.mleg i.ln{width:16px;height:4px;border-radius:2px}
+.bmk2{position:relative;width:52px;height:52px;--c:#2ee59d;--t:#04121f}
+.bmk2.bunch{--c:#ff5566;--t:#fff}.bmk2.close{--c:#ffb547}.bmk2.gap{--c:#4aa6ff;--t:#03142a}
+.bmk2 .hd{position:absolute;inset:0;pointer-events:none}
+.bmk2 .hd:before{content:"";position:absolute;left:50%;top:0;transform:translateX(-50%);border-left:6px solid transparent;border-right:6px solid transparent;border-bottom:10px solid var(--c);filter:drop-shadow(0 0 1.5px rgba(0,0,0,.9))}
+.bmk2 .bd{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:flex;align-items:center;gap:3px;height:26px;padding:0 7px 0 5px;border-radius:8px;background:var(--c);color:var(--t);border:2px solid #fff;box-shadow:0 2px 10px rgba(0,0,0,.6);font-size:13px;font-weight:800;line-height:1;white-space:nowrap}
+.bmk2 .bd svg{width:16px;height:16px;flex:none}
+.bmk2.bunch .bd{box-shadow:0 0 0 3px rgba(255,85,102,.4),0 2px 10px rgba(0,0,0,.6)}
+.mlbl{position:absolute;left:0;top:0;transform:translate(-50%,calc(-100% - 26px));white-space:nowrap;padding:5px 10px;border-radius:8px;font-size:12px;font-weight:800;line-height:1.2;background:#2a0b12;color:#ffd0d6;border:1.5px solid #ff5566;box-shadow:0 4px 14px rgba(0,0,0,.55);cursor:pointer}
+.mlbl:after{content:"";position:absolute;left:50%;bottom:-7px;margin-left:-6px;border-left:6px solid transparent;border-right:6px solid transparent;border-top:6px solid #ff5566}
+.mlbl.side:after{display:none}
+.mlbl.warn{background:#2e2106;color:#ffe0ad;border-color:#ffb547}.mlbl.warn:after{border-top-color:#ffb547}
+.mlbl.watch{background:#2c2706;color:#fff0a8;border-color:#ffd23f}.mlbl.watch:after{border-top-color:#ffd23f}
+.mlbl.gapl{background:#2e2106;color:#ffe0ad;border-color:#ffb547;border-style:dashed}.mlbl.gapl:after{border-top-color:#ffb547}
+.pulse{width:76px;height:76px;border-radius:50%;border:2px solid rgba(255,85,102,.85);animation:bbpl 1.8s ease-out infinite}
+.pulse.warn{border-color:rgba(255,181,71,.85)}
+@keyframes bbpl{0%{transform:scale(.45);opacity:1}100%{transform:scale(1.35);opacity:0}}
+@media (prefers-reduced-motion:reduce){.pulse{animation:none;opacity:.55}}
+/* bus order list */
+.blist{display:grid;gap:6px;max-height:520px;overflow:auto}
+.bi{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:10px;align-items:center;text-align:left;width:100%;padding:8px 10px;border-radius:10px;border:1px solid var(--line);background:#0b1d33;color:var(--text);cursor:pointer;font:inherit}
+.bi:hover{border-color:#2f6ea6}.bi.bunch{border-color:rgba(255,85,102,.45)}.bi.close{border-color:rgba(255,181,71,.4)}
+.bi .bw{min-width:0}.bi .bw b{display:block;font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.bi .bw small{color:var(--mut);font-size:11.5px}
+.bi .bl{min-width:28px;height:28px;font-size:14px}
+.blgap{font-size:11.5px;color:var(--mut);padding:0 0 0 46px;margin:-2px 0}.blgap b{color:#cfe0f3}.blgap b.c-red{color:#ff7a80}
+@media(max-width:1200px){.bbtop,.bbmap{grid-template-columns:1fr}
+  #dash:not([hidden]){display:flex;flex-direction:column;gap:12px}.bbtop,.bbside{display:contents}#trendCard{order:9}#dash>.bbdiag,#dash>.bbmap{margin-top:0}.msgs:empty{display:none}.kpis4{margin:0}}
+.seg.sm button{white-space:nowrap}
+@media(max-width:760px){.mleg{position:static;margin-top:8px;background:transparent;border:0;padding:0;max-width:none}.kpis4{grid-template-columns:repeat(2,minmax(0,1fr))}.kt>b{font-size:26px}#map{height:400px}.fcard .fsvc{font-size:26px}.hwends .c{display:none}.mtools{width:100%}.mtools .seg{flex:1 1 100%}.mtools .seg button{flex:1;justify-content:center}}
 </style>
 <link rel="stylesheet" href="/design-system.css">
 <script src="/app-shell.js" data-module="bunching"></script>
@@ -130,7 +223,7 @@ tbody tr{cursor:pointer}tbody tr:hover{background:#0d2440}tbody tr.sel{backgroun
     
     <div class="hdr-right"><div id="clock">&nbsp;</div><div class="live" id="live"><span class="dot"></span><span id="liveText">Connecting&hellip;</span></div></div>
   </header>
-  <section class="module-intro"><h2>Bunching & Gap</h2><p>Detect bunching, prolonged gaps and unstable service spacing.</p></section>
+  <section class="module-intro"><h2>Bunching & Gap</h2><p>Which buses are too close together or too far apart &mdash; now and in the next 30 minutes.</p></section>
   <section class="ai-shell-card" aria-label="AI Operational Assistant"><div class="ai-shell-icon">✦</div><div><b>AI Operational Assistant</b><span>Context-aware operational interpretation for bunching & gap; existing calculations remain authoritative.</span></div><div class="ai-shell-badge">AI READY</div></section>
   <div class="tabs" role="tablist"><button role="tab" id="tabDash" aria-selected="true">Dashboard</button><button role="tab" id="tabAlerts" aria-selected="false">Alerts<span class="tbadge" id="alBadge" hidden>0</span></button><button role="tab" id="tabSet" aria-selected="false">Settings</button></div>
 
@@ -148,33 +241,34 @@ tbody tr{cursor:pointer}tbody tr:hover{background:#0d2440}tbody tr.sel{backgroun
       <label class="auto"><input type="checkbox" id="autoCb" checked> Auto refresh <span id="cd"></span></label>
     </form>
     <div class="msgs" id="msgs"></div>
-    <section class="kpis" id="kpis" aria-label="Summary"></section>
+    <section class="kpis4" id="kpis" aria-label="Summary"></section>
 
-    <div class="grid1">
+    <div class="bbtop">
       <section class="card" id="tableCard">
-        <header><div><h2 id="tblTitle">Service Headway &amp; Bunching Status</h2><div class="sub" id="tblSub">Loading&hellip;</div></div>
-          <div class="sorts">Sort by: <button data-s="risk" aria-pressed="true">Risk level</button><button data-s="time" aria-pressed="false">Time to occur</button><button data-s="svc" aria-pressed="false">Service no.</button><button data-s="gap" aria-pressed="false">Headway gap</button>
+        <header><div><h2 id="tblTitle">Service status</h2><div class="sub" id="tblSub">Loading&hellip;</div></div>
+          <div class="sorts">Sort: <button data-s="risk" aria-pressed="true">Most urgent</button><button data-s="time" aria-pressed="false">Soonest</button><button data-s="svc" aria-pressed="false">Service</button><button data-s="gap" aria-pressed="false">Biggest gap</button>
           <button class="btn sm" id="exportBtn" type="button">Export</button></div></header>
         <div class="tw"><table id="tbl"><thead id="thead"></thead><tbody id="tbody"></tbody></table></div>
         <div class="empty" id="tblEmpty" hidden></div><div class="pager" id="pager"></div>
       </section>
-      <div style="display:grid;gap:12px;align-content:start">
-        <section class="card"><h2>Bunching Cases by Level</h2><div id="donut" style="display:flex;align-items:center;gap:16px;margin-top:8px"></div></section>
-        <section class="card"><h2>Headway Gap vs Bunching Trend</h2><div id="trend"></div></section>
+      <div class="bbside">
+        <section class="card fcard" id="focus" aria-live="polite"><div class="empty">Select a service to see what is happening.</div></section>
+        <section class="card" id="trendCard"><header><div><h2>Trend today</h2><div class="sub">Number of bunching cases and long gaps over time</div></div></header><div id="trend"></div></section>
       </div>
     </div>
 
-    <section class="card insight" id="insight" hidden>
-      <div><h2 id="inTitle"></h2><div class="sub" id="inSub"></div><div class="kv" id="inKv" style="margin-top:10px"></div></div>
-      <div><h2>Headway path</h2><div class="sub">Predicted spacing of the focus pair vs scheduled</div><div class="path" id="inPath"></div><div id="inState" class="sub"></div></div>
-      <div><h2>Supporting information</h2><div class="sub">Context only - not presented as the cause</div><div id="inSupport" style="margin-top:8px;font-size:13.5px;display:grid;gap:6px"></div></div>
-    </section>
+    <section class="ds-panel bbdiag" id="diagCard"><div class="ds-ph"><span id="diagTitle">HEADWAY DIAGRAM</span><span class="sp"></span><span id="diagSev"></span></div><div id="diag"></div></section>
 
-    <div class="grid2">
-      <section class="card"><header><h2 id="mapTitle">Live Bus Positions</h2></header>
-        <div class="mapwrap"><div id="map"></div><div class="mlay" id="mlay"><label><input type="checkbox" data-m="bus" checked>Bus (on route)</label><label><input type="checkbox" data-m="stop" checked>Bus stop</label><label><input type="checkbox" data-m="group" checked>Bunched group</label><label><input type="checkbox" data-m="gap" checked>Headway gap</label></div></div></section>
-      <section class="card"><header><h2 id="seqTitle">Bus Sequence</h2></header><div class="tw" id="seq"><div class="empty">Select a service to see its bus formation.</div></div></section>
-      <section class="card"><header><h2 id="distTitle">Headway Distribution</h2></header><div id="dist"><div class="empty">Select a service.</div></div></section>
+    <div class="bbmap">
+      <section class="card" id="mapCard">
+        <div class="maph"><h2 id="mapTitle">Live bus positions</h2>
+          <div class="mtools"><div class="seg sm" id="mapSeg" role="group" aria-label="Map view"><button type="button" data-m="focus">Bunching area</button><button type="button" data-m="all">All buses</button><button type="button" data-m="route">Whole route</button></div>
+            <label class="tg"><input type="checkbox" id="tgStops"> Stops</label><label class="tg"><input type="checkbox" id="tgTraffic"> Traffic</label></div></div>
+        <div class="pchips" id="pchips"></div>
+        <div class="mapwrap"><div id="map"></div>
+          <div class="mleg" aria-hidden="true"><span><i style="background:#2ee59d"></i>Normal</span><span><i style="background:#ff5566"></i>Bunched</span><span><i style="background:#ffb547"></i>Closing in</span><span><i style="background:#4aa6ff"></i>Long gap behind</span><span><i class="ln" style="background:#ff5566"></i>Bunched section</span><span><i class="ln" style="background:repeating-linear-gradient(90deg,#ffb547 0 5px,transparent 5px 8px)"></i>Long gap</span></div></div>
+      </section>
+      <section class="card"><header><div><h2 id="seqTitle">Bus order</h2><div class="sub">Front bus first &bull; tap a bus to find it on the map</div></div></header><div id="seq"><div class="empty">Select a service.</div></div></section>
     </div>
   </main>
 
@@ -190,7 +284,7 @@ tbody tr{cursor:pointer}tbody tr:hover{background:#0d2440}tbody tr.sel{backgroun
     <section class="card" style="margin-top:12px"><header><div><h2>Event log</h2><div class="sub" id="evSub">Bunching and long-headway events, logged only when they last long enough.</div></div><button class="btn sm" id="evExport" type="button">Export CSV</button></header><div class="tw" id="events"></div></section>
   </main>
 
-  <footer class="foot"><span>Sources: LTA DataMall (Bus Arrival, Bus Routes/Stops/Services, Traffic Speed Bands, Incidents), OneMap &nbsp;|&nbsp; Decision support only, not for operational use</span><span>SG Transport Pulse V12.7</span></footer>
+  <footer class="foot"><span>Sources: LTA DataMall (Bus Arrival, Bus Routes/Stops/Services, Traffic Speed Bands, Incidents), OneMap &nbsp;|&nbsp; Decision support only, not for operational use</span><span>SG Transport Pulse</span></footer>
 </div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -199,12 +293,13 @@ tbody tr{cursor:pointer}tbody tr:hover{background:#0d2440}tbody tr.sel{backgroun
 "use strict";
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-const f1 = x => x == null ? "\u2013" : (Math.abs(x - Math.round(x)) < .05 ? String(Math.round(x)) : x.toFixed(1));
+const f1 = x => x == null ? "–" : (Math.abs(x - Math.round(x)) < .05 ? String(Math.round(x)) : x.toFixed(1));
 const LS = {get(k, d){ try{ const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); }catch(e){ return d; } }, set(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }};
 const COL = {smooth:"#22d36a", moderate:"#ffc21a", slow:"#ff4d55", none:"#2f7dff"}, bandCls = b => b == null ? "none" : b >= 5 ? "smooth" : b >= 3 ? "moderate" : "slow";
 const RNK = {red:0, orange:1, yellow:2, green:3, nodata:4}, RNAME = {red:"Critical", orange:"Developing", yellow:"Early sign", green:"Normal", nodata:"No data"};
 const S = {services:LS.get("bb.services", []), dir:LS.get("bb.dir", 0), win:LS.get("bb.win", 30), view:"service", issue:"all", lv:{2:true, 3:true, 4:true}, op:LS.get("bb.op", ""), opMap:null, sort:"risk", page:1, data:null, sel:null,
-           detail:{}, auto:LS.get("bb.auto", true), left:30, tok:0, busy:false, tab:"dash", alOpen:{}};
+           detail:{}, auto:LS.get("bb.auto", true), left:30, tok:0, busy:false, tab:"dash", alOpen:{},
+           mapMode:"focus", focusI:0, autoFit:true, fitting:false, probs:[], showStops:LS.get("bb.stops", false), showTraffic:LS.get("bb.traffic", false)};
 const sgt = o => new Intl.DateTimeFormat("en-GB", {timeZone:"Asia/Singapore", hour12:false, ...o});
 function tick(){ const p = Object.fromEntries(sgt({weekday:"short", day:"2-digit", month:"short", year:"numeric", hour:"2-digit", minute:"2-digit"}).formatToParts(new Date()).map(x => [x.type, x.value])); $("clock").textContent = `${p.weekday}, ${p.day} ${p.month} ${p.year}  ${p.hour}:${p.minute}`; }
 tick(); setInterval(tick, 15000);
@@ -218,22 +313,39 @@ async function post(url, body){
   const j = await r.json().catch(() => ({error:"Bad response"})); if(!r.ok && !j.error) j.error = "Error " + r.status; return j;
 }
 
-/* ------------------------------------------------------------------ helpers */
+/* ------------------------------------------------------------------ helpers (plain-language wording; the engine's numbers are unchanged) */
 const P = () => (S.data && S.data.params) || {bunch_min:3, confirm_stops:15, gap_add_min:10, gap_stops:15, alert_step:5, horizon_min:30};
 function hwCls(v, H){ if(v == null || !H) return ""; const p = P(); return v < p.bunch_min - 1e-6 || v >= H + p.gap_add_min - 1e-6 ? "c-red" : ""; }
-const tOcc = t => t == null ? "\u2013" : t <= 0 ? "Now" : Math.round(t) + " min";
-function spark(r){
-  const H = r.sched_hw, v = ["0", "10", "20", "30"].map(k => r.hw && r.hw[k]); if(!H) return "";
-  return `<span class="bar4" title="HW now / +10 / +20 / +30: ${v.map(x => x == null ? "-" : f1(x)).join(" / ")}">${v.map(x => { const h = x == null ? 3 : Math.max(3, Math.min(18, Math.round(18 * x / (2 * H)))); const c = x == null ? "#3a5670" : x < P().bunch_min - 1e-6 || x >= H + P().gap_add_min - 1e-6 ? "#ff4d55" : "#22d36a"; return `<i style="height:${h}px;background:${c}"></i>`; }).join("")}</span>`;
+const tOcc = t => t == null ? "–" : t <= 0 ? "Now" : Math.round(t) + " min";
+const LETTER = o => o >= 1 && o <= 26 ? String.fromCharCode(64 + o) : String(o);            // bus A = front bus (furthest along the route)
+const tid = id => String(id == null ? "" : id).replace(/^B(?=\d)/, "#");                     // tracking id B17 -> #17 (never confused with bus letters)
+const ST = {Leading:"bunch", Bunched:"bunch", Joining:"close", Converging:"close", Gap:"gap", Normal:"ok"};
+const STW = {bunch:"Bunched", close:"Closing in", gap:"Long gap behind", ok:"Normal"};
+const STP = {bunch:"crit", close:"warn", gap:"warn", ok:"ok"};
+const RCLS = {red:"crit", orange:"warn", yellow:"watch", green:"ok", nodata:"off"};
+const lvl = b => b.size >= 4 ? "4BB+" : b.size + "BB";
+const inMin = t => t != null && t > 0 ? `in ~${Math.max(1, Math.round(t))} min` : "now";
+const OLW = {worse:"Getting worse", better:"Improving", steady:"Steady"};
+const hwTxt = v => v == null ? "\u2013" : (v < .5 ? "<0.5" : f1(v)) + " min";
+const hm = ts => ts ? sgt({hour:"2-digit", minute:"2-digit"}).format(new Date(ts * 1000)) : "–";
+function statusOf(r){
+  const cls = RCLS[r.risk] || "off", b = r.bb, g = r.gap;
+  if(r.risk === "nodata") return {cls, label:"No data", sub:r.n_buses < 2 ? "fewer than 2 buses" : /Master/.test(r.note || "") ? "no scheduled headway" : "waiting for data"};
+  let label = "", sub = "";
+  if(b){ label = b.status === "confirmed" ? `Bunched ${lvl(b)}` : b.status === "developing" ? `Bunching ${lvl(b)}` : `${lvl(b)} likely`;
+         sub = b.status === "early" ? inMin(b.t_occur) : `for ${b.stops} stop${b.stops === 1 ? "" : "s"}`; }
+  if(g){ if(label) label += " + gap"; else { label = g.state === "confirmed" ? "Long gap" : "Gap building"; sub = g.stops ? `for ${g.stops} stops` : inMin(g.t_occur); } }
+  if(!label){ label = r.risk === "yellow" ? "Watch" : "Normal"; sub = r.risk === "yellow" ? "spacing drifting" : ""; }
+  return {cls, label, sub};
 }
-const TREND = {converging:"\u2198 converging", separating:"\u2197 separating", widening:"\u2197 widening", recovering:"\u2198 recovering", stable:"\u2192 stable"};
-function bbCell(r){
-  if(!r.bb) return `<span class="m">&ndash;</span>`;
-  const st = r.bb.status, t = st === "confirmed" ? `<span class="tag conf">confirmed</span>` : st === "developing" ? `<span class="tag dev">developing</span>` : `<span class="tag early">early warning</span>`;
-  return `<b>${esc(r.bb.label)}</b>${t}${r.bb.joining && r.bb.joining.length ? ` <small class="m">+${r.bb.joining.length} joining</small>` : ""}`;
+function outlook(r){                                   // where the focus pair's headway is heading within the chosen time period
+  const H = r.sched_hw, h = r.hw || {}, v0 = h["0"]; if(!S.win || v0 == null || !H) return null;
+  let k = null; for(const x of [S.win, 20, 10]) if(x <= S.win && h[String(x)] != null){ k = x; break; }
+  if(k == null) return null;
+  const v = h[String(k)], thr = Math.max(.5, .05 * H), d0 = Math.abs(v0 - H), d1 = Math.abs(v - H);        // distance from the scheduled headway: growing = worse
+  return {k, v, w:d1 - d0 >= thr ? "worse" : d0 - d1 >= thr ? "better" : "steady", ar:v < v0 - .5 ? "↘" : v > v0 + .5 ? "↗" : "→"};
 }
-function issueCell(r){ return r.issue === "Normal" ? `<span class="c-grn">Normal</span>` : r.risk === "nodata" ? `<span class="m">No data</span>` : `<span class="${r.risk === "red" ? "c-red" : "c-amb"}">${esc(r.issue)}</span>`; }
-function stopsCell(r){ return r.bb && r.bb.status !== "early" ? r.bb.stops : `<span class="m">&ndash;</span>`; }
+function alertFor(r){ return ((S.data && S.data.alerts) || []).filter(a => a.service === r.service && +a.direction === +r.direction).sort((a, b) => (a.acked - b.acked) || (b.stops - a.stops))[0] || null; }
 
 /* ------------------------------------------------------------------ filtering / sorting */
 function visibleRows(){
@@ -251,58 +363,59 @@ function visibleRows(){
 }
 function busRows(rows){ const out = []; rows.forEach(r => (r.seq || []).forEach(s => out.push({r, s}))); const o = {Bunched:0, Leading:0, Joining:1, Converging:1, Gap:2, Normal:3}; return out.sort((a, b) => (RNK[a.r.risk] - RNK[b.r.risk]) || (o[a.s.status] - o[b.s.status])); }
 
-/* ------------------------------------------------------------------ rendering */
+/* ------------------------------------------------------------------ KPIs: four plain tiles */
 function renderKpis(){
-  const k = S.data ? S.data.kpi : null, v = x => k ? x : "\u2013";
-  const dl = key => { if(!k) return ""; if(!k.prev) return `<div class="d na">vs 30 min: history builds (${f1(k.history_min)} min so far)</div>`; const d = k[key] - k.prev[key]; return `<div class="d ${d > 0 ? "up" : d < 0 ? "dn" : "flat"}">${d > 0 ? "\u2191" : d < 0 ? "\u2193" : "\u2192"} ${Math.abs(d)} vs 30 min ago</div>`; };
+  const k = S.data ? S.data.kpi : null, v = x => k ? x : "–", al = (S.data && S.data.alerts) || [], un = al.filter(a => !a.acked).length;
+  const dl = key => { if(!k || !k.prev) return ""; const d = k[key] - k.prev[key]; return `<em class="${d > 0 ? "up" : d < 0 ? "dn" : "flat"}">${d > 0 ? "▲ " + d + " more" : d < 0 ? "▼ " + (-d) + " fewer" : "no change"}${d ? " than" : " since"} 30 min ago</em>`; };
   $("kpis").innerHTML = `
-   <div class="kpi gap"><div class="n">${v(k && k.gaps)}</div><div><b>Headway Gaps</b><span>long headway: scheduled + ${P().gap_add_min} min for ${P().gap_stops} stops</span>${dl("gaps")}</div></div>
-   <div class="kpi bb"><div class="n">${v(k && k.bb)}</div><div><b>Bunching Cases</b><span>&ge; 2 buses${k && k.early ? ` &bull; +${k.early} early warning${k.early > 1 ? "s" : ""}` : ""}</span>${dl("bb")}</div></div>
-   <div class="kpi"><div class="n">${v(k && k.bb2)}</div><div><b>2BB cases</b>${dl("bb2")}</div></div>
-   <div class="kpi"><div class="n">${v(k && k.bb3)}</div><div><b>3BB cases</b>${dl("bb3")}</div></div>
-   <div class="kpi"><div class="n">${v(k && k.bb4)}</div><div><b>4BB+ cases</b>${dl("bb4")}</div></div>
-   <div class="kpi"><div class="n">${v(k && k.services)}</div><div><b>Services monitored</b><span>${S.data ? S.data.rows.length + (S.data.rows.length === 1 ? " direction" : " directions") : ""}</span></div></div>`;
+   <button type="button" class="kt bb${S.issue === "bb" ? " on" : ""}" data-go="bb" title="Show bunching only"><span>Bunching now</span><b>${v(k && k.bb)}</b><small>${k ? `2BB ${k.bb2} · 3BB ${k.bb3} · 4BB+ ${k.bb4}${k.early ? ` · ${k.early} likely soon` : ""}` : "&nbsp;"}</small>${dl("bb")}</button>
+   <button type="button" class="kt gap${S.issue === "gap" ? " on" : ""}" data-go="gap" title="Show long gaps only"><span>Long gaps</span><b>${v(k && k.gaps)}</b><small>${S.data ? `${P().gap_add_min}+ min longer than scheduled` : "&nbsp;"}</small>${dl("gaps")}</button>
+   <button type="button" class="kt al" data-go="alerts" title="Open the alert list"><span>Alerts to acknowledge</span><b>${S.data ? un : "–"}</b><small>${S.data ? `${al.length} open alert${al.length === 1 ? "" : "s"}` : "&nbsp;"}</small></button>
+   <div class="kt"><span>Services watched</span><b>${v(k && k.services)}</b><small>${S.data ? `${S.data.rows.length} direction${S.data.rows.length === 1 ? "" : "s"} · live LTA data` : "&nbsp;"}</small></div>`;
 }
+
+/* ------------------------------------------------------------------ status table */
 function renderHead(){
   $("thead").innerHTML = S.view === "service"
-    ? `<tr><th>#</th><th>Risk</th><th>Service</th><th>Dir</th><th class="hide-m">Current HW (min)</th><th class="hide-m">+10</th><th class="hide-m">+20</th><th class="hide-m">+30</th><th class="hide-m">Sch HW</th><th>Issue type</th><th>BB level</th><th class="hide-m">Consec. stops</th><th class="hide-m">Location (worst section)</th><th>Time to occur</th><th class="hide-m">Trend</th><th>Action</th></tr>`
-    : `<tr><th>#</th><th>Risk</th><th>Service</th><th>Dir</th><th>Order</th><th>Bus</th><th>Location</th><th>HW to next (min)</th><th>Status</th><th>Action</th></tr>`;
+    ? `<tr><th>Service</th><th>Status</th><th>Headway now</th>${S.win ? `<th class="hide-m">In ${S.win} min</th>` : ""}<th class="hide-m">Where</th><th class="hide-m"></th></tr>`
+    : `<tr><th>Service</th><th>Bus</th><th class="hide-m">Where</th><th>Next bus behind</th><th>Status</th><th class="hide-m"></th></tr>`;
 }
 function renderTable(){
   renderHead();
-  const d = S.data, tb = $("tbody"); $("tblTitle").textContent = `Service Headway & Bunching Status (${S.win ? "Next " + S.win + " min" : "Current"})`;
-  if(!d){ tb.innerHTML = `<tr><td colspan="16"><div class="sk"></div><div class="sk"></div><div class="sk"></div></td></tr>`; $("tblSub").textContent = "Loading live buses\u2026"; $("pager").innerHTML = ""; return; }
+  const d = S.data, tb = $("tbody"); $("tblTitle").textContent = S.win ? `Service status — next ${S.win} min` : "Service status — now";
+  if(!d){ tb.innerHTML = `<tr><td colspan="6"><div class="sk"></div><div class="sk"></div><div class="sk"></div></td></tr>`; $("tblSub").textContent = "Loading live buses…"; $("pager").innerHTML = ""; return; }
   const rows = visibleRows(), items = S.view === "service" ? rows : busRows(rows), per = 10, pages = Math.max(1, Math.ceil(items.length / per));
   S.page = Math.min(S.page, pages); const from = (S.page - 1) * per, slice = items.slice(from, from + per);
-  $("tblSub").textContent = items.length ? `Showing ${from + 1}\u2013${from + slice.length} of ${items.length} ${S.view === "service" ? "service directions" : "buses"}` : "Nothing matches the current filters";
+  $("tblSub").textContent = items.length ? `Most urgent first · ${from + 1}–${from + slice.length} of ${items.length} ${S.view === "service" ? "service directions" : "buses"}` : "Nothing matches the current filters";
   if(S.view === "service"){
-    tb.innerHTML = slice.map((r, i) => { const H = r.sched_hw, h = r.hw || {};
-      return `<tr data-k="${esc(r.key)}" class="${r.key === S.sel ? "sel" : ""}" tabindex="0"><td>${from + i + 1}</td><td><span class="rk ${r.risk}" title="${RNAME[r.risk]} (score ${r.score})"></span></td><td class="svc">${esc(r.service)}</td><td>${r.direction}</td>
-        <td class="hide-m ${hwCls(h["0"], H)}">${f1(h["0"])}</td><td class="hide-m ${hwCls(h["10"], H)}">${f1(h["10"])}</td><td class="hide-m ${hwCls(h["20"], H)}">${f1(h["20"])}</td><td class="hide-m ${hwCls(h["30"], H)}">${f1(h["30"])}</td>
-        <td class="hide-m">${H == null ? "\u2013" : f1(H)}</td><td>${issueCell(r)}</td><td>${bbCell(r)}</td><td class="hide-m">${stopsCell(r)}</td><td class="hide-m">${esc(r.location || "\u2013")}</td>
-        <td class="${r.t_occur != null && r.t_occur <= 10 ? "c-amb" : ""}">${tOcc(r.t_occur)}</td><td class="hide-m">${spark(r)} <small class="m">${TREND[r.trend] || ""}</small></td><td><button class="vbtn" type="button" data-k="${esc(r.key)}">View</button></td></tr>`; }).join("");
+    tb.innerHTML = slice.map(r => { const H = r.sched_hw, h = r.hw || {}, st = statusOf(r), ol = outlook(r);
+      return `<tr data-k="${esc(r.key)}" class="r-${st.cls}${r.key === S.sel ? " sel" : ""}" tabindex="0">
+        <td class="sv"><b>${esc(r.service)}</b><small>Dir ${r.direction}</small></td>
+        <td><span class="pill ${st.cls}">${esc(st.label)}</span>${st.sub ? `<small>${esc(st.sub)}</small>` : ""}</td>
+        <td><span class="hwv ${hwCls(h["0"], H)}">${h["0"] == null ? "–" : f1(h["0"]) + " min"}</span><small>should be ${H == null ? "?" : f1(H)}</small></td>
+        ${S.win ? `<td class="hide-m">${ol ? `<span class="hwv ${hwCls(ol.v, H)}">${ol.ar} ${hwTxt(ol.v)}</span><small class="ol ${ol.w}">${OLW[ol.w]}</small>` : `<span class="m">–</span>`}</td>` : ""}
+        <td class="hide-m where">${esc(r.location || "–")}</td>
+        <td class="hide-m"><button class="vbtn sm" type="button" data-k="${esc(r.key)}">View</button></td></tr>`; }).join("");
   }else{
-    tb.innerHTML = slice.map(({r, s}, i) => `<tr data-k="${esc(r.key)}" class="${r.key === S.sel ? "sel" : ""}" tabindex="0"><td>${from + i + 1}</td><td><span class="rk ${r.risk}"></span></td><td class="svc">${esc(r.service)}</td><td>${r.direction}</td><td>${s.order}</td><td>${esc(s.id)}</td><td>${esc(s.near)}</td><td>${f1(s.hw_next)}</td><td><b class="${s.status === "Normal" ? "c-grn" : s.status === "Gap" ? "c-amb" : "c-red"}">${s.status}</b></td><td><button class="vbtn" type="button" data-k="${esc(r.key)}">View</button></td></tr>`).join("");
+    tb.innerHTML = slice.map(({r, s}) => { const st = ST[s.status] || "ok";
+      return `<tr data-k="${esc(r.key)}" class="r-${STP[st]}${r.key === S.sel ? " sel" : ""}" tabindex="0"><td class="sv"><b>${esc(r.service)}</b><small>Dir ${r.direction}</small></td>
+        <td><span class="bl ${st}">${LETTER(s.order)}</span> <small style="display:inline">${esc(tid(s.id))}</small></td><td class="hide-m where">${esc(s.near || "–")}</td>
+        <td><span class="hwv ${hwCls(s.hw_next, r.sched_hw)}">${s.hw_next == null ? "–" : f1(s.hw_next) + " min"}</span></td><td><span class="pill ${STP[st]}">${STW[st]}</span></td>
+        <td class="hide-m"><button class="vbtn sm" type="button" data-k="${esc(r.key)}">View</button></td></tr>`; }).join("");
   }
   const e = $("tblEmpty"); e.hidden = items.length > 0; e.textContent = d.rows.length ? "No service matches the current filters." : "No service could be evaluated. Check the messages above.";
   $("pager").innerHTML = pages > 1 ? `<button data-p="${S.page - 1}" ${S.page <= 1 ? "disabled" : ""}>&lsaquo; Prev</button> Page ${S.page} of ${pages} <button data-p="${S.page + 1}" ${S.page >= pages ? "disabled" : ""}>Next &rsaquo;</button>` : "";
 }
-function renderDonut(){
-  const k = S.data && S.data.kpi, vals = [[4, k ? k.bb4 : 0, "#ff4d55", "4BB+"], [3, k ? k.bb3 : 0, "#ff9f1c", "3BB"], [2, k ? k.bb2 : 0, "#ffd23f", "2BB"]], tot = vals.reduce((a, x) => a + x[1], 0), R = 52, C = 2 * Math.PI * R; let off = 0;
-  const arcs = tot ? vals.filter(x => x[1]).map(x => { const len = C * x[1] / tot, a = `<circle r="${R}" cx="70" cy="70" fill="none" stroke="${x[2]}" stroke-width="20" stroke-dasharray="${len.toFixed(1)} ${(C - len).toFixed(1)}" stroke-dashoffset="${(-off).toFixed(1)}" transform="rotate(-90 70 70)"/>`; off += len; return a; }).join("") : `<circle r="${R}" cx="70" cy="70" fill="none" stroke="#163250" stroke-width="20"/>`;
-  $("donut").innerHTML = `<svg viewBox="0 0 140 140" width="140" height="140" role="img" aria-label="Bunching cases by level">${arcs}<text x="70" y="72" text-anchor="middle" font-size="26" font-weight="800" fill="#fff">${tot}</text><text x="70" y="90" text-anchor="middle" font-size="10" fill="#8ba3bd">Bunching cases</text></svg>
-    <div class="legend">${vals.map(x => `<div><i style="background:${x[2]}"></i><b>${x[3]}</b><span class="m">${x[1]}${tot ? ` (${Math.round(100 * x[1] / tot)}%)` : ""}</span></div>`).join("")}</div>`;
-}
 function renderTrend(){
   const t = S.data ? S.data.trend : [];
-  if(t.length < 2){ $("trend").innerHTML = `<div class="empty">The trend fills in as the collector runs (${f1(S.data ? S.data.kpi.history_min : 0)} min of history so far).</div>`; return; }
-  const W = 360, H = 170, L = 30, R = 10, T = 12, B = 24, x0 = t[0][0], x1 = t[t.length - 1][0] || x0 + 1, ymax = Math.max(5, ...t.map(p => Math.max(p[1], p[2]))) , X = ts => L + (W - L - R) * (ts - x0) / Math.max(1, x1 - x0), Y = v => T + (H - T - B) * (1 - v / ymax);
+  if(t.length < 2){ $("trend").innerHTML = `<div class="empty">Fills in while the page runs (${f1(S.data ? S.data.kpi.history_min : 0)} min so far).</div>`; return; }
+  const W = 360, H = 150, L = 30, R = 10, T = 12, B = 24, x0 = t[0][0], x1 = t[t.length - 1][0] || x0 + 1, ymax = Math.max(5, ...t.map(p => Math.max(p[1], p[2]))) , X = ts => L + (W - L - R) * (ts - x0) / Math.max(1, x1 - x0), Y = v => T + (H - T - B) * (1 - v / ymax);
   const line = (i, c) => `<polyline fill="none" stroke="${c}" stroke-width="2" points="${t.map(p => X(p[0]).toFixed(1) + "," + Y(p[i]).toFixed(1)).join(" ")}"/>`;
   const tf = ts => sgt({hour:"2-digit", minute:"2-digit"}).format(new Date(ts * 1000));
-  $("trend").innerHTML = `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Headway gaps and bunching cases over time"><line x1="${L}" x2="${W - R}" y1="${Y(0)}" y2="${Y(0)}" stroke="#163250"/><line x1="${L}" x2="${W - R}" y1="${Y(ymax)}" y2="${Y(ymax)}" stroke="#163250"/>
+  $("trend").innerHTML = `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Long gaps and bunching cases over time"><line x1="${L}" x2="${W - R}" y1="${Y(0)}" y2="${Y(0)}" stroke="#163250"/><line x1="${L}" x2="${W - R}" y1="${Y(ymax)}" y2="${Y(ymax)}" stroke="#163250"/>
     <text x="${L - 5}" y="${Y(0) + 4}" text-anchor="end" font-size="10" fill="#8ba3bd">0</text><text x="${L - 5}" y="${Y(ymax) + 4}" text-anchor="end" font-size="10" fill="#8ba3bd">${ymax}</text>${line(1, "#ff4d55")}${line(2, "#ff9f1c")}
     <text x="${L}" y="${H - 6}" font-size="10" fill="#8ba3bd">${tf(x0)}</text><text x="${W - R}" y="${H - 6}" text-anchor="end" font-size="10" fill="#8ba3bd">${tf(x1)}</text></svg>
-    <div class="sub"><span style="color:#ff4d55">&#9632;</span> Headway gap &nbsp;<span style="color:#ff9f1c">&#9632;</span> Bunching &nbsp;(no. of cases)</div>`;
+    <div class="sub"><span style="color:#ff9f1c">&#9632;</span> Bunching &nbsp;<span style="color:#ff4d55">&#9632;</span> Long gaps</div>`;
 }
 function renderMsgs(){
   const d = S.data, m = [];
@@ -315,14 +428,13 @@ function renderMsgs(){
   }
   $("msgs").innerHTML = m.join("");
 }
-function render(){ renderMsgs(); renderKpis(); renderTable(); renderDonut(); renderTrend(); renderInsight(); renderAlerts(); }
+function render(){ renderMsgs(); renderKpis(); renderTable(); renderTrend(); renderSel(); renderAlerts(); }
 
 /* ------------------------------------------------------------------ alerts: 1st alert at 15 stops, then one more every 5 stops while it lasts */
-const hm = ts => ts ? sgt({hour:"2-digit", minute:"2-digit"}).format(new Date(ts * 1000)) : "\u2013";
 function alertRow(a){
   const cls = a.count >= 3 ? "l3" : a.count === 2 ? "l2" : "l1", open = S.alOpen[a.id], p = P();
   const hwTxt = a.kind === "bb" ? `min headway ${f1(a.min_hw)} min (bunched: below ${p.bunch_min} min)` : `headway up to ${f1(a.max_hw)} min vs scheduled ${f1(a.sched)} min (long: ${f1((a.sched || 0) + p.gap_add_min)}+ min)`;
-  const act = a.acked ? `<button class="albtn act done" type="button" disabled title="Acknowledged ${hm(a.acked_ts)}">ACKED \u2713 ${hm(a.acked_ts)}</button>` : `<button class="albtn act" type="button" data-act="${a.id}" title="Acknowledge: I have seen / actioned this alert">ACT</button>`;
+  const act = a.acked ? `<button class="albtn act done" type="button" disabled title="Acknowledged ${hm(a.acked_ts)}">ACKED ✓ ${hm(a.acked_ts)}</button>` : `<button class="albtn act" type="button" data-act="${a.id}" title="Acknowledge: I have seen / actioned this alert">ACT</button>`;
   const tl = a.alerts.map(x => `<li><b>Alert ${x.n}</b> &bull; ${hm(x.ts)} &bull; at ${x.at_stops} stops${x.stop ? " &bull; " + esc(x.stop) : ""}</li>`).join("");
   return `<div class="al ${cls}${a.acked ? " acked" : ""}${open ? " open" : ""}" data-id="${a.id}">
     <div class="alrow"><span class="albadge"><i></i>${esc(a.label)}</span><span class="alsvc"><b>Svc ${esc(a.service)}</b><span>Dir ${a.direction}</span></span>
@@ -335,97 +447,242 @@ function alertRow(a){
 function renderAlerts(){
   const list = (S.data && S.data.alerts) || [], un = list.filter(a => !a.acked).length, p = P();
   const b = $("alBadge"); b.hidden = !list.length; b.textContent = un || list.length; b.classList.toggle("ok", !un);
-  document.title = (un ? `(${un}) ` : "") + "SG Transport Pulse \u2013 Bunching & Gap";
+  document.title = (un ? `(${un}) ` : "") + "SG Transport Pulse – Bunching & Gap";
   $("alRule").textContent = `Alert 1 when bunching (headway below ${p.bunch_min} min) or long headway (scheduled + ${p.gap_add_min} min) has lasted ${p.confirm_stops} bus stops; then another alert every ${p.alert_step} more stops while it continues.`;
   $("alSub").textContent = list.length ? `${list.length} active case${list.length === 1 ? "" : "s"}, ${un} not acknowledged` : "No active alerts";
   $("alList").innerHTML = list.length ? list.map(alertRow).join("") : `<div class="empty">No active alerts. A case that has lasted ${p.confirm_stops} bus stops raises alert 1, then alert 2 at ${p.confirm_stops + p.alert_step}, alert 3 at ${p.confirm_stops + 2 * p.alert_step} stops, and so on. Cases that clear before ${p.confirm_stops} stops never raise an alert.</div>`;
 }
+async function ackAlert(id){
+  const j = await post("/api/bunching/alerts/ack", JSON.stringify({id:+id}));
+  if(j.error){ toast(j.error); load(true); return false; }
+  if(S.data && S.data.alerts && j.alert){ const i = S.data.alerts.findIndex(a => a.id === j.alert.id); if(i >= 0) S.data.alerts[i] = j.alert; }
+  toast("Alert acknowledged"); renderAlerts(); renderKpis(); renderFocus(selRow()); try{ if(window.DS && DS.refreshNotes) DS.refreshNotes(); }catch(e){}
+  return true;
+}
 $("alList").addEventListener("click", async e => {
   const t = e.target.closest("button"); if(!t) return;
   if(t.dataset.more){ S.alOpen[t.dataset.more] = !S.alOpen[t.dataset.more]; renderAlerts(); }
-  else if(t.dataset.map){ showTab("dash"); select(t.dataset.map, false); setTimeout(() => { const m = $("map"); if(m) m.scrollIntoView({behavior:"smooth", block:"center"}); if(map) map.invalidateSize(); }, 150); }
-  else if(t.dataset.act){
-    t.disabled = true; const j = await post("/api/bunching/alerts/ack", JSON.stringify({id:+t.dataset.act}));
-    if(j.error){ toast(j.error); t.disabled = false; load(true); return; }
-    if(S.data && S.data.alerts){ const i = S.data.alerts.findIndex(a => a.id === j.alert.id); if(i >= 0) S.data.alerts[i] = j.alert; }
-    toast("Alert acknowledged"); renderAlerts();
-  }
+  else if(t.dataset.map){ showTab("dash"); select(t.dataset.map, false); setTimeout(() => { const m = $("mapCard"); if(m) m.scrollIntoView({behavior:"smooth", block:"center"}); if(map) map.invalidateSize(); }, 150); }
+  else if(t.dataset.act){ t.disabled = true; if(!await ackAlert(t.dataset.act)) t.disabled = false; }
 });
 
-/* ------------------------------------------------------------------ drill-down */
+/* ------------------------------------------------------------------ selected service: what's happening + diagram + map + bus order */
 function selRow(){ return S.data && S.data.rows.find(r => r.key === S.sel); }
-function renderInsight(){
-  const r = selRow(), box = $("insight"); box.hidden = !r; if(!r){ return; }
-  const H = r.sched_hw, det = S.detail[r.key];
-  $("inTitle").innerHTML = `Svc ${esc(r.service)} Dir ${r.direction} <span class="rk ${r.risk}" style="vertical-align:middle;margin-left:6px"></span>`;
-  $("inSub").textContent = `${r.n_buses} buses \u2022 scheduled HW ${f1(H)} min (${r.hw_src || "unknown"})`;
-  const kv = [["Issue", issueCell(r)], ["Risk", `${RNAME[r.risk]} (score ${r.score}/100)`]];
-  if(r.bb) kv.push(["Bunching", `${esc(r.bb.label)} \u2022 ${r.bb.status}${r.bb.status !== "early" ? ` \u2022 ${r.bb.stops} consecutive stops` : ""} \u2022 min HW ${f1(r.bb.min_hw)} min`], ["Where", esc(r.bb.location)]);
-  if(r.gap) kv.push(["Gap", `${f1(r.gap.now)} min now, up to ${f1(r.gap.max_hw)} min (${r.gap.max_hw >= H ? "+" : "\u2212"}${f1(Math.abs(r.gap.max_hw - H))} vs scheduled) \u2022 ${r.gap.state}${r.gap.stops ? ` \u2022 ${r.gap.stops} consecutive stops` : ""} \u2022 ${r.gap.trend}`], ["Where", esc(r.gap.location)]);
-  kv.push(["Time to occur", tOcc(r.t_occur)]); if(r.note) kv.push(["Note", esc(r.note)]);
-  $("inKv").innerHTML = kv.map(([a, b]) => `<span>${a}</span><span>${b}</span>`).join("");
-  const h = r.hw || {}; $("inPath").innerHTML = ["0", "10", "20", "30"].map(k => `<div><b class="${hwCls(h[k], H)}">${f1(h[k])}</b><small>${k === "0" ? "NOW" : "+" + k + " min"}</small></div>`).join("") + `<div><b>${f1(H)}</b><small>Scheduled</small></div>`;
-  const gp = r.gap && r.gap.trend, tr = TREND[r.trend] || "";
-  $("inState").innerHTML = r.gap ? `Gap <b>${esc(gp)}</b>${gp === "widening" ? " &mdash; <b class=\"c-amb\">HEADWAY WIDENING</b>" : ""}` : `Spacing ${esc(tr)}`;
-  const sup = []; if(r.traffic) sup.push(`&#128678; ${esc(r.traffic.text)}`);
-  if(det && det.incidents) sup.push(det.incidents.count ? `&#9888; ${det.incidents.count} traffic incident(s) within 1 km of the route: ${esc((det.incidents.items[0] || {}).message || "")}` : "No traffic incidents reported near this route.");
-  sup.push(`<span class="m">Road works: not available from DataMall with coordinates.</span>`);
-  if(det && det.events && det.events.length) sup.push(`Recent events: ${det.events.slice(0, 3).map(e => `${e.kind === "bb" ? (e.level || "?") + "BB" : "gap"} ${e.open ? "(open)" : ""}`).join(", ")}`);
-  $("inSupport").innerHTML = sup.map(x => `<div>${x}</div>`).join("");
-  renderSeq(r); renderDist(r); renderMap(r);
+function renderSel(){
+  const r = selRow(); renderFocus(r); renderDiagram(r);
+  if(r){ renderSeq(r); renderMap(r); }
+  else { $("seq").innerHTML = `<div class="empty">Select a service.</div>`; $("seqTitle").textContent = "Bus order"; }
 }
-function renderSeq(r){
-  $("seqTitle").textContent = `Bus Sequence \u2013 Svc ${r.service} Dir ${r.direction} (${r.seq.length} buses)`;
-  $("seq").innerHTML = `<table><thead><tr><th>Order</th><th>Bus</th><th>Location</th><th>HW to next</th><th>Status</th></tr></thead><tbody>${r.seq.map(s => `<tr data-o="${s.order}"><td>${s.order}</td><td>${esc(s.id)}</td><td>${esc(s.near)}</td><td class="${hwCls(s.hw_next, r.sched_hw)}">${s.hw_next == null ? "\u2013" : f1(s.hw_next) + " min"}</td><td><b class="${s.status === "Normal" ? "c-grn" : s.status === "Gap" || s.status === "Converging" || s.status === "Joining" ? "c-amb" : "c-red"}">${s.status}</b></td></tr>`).join("")}</tbody></table><div class="sub">Bus ids are assigned by position tracking (LTA gives no registration number).</div>`;
+function renderFocus(r){
+  const el = $("focus");
+  if(!r){ el.innerHTML = `<div class="empty">Select a service in the list to see what is happening.</div>`; return; }
+  const st = statusOf(r), H = r.sched_hw, ord = {}, sts = {}; (r.seq || []).forEach(s => { ord[s.id] = s.order; sts[s.id] = ST[s.status] || "ok"; });
+  const Lt = id => ord[id] ? `<span class="bl ${sts[id]}" data-o="${ord[id]}" title="Bus ${LETTER(ord[id])} (${esc(tid(id))}) – show on map">${LETTER(ord[id])}</span>` : "";
+  const every = H ? `every ${f1(H)} min` : "unknown (add to Service Headway Master)", ol = outlook(r), det = S.detail[r.key];
+  let head, rec; const facts = [];
+  if(r.risk === "nodata"){ head = "No live picture yet"; facts.push(["Why", esc(r.note || "Waiting for live data")]); rec = "Nothing to do yet — the page keeps checking."; }
+  else if(r.bb && r.bb.status !== "early"){
+    const g = (r.groups || []).find(x => x.ids && x.ids.join() === r.bb.ids.join()), last = r.bb.ids[r.bb.ids.length - 1];
+    head = `${r.bb.size} buses ${r.bb.status === "confirmed" ? "bunched" : "bunching"}`;
+    facts.push(["Buses", `${r.bb.ids.map(Lt).join(" ")} only <b>${f1(r.bb.hw_now != null ? r.bb.hw_now : r.bb.min_hw)} min</b> apart`], ["Should be", every],
+               ["Where", esc(r.bb.location || r.location || "–")], ["How long", `${r.bb.stops} stop${r.bb.stops === 1 ? "" : "s"}${g && g.since_stop ? ` · since ${esc(g.since_stop)}` : ""}`]);
+    if(r.gap) facts.push(["Also", `long gap between ${Lt(r.gap.lead)} ${Lt(r.gap.foll)} (${f1(r.gap.now)} min)`]);
+    rec = `Hold bus ${LETTER(ord[last])} (the bus behind) to open up the spacing. Headway Control works out how long to hold.`;
+  }else if(r.gap){
+    head = r.gap.state === "confirmed" ? "Long gap" : "Gap building";
+    facts.push(["Buses", `${Lt(r.gap.lead)} ${Lt(r.gap.foll)} <b>${f1(r.gap.now)} min</b> apart`], ["Should be", every], ["Where", esc(r.gap.location || r.location || "–")],
+               ["How long", r.gap.stops ? `${r.gap.stops} stops${r.gap.since_stop ? ` · since ${esc(r.gap.since_stop)}` : ""}` : `expected ${inMin(r.gap.t_occur)}`]);
+    rec = H && r.gap.max_hw >= 2 * H ? "The gap is double the plan — consider a recovery (short-turn or an extra bus)." : "Keep watching. Regulate the bus in front if the gap keeps widening.";
+  }else if(r.bb){
+    head = `${lvl(r.bb)} likely ${inMin(r.bb.t_occur)}`;
+    facts.push(["Buses", `${r.bb.ids.map(Lt).join(" ")} now <b>${f1(r.bb.hw_now)} min</b> apart and closing in`], ["Should be", every], ["Where", esc(r.bb.location || r.location || "–")]);
+    rec = "Watch. Regulate early if they keep closing in.";
+  }else{
+    head = r.risk === "yellow" ? "Spacing drifting" : "Running normally";
+    facts.push(["Buses", `${r.n_buses} on the road`], ["Should be", every]);
+    rec = r.risk === "yellow" ? "Keep an eye on it — no action yet." : "No action needed.";
+  }
+  if(ol) facts.push([`Next ${S.win} min`, `<span class="ol ${ol.w}">${OLW[ol.w]}</span> · ${ol.ar} ${hwTxt(ol.v)}`]);
+  const a = alertFor(r), ack = a ? (a.acked ? `<span class="pill ok">Acknowledged ${hm(a.acked_ts)}</span>` : `<button class="ds-btn pri sm" type="button" id="fAck" data-id="${a.id}">Acknowledge alert</button>`) : "";
+  const ctx = []; if(r.traffic && r.traffic.longest_km >= .5) ctx.push(r.traffic.text); if(det && det.incidents && det.incidents.count) ctx.push(`${det.incidents.count} traffic incident(s) within 1 km of the route.`);
+  el.innerHTML = `<div class="fh"><div><span class="fsvc">${esc(r.service)}</span><span class="fdir">Dir ${r.direction}</span></div><span class="pill ${st.cls}">${esc(st.label)}</span></div>
+    <h3 class="fhead ${st.cls}">${head}</h3><dl class="facts">${facts.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("")}</dl>
+    <div class="rec"><b>SUGGESTED</b>${rec}</div>
+    <div class="facts-act">${ack}<a class="ds-btn sm" href="/control?svc=${encodeURIComponent(r.service)}">Headway Control</a>${r.gap ? `<a class="ds-btn sm ghost" href="/recovery?svc=${encodeURIComponent(r.service)}">Recovery</a>` : ""}</div>
+    ${ctx.length ? `<div class="fctx">Context: ${ctx.map(esc).join(" ")}</div>` : ""}`;
 }
-function renderDist(r){
-  const H = r.sched_hw, edges = [0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20], bin = v => { for(let i = edges.length - 1; i >= 0; i--) if(v >= edges[i]) return i === edges.length - 1 ? edges.length - 1 : i; return 0; };
-  const now = (r.dist && r.dist.now) || [], pr = (r.dist && r.dist.pred) || [], cn = Array(11).fill(0), cp = Array(11).fill(0);
-  now.forEach(v => cn[bin(v)]++); pr.forEach(v => cp[bin(v)]++);
-  const mx = Math.max(1, ...cn, ...cp), W = 380, Hh = 190, L = 26, T = 10, B = 34, bw = (W - L - 6) / 11, X = i => L + i * bw, Y = v => T + (Hh - T - B) * (1 - v / mx);
-  let s = `<svg viewBox="0 0 ${W} ${Hh}" width="100%" role="img" aria-label="Headway distribution">`;
-  for(let i = 0; i < 11; i++){ s += `<rect x="${X(i) + 3}" y="${Y(cn[i])}" width="${bw / 2 - 3}" height="${Hh - B - Y(cn[i])}" fill="#3c8dff"/><rect x="${X(i) + bw / 2}" y="${Y(cp[i])}" width="${bw / 2 - 3}" height="${Hh - B - Y(cp[i])}" fill="#ff5c93"/><text x="${X(i) + bw / 2}" y="${Hh - 20}" text-anchor="middle" font-size="9" fill="#8ba3bd">${i === 10 ? ">20" : edges[i] + "-" + edges[i + 1]}</text>`; }
-  if(H) s += `<line x1="${X(Math.min(10, H / 2)) }" x2="${X(Math.min(10, H / 2))}" y1="${T}" y2="${Hh - B}" stroke="#c6d8ea" stroke-dasharray="4 3"/>`;
-  s += `<text x="${W / 2}" y="${Hh - 4}" text-anchor="middle" font-size="10" fill="#8ba3bd">Headway (min)</text></svg>`;
-  const pct = (a, f) => a.length ? Math.round(100 * a.filter(f).length / a.length) : null, avg = now.length ? now.reduce((a, b) => a + b, 0) / now.length : null;
-  $("dist").innerHTML = s + `<div class="sub"><span style="color:#3c8dff">&#9632;</span> Current &nbsp;<span style="color:#ff5c93">&#9632;</span> Predicted (next 30 min) &nbsp;&bull; dashed = scheduled ${f1(H)} min</div>
-   <div class="stat3"><div><b>${pct(now, v => v < P().bunch_min - 1e-6) == null ? "\u2013" : pct(now, v => v < P().bunch_min - 1e-6) + "%"}</b><small>Intervals &lt; ${P().bunch_min} min (bunched)</small></div><div><b>${pct(now, v => v >= H + P().gap_add_min - 1e-6) == null ? "\u2013" : pct(now, v => v >= H + P().gap_add_min - 1e-6) + "%"}</b><small>Intervals &ge; scheduled + ${P().gap_add_min} min</small></div><div><b>${f1(avg)}</b><small>Avg headway (min)</small></div></div>`;
-}
+$("focus").addEventListener("click", async e => {
+  const b = e.target.closest("#fAck"); if(b){ b.disabled = true; if(!await ackAlert(b.dataset.id)) b.disabled = false; return; }
+  const l = e.target.closest(".bl[data-o]"); if(l) zoomBus(+l.dataset.o);
+});
 
-/* ------------------------------------------------------------------ map */
-let map = null, gRoute = null, gStop = null, gBus = null, gGrp = null, mapKey = null;
+/* headway diagram: same drawing for both directions, but Direction 2 runs right-to-left (bus A, the front bus, starts on the right) */
+function renderDiagram(r){
+  const el = $("diag");
+  if(!r){ $("diagTitle").textContent = "HEADWAY DIAGRAM"; $("diagSev").innerHTML = ""; el.innerHTML = `<div class="empty">Select a service to see its buses in a line.</div>`; return; }
+  const seq = (r.seq || []).slice().sort((a, b) => a.order - b.order), H = r.sched_hw || 0, rtl = +r.direction === 2, st = statusOf(r);
+  $("diagTitle").textContent = `HEADWAY DIAGRAM · SVC ${r.service} DIR ${r.direction}`; $("diagSev").innerHTML = `<span class="pill ${st.cls}">${esc(st.label)}</span>`;
+  if(seq.length < 2){ el.innerHTML = `<div class="empty">At least two live buses are needed to draw the headway diagram.</div>`; return; }
+  const rg = seq.slice(0, -1).map(s => s.hw_next == null ? H || 1 : Math.max(.5, s.hw_next)), t0 = rg.reduce((a, b) => a + b, 0) || 1;
+  const wpx = Math.max(240, el.clientWidth - 28), narrow = wpx < 560, minShare = Math.min(.9 / rg.length, Math.max(.06, (narrow ? 46 : 70) / wpx));
+  const gaps = rg.map(g => Math.max(g, minShare * t0)), tot = gaps.reduce((a, b) => a + b, 0), pos = [3]; let x = 3;   // very short gaps get a minimum width (the number shows the real minutes)
+  gaps.forEach(g => { x += 94 * g / tot; pos.push(x); });
+  const X = p => rtl ? 100 - p : p, bm = P().bunch_min || 3;
+  let h = gaps.map((g, i) => { const raw = seq[i].hw_next, cls = raw == null ? "" : raw <= bm || (H && raw <= .5 * H) ? "short" : H && raw >= 1.5 * H ? "long" : "", a = X(pos[i]), b = X(pos[i + 1]);
+    return `<div class="seg ${cls}" style="left:${Math.min(a, b)}%;width:${Math.abs(b - a)}%"><span>${raw == null ? "?" : f1(raw) + (narrow ? "m" : " min")}</span></div>`; }).join("");
+  h += seq.map((s, i) => { const k = ST[s.status] || "ok", c = k === "bunch" ? " late" : k === "close" ? " close" : k === "gap" ? " gapb" : "";
+    return `<div class="bus${c}" style="left:${X(pos[i])}%" data-o="${s.order}" title="${esc(`Bus ${LETTER(s.order)} (${tid(s.id)}) · ${s.near || ""} · ${STW[k]}`)}"><i></i><b>${LETTER(s.order)}</b></div>`; }).join("");
+  const front = `FRONT · BUS A`, back = `BACK · BUS ${LETTER(seq.length)}`;
+  el.innerHTML = `<div class="ds-hwline">${'<div class="rail"></div>' + h}</div>
+    <div class="hwends"><span>${rtl ? "◀ " + back : "◀ " + front}</span><span class="c">Direction ${r.direction} · bus order ${rtl ? "right → left" : "left → right"} · should be every ${f1(H)} min</span><span>${rtl ? front + " ▶" : back + " ▶"}</span></div>
+    <div class="hwleg"><span><i style="background:#ffb547"></i>Too close (bunching)</span><span><i style="background:#ff5566"></i>Too far apart (gap)</span><span>Numbers = minutes between buses</span></div>`;
+}
+$("diag").addEventListener("click", e => { const b = e.target.closest(".bus[data-o]"); if(b) zoomBus(+b.dataset.o); });
+
+function renderSeq(r){
+  const seq = (r.seq || []).slice().sort((a, b) => a.order - b.order);
+  $("seqTitle").textContent = `Bus order – ${r.service} Dir ${r.direction} (${seq.length} bus${seq.length === 1 ? "" : "es"})`;
+  if(!seq.length){ $("seq").innerHTML = `<div class="empty">No live buses.</div>`; return; }
+  $("seq").innerHTML = `<div class="blist">${seq.map((s, i) => { const k = ST[s.status] || "ok";
+    return `<button type="button" class="bi ${k}" data-o="${s.order}"><span class="bl ${k}">${LETTER(s.order)}</span><span class="bw"><b>${esc(s.near || "Position unknown")}</b><small>${esc(tid(s.id))}${s.lat == null ? " · no GPS" : ""}</small></span><span class="pill ${STP[k]}">${STW[k]}</span></button>`
+      + (i < seq.length - 1 ? `<div class="blgap">↓ next bus <b class="${hwCls(s.hw_next, r.sched_hw)}">${s.hw_next == null ? "?" : f1(s.hw_next) + " min"}</b> behind</div>` : ""); }).join("")}</div>`;
+}
+$("seq").addEventListener("click", e => { const b = e.target.closest(".bi[data-o]"); if(b) zoomBus(+b.dataset.o); });
+
+/* ------------------------------------------------------------------ map: bus icons pointing the way they travel, smart zoom to the bunch */
+let map = null, gRoute = null, gStop = null, gHi = null, gLbl = null, gBus = null, mapKey = null, ROUTE = null, MK = {};
+const BUS_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" fill-rule="evenodd" d="M6.5 2.5h11A2.5 2.5 0 0 1 20 5v11.2a1.8 1.8 0 0 1-1.8 1.8H5.8A1.8 1.8 0 0 1 4 16.2V5a2.5 2.5 0 0 1 2.5-2.5ZM6.3 5.6v5.6h11.4V5.6ZM8 13.4a1.25 1.25 0 1 0 0 2.5 1.25 1.25 0 0 0 0-2.5Zm8 0a1.25 1.25 0 1 0 0 2.5 1.25 1.25 0 0 0 0-2.5ZM9 3.6v1h6v-1Z"/><path fill="currentColor" d="M5.8 18.4h2.8v1.9a.9.9 0 0 1-.9.9h-1a.9.9 0 0 1-.9-.9Zm9.6 0h2.8v1.9a.9.9 0 0 1-.9.9h-1a.9.9 0 0 1-.9-.9ZM2.4 6.2h1.2v3.4H2.4Zm18 0h1.2v3.4h-1.2Z"/></svg>';
+function busIcon(letter, st, rot){
+  return L.divIcon({className:"", iconSize:[52, 52], iconAnchor:[26, 26], popupAnchor:[0, -14],
+    html:`<div class="bmk2 ${st}">${rot == null ? "" : `<i class="hd" style="transform:rotate(${Math.round(rot)}deg)"></i>`}<span class="bd">${BUS_SVG}<b>${esc(letter)}</b></span></div>`});
+}
 function initMap(){
   if(map || typeof L === "undefined") return;
   map = L.map("map", {zoomControl:true, attributionControl:false, minZoom:11, maxZoom:19}).setView([1.3521, 103.8198], 11);
-  const AO = `<a href="https://www.onemap.gov.sg/" target="_blank" rel="noopener">OneMap</a> | \u00a9 ${new Date().getFullYear()} Singapore Land Authority`, AS = `Basemap \u00a9 OpenStreetMap contributors (OneMap unavailable)`;
-  (window.SGBasemap ? SGBasemap.add(map, {minZoom:11, maxZoom:19}) : L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {minZoom:11, maxZoom:19, attribution:"\u00a9 OpenStreetMap contributors"}).addTo(map));
-  L.control.attribution({position:"bottomleft", prefix:false}).addTo(map);
-  gRoute = L.layerGroup().addTo(map); gStop = L.layerGroup().addTo(map); gGrp = L.layerGroup().addTo(map); gBus = L.layerGroup().addTo(map);
+  (window.SGBasemap ? SGBasemap.add(map, {minZoom:11, maxZoom:19}) : L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {minZoom:11, maxZoom:19, attribution:"© OpenStreetMap contributors"}).addTo(map));
+  L.control.attribution({position:"bottomright", prefix:false}).addTo(map);
+  gRoute = L.layerGroup().addTo(map); gStop = L.layerGroup(); gHi = L.layerGroup().addTo(map); gLbl = L.layerGroup().addTo(map); gBus = L.layerGroup().addTo(map);
+  if(S.showStops) gStop.addTo(map);
+  map.on("dragstart zoomstart", () => { if(!S.fitting) S.autoFit = false; syncMapSeg(); });
 }
-function mapLayers(){ if(!map) return; const on = (g, v) => { if(v && !map.hasLayer(g)) map.addLayer(g); if(!v && map.hasLayer(g)) map.removeLayer(g); }; const c = k => document.querySelector(`#mlay input[data-m="${k}"]`).checked; on(gStop, c("stop")); on(gBus, c("bus")); on(gGrp, c("group")); }
-function renderMap(r){
-  initMap(); if(!map) return; $("mapTitle").textContent = `Live Bus Positions \u2013 Service ${r.service} Dir ${r.direction} (${r.issue})`;
-  const det = S.detail[r.key]; gBus.clearLayers(); gGrp.clearLayers();
-  if(det && det.route && mapKey !== r.key + "|" + (det.route.stops || []).length){
-    mapKey = r.key + "|" + (det.route.stops || []).length; gRoute.clearLayers(); gStop.clearLayers(); const all = [];
-    (det.route.runs || []).forEach(run => { all.push(...run.pts); L.polyline(run.pts, {color:"#04101f", weight:8, opacity:.5, interactive:false}).addTo(gRoute); L.polyline(run.pts, {color:COL[bandCls(run.b)], weight:5, opacity:.95, interactive:false}).addTo(gRoute); });
-    (det.route.stops || []).forEach(s => L.circleMarker([s.lat, s.lon], {radius:2.5, color:"#06111f", weight:1, fillColor:"#fff", fillOpacity:1}).bindPopup(`<b>${esc(s.code)}</b> ${esc(s.name)}`).addTo(gStop));
-    if(all.length) map.fitBounds(L.latLngBounds(all), {padding:[20, 20], maxZoom:15});
+const geo = {dist(a, b){ const k = 111320, dx = (b[1] - a[1]) * k * Math.cos(a[0] * Math.PI / 180), dy = (b[0] - a[0]) * k; return Math.hypot(dx, dy); }};
+function buildRoute(key, det){
+  const pts = []; (det.route.runs || []).forEach(run => (run.pts || []).forEach(p => { const l = pts[pts.length - 1]; if(!l || l[0] !== p[0] || l[1] !== p[1]) pts.push(p); }));
+  const cum = [0]; for(let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + geo.dist(pts[i - 1], pts[i]));
+  return {key, pts, cum};
+}
+function project(R, lat, lon, hint){                   // nearest point on the route; on a loop, prefer the pass that matches the engine's position along the route
+  if(!R || R.pts.length < 2) return null;
+  const k = 111320, cl = Math.cos(lat * Math.PI / 180), n = R.pts.length - 1, ds = new Float64Array(n), ts = new Float64Array(n); let best = 1e18;
+  for(let i = 0; i < n; i++){
+    const a = R.pts[i], b = R.pts[i + 1], ax = (a[1] - lon) * k * cl, ay = (a[0] - lat) * k, vx = (b[1] - a[1]) * k * cl, vy = (b[0] - a[0]) * k, L2 = vx * vx + vy * vy;
+    let t = L2 ? -(ax * vx + ay * vy) / L2 : 0; t = Math.max(0, Math.min(1, t)); ds[i] = Math.hypot(ax + t * vx, ay + t * vy); ts[i] = t; if(ds[i] < best) best = ds[i];
   }
-  const cls = {Leading:"b", Bunched:"b", Joining:"b", Converging:"c", Gap:"g", Normal:"n"}, pos = {};
-  r.seq.forEach(s => { if(s.lat == null) return; pos[s.id] = [s.lat, s.lon];
-    L.marker([s.lat, s.lon], {icon:L.divIcon({className:"", iconSize:[26, 26], iconAnchor:[13, 13], html:`<div class="bmk ${cls[s.status] || "n"}">${s.order}</div>`}), keyboard:false})
-      .bindPopup(`<b>Bus ${esc(s.id)}</b> (order ${s.order})<br>${esc(s.near)}<br>HW to next: ${s.hw_next == null ? "\u2013" : f1(s.hw_next) + " min"}<br><b>${s.status}</b>`).addTo(gBus); });
-  (r.groups || []).filter(g => g.status !== "early").forEach(g => { const pts = g.ids.map(i => pos[i]).filter(Boolean); if(!pts.length) return;
-    const la = pts.reduce((a, p) => a + p[0], 0) / pts.length, lo = pts.reduce((a, p) => a + p[1], 0) / pts.length;
-    L.circle([la, lo], {radius:350, color:"#ff4d55", weight:1, fillColor:"#ff4d55", fillOpacity:.22, interactive:false}).addTo(gGrp); });
-  mapLayers();
+  if(best > 400) return null;
+  let bi = -1, bs = 1e18;
+  for(let i = 0; i < n; i++) if(ds[i] <= best + 25){ const s = R.cum[i] + ts[i] * (R.cum[i + 1] - R.cum[i]), sc = hint == null ? ds[i] : Math.abs(s - hint); if(sc < bs){ bs = sc; bi = i; } }
+  let j = bi; while(j < n - 1 && R.cum[j + 1] - R.cum[j] < 3) j++;
+  const a = R.pts[j], b = R.pts[j + 1], brg = (Math.atan2((b[1] - a[1]) * cl, b[0] - a[0]) * 180 / Math.PI + 360) % 360;
+  return {s:R.cum[bi] + ts[bi] * (R.cum[bi + 1] - R.cum[bi]), brg};
 }
+function pointAt(R, s){ let lo = 0, hi = R.cum.length - 1; if(s <= 0) return R.pts[0]; if(s >= R.cum[hi]) return R.pts[hi];
+  while(hi - lo > 1){ const m = (lo + hi) >> 1; if(R.cum[m] <= s) lo = m; else hi = m; }
+  const t = (s - R.cum[lo]) / Math.max(1e-9, R.cum[hi] - R.cum[lo]), a = R.pts[lo], b = R.pts[hi]; return [a[0] + t * (b[0] - a[0]), a[1] + t * (b[1] - a[1])]; }
+function slice(R, s1, s2){ if(s1 > s2) [s1, s2] = [s2, s1]; const out = [pointAt(R, s1)]; for(let i = 0; i < R.pts.length; i++) if(R.cum[i] > s1 && R.cum[i] < s2) out.push(R.pts[i]); out.push(pointAt(R, s2)); return out; }
+function problems(r){
+  const ord = {}; (r.seq || []).forEach(s => ord[s.id] = s.order); const nm = ids => ids.map(id => LETTER(ord[id])).join("+"), out = [];
+  (r.groups || []).forEach(g => { const kind = g.status === "early" ? "close" : "bunch", cls = g.status === "confirmed" ? "crit" : g.status === "developing" ? "warn" : "watch", b = {size:g.size};
+    out.push({kind, cls, ids:g.ids, rank:{crit:0, warn:1, watch:3}[cls], chip:`${lvl(b)} · ${nm(g.ids)}`,
+      label:g.status === "early" ? `${nm(g.ids)} closing in · ${lvl(b)} ${inMin(g.t_occur)}` : `${g.status === "confirmed" ? "BUNCHED" : "BUNCHING"} ${lvl(b)} · ${nm(g.ids)} · ${f1(g.hw_now != null ? g.hw_now : g.min_hw)} min apart`,
+      short:g.status === "early" ? `${lvl(b)} ${inMin(g.t_occur)}` : `${lvl(b)} · ${f1(g.hw_now != null ? g.hw_now : g.min_hw)} min`}); });
+  (r.gaps || []).forEach(g => out.push({kind:"gap", cls:g.state === "confirmed" ? "crit" : "warn", ids:[g.lead, g.foll], rank:g.state === "confirmed" ? 2 : 2.5,
+    chip:`Gap ${LETTER(ord[g.lead])}–${LETTER(ord[g.foll])}`, label:`LONG GAP · ${LETTER(ord[g.lead])}–${LETTER(ord[g.foll])} · ${f1(g.now)} min`, short:`Gap ${f1(g.now)} min`}));
+  return out.sort((a, b) => a.rank - b.rank);
+}
+function syncMapSeg(){ document.querySelectorAll("#mapSeg button").forEach(b => b.setAttribute("aria-pressed", S.autoFit && b.dataset.m === S.mapMode)); document.querySelectorAll("#pchips .pc").forEach(b => b.classList.toggle("on", S.autoFit && S.mapMode === "focus" && +b.dataset.i === S.focusI)); }
+function renderChips2(){
+  const pr = S.probs || [];
+  $("pchips").innerHTML = pr.length ? `<span class="pl">Jump to:</span>` + pr.map((p, i) => `<button type="button" class="pc ${p.cls}" data-i="${i}">${esc(p.chip)}</button>`).join("")
+    : `<span class="okm">✓ No bunching or long gaps on this service right now</span>`;
+  syncMapSeg();
+}
+function renderMap(r){
+  initMap(); if(!map) return;
+  $("mapTitle").textContent = `Live bus positions – Svc ${r.service} Dir ${r.direction}`;
+  const det = S.detail[r.key], mk = r.key + "|" + (det && det.route ? (det.route.runs || []).length + ":" + (det.route.stops || []).length : "none") + "|" + S.showTraffic;
+  if(mapKey !== mk){
+    mapKey = mk; gRoute.clearLayers(); gStop.clearLayers(); ROUTE = null;
+    if(det && det.route){
+      ROUTE = buildRoute(r.key, det);
+      if(ROUTE.pts.length > 1){
+        L.polyline(ROUTE.pts, {color:"#04101f", weight:9, opacity:.55, interactive:false}).addTo(gRoute);
+        if(S.showTraffic) (det.route.runs || []).forEach(run => L.polyline(run.pts, {color:COL[bandCls(run.b)], weight:5, opacity:.95, interactive:false}).addTo(gRoute));
+        else L.polyline(ROUTE.pts, {color:"#3d8bff", weight:5, opacity:.9, interactive:false}).addTo(gRoute);
+      }
+      (det.route.stops || []).forEach(s => L.circleMarker([s.lat, s.lon], {radius:3.5, color:"#06111f", weight:1.5, fillColor:"#fff", fillOpacity:1}).bindPopup(`<b>${esc(s.code)}</b> ${esc(s.name)}`).addTo(gStop));
+    }
+  }
+  const R = ROUTE && ROUTE.key === r.key ? ROUTE : null, info = {};
+  gBus.clearLayers(); gHi.clearLayers(); gLbl.clearLayers(); MK = {};
+  (r.seq || []).forEach(s => { if(s.lat == null) return; info[s.id] = {s, ll:[s.lat, s.lon], pj:R ? project(R, s.lat, s.lon, s.s_km != null ? s.s_km * 1000 : null) : null}; });
+  S.probs = problems(r);
+  S.probs.forEach((p, i) => {
+    const pts = p.ids.map(id => info[id]).filter(Boolean); p.bounds = pts.map(x => x.ll); if(!pts.length) return;
+    let seg = null;
+    if(R && pts.length >= 2 && pts.every(x => x.pj)){ const ss = pts.map(x => x.pj.s); if(Math.max(...ss) - Math.min(...ss) < 15000) seg = slice(R, Math.min(...ss), Math.max(...ss)); }
+    if(!seg && pts.length >= 2) seg = pts.map(x => x.ll);
+    if(seg){ p.bounds = p.bounds.concat(seg);
+      if(p.kind === "gap") L.polyline(seg, {color:"#ffb547", weight:6, opacity:.95, dashArray:"10 9", interactive:false}).addTo(gHi);
+      else { const c = p.cls === "crit" ? "#ff5566" : p.cls === "warn" ? "#ffb547" : "#ffd23f"; L.polyline(seg, {color:c, weight:18, opacity:.22, interactive:false}).addTo(gHi); L.polyline(seg, {color:c, weight:7, opacity:.95, interactive:false}).addTo(gHi); } }
+    const mi = seg ? Math.floor(seg.length / 2) : 0, at = seg ? seg[mi] : pts[0].ll, txt = $("map").clientWidth < 560 ? p.short : p.label;   // phones: compact label
+    // label sits BESIDE the highlighted road (perpendicular to it), so it never covers the buses themselves
+    let ox = 0, oy = -44; if(seg && seg.length > 1){ const s0 = seg[Math.max(0, mi - 1)], s1 = seg[Math.min(seg.length - 1, mi + 1)], cl = Math.cos(s0[0] * Math.PI / 180);
+      const th = Math.atan2((s1[1] - s0[1]) * cl, s1[0] - s0[0]), w = 7.4 * txt.length + 26; let px = Math.cos(th), py = Math.sin(th); if(px < -.2 || (Math.abs(px) <= .2 && py < 0)){ px = -px; py = -py; }
+      ox = Math.round(px * (w / 2 + 30)); oy = Math.round(py * (15 + 30)); }
+    L.marker(at, {icon:L.divIcon({className:"", iconSize:[0, 0], iconAnchor:[0, 0], html:`<div class="mlbl side ${p.kind === "gap" ? "gapl" : p.cls}" style="transform:translate(calc(-50% + ${ox}px),calc(-50% + ${oy}px))" title="${esc(p.label)}">${esc(txt)}</div>`}), keyboard:false, zIndexOffset:2000})
+      .on("click", () => { S.mapMode = "focus"; S.focusI = i; S.autoFit = true; fitMap(); }).addTo(gLbl);
+    if(p.kind === "bunch") L.marker(at, {icon:L.divIcon({className:"", iconSize:[76, 76], iconAnchor:[38, 38], html:`<div class="pulse ${p.cls === "crit" ? "" : "warn"}"></div>`}), interactive:false, keyboard:false, zIndexOffset:-500}).addTo(gHi);
+  });
+  (r.seq || []).forEach(s => { const x = info[s.id]; if(!x) return; const k = ST[s.status] || "ok";
+    MK[s.order] = L.marker(x.ll, {icon:busIcon(LETTER(s.order), k, x.pj ? x.pj.brg : null), keyboard:false, zIndexOffset:k === "ok" ? 0 : 1000, title:`Bus ${LETTER(s.order)}`})
+      .bindPopup(`<b>Bus ${LETTER(s.order)}</b> <span style="color:#8ba3bd">${esc(tid(s.id))}</span><br>${esc(s.near || "")}<br>Next bus behind: ${s.hw_next == null ? "–" : f1(s.hw_next) + " min"}<br><b>${STW[k]}</b>`).addTo(gBus); });
+  if(S.focusI >= S.probs.length) S.focusI = 0;
+  renderChips2();
+  if(S.autoFit) fitMap();
+}
+function fitMap(){
+  const r = selRow(); if(!map || !r) return;
+  let pts = [];
+  if(S.mapMode === "route" && ROUTE && ROUTE.key === r.key) pts = ROUTE.pts;
+  else if(S.mapMode === "focus" && S.probs.length) pts = S.probs[Math.min(S.focusI, S.probs.length - 1)].bounds || [];
+  if(!pts.length) pts = (r.seq || []).filter(s => s.lat != null).map(s => [s.lat, s.lon]);
+  if(!pts.length && ROUTE && ROUTE.key === r.key) pts = ROUTE.pts;
+  if(!pts.length) return;
+  let b = L.latLngBounds(pts); const c = b.getCenter(), m = S.mapMode === "focus" ? .003 : .002;      // never zoom tighter than ~650 m across
+  b = b.extend([c.lat - m, c.lng - m]).extend([c.lat + m, c.lng + m]);
+  map.invalidateSize(); programmatic(() => map.fitBounds(b, {padding:[46, 46], maxZoom:S.mapMode === "focus" ? 17 : 16})); syncMapSeg();
+}
+function programmatic(fn){                             // our own moves must not count as the controller zooming / dragging the map
+  S.fitting = true; clearTimeout(S.fitT);
+  map.once("moveend", () => { clearTimeout(S.fitT); S.fitT = setTimeout(() => { S.fitting = false; }, 60); });
+  S.fitT = setTimeout(() => { S.fitting = false; }, 1500); fn();
+}
+function zoomBus(order){
+  const m = MK[order]; if(!m || !map) return; S.autoFit = false; syncMapSeg();
+  const card = $("mapCard"); if(card && card.getBoundingClientRect().top > window.innerHeight * .6) card.scrollIntoView({behavior:"smooth", block:"center"});
+  programmatic(() => map.setView(m.getLatLng(), Math.max(map.getZoom(), 16))); m.openPopup();
+}
+$("mapSeg").addEventListener("click", e => { const b = e.target.closest("button[data-m]"); if(!b) return; S.mapMode = b.dataset.m; S.autoFit = true; fitMap(); });
+$("pchips").addEventListener("click", e => { const b = e.target.closest(".pc"); if(!b) return; S.mapMode = "focus"; S.focusI = +b.dataset.i; S.autoFit = true; fitMap(); });
+$("tgStops").checked = S.showStops; $("tgTraffic").checked = S.showTraffic;
+$("tgStops").addEventListener("change", () => { S.showStops = $("tgStops").checked; LS.set("bb.stops", S.showStops); if(map){ if(S.showStops) gStop.addTo(map); else map.removeLayer(gStop); } });
+$("tgTraffic").addEventListener("change", () => { S.showTraffic = $("tgTraffic").checked; LS.set("bb.traffic", S.showTraffic); const r = selRow(); if(r) renderMap(r); });
+
 async function loadDetail(key){
   const [svc, dir] = key.split(":"); const j = await getJSON(`/api/bunching/detail?service=${encodeURIComponent(svc)}&direction=${dir}`, 45000);
-  if(j.error){ return; } S.detail[key] = j; if(S.sel === key) renderInsight();
+  if(j.error){ return; } S.detail[key] = j; if(S.sel === key) renderSel();
 }
-function select(key, scroll){ S.sel = key; renderTable(); renderInsight(); loadDetail(key); if(scroll) $("insight").scrollIntoView({behavior:"smooth", block:"start"}); }
+function select(key, scroll){ if(key !== S.sel){ S.focusI = 0; S.mapMode = "focus"; } S.sel = key; S.autoFit = true; renderTable(); renderSel(); loadDetail(key); if(scroll) $("focus").scrollIntoView({behavior:"smooth", block:"start"}); }
 
 /* ------------------------------------------------------------------ data */
 async function load(quiet){
@@ -436,7 +693,7 @@ async function load(quiet){
   if(j.error){ setLive("bad", "Server error", j.error); $("msgs").innerHTML = `<div class="msg bad">Could not load: ${esc(j.error)}</div>`; return; }
   S.data = j; S.left = Math.max(20, (j.params && j.params.refresh_sec) || 30);
   const c = j.collector || {}; setLive(c.db_ok === false ? "warn" : "ok", "Live Data (LTA)", c.alive ? `Collector cycle ${c.took}s over ${c.pairs} service directions` : "On-demand evaluation");
-  if(!S.sel || !j.rows.some(r => r.key === S.sel)){ const f = j.rows.find(r => r.risk === "red" || r.risk === "orange") || j.rows[0]; S.sel = f ? f.key : null; if(S.sel) loadDetail(S.sel); }
+  if(!S.sel || !j.rows.some(r => r.key === S.sel)){ const f = j.rows.find(r => r.risk === "red" || r.risk === "orange") || j.rows[0]; S.sel = f ? f.key : null; S.focusI = 0; S.mapMode = "focus"; S.autoFit = true; if(S.sel) loadDetail(S.sel); }
   else if(!S.detail[S.sel] || quiet) loadDetail(S.sel);
   render();
 }
@@ -468,23 +725,22 @@ $("form").addEventListener("submit", e => { e.preventDefault(); if($("svcIn").va
 $("chips").addEventListener("click", e => { const b = e.target.closest("button[data-s]"); if(!b) return; S.services = S.services.filter(x => x !== b.dataset.s); LS.set("bb.services", S.services); renderChips(); load(); });
 $("dirSeg").addEventListener("click", e => { const b = e.target.closest("button"); if(!b) return; S.dir = +b.dataset.d; LS.set("bb.dir", S.dir); S.page = 1; syncSegs(); load(); });
 $("viewSeg").addEventListener("click", e => { const b = e.target.closest("button"); if(!b) return; S.view = b.dataset.v; S.page = 1; syncSegs(); renderTable(); });
-$("issueSeg").addEventListener("click", e => { const b = e.target.closest("button"); if(!b) return; S.issue = b.dataset.i; S.page = 1; syncSegs(); renderTable(); });
-$("win").addEventListener("change", () => { S.win = +$("win").value; LS.set("bb.win", S.win); S.page = 1; renderTable(); });
+$("issueSeg").addEventListener("click", e => { const b = e.target.closest("button"); if(!b) return; S.issue = b.dataset.i; S.page = 1; syncSegs(); renderTable(); renderKpis(); });
+$("win").addEventListener("change", () => { S.win = +$("win").value; LS.set("bb.win", S.win); S.page = 1; renderTable(); renderFocus(selRow()); });
 $("lvls").addEventListener("change", e => { S.lv[e.target.dataset.l] = e.target.checked; S.page = 1; renderTable(); });
 document.querySelector(".sorts").addEventListener("click", e => { const b = e.target.closest("button[data-s]"); if(!b) return; S.sort = b.dataset.s; S.page = 1; syncSegs(); renderTable(); });
 $("reset").addEventListener("click", () => { S.services = []; S.dir = 0; S.win = 30; S.issue = "all"; S.view = "service"; S.lv = {2:true, 3:true, 4:true}; S.sort = "risk"; S.page = 1; LS.set("bb.services", []); LS.set("bb.dir", 0); document.querySelectorAll("#lvls input").forEach(i => i.checked = true); renderChips(); syncSegs(); load(); });
-$("tbody").addEventListener("click", e => { const r = e.target.closest("tr[data-k]"); if(r) select(r.dataset.k, !!e.target.closest(".vbtn")); });
+$("tbody").addEventListener("click", e => { const r = e.target.closest("tr[data-k]"); if(r) select(r.dataset.k, !!e.target.closest(".vbtn") || matchMedia("(max-width:760px)").matches); });
 $("tbody").addEventListener("keydown", e => { if(e.key === "Enter"){ const r = e.target.closest("tr[data-k]"); if(r) select(r.dataset.k, false); } });
 $("pager").addEventListener("click", e => { const b = e.target.closest("button[data-p]"); if(!b || b.disabled) return; S.page = +b.dataset.p; renderTable(); });
-$("seq").addEventListener("click", e => { const tr = e.target.closest("tr[data-o]"); const r = selRow(); if(!tr || !r || !map) return; const s = r.seq.find(x => String(x.order) === tr.dataset.o); if(s && s.lat != null) map.setView([s.lat, s.lon], Math.max(map.getZoom(), 15)); });
-$("mlay").addEventListener("change", mapLayers);
 $("autoCb").checked = S.auto; $("autoCb").addEventListener("change", () => { S.auto = $("autoCb").checked; LS.set("bb.auto", S.auto); });
 setInterval(() => { if((S.tab !== "dash" && S.tab !== "alerts") || document.hidden || !S.auto) { $("cd").textContent = S.auto ? "" : ""; return; } S.left--; $("cd").textContent = `(in ${Math.max(0, S.left)}s)`; if(S.left <= 0 && !S.busy) load(true); }, 1000);
 $("exportBtn").addEventListener("click", () => {
   const rows = visibleRows(); if(!rows.length){ toast("Nothing to export"); return; }
-  csvDownload("bunching-gap-status.csv", [["Service", "Dir", "Risk", "Score", "HW now", "+10", "+20", "+30", "Scheduled HW", "Issue", "BB level", "BB status", "Consecutive stops", "Location", "Time to occur (min)", "Trend"], ...rows.map(r => [r.service, r.direction, RNAME[r.risk], r.score, r.hw["0"], r.hw["10"], r.hw["20"], r.hw["30"], r.sched_hw, r.issue, r.bb && r.bb.label, r.bb && r.bb.status, r.bb && r.bb.stops, r.location, r.t_occur, r.trend])]);
+  csvDownload("bunching-gap-status.csv", [["Service", "Dir", "Status", "Headway now (min)", "Should be (min)", "In 10 min", "In 20 min", "In 30 min", "Outlook", "Where", "Risk", "Score", "Starts in (min)"], ...rows.map(r => { const st = statusOf(r), ol = outlook(r); return [r.service, r.direction, st.label + (st.sub ? " (" + st.sub + ")" : ""), r.hw["0"], r.sched_hw, r.hw["10"], r.hw["20"], r.hw["30"], ol ? OLW[ol.w] : "", r.location, RNAME[r.risk], r.score, r.t_occur]; })]);
 });
-function showTab(t){ S.tab = t; $("dash").hidden = t !== "dash"; $("alerts").hidden = t !== "alerts"; $("settings").hidden = t !== "set"; $("tabDash").setAttribute("aria-selected", t === "dash"); $("tabAlerts").setAttribute("aria-selected", t === "alerts"); $("tabSet").setAttribute("aria-selected", t === "set"); if(t === "set") loadSettings(); else if(t === "alerts") renderAlerts(); else if(map) setTimeout(() => map.invalidateSize(), 100); }
+function showTab(t){ S.tab = t; $("dash").hidden = t !== "dash"; $("alerts").hidden = t !== "alerts"; $("settings").hidden = t !== "set"; $("tabDash").setAttribute("aria-selected", t === "dash"); $("tabAlerts").setAttribute("aria-selected", t === "alerts"); $("tabSet").setAttribute("aria-selected", t === "set"); if(t === "set") loadSettings(); else if(t === "alerts") renderAlerts(); else if(map) setTimeout(() => { map.invalidateSize(); if(S.autoFit) fitMap(); }, 100); }
+$("kpis").addEventListener("click", e => { const b = e.target.closest("[data-go]"); if(!b) return; const g = b.dataset.go; if(g === "alerts"){ showTab("alerts"); return; } S.issue = S.issue === g ? "all" : g; S.page = 1; syncSegs(); renderTable(); renderKpis(); });
 $("tabDash").onclick = () => showTab("dash"); $("tabAlerts").onclick = () => showTab("alerts"); $("tabSet").onclick = () => showTab("set");
 $("parSave").onclick = async () => { const params = {}; document.querySelectorAll("#params input").forEach(i => params[i.dataset.k] = i.value); const j = await post("/api/bunching/settings", JSON.stringify({params})); if(j.error){ toast(j.error); return; } toast("Parameters saved"); loadSettings(); };
 $("parReset").onclick = async () => { const j = await post("/api/bunching/settings", JSON.stringify({reset:true})); if(j.error){ toast(j.error); return; } toast("Parameters reset to defaults"); loadSettings(); };
@@ -499,11 +755,12 @@ $("evExport").onclick = () => { const ev = S.events || []; if(!ev.length){ toast
   const q = new URLSearchParams(location.search); if(q.get("svc")){ S.services = q.get("svc").toUpperCase().split(",").filter(x => /^[0-9A-Z]{1,6}$/.test(x)); } if(q.get("dir") === "1" || q.get("dir") === "2") S.dir = +q.get("dir");
   $("opSel").value = S.op; $("opSel").onchange = () => { S.op = $("opSel").value; LS.set("bb.op", S.op); renderTable(); };
   getJSON("/api/traffic/services", 20000).then(j => { if(j.services){ S.opMap = {}; j.services.forEach(x => { S.opMap[x.svc] = x.operators || []; }); if(S.op) renderTable(); } });
-  renderChips(); syncSegs(); renderTable(); renderKpis(); renderDonut();
+  renderChips(); syncSegs(); renderTable(); renderKpis(); renderSel();
   const h = await getJSON("/api/health", 15000); if(h.error) setLive("bad", "Server unreachable", h.error); else if(!h.lta) setLive("bad", "LTA key missing", "Set LTA_ACCOUNT_KEY on the server"); else setLive("ok", "Live Data (LTA)", "");
   load();
 })();
 window.addEventListener("resize", () => { if(map) map.invalidateSize(); });
+
 </script>
 
 
@@ -531,55 +788,6 @@ document.addEventListener("click", function(e){
   else if(mbtn) mbtn.parentNode.insertBefore(show, mbtn.nextSibling);
   else if(top) top.insertBefore(show, top.firstChild);
   else { show.classList.add("floating"); document.body.appendChild(show); }
-})();
-</script>
-<!-- V16.0 Bunching & Gap: exception console for the selected service (headway diagram + AI insight + acknowledge).
-     Uses only the row the bunching engine already returned (S.data / selRow()) and the existing acknowledge endpoint. -->
-<style>
-.bbx{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(300px,1fr);gap:12px;margin-top:12px}
-@media (max-width:1100px){.bbx{grid-template-columns:1fr}}
-.bbx .ds-hwline{height:92px}
-.bbx .dir{display:flex;justify-content:space-between;font-size:11px;color:var(--ds-faint);margin:0 14px}
-.bbx .acts{display:flex;gap:8px;flex-wrap:wrap}
-</style>
-<script>
-(function(){
-  "use strict";
-  if(!window.DS || typeof S === "undefined" || typeof selRow !== "function") return;
-  var $ = function(id){ return document.getElementById(id); }, esc = DS.esc, f1 = function(x){ return x == null || isNaN(x) ? "\u2013" : (Math.round(x * 10) / 10).toString(); };
-  var host = $("insight"); if(!host) return;
-  var box = document.createElement("section"); box.className = "bbx"; box.id = "bbConsole"; host.parentNode.insertBefore(box, host.nextSibling);
-  function diagram(r){
-    var seq = (r.seq || []).slice().sort(function(a, b){ return a.order - b.order; }), H = r.sched_hw || 0;
-    if(seq.length < 2) return DS.empty({icon:"bunch", title:"NOT ENOUGH BUSES", text:"At least two live buses are needed to draw the headway diagram."});
-    var gaps = seq.slice(0, -1).map(function(s){ return s.hw_next == null ? H || 1 : Math.max(.5, s.hw_next); }), tot = gaps.reduce(function(a, b){ return a + b; }, 0) || 1, x = 3, pos = [3];
-    gaps.forEach(function(g){ x += 94 * g / tot; pos.push(x); });
-    var h = gaps.map(function(g, i){ var raw = seq[i].hw_next, cls = raw == null ? "" : raw <= (r.bunch_min || 3) || (H && raw <= .5 * H) ? "short" : H && raw >= 1.5 * H ? "long" : "";
-      return '<div class="seg ' + cls + '" style="left:' + pos[i] + '%;width:' + (pos[i + 1] - pos[i]) + '%"><span>' + (raw == null ? "?" : f1(raw) + "m") + '</span></div>'; }).join("");
-    h += seq.map(function(s, i){ var bad = s.status && s.status !== "Normal"; return '<div class="bus' + (bad ? " late" : "") + '" style="left:' + pos[i] + '%" title="' + esc(s.id + " \u00b7 " + (s.near || "") + " \u00b7 " + (s.status || "")) + '"><i></i><b>' + esc(String.fromCharCode(65 + (i % 26))) + '</b></div>'; }).join("");
-    return '<div class="ds-hwline"><div class="rail"></div>' + h + '</div><div class="dir"><span>\u2190 leading (further along the route)</span><span>scheduled headway ' + f1(H) + ' min</span><span>following \u2192</span></div>';
-  }
-  function alertFor(r){ return ((S.data && S.data.alerts) || []).filter(function(a){ return a.service === r.service && +a.direction === +r.direction; })[0] || null; }
-  function render(){
-    var r = selRow();
-    if(!r){ box.innerHTML = '<div class="ds-panel" style="grid-column:1/-1">' + DS.empty({icon:"bunch", title:"NO SERVICE SELECTED", text:"Select a service in the table to open its exception console: live headway diagram, insight and actions."}) + '</div>'; return; }
-    var a = alertFor(r), sev = r.risk === "red" ? "critical" : r.risk === "orange" || r.risk === "yellow" ? "warning" : "ok";
-    var det = r.bb ? r.bb.label + (r.bb.min_hw != null ? " \u00b7 min headway " + f1(r.bb.min_hw) + " min" : "") + (r.bb.location ? " near " + r.bb.location : "")
-            : r.gap ? "Gap up to " + f1(r.gap.max_hw) + " min (scheduled " + f1(r.sched_hw) + ")" + (r.gap.location ? " near " + r.gap.location : "") : "Spacing within tolerance";
-    var when = r.t_occur != null && r.t_occur > 0 ? "Projected in about " + Math.round(r.t_occur) + " min" : r.bb && r.bb.status === "early" ? "Developing" : "";
-    var rec = r.bb ? "Regulate the following bus \u2014 Headway Control calculates the hold" : r.gap && r.sched_hw && r.gap.max_hw >= 2 * r.sched_hw ? "Evaluate recovery (Recovery Decision Engine)" : r.gap ? "Monitor the gap; regulate if it keeps widening" : "No action needed";
-    var href = r.bb ? "/control?svc=" + encodeURIComponent(r.service) : "/recovery?svc=" + encodeURIComponent(r.service);
-    box.innerHTML = '<div class="ds-panel"><div class="ds-ph">HEADWAY DIAGRAM \u00b7 SVC ' + esc(r.service) + ' DIR ' + r.direction + '<span class="sp"></span>' + DS.sev(sev, (r.issue || "Normal").toUpperCase()) + '</div>' + diagram(r) + '</div>'
-      + '<div>' + DS.ai({detected:esc(det), cause:esc(r.note || (r.traffic && r.traffic.text) || when || "\u2013"), recommendation:esc(rec), effect:"Quantified in the target module \u2014 not estimated here.",
-          badge:when ? DS.sev("warning", when.toUpperCase()) : "", basis:"From the bunching engine\u2019s classification of live positions"})
-      + '<div class="acts" style="margin-top:10px">'
-      + (a ? (a.acked ? DS.sev("ok", "ACKNOWLEDGED") : '<button class="ds-btn pri sm" type="button" id="bbxAck">Acknowledge</button>') : '<span class="ds-note">No alert raised for this service yet (alerts start once a case is confirmed).</span>')
-      + '<a class="ds-btn sm" href="/control?svc=' + encodeURIComponent(r.service) + '">Open Headway Control</a><a class="ds-btn sm ghost" href="' + href + '">' + (r.bb ? "Regulate" : "Analyse") + '</a></div></div>';
-    var b = $("bbxAck"); if(b) b.onclick = function(){ b.disabled = true;
-      DS.api("/api/bunching/alerts/ack", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({id:a.id})}).then(function(j){ if(j.ok){ a.acked = true; DS.refreshNotes(); render(); } else { b.disabled = false; b.textContent = j.error || "Retry"; } }); };
-  }
-  var o = window.renderInsight; if(typeof o === "function") window.renderInsight = function(){ try{ return o.apply(this, arguments); } finally{ try{ render(); }catch(e){ console.error(e); } } };
-  render();
 })();
 </script>
 

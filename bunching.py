@@ -424,7 +424,7 @@ def evaluate(ctx, P=None):
         else:
             st = "Normal"
         seq.append({"order": v["order"], "id": v["id"], "near": v["near"], "hw_next": _r(pairs[k]["now"]) if k < len(pairs) and pairs[k]["ok"] else None,
-                    "status": st, "lat": v["lat"], "lon": v["lon"], "monitored": v["monitored"], "load": v["load"]})
+                    "status": st, "lat": v["lat"], "lon": v["lon"], "monitored": v["monitored"], "load": v["load"], "s_km": _r(v["s_km"], 3)})
 
     # supporting traffic information (context only - never presented as the cause)
     traffic = None
