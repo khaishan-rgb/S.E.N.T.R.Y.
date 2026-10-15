@@ -1989,14 +1989,11 @@ document.addEventListener("click", function(e){
 .ln-facts b{color:#fff}
 .ln-trips-h{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;margin:16px 0 8px;font-size:13px;color:var(--ds-text-2,#b6c8dd)}
 .ln-trips-h b{color:#fff}
-.ln-trips{display:grid;grid-template-columns:repeat(10,minmax(0,1fr));gap:8px}
-.ln-t{display:flex;flex-direction:column;align-items:center;gap:3px;padding:8px 4px 6px;border-radius:10px;border:1px solid var(--ds-line-2,rgba(126,178,230,.26));background:rgba(8,20,38,.7);cursor:text;min-width:0}
-.ln-t span{font:700 13px var(--ds-display,inherit);color:#fff}
-.ln-t small{font-size:11px;color:var(--ds-mut,#8aa2bd);font-variant-numeric:tabular-nums}
-.ln-t input{width:100%;max-width:64px;height:34px;border-radius:7px;border:1px solid var(--ds-line-2,rgba(126,178,230,.26));background:#06101e;color:#fff;text-align:center;font:600 16px var(--ds-font,inherit);font-variant-numeric:tabular-nums;padding:0}
-.ln-t input:focus{outline:2px solid #38d6ff;outline-offset:1px}
-.ln-t.late{border-color:rgba(255,181,71,.6);background:rgba(255,181,71,.08)}
-.ln-t.late input{border-color:rgba(255,181,71,.7);color:#ffe0ad}
+#lnTripTbl .hx-trips{border:0;background:transparent;box-shadow:none;padding:0;margin:0}
+#lnTripTbl .hx-trips>header{display:none}
+#lnTripTbl .hodisbar{margin:0 0 6px}
+#hoTrips input.late.on{border-color:rgba(255,181,71,.75);background:rgba(255,181,71,.1);color:#ffe0ad;font-weight:700}
+#stIn{display:none!important}
 .ln-act{display:flex;align-items:center;gap:10px 14px;flex-wrap:wrap;margin-top:14px}
 #lean #hoRun{height:42px;padding:0 22px;font-size:15px;letter-spacing:.02em}
 #lean #hoMsg{margin:0;font-size:13px}
@@ -2118,8 +2115,6 @@ document.addEventListener("click", function(e){
 @media (max-width:760px){
   .ln-in{grid-template-columns:minmax(0,1fr) auto}.ln-facts{grid-column:1/-1}
   #lean #hoDir button{white-space:nowrap}
-  .ln-t small i{display:none}
-  .ln-trips{grid-template-columns:repeat(5,minmax(0,1fr))}
   .ln-row{grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"name val" "bar bar" "g g";gap:8px 12px}
   .ln-sqr{grid-template-columns:58px minmax(0,1fr)}.ln-sqr>span{line-height:1.2}.ln-sqr>span em{display:block;font-size:10.5px}.ln-sqb{padding:12px 10px}
   .ln-in{grid-template-columns:minmax(0,1fr) auto}.ln-in>#lnAitpF{grid-column:1/-1}
@@ -2157,8 +2152,8 @@ document.addEventListener("click", function(e){
     '<section class="ln-step" id="lnEnter"><div class="ln-hd"><span class="n">1</span><div class="t"><b>Enter the late trips</b><small>Service, direction and how many minutes late each trip arrives at the first stop. Everything else has a default.</small></div></div>'
     + '<div class="ln-in"><div id="lnSvcF"></div><div id="lnDirF"></div><div class="fld" id="lnAitpF"><label for="lnAitpN">AITPs per direction</label><input id="lnAitpN" class="sel" type="number" min="1" max="40" step="1" inputmode="numeric" placeholder="every stop" aria-describedby="lnAitpTxt"></div><div class="ln-facts" id="lnFacts">Enter a service to load its route.</div></div>'
     + '<div class="ln-aitp" id="lnAitpTxt"></div>'
-    + '<div class="ln-trips-h"><span><b>Minutes late</b> arriving at <span id="lnFirst">the first stop</span> &middot; 0 = on time</span><span id="lnLateSum"></span></div>'
-    + '<div class="ln-trips" id="lnTrips"></div>'
+    + '<div class="ln-trips-h"><span>Type how many minutes late each bus arrives at <b id="lnFirst">the first stop</b> in the <b>Lateness</b> column (0 = on time). After <b>Compare options</b> the green columns show the recommended plan.</span></div>'
+    + '<div id="lnTripTbl"></div>'
     + '<div class="ln-act" id="lnAct"></div>'
     + '<details class="ln-more" id="lnMore"><summary>More settings <small>balance trips, priority, AITP stops, layover, halfway rules</small></summary></details></section>'
     + '<section class="ln-step" id="lnCompare"><div class="ln-hd"><span class="n">2</span><div class="t"><b>Compare on EWT &mdash; lower is better</b><small>Excess Wait Time: the extra minutes the average passenger waits beyond the timetable because buses are uneven.</small></div></div><div class="ln-res" id="lnCmp"></div></section>'
@@ -2177,6 +2172,7 @@ document.addEventListener("click", function(e){
   $("lnAct").appendChild($("hoRun")); $("lnAct").appendChild($("hoEx")); $("lnAct").appendChild($("hoMsg"));
   $("hoRun").textContent = "Compare options"; $("hoEx").textContent = "Load example";
   $("lnMore").appendChild(sc);
+  var trips = document.querySelector("#stIn .hx-trips"); if(trips) $("lnTripTbl").appendChild(trips);          // the previous trip table, unchanged, is the input
   ["rdeBoard", "stIn", "story"].forEach(function(id){ var e = $(id); if(e) $("lnAll").appendChild(e); });
   if($("osCard")) $("lnRouteSec").appendChild($("osCard"));
   var hd = inp.querySelector(".st-hd b"), hs = inp.querySelector(".st-hd small"); if(hd) hd.textContent = "Trip-by-trip table"; if(hs) hs.textContent = "Arrival, departure and the AI plan for every trip";
@@ -2185,29 +2181,13 @@ document.addEventListener("click", function(e){
   function openFull(id){ full.open = true; setTimeout(function(){ var e = $(id); if(e){ for(var d = e.parentElement; d; d = d.parentElement) if(d.tagName === "DETAILS") d.open = true; e.scrollIntoView({behavior:"smooth", block:"start"}); } }, 120); }
 
   /* ---------- step 1: the late-trip strip writes into the page's own trip table (same handlers, same engine inputs) */
-  function schedDeps(){
-    var r = HO.prev && HO.prev.ok && HO.prev.trips ? HO.prev.trips : null;
-    if(r) return r.map(function(t){ return t.sch_dep; });
-    var ref = ($("hoRef").value || "").match(/^(\d\d):(\d\d)$/), H = +$("hoHw").value || (HO.setup && HO.setup.sched_hw) || 0;
-    if(!ref || !H) return [];
-    var t0 = +ref[1] * 60 + +ref[2]; return Array.from({length:HO.n || 10}, function(_, k){ return t0 + k * H; });
-  }
-  function tripsRender(){
-    var n = HO.n || 10, box = $("lnTrips"), dep = schedDeps(), act = document.activeElement;
-    if(box.children.length !== n){
-      box.innerHTML = Array.from({length:n}, function(_, k){ return '<label class="ln-t" data-i="' + (k + 1) + '"><span>T' + (k + 1) + '</span><small>&nbsp;</small><input type="number" inputmode="numeric" step="1" min="-60" max="300" data-i="' + (k + 1) + '" aria-label="Minutes late, trip ' + (k + 1) + '"></label>'; }).join("");
-      box.querySelectorAll("input").forEach(function(x){ x.addEventListener("input", function(){ var t = document.querySelector('#hoTrips input.late[data-i="' + x.dataset.i + '"]'); if(t){ t.value = x.value; t.dispatchEvent(new Event("input", {bubbles:true})); } mark(); });
-        x.addEventListener("keydown", function(e){ if(e.key === "Enter"){ e.preventDefault(); $("hoRun").click(); } }); });
-    }
-    box.querySelectorAll(".ln-t").forEach(function(c, k){ var x = c.querySelector("input"), v = HO.late[k] || 0;
-      if(x !== act) x.value = v ? String(v) : "0";
-      c.querySelector("small").innerHTML = dep[k] != null ? "<i>dep </i>" + hm(dep[k]) : "&nbsp;"; });
-    mark();
-  }
-  function mark(){
-    var late = [];
-    $("lnTrips").querySelectorAll(".ln-t").forEach(function(c){ var v = +c.querySelector("input").value || 0; c.classList.toggle("late", v > 0); if(v > 0) late.push("T" + c.dataset.i + " +" + v); });
-    $("lnLateSum").textContent = late.length ? late.join(" · ") : "no late trip yet";
+  function tripsRender(){                                       // the page's own trip table is the input: highlight late trips, Enter = Compare
+    document.querySelectorAll("#hoTrips input.late").forEach(function(x){
+      x.classList.toggle("on", (+x.value || 0) > 0);
+      if(!x.dataset.ln){ x.dataset.ln = "1";
+        x.addEventListener("input", function(){ x.classList.toggle("on", (+x.value || 0) > 0); });
+        x.addEventListener("keydown", function(e){ if(e.key === "Enter"){ e.preventDefault(); $("hoRun").click(); } }); }
+    });
   }
   function factsRender(){
     var j = HO.setup;
