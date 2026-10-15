@@ -1081,6 +1081,55 @@ BB_IDLE_SEC = 600                     # stop polling LTA when nobody has looked 
 BB_ALWAYS = os.getenv("BUNCHING_ALWAYS_ON", "").strip().lower() in ("1", "true", "yes")   # keep polling with nobody watching, so the event log keeps filling
 BB = {"params": dict(bunching.PARAMS), "labels": {}, "master": [], "rows": {}, "watch": {}, "hist": deque(maxlen=900), "trk": {}, "open": {}, "seq": 0,
       "last_req": 0.0, "cycle": {"at": None, "took": None, "pairs": 0}, "loop_at": 0.0, "db_ok": True, "db_err": None}
+BB_BOOT = time.time()
+
+
+def bb_persistent():
+    """Does the bunching database survive an upload (redeploy) or restart? BUNCHING_PERSISTENT=1 / 0 overrides the guess.
+    On Render only a mounted persistent disk does (free instances cannot have one); on your own PC or server the file simply stays."""
+    f = os.getenv("BUNCHING_PERSISTENT", "").strip().lower()
+    if f in ("1", "true", "yes"):
+        return True
+    if f in ("0", "false", "no"):
+        return False
+    if not (os.getenv("RENDER") or os.getenv("RENDER_SERVICE_ID")):
+        return True
+    try:
+        d, top = Path(BB_DB).resolve().parent, HERE.resolve()
+        if d == top or d in top.parents:                     # next to the app (default) = the instance's own, temporary disk
+            return False
+        while d != d.parent and d != top:
+            if os.path.ismount(d):                           # e.g. /var/data, a Render persistent disk
+                return True
+            d = d.parent
+    except Exception:
+        pass
+    return False
+
+
+BB_PERSIST = bb_persistent()
+
+
+def bb_rec_status(now=None):
+    """What the analytics RECORDING chip shows. state: on | starting (server just woke / page just opened) | paused (nobody watching,
+    BUNCHING_ALWAYS_ON off) | stalled (should record but no collector cycle for 5 min) | off (no LTA key)."""
+    now = now or time.time()
+    every = float(BB["params"]["refresh_sec"])
+    attended = BB_ALWAYS or now - BB["last_req"] < BB_IDLE_SEC
+    fresh = bool(BB["loop_at"]) and now - BB["loop_at"] < max(3 * every, 2 * float(BB["cycle"].get("took") or 0) + every)
+    if not KEY:
+        state = "off"
+    elif not attended:
+        state = "paused"
+    elif fresh:
+        state = "on"
+    elif now - max(BB_BOOT, BB.get("wake_at", 0.0)) < 300:
+        state = "starting"
+    else:
+        state = "stalled"
+    return {"state": state, "always_on": bool(BB_ALWAYS), "persistent": BB_PERSIST, "keep_days": BB_KEEP_DAYS, "since": round(BB_BOOT), "db_ok": BB["db_ok"]}
+
+
 BB_INT_PARAMS = ("confirm_stops", "gap_stops", "alert_step", "refresh_sec", "horizon_min")
 PARAM_RANGES = {"bunch_min": (0.5, 10), "confirm_stops": (1, 60), "gap_add_min": (1, 60), "gap_stops": (1, 60), "alert_step": (1, 30), "horizon_min": (10, 60), "refresh_sec": (15, 600),
                 "w_gap": (0, 100), "w_bunch": (0, 100), "w_persist": (0, 100), "w_deter": (0, 100), "w_time": (0, 100), "yellow_conv": (0.3, 1), "yellow_div": (1, 3)}
@@ -1617,6 +1666,8 @@ async def recovery_guide_page():
 @app.get("/api/bunching")
 async def api_bunching(services: str = "", direction: int = 0):
     """Cached gap / bunching state for the selected services. Browsers never call DataMall; the collector does."""
+    if time.time() - BB["last_req"] >= BB_IDLE_SEC:
+        BB["wake_at"] = time.time()                          # first viewer after a quiet spell: recording restarts ("starting")
     BB["last_req"] = time.time()
     svcs = []
     for t in re.split(r"[,\s]+", (services or BB_DEFAULT).upper()):
@@ -1654,7 +1705,7 @@ async def api_bunching(services: str = "", direction: int = 0):
     return {"updated": now_sgt().isoformat(timespec="seconds"), "rows": [{k: v for k, v in r.items() if k not in ("groups_full",)} for r in rows],
             "kpi": {**cur, "services": len({r["service"] for r in rows}), "prev": prev, "history_min": hist_min}, "trend": trend[::step],
             "params": P, "errors": errors, "collector": {**BB["cycle"], "alive": alive, "db_ok": BB["db_ok"], "db_err": BB["db_err"], "max_pairs": BB_MAX_PAIRS,
-                                                         "truncated": len(svcs) * len(dirs) > BB_MAX_PAIRS},
+                                                         "truncated": len(svcs) * len(dirs) > BB_MAX_PAIRS, "recording": bb_rec_status()},
             "open_events": sum(1 for e in bb_open_public() if e["service"] + ":" + str(e["direction"]) in kk), "alerts": bb_alerts(set(kk))}
 
 
@@ -2374,9 +2425,10 @@ async def api_bb_analytics(period: str = "7d", kind: str = "all", direction: int
         cov_rows = [r for r in cov_rows if int(r["direction"] or 0) == direction]
     first = bb_sql("SELECT MIN(t) AS t FROM (SELECT MIN(start_ts) AS t FROM bunching_event UNION ALL SELECT MIN(start_ts) FROM gap_event)", fetch=True)
     first_obs = bb_sql("SELECT MIN(hour_ts) AS t FROM bb_cov", fetch=True)                # when this server's recorded history begins
+    rec = bb_rec_status()
     out.update(measure=measure, coverage=bunching_analytics.coverage(cov_rows, p), db_ok=BB["db_ok"], db_err=BB["db_err"], first_ts=(first[0]["t"] if first else None),
                first_obs_ts=(first_obs[0]["t"] if first_obs else None),
-               always_on=BB_ALWAYS, keep_days=BB_KEEP_DAYS, collecting=time.time() - BB["loop_at"] < 3 * BB["params"]["refresh_sec"],
+               always_on=BB_ALWAYS, keep_days=BB_KEEP_DAYS, collecting=rec["state"] in ("on", "starting"), recording=rec,
                gate={"bunching": int(BB["params"]["confirm_stops"]), "gap": int(BB["params"]["gap_stops"])})
     return out
 

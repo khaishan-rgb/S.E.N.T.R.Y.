@@ -2,7 +2,11 @@ services:
   - type: web
     name: sg-transport-pulse
     runtime: python
-    plan: free
+    plan: free                    # free = bunching history is deleted on every upload, restart and 15-min sleep. To keep it: change to 0.5c-512mb (US$7/month)
+    # disk:                       # ... and un-comment these 4 lines (US$0.25 per GB a month), then set BUNCHING_DB=/var/data/bunching.db and BUNCHING_ALWAYS_ON=1
+    #   name: bunching-data
+    #   mountPath: /var/data
+    #   sizeGB: 1
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn app:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /api/health
@@ -32,6 +36,8 @@ services:
       - key: BUNCHING_ALWAYS_ON   # optional: 1 = keep collecting when nobody has the page open (needed for an unattended event log; uses more LTA quota)
         sync: false
       - key: BUNCHING_DB          # optional: SQLite file for bunching settings, event log and analytics, e.g. /var/data/bunching.db on a persistent disk (paid instance)
+        sync: false
+      - key: BUNCHING_PERSISTENT  # optional: the dashboard guesses whether history survives an upload (a mounted disk); 1 / 0 overrides the guess
         sync: false
       - key: BUNCHING_KEEP_DAYS   # optional: days of bunching analytics kept (default 62 = 30 days + the 30 days before)
         sync: false

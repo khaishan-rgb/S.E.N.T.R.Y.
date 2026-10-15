@@ -1969,5 +1969,335 @@ document.addEventListener("click", function(e){
 })();
 </script>
 
+<!-- V16.23 Recovery Decision Engine - LEAN VIEW: 1 Enter -> 2 Compare on EWT -> 3 Decide.
+     Lean Six Sigma: one decision metric (EWT = the passenger's extra wait), two guardrails (max gap, km lost), one fixed decision rule, no duplicate figures.
+     Reads only the engine result the page already fetched (HO.rec from /api/halfway/recovery) and drives the page's own controls; the full analysis is kept, folded. -->
+<style>
+#lean{display:grid;gap:14px;margin:4px 0 14px}
+.ln-step,.ln-full,#techEwt,#osCard{scroll-margin-top:76px}
+.ln-step{border:1px solid var(--ds-line,rgba(126,178,230,.14));border-radius:14px;background:linear-gradient(180deg,rgba(15,32,56,.86),rgba(8,18,33,.92));padding:16px 18px;min-width:0}
+.ln-hd{display:flex;align-items:center;gap:12px;margin:0 0 14px;flex-wrap:wrap}
+.ln-hd .n{flex:none;width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font:700 15px var(--ds-display,inherit);background:rgba(56,214,255,.12);color:#bfefff;border:1px solid rgba(56,214,255,.42)}
+.ln-hd .t{flex:1;min-width:200px}
+.ln-hd b{display:block;font:600 19px/1.2 var(--ds-display,inherit);color:#fff}
+.ln-hd small{display:block;color:var(--ds-mut,#8aa2bd);font-size:13px;margin-top:2px;line-height:1.4}
+.ln-in{display:grid;grid-template-columns:150px 170px minmax(0,1fr);gap:12px 16px;align-items:end}
+.ln-in .fld{margin:0}
+.ln-facts{font-size:13px;color:var(--ds-text-2,#b6c8dd);line-height:1.5;padding-bottom:6px}
+.ln-facts b{color:#fff}
+.ln-trips-h{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;margin:16px 0 8px;font-size:13px;color:var(--ds-text-2,#b6c8dd)}
+.ln-trips-h b{color:#fff}
+.ln-trips{display:grid;grid-template-columns:repeat(10,minmax(0,1fr));gap:8px}
+.ln-t{display:flex;flex-direction:column;align-items:center;gap:3px;padding:8px 4px 6px;border-radius:10px;border:1px solid var(--ds-line-2,rgba(126,178,230,.26));background:rgba(8,20,38,.7);cursor:text;min-width:0}
+.ln-t span{font:700 13px var(--ds-display,inherit);color:#fff}
+.ln-t small{font-size:11px;color:var(--ds-mut,#8aa2bd);font-variant-numeric:tabular-nums}
+.ln-t input{width:100%;max-width:64px;height:34px;border-radius:7px;border:1px solid var(--ds-line-2,rgba(126,178,230,.26));background:#06101e;color:#fff;text-align:center;font:600 16px var(--ds-font,inherit);font-variant-numeric:tabular-nums;padding:0}
+.ln-t input:focus{outline:2px solid #38d6ff;outline-offset:1px}
+.ln-t.late{border-color:rgba(255,181,71,.6);background:rgba(255,181,71,.08)}
+.ln-t.late input{border-color:rgba(255,181,71,.7);color:#ffe0ad}
+.ln-act{display:flex;align-items:center;gap:10px 14px;flex-wrap:wrap;margin-top:14px}
+#lean #hoRun{height:42px;padding:0 22px;font-size:15px;letter-spacing:.02em}
+#lean #hoMsg{margin:0;font-size:13px}
+.ln-more{margin-top:12px;border-top:1px solid var(--ds-line,rgba(126,178,230,.14));padding-top:10px}
+.ln-more>summary{cursor:pointer;font-size:13px;color:#9cc4ff;font-weight:600}
+.ln-more>summary small{color:var(--ds-mut,#8aa2bd);font-weight:400;margin-left:6px}
+.ln-more[open]>summary{margin-bottom:10px}
+.ln-more .hx-sc{border:0;background:transparent;padding:0;box-shadow:none}
+.ln-more .hx-sc>h2{display:none}
+.ln-empty{color:var(--ds-mut,#8aa2bd);font-size:14px;line-height:1.5;padding:6px 0}
+.ln-stale{margin:0 0 12px;padding:9px 12px;border-radius:9px;border:1px solid rgba(255,181,71,.5);background:rgba(255,181,71,.08);color:#ffe0ad;font-size:13px}
+#lean.stale .ln-res{opacity:.5}
+.ln-what{font-size:12.5px;color:var(--ds-mut,#8aa2bd);margin:-4px 0 14px;line-height:1.5}
+.ln-what a{color:#9cc4ff}
+.ln-bars{display:grid;gap:10px}
+.ln-row{display:grid;grid-template-columns:minmax(190px,260px) minmax(0,1fr) 168px;grid-template-areas:"name bar val" "name g g";gap:4px 16px;align-items:center;padding:12px 14px;border-radius:12px;border:1px solid var(--ds-line,rgba(126,178,230,.14));background:rgba(6,16,30,.55)}
+.ln-row.rec{border-color:rgba(56,214,255,.55);background:radial-gradient(360px 90px at 0 0,rgba(56,214,255,.1),transparent 70%),rgba(6,16,30,.7);box-shadow:0 0 0 1px rgba(56,214,255,.15)}
+.ln-row.off{opacity:.75}
+.ln-name{grid-area:name;min-width:0}
+.ln-name b{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font:600 15.5px/1.25 var(--ds-display,inherit);color:#fff}
+.ln-name small{display:block;font-size:12.5px;color:var(--ds-mut,#8aa2bd);margin-top:3px;line-height:1.4}
+.ln-bar{grid-area:bar;height:22px;position:relative;border-left:1px solid #39536e}
+.ln-bar i{position:absolute;left:0;top:2px;height:18px;border-radius:0 4px 4px 0;background:#5b7a9c;min-width:2px;transition:width .4s var(--ds-ease,ease)}
+.ln-row.rec .ln-bar i{background:#38d6ff}
+.ln-val{grid-area:val;text-align:right;font-variant-numeric:tabular-nums;color:var(--ds-text-2,#b6c8dd);font-size:13px;white-space:nowrap}
+.ln-val b{font:700 22px var(--ds-display,inherit);color:#fff;margin-right:3px}
+.ln-val em{display:block;font-style:normal;font-size:12px;color:var(--ds-mut,#8aa2bd)}
+.ln-val em.dn{color:#b9f7dc}.ln-val em.up{color:#ffc3ca}
+.ln-g{grid-area:g;font-size:12.5px;color:var(--ds-text-2,#b6c8dd)}
+.ln-g span+span:before{content:"\00b7";margin:0 7px;color:var(--ds-faint,#5f7690)}
+.ln-chip{display:inline-flex;align-items:center;height:20px;padding:0 8px;border-radius:999px;font:700 10.5px/1 var(--ds-font,inherit);letter-spacing:.08em;border:1px solid rgba(126,178,230,.35);color:#cfe0f2;white-space:nowrap}
+.ln-chip.rec{border-color:rgba(56,214,255,.6);background:rgba(56,214,255,.14);color:#bfefff}
+.ln-axis{display:grid;grid-template-columns:minmax(190px,260px) minmax(0,1fr) 168px;gap:16px;font-size:11.5px;color:var(--ds-faint,#5f7690);padding:0 15px}
+.ln-axis div{display:flex;justify-content:space-between}
+.ln-rule{margin:16px 0 0;padding:12px 14px;border-radius:12px;border:1px dashed rgba(126,178,230,.3);background:rgba(4,12,24,.45)}
+.ln-rule h4{margin:0 0 8px;font:600 12px var(--ds-font,inherit);letter-spacing:.1em;color:var(--ds-mut,#8aa2bd)}
+.ln-rule ol{margin:0;padding-left:0;list-style:none;display:grid;gap:8px;font-size:13.5px;color:var(--ds-text,#e6f1ff);line-height:1.45}
+.ln-rule li{display:grid;grid-template-columns:22px minmax(0,1fr);gap:8px}
+.ln-rule li>i{font-style:normal;font-weight:700;text-align:center}
+.ln-rule li.p>i{color:#2ee59d}.ln-rule li.f>i{color:#ffb547}.ln-rule li.n>i{color:var(--ds-faint,#5f7690)}
+.ln-rule .res{display:flex;gap:6px;flex-wrap:wrap;margin-top:4px}
+.ln-rule .res span{font-size:12px;padding:2px 8px;border-radius:6px;border:1px solid rgba(126,178,230,.25);color:var(--ds-text-2,#b6c8dd)}
+.ln-rule .res span.p{border-color:rgba(46,229,157,.45);color:#b9f7dc}.ln-rule .res span.f{border-color:rgba(255,181,71,.5);color:#ffe0ad}
+.ln-hero{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:16px;align-items:start}
+.ln-pick{padding:16px;border-radius:12px;border:1px solid rgba(56,214,255,.5);background:radial-gradient(420px 140px at 0 0,rgba(56,214,255,.12),transparent 70%),rgba(6,16,30,.7)}
+.ln-pick .k{font:700 11px var(--ds-font,inherit);letter-spacing:.14em;color:#8fd8ff}
+.ln-pick h3{margin:6px 0 6px;font:700 24px/1.15 var(--ds-display,inherit);color:#fff}
+.ln-pick p{margin:0;font-size:14.5px;color:var(--ds-text,#e6f1ff);line-height:1.5}
+.ln-pick p small{display:block;color:var(--ds-mut,#8aa2bd);font-size:12.5px;margin-top:2px}
+.ln-kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:14px}
+.ln-kpi{padding:10px 12px;border-radius:10px;background:rgba(4,12,24,.55);border:1px solid var(--ds-line,rgba(126,178,230,.14))}
+.ln-kpi span{display:block;font-size:11.5px;color:var(--ds-mut,#8aa2bd)}
+.ln-kpi b{display:block;font:700 18px/1.25 var(--ds-display,inherit);color:#fff;font-variant-numeric:tabular-nums;margin-top:2px}
+.ln-kpi small{display:block;font-size:12px;color:#b9f7dc}
+.ln-kpi small.n{color:var(--ds-mut,#8aa2bd)}
+.ln-btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;align-items:center}
+.ln-dec{font-size:13px;color:#b9f7dc;margin-top:10px}
+.ln-ins h4{margin:0 0 8px;font:600 12px var(--ds-font,inherit);letter-spacing:.1em;color:var(--ds-mut,#8aa2bd)}
+.ln-ins ul{list-style:none;margin:0;padding:0;display:grid;gap:2px}
+.ln-ins li{display:grid;grid-template-columns:52px 70px minmax(0,1fr);gap:8px;align-items:baseline;padding:7px 0;border-bottom:1px solid rgba(126,178,230,.1);font-size:13.5px;color:var(--ds-text,#e6f1ff)}
+.ln-ins time{font-weight:700;color:#9cc4ff;font-variant-numeric:tabular-nums}
+.ln-ins .kd{font:700 10.5px var(--ds-font,inherit);letter-spacing:.08em;color:var(--ds-mut,#8aa2bd)}
+.ln-ins .kd.halfway,.ln-ins .kd.standby{color:#8fd8ff}
+.ln-ins details{margin-top:8px;font-size:13px;color:var(--ds-text-2,#b6c8dd)}
+.ln-ins details summary{cursor:pointer;color:#9cc4ff}
+.ln-full{margin-top:4px;border:1px solid var(--ds-line,rgba(126,178,230,.14));border-radius:14px;background:rgba(6,14,27,.5)}
+.ln-full>summary{cursor:pointer;padding:14px 18px;font:600 15px var(--ds-display,inherit);color:#fff;list-style:none;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.ln-full>summary::-webkit-details-marker{display:none}
+.ln-full>summary:before{content:"\25B8";color:#9cc4ff;transition:transform .2s}
+.ln-full[open]>summary:before{transform:rotate(90deg)}
+.ln-full>summary small{font:400 12.5px var(--ds-font,inherit);color:var(--ds-mut,#8aa2bd)}
+.ln-full>.ln-fbody{padding:0 14px 14px}
+#rdeTop{display:none!important}
+#lnFull .hx-top{grid-template-columns:minmax(0,1fr)!important}
+.ln-more .hx-sc{max-width:760px}
+@media (max-width:980px){.ln-hero{grid-template-columns:1fr}}
+@media (max-width:760px){
+  .ln-in{grid-template-columns:minmax(0,1fr) auto}.ln-facts{grid-column:1/-1}
+  #lean #hoDir button{white-space:nowrap}
+  .ln-t small i{display:none}
+  .ln-trips{grid-template-columns:repeat(5,minmax(0,1fr))}
+  .ln-row{grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"name val" "bar bar" "g g";gap:8px 12px}
+  .ln-axis{display:none}
+  .ln-kpis{grid-template-columns:1fr;gap:6px}
+  .ln-kpi{display:grid;grid-template-columns:auto minmax(0,1fr);gap:0 10px;align-items:baseline;padding:8px 12px}
+  .ln-kpi b{text-align:right;font-size:16px;margin:0}.ln-kpi small{grid-column:1/-1;text-align:right}
+  .ln-step{padding:14px 13px}
+  .ln-pick h3{font-size:21px}
+  .ln-ins li{grid-template-columns:48px minmax(0,1fr)}.ln-ins .kd{display:none}
+}
+@media (prefers-reduced-motion:reduce){.ln-bar i{transition:none}}
+</style>
+<script>
+(function(){
+  "use strict";
+  var $ = function(id){ return document.getElementById(id); };
+  var esc = function(s){ return String(s == null ? "" : s).replace(/[&<>"']/g, function(c){ return {"&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;"}[c]; }); };
+  var f2 = function(x){ return x == null || isNaN(x) ? "–" : (+x).toFixed(2); };
+  var f0 = function(x){ return x == null || isNaN(x) ? "–" : String(Math.round(x)); };
+  var f1 = function(x){ return x == null || isNaN(x) ? "–" : (Math.abs(x - Math.round(x)) < .05 ? String(Math.round(x)) : (+x).toFixed(1)); };
+  var hm = function(m){ m = ((Math.round(m) % 1440) + 1440) % 1440; return String(Math.floor(m / 60)).padStart(2, "0") + ":" + String(m % 60).padStart(2, "0"); };
+  var opt = $("opt"), inp = $("stIn"), story = $("story"), sc = document.querySelector("#stIn .hx-sc"); if(!opt || !inp || !story || !sc || typeof HO === "undefined") return;
+
+  var NAME = {none:"No action", adjust:"Trip adjustment", halfway:"Halfway deployment"};
+  var ORDER = ["none", "adjust", "halfway"];
+
+  /* ---------- layout: three steps on top, everything else folded under "Full analysis" */
+  var lean = document.createElement("section"); lean.id = "lean"; lean.setAttribute("aria-label", "Recovery decision in three steps");
+  lean.innerHTML =
+    '<section class="ln-step" id="lnEnter"><div class="ln-hd"><span class="n">1</span><div class="t"><b>Enter the late trips</b><small>Service, direction and how many minutes late each trip arrives at the first stop. Everything else has a default.</small></div></div>'
+    + '<div class="ln-in"><div id="lnSvcF"></div><div id="lnDirF"></div><div class="ln-facts" id="lnFacts">Enter a service to load its route.</div></div>'
+    + '<div class="ln-trips-h"><span><b>Minutes late</b> arriving at <span id="lnFirst">the first stop</span> &middot; 0 = on time</span><span id="lnLateSum"></span></div>'
+    + '<div class="ln-trips" id="lnTrips"></div>'
+    + '<div class="ln-act" id="lnAct"></div>'
+    + '<details class="ln-more" id="lnMore"><summary>More settings <small>balance trips, priority, AITP stops, layover, halfway rules</small></summary></details></section>'
+    + '<section class="ln-step" id="lnCompare"><div class="ln-hd"><span class="n">2</span><div class="t"><b>Compare on EWT &mdash; lower is better</b><small>Excess Wait Time: the extra minutes the average passenger waits beyond the timetable because buses are uneven.</small></div></div><div class="ln-res" id="lnCmp"></div></section>'
+    + '<section class="ln-step" id="lnDecide"><div class="ln-hd"><span class="n">3</span><div class="t"><b>Decide</b><small>The recommended recovery, what to tell the bus captains, and your decision.</small></div></div><div class="ln-res" id="lnDec"></div></section>';
+  opt.insertBefore(lean, opt.firstChild);
+  var full = document.createElement("details"); full.className = "ln-full"; full.id = "lnFull";
+  full.innerHTML = '<summary>Full analysis <small>for analysts &middot; every option incl. next-departure fix, EWT at each stop and the calculation, 1,000-future stress test, trip table, simulation map, off-service route</small></summary><div class="ln-fbody"></div>';
+  opt.insertBefore(full, lean.nextSibling);
+  var fb = full.querySelector(".ln-fbody");
+  // the page's own controls move into the steps (their handlers move with them)
+  var svcF = $("hoSvc").closest(".fld"), dirF = $("hoDir").closest(".fld");
+  $("lnSvcF").appendChild(svcF); $("lnDirF").appendChild(dirF);
+  $("lnAct").appendChild($("hoRun")); $("lnAct").appendChild($("hoEx")); $("lnAct").appendChild($("hoMsg"));
+  $("hoRun").textContent = "Compare options"; $("hoEx").textContent = "Load example";
+  $("lnMore").appendChild(sc);
+  ["rdeBoard", "stIn", "story"].forEach(function(id){ var e = $(id); if(e) fb.appendChild(e); });
+  var hd = inp.querySelector(".st-hd b"), hs = inp.querySelector(".st-hd small"); if(hd) hd.textContent = "Trip-by-trip table"; if(hs) hs.textContent = "Arrival, departure and the AI plan for every trip";
+  var intro = document.querySelector(".module-intro"); if(intro){ var ps = intro.querySelectorAll("p"); if(ps.length > 1) ps[ps.length - 1].innerHTML = "Pick the recovery that gives passengers the least <b>Excess Wait Time (EWT)</b>: enter &rarr; compare &rarr; decide."; }
+  full.addEventListener("toggle", function(){ if(full.open) setTimeout(function(){ window.dispatchEvent(new Event("resize")); }, 80); });
+  function openFull(id){ full.open = true; setTimeout(function(){ var e = $(id); if(e){ var d = e.closest("details.tech, details.st-ins"); if(d) d.open = true; e.scrollIntoView({behavior:"smooth", block:"start"}); } }, 120); }
+
+  /* ---------- step 1: the late-trip strip writes into the page's own trip table (same handlers, same engine inputs) */
+  function schedDeps(){
+    var r = HO.prev && HO.prev.ok && HO.prev.trips ? HO.prev.trips : null;
+    if(r) return r.map(function(t){ return t.sch_dep; });
+    var ref = ($("hoRef").value || "").match(/^(\d\d):(\d\d)$/), H = +$("hoHw").value || (HO.setup && HO.setup.sched_hw) || 0;
+    if(!ref || !H) return [];
+    var t0 = +ref[1] * 60 + +ref[2]; return Array.from({length:HO.n || 10}, function(_, k){ return t0 + k * H; });
+  }
+  function tripsRender(){
+    var n = HO.n || 10, box = $("lnTrips"), dep = schedDeps(), act = document.activeElement;
+    if(box.children.length !== n){
+      box.innerHTML = Array.from({length:n}, function(_, k){ return '<label class="ln-t" data-i="' + (k + 1) + '"><span>T' + (k + 1) + '</span><small>&nbsp;</small><input type="number" inputmode="numeric" step="1" min="-60" max="300" data-i="' + (k + 1) + '" aria-label="Minutes late, trip ' + (k + 1) + '"></label>'; }).join("");
+      box.querySelectorAll("input").forEach(function(x){ x.addEventListener("input", function(){ var t = document.querySelector('#hoTrips input.late[data-i="' + x.dataset.i + '"]'); if(t){ t.value = x.value; t.dispatchEvent(new Event("input", {bubbles:true})); } mark(); });
+        x.addEventListener("keydown", function(e){ if(e.key === "Enter"){ e.preventDefault(); $("hoRun").click(); } }); });
+    }
+    box.querySelectorAll(".ln-t").forEach(function(c, k){ var x = c.querySelector("input"), v = HO.late[k] || 0;
+      if(x !== act) x.value = v ? String(v) : "0";
+      c.querySelector("small").innerHTML = dep[k] != null ? "<i>dep </i>" + hm(dep[k]) : "&nbsp;"; });
+    mark();
+  }
+  function mark(){
+    var late = [];
+    $("lnTrips").querySelectorAll(".ln-t").forEach(function(c){ var v = +c.querySelector("input").value || 0; c.classList.toggle("late", v > 0); if(v > 0) late.push("T" + c.dataset.i + " +" + v); });
+    $("lnLateSum").textContent = late.length ? late.join(" · ") : "no late trip yet";
+  }
+  function factsRender(){
+    var j = HO.setup;
+    if(!HO.svc){ $("lnFacts").textContent = "Enter a service to load its route."; return; }
+    if(!j){ $("lnFacts").textContent = "Loading route…"; return; }
+    if(j.error){ $("lnFacts").innerHTML = '<span class="hx-err">' + esc(j.error) + '</span>'; return; }
+    var H = $("hoHw").value || j.sched_hw;
+    $("lnFacts").innerHTML = '<b>' + esc(j.first) + '</b> &rarr; <b>' + esc(j.last) + '</b><br>' + (H ? 'Every <b>' + esc(H) + ' min</b>' : '<span class="hx-err">Scheduled headway unknown &ndash; set it under More settings</span>') + ' &middot; first departure <b>' + esc($("hoRef").value || j.ref) + '</b> &middot; ' + j.n_stops + ' stops, ' + f1(j.route_km) + ' km';
+    $("lnFirst").textContent = j.first;
+  }
+
+  /* ---------- step 2: one chart, one number per option */
+  function planDesc(k, p, r){
+    var rows = p.rows || [], hw = rows.filter(function(x){ return x.type === "halfway"; }), adj = p.n_adjusted || rows.filter(function(x){ return x.type === "full" && Math.abs(x.shift || 0) >= .5; }).length;
+    if(k === "none") return "Every bus leaves when it is ready. Nothing held, no km lost.";
+    if(k === "adjust") return adj ? "Hold or release " + adj + " departure" + (adj > 1 ? "s" : "") + "; every trip runs the full route." : "Every trip runs the full route; no departure needs to move.";
+    var where = hw.map(function(x){ return "Trip " + x.n + " starts at " + esc(x.stop); }).join("; ");
+    return where + (adj ? "; " + adj + " other departure" + (adj > 1 ? "s" : "") + " adjusted." : ".") + (r.needs_standby ? " Needs a standby bus." : "");
+  }
+  function ruleBox(r){
+    var P = r.plans, N = P.none, A = P.adjust, pr = r.params || {}, sims = Number(r.sims || 1000).toLocaleString();
+    var aGain = N.ewt && A.ewt ? N.ewt.avg - A.ewt.avg : null, aMin = pr.ewt_adjust_min != null ? pr.ewt_adjust_min : 0.05, aOk = r.full_choice === "adjust";
+    var li = function(cls, txt, res){ return '<li class="' + cls + '"><i>' + (cls === "p" ? "✓" : cls === "f" ? "✗" : "–") + '</i><div>' + txt + (res ? '<div class="res">' + res + '</div>' : '') + '</div></li>'; };
+    var h = '<div class="ln-rule"><h4>DECISION RULE &middot; THE SAME EVERY TIME &middot; CHOOSE THE SIMPLEST OPTION THAT CUTS EWT ENOUGH</h4><ol>';
+    h += li(aOk ? "p" : "f", '<b>Trip adjustment</b> beats no action only if it cuts EWT by at least <b>' + f2(aMin) + ' min</b>.',
+      '<span class="' + (aOk ? "p" : "f") + '">' + (aGain == null ? "–" : aGain > 0.005 ? "cuts " + f2(aGain) + " min" : "no cut") + '</span>' + (!aOk && A && !(A.n_adjusted > 0) ? '<span>no departure needs to move</span>' : ''));
+    var cont = NAME[r.full_choice] || "the full-trip option";
+    if(!P.halfway) h += li("n", '<b>Halfway deployment</b> &ndash; not possible: no halfway stop can be reached in time' + (r.halfway_trips_tested && r.halfway_trips_tested.length ? "" : " (no trip is late enough to test it)") + '.', "");
+    else {
+      var tests = (r.tests || []).map(function(t){ var v = String(t.value || ""), x = parseFloat(v), need = function(re, u){ var m = String(t.test).match(re); return m ? " (need " + m[1] + u + ")" : ""; };
+        var cut = function(u, dp){ return isNaN(x) ? v : x > 0 ? "cuts " + Math.abs(x).toFixed(dp) + u : x < 0 ? "adds " + Math.abs(x).toFixed(dp) + u : "no cut"; };
+        var txt = /stress/i.test(t.test) ? "stress test, " + sims + " what-if futures: P85 " + v : /per km/i.test(t.test) ? "worth the km: " + v + need(/([\d.]+) min per km/, " min/km") : /%/.test(t.test) ? cut("%", 0) + need(/([\d.]+)%/, "%") : cut(" min", 2) + need(/([\d.]+) min/, " min");
+        return '<span class="' + (t.pass ? "p" : "f") + '">' + (t.pass ? "✓ " : "✗ ") + esc(txt) + '</span>'; }).join("");
+      var gm = pr.ewt_gain_min != null ? pr.ewt_gain_min : 0.1, gp = (pr.ewt_gain_pct != null ? pr.ewt_gain_pct : 5) * (r.mode === "headway" ? .5 : 1);
+      h += li(r.halfway_ok ? "p" : "f", '<b>Halfway deployment</b> beats ' + esc(cont.toLowerCase()) + ' only if it cuts EWT by a further <b>' + f2(gm) + ' min</b> and <b>' + f1(gp) + '%</b>, and stays better in the stress test' + (r.mode === "mileage" ? ' and is worth the km not run' : '') + '.', tests);
+    }
+    return h + '</ol></div>';
+  }
+  function cmpRender(r){
+    var el = $("lnCmp");
+    if(!r){ el.innerHTML = '<div class="ln-empty">' + (HO.svc ? "Type how late each trip is, then press <b>Compare options</b>. No action, Trip adjustment and Halfway deployment are simulated over the next trips and ranked by EWT." : "Enter a service first.") + '</div>'; return; }
+    if(!r.ok){ el.innerHTML = '<div class="ln-empty hx-err">' + esc(r.error || "The comparison failed.") + '</div>'; return; }
+    if(!r.plans || !r.plans.none){ el.innerHTML = '<div class="ln-empty"><b style="color:#fff">No recovery needed.</b> ' + esc(r.message || (r.why || [])[0] || "No trip would leave the first stop late.") + '</div>'; return; }
+    var P = r.plans, E = r.ewt || {}, base = P.none.ewt ? P.none.ewt.avg : null;
+    var keys = ORDER.filter(function(k){ return P[k] && P[k].ewt; }), vals = keys.map(function(k){ return P[k].ewt.avg; });
+    var mx = Math.max.apply(null, vals.map(function(v){ return Math.max(0, v); }).concat([0.01])), lo = Math.min.apply(null, vals), best = keys[vals.indexOf(lo)];
+    var C = E.continue || {}, npts = C.n_points || (P.none.ewt.n_points), bal = E.balance_trips || r.balance_trips;
+    var h = '<div class="ln-what">Average over <b>' + (npts || "every") + ' stops</b> on the next <b>' + (bal || "") + ' trips</b> of every bus (' + esc(typeof balSpan === "function" ? balSpan(bal) : "") + '), the same for every option. <a href="#" id="lnHowEwt">How EWT is worked out</a></div>';
+    if(E.aitp && E.aitp.on && !C.n_points) h += '<div class="ln-stale">None of your ticked AITP stops is on these trips, so there is no EWT to compare. Change the AITP stops under More settings.</div>';
+    h += '<div class="ln-bars" role="list">';
+    ORDER.forEach(function(k){
+      var p = P[k];
+      if(!p || !p.ewt){ h += '<div class="ln-row off" role="listitem"><div class="ln-name"><b>' + NAME[k] + '</b><small>' + (k === "halfway" ? "Not possible: no halfway stop can be reached in time." : "Not simulated in this run.") + '</small></div><div class="ln-bar"></div><div class="ln-val">&ndash;</div></div>'; return; }
+      var v = p.ewt.avg, rec = r.decision === k, d = base != null && k !== "none" ? v - base : null, pct = d != null && base > 0.005 ? Math.round(100 * -d / base) : null;
+      var tip = NAME[k] + ": average EWT " + f2(v) + " min · max gap " + f0(p.det.max) + " min · " + ((p.det.km || 0) > 0 ? f1(p.det.km) + " km not run" : "no km lost") + (p.mc && p.mc.ewt_p85 != null ? " · stress test P85 " + f2(p.mc.ewt_p85) + " min" : "");
+      h += '<div class="ln-row' + (rec ? " rec" : "") + '" role="listitem" data-k="' + k + '" title="' + esc(tip) + '"><div class="ln-name"><b>' + NAME[k] + (rec ? ' <span class="ln-chip rec">RECOMMENDED</span>' : '') + (k === best && keys.length > 1 ? ' <span class="ln-chip">LOWEST EWT</span>' : '') + '</b><small>' + planDesc(k, p, r) + '</small></div>'
+        + '<div class="ln-bar" aria-hidden="true"><i style="width:' + Math.max(0.6, 100 * Math.max(0, v) / mx).toFixed(1) + '%"></i></div>'
+        + '<div class="ln-val"><b>' + f2(v) + '</b>min' + (d != null ? '<em class="' + (d < -0.005 ? "dn" : d > 0.005 ? "up" : "") + '">' + (d < -0.005 ? "▼ " + f2(-d) + " min" + (pct != null ? " (" + pct + "%)" : "") + " vs no action" : d > 0.005 ? "▲ " + f2(d) + " min vs no action" : "same as no action") + '</em>' : '<em>the baseline</em>') + '</div>'
+        + '<div class="ln-g"><span>Max gap ' + f0(p.det.max) + ' min</span><span>' + ((p.det.km || 0) > 0 ? f1(p.det.km) + ' km not run' : 'no km lost') + '</span></div></div>';
+    });
+    h += '</div><div class="ln-axis" aria-hidden="true"><span></span><div><span>0</span><span>' + f2(mx) + ' min</span></div><span></span></div>';
+    h += ruleBox(r);
+    el.innerHTML = h;
+    var a = $("lnHowEwt"); if(a) a.onclick = function(e){ e.preventDefault(); openFull("techEwt"); };
+  }
+
+  /* ---------- step 3: the decision */
+  var DKEY = "rde.decisions";                                    // same store as the decision board, so both views agree
+  function decisions(){ try{ return JSON.parse(localStorage.getItem(DKEY) || "[]"); }catch(e){ return []; } }
+  function runKey(r){ return [r.service, r.direction, r.ref, r.updated].join("|"); }
+  function decision(r){ var k = runKey(r); return decisions().filter(function(d){ return d.key === k; })[0] || null; }
+  function decide(r, k){
+    var lbl = {none:"Continue service", local:"Regulate", adjust:"Trip adjustment", halfway:"Halfway deployment"}[k] + (k === r.decision ? " (as recommended)" : " (controller override)");
+    var t = new Date(), tm = String(t.getHours()).padStart(2, "0") + ":" + String(t.getMinutes()).padStart(2, "0");
+    var list = decisions().filter(function(d){ return d.key !== runKey(r); }); list.unshift({key:runKey(r), svc:r.service, dir:r.direction, opt:k, label:lbl, rec:r.decision, ts:Date.now(), time:(window.DS && DS.fmtTime ? DS.fmtTime(t) : tm)});
+    try{ localStorage.setItem(DKEY, JSON.stringify(list.slice(0, 50))); }catch(e){}
+    decRender(r);
+  }
+  function insList(r){
+    var ins = r.instructions || [], act = function(i){ return ["halfway", "hold", "release", "standby"].indexOf(i.kind) >= 0; };
+    var now_ = ins.filter(function(i){ return !i.later && act(i); }), later = ins.filter(function(i){ return i.later; });
+    var KD = {halfway:"HALFWAY", standby:"STANDBY", hold:"HOLD", release:"EARLY", full:""};
+    var tidy = function(t){ return esc(String(t || "").replace(/ — Full trip \| /, " · ").replace(/ — /, " · ").replace(/ \| /g, " · ")); };
+    var li = function(i){ return '<li><time>' + esc(i.time || "") + '</time><span class="kd ' + esc(i.kind) + '">' + (KD[i.kind] || "") + '</span><span>' + tidy(i.text) + '</span></li>'; };
+    var h = '<div class="ln-ins"><h4>TELL THE BUS CAPTAINS &middot; ' + esc((r.first_stop || "FIRST STOP").toUpperCase()) + '</h4>';
+    h += now_.length ? '<ul>' + now_.map(li).join("") + '</ul>' : '<div class="ln-empty">No departure changes at ' + esc(r.first_stop || "the first stop") + '.</div>';
+    if(later.length) h += '<details><summary>' + later.length + ' later instruction' + (later.length > 1 ? "s" : "") + ' at the terminals</summary><ul>' + later.map(li).join("") + '</ul></details>';
+    return h + '</div>';
+  }
+  function decRender(r){
+    var el = $("lnDec");
+    if(!r || !r.ok){ el.innerHTML = '<div class="ln-empty">The recommendation appears here after <b>Compare options</b>.</div>'; return; }
+    if(!r.plans || !r.plans.none){ el.innerHTML = '<div class="ln-pick"><div class="k">RECOMMENDED</div><h3>No action needed</h3><p>' + esc(r.message || "Every trip leaves on time.") + '</p></div>'; return; }
+    var P = r.plans, k = r.decision, p = P[k], N = P.none, base = N.ewt ? N.ewt.avg : null, v = p.ewt ? p.ewt.avg : null;
+    var hw = (p.rows || []).filter(function(x){ return x.type === "halfway"; }), adj = p.n_adjusted || 0;
+    var head = k === "halfway" ? hw.map(function(x){ return "Start Trip " + x.n + " halfway at " + esc(x.stop) + (x.code ? " (" + esc(x.code) + ")" : "") + " at " + esc(x.start_clock); }).join("<br>")
+      : k === "adjust" ? "Keep every trip in full; hold or release " + adj + " departure" + (adj !== 1 ? "s" : "") : "Keep the natural departures &ndash; no change needed";
+    var sub = k === "halfway" ? hw.map(function(x){ return (x.leave_clock ? "Bus leaves off-service at " + esc(x.leave_clock) + " · " : "") + f1(x.km_lost) + " km not run"; }).join("; ") + (r.needs_standby ? " · needs a standby bus at the stop (the late bus cannot get there in time)" : "") + (adj ? " · " + adj + " other departure" + (adj > 1 ? "s" : "") + " adjusted" : "")
+      : k === "adjust" ? "No km lost" : "";
+    var cmpTo = k === "halfway" ? P[r.full_choice] : N, cv = cmpTo && cmpTo.ewt ? cmpTo.ewt.avg : null;
+    var why = k === "halfway" ? "Lowest EWT: " + f2(v) + " min against " + f2(cv) + " min with " + NAME[r.full_choice].toLowerCase() + " (" + (r.ewt && r.ewt.improvement_pct != null ? Math.round(r.ewt.improvement_pct) + "% better" : "") + "), and it passes every check of the decision rule."
+      : k === "adjust" ? "Adjusting cuts EWT from " + f2(base) + " to " + f2(v) + " min without losing mileage" + (P.halfway && P.halfway.ewt ? "; halfway (" + f2(P.halfway.ewt.avg) + " min) does not cut enough more to be worth the km." : ".")
+      : "No option cuts EWT enough to be worth a change" + (P.adjust && P.adjust.ewt ? " (trip adjustment: " + f2(P.adjust.ewt.avg) + " min against " + f2(base) + " min)" : "") + ".";
+    var pct = base > 0.005 && v != null ? Math.round(100 * (base - v) / base) : null;
+    var kpi = function(lbl, val, s, cls){ return '<div class="ln-kpi"><span>' + lbl + '</span><b>' + val + '</b>' + (s ? '<small class="' + (cls || "") + '">' + s + '</small>' : '') + '</div>'; };
+    var dec = decision(r), others = ORDER.filter(function(x){ return x !== k && P[x]; });
+    var h = '<div class="ln-hero"><div class="ln-pick"><div class="k">RECOMMENDED &middot; ' + esc(NAME[k].toUpperCase()) + '</div><h3>' + head + '</h3>' + (sub ? '<p><small>' + sub + '</small></p>' : '')
+      + '<p style="margin-top:10px">' + why + '</p>'
+      + '<div class="ln-kpis">' + kpi("EWT vs no action", f2(base) + " &rarr; " + f2(v) + " min", pct != null && pct > 0 ? "▼ " + pct + "% less waiting" : "no change", pct > 0 ? "" : "n")
+      + kpi("Max gap", f0(N.det.max) + " &rarr; " + f0(p.det.max) + " min", "", "") + kpi("Mileage", (p.det.km || 0) > 0 ? f1(p.det.km) + " km not run" : "none lost", "", "") + '</div>'
+      + '<div class="ln-btns"><button class="ds-btn pri" type="button" data-dec="' + k + '">Accept recommendation</button>'
+      + others.map(function(x){ return '<button class="ds-btn sm ghost" type="button" data-dec="' + x + '">Choose ' + esc(NAME[x].toLowerCase()) + '</button>'; }).join("")
+      + (k === "halfway" ? '<button class="ds-btn sm" type="button" id="lnRoute">Off-service route</button>' : '') + '</div>'
+      + '<div class="ln-dec" id="lnDecTxt">' + (dec ? "✓ Decision recorded " + esc(dec.time) + ": " + esc(dec.label) + "." : "") + '</div>'
+      + '<div class="ds-note" style="font-size:12px;color:var(--ds-mut,#8aa2bd);margin-top:6px">Decision support: nothing is sent to buses. The controller instructs.</div></div>'
+      + insList(r) + '</div>';
+    el.innerHTML = h;
+    el.querySelectorAll("[data-dec]").forEach(function(b){ b.onclick = function(){ decide(r, b.dataset.dec); }; });
+    var rt = $("lnRoute"); if(rt) rt.onclick = function(){ openFull("osCard"); };
+  }
+
+  /* ---------- keep the steps in step with the page */
+  var LOADING = null, lastRec = null;
+  function render(){
+    factsRender(); tripsRender();
+    var r = HO.rec;
+    lean.classList.toggle("stale", !!(r && HO.recStale));
+    var st = r && HO.recStale ? '<div class="ln-stale">Inputs changed since this result &ndash; press <b>Compare options</b> to update it.</div>' : "";
+    if(LOADING && r === LOADING.prev){ return; }
+    LOADING = null;
+    cmpRender(r); decRender(r);
+    if(st){ $("lnCmp").insertAdjacentHTML("afterbegin", st); }
+    if(r && r !== lastRec && r.ok){ lastRec = r; setTimeout(function(){ var c = $("lnCompare"), b = c.getBoundingClientRect(); if(b.top < 0 || b.top > innerHeight * .6) c.scrollIntoView({behavior:"smooth", block:"start"}); }, 60); }
+  }
+  $("hoRun").addEventListener("click", function(){ if(!HO.svc) return; LOADING = {prev:HO.rec};          // an input error clears it again (hoMsg with err)
+    $("lnCmp").innerHTML = '<div class="ds-load" role="status" aria-live="polite"><b>COMPARING OPTIONS</b><div class="bar"><i></i></div><ol><li class="on">Simulating no action, trip adjustment and halfway&hellip;</li><li>Running ' + "1,000" + ' what-if futures&hellip;</li><li>Working out EWT at every stop&hellip;</li></ol></div>';
+    $("lnDec").innerHTML = ""; }, true);
+  ["hoRenderRecovery", "hoRenderTrips"].forEach(function(fn){ var f = window[fn]; if(typeof f !== "function") return;
+    window[fn] = function(){ try{ return f.apply(this, arguments); } finally{ try{ render(); }catch(e){ console.error(e); } } }; });
+  var hoMsg0 = window.hoMsg; if(typeof hoMsg0 === "function") window.hoMsg = function(t, err){ hoMsg0(t, err); try{ if(err && LOADING){ LOADING = null; render(); } else factsRender(); }catch(e){} };
+  var bt = window.hoBuildTrips; if(typeof bt === "function") window.hoBuildTrips = function(){ var x = bt.apply(this, arguments); try{ tripsRender(); }catch(e){} return x; };
+  ["hoRef", "hoHw"].forEach(function(id){ $(id).addEventListener("input", function(){ factsRender(); tripsRender(); }); });
+  render();
+})();
+</script>
+
 </body>
 </html>

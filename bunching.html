@@ -271,6 +271,12 @@ body.ds-app #anSection .an-card,#anSection .an-card{background:linear-gradient(1
 #anSection .an-kpis .kt>b{text-shadow:0 0 18px rgba(56,214,255,.28)}
 .an-live{display:inline-flex;align-items:center;gap:7px;margin-left:10px;padding:3px 10px;border-radius:999px;border:1px solid rgba(56,214,255,.4);color:#8fd8ff;font-size:11px;font-weight:700;letter-spacing:.12em;vertical-align:middle}
 .an-live.off{color:var(--an-mut);border-color:#2a4d73}.an-live.off:before{background:#6f8399;box-shadow:none;animation:none}
+.an-chips{display:inline-flex;flex-wrap:wrap;gap:6px;margin-left:10px;vertical-align:middle}.an-chips .an-live{margin-left:0;cursor:help}
+.an-live.wait{color:#ffd27a;border-color:rgba(217,154,26,.55)}.an-live.wait:before{background:#d99a1a;box-shadow:0 0 8px #d99a1a}
+.an-live.bad{color:#ff9aa3;border-color:rgba(224,90,102,.6)}.an-live.bad:before{background:#e05a66;box-shadow:none;animation:none}
+.an-store:before{border-radius:2px;animation:none}.an-store.ok{color:#8fd8ff;border-color:rgba(56,214,255,.3)}.an-store.ok:before{box-shadow:none}
+.an-store.tmp{color:#ffd27a;border-color:rgba(217,154,26,.55);background:rgba(217,154,26,.08)}.an-store.tmp:before{background:#d99a1a;box-shadow:none}
+.an-note .warnline{display:block;margin-top:6px;color:#ffd27a}
 .an-live:before{content:"";width:7px;height:7px;border-radius:50%;background:#38d6ff;box-shadow:0 0 8px #38d6ff;animation:anpulse 2s ease-in-out infinite}
 @keyframes anpulse{50%{opacity:.35}}
 .an-grid.one{grid-template-columns:1fr}
@@ -371,7 +377,7 @@ body.ds-app #anSection .an-card,#anSection .an-card{background:linear-gradient(1
     </div>
 
     <section class="an-dash" id="anSection" aria-label="Patterns and hotspots">
-      <div class="an-head"><div><h2>Patterns &amp; hotspots<span class="an-live" id="anLive" hidden>RECORDING</span></h2><div class="sub">Which services, hours and roads keep bunching &mdash; counted per trip: a bus pair that stays bunched for 15 stops counts as 1. The filters above apply here too.</div></div>
+      <div class="an-head"><div><h2>Patterns &amp; hotspots<span class="an-chips"><span class="an-live" id="anLive" hidden>RECORDING</span><span class="an-live an-store" id="anStore" hidden></span></span></h2><div class="sub">Which services, hours and roads keep bunching &mdash; counted per trip: a bus pair that stays bunched for 15 stops counts as 1. The filters above apply here too.</div></div>
         <div class="an-ctrl"><div class="seg sm" id="anPer" role="group" aria-label="Period"><button type="button" data-p="today">Today</button><button type="button" data-p="yesterday">Yesterday</button><button type="button" data-p="7d">7 days</button><button type="button" data-p="30d">30 days</button></div>
           <span id="anSvc"></span></div></div>
       <div id="anBody"><div class="sk"></div><div class="sk"></div><div class="sk"></div></div>
@@ -800,6 +806,7 @@ async function load(quiet){
   if(j.error){ setLive("bad", "Server error", j.error); $("msgs").innerHTML = `<div class="msg bad">Could not load: ${esc(j.error)}</div>`; return; }
   S.data = j; S.left = Math.max(20, (j.params && j.params.refresh_sec) || 30);
   const c = j.collector || {}; setLive(c.db_ok === false ? "warn" : "ok", "Live Data (LTA)", c.alive ? `Collector cycle ${c.took}s over ${c.pairs} service directions` : "On-demand evaluation");
+  if(c.recording && typeof recChip === "function"){ recChip(c.recording); if(typeof AN !== "undefined" && AN.data) AN.data.recording = c.recording; }
   if(!S.sel || !j.rows.some(r => r.key === S.sel)){ const f = j.rows.find(r => r.risk === "red" || r.risk === "orange") || j.rows[0]; S.sel = f ? f.key : null; S.focusI = 0; S.mapMode = "focus"; S.autoFit = true; if(S.sel) loadDetail(S.sel); }
   else if(!S.detail[S.sel] || quiet) loadDetail(S.sel);
   render();
@@ -941,13 +948,42 @@ function anKpis(d){
     <div class="kt"><span>Most affected service</span><b>${s ? esc(s.service) : "–"}</b><small>${s ? `${qty(s.events)} · ${pctOf(s.events, t.events)}% of all` : "&nbsp;"}${t.median_stops != null ? ` · typical ${f1(t.median_stops)} stops` : ""}</small></div>
     <div class="kt"><span>Peak hour</span><b>${t.events ? hh(pk) : "–"}</b><small>${t.events ? `${qty(hs[pk])} · ${pctOf(hs[pk], t.events)}% of all` : "&nbsp;"}</small></div></section>`;
 }
+const REC_TXT = {on: "RECORDING", starting: "STARTING", paused: "PAUSED", stalled: "STALLED", off: "OFF"};
+function recInfo(r){
+  if(!r) return "";
+  const allDay = r.always_on ? "round the clock" : "while this page is open (and for 10 min after)";
+  return {on: `Recording ${allDay}.`, starting: "The server has just started or woken up — recording begins within about a minute.",
+    paused: `Recording is paused: nobody has had this page open for 10 min${r.always_on ? "" : " and BUNCHING_ALWAYS_ON is off"}.`,
+    stalled: "Recording has stalled: no reply from LTA for 5 min — see Health.", off: "Not recording: the LTA key is not set."}[r.state] || "";
+}
+function recChip(r){
+  const lv = $("anLive"), sv = $("anStore"); if(!lv || !r) return;
+  const st = REC_TXT[r.state] ? r.state : "paused";
+  lv.hidden = false; lv.textContent = REC_TXT[st] + (st === "on" && r.always_on ? " 24/7" : "");
+  lv.className = "an-live" + (st === "on" ? "" : st === "starting" ? " wait" : st === "stalled" ? " bad" : " off");
+  lv.title = recInfo(r) + (st === "on" && !r.always_on ? " Set BUNCHING_ALWAYS_ON=1 to record round the clock." : "");
+  if(sv){
+    sv.hidden = r.persistent == null;
+    sv.textContent = r.persistent ? `KEPT ${r.keep_days || 62} DAYS` : "TEMPORARY STORAGE";
+    sv.className = "an-live an-store " + (r.persistent ? "ok" : "tmp");
+    sv.title = r.persistent ? `History is kept for ${r.keep_days || 62} days, also through uploads and restarts.` : "History is deleted on every upload (redeploy), restart, or 15 min without visitors on Render's free plan. Attach a Render disk to keep it (see README).";
+  }
+}
 function anBasis(d){
   const cv = d.coverage || {}, p = d.period, fmt = ts => sgt({day:"2-digit", month:"short", hour:"2-digit", minute:"2-digit"}).format(new Date(ts * 1000)), out = [];
   const since = d.first_obs_ts || cv.first_ts || d.first_ts, gap = since && since > p.start + 1800;   // the server's whole history begins inside this period
   out.push(`<b>Counted per trip:</b> a bus pair (or group) that stays bunched &mdash; headway under ${P().bunch_min} min &mdash; for ${d.gate ? d.gate.bunching : 15} bus stops counts as 1; if the same buses bunch again on that trip it is not counted again. A long gap (scheduled + ${P().gap_add_min} min for ${d.gate ? d.gate.gap : 15} stops) is counted the same way. Hotspots are where it began; times are when it began.`);
   if(gap) out.push(`<b>History starts ${fmt(since)}</b> — nothing earlier was kept (the server was restarted or redeployed; Render's free plan keeps no files after a restart, a redeploy or 15 min without visitors).`);
-  if(!d.collecting) out.push(`Recording is paused right now: the server records while this page is open${d.always_on ? "" : " (set <code>BUNCHING_ALWAYS_ON=1</code> to record round the clock)"}.`);
-  out.push(`Kept for ${d.keep_days || 62} days when the server's storage persists.${d.db_ok === false ? ` <b>Storage error: ${esc(d.db_err || "")}</b>` : ""}`);
+  const r = d.recording;
+  if(r){
+    out.push(recInfo(r) + (r.always_on || r.state === "off" ? "" : ` Set <code>BUNCHING_ALWAYS_ON=1</code> to record round the clock${r.persistent ? "" : " (on a paid instance; free ones sleep after 15 min without visitors)"}.`));
+    out.push(r.persistent ? `Kept for ${r.keep_days || 62} days, also through uploads and restarts.`
+      : `<span class="warnline"><b>Temporary storage:</b> on Render's free plan this history is deleted on every upload (redeploy), restart, or 15 min without visitors. To keep ${r.keep_days ? Math.min(30, r.keep_days) : 30} days, attach a Render disk at <code>/var/data</code> and set <code>BUNCHING_DB=/var/data/bunching.db</code> (see README).</span>`);
+  } else {
+    if(!d.collecting) out.push(`Recording is paused right now: the server records while this page is open${d.always_on ? "" : " (set <code>BUNCHING_ALWAYS_ON=1</code> to record round the clock)"}.`);
+    out.push(`Kept for ${d.keep_days || 62} days when the server's storage persists.`);
+  }
+  if(d.db_ok === false) out.push(`<b>Storage error: ${esc(d.db_err || "")}</b>`);
   return `<div class="an-note">${out.join(" ")}</div>`;
 }
 function hbars(rows, max, opt){
@@ -1043,7 +1079,7 @@ function renderAn(){
   syncAnFilters();
   const t = d.totals, cv = d.coverage || {}, legend = AN.kind === "all" ? `<div class="an-leg"><span><i class="sw bb"></i>Bunching</span><span><i class="sw gap"></i>Long gap</span></div>` : "";
   const unit = "trips", scope = `${esc(d.period.label)}${AN.svc ? " · service " + esc(AN.svc) : S.services.length ? " · services " + esc(S.services.join(", ")) : ""}${S.op ? " · " + esc($("opSel").selectedOptions[0].textContent) : ""}${S.dir ? " · Dir " + S.dir : ""}${AN.kind !== "all" ? " · " + esc(what()) + " only" : ""}`;
-  const lv = $("anLive"); if(lv){ lv.hidden = false; lv.textContent = d.collecting ? "RECORDING" : "PAUSED"; lv.classList.toggle("off", !d.collecting); }
+  recChip(d.recording || {state: d.collecting ? "on" : "paused", always_on: d.always_on, persistent: null, keep_days: d.keep_days});
   if(!t.events){
     body.innerHTML = anKpis(d) + `<section class="card an-empty"><b>No trips affected ${esc(d.period.label.toLowerCase())}</b>A trip is counted once its buses have stayed bunched (or a long gap has lasted) for ${d.gate ? d.gate.bunching : 15} bus stops${cv.hours_watched ? ` &mdash; ${cv.hours_watched} h recorded so far, and none has qualified yet` : ""}.${anBasis(d)}</section>`;
     if(AN.map){ AN.map.remove(); AN.map = null; } return;

@@ -1,5 +1,14 @@
 # SG Transport Pulse V16.19 — Operational Intelligence & Service Recovery Platform
 
+## Recovery Decision Engine — lean view: Enter → Compare on EWT → Decide (halfway.html only)
+The page (`/recovery`) now opens on three steps. Engine, APIs, Settings tab and every earlier figure are unchanged; the long analysis is kept, folded under **Full analysis**.
+* **Lean Six Sigma basis.** One decision metric — **EWT** (Excess Wait Time: the extra minutes the average passenger waits beyond the timetable). Two guardrails only — **max gap** and **km not run**. One fixed decision rule. No duplicated figures (EWT was shown four times before). Page length with one late trip: desktop 5.4 → 2.1 screens, phone 10.6 → 3.9 screens.
+* **1 Enter the late trips** — service, direction (moved here from the scenario card) and one box per trip for *minutes late arriving at the first stop*, each labelled with its scheduled departure. It writes into the existing trip table, so the engine inputs are identical. Balance trips, priority, AITP stops, layover, halfway rules: **More settings**. One button: **Compare options** (the old RUN ANALYSIS strip is hidden).
+* **2 Compare on EWT** — one bar chart from zero: *No action*, *Trip adjustment*, *Halfway deployment*, in that order (the engine's `none` / `adjust` / `halfway` plans), each with its Average EWT (same points, same balance trips), saving against no action, max gap and km not run. Tags: RECOMMENDED (the engine's decision) and LOWEST EWT.
+* **Decision rule** (shown with this run's ✓ / ✗, straight from the engine): choose the simplest option that cuts EWT enough — trip adjustment only if it cuts EWT by ≥ `ewt_adjust_min` (0.05 min) against no action; halfway only if it cuts a further ≥ `ewt_gain_min` (0.10 min) and ≥ `ewt_gain_pct` (5 %, halved under headway priority) and the 1,000-future stress test agrees (plus min-per-km under mileage priority).
+* **3 Decide** — the recommendation in one line (e.g. *Start Trip 4 halfway at Orchard Stn at 09:12*), EWT / max gap / mileage before → after, what to tell the bus captains (changes only; later terminal instructions folded), **Accept recommendation** or choose another option (recorded in the browser in the same store as the decision board, as "as recommended" or "controller override"), Off-service route.
+* The next-departure-only fix (plan `local`) is a reference, not part of the engine's decision, so it appears only in Full analysis.
+
 ## Bunching & Gap — Patterns & hotspots (on the Dashboard), counted per trip
 Analytics sits at the bottom of the Bunching & Gap **Dashboard** (old `/bunching?tab=analytics` links scroll to it). The main filter bar (Transport Operator, Services, Direction, Headway status) applies to it, plus its own **Period** (Today / Yesterday / 7 days / 30 days).
 * **Counted per trip.** A bunched bus pair (or group) counts **1** as soon as it has stayed bunched (headway under 3 min) for 15 bus stops (`confirm_stops`); if the same buses bunch again on that trip it is not counted again, and a bus joining (2BB → 3BB) does not add a count. Long gaps (scheduled + 10 min for 15 stops) are counted the same way. LTA gives no trip id: each bus's tracking id follows one bus along one run of the route, so the buses' tracking ids identify the trip.
@@ -13,10 +22,18 @@ Analytics sits at the bottom of the Bunching & Gap **Dashboard** (old `/bunching
 * Kept for `BUNCHING_KEEP_DAYS` days (default 62 = 30 days + the 30 days before, for the comparison); older rows are deleted hourly.
 
 ### Keeping 30 days on Render
-Everything is stored in the SQLite file `BUNCHING_DB` (default `bunching.db` next to the app). On Render's **free** plan that file is lost on every redeploy, restart **and after 15 minutes without visitors** (the free service sleeps), and persistent disks are not available — so history restarts often. Options:
-1. **Render paid instance + persistent disk** (no code change): attach a 1 GB disk (e.g. mounted at `/var/data`), set `BUNCHING_DB=/var/data/bunching.db` and `BUNCHING_ALWAYS_ON=1`. Paid instances do not sleep, so it records 24/7.
-2. Free: an external database (e.g. Neon Postgres) — needs a small code change to store these tables there.
-`BUNCHING_ALWAYS_ON=1` keeps recording with nobody watching (uses more LTA calls); without it the server records while a bunching page is open.
+Two chips next to **Patterns & hotspots** show the state: **RECORDING** (or RECORDING 24/7 / STARTING / PAUSED / STALLED) and **TEMPORARY STORAGE** or **KEPT 62 DAYS**. They update with every dashboard refresh.
+
+Everything is stored in the SQLite file `BUNCHING_DB` (default `bunching.db` next to the app). On Render's **free** plan that file is deleted on every upload (redeploy), every restart **and after 15 minutes without visitors** (the free service sleeps), and free services cannot have a persistent disk — so the history starts again each time and the chip says TEMPORARY STORAGE.
+
+To keep the history (no code change, about US$7.25 a month):
+1. Render dashboard → this service → **Settings → Instance type** → the cheapest paid one (US$7 a month, 0.5 CPU / 512 MB, the same memory as free; plan id `0.5c-512mb`).
+2. **Disks → Add disk**: mount path `/var/data`, size **1 GB** (US$0.25 a month; it can grow later but never shrink).
+3. **Environment**: add `BUNCHING_DB=/var/data/bunching.db` and `BUNCHING_ALWAYS_ON=1`, save and let it redeploy.
+4. The chips then show **RECORDING 24/7** and **KEPT 62 DAYS**; uploads no longer clear the history (each deploy has a few seconds' downtime while the disk moves to the new version).
+If the service was created from this Blueprint (`render.yaml`), make the same change there instead (`plan` and the commented `disk` block), or the next Blueprint sync puts it back to free.
+Free alternative: an external database (e.g. Neon or Supabase Postgres) plus an outside "ping" every 10 minutes to stop the free service sleeping — needs a code change to store these tables there.
+Without `BUNCHING_ALWAYS_ON=1` the server records only while a Bunching page is open (and for 10 min after).
 
 ## Bunching & Gap — simpler dashboard (patch on V16.19; bunching.html and bunching.py)
 * Filters unchanged (Transport Operator, Services, Direction, Time period, View by, Headway status, Bunching level). Engine, alert rules, Alerts / Settings tabs and APIs unchanged.
@@ -1078,6 +1095,8 @@ Run locally: `pip install -r requirements.txt` then `LTA_ACCOUNT_KEY=... uvicorn
 | `BUNCHING_MAX_PAIRS` | Max bus pairs analysed per request (default 40) |
 | `BUNCHING_DB` | SQLite path for settings / headway master / event log (default `bunching.db`) |
 | `BUNCHING_ALWAYS_ON` | `1` = keep collecting when nobody has the Bunching page open (default: stop after 10 idle minutes) |
+| `BUNCHING_KEEP_DAYS` | Days of bunching analytics kept (default 62 = 30 days + the 30 before, for comparison) |
+| `BUNCHING_PERSISTENT` | `1` / `0` overrides the dashboard's guess of whether history survives an upload (it checks for a mounted disk) |
 | `BUNCHING_ADMIN_TOKEN` | If set, saving Bunching settings / master requires it (falls back to `TIMETABLE_TOKEN`) |
 | `DATA_GOV_SG_KEY` | Optional, only raises data.gov.sg rate limits for the Rain layer |
 
