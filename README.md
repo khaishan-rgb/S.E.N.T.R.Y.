@@ -1,12 +1,16 @@
 # SG Transport Pulse V16.19 — Operational Intelligence & Service Recovery Platform
 
-## Bunching & Gap — Patterns & hotspots (on the Dashboard)
-Analytics now sits at the bottom of the Bunching & Gap **Dashboard** (no separate tab; old `/bunching?tab=analytics` links scroll to it). The main filter bar (Transport Operator, Services, Direction, Headway status) applies to it; it has its own **Period** (Today / Yesterday / 7 days / 30 days) and **Measure**:
-* **Time with a problem** (default) — minutes the live collector *saw* buses bunched (confirmed or developing) or with a long gap, recorded every cycle (30 s) at the stop where it was happening. New table `bb_obs` (hourly buckets per service, direction, level, stop) + `bb_cov` (how long each service was watched). This fills from the first minutes the dashboard runs, so it is not empty like the 15-stop case log.
-* **Cases (15+ stops)** — the logged cases (`bunching_event` / `gap_event`) as before.
-* Tiles, Key findings, most affected services, when it happens (hours not recorded are shown grey), weekly pattern heatmap, hotspot map, hotspot roads, day by day, bunching level mix (and case length for cases), hotspot stop table + CSV.
-* The note under the table says when the server's recorded history begins, and whether recording is paused.
-* Kept for `BUNCHING_KEEP_DAYS` days (default 62 = 30 days + the 30 days before, for the comparison); older rows are deleted hourly. About 1–5 MB for 30 days.
+## Bunching & Gap — Patterns & hotspots (on the Dashboard), counted per trip
+Analytics sits at the bottom of the Bunching & Gap **Dashboard** (old `/bunching?tab=analytics` links scroll to it). The main filter bar (Transport Operator, Services, Direction, Headway status) applies to it, plus its own **Period** (Today / Yesterday / 7 days / 30 days).
+* **Counted per trip.** A bunched bus pair (or group) counts **1** as soon as it has stayed bunched (headway under 3 min) for 15 bus stops (`confirm_stops`); if the same buses bunch again on that trip it is not counted again, and a bus joining (2BB → 3BB) does not add a count. Long gaps (scheduled + 10 min for 15 stops) are counted the same way. LTA gives no trip id: each bus's tracking id follows one bus along one run of the route, so the buses' tracking ids identify the trip.
+* Each qualifying trip is written to the new table `bb_trip` **straight away** (not when the case ends) and kept up to date while it lasts (longest stops, highest level). `bb_cov` records how long each service was watched, so hours with no recording show grey.
+* Visuals (glass cards with a neon edge; a RECORDING / PAUSED chip says whether the server is recording):
+  * **Every affected trip** — a unit chart, one bus icon per trip, coloured 2BB / 3BB / 4BB+ (amber, brighter = worse) or long gap (blue), plus how many stops it lasted.
+  * **Most affected services** — butterfly chart: Direction 1 to the left, Direction 2 to the right; tap a service to look at it alone.
+  * **Bunching clock** — 24-hour radial chart of trips by the hour they started, AM / PM peaks marked, busiest hour in the centre, grey = not recorded; weekly heatmap below.
+  * **Better or worse?** — arrow chart per service, this period against the previous one (▲ more = worse, ▼ fewer = better).
+  * Tiles, key findings, hotspot map, hotspot roads, day by day, hotspot stop table + CSV.
+* Kept for `BUNCHING_KEEP_DAYS` days (default 62 = 30 days + the 30 days before, for the comparison); older rows are deleted hourly.
 
 ### Keeping 30 days on Render
 Everything is stored in the SQLite file `BUNCHING_DB` (default `bunching.db` next to the app). On Render's **free** plan that file is lost on every redeploy, restart **and after 15 minutes without visitors** (the free service sleeps), and persistent disks are not available — so history restarts often. Options:

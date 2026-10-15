@@ -1129,9 +1129,10 @@ def bb_sql_many(sql, rows):
 
 def bb_init():
     bb_sql("CREATE TABLE IF NOT EXISTS system_parameter(k TEXT PRIMARY KEY, v REAL)")
-    # analytics: time observed in each state, summed per hour / service / direction / level / stop (bb_obs), and how long each service was watched (bb_cov)
-    bb_sql("CREATE TABLE IF NOT EXISTS bb_obs(hour_ts INTEGER, service TEXT, direction INTEGER, kind TEXT, level INTEGER, stop TEXT, n INTEGER, sec REAL, "
-           "PRIMARY KEY(hour_ts, service, direction, kind, level, stop))")
+    # analytics: one row per bunched / long-gap TRIP (bb_trip, counted once it lasts 15 stops), and how long each service was watched (bb_cov)
+    bb_sql("CREATE TABLE IF NOT EXISTS bb_trip(trip_key TEXT PRIMARY KEY, service TEXT, direction INTEGER, kind TEXT, start_ts REAL, last_ts REAL, level INTEGER, "
+           "stops INTEGER, start_stop TEXT, buses TEXT)")
+    bb_sql("CREATE INDEX IF NOT EXISTS bb_trip_start ON bb_trip(start_ts)")
     bb_sql("CREATE TABLE IF NOT EXISTS bb_cov(hour_ts INTEGER, service TEXT, direction INTEGER, n INTEGER, sec REAL, PRIMARY KEY(hour_ts, service, direction))")
     bb_sql("CREATE TABLE IF NOT EXISTS service_headway_config(service TEXT, direction INTEGER, day_type TEXT, t_from TEXT, t_to TEXT, hw REAL)")
     bb_sql("CREATE TABLE IF NOT EXISTS bunching_event(id INTEGER PRIMARY KEY AUTOINCREMENT, service TEXT, direction INTEGER, start_ts REAL, end_ts REAL, bus_group TEXT, "
@@ -1364,6 +1365,7 @@ def bb_events(key, res, ts):
             e["last_j"], e["end_stop"] = g["cur_j"], g["cur_stop"]
         e["last"], e["miss"] = ts, 0
         bb_alert_update(e, ts)
+        bb_trip_record(e, ts)
         seen.add(e["id"])
     for gp in res.get("gaps", []):
         if not gp.get("active"):                                                     # only pairs whose headway is long right now
@@ -1387,12 +1389,31 @@ def bb_events(key, res, ts):
         e["sched"] = res.get("sched_hw", e.get("sched"))
         e["last"], e["miss"] = ts, 0
         bb_alert_update(e, ts)
+        bb_trip_record(e, ts)
         seen.add(e["id"])
     for eid in [i for i, e in ev.items() if e["key"] == key and i not in seen]:
         e = ev[eid]
         e["miss"] = e.get("miss", 0) + 1
         if e["miss"] >= 2:
             bb_close_event(ev.pop(eid))
+
+
+BB_TRIPS = bunching_analytics.TripCounter(format(int(time.time()), "x"))
+
+
+def bb_trip_record(e, ts):
+    """Trip-level analytics: the case counts once (per trip) as soon as it has lasted the required stops (15) - written straight away,
+    not when the case ends, and kept up to date (longest stops, highest level) while it lasts."""
+    n = bb_ev_stops(e)
+    if n < bb_ev_gate(e):
+        return
+    if "trip_key" not in e:
+        ids = set(e.get("cur_ids") or e["ids"]) if e["kind"] == "bb" else {e.get("lead"), e.get("foll")}
+        e["trip_key"], _ = BB_TRIPS.key_for(e["key"], e["kind"], ids, ts)
+    bb_sql("INSERT INTO bb_trip(trip_key, service, direction, kind, start_ts, last_ts, level, stops, start_stop, buses) VALUES (?,?,?,?,?,?,?,?,?,?) "
+           "ON CONFLICT(trip_key) DO UPDATE SET last_ts = excluded.last_ts, level = MAX(level, excluded.level), stops = MAX(stops, excluded.stops), buses = excluded.buses",
+           (e["trip_key"], e["service"], e["direction"], e["kind"], e["start"], ts, int(e.get("max_level") or 0) if e["kind"] == "bb" else 0, n,
+            (e.get("start_stop") or "")[:120], ",".join(sorted(e["ids"]))))
 
 
 def bb_close_event(e):
@@ -1471,7 +1492,7 @@ async def bb_cycle(keys=None):
     BB["cycle"] = {"at": t0, "took": round(time.time() - t0, 1), "pairs": len(keys)}
     BB["loop_at"] = time.time()
     try:
-        bb_obs_record(keys, t0)
+        bb_cov_record(keys, t0)
     except Exception:
         pass
 
@@ -1479,35 +1500,27 @@ async def bb_cycle(keys=None):
 BB_KEEP_DAYS = max(31, int(os.getenv("BUNCHING_KEEP_DAYS", "62") or 62))     # analytics history kept (62 days = 30 days + the 30 days before, for comparison)
 
 
-def bb_obs_record(keys, t0):
-    """Analytics recorder: every collector cycle adds its interval to bb_obs for each bunched group (confirmed / developing) and each long gap
-    seen right now, at the stop where it is happening, and to bb_cov for each service direction watched. Real observations only."""
+def bb_cov_record(keys, t0):
+    """Analytics coverage: every collector cycle adds its interval to bb_cov for each service direction watched, so the charts can tell
+    "no bunching" from "not recorded". (Bunched / long-gap trips are written by bb_trip_record as they qualify.)"""
     every = float(BB["params"]["refresh_sec"])
     last = BB.get("obs_at")
     dt = t0 - last if last else every
     sec = dt if 5 <= dt <= 3 * max(every, RT_POLL_SEC) else every                    # a pause in polling is not counted as observed time
     BB["obs_at"] = t0
     hour = int(t0 // 3600) * 3600                                                    # Singapore is UTC+8 whole hours: same hour boundaries
-    obs, cov = [], []
+    cov = []
     for k in keys:
         r = BB["rows"].get(f"{k[0]}:{k[1]}")
         if not r or r.get("error") or r.get("risk") == "nodata":
             continue
         cov.append((hour, r["service"], r["direction"], sec))
-        for g in r.get("groups") or []:
-            if g.get("status") in ("confirmed", "developing"):
-                obs.append((hour, r["service"], r["direction"], "bb", min(4, int(g.get("size") or 2)), (g.get("cur_stop") or g.get("location") or "")[:120], sec))
-        for gp in r.get("gaps") or []:
-            if gp.get("active"):
-                obs.append((hour, r["service"], r["direction"], "gap", 0, (gp.get("cur_stop") or gp.get("location") or "")[:120], sec))
-    bb_sql_many("INSERT INTO bb_obs(hour_ts, service, direction, kind, level, stop, n, sec) VALUES (?,?,?,?,?,?,1,?) "
-                "ON CONFLICT(hour_ts, service, direction, kind, level, stop) DO UPDATE SET n = n + 1, sec = sec + excluded.sec", obs)
     bb_sql_many("INSERT INTO bb_cov(hour_ts, service, direction, n, sec) VALUES (?,?,?,1,?) "
                 "ON CONFLICT(hour_ts, service, direction) DO UPDATE SET n = n + 1, sec = sec + excluded.sec", cov)
     if t0 - BB.get("obs_pruned", 0) > 3600:
         BB["obs_pruned"] = t0
         cut = t0 - BB_KEEP_DAYS * 86400
-        bb_sql("DELETE FROM bb_obs WHERE hour_ts < ?", (cut,))
+        bb_sql("DELETE FROM bb_trip WHERE start_ts < ?", (cut,))
         bb_sql("DELETE FROM bb_cov WHERE hour_ts < ?", (cut,))
 
 
@@ -2319,22 +2332,22 @@ _BB_AN_SQL = ("SELECT 'bb' AS kind, service, direction, start_ts AS start, end_t
               "UNION ALL SELECT 'gap', service, direction, start_ts, end_ts, NULL, stops, COALESCE(start_stop, location), end_stop, alerts FROM gap_event WHERE start_ts >= ? AND start_ts < ?")
 
 
-_BB_OBS_SQL = "SELECT hour_ts, service, direction, kind, level, stop, n, sec FROM bb_obs WHERE hour_ts >= ? AND hour_ts < ?"
-
-
-def _bb_obs_recs(rows):
-    return [{"kind": r["kind"], "service": r["service"], "direction": r["direction"], "start": r["hour_ts"], "end": None, "level": r["level"] or None,
-             "stops": 0, "start_stop": r["stop"], "w": (r["sec"] or 0) / 60.0} for r in rows]
+_BB_TRIP_SQL = "SELECT trip_key, kind, service, direction, start_ts AS start, last_ts AS end, level, stops, start_stop FROM bb_trip WHERE start_ts >= ? AND start_ts < ?"
 
 
 @app.get("/api/bunching/analytics")
-async def api_bb_analytics(period: str = "7d", kind: str = "all", direction: int = 0, service: str = "", operator: str = "", services: str = "", measure: str = "time"):
+async def api_bb_analytics(period: str = "7d", kind: str = "all", direction: int = 0, service: str = "", operator: str = "", services: str = "", measure: str = "trips"):
     p = bunching_analytics.period_bounds(period, time.time())
-    measure = "cases" if measure == "cases" else "time"
+    measure = "cases" if measure == "cases" else "trips"
     h0 = lambda t: int(t // 3600) * 3600
-    if measure == "time":                                                            # minutes observed by the live collector (fills from the first cycle)
-        cur = _bb_obs_recs(bb_sql(_BB_OBS_SQL, (h0(p["start"]), p["end"]), fetch=True))
-        prev = _bb_obs_recs(bb_sql(_BB_OBS_SQL, (h0(p["prev_start"]), p["prev_end"]), fetch=True))
+    if measure == "trips":                                                           # one count per bunched / long-gap trip (15+ stops)
+        cur = bb_sql(_BB_TRIP_SQL, (p["start"], p["end"]), fetch=True)
+        prev = bb_sql(_BB_TRIP_SQL, (p["prev_start"], p["prev_end"]), fetch=True)
+        running = {e["trip_key"] for e in BB["open"].values() if e.get("trip_key")}
+        for r in cur:
+            r["open"] = r.pop("trip_key") in running
+        for r in prev:
+            r.pop("trip_key", None)
     else:                                                                            # logged cases (15+ stops) and cases still running
         cur = bb_sql(_BB_AN_SQL, (p["start"], p["end"], p["start"], p["end"]), fetch=True)
         prev = bb_sql(_BB_AN_SQL, (p["prev_start"], p["prev_end"], p["prev_start"], p["prev_end"]), fetch=True)

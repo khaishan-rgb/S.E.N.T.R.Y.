@@ -1,9 +1,9 @@
 """Bunching & Gap analytics (pure stdlib, no I/O, unit-testable).
 
 Two measures, same charts (top services, hour of day, weekday x hour, daily trend, hotspot roads and stops, bunching level):
-  * time  - minutes of bunching / long gap OBSERVED by the live collector (table bb_obs: every collector cycle adds its interval
-            to the hour, service, direction, level and stop where it was seen). Fills as soon as the dashboard runs.
-  * cases - LOGGED cases (bunching_event / gap_event + cases still open): only cases that lasted the required number of bus stops (15).
+  * trips - TRIP-LEVEL counts (table bb_trip): a bunched pair / group, or a long gap, counts 1 per trip once it has lasted the
+            required number of bus stops (15); the same buses bunching again on that trip are not counted again (TripCounter).
+  * cases - LOGGED episodes (bunching_event / gap_event + cases still open) that lasted the required number of bus stops (15).
 Nothing here is estimated or invented: no records gives empty charts.
 Times are Singapore time (UTC+8, no daylight saving).
 """
@@ -102,11 +102,12 @@ def aggregate(events, prev_events, stops, p, kind="all", direction=0, service=""
         k, w = e["kind"], _w(e)
         s = str(e.get("service", ""))
         d = int(e.get("direction") or 0)
-        x = svc.setdefault(s, {"service": s, "events": 0, "bb": 0, "gap": 0, "d1": 0, "d2": 0, "stops": 0, "max_stops": 0})
+        x = svc.setdefault(s, {"service": s, "events": 0, "bb": 0, "gap": 0, "d1": 0, "d2": 0, "d1_bb": 0, "d1_gap": 0, "d2_bb": 0, "d2_gap": 0, "stops": 0, "max_stops": 0})
         x["events"] += w
         x[k] += w
         if d in (1, 2):
             x[f"d{d}"] += w
+            x[f"d{d}_{k}"] += w
         n = int(e.get("stops") or 0)
         x["stops"] += n
         x["max_stops"] = max(x["max_stops"], n)
@@ -158,6 +159,7 @@ def aggregate(events, prev_events, stops, p, kind="all", direction=0, service=""
                    "alerts": sum(int(e.get("alerts") or 0) for e in ev), "services": len(svc), "worst": worst,
                    "levels": {"2": lv[2], "3": lv[3], "4": lv[4]}},
         "prev": {"events": sum(_w(e) for e in pv), "bb": sum(_w(e) for e in pv if e["kind"] == "bb"), "gap": sum(_w(e) for e in pv if e["kind"] == "gap")},
+        "prev_by_service": _by_service(pv),
         "services": services[:top_n], "services_total": len(services),
         "hours": hours, "heat": heat, "days": day_list, "durations": dur_b,
         "roads": [{"road": r["road"], "events": r["events"], "bb": r["bb"], "gap": r["gap"], "stops": len(r["stops"]),
@@ -165,6 +167,13 @@ def aggregate(events, prev_events, stops, p, kind="all", direction=0, service=""
         "stops": [{"code": s["code"], "name": s["name"], "road": s["road"], "lat": s["lat"], "lon": s["lon"], "events": s["events"], "bb": s["bb"], "gap": s["gap"],
                    "avg_stops": round(s["len"] / s["n"], 1) if s["n"] else None, "services": [x for x, _ in s["svc"].most_common(6)]} for s in stop_list[:30]],
     })
+
+
+def _by_service(rows):
+    out = Counter()
+    for e in rows:
+        out[str(e.get("service", ""))] += _w(e)
+    return dict(out.most_common(40))
 
 
 def _round(o):
@@ -195,3 +204,26 @@ def coverage(rows, p):
     hrs_watched = len({r["hour_ts"] for r in (rows or []) if p["start"] - 3600 < r["hour_ts"] < p["end"]})
     return {"hours_watched": hrs_watched, "svc_dirs": len(svc), "services": len({s for s, _ in svc}), "first_ts": first,
             "by_hour": [round(h / 3600, 2) for h in hours], "by_day": {k: round(v / 3600, 2) for k, v in days.items()}, "svc_hours": round(total / 3600, 1)}
+
+
+class TripCounter:
+    """Trip-level counting. A bunched pair / group (or a long gap) counts ONCE per trip, as soon as it has lasted the required
+    number of bus stops (15). LTA gives no trip id: a bus's tracking id (B17 ...) follows one bus along one run of the route, so the
+    buses' tracking ids identify the trip. The same buses bunching again on that trip (any pair of them in common) reuse the first
+    count instead of adding one. `boot` makes keys unique per server run (tracking ids restart at B1 after a restart)."""
+
+    def __init__(self, boot, keep_sec=4 * 3600):
+        self.boot, self.keep, self.counted = str(boot), keep_sec, {}
+
+    def key_for(self, key, kind, ids, ts):
+        """-> (trip_key, is_new)."""
+        ids = frozenset(str(i) for i in ids if i)
+        seen = [x for x in self.counted.get((key, kind), []) if ts - x[2] < self.keep]
+        for s, k, _ in seen:
+            if len(s & ids) >= min(2, len(ids)):
+                self.counted[(key, kind)] = seen
+                return k, False
+        k = f"{self.boot}:{key}:{kind}:{','.join(sorted(ids))}"
+        seen.append((ids, k, ts))
+        self.counted[(key, kind)] = seen
+        return k, True
