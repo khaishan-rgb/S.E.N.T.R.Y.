@@ -212,7 +212,10 @@ button.bl,.bl[data-o]{cursor:pointer}
 @media(max-width:760px){.mleg{position:static;margin-top:8px;background:transparent;border:0;padding:0;max-width:none}.kpis4{grid-template-columns:repeat(2,minmax(0,1fr))}.kt>b{font-size:26px}#map{height:400px}.fcard .fsvc{font-size:26px}.hwends .c{display:none}.mtools{width:100%}.mtools .seg{flex:1 1 100%}.mtools .seg button{flex:1;justify-content:center}}
 
 /* ===== Bunching & Gap analytics tab ===== */
-#analytics{--an-bb:#c98500;--an-gap:#3987e5;--an-all:#38d6ff;--an-l2:#6b4a00;--an-l3:#a06d00;--an-l4:#d99a1a;--an-grid:#1a3352;--an-ink:#e6f1ff;--an-ink2:#b6c8dd;--an-mut:#8aa2bd}
+#anSection{--an-bb:#c98500;--an-gap:#3987e5;--an-all:#38d6ff;--an-l2:#6b4a00;--an-l3:#a06d00;--an-l4:#d99a1a;--an-grid:#1a3352;--an-ink:#e6f1ff;--an-ink2:#b6c8dd;--an-mut:#8aa2bd}
+.an-dash{margin-top:22px;padding-top:16px;border-top:1px solid var(--line)}
+.an-head{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:flex-end;justify-content:space-between;margin-bottom:12px}.an-head h2{margin:0;font-size:20px}
+.an-ctrl{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
 .an-filters{display:flex;flex-wrap:wrap;gap:12px 14px;align-items:flex-end;padding:12px 2px}
 .an-chip{display:inline-flex;align-items:center;gap:8px;height:42px;padding:0 6px 0 12px;border-radius:10px;border:1px solid #2a6fbf;background:#12365f;font-weight:700}
 .an-chip button{background:transparent;border:0;color:#9cc4ff;font-size:16px;cursor:pointer;padding:0 6px}
@@ -232,14 +235,14 @@ button.bl,.bl[data-o]{cursor:pointer}
 .an-leg{display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--an-ink2)}
 .an-leg span{display:inline-flex;align-items:center}
 .hbars{display:grid;gap:4px}
-.hb{display:grid;grid-template-columns:minmax(52px,auto) minmax(0,1fr) 40px;gap:10px;align-items:center;width:100%;padding:5px 6px;border:0;border-radius:8px;background:transparent;color:var(--an-ink);cursor:pointer;text-align:left;font:inherit}
+.hb{display:grid;grid-template-columns:minmax(52px,auto) minmax(0,1fr) minmax(40px,auto);gap:10px;align-items:center;width:100%;padding:5px 6px;border:0;border-radius:8px;background:transparent;color:var(--an-ink);cursor:pointer;text-align:left;font:inherit}
 .hb:hover,.hb:focus-visible{background:rgba(56,214,255,.06)}
 .hb .hl{font-weight:800;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:190px}.hb .hl small{display:block;font-weight:500;font-size:11px;color:var(--an-mut)}
 .hb .ht{display:flex;gap:2px;height:14px;align-items:stretch}
 .hb .ht i{display:block;min-width:2px}.hb .ht i.bb{background:var(--an-bb)}.hb .ht i.gap{background:var(--an-gap)}
 .hb .ht i:last-child{border-radius:0 4px 4px 0}
-.hb .hv{font-weight:700;font-variant-numeric:tabular-nums;text-align:right;color:var(--an-ink)}
-.hbars.roads .hb{grid-template-columns:minmax(120px,190px) minmax(0,1fr) 40px}
+.hb .hv{font-weight:700;font-variant-numeric:tabular-nums;text-align:right;color:var(--an-ink);white-space:nowrap;min-width:56px}
+.hbars.roads .hb{grid-template-columns:minmax(120px,190px) minmax(0,1fr) minmax(40px,auto)}
 .anc{width:100%;height:auto;display:block;overflow:visible}
 .anc text{font-family:inherit}
 .anc .hit{fill:transparent;cursor:default}.anc .hit:hover{fill:rgba(255,255,255,.05)}
@@ -259,7 +262,7 @@ button.bl,.bl[data-o]{cursor:pointer}
 .an-empty{padding:28px 18px;text-align:center;color:var(--mut)}.an-empty b{display:block;color:var(--text);font-size:16px;margin-bottom:6px}
 @media(max-width:1200px){.an-kpis{grid-template-columns:repeat(3,minmax(0,1fr))}.an-grid{grid-template-columns:1fr}}
 .tabs{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}.tabs::-webkit-scrollbar{display:none}.tabs button{white-space:nowrap;flex:none}
-@media(max-width:760px){.tabs button{padding:8px 10px;font-size:13px}.an-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.an-filters .fld{width:100%}.an-filters .seg{width:100%}.an-filters .seg button{flex:1;justify-content:center;padding:0 4px}.hbars.roads .hb{grid-template-columns:minmax(0,120px) minmax(0,1fr) 34px}#anMap{height:320px}.hm{grid-template-columns:28px repeat(24,minmax(0,1fr));gap:1px}.an-ins{grid-template-columns:1fr}}
+@media(max-width:760px){.tabs button{padding:8px 10px;font-size:13px}.an-ctrl,.an-ctrl .seg{width:100%}.an-ctrl .seg button{flex:1;justify-content:center;padding:0 4px}.an-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.an-filters .fld{width:100%}.an-filters .seg{width:100%}.an-filters .seg button{flex:1;justify-content:center;padding:0 4px}.hbars.roads .hb{grid-template-columns:minmax(0,120px) minmax(0,1fr) minmax(34px,auto)}#anMap{height:320px}.hm{grid-template-columns:28px repeat(24,minmax(0,1fr));gap:1px}.an-ins{grid-template-columns:1fr}}
 </style>
 <link rel="stylesheet" href="/design-system.css">
 <script src="/app-shell.js" data-module="bunching"></script>
@@ -275,7 +278,7 @@ button.bl,.bl[data-o]{cursor:pointer}
   </header>
   <section class="module-intro"><h2>Bunching & Gap</h2><p>Which buses are too close together or too far apart &mdash; now and in the next 30 minutes.</p></section>
   <section class="ai-shell-card" aria-label="AI Operational Assistant"><div class="ai-shell-icon">✦</div><div><b>AI Operational Assistant</b><span>Context-aware operational interpretation for bunching & gap; existing calculations remain authoritative.</span></div><div class="ai-shell-badge">AI READY</div></section>
-  <div class="tabs" role="tablist"><button role="tab" id="tabDash" aria-selected="true">Dashboard</button><button role="tab" id="tabAlerts" aria-selected="false">Alerts<span class="tbadge" id="alBadge" hidden>0</span></button><button role="tab" id="tabAn" aria-selected="false">Analytics</button><button role="tab" id="tabSet" aria-selected="false">Settings</button></div>
+  <div class="tabs" role="tablist"><button role="tab" id="tabDash" aria-selected="true">Dashboard</button><button role="tab" id="tabAlerts" aria-selected="false">Alerts<span class="tbadge" id="alBadge" hidden>0</span></button><button role="tab" id="tabSet" aria-selected="false">Settings</button></div>
 
   <main id="dash">
     <form class="filters" id="form" autocomplete="off">
@@ -320,22 +323,19 @@ button.bl,.bl[data-o]{cursor:pointer}
       </section>
       <section class="card"><header><div><h2 id="seqTitle">Bus order</h2><div class="sub">Front bus first &bull; tap a bus to find it on the map</div></div></header><div id="seq"><div class="empty">Select a service.</div></div></section>
     </div>
+
+    <section class="an-dash" id="anSection" aria-label="Patterns and hotspots">
+      <div class="an-head"><div><h2>Patterns &amp; hotspots</h2><div class="sub">Which services, hours and roads keep bunching &mdash; from what this server has recorded. The filters above apply here too.</div></div>
+        <div class="an-ctrl"><div class="seg sm" id="anPer" role="group" aria-label="Period"><button type="button" data-p="today">Today</button><button type="button" data-p="yesterday">Yesterday</button><button type="button" data-p="7d">7 days</button><button type="button" data-p="30d">30 days</button></div>
+          <div class="seg sm" id="anMeas" role="group" aria-label="Measure"><button type="button" data-m="time" title="Minutes buses were seen bunched or with a long gap">Time with a problem</button><button type="button" data-m="cases" title="Cases that lasted 15 or more bus stops">Cases (15+ stops)</button></div>
+          <span id="anSvc"></span></div></div>
+      <div id="anBody"><div class="sk"></div><div class="sk"></div><div class="sk"></div></div>
+    </section>
   </main>
 
   <main id="alerts" hidden>
     <section class="card" style="margin-top:12px"><header><div><h2>Active alerts</h2><div class="sub" id="alSub">Alerts are raised when bunching or long headway lasts long enough.</div></div></header>
       <div class="alnote" id="alRule"></div><div id="alList"></div></section>
-  </main>
-  <main id="analytics" hidden>
-    <form class="an-filters" autocomplete="off" onsubmit="return false">
-      <div class="fld"><label id="anPl">Period</label><div class="seg" id="anPer" role="group" aria-labelledby="anPl"><button type="button" data-p="today">Today</button><button type="button" data-p="yesterday">Yesterday</button><button type="button" data-p="7d">Last 7 days</button><button type="button" data-p="30d">Last 30 days</button></div></div>
-      <div class="fld"><label id="anKl">Type</label><div class="seg" id="anKind" role="group" aria-labelledby="anKl"><button type="button" data-k="all">All</button><button type="button" data-k="bb">Bunching</button><button type="button" data-k="gap">Long gaps</button></div></div>
-      <div class="fld"><label for="anOp">Transport Operator</label><select id="anOp"><option value="">All operators</option><option value="SBST">SBS Transit</option><option value="SMRT">SMRT</option><option value="TTS">Tower Transit</option><option value="GAS">Go-Ahead</option></select></div>
-      <div class="fld"><label id="anDl">Direction</label><div class="seg" id="anDir" role="group" aria-labelledby="anDl"><button type="button" data-d="0">Both</button><button type="button" data-d="1">Dir 1</button><button type="button" data-d="2">Dir 2</button></div></div>
-      <div id="anSvc"></div>
-      <button class="btn" type="button" id="anRefresh">Refresh</button>
-    </form>
-    <div id="anBody"><div class="sk"></div><div class="sk"></div><div class="sk"></div></div>
   </main>
   <main id="settings" hidden>
     <section class="card"><header><div><h2>System parameters</h2><div class="sub">Tune the rules without changing code. Saved on the server; applied on the next refresh.</div></div><div><button class="btn sm go" id="parSave" type="button">Save</button> <button class="btn sm" id="parReset" type="button">Reset to defaults</button></div></header><div class="set" id="params"></div></section>
@@ -758,6 +758,7 @@ async function load(quiet){
   if(!S.sel || !j.rows.some(r => r.key === S.sel)){ const f = j.rows.find(r => r.risk === "red" || r.risk === "orange") || j.rows[0]; S.sel = f ? f.key : null; S.focusI = 0; S.mapMode = "focus"; S.autoFit = true; if(S.sel) loadDetail(S.sel); }
   else if(!S.detail[S.sel] || quiet) loadDetail(S.sel);
   render();
+  if(quiet && typeof AN !== "undefined" && AN.period !== "yesterday" && Date.now() - AN.at > 300000) loadAn();
 }
 function renderChips(){
   $("chips").innerHTML = S.services.map(s => `<span class="chip">${esc(s)}<button type="button" data-s="${esc(s)}" aria-label="Remove ${esc(s)}">&times;</button></span>`).join("") + `<input id="svcIn" placeholder="${S.services.length ? "Add another" : "All monitored (add e.g. 32)"}" maxlength="6" autocapitalize="characters">`;
@@ -801,9 +802,9 @@ $("exportBtn").addEventListener("click", () => {
   const rows = visibleRows(); if(!rows.length){ toast("Nothing to export"); return; }
   csvDownload("bunching-gap-status.csv", [["Service", "Dir", "Status", "Headway now (min)", "Should be (min)", "In 10 min", "In 20 min", "In 30 min", "Outlook", "Where", "Risk", "Score", "Starts in (min)"], ...rows.map(r => { const st = statusOf(r), ol = outlook(r); return [r.service, r.direction, st.label + (st.sub ? " (" + st.sub + ")" : ""), r.hw["0"], r.sched_hw, r.hw["10"], r.hw["20"], r.hw["30"], ol ? OLW[ol.w] : "", r.location, RNAME[r.risk], r.score, r.t_occur]; })]);
 });
-function showTab(t){ S.tab = t; $("dash").hidden = t !== "dash"; $("alerts").hidden = t !== "alerts"; $("analytics").hidden = t !== "an"; $("settings").hidden = t !== "set"; $("tabDash").setAttribute("aria-selected", t === "dash"); $("tabAlerts").setAttribute("aria-selected", t === "alerts"); $("tabAn").setAttribute("aria-selected", t === "an"); $("tabSet").setAttribute("aria-selected", t === "set"); if(t === "set") loadSettings(); else if(t === "alerts") renderAlerts(); else if(t === "an") openAn(); else if(map) setTimeout(() => { map.invalidateSize(); if(S.autoFit) fitMap(); }, 100); }
+function showTab(t){ S.tab = t; $("dash").hidden = t !== "dash"; $("alerts").hidden = t !== "alerts"; $("settings").hidden = t !== "set"; $("tabDash").setAttribute("aria-selected", t === "dash"); $("tabAlerts").setAttribute("aria-selected", t === "alerts"); $("tabSet").setAttribute("aria-selected", t === "set"); if(t === "set") loadSettings(); else if(t === "alerts") renderAlerts(); else if(map) setTimeout(() => { map.invalidateSize(); if(S.autoFit) fitMap(); }, 100); }
 $("kpis").addEventListener("click", e => { const b = e.target.closest("[data-go]"); if(!b) return; const g = b.dataset.go; if(g === "alerts"){ showTab("alerts"); return; } S.issue = S.issue === g ? "all" : g; S.page = 1; syncSegs(); renderTable(); renderKpis(); });
-$("tabDash").onclick = () => showTab("dash"); $("tabAn").onclick = () => showTab("an"); $("tabAlerts").onclick = () => showTab("alerts"); $("tabSet").onclick = () => showTab("set");
+$("tabDash").onclick = () => showTab("dash"); $("tabAlerts").onclick = () => showTab("alerts"); $("tabSet").onclick = () => showTab("set");
 $("parSave").onclick = async () => { const params = {}; document.querySelectorAll("#params input").forEach(i => params[i.dataset.k] = i.value); const j = await post("/api/bunching/settings", JSON.stringify({params})); if(j.error){ toast(j.error); return; } toast("Parameters saved"); loadSettings(); };
 $("parReset").onclick = async () => { const j = await post("/api/bunching/settings", JSON.stringify({reset:true})); if(j.error){ toast(j.error); return; } toast("Parameters reset to defaults"); loadSettings(); };
 $("mUp").onclick = () => $("mFile").click();
@@ -820,21 +821,28 @@ $("evExport").onclick = () => { const ev = S.events || []; if(!ev.length){ toast
   renderChips(); syncSegs(); renderTable(); renderKpis(); renderSel();
   const h = await getJSON("/api/health", 15000); if(h.error) setLive("bad", "Server unreachable", h.error); else if(!h.lta) setLive("bad", "LTA key missing", "Set LTA_ACCOUNT_KEY on the server"); else setLive("ok", "Live Data (LTA)", "");
   load();
-  if(q.get("tab") === "analytics") showTab("an");
+  loadAn();
+  if(q.get("tab") === "analytics") setTimeout(() => $("anSection").scrollIntoView({block:"start"}), 600);
 })();
 window.addEventListener("resize", () => { if(map) map.invalidateSize(); if(typeof AN !== "undefined" && AN.map) AN.map.invalidateSize(); });
 
 
-/* ------------------------------------------------------------------ analytics tab: logged cases only (bunching_event / gap_event + cases still open) */
-const AN = {period:LS.get("an.period", "7d"), kind:"all", dir:0, op:"", svc:"", data:null, tok:0, map:null, gStops:null, focusRoad:null};
-const ANC = {bb:"#c98500", gap:"#3987e5", all:"#38d6ff", l2:"#6b4a00", l3:"#a06d00", l4:"#d99a1a", grid:"#1a3352", ink:"#e6f1ff", ink2:"#b6c8dd", mut:"#8aa2bd"};
+/* ------------------------------------------------------------------ analytics on the dashboard: patterns & hotspots.
+   Measure "time" = minutes of bunching / long gap the live collector has SEEN (bb_obs, fills from the first cycle);
+   measure "cases" = logged cases that lasted 15+ stops. The main filter bar (operator, services, direction, headway status) applies. */
+const AN = {period:LS.get("an.period", "7d"), measure:LS.get("an.measure", "time"), kind:"all", svc:"", data:null, tok:0, at:0, map:null, gStops:null, focusRoad:null, t:null};
+const ANC = {bb:"#c98500", gap:"#3987e5", all:"#38d6ff", l2:"#6b4a00", l3:"#a06d00", l4:"#d99a1a", grid:"#1a3352", ink:"#e6f1ff", ink2:"#b6c8dd", mut:"#8aa2bd", none:"#2a3e57"};
 const ANRAMP = {all:["#0e2c3d", "#38d6ff"], bb:["#2e2205", "#f0a830"], gap:["#0f2647", "#6aa8f0"]};
 const hh = h => String(h % 24).padStart(2, "0") + ":00";
 const pctOf = (n, t) => t ? Math.round(100 * n / t) : 0;
 const niceMax = v => { if(v <= 4) return 4; const e = Math.pow(10, Math.floor(Math.log10(v))), m = v / e; return [1, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10].find(x => m <= x + 1e-9) * e; };
-// chart width in CSS pixels, so 1 SVG unit = 1 px and text stays at its real size
 const anW = () => { const b = $("anBody"), w = (b && b.clientWidth) || 900, two = innerWidth > 1200; return Math.max(280, Math.round((two ? (w - 12) / 2 : w) - 34)); };
-const kindWord = () => AN.kind === "bb" ? "bunching cases" : AN.kind === "gap" ? "long gaps" : "cases";
+const isTime = () => AN.measure === "time";
+const fmtMin = v => { v = Math.round(v || 0); return v < 60 ? `${v} min` : `${Math.floor(v / 60)} h ${String(v % 60).padStart(2, "0")} min`; };
+const qty = v => isTime() ? fmtMin(v) : `${Math.round(v)} case${Math.round(v) === 1 ? "" : "s"}`;
+const num = v => isTime() ? fmtMin(v) : String(Math.round(v));
+const short = v => { if(!isTime()) return String(Math.round(v)); v = Math.round(v || 0); return v < 60 ? `${v}m` : `${Math.floor(v / 60)}h ${String(v % 60).padStart(2, "0")}m`; };
+const what = () => AN.kind === "bb" ? "bunching" : AN.kind === "gap" ? "long gaps" : "bunching and long gaps";
 const AIC = {svc:'<path d="M6.5 2.5h11A2.5 2.5 0 0 1 20 5v11.2a1.8 1.8 0 0 1-1.8 1.8H5.8A1.8 1.8 0 0 1 4 16.2V5a2.5 2.5 0 0 1 2.5-2.5ZM6.3 5.6v5.6h11.4V5.6ZM8 13.4a1.25 1.25 0 1 0 0 2.5 1.25 1.25 0 0 0 0-2.5Zm8 0a1.25 1.25 0 1 0 0 2.5 1.25 1.25 0 0 0 0-2.5Z" fill="currentColor" fill-rule="evenodd"/>',
   time:'<circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 7v5.2l3.4 2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>',
   road:'<path d="M8 3 5 21M16 3l3 18M12 4v3M12 10.5v3M12 17v3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>',
@@ -845,130 +853,145 @@ const AIC = {svc:'<path d="M6.5 2.5h11A2.5 2.5 0 0 1 20 5v11.2a1.8 1.8 0 0 1-1.8
 const ico = k => `<span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true">${AIC[k]}</svg></span>`;
 const tipAttr = lines => ` data-t="${esc(lines.filter(x => x != null && x !== "").join("|"))}"`;
 
+function anReload(){ clearTimeout(AN.t); AN.t = setTimeout(loadAn, 350); }
 async function loadAn(){
   const tok = ++AN.tok, body = $("anBody"); body.classList.add("busy");
-  const q = new URLSearchParams({period:AN.period, kind:AN.kind, direction:AN.dir, service:AN.svc, operator:AN.op});
+  AN.kind = S.issue === "bb" ? "bb" : S.issue === "gap" ? "gap" : "all";
+  const q = new URLSearchParams({period:AN.period, measure:AN.measure, kind:AN.kind, direction:S.dir, operator:S.op, services:S.services.join(","), service:AN.svc});
   const j = await getJSON("/api/bunching/analytics?" + q, 45000);
   if(tok !== AN.tok) return; body.classList.remove("busy");
-  if(j.error){ body.innerHTML = `<div class="msg bad">Could not load analytics: ${esc(j.error)}</div>`; return; }
-  AN.data = j; renderAn();
+  if(j.error){ body.innerHTML = `<div class="msg bad">Could not load the analytics: ${esc(j.error)}</div>`; return; }
+  if(!j.totals || !j.period){ body.innerHTML = `<div class="msg warn">Analytics is not available from this server yet — upload the new <b>app.py</b> and <b>bunching_analytics.py</b> together with bunching.html.</div>`; return; }
+  AN.data = j; AN.at = Date.now(); renderAn();
 }
 function syncAnFilters(){
   document.querySelectorAll("#anPer button").forEach(b => b.setAttribute("aria-pressed", b.dataset.p === AN.period));
-  document.querySelectorAll("#anKind button").forEach(b => b.setAttribute("aria-pressed", b.dataset.k === AN.kind));
-  document.querySelectorAll("#anDir button").forEach(b => b.setAttribute("aria-pressed", +b.dataset.d === AN.dir));
-  $("anOp").value = AN.op;
-  $("anSvc").innerHTML = AN.svc ? `<span class="an-chip">Service ${esc(AN.svc)}<button type="button" id="anSvcX" aria-label="Show all services">&times;</button></span>` : "";
+  document.querySelectorAll("#anMeas button").forEach(b => b.setAttribute("aria-pressed", b.dataset.m === AN.measure));
+  $("anSvc").innerHTML = AN.svc ? `<span class="an-chip">Service ${esc(AN.svc)} only<button type="button" id="anSvcX" aria-label="Show all services">&times;</button></span>` : "";
 }
 function anInsights(d){
-  const t = d.totals, tot = t.events, out = [], w = kindWord(); if(!tot) return out;
+  const t = d.totals, tot = t.events, out = []; if(!tot) return out;
   const s = d.services[0];
-  if(s && !AN.svc){ const dir = s.d1 && s.d2 ? (s.d1 >= 2 * s.d2 ? `, mostly Direction 1 (${s.d1})` : s.d2 >= 2 * s.d1 ? `, mostly Direction 2 (${s.d2})` : "") : "";
-    out.push(["svc", `Service <b>${esc(s.service)}</b> is the most affected: <b>${s.events}</b> ${w} (${pctOf(s.events, tot)}% of all)${dir}.`]); }
+  if(s && !AN.svc && d.services_total > 1){ const dir = s.d1 && s.d2 ? (s.d1 >= 2 * s.d2 ? `, mostly Direction 1` : s.d2 >= 2 * s.d1 ? `, mostly Direction 2` : "") : "";
+    out.push(["svc", `Service <b>${esc(s.service)}</b> is the most affected: <b>${qty(s.events)}</b> (${pctOf(s.events, tot)}% of all)${dir}.`]); }
   const hs = d.hours.map(h => h.bb + h.gap), pk = hs.indexOf(Math.max(...hs)), peak = hs[7] + hs[8] + hs[17] + hs[18] + hs[19];
-  out.push(["time", `Busiest hour: <b>${hh(pk)}–${hh(pk + 1)}</b> with ${hs[pk]} ${w} (${pctOf(hs[pk], tot)}%). The peaks (07–09 and 17–20) account for <b>${pctOf(peak, tot)}%</b>.`]);
+  out.push(["time", `Busiest hour: <b>${hh(pk)}–${hh(pk + 1)}</b> with ${qty(hs[pk])} (${pctOf(hs[pk], tot)}%). The peaks (07–09 and 17–20) account for <b>${pctOf(peak, tot)}%</b>.`]);
   const r = d.roads.find(x => x.road !== "Road not known");
-  if(r) out.push(["road", `Hotspot road: <b>${esc(r.road)}</b> — ${r.events} ${w} on ${r.services.length} service${r.services.length === 1 ? "" : "s"} (${esc(r.services.slice(0, 4).join(", "))}).`]);
+  if(r) out.push(["road", `Hotspot road: <b>${esc(r.road)}</b> — ${qty(r.events)} on ${r.services.length} service${r.services.length === 1 ? "" : "s"} (${esc(r.services.slice(0, 4).join(", "))}).`]);
   const st = d.stops.find(x => x.code);
-  if(st) out.push(["stop", `Cases most often start at <b>${esc(st.name)}</b> (${esc(st.code)}${st.road ? ", " + esc(st.road) : ""}) — ${st.events} time${st.events === 1 ? "" : "s"}.`]);
+  if(st) out.push(["stop", `${isTime() ? "It is seen most often near" : "Cases most often start at"} <b>${esc(st.name)}</b> (${esc(st.code)}${st.road ? ", " + esc(st.road) : ""}) — ${qty(st.events)}.`]);
   if(d.period.days >= 7){ const wd = d.heat.map(row => row.reduce((a, b) => a + b, 0)), i = wd.indexOf(Math.max(...wd)), NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
-    out.push(["day", `Worst day of the week: <b>${NAMES[i]}</b> (${wd[i]} ${w}, ${pctOf(wd[i], tot)}%).`]); }
-  if(d.prev.events >= 3){ const ch = Math.round(100 * (tot - d.prev.events) / d.prev.events);
-    out.push(["trend", ch > 0 ? `<b>Up ${ch}%</b> on ${esc(d.period.prev_label)} (${d.prev.events} → ${tot}).` : ch < 0 ? `<b>Down ${-ch}%</b> on ${esc(d.period.prev_label)} (${d.prev.events} → ${tot}).` : `Same as ${esc(d.period.prev_label)} (${tot}).`]); }
-  else if(t.median_stops) out.push(["len", `A typical case lasts <b>${f1(t.median_stops)} stops</b>${t.median_min ? ` (~${Math.round(t.median_min)} min)` : ""}; the longest was ${t.worst.stops} stops on service ${esc(t.worst.service)}.`]);
+    out.push(["day", `Worst day of the week: <b>${NAMES[i]}</b> (${qty(wd[i])}, ${pctOf(wd[i], tot)}%).`]); }
+  if(d.prev.events >= (isTime() ? 10 : 3)){ const ch = Math.round(100 * (tot - d.prev.events) / d.prev.events);
+    out.push(["trend", ch > 0 ? `<b>Up ${ch}%</b> on ${esc(d.period.prev_label)} (${qty(d.prev.events)} → ${qty(tot)}).` : ch < 0 ? `<b>Down ${-ch}%</b> on ${esc(d.period.prev_label)} (${qty(d.prev.events)} → ${qty(tot)}).` : `Same as ${esc(d.period.prev_label)}.`]); }
+  else if(!isTime() && t.median_stops) out.push(["len", `A typical case lasts <b>${f1(t.median_stops)} stops</b>${t.median_min ? ` (~${Math.round(t.median_min)} min)` : ""}; the longest was ${t.worst.stops} stops on service ${esc(t.worst.service)}.`]);
   return out.slice(0, 6);
 }
 function anKpis(d){
-  const t = d.totals, hs = d.hours.map(h => h.bb + h.gap), pk = hs.indexOf(Math.max(...hs)), dv = t.events - d.prev.events;
-  const delta = d.prev.events || t.events ? `<em class="${dv > 0 ? "up" : dv < 0 ? "dn" : "flat"}">${dv > 0 ? "▲ " + dv + " more" : dv < 0 ? "▼ " + (-dv) + " fewer" : "no change"} than ${esc(d.period.prev_label)}</em>` : "";
-  const lv = t.levels;
+  const t = d.totals, hs = d.hours.map(h => h.bb + h.gap), pk = hs.indexOf(Math.max(...hs)), dv = t.events - d.prev.events, lv = t.levels, lt = lv["2"] + lv["3"] + lv["4"], cv = d.coverage || {};
+  const delta = d.prev.events || t.events ? `<em class="${dv > 0 ? "up" : dv < 0 ? "dn" : "flat"}">${dv > 0 ? "▲ " + num(dv) + " more" : dv < 0 ? "▼ " + num(-dv) + " less" : "no change"} than ${esc(d.period.prev_label)}</em>` : "";
+  const s = d.services[0];
   return `<section class="an-kpis">
-    <div class="kt"><span>Cases · ${esc(d.period.label.toLowerCase())}</span><b>${t.events}</b><small>${t.open ? `${t.open} still running · ` : ""}${t.services} service${t.services === 1 ? "" : "s"}</small>${delta}</div>
-    <div class="kt"><span><i class="sw bb"></i>Bunching</span><b>${t.bb}</b><small>2BB ${lv["2"]} · 3BB ${lv["3"]} · 4BB+ ${lv["4"]}</small></div>
-    <div class="kt"><span><i class="sw gap"></i>Long gaps</span><b>${t.gap}</b><small>${pctOf(t.gap, t.events)}% of cases</small></div>
-    <div class="kt"><span>Typical case</span><b>${t.median_stops == null ? "–" : f1(t.median_stops) + " stops"}</b><small>${t.median_min ? `~${Math.round(t.median_min)} min · ` : ""}${t.worst ? `longest ${t.worst.stops} stops (svc ${esc(t.worst.service)})` : "&nbsp;"}</small></div>
-    <div class="kt"><span>Peak hour</span><b>${t.events ? hh(pk) : "–"}</b><small>${t.events ? `${hs[pk]} cases · ${pctOf(hs[pk], t.events)}% of all` : "&nbsp;"}</small></div></section>`;
+    <div class="kt"><span>${isTime() ? "Time with a problem" : "Cases (15+ stops)"}</span><b>${num(t.events)}</b><small>${isTime() ? `${cv.services || 0} service${cv.services === 1 ? "" : "s"} watched · ${cv.hours_watched || 0} h recorded` : `${t.open ? t.open + " still running · " : ""}${t.services} service${t.services === 1 ? "" : "s"}`}</small>${delta}</div>
+    <div class="kt"><span><i class="sw bb"></i>Bunching</span><b>${num(t.bb)}</b><small>${lt ? `2BB ${pctOf(lv["2"], lt)}% · 3BB ${pctOf(lv["3"], lt)}% · 4BB+ ${pctOf(lv["4"], lt)}%` : "&nbsp;"}</small></div>
+    <div class="kt"><span><i class="sw gap"></i>Long gaps</span><b>${num(t.gap)}</b><small>${pctOf(t.gap, t.events)}% of the total</small></div>
+    ${isTime() ? `<div class="kt"><span>Most affected service</span><b>${s ? esc(s.service) : "–"}</b><small>${s ? `${fmtMin(s.events)} · ${pctOf(s.events, t.events)}% of all` : "&nbsp;"}</small></div>`
+      : `<div class="kt"><span>Typical case</span><b>${t.median_stops == null ? "–" : f1(t.median_stops) + " stops"}</b><small>${t.median_min ? `~${Math.round(t.median_min)} min · ` : ""}${t.worst ? `longest ${t.worst.stops} stops (svc ${esc(t.worst.service)})` : "&nbsp;"}</small></div>`}
+    <div class="kt"><span>Peak hour</span><b>${t.events ? hh(pk) : "–"}</b><small>${t.events ? `${num(hs[pk])} · ${pctOf(hs[pk], t.events)}% of all` : "&nbsp;"}</small></div></section>`;
+}
+function anBasis(d){
+  const cv = d.coverage || {}, p = d.period, fmt = ts => sgt({day:"2-digit", month:"short", hour:"2-digit", minute:"2-digit"}).format(new Date(ts * 1000)), out = [];
+  const since = isTime() ? (d.first_obs_ts || cv.first_ts) : d.first_ts, gap = since && since > p.start + 1800;   // the server's whole history begins inside this period
+  if(isTime()) out.push(`<b>Time with a problem</b> = minutes the live dashboard saw buses bunched (headway under ${P().bunch_min} min) or a long gap (scheduled + ${P().gap_add_min} min), recorded every ${P().refresh_sec} s at the stop where it was happening.`);
+  else out.push(`<b>Cases</b> = bunching or long gaps that lasted at least ${d.gate ? d.gate.bunching : 15} bus stops (shorter ones are not logged); hotspots are where each case began.`);
+  if(gap) out.push(`<b>History starts ${fmt(since)}</b> — nothing earlier was kept (the server was restarted or redeployed; Render's free plan keeps no files after a restart, a redeploy or 15 min without visitors).`);
+  if(!d.collecting) out.push(`Recording is paused right now: the server records while this page is open${d.always_on ? "" : " (set <code>BUNCHING_ALWAYS_ON=1</code> to record round the clock)"}.`);
+  out.push(`Kept for ${d.keep_days || 62} days when the server's storage persists.${d.db_ok === false ? ` <b>Storage error: ${esc(d.db_err || "")}</b>` : ""}`);
+  return `<div class="an-note">${out.join(" ")}</div>`;
 }
 function hbars(rows, max, opt){
   return `<div class="hbars${opt.cls ? " " + opt.cls : ""}">` + rows.map(r => {
     const segs = (AN.kind === "gap" ? ["gap"] : AN.kind === "bb" ? ["bb"] : ["bb", "gap"]).filter(k => r[k] > 0);
-    return `<button type="button" class="hb" ${opt.attr(r)}${tipAttr(opt.tip(r))}><span class="hl">${opt.label(r)}</span><span class="ht">${segs.map(k => `<i class="${k}" style="width:${(100 * r[k] / max).toFixed(2)}%"></i>`).join("")}</span><span class="hv">${r.events}</span></button>`; }).join("") + `</div>`;
+    return `<button type="button" class="hb" ${opt.attr(r)}${tipAttr(opt.tip(r))}><span class="hl">${opt.label(r)}</span><span class="ht">${segs.map(k => `<i class="${k}" style="width:${(100 * r[k] / max).toFixed(2)}%"></i>`).join("")}</span><span class="hv">${short(r.events)}</span></button>`; }).join("") + `</div>`;
 }
 function topPath(x, y, w, h, r){ r = Math.max(0, Math.min(r, w / 2, h)); return `M${x.toFixed(1)},${(y + h).toFixed(1)}V${(y + r).toFixed(1)}Q${x.toFixed(1)},${y.toFixed(1)} ${(x + r).toFixed(1)},${y.toFixed(1)}H${(x + w - r).toFixed(1)}Q${(x + w).toFixed(1)},${y.toFixed(1)} ${(x + w).toFixed(1)},${(y + r).toFixed(1)}V${(y + h).toFixed(1)}Z`; }
 function colChart(o){
-  const W = o.W || anW(), H = o.H || 210, L = 30, R = 6, T = 20, B = 24, n = o.cats.length, bw = (W - L - R) / n, cw = Math.min(24, Math.max(3, bw * .72));
+  const W = o.W || anW(), H = o.H || (o.bands ? 222 : 210), L = 34, R = 6, T = o.bands ? 34 : 20, B = 24, n = o.cats.length, bw = (W - L - R) / n, cw = Math.min(24, Math.max(3, bw * .72));
   const ks = AN.kind === "gap" ? ["gap"] : AN.kind === "bb" ? ["bb"] : ["bb", "gap"], tot = c => ks.reduce((a, k) => a + c[k], 0);
   const max = niceMax(Math.max(1, ...o.cats.map(tot))), Y = v => T + (H - T - B) * (1 - v / max), y0 = Y(0);
   let s = `<svg class="anc" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(o.aria)}">`;
-  (o.bands || []).forEach(([a, b, lab]) => { s += `<rect x="${L + a * bw}" y="${T - 14}" width="${(b - a) * bw}" height="${y0 - T + 14}" fill="rgba(56,214,255,.055)"/><text x="${L + (a + b) / 2 * bw}" y="${T - 4}" text-anchor="middle" font-size="10.5" font-weight="700" fill="${ANC.mut}" letter-spacing=".06em">${lab}</text>`; });
+  (o.bands || []).forEach(([a, b, lab]) => { s += `<rect x="${L + a * bw}" y="2" width="${(b - a) * bw}" height="${y0 - 2}" fill="rgba(56,214,255,.055)"/><text x="${L + (a + b) / 2 * bw}" y="14" text-anchor="middle" font-size="10.5" font-weight="700" fill="${ANC.mut}" letter-spacing=".06em">${lab}</text>`; });
   [max / 2, max].forEach(v => { s += `<line x1="${L}" x2="${W - R}" y1="${Y(v)}" y2="${Y(v)}" stroke="${ANC.grid}"/><text x="${L - 6}" y="${Y(v) + 4}" text-anchor="end" font-size="11" fill="${ANC.mut}">${f1(v)}</text>`; });
   s += `<line x1="${L}" x2="${W - R}" y1="${y0}" y2="${y0}" stroke="#2a4a6e"/><text x="${L - 6}" y="${y0 + 4}" text-anchor="end" font-size="11" fill="${ANC.mut}">0</text>`;
   const peak = o.cats.reduce((bi, c, i) => tot(c) > tot(o.cats[bi]) ? i : bi, 0);
   o.cats.forEach((c, i) => {
-    const x = L + i * bw + (bw - cw) / 2; let base = y0; const vis = ks.filter(k => c[k] > 0);
+    const x = L + i * bw + (bw - cw) / 2, nd = o.nodata && o.nodata(c, i); let base = y0; const vis = ks.filter(k => c[k] > 0);
+    if(nd && !vis.length) s += `<rect x="${x.toFixed(1)}" y="${(y0 - 3).toFixed(1)}" width="${cw.toFixed(1)}" height="3" fill="${ANC.none}"/>`;
     vis.forEach((k, j) => { const h = y0 - Y(c[k]) - (j ? 2 : 0), y = base - h - (j ? 2 : 0); if(h <= 0) return;
       s += j === vis.length - 1 ? `<path d="${topPath(x, y, cw, h, 4)}" fill="${ANC[k]}"/>` : `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${cw.toFixed(1)}" height="${h.toFixed(1)}" fill="${ANC[k]}"/>`; base = y; });
-    if(i === peak && tot(c)) s += `<text x="${L + i * bw + bw / 2}" y="${Y(tot(c)) - 5}" text-anchor="middle" font-size="11" font-weight="700" fill="${ANC.ink}">${tot(c)}</text>`;
+    if(i === peak && tot(c)) s += `<text x="${L + i * bw + bw / 2}" y="${Y(tot(c)) - 5}" text-anchor="middle" font-size="11" font-weight="700" fill="${ANC.ink}">${esc(short(tot(c)))}</text>`;
     if(o.tick(i)) s += `<text x="${L + i * bw + bw / 2}" y="${H - 7}" text-anchor="middle" font-size="11" fill="${c.weekend ? ANC.ink2 : ANC.mut}">${esc(o.xl(c, i))}</text>`;
-    s += `<rect class="hit" x="${L + i * bw}" y="${T - 14}" width="${bw}" height="${y0 - T + 14}"${tipAttr(o.tip(c, i))}/>`;
+    s += `<rect class="hit" x="${L + i * bw}" y="${T - 14}" width="${bw}" height="${y0 - T + 14}"${tipAttr(nd && !vis.length ? ["Not recorded", o.label(c, i), "the dashboard was not running then"] : o.tip(c, i))}/>`;
   });
   return s + `</svg>`;
 }
 function mix(a, b, t){ const p = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16)), A = p(a), B = p(b); return "#" + A.map((v, i) => Math.round(v + (B[i] - v) * t).toString(16).padStart(2, "0")).join(""); }
 function heatmap(d){
-  const max = Math.max(1, ...d.heat.flat()), ramp = ANRAMP[AN.kind] || ANRAMP.all, DN = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-  let s = `<div class="hm" role="img" aria-label="Cases by weekday and hour">`;
-  d.heat.forEach((row, wd) => { s += `<span>${DN[wd]}</span>` + row.map((v, h) => `<i style="background:${v ? mix(ramp[0], ramp[1], Math.sqrt(v / max)) : "#0c1c30"}"${tipAttr([`${v} ${kindWord()}`, `${DN[wd]} ${hh(h)}–${hh(h + 1)}`])}></i>`).join(""); });
+  const max = Math.max(1e-9, ...d.heat.flat()), ramp = ANRAMP[AN.kind] || ANRAMP.all, DN = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+  let s = `<div class="hm" role="img" aria-label="By weekday and hour">`;
+  d.heat.forEach((row, wd) => { s += `<span>${DN[wd]}</span>` + row.map((v, h) => `<i style="background:${v ? mix(ramp[0], ramp[1], Math.sqrt(v / max)) : "#0c1c30"}"${tipAttr([v ? qty(v) : "none", `${DN[wd]} ${hh(h)}–${hh(h + 1)}`])}></i>`).join(""); });
   s += `<span></span>` + Array.from({length:24}, (_, h) => `<span class="hx">${h % 3 ? "" : String(h).padStart(2, "0")}</span>`).join("") + `</div>`;
-  return s + `<div class="hmscale">fewer <b style="background:linear-gradient(90deg,${mix(ramp[0], ramp[1], .1)},${ramp[1]})"></b> more (max ${max} in one hour)</div>`;
+  return s + `<div class="hmscale">less <b style="background:linear-gradient(90deg,${mix(ramp[0], ramp[1], .1)},${ramp[1]})"></b> more (max ${esc(num(max))} in one hour)</div>`;
 }
 function partBar(lv){
   const a = [["2", "2BB", "l2"], ["3", "3BB", "l3"], ["4", "4BB+", "l4"]], tot = a.reduce((s, x) => s + lv[x[0]], 0);
-  if(!tot) return `<div class="empty">No bunching cases in this period.</div>`;
-  return `<div class="part" role="img" aria-label="Bunching cases by level">${a.filter(x => lv[x[0]]).map(x => `<i style="width:${100 * lv[x[0]] / tot}%;background:${ANC[x[2]]}"${tipAttr([`${lv[x[0]]} cases`, `${x[1]} · ${pctOf(lv[x[0]], tot)}%`])}></i>`).join("")}</div>
-    <div class="partleg">${a.map(x => `<div><span><i class="sw" style="background:${ANC[x[2]]}"></i>${x[1]}</span><b>${lv[x[0]]}</b><small>${pctOf(lv[x[0]], tot)}% · ${x[0] === "2" ? "2 buses together" : x[0] === "3" ? "3 buses together" : "4 or more"}</small></div>`).join("")}</div>`;
+  if(!tot) return `<div class="empty">No bunching in this period.</div>`;
+  return `<div class="part" role="img" aria-label="Bunching by level">${a.filter(x => lv[x[0]]).map(x => `<i style="width:${100 * lv[x[0]] / tot}%;background:${ANC[x[2]]}"${tipAttr([qty(lv[x[0]]), `${x[1]} · ${pctOf(lv[x[0]], tot)}%`])}></i>`).join("")}</div>
+    <div class="partleg">${a.map(x => `<div><span><i class="sw" style="background:${ANC[x[2]]}"></i>${x[1]}</span><b>${pctOf(lv[x[0]], tot)}%</b><small>${esc(num(lv[x[0]]))} · ${x[0] === "2" ? "2 buses together" : x[0] === "3" ? "3 buses together" : "4 or more"}</small></div>`).join("")}</div>`;
 }
 function renderAn(){
   const d = AN.data, body = $("anBody"); if(!d) return;
-  const t = d.totals, legend = AN.kind === "all" ? `<div class="an-leg"><span><i class="sw bb"></i>Bunching</span><span><i class="sw gap"></i>Long gap</span></div>` : "";
-  const since = d.first_ts ? sgt({day:"2-digit", month:"short", year:"numeric"}).format(new Date(d.first_ts * 1000)) : null;
-  const note = `<div class="an-note">Counts every <b>logged case</b>: bunching (headway under ${P().bunch_min} min) or a long gap (scheduled + ${P().gap_add_min} min) that lasted at least ${d.gate ? d.gate.bunching : 15} bus stops, on the services the collector was watching${since ? `, logged since ${since}` : ""}. Start times are Singapore time; hotspots are the stops where a case began.${d.always_on ? "" : " The collector only runs while someone has a bunching page open — set <code>BUNCHING_ALWAYS_ON=1</code> on the server for round-the-clock history."} The log is kept in the server's SQLite file; on Render, attach a persistent disk (<code>BUNCHING_DB</code>) so history survives a redeploy.${d.db_ok === false ? ` <b>Storage error: ${esc(d.db_err || "")}</b>` : ""}</div>`;
+  syncAnFilters();
+  const t = d.totals, cv = d.coverage || {}, legend = AN.kind === "all" ? `<div class="an-leg"><span><i class="sw bb"></i>Bunching</span><span><i class="sw gap"></i>Long gap</span></div>` : "";
+  const unit = isTime() ? "minutes" : "cases", scope = `${esc(d.period.label)}${AN.svc ? " · service " + esc(AN.svc) : S.services.length ? " · services " + esc(S.services.join(", ")) : ""}${S.op ? " · " + esc($("opSel").selectedOptions[0].textContent) : ""}${S.dir ? " · Dir " + S.dir : ""}${AN.kind !== "all" ? " · " + esc(what()) + " only" : ""}`;
   if(!t.events){
-    body.innerHTML = anKpis(d) + `<section class="card an-empty"><b>No logged cases ${esc(d.period.label.toLowerCase())}${AN.svc ? " for service " + esc(AN.svc) : ""}</b>A case is logged once bunching or a long gap has lasted ${d.gate ? d.gate.bunching : 15} bus stops. Try a longer period${AN.svc || AN.op || AN.dir || AN.kind !== "all" ? " or clear the filters" : ""}.${note}</section>`;
+    body.innerHTML = anKpis(d) + `<section class="card an-empty"><b>Nothing recorded for ${esc(d.period.label.toLowerCase())} yet</b>${isTime()
+      ? `The dashboard records bunching and long gaps every ${P().refresh_sec} s while it runs, so these charts fill up as soon as it has been open for a while${cv.hours_watched ? ` (${cv.hours_watched} h recorded so far, with no ${esc(what())} seen)` : ""}.`
+      : `A case is logged once bunching or a long gap has lasted ${d.gate ? d.gate.bunching : 15} bus stops. Switch to <b>Time with a problem</b> to see shorter ones.`}${anBasis(d)}</section>`;
     if(AN.map){ AN.map.remove(); AN.map = null; } return;
   }
-  const smax = Math.max(1, ...d.services.map(r => r.events)), rmax = Math.max(1, ...d.roads.map(r => r.events));
-  const svcCard = `<section class="card an-card"><header><div><h2>Most affected services</h2><div class="sub">Top ${d.services.length} of ${d.services_total} · ${esc(kindWord())} per service · tap a bar to look at one service</div></div>${legend}</header>
-    ${hbars(d.services, smax, {attr:r => `data-svc="${esc(r.service)}"`, label:r => `${esc(r.service)}<small>${r.d1 && r.d2 ? `D1 ${r.d1} · D2 ${r.d2}` : r.d1 ? "Dir 1" : "Dir 2"}</small>`,
-      tip:r => [`${r.events} ${kindWord()}`, `Service ${r.service}`, AN.kind === "all" ? `Bunching ${r.bb} · Long gaps ${r.gap}` : null, `Dir 1: ${r.d1} · Dir 2: ${r.d2}`, `Longest ${r.max_stops} stops`]})}</section>`;
-  const hourCard = `<section class="card an-card"><header><div><h2>When it happens</h2><div class="sub">${esc(kindWord())} by start time (Singapore time)</div></div>${legend}</header>
-    ${colChart({aria:"Cases by hour of day", cats:d.hours, bands:[[7, 9, "AM PEAK"], [17, 20, "PM PEAK"]], tick:i => i % 3 === 0, xl:c => String(c.h).padStart(2, "0"),
-      tip:c => [`${c.bb + c.gap} ${kindWord()}`, `${hh(c.h)}–${hh(c.h + 1)}`, AN.kind === "all" ? `Bunching ${c.bb} · Long gaps ${c.gap}` : null]})}
-    <div class="an-h3">WEEKLY PATTERN</div>${d.period.days >= 7 ? heatmap(d) : `<div class="sub">Choose Last 7 days or Last 30 days to see which day and hour it keeps happening.</div>`}</section>`;
-  const mapCard = `<section class="card an-card"><header><div><h2>Hotspot map</h2><div class="sub">Bus stops where cases begin · bigger circle = more cases · numbers = top 5</div></div>${legend}</header><div id="anMap"></div></section>`;
-  const roadCard = `<section class="card an-card"><header><div><h2>Roads where it keeps happening</h2><div class="sub">Road of the stop where each case began · tap a road to see it on the map</div></div></header>
+  const smax = Math.max(1e-9, ...d.services.map(r => r.events)), rmax = Math.max(1e-9, ...d.roads.map(r => r.events)), byH = cv.by_hour || [], byD = cv.by_day || {};
+  const svcCard = `<section class="card an-card"><header><div><h2>Most affected services</h2><div class="sub">Top ${d.services.length} of ${d.services_total} · ${unit} per service · tap a bar to look at one service</div></div>${legend}</header>
+    ${hbars(d.services, smax, {attr:r => `data-svc="${esc(r.service)}"`, label:r => `${esc(r.service)}<small>${r.d1 && r.d2 ? `D1 ${pctOf(r.d1, r.events)}% · D2 ${pctOf(r.d2, r.events)}%` : r.d1 ? "Dir 1" : "Dir 2"}</small>`,
+      tip:r => [qty(r.events), `Service ${r.service}`, AN.kind === "all" ? `Bunching ${num(r.bb)} · Long gaps ${num(r.gap)}` : null, `Dir 1: ${num(r.d1)} · Dir 2: ${num(r.d2)}`]})}</section>`;
+  const hourCard = `<section class="card an-card"><header><div><h2>When it happens</h2><div class="sub">${unit} by hour of day (Singapore time)${isTime() ? " · grey = not recorded" : ""}</div></div>${legend}</header>
+    ${colChart({aria:"By hour of day", cats:d.hours, bands:[[7, 9, "AM PEAK"], [17, 20, "PM PEAK"]], tick:i => i % 3 === 0, xl:c => String(c.h).padStart(2, "0"), label:c => `${hh(c.h)}–${hh(c.h + 1)}`,
+      nodata:c => isTime() && !(byH[c.h] > 0), tip:c => [qty(c.bb + c.gap), `${hh(c.h)}–${hh(c.h + 1)}`, AN.kind === "all" ? `Bunching ${num(c.bb)} · Long gaps ${num(c.gap)}` : null]})}
+    <div class="an-h3">WEEKLY PATTERN</div>${d.period.days >= 7 ? heatmap(d) : `<div class="sub">Choose 7 days or 30 days to see which day and hour it keeps happening.</div>`}</section>`;
+  const mapCard = `<section class="card an-card"><header><div><h2>Hotspot map</h2><div class="sub">${isTime() ? "Bus stops where it was seen" : "Bus stops where cases began"} · bigger circle = more · numbers = top 5</div></div>${legend}</header><div id="anMap"></div></section>`;
+  const roadCard = `<section class="card an-card"><header><div><h2>Roads where it keeps happening</h2><div class="sub">${unit} per road · tap a road to see it on the map</div></div></header>
     ${hbars(d.roads, rmax, {cls:"roads", attr:r => `data-road="${esc(r.road)}"`, label:r => `${esc(r.road)}<small>${r.stops} stop${r.stops === 1 ? "" : "s"} · svc ${esc(r.services.slice(0, 4).join(", "))}</small>`,
-      tip:r => [`${r.events} ${kindWord()}`, r.road, AN.kind === "all" ? `Bunching ${r.bb} · Long gaps ${r.gap}` : null, `Services ${r.services.join(", ")}`]})}</section>`;
-  const dayCard = d.period.days > 1 ? `<section class="card an-card"><header><div><h2>Day by day</h2><div class="sub">${esc(kindWord())} per day · ${esc(d.period.label.toLowerCase())}</div></div>${legend}</header>
-    ${colChart({aria:"Cases per day", cats:d.days.map(x => ({...x, weekend:x.wd === "Sat" || x.wd === "Sun"})), tick:i => d.days.length <= 7 || i % 5 === 0 || i === d.days.length - 1,
-      xl:c => d.days.length <= 7 ? `${c.wd} ${+c.date.slice(8)}` : `${+c.date.slice(8)}/${+c.date.slice(5, 7)}`, tip:c => [`${c.bb + c.gap} ${kindWord()}`, `${c.wd} ${c.date}`, AN.kind === "all" ? `Bunching ${c.bb} · Long gaps ${c.gap}` : null]})}</section>` : "";
-  const sevCard = `<section class="card an-card"><header><div><h2>How bad and how long</h2><div class="sub">Bunching level and case length</div></div></header>
+      tip:r => [qty(r.events), r.road, AN.kind === "all" ? `Bunching ${num(r.bb)} · Long gaps ${num(r.gap)}` : null, `Services ${r.services.join(", ")}`]})}</section>`;
+  const dayCard = d.period.days > 1 ? `<section class="card an-card"><header><div><h2>Day by day</h2><div class="sub">${unit} per day · ${esc(d.period.label.toLowerCase())}</div></div>${legend}</header>
+    ${colChart({aria:"Per day", cats:d.days.map(x => ({...x, weekend:x.wd === "Sat" || x.wd === "Sun"})), tick:i => d.days.length <= 7 || i % 5 === 0 || i === d.days.length - 1, label:c => `${c.wd} ${c.date}`,
+      nodata:c => isTime() && !(byD[c.date] > 0), xl:c => d.days.length <= 7 ? `${c.wd} ${+c.date.slice(8)}` : `${+c.date.slice(8)}/${+c.date.slice(5, 7)}`, tip:c => [qty(c.bb + c.gap), `${c.wd} ${c.date}`, AN.kind === "all" ? `Bunching ${num(c.bb)} · Long gaps ${num(c.gap)}` : null]})}</section>` : "";
+  const sevCard = `<section class="card an-card"><header><div><h2>How bad${isTime() ? "" : " and how long"}</h2><div class="sub">${isTime() ? "Share of bunching time by how many buses were together" : "Bunching level and case length"}</div></div></header>
     ${AN.kind !== "gap" ? `<div class="an-h3">BUNCHING LEVEL</div>${partBar(t.levels)}` : ""}
-    <div class="an-h3">CASE LENGTH (BUS STOPS)</div>${colChart({aria:"Cases by length in bus stops", H:170, cats:d.durations, tick:() => true, xl:c => c.label, tip:c => [`${c.bb + c.gap} ${kindWord()}`, `${c.label} bus stops`, AN.kind === "all" ? `Bunching ${c.bb} · Long gaps ${c.gap}` : null]})}</section>`;
+    ${isTime() ? "" : `<div class="an-h3">CASE LENGTH (BUS STOPS)</div>${colChart({aria:"Cases by length in bus stops", H:170, cats:d.durations, tick:() => true, xl:c => c.label, label:c => c.label, tip:c => [qty(c.bb + c.gap), `${c.label} bus stops`, AN.kind === "all" ? `Bunching ${c.bb} · Long gaps ${c.gap}` : null]})}`}</section>`;
   const rows = d.stops.slice(0, 15);
-  const table = `<section class="card an-card" style="margin-top:12px"><header><div><h2>Hotspot bus stops</h2><div class="sub">Where cases most often begin · tap a row to find it on the map</div></div><button class="btn sm" type="button" id="anExport">Export CSV</button></header>
-    <div class="tw"><table id="anTable"><thead><tr><th class="n">#</th><th>Bus stop</th><th class="hide-m">Road</th><th class="n">Cases</th><th class="n hide-m">Bunching</th><th class="n hide-m">Long gaps</th><th>Services</th><th class="n hide-m">Avg length</th></tr></thead>
-    <tbody>${rows.map((s, i) => `<tr data-i="${i}"><td class="n">${i + 1}</td><td><b>${esc(s.name)}</b>${s.code ? ` <small class="m">${esc(s.code)}</small>` : ""}</td><td class="hide-m">${esc(s.road || "–")}</td><td class="n"><b>${s.events}</b></td><td class="n hide-m">${s.bb}</td><td class="n hide-m">${s.gap}</td><td>${esc(s.services.join(", "))}</td><td class="n hide-m">${s.avg_stops == null ? "–" : f1(s.avg_stops) + " stops"}</td></tr>`).join("")}</tbody></table></div>${note}</section>`;
+  const table = `<section class="card an-card" style="margin-top:12px"><header><div><h2>Hotspot bus stops</h2><div class="sub">${isTime() ? "Where it was seen most" : "Where cases most often began"} · tap a row to find it on the map</div></div><button class="btn sm" type="button" id="anExport">Export CSV</button></header>
+    <div class="tw"><table id="anTable"><thead><tr><th class="n">#</th><th>Bus stop</th><th class="hide-m">Road</th><th class="n">${isTime() ? "Time" : "Cases"}</th><th class="n hide-m">Bunching</th><th class="n hide-m">Long gaps</th><th>Services</th>${isTime() ? "" : `<th class="n hide-m">Avg length</th>`}</tr></thead>
+    <tbody>${rows.map((s, i) => `<tr data-i="${i}"><td class="n">${i + 1}</td><td><b>${esc(s.name)}</b>${s.code ? ` <small class="m">${esc(s.code)}</small>` : ""}</td><td class="hide-m">${esc(s.road || "–")}</td><td class="n"><b>${esc(num(s.events))}</b></td><td class="n hide-m">${esc(num(s.bb))}</td><td class="n hide-m">${esc(num(s.gap))}</td><td>${esc(s.services.join(", "))}</td>${isTime() ? "" : `<td class="n hide-m">${s.avg_stops == null ? "–" : f1(s.avg_stops) + " stops"}</td>`}</tr>`).join("")}</tbody></table></div>${anBasis(d)}</section>`;
   const ins = anInsights(d);
   body.innerHTML = anKpis(d)
-    + `<section class="card an-card"><header><div><h2>Key findings</h2><div class="sub">${esc(d.period.label)}${AN.svc ? " · service " + esc(AN.svc) : ""}${AN.op ? " · " + esc($("anOp").selectedOptions[0].textContent) : ""}${AN.dir ? " · Dir " + AN.dir : ""} · from ${t.events} logged ${esc(kindWord())}</div></div></header><ul class="an-ins">${ins.map(([k, s]) => `<li>${ico(k)}<span>${s}</span></li>`).join("")}</ul></section>`
-    + `<div class="an-grid">${svcCard}${hourCard}</div><div class="an-grid">${mapCard}${roadCard}</div><div class="an-grid">${dayCard}${sevCard}</div>` + table;
+    + `<section class="card an-card"><header><div><h2>Key findings</h2><div class="sub">${scope} · ${isTime() ? `${cv.hours_watched || 0} h recorded` : `${t.events} logged case${t.events === 1 ? "" : "s"}`}</div></div></header><ul class="an-ins">${ins.map(([k, s]) => `<li>${ico(k)}<span>${s}</span></li>`).join("")}</ul></section>`
+    + `<div class="an-grid">${svcCard}${hourCard}</div><div class="an-grid">${mapCard}${roadCard}</div><div class="an-grid">${dayCard || ""}${sevCard}</div>` + table;
   anMap(d);
 }
 function anMap(d){
-  if(typeof L === "undefined") return;
+  if(typeof L === "undefined" || !$("anMap")) return;
   if(AN.map){ AN.map.remove(); AN.map = null; }
-  const pts = d.stops.filter(s => s.lat != null && s.lon != null); if(!pts.length){ $("anMap").innerHTML = `<div class="empty" style="padding:16px">No stop positions for these cases (bus stop list not loaded).</div>`; return; }
+  const pts = d.stops.filter(s => s.lat != null && s.lon != null); if(!pts.length){ $("anMap").innerHTML = `<div class="empty" style="padding:16px">No stop positions for these records (bus stop list not loaded).</div>`; return; }
   AN.map = L.map("anMap", {zoomControl:true, attributionControl:false, minZoom:10, maxZoom:18}).setView([1.3521, 103.8198], 11);
   (window.SGBasemap ? SGBasemap.add(AN.map, {minZoom:10, maxZoom:18}) : L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {minZoom:10, maxZoom:18}).addTo(AN.map));
   AN.gStops = L.layerGroup().addTo(AN.map);
@@ -976,36 +999,38 @@ function anMap(d){
   pts.slice().sort((a, b) => a.events - b.events).forEach(s => {
     const col = AN.kind === "bb" ? ANC.bb : AN.kind === "gap" ? ANC.gap : (s.bb >= s.gap ? ANC.bb : ANC.gap), on = AN.focusRoad && s.road === AN.focusRoad;
     L.circleMarker([s.lat, s.lon], {radius:6 + 16 * Math.sqrt(s.events / mx), color:on ? "#ffffff" : "#0a1a2e", weight:on ? 3 : 2, fillColor:col, fillOpacity:.82})
-      .bindPopup(`<b>${esc(s.name)}</b>${s.code ? " (" + esc(s.code) + ")" : ""}<br>${esc(s.road || "")}<br><b>${s.events}</b> ${esc(kindWord())}${AN.kind === "all" ? ` · bunching ${s.bb}, long gaps ${s.gap}` : ""}<br>Services: ${esc(s.services.join(", "))}`).addTo(AN.gStops); });
+      .bindPopup(`<b>${esc(s.name)}</b>${s.code ? " (" + esc(s.code) + ")" : ""}<br>${esc(s.road || "")}<br><b>${esc(qty(s.events))}</b>${AN.kind === "all" ? ` · bunching ${esc(num(s.bb))}, long gaps ${esc(num(s.gap))}` : ""}<br>Services: ${esc(s.services.join(", "))}`).addTo(AN.gStops); });
   rank.forEach((s, i) => L.marker([s.lat, s.lon], {icon:L.divIcon({className:"", iconSize:[20, 20], iconAnchor:[10, 10], html:`<div class="anrk">${i + 1}</div>`}), interactive:false, keyboard:false, zIndexOffset:1000}).addTo(AN.gStops));
   const focus = AN.focusRoad ? pts.filter(s => s.road === AN.focusRoad) : pts;
   AN.map.fitBounds(L.latLngBounds((focus.length ? focus : pts).map(s => [s.lat, s.lon])), {padding:[30, 30], maxZoom:AN.focusRoad ? 16 : 14});
 }
 function anTip(e){
   const tip = $("anTip"), el = e.target.closest && e.target.closest("[data-t]");
-  if(!el || !$("analytics").contains(el)){ tip.classList.remove("on"); return; }
+  if(!el || !$("anSection").contains(el)){ tip.classList.remove("on"); return; }
   tip.textContent = ""; el.dataset.t.split("|").forEach(l => { const x = document.createElement("div"); x.textContent = l; tip.appendChild(x); });
   const r = el.getBoundingClientRect(), px = e.clientX != null && e.type !== "focusin" ? e.clientX : r.left + r.width / 2, py = e.clientY != null && e.type !== "focusin" ? e.clientY : r.top;
   tip.classList.add("on"); const tw = tip.offsetWidth, th = tip.offsetHeight;
   tip.style.left = Math.max(8, Math.min(window.innerWidth - tw - 8, px + 14)) + "px"; tip.style.top = Math.max(8, py - th - 12) + "px";
 }
-let anRT; window.addEventListener("resize", () => { clearTimeout(anRT); anRT = setTimeout(() => { if(S.tab === "an" && AN.data) renderAn(); }, 250); });
-function openAn(){ syncAnFilters(); if(!AN.data) loadAn(); else if(AN.map) setTimeout(() => AN.map.invalidateSize(), 80); }
+let anRT; window.addEventListener("resize", () => { clearTimeout(anRT); anRT = setTimeout(() => { if(S.tab === "dash" && AN.data) renderAn(); }, 250); });
 (function(){
+  syncAnFilters();
   $("anPer").addEventListener("click", e => { const b = e.target.closest("button[data-p]"); if(!b) return; AN.period = b.dataset.p; LS.set("an.period", AN.period); syncAnFilters(); loadAn(); });
-  $("anKind").addEventListener("click", e => { const b = e.target.closest("button[data-k]"); if(!b) return; AN.kind = b.dataset.k; syncAnFilters(); loadAn(); });
-  $("anDir").addEventListener("click", e => { const b = e.target.closest("button[data-d]"); if(!b) return; AN.dir = +b.dataset.d; syncAnFilters(); loadAn(); });
-  $("anOp").addEventListener("change", () => { AN.op = $("anOp").value; loadAn(); });
+  $("anMeas").addEventListener("click", e => { const b = e.target.closest("button[data-m]"); if(!b) return; AN.measure = b.dataset.m; LS.set("an.measure", AN.measure); syncAnFilters(); loadAn(); });
   $("anSvc").addEventListener("click", e => { if(e.target.closest("#anSvcX")){ AN.svc = ""; syncAnFilters(); loadAn(); } });
-  $("anRefresh").addEventListener("click", loadAn);
-  const root = $("analytics");
+  const root = $("anSection");
   root.addEventListener("pointermove", anTip); root.addEventListener("pointerleave", () => $("anTip").classList.remove("on")); root.addEventListener("focusin", anTip); root.addEventListener("focusout", () => $("anTip").classList.remove("on"));
   $("anBody").addEventListener("click", e => {
-    const sv = e.target.closest("[data-svc]"); if(sv){ AN.svc = sv.dataset.svc; AN.focusRoad = null; syncAnFilters(); loadAn(); window.scrollTo({top:$("analytics").getBoundingClientRect().top + scrollY - 70, behavior:"smooth"}); return; }
+    const sv = e.target.closest("[data-svc]"); if(sv){ AN.svc = sv.dataset.svc; AN.focusRoad = null; syncAnFilters(); loadAn(); root.scrollIntoView({behavior:"smooth", block:"start"}); return; }
     const rd = e.target.closest("[data-road]"); if(rd){ AN.focusRoad = AN.focusRoad === rd.dataset.road ? null : rd.dataset.road; anMap(AN.data); const m = $("anMap"); if(m){ const r = m.getBoundingClientRect(); if(r.top < 0 || r.bottom > innerHeight) m.scrollIntoView({behavior:"smooth", block:"center"}); } return; }
     const tr = e.target.closest("#anTable tr[data-i]"); if(tr && AN.map){ const s = AN.data.stops[+tr.dataset.i]; if(s && s.lat != null){ AN.map.setView([s.lat, s.lon], 16); $("anMap").scrollIntoView({behavior:"smooth", block:"center"}); } return; }
-    if(e.target.closest("#anExport")){ const d = AN.data; csvDownload(`bunching-hotspots-${d.period.key}.csv`, [["rank", "stop_code", "stop_name", "road", "cases", "bunching", "long_gaps", "services", "avg_length_stops"], ...d.stops.map((s, i) => [i + 1, s.code, s.name, s.road, s.events, s.bb, s.gap, s.services.join(" "), s.avg_stops])]); }
+    if(e.target.closest("#anExport")){ const d = AN.data; csvDownload(`bunching-hotspots-${d.period.key}-${AN.measure}.csv`, [["rank", "stop_code", "stop_name", "road", isTime() ? "minutes" : "cases", isTime() ? "bunching_min" : "bunching", isTime() ? "long_gap_min" : "long_gaps", "services"], ...d.stops.map((s, i) => [i + 1, s.code, s.name, s.road, s.events, s.bb, s.gap, s.services.join(" ")])]); }
   });
+  // the main filter bar also scopes the analytics
+  $("dirSeg").addEventListener("click", anReload); $("issueSeg").addEventListener("click", anReload); $("opSel").addEventListener("change", anReload);
+  $("chips").addEventListener("click", e => { if(e.target.closest("button[data-s]")) anReload(); }); $("reset").addEventListener("click", anReload);
+  $("form").addEventListener("submit", anReload); $("kpis").addEventListener("click", anReload);
+  document.addEventListener("keydown", e => { if(e.target && e.target.id === "svcIn" && (e.key === "Enter" || e.key === ",")) anReload(); });
 })();
 </script>
 

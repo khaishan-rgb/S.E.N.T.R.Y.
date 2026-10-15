@@ -1,14 +1,18 @@
 # SG Transport Pulse V16.19 — Operational Intelligence & Service Recovery Platform
 
-## Bunching & Gap — Analytics tab
-New **Analytics** tab (Dashboard · Alerts · Analytics · Settings; link `/bunching?tab=analytics`). Everything is counted from the **logged cases** (`bunching_event` / `gap_event`, plus cases still running) — nothing is estimated, and an empty log shows empty charts.
-* Filters: Period (Today / Yesterday / Last 7 days / Last 30 days), Type (All / Bunching / Long gaps), Transport Operator, Direction; tap a service bar to look at one service.
-* Five tiles: cases (vs the previous period), bunching (2BB / 3BB / 4BB+), long gaps, typical case length (median stops / minutes, longest case), peak hour.
-* **Key findings** written from the data: most affected service, busiest hour and the peak-hour share, hotspot road, hotspot stop, worst day of the week, change vs the previous period.
-* Charts: most affected services (bunching / long gaps), cases by hour with AM / PM peak bands, weekday × hour heatmap (7+ days), **hotspot map** of the stops where cases begin (size = cases, top 5 numbered), roads where it keeps happening (tap a road to zoom the map), day by day, bunching level mix and case length. Every mark has a tooltip.
-* Hotspot bus stops table (top 15) with CSV export.
-* Backend: `GET /api/bunching/analytics?period=7d&kind=all&direction=0&service=&operator=` (read-only) in `app.py`; the counting is in the new `bunching_analytics.py` (stdlib only). Road names and map positions come from the LTA bus-stop list.
-* History depends on what was logged: the collector runs while a bunching page is open (`BUNCHING_ALWAYS_ON=1` for round the clock), and on Render the SQLite file is wiped on redeploy unless `BUNCHING_DB` points to a persistent disk.
+## Bunching & Gap — Patterns & hotspots (on the Dashboard)
+Analytics now sits at the bottom of the Bunching & Gap **Dashboard** (no separate tab; old `/bunching?tab=analytics` links scroll to it). The main filter bar (Transport Operator, Services, Direction, Headway status) applies to it; it has its own **Period** (Today / Yesterday / 7 days / 30 days) and **Measure**:
+* **Time with a problem** (default) — minutes the live collector *saw* buses bunched (confirmed or developing) or with a long gap, recorded every cycle (30 s) at the stop where it was happening. New table `bb_obs` (hourly buckets per service, direction, level, stop) + `bb_cov` (how long each service was watched). This fills from the first minutes the dashboard runs, so it is not empty like the 15-stop case log.
+* **Cases (15+ stops)** — the logged cases (`bunching_event` / `gap_event`) as before.
+* Tiles, Key findings, most affected services, when it happens (hours not recorded are shown grey), weekly pattern heatmap, hotspot map, hotspot roads, day by day, bunching level mix (and case length for cases), hotspot stop table + CSV.
+* The note under the table says when the server's recorded history begins, and whether recording is paused.
+* Kept for `BUNCHING_KEEP_DAYS` days (default 62 = 30 days + the 30 days before, for the comparison); older rows are deleted hourly. About 1–5 MB for 30 days.
+
+### Keeping 30 days on Render
+Everything is stored in the SQLite file `BUNCHING_DB` (default `bunching.db` next to the app). On Render's **free** plan that file is lost on every redeploy, restart **and after 15 minutes without visitors** (the free service sleeps), and persistent disks are not available — so history restarts often. Options:
+1. **Render paid instance + persistent disk** (no code change): attach a 1 GB disk (e.g. mounted at `/var/data`), set `BUNCHING_DB=/var/data/bunching.db` and `BUNCHING_ALWAYS_ON=1`. Paid instances do not sleep, so it records 24/7.
+2. Free: an external database (e.g. Neon Postgres) — needs a small code change to store these tables there.
+`BUNCHING_ALWAYS_ON=1` keeps recording with nobody watching (uses more LTA calls); without it the server records while a bunching page is open.
 
 ## Bunching & Gap — simpler dashboard (patch on V16.19; bunching.html and bunching.py)
 * Filters unchanged (Transport Operator, Services, Direction, Time period, View by, Headway status, Bunching level). Engine, alert rules, Alerts / Settings tabs and APIs unchanged.

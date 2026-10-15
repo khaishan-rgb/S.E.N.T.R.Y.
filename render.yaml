@@ -31,6 +31,10 @@ services:
         sync: false
       - key: BUNCHING_ALWAYS_ON   # optional: 1 = keep collecting when nobody has the page open (needed for an unattended event log; uses more LTA quota)
         sync: false
+      - key: BUNCHING_DB          # optional: SQLite file for bunching settings, event log and analytics, e.g. /var/data/bunching.db on a persistent disk (paid instance)
+        sync: false
+      - key: BUNCHING_KEEP_DAYS   # optional: days of bunching analytics kept (default 62 = 30 days + the 30 days before)
+        sync: false
       - key: CARTO_API_KEY        # CARTO basemap key (tiles). Optional: the app has a built-in default; set your own here to rotate it without a code change
         sync: false
       - key: OVERPASS_URL         # optional: road-restriction data for the off-service route check (default public overpass-api.de)

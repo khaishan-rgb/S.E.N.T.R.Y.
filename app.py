@@ -1114,8 +1114,25 @@ def bb_insert(sql, args=()):
         return None
 
 
+def bb_sql_many(sql, rows):
+    """Many rows in ONE transaction (the analytics recorder writes a handful of rows every collector cycle)."""
+    if not rows:
+        return
+    try:
+        with contextlib.closing(sqlite3.connect(BB_DB, timeout=10)) as c:
+            c.executemany(sql, rows)
+            c.commit()
+            BB["db_ok"], BB["db_err"] = True, None
+    except Exception as e:
+        BB["db_ok"], BB["db_err"] = False, f"{type(e).__name__}: {e}"
+
+
 def bb_init():
     bb_sql("CREATE TABLE IF NOT EXISTS system_parameter(k TEXT PRIMARY KEY, v REAL)")
+    # analytics: time observed in each state, summed per hour / service / direction / level / stop (bb_obs), and how long each service was watched (bb_cov)
+    bb_sql("CREATE TABLE IF NOT EXISTS bb_obs(hour_ts INTEGER, service TEXT, direction INTEGER, kind TEXT, level INTEGER, stop TEXT, n INTEGER, sec REAL, "
+           "PRIMARY KEY(hour_ts, service, direction, kind, level, stop))")
+    bb_sql("CREATE TABLE IF NOT EXISTS bb_cov(hour_ts INTEGER, service TEXT, direction INTEGER, n INTEGER, sec REAL, PRIMARY KEY(hour_ts, service, direction))")
     bb_sql("CREATE TABLE IF NOT EXISTS service_headway_config(service TEXT, direction INTEGER, day_type TEXT, t_from TEXT, t_to TEXT, hw REAL)")
     bb_sql("CREATE TABLE IF NOT EXISTS bunching_event(id INTEGER PRIMARY KEY AUTOINCREMENT, service TEXT, direction INTEGER, start_ts REAL, end_ts REAL, bus_group TEXT, "
            "max_level INTEGER, start_stop TEXT, end_stop TEXT, stops INTEGER, min_hw REAL)")
@@ -1453,6 +1470,45 @@ async def bb_cycle(keys=None):
     BB["hist"].append({"ts": t0, "per": per})
     BB["cycle"] = {"at": t0, "took": round(time.time() - t0, 1), "pairs": len(keys)}
     BB["loop_at"] = time.time()
+    try:
+        bb_obs_record(keys, t0)
+    except Exception:
+        pass
+
+
+BB_KEEP_DAYS = max(31, int(os.getenv("BUNCHING_KEEP_DAYS", "62") or 62))     # analytics history kept (62 days = 30 days + the 30 days before, for comparison)
+
+
+def bb_obs_record(keys, t0):
+    """Analytics recorder: every collector cycle adds its interval to bb_obs for each bunched group (confirmed / developing) and each long gap
+    seen right now, at the stop where it is happening, and to bb_cov for each service direction watched. Real observations only."""
+    every = float(BB["params"]["refresh_sec"])
+    last = BB.get("obs_at")
+    dt = t0 - last if last else every
+    sec = dt if 5 <= dt <= 3 * max(every, RT_POLL_SEC) else every                    # a pause in polling is not counted as observed time
+    BB["obs_at"] = t0
+    hour = int(t0 // 3600) * 3600                                                    # Singapore is UTC+8 whole hours: same hour boundaries
+    obs, cov = [], []
+    for k in keys:
+        r = BB["rows"].get(f"{k[0]}:{k[1]}")
+        if not r or r.get("error") or r.get("risk") == "nodata":
+            continue
+        cov.append((hour, r["service"], r["direction"], sec))
+        for g in r.get("groups") or []:
+            if g.get("status") in ("confirmed", "developing"):
+                obs.append((hour, r["service"], r["direction"], "bb", min(4, int(g.get("size") or 2)), (g.get("cur_stop") or g.get("location") or "")[:120], sec))
+        for gp in r.get("gaps") or []:
+            if gp.get("active"):
+                obs.append((hour, r["service"], r["direction"], "gap", 0, (gp.get("cur_stop") or gp.get("location") or "")[:120], sec))
+    bb_sql_many("INSERT INTO bb_obs(hour_ts, service, direction, kind, level, stop, n, sec) VALUES (?,?,?,?,?,?,1,?) "
+                "ON CONFLICT(hour_ts, service, direction, kind, level, stop) DO UPDATE SET n = n + 1, sec = sec + excluded.sec", obs)
+    bb_sql_many("INSERT INTO bb_cov(hour_ts, service, direction, n, sec) VALUES (?,?,?,1,?) "
+                "ON CONFLICT(hour_ts, service, direction) DO UPDATE SET n = n + 1, sec = sec + excluded.sec", cov)
+    if t0 - BB.get("obs_pruned", 0) > 3600:
+        BB["obs_pruned"] = t0
+        cut = t0 - BB_KEEP_DAYS * 86400
+        bb_sql("DELETE FROM bb_obs WHERE hour_ts < ?", (cut,))
+        bb_sql("DELETE FROM bb_cov WHERE hour_ts < ?", (cut,))
 
 
 async def bb_loop():
@@ -2263,14 +2319,28 @@ _BB_AN_SQL = ("SELECT 'bb' AS kind, service, direction, start_ts AS start, end_t
               "UNION ALL SELECT 'gap', service, direction, start_ts, end_ts, NULL, stops, COALESCE(start_stop, location), end_stop, alerts FROM gap_event WHERE start_ts >= ? AND start_ts < ?")
 
 
+_BB_OBS_SQL = "SELECT hour_ts, service, direction, kind, level, stop, n, sec FROM bb_obs WHERE hour_ts >= ? AND hour_ts < ?"
+
+
+def _bb_obs_recs(rows):
+    return [{"kind": r["kind"], "service": r["service"], "direction": r["direction"], "start": r["hour_ts"], "end": None, "level": r["level"] or None,
+             "stops": 0, "start_stop": r["stop"], "w": (r["sec"] or 0) / 60.0} for r in rows]
+
+
 @app.get("/api/bunching/analytics")
-async def api_bb_analytics(period: str = "7d", kind: str = "all", direction: int = 0, service: str = "", operator: str = ""):
+async def api_bb_analytics(period: str = "7d", kind: str = "all", direction: int = 0, service: str = "", operator: str = "", services: str = "", measure: str = "time"):
     p = bunching_analytics.period_bounds(period, time.time())
-    cur = bb_sql(_BB_AN_SQL, (p["start"], p["end"], p["start"], p["end"]), fetch=True)
-    prev = bb_sql(_BB_AN_SQL, (p["prev_start"], p["prev_end"], p["prev_start"], p["prev_end"]), fetch=True)
-    for e in bb_open_public():                                                       # cases still running (already long enough to be logged)
-        cur.append({"kind": e["kind"], "service": e["service"], "direction": e["direction"], "start": e["start"], "end": None, "level": e.get("level"),
-                    "stops": e.get("stops"), "start_stop": e.get("start_stop") or e.get("location"), "end_stop": e.get("end_stop"), "alerts": e.get("alerts"), "open": True})
+    measure = "cases" if measure == "cases" else "time"
+    h0 = lambda t: int(t // 3600) * 3600
+    if measure == "time":                                                            # minutes observed by the live collector (fills from the first cycle)
+        cur = _bb_obs_recs(bb_sql(_BB_OBS_SQL, (h0(p["start"]), p["end"]), fetch=True))
+        prev = _bb_obs_recs(bb_sql(_BB_OBS_SQL, (h0(p["prev_start"]), p["prev_end"]), fetch=True))
+    else:                                                                            # logged cases (15+ stops) and cases still running
+        cur = bb_sql(_BB_AN_SQL, (p["start"], p["end"], p["start"], p["end"]), fetch=True)
+        prev = bb_sql(_BB_AN_SQL, (p["prev_start"], p["prev_end"], p["prev_start"], p["prev_end"]), fetch=True)
+        for e in bb_open_public():
+            cur.append({"kind": e["kind"], "service": e["service"], "direction": e["direction"], "start": e["start"], "end": None, "level": e.get("level"),
+                        "stops": e.get("stops"), "start_stop": e.get("start_stop") or e.get("location"), "end_stop": e.get("end_stop"), "alerts": e.get("alerts"), "open": True})
     try:
         stops = (await static()).get("stops") or {}
     except Exception:
@@ -2281,10 +2351,19 @@ async def api_bb_analytics(period: str = "7d", kind: str = "all", direction: int
             opmap = await occ_operator_map()
         except Exception:
             opmap = {}
+    svc_list = [x for x in re.split(r"[,\s]+", services.upper()) if re.fullmatch(r"[0-9A-Z]{1,6}", x)][:60]
     out = bunching_analytics.aggregate(cur, prev, stops, p, kind=kind if kind in ("bb", "gap") else "all", direction=direction if direction in (1, 2) else 0,
-                                       service=re.sub(r"[^0-9A-Za-z]", "", service)[:6], operator=operator.strip().upper()[:6], opmap=opmap)
+                                       service=re.sub(r"[^0-9A-Za-z]", "", service)[:6], operator=operator.strip().upper()[:6], opmap=opmap, services=svc_list)
+    cov_rows = bb_sql("SELECT hour_ts, service, direction, sec FROM bb_cov WHERE hour_ts >= ? AND hour_ts < ?", (h0(p["start"]), p["end"]), fetch=True)
+    if svc_list:
+        cov_rows = [r for r in cov_rows if r["service"] in svc_list]
+    if direction in (1, 2):
+        cov_rows = [r for r in cov_rows if int(r["direction"] or 0) == direction]
     first = bb_sql("SELECT MIN(t) AS t FROM (SELECT MIN(start_ts) AS t FROM bunching_event UNION ALL SELECT MIN(start_ts) FROM gap_event)", fetch=True)
-    out.update(db_ok=BB["db_ok"], db_err=BB["db_err"], first_ts=(first[0]["t"] if first else None), always_on=BB_ALWAYS,
+    first_obs = bb_sql("SELECT MIN(hour_ts) AS t FROM bb_cov", fetch=True)                # when this server's recorded history begins
+    out.update(measure=measure, coverage=bunching_analytics.coverage(cov_rows, p), db_ok=BB["db_ok"], db_err=BB["db_err"], first_ts=(first[0]["t"] if first else None),
+               first_obs_ts=(first_obs[0]["t"] if first_obs else None),
+               always_on=BB_ALWAYS, keep_days=BB_KEEP_DAYS, collecting=time.time() - BB["loop_at"] < 3 * BB["params"]["refresh_sec"],
                gate={"bunching": int(BB["params"]["confirm_stops"]), "gap": int(BB["params"]["gap_stops"])})
     return out
 
