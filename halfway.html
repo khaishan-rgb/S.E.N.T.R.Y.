@@ -2012,7 +2012,7 @@ document.addEventListener("click", function(e){
 .ln-what{font-size:12.5px;color:var(--ds-mut,#8aa2bd);margin:-4px 0 14px;line-height:1.5}
 .ln-what a{color:#9cc4ff}
 .ln-bars{display:grid;gap:10px}
-.ln-row{display:grid;grid-template-columns:minmax(180px,240px) minmax(0,1fr) 150px 268px;grid-template-areas:"name bar val ait" "name g g ait";gap:4px 16px;align-items:center;padding:12px 14px;border-radius:12px;border:1px solid var(--ds-line,rgba(126,178,230,.14));background:rgba(6,16,30,.55)}
+.ln-row{display:grid;grid-template-columns:minmax(190px,260px) minmax(0,1fr) 168px;grid-template-areas:"name bar val" "name g g";gap:4px 16px;align-items:center;padding:12px 14px;border-radius:12px;border:1px solid var(--ds-line,rgba(126,178,230,.14));background:rgba(6,16,30,.55)}
 .ln-row.rec{border-color:rgba(56,214,255,.55);background:radial-gradient(360px 90px at 0 0,rgba(56,214,255,.1),transparent 70%),rgba(6,16,30,.7);box-shadow:0 0 0 1px rgba(56,214,255,.15)}
 .ln-row.off{opacity:.75}
 .ln-name{grid-area:name;min-width:0}
@@ -2025,13 +2025,9 @@ document.addEventListener("click", function(e){
 .ln-val b{font:700 22px var(--ds-display,inherit);color:#fff;margin-right:3px}
 .ln-val em{display:block;font-style:normal;font-size:12px;color:var(--ds-mut,#8aa2bd)}
 .ln-val em.dn{color:#b9f7dc}.ln-val em.up{color:#ffc3ca}
-.ln-cols{display:grid;grid-template-columns:minmax(180px,240px) minmax(0,1fr) 150px 268px;gap:16px;padding:0 15px;font:700 10.5px var(--ds-font,inherit);letter-spacing:.1em;color:var(--ds-mut,#8aa2bd);margin-bottom:-2px}
-.ln-cols span:nth-child(3){text-align:right}
 .ln-leg{display:flex;flex-wrap:wrap;gap:6px 16px;align-items:center;font-size:12.5px;color:var(--ds-text-2,#b6c8dd);margin:-4px 0 12px}
 .ln-leg i,.ln-ac i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px}
 .ln-leg i.r,.ln-ac i.r{background:#f0506e}.ln-leg i.y,.ln-ac i.y{background:#e8c547}.ln-leg i.g,.ln-ac i.g{background:#26c485}
-.ln-ait{grid-area:ait;min-width:0;border-left:1px solid var(--ds-line,rgba(126,178,230,.14));padding-left:14px}
-.ln-ait svg{display:block;max-width:100%;height:auto}
 .ln-ac{display:flex;flex-wrap:wrap;gap:2px 12px;margin-top:6px;font-size:12px;color:var(--ds-text-2,#b6c8dd);font-variant-numeric:tabular-nums}
 .ln-ac b{color:#fff}
 .ln-note{margin:10px 0 0;padding:9px 12px;border-radius:9px;border:1px solid rgba(126,178,230,.22);background:rgba(4,12,24,.45);font-size:13px;color:var(--ds-text-2,#b6c8dd);line-height:1.5}
@@ -2039,7 +2035,7 @@ document.addEventListener("click", function(e){
 .ln-g span+span:before{content:"\00b7";margin:0 7px;color:var(--ds-faint,#5f7690)}
 .ln-chip{display:inline-flex;align-items:center;height:20px;padding:0 8px;border-radius:999px;font:700 10.5px/1 var(--ds-font,inherit);letter-spacing:.08em;border:1px solid rgba(126,178,230,.35);color:#cfe0f2;white-space:nowrap}
 .ln-chip.rec{border-color:rgba(56,214,255,.6);background:rgba(56,214,255,.14);color:#bfefff}
-.ln-axis{display:grid;grid-template-columns:minmax(180px,240px) minmax(0,1fr) 150px 268px;gap:16px;font-size:11.5px;color:var(--ds-faint,#5f7690);padding:0 15px}
+.ln-axis{display:grid;grid-template-columns:minmax(190px,260px) minmax(0,1fr) 168px;gap:16px;font-size:11.5px;color:var(--ds-faint,#5f7690);padding:0 15px}
 .ln-axis div{display:flex;justify-content:space-between}
 .ln-rule{margin:16px 0 0;padding:12px 14px;border-radius:12px;border:1px dashed rgba(126,178,230,.3);background:rgba(4,12,24,.45)}
 .ln-rule h4{margin:0 0 8px;font:600 12px var(--ds-font,inherit);letter-spacing:.1em;color:var(--ds-mut,#8aa2bd)}
@@ -2082,7 +2078,21 @@ document.addEventListener("click", function(e){
 .ln-fa{border:1px solid var(--ds-line,rgba(126,178,230,.14));border-radius:12px;background:rgba(8,18,33,.75);padding:14px 16px;min-width:0}
 .ln-fa>h3{margin:0 0 4px;font:600 16px/1.25 var(--ds-display,inherit);color:#fff}
 .ln-fa>.sub{font-size:12.5px;color:var(--ds-mut,#8aa2bd);margin-bottom:12px;line-height:1.45}
-.ln-wps{display:grid;grid-template-columns:repeat(auto-fit,minmax(330px,1fr));gap:12px}
+.ln-sqb{margin-top:16px;padding:14px;border-radius:12px;border:1px solid var(--ds-line,rgba(126,178,230,.14));background:rgba(4,12,24,.45)}
+.ln-sqb>h4{margin:0 0 4px;font:600 15px var(--ds-display,inherit);color:#fff}
+.ln-sqb>.sub{font-size:12.5px;color:var(--ds-mut,#8aa2bd);line-height:1.5;margin-bottom:8px}
+.ln-dirs{display:flex;flex-wrap:wrap;gap:4px 18px;font-size:12.5px;color:var(--ds-text-2,#b6c8dd);margin-bottom:10px}
+.ln-dirs b{color:#fff;font-weight:600}
+.ln-wps{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:12px}
+.ln-sqg{display:grid;gap:3px}
+.ln-sqr{display:grid;grid-template-columns:88px minmax(0,1fr);gap:8px;align-items:center}
+.ln-sqr>span{font:600 11.5px var(--ds-font,inherit);color:var(--ds-text-2,#b6c8dd);white-space:nowrap}
+.ln-sqr>span em{font-style:normal;color:var(--ds-mut,#8aa2bd);font-weight:500}
+.ln-sqc{display:grid;gap:3px}
+.ln-sqc i{display:grid;place-items:center;aspect-ratio:1/1;border-radius:3px;font:700 10.5px/1 var(--ds-font,inherit);font-style:normal;color:#0b1626;cursor:default;min-width:0;overflow:hidden}
+.ln-sqc i.r{background:#f0506e}.ln-sqc i.y{background:#e8c547}.ln-sqc i.g{background:#26c485}
+.ln-sqc.sm i{border-radius:2px;font-size:0}
+.ln-wps.wide{grid-template-columns:1fr}.ln-wps.wide .ln-sqc{gap:2px}
 .ln-wp{border:1px solid var(--ds-line,rgba(126,178,230,.14));border-radius:10px;padding:10px 12px;background:rgba(4,12,24,.5);min-width:0}
 .ln-wp.rec{border-color:rgba(56,214,255,.5)}
 .ln-wh{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:baseline;margin-bottom:8px}
@@ -2104,16 +2114,14 @@ document.addEventListener("click", function(e){
 #rdeTop{display:none!important}
 #lnFull .hx-top{grid-template-columns:minmax(0,1fr)!important}
 .ln-more .hx-sc{max-width:760px}
-@media (max-width:1280px) and (min-width:761px){.ln-row{grid-template-columns:minmax(170px,220px) minmax(0,1fr) 140px;grid-template-areas:"name bar val" "name g g" "name ait ait"}.ln-ait{border-left:0;padding-left:0}.ln-cols span:nth-child(4){display:none}.ln-cols,.ln-axis{grid-template-columns:minmax(170px,220px) minmax(0,1fr) 140px}}
 @media (max-width:980px){.ln-hero{grid-template-columns:1fr}}
 @media (max-width:760px){
   .ln-in{grid-template-columns:minmax(0,1fr) auto}.ln-facts{grid-column:1/-1}
   #lean #hoDir button{white-space:nowrap}
   .ln-t small i{display:none}
   .ln-trips{grid-template-columns:repeat(5,minmax(0,1fr))}
-  .ln-row{grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"name val" "bar bar" "g g" "ait ait";gap:8px 12px}
-  .ln-ait{border-left:0;padding-left:0;border-top:1px solid var(--ds-line,rgba(126,178,230,.14));padding-top:8px}
-  .ln-cols{display:none}
+  .ln-row{grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"name val" "bar bar" "g g";gap:8px 12px}
+  .ln-sqr{grid-template-columns:58px minmax(0,1fr)}.ln-sqr>span{line-height:1.2}.ln-sqr>span em{display:block;font-size:10.5px}.ln-sqb{padding:12px 10px}
   .ln-in{grid-template-columns:minmax(0,1fr) auto}.ln-in>#lnAitpF{grid-column:1/-1}
   .ln-ht thead{display:none}.ln-ht tr{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"nm ew" "gp gp" "aw tt";gap:6px 12px;padding:10px 8px;border-bottom:1px solid rgba(126,178,230,.1)}
   .ln-ht td{border:0;padding:0}.ln-ht td.nm{grid-area:nm}.ln-ht td.gp{grid-area:gp}.ln-ht td.ew{grid-area:ew;text-align:right;white-space:nowrap}.ln-ht td.ew .ln-ac{flex-wrap:nowrap}.ln-ht td.aw{grid-area:aw;text-align:left;color:var(--ds-text-2,#b6c8dd);font-size:12.5px}.ln-ht td.tt{grid-area:tt;text-align:left;color:var(--ds-text-2,#b6c8dd);font-size:12.5px}
@@ -2157,8 +2165,8 @@ document.addEventListener("click", function(e){
     + '<section class="ln-step" id="lnDecide"><div class="ln-hd"><span class="n">3</span><div class="t"><b>Decide</b><small>The recommended recovery, what to tell the bus captains, and your decision.</small></div></div><div class="ln-res" id="lnDec"></div></section>';
   opt.insertBefore(lean, opt.firstChild);
   var full = document.createElement("details"); full.className = "ln-full"; full.id = "lnFull";
-  full.innerHTML = '<summary>Full analysis <small>where passengers wait longer &middot; how EWT is worked out &middot; off-service route &middot; all tables</small></summary><div class="ln-fbody">'
-    + '<section class="ln-fa" id="lnWhere"></section><section class="ln-fa" id="lnHow"></section>'
+  full.innerHTML = '<summary>Full analysis <small>how EWT is worked out &middot; off-service route &middot; all tables</small></summary><div class="ln-fbody">'
+    + '<section class="ln-fa" id="lnHow"></section>'
     + '<section class="ln-fa" id="lnRouteSec" hidden><h3>Off-service route for the halfway bus</h3><div class="sub">Where the bus joins the route, the roads it takes to get there and whether this bus type can use them.</div></section>'
     + '<details class="ln-more ln-all" id="lnAll"><summary>All tables for analysts <small>4-option board incl. next-departure fix, trip-by-trip table, every EWT point, stress test, simulation map, rules</small></summary></details></div>';
   opt.insertBefore(full, lean.nextSibling);
@@ -2239,19 +2247,12 @@ document.addEventListener("click", function(e){
   $("lnAitpN").addEventListener("input", function(){ clearTimeout(aitpT); aitpT = setTimeout(aitpApply, 700); });
   $("lnAitpN").addEventListener("keydown", function(e){ if(e.key === "Enter"){ e.preventDefault(); clearTimeout(aitpT); aitpApply(); } });
 
-  /* ---------- the passenger pictogram: one figure = one AITP on one trip, coloured by its EWT */
+  /* ---------- EWT bands for the squares: one square = one AITP on one trip */
   var BAND = {g:0.25, r:0.75}, COLR = {r:"#f0506e", y:"#e8c547", g:"#26c485"}, BNAME = {r:"red", y:"yellow", g:"green"};
   function band(v){ return v == null ? null : v <= BAND.g ? "g" : v <= BAND.r ? "y" : "r"; }
   function pts(p){ return ((p && p.ewt && p.ewt.points) || []).filter(function(q){ return q.ewt != null; }); }
   function counts(list){ var c = {r:0, y:0, g:0}; list.forEach(function(q){ c[band(q.ewt)]++; }); return c; }
   function cleanLbl(l){ return String(l || "").replace(/ \((dep|arr)\.\)$/, ""); }
-  function people(list, cols, sorted, aria){
-    var L = sorted ? list.slice().sort(function(a, b){ return "ryg".indexOf(band(a.ewt)) - "ryg".indexOf(band(b.ewt)) || b.ewt - a.ewt; }) : list;
-    var W = 10, Hh = 14, rows = Math.max(1, Math.ceil(L.length / cols)), h = '<svg viewBox="0 0 ' + (cols * W) + ' ' + (rows * Hh) + '" width="' + (cols * W) + '" height="' + (rows * Hh) + '" role="img" aria-label="' + esc(aria || "") + '">';
-    L.forEach(function(q, i){ var x = (i % cols) * W, y = Math.floor(i / cols) * Hh, b = band(q.ewt);
-      h += '<g class="pp ' + b + '" fill="' + COLR[b] + '"><title>' + esc(q.leg + " · " + cleanLbl(q.label) + ": " + f2(q.ewt) + " min extra wait (" + BNAME[b] + ")") + '</title><rect x="' + x + '" y="' + y + '" width="' + W + '" height="' + Hh + '" fill="transparent"/><circle cx="' + (x + 5) + '" cy="' + (y + 3.2) + '" r="2.4"/><path d="M' + (x + 1.6) + ',' + (y + 12.6) + 'v-3.2a3.4,3.4 0 0 1 6.8,0v3.2z"/></g>'; });
-    return h + '</svg>';
-  }
   function cntTxt(c){ return '<span><i class="r"></i><b>' + c.r + '</b> red</span> <span><i class="y"></i><b>' + c.y + '</b> yellow</span> <span><i class="g"></i><b>' + c.g + '</b> green</span>'; }
   function aitpBasis(r){
     var E = r.ewt || {}, A = E.aitp || {}, bal = E.balance_trips || r.balance_trips, n = (E.continue || {}).n_points;
@@ -2291,7 +2292,7 @@ document.addEventListener("click", function(e){
     if(!others.length) return "";
     var o = others.sort(function(a, b){ return red(a) - red(b); })[0], hw = k === "halfway" ? (p.rows || []).filter(function(x){ return x.type === "halfway"; }) : [];
     var before = hw.length ? pts(p).filter(function(q){ return q.L === 0 && band(q.ewt) === "r" && r.pts_up && hw.some(function(x){ return r.pts_up[q.p] < x.j; }); }).length : 0;
-    return '<div class="ln-note">' + NAME[k] + ' still has <b>' + rk + ' red</b> against ' + red(o) + ' with ' + NAME[o].toLowerCase() + (before ? ': ' + before + ' of them are AITPs on UP 1 before ' + esc(hw.map(function(x){ return x.stop; }).join(" / ")) + ', which Trip ' + hw.map(function(x){ return x.n; }).join(" / ") + ' skips' : '') + '. Its average EWT is still the lowest because more AITPs turn green elsewhere &ndash; the average decides.</div>';
+    return '<div class="ln-note">' + NAME[k] + ' still has <b>' + rk + ' red squares</b> against ' + red(o) + ' with ' + NAME[o].toLowerCase() + (before ? ': ' + before + ' of them are AITPs on UP 1 before ' + esc(hw.map(function(x){ return x.stop; }).join(" / ")) + ', which Trip ' + hw.map(function(x){ return x.n; }).join(" / ") + ' skips' : '') + '. Its average EWT is still the lowest because more AITPs turn green elsewhere &ndash; the average decides.</div>';
   }
   function cmpRender(r){
     var el = $("lnCmp");
@@ -2302,10 +2303,7 @@ document.addEventListener("click", function(e){
     var keys = ORDER.filter(function(k){ return P[k] && P[k].ewt; }), vals = keys.map(function(k){ return P[k].ewt.avg; });
     var mx = Math.max.apply(null, vals.map(function(v){ return Math.max(0, v); }).concat([0.01])), lo = Math.min.apply(null, vals), best = keys[vals.indexOf(lo)];
     var C = E.continue || {}, npts = C.n_points || (P.none.ewt.n_points), bal = E.balance_trips || r.balance_trips;
-    var h = '<div class="ln-what">Each option is measured the same way: ' + aitpBasis(r) + ', ' + esc(typeof balSpan === "function" ? balSpan(bal) : "") + '. <a href="#" id="lnHowEwt">How EWT is worked out</a></div>'
-      + '<div class="ln-leg"><span>Each figure = passengers at one AITP on one trip:</span><span><i class="r"></i>Red &gt; ' + f2(BAND.r) + ' min extra wait (about a missed bus)</span><span><i class="y"></i>Yellow ' + f2(BAND.g) + '&ndash;' + f2(BAND.r) + '</span><span><i class="g"></i>Green &le; ' + f2(BAND.g) + ' (close to timetable)</span></div>'
-      + '<div class="ln-cols" aria-hidden="true"><span>OPTION</span><span>AVERAGE EWT &middot; DECIDES</span><span></span><span>AITPs BY EXTRA WAIT</span></div>';
-    var cols = Math.min(26, Math.max.apply(null, keys.map(function(k){ return pts(P[k]).length; }).concat([1])));
+    var h = '<div class="ln-what">Each option is measured the same way: ' + aitpBasis(r) + ', ' + esc(typeof balSpan === "function" ? balSpan(bal) : "") + '. <a href="#" id="lnHowEwt">How EWT is worked out</a></div>';
     if(E.aitp && E.aitp.on && !C.n_points) h += '<div class="ln-stale">None of your ticked AITP stops is on these trips, so there is no EWT to compare. Change the AITP stops under More settings.</div>';
     h += '<div class="ln-bars" role="list">';
     ORDER.forEach(function(k){
@@ -2316,11 +2314,10 @@ document.addEventListener("click", function(e){
       h += '<div class="ln-row' + (rec ? " rec" : "") + '" role="listitem" data-k="' + k + '" title="' + esc(tip) + '"><div class="ln-name"><b>' + NAME[k] + (rec ? ' <span class="ln-chip rec">RECOMMENDED</span>' : '') + (k === best && keys.length > 1 ? ' <span class="ln-chip">LOWEST EWT</span>' : '') + '</b><small>' + planDesc(k, p, r) + '</small></div>'
         + '<div class="ln-bar" aria-hidden="true"><i style="width:' + Math.max(0.6, 100 * Math.max(0, v) / mx).toFixed(1) + '%"></i></div>'
         + '<div class="ln-val"><b>' + f2(v) + '</b>min' + (d != null ? '<em class="' + (d < -0.005 ? "dn" : d > 0.005 ? "up" : "") + '">' + (d < -0.005 ? "▼ " + f2(-d) + " min" + (pct != null ? " (" + pct + "%)" : "") + " vs no action" : d > 0.005 ? "▲ " + f2(d) + " min vs no action" : "same as no action") + '</em>' : '<em>the baseline</em>') + '</div>'
-        + '<div class="ln-g"><span>Max gap ' + f0(p.det.max) + ' min</span><span>' + ((p.det.km || 0) > 0 ? f1(p.det.km) + ' km not run' : 'no km lost') + '</span></div>'
-        + (function(){ var L = pts(p), c = counts(L); return '<div class="ln-ait">' + people(L, cols, true, NAME[k] + ": " + c.r + " red, " + c.y + " yellow, " + c.g + " green AITP checks") + '<div class="ln-ac">' + cntTxt(c) + '</div></div>'; })() + '</div>';
+        + '<div class="ln-g"><span>Max gap ' + f0(p.det.max) + ' min</span><span>' + ((p.det.km || 0) > 0 ? f1(p.det.km) + ' km not run' : 'no km lost') + '</span></div></div>';
     });
-    h += '</div><div class="ln-axis" aria-hidden="true"><span></span><div><span>0</span><span>' + f2(mx) + ' min</span></div><span></span><span></span></div>';
-    h += redNote(r);
+    h += '</div><div class="ln-axis" aria-hidden="true"><span></span><div><span>0</span><span>' + f2(mx) + ' min</span></div><span></span></div>';
+    h += squares(r) + redNote(r);
     h += ruleBox(r);
     el.innerHTML = h;
     var a = $("lnHowEwt"); if(a) a.onclick = function(e){ e.preventDefault(); openFull("lnHow"); };
@@ -2383,33 +2380,27 @@ document.addEventListener("click", function(e){
   }
 
   /* ---------- full analysis, short: where and when passengers wait longer, one worked EWT example, the off-service route */
-  function whereRender(r){
-    var el = $("lnWhere");
-    if(!r || !r.ok || !r.plans || !r.plans.none){ el.innerHTML = '<h3>Where and when passengers wait longer</h3><div class="sub">Appears after <b>Compare options</b>.</div>'; return; }
-    var P = r.plans, keys = ORDER.filter(function(k){ return P[k] && P[k].ewt; });
+  function squares(r){                                         // every AITP, trip by trip, in each trip's own direction of travel: one coloured square per AITP
+    var P = r.plans, keys = ORDER.filter(function(k){ return P[k] && P[k].ewt; }); if(!keys.length) return "";
     var legs = []; keys.forEach(function(k){ pts(P[k]).forEach(function(q){ if(legs.indexOf(q.leg) < 0) legs.push(q.leg); }); });
-    var mx = Math.max.apply(null, keys.map(function(k){ var c = {}; pts(P[k]).forEach(function(q){ c[q.leg] = (c[q.leg] || 0) + 1; }); return Math.max.apply(null, Object.keys(c).map(function(x){ return c[x]; }).concat([1])); }));
-    var h = '<h3>Where and when passengers wait longer</h3><div class="sub">One row per trip of every bus, AITPs from the first stop (left) to the last (right). Same colours as step 2; hover a figure for the stop and its EWT.</div><div class="ln-wps">';
+    var mx = 1; keys.forEach(function(k){ var c = {}; pts(P[k]).forEach(function(q){ c[q.leg] = (c[q.leg] || 0) + 1; mx = Math.max(mx, c[q.leg]); }); });
+    var big = mx <= 10, d1 = +(r.direction || HO.dir), d2 = retDir(), j = HO.setup || {}, first = (r.route && r.route.first) || j.first || "first stop", last = (r.route && r.route.last) || j.last || "last stop";
+    var dirOf = function(lg){ return /^UP/.test(lg) ? d1 : d2; }, arrow = function(lg){ return /^UP/.test(lg) ? "→" : "←"; };
+    var h = '<div class="ln-sqb"><h4>Every AITP, trip by trip</h4><div class="sub">One square = one AITP on one trip, coloured by its EWT' + (big ? ' (the number in it)' : ' (hover for the stop and value)') + ': <span class="ln-ac" style="display:inline-flex;margin:0"><span><i class="r"></i>red &gt; ' + f2(BAND.r) + ' min, about a missed bus</span> <span><i class="y"></i>yellow ' + f2(BAND.g) + '&ndash;' + f2(BAND.r) + '</span> <span><i class="g"></i>green &le; ' + f2(BAND.g) + ', close to timetable</span></span></div>'
+      + '<div class="ln-dirs"><span><b>Dir ' + d1 + ' →</b> ' + esc(first) + ' to ' + esc(last) + '</span><span><b>Dir ' + d2 + ' ←</b> ' + esc(last) + ' back to ' + esc(first) + '</span><span>Squares run in the direction of travel: left = where that trip starts.</span></div><div class="ln-wps' + (big ? "" : " wide") + '">';
     keys.forEach(function(k){ var L = pts(P[k]), c = counts(L);
-      h += '<div class="ln-wp' + (r.decision === k ? " rec" : "") + '"><div class="ln-wh"><b>' + NAME[k] + (r.decision === k ? ' <span class="ln-chip rec">RECOMMENDED</span>' : '') + '</b><span>average ' + f2(P[k].ewt.avg) + ' min &middot; ' + c.r + ' red &middot; ' + c.y + ' yellow &middot; ' + c.g + ' green</span></div>';
+      h += '<div class="ln-wp' + (r.decision === k ? " rec" : "") + '" data-k="' + k + '"><div class="ln-wh"><b>' + NAME[k] + (r.decision === k ? ' <span class="ln-chip rec">RECOMMENDED</span>' : '') + '</b><span class="ln-ac" style="margin:0">' + cntTxt(c) + '</span></div><div class="ln-sqg">';
       legs.forEach(function(lg){ var row = L.filter(function(q){ return q.leg === lg; }); if(!row.length) return;
-        h += '<div class="ln-wr"><span>' + esc(lg) + '</span>' + people(row, mx, false, NAME[k] + " " + lg).replace('<svg ', '<svg preserveAspectRatio="xMinYMid meet" style="max-width:' + (mx * 26) + 'px" ') + '</div>'; });
-      h += '</div>'; });
-    el.innerHTML = h + '</div>';
+        h += '<div class="ln-sqr"><span>' + esc(lg) + ' <em>Dir ' + dirOf(lg) + ' ' + arrow(lg) + '</em></span><div class="ln-sqc' + (big ? "" : " sm") + '" style="grid-template-columns:repeat(' + mx + ',minmax(0,1fr));max-width:' + (mx * (big ? 46 : 28)) + 'px">'
+          + row.map(function(q){ var b = band(q.ewt); return '<i class="' + b + '" title="' + esc(lg + " · Dir " + dirOf(lg) + " · " + cleanLbl(q.label) + ": " + f2(q.ewt) + " min extra wait (" + BNAME[b] + ")") + '">' + (big ? f2(q.ewt).replace(/^(-?)0\./, "$1.") : "") + '</i>'; }).join("") + '</div></div>'; });
+      h += '</div></div>'; });
+    return h + '</div></div>';
   }
   function howRender(r){
     var el = $("lnHow");
     if(!r || !r.ok || !r.plans || !r.plans.none){ el.innerHTML = '<h3>How EWT is worked out</h3><div class="sub">Appears after <b>Compare options</b>.</div>'; return; }
-    var P = r.plans, keys = ORDER.filter(function(k){ return P[k] && P[k].ewt; }), all = pts(P.none);
-    var q0 = all.filter(function(q){ return q.L === 0 && !/\(arr\.\)$/.test(q.label); }).sort(function(a, b){ return b.ewt - a.ewt; })[0] || all[0]; if(!q0){ el.innerHTML = ""; return; }     // the worst boarding AITP on UP 1
-    var at = function(k){ return (P[k].ewt.points || []).filter(function(q){ return q.L === q0.L && q.p === q0.p; })[0]; }, H = r.H, bm = (r.params && r.params.bunch_min) || 3;
-    var h = '<h3>How EWT is worked out &ndash; one AITP</h3><p class="ln-hp">At <b>' + esc(cleanLbl(q0.label)) + '</b> on <b>' + esc(q0.leg) + '</b> buses are due every <b>' + f1(H) + ' min</b>, so a passenger should wait about <b>' + f2(at("none") ? at("none").swt : H / 2) + ' min</b> (half the gap). Uneven gaps make the real average wait longer, because more people turn up during a long gap and all of them wait longer. <b>EWT = real average wait &minus; timetable wait.</b></p>';
-    h += '<div class="tw"><table class="ln-ht"><thead><tr><th>Option</th><th>Gaps between the buses (min)</th><th style="text-align:right">Average wait</th><th style="text-align:right">Timetable</th><th style="text-align:right">EWT</th></tr></thead><tbody>';
-    keys.forEach(function(k){ var q = at(k); if(!q) return; var b = band(q.ewt);
-      h += '<tr class="' + (r.decision === k ? "rec" : "") + '"><td class="nm"><b>' + NAME[k] + '</b></td><td class="gp"><div class="ln-gaps">' + (q.h || []).map(function(x){ var g = x[1]; return '<span class="' + (g >= 1.5 * H || g < bm ? "x" : "") + '">' + f1(g) + '</span>'; }).join("") + '</div></td>'
-        + '<td class="n aw">' + f2(q.awt) + ' min</td><td class="n tt">&minus; ' + f2(q.swt) + '</td><td class="n ew"><span class="ln-ac" style="display:inline-flex;margin:0"><span><i class="' + b + '"></i><b>' + f2(q.ewt) + ' min</b></span></span></td></tr>'; });
-    h += '</tbody></table></div><p class="ln-hn">Amber gaps are long (&ge; 1.5&times; the headway) or bunched (&lt; ' + f1(bm) + ' min). Step 2 shows the average EWT over all ' + (((r.ewt || {}).continue || {}).n_points || all.length) + ' checks. For analysts: average wait = &Sigma;gap&sup2; &divide; (2 &times; &Sigma;gap); every table is under <i>All tables for analysts</i>.</p>';
-    el.innerHTML = h;
+    var calc = ""; try{ calc = typeof stEwtCalc === "function" ? stEwtCalc(r) : ""; }catch(e){ calc = ""; }
+    el.innerHTML = '<h3>How EWT is worked out</h3><p class="ln-hp">At each AITP: <b>EWT = average wait with the real gaps between buses &minus; average wait the timetable promises</b> (half the headway when buses are evenly spaced). A long gap counts more because more passengers turn up during it and all of them wait longer. Step 1 below is one AITP; step 2 is the average over every AITP on every trip &ndash; the number used in the comparison.</p>' + calc;
   }
 
   /* ---------- keep the steps in step with the page */
@@ -2421,7 +2412,7 @@ document.addEventListener("click", function(e){
     var st = r && HO.recStale ? '<div class="ln-stale">Inputs changed since this result &ndash; press <b>Compare options</b> to update it.</div>' : "";
     if(LOADING && r === LOADING.prev){ return; }
     LOADING = null;
-    cmpRender(r); decRender(r); whereRender(r); howRender(r); aitpTxt();
+    cmpRender(r); decRender(r); howRender(r); aitpTxt();
     $("lnRouteSec").hidden = !(r && r.ok && r.decision === "halfway");
     if(st){ $("lnCmp").insertAdjacentHTML("afterbegin", st); }
     if(r && r !== lastRec && r.ok){ lastRec = r; setTimeout(function(){ var c = $("lnCompare"), b = c.getBoundingClientRect(); if(b.top < 0 || b.top > innerHeight * .6) c.scrollIntoView({behavior:"smooth", block:"start"}); }, 60); }
