@@ -1071,6 +1071,7 @@ import sqlite3
 import contextlib
 from collections import deque
 import bunching
+import bunching_analytics
 
 BB_DB = os.getenv("BUNCHING_DB", str(HERE / "bunching.db"))
 BB_DEFAULT = os.getenv("BUNCHING_SERVICES", "32,145,65,33,51,74,89,200,27,157")
@@ -2254,6 +2255,38 @@ async def api_bb_events(limit: int = 100):
     closed = bb_sql("SELECT 'bb' AS kind, service, direction, start_ts AS start, end_ts AS end, bus_group AS buses, max_level AS level, stops, min_hw, NULL AS max_hw, start_stop, end_stop, start_stop AS location, alerts FROM bunching_event "
                     "UNION ALL SELECT 'gap', service, direction, start_ts, end_ts, buses, NULL, stops, NULL, max_hw, start_stop, end_stop, location, alerts FROM gap_event ORDER BY start DESC LIMIT ?", (limit,), fetch=True)
     return {"events": bb_open_public() + closed, "db_ok": BB["db_ok"], "min_stops": {"bunching": int(BB["params"]["confirm_stops"]), "gap": int(BB["params"]["gap_stops"])}}
+
+
+# Bunching & Gap analytics: top services, hour of day, weekday x hour, daily trend, hotspot roads / stops - all from the LOGGED events
+# (bunching_event / gap_event + cases still open). Read-only; nothing is estimated. Aggregation lives in bunching_analytics.py.
+_BB_AN_SQL = ("SELECT 'bb' AS kind, service, direction, start_ts AS start, end_ts AS end, max_level AS level, stops, start_stop, end_stop, alerts FROM bunching_event WHERE start_ts >= ? AND start_ts < ? "
+              "UNION ALL SELECT 'gap', service, direction, start_ts, end_ts, NULL, stops, COALESCE(start_stop, location), end_stop, alerts FROM gap_event WHERE start_ts >= ? AND start_ts < ?")
+
+
+@app.get("/api/bunching/analytics")
+async def api_bb_analytics(period: str = "7d", kind: str = "all", direction: int = 0, service: str = "", operator: str = ""):
+    p = bunching_analytics.period_bounds(period, time.time())
+    cur = bb_sql(_BB_AN_SQL, (p["start"], p["end"], p["start"], p["end"]), fetch=True)
+    prev = bb_sql(_BB_AN_SQL, (p["prev_start"], p["prev_end"], p["prev_start"], p["prev_end"]), fetch=True)
+    for e in bb_open_public():                                                       # cases still running (already long enough to be logged)
+        cur.append({"kind": e["kind"], "service": e["service"], "direction": e["direction"], "start": e["start"], "end": None, "level": e.get("level"),
+                    "stops": e.get("stops"), "start_stop": e.get("start_stop") or e.get("location"), "end_stop": e.get("end_stop"), "alerts": e.get("alerts"), "open": True})
+    try:
+        stops = (await static()).get("stops") or {}
+    except Exception:
+        stops = {}
+    opmap = {}
+    if operator:
+        try:
+            opmap = await occ_operator_map()
+        except Exception:
+            opmap = {}
+    out = bunching_analytics.aggregate(cur, prev, stops, p, kind=kind if kind in ("bb", "gap") else "all", direction=direction if direction in (1, 2) else 0,
+                                       service=re.sub(r"[^0-9A-Za-z]", "", service)[:6], operator=operator.strip().upper()[:6], opmap=opmap)
+    first = bb_sql("SELECT MIN(t) AS t FROM (SELECT MIN(start_ts) AS t FROM bunching_event UNION ALL SELECT MIN(start_ts) FROM gap_event)", fetch=True)
+    out.update(db_ok=BB["db_ok"], db_err=BB["db_err"], first_ts=(first[0]["t"] if first else None), always_on=BB_ALWAYS,
+               gate={"bunching": int(BB["params"]["confirm_stops"]), "gap": int(BB["params"]["gap_stops"])})
+    return out
 
 
 # =========================================================================== AI Halfway Optimiser
