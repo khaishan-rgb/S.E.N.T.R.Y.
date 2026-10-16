@@ -60,6 +60,12 @@ PARAMS = {
     "early_probe": 4,         # always also check this many earlier diversion starts (to prove or disprove an early turn-off)
     "early_window_m": 3000.0,  # ...and every stop back to the start of the route (e.g. an interchange) within this distance
     "impossible_turn_deg": 165.0,
+    # V16.23 late exit: when the bus runs a long stretch with no stop before the blockage (an expressway such as the BKE),
+    # also ask the routing engine from points further along that stretch, nearest the blockage first, so the bus can stay
+    # on its normal route and leave at the last practical exit instead of at the last stop kilometres earlier
+    "late_exit_gap_m": 1200.0,                                              # only for a stretch at least this long
+    "late_exit_back_m": (150.0, 400.0, 800.0, 1300.0, 2000.0, 3000.0, 4500.0, 6500.0, 9000.0),   # probe points: this far before the blockage
+    "late_exit_batch": 3,                                                   # asked 3 at a time; stop at the first batch that works
 }
 
 TURN_WORDS = [(20, "STRAIGHT"), (60, "SLIGHT"), (120, ""), (165, "SHARP")]
@@ -191,8 +197,10 @@ def bc_sentence(m, instr):
         else:
             bits.append(f"{words.get(x['turn'], x['turn'].lower())} {road}")
     start = f"After {m['leave_name']} ({m['leave_code']})" if not m.get("free_start") else f"Leave {m['leave_name']} ({m['leave_code']})"
+    if m.get("keep_km", 0.0) >= 0.5 and not m.get("free_start"):           # V16.23 late exit: say where the bus really turns off
+        start += f", stay on the normal route for {m['keep_km']:.1f} km" + (f" ({m['keep_road']})" if m.get("keep_road") else "") + ", then"
     body = ", ".join(bits) if bits else "follow the diversion"
-    return f"{start}, {body} and resume the normal route at {m['rejoin_name']} ({m['rejoin_code']})."
+    return f"{start}{' ' if start.endswith(' then') else ', '}{body} and resume the normal route at {m['rejoin_name']} ({m['rejoin_code']})."
 
 
 def impossible_turn(instr, P=PARAMS):
@@ -285,7 +293,9 @@ def why_this(best, ctx_m):
         out.append(f"Earlier diversion point needed: no practical escape after {ctx_m['ia_name']}, so the bus leaves after {m['leave_name']}")
     if m.get("free_start"):
         out.append(f"Leaves {m['leave_name']} by a different exit \u2014 the normal exit leads straight into the blockage")
-    if m.get("probe"):
+    if m.get("probe") and m.get("keep_km", 0.0) >= 1.0:
+        out.append(f"Stays on the normal route for {m['keep_km']:.1f} km past {m['leave_name']} and turns off at the last practical exit before the blockage")
+    elif m.get("probe"):
         out.append("Keeps to the normal route past the stop and turns off at a later junction (the immediate turn-off does not work)")
     if m["preserved_vs_early"] > 0:
         out.append(f"Preserves {m['preserved_vs_early']} more original stop(s) than the earliest diversion checked")

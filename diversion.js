@@ -424,7 +424,7 @@
     h += '<dl class="dp-kv">'
       + (earlier ? '<dt>Last reachable stop</dt><dd>' + esc(lr.code) + ' ' + esc(lr.name) + ' <span style="color:#ffd391">\u2014 no practical escape after it</span></dd>' : '')
       + '<dt>Last normal stop served</dt><dd><b>' + esc(c.leave.code) + '</b> ' + esc(c.leave.name) + '</dd>'
-      + '<dt>Diversion begins</dt><dd>after ' + esc(c.leave.name) + '</dd></dl>'
+      + '<dt>Diversion begins</dt><dd>' + (c.keep_km >= 0.5 ? '<b>' + f1(c.keep_km) + ' km after ' + esc(c.leave.name) + '</b> \u2014 stays on the normal route' + (c.keep_road ? ' (' + esc(c.keep_road) + ')' : '') + ' and turns off at the last practical exit before the blockage' : 'after ' + esc(c.leave.name)) + '</dd></dl>'
       + '<div class="dp-k">Recommended roads</div><ul class="dp-chain">' + c.roads.map(function(r, i){ return (i ? '<li class="ar">\u2192</li>' : '') + '<li>' + esc(r) + '</li>'; }).join("") + '<li class="ar">\u2192</li><li class="rj">\u21aa ' + esc(c.rejoin.name) + '</li></ul>'
       + (c.dd_chain ? '<div class="dp-k">Stop to stop on double-deck services</div><ul class="dp-ddleg">' + c.dd_chain.legs.map(function(l){
           return '<li><span class="sv">' + (l.own ? esc(x.service) + ' own' : esc(l.svc)) + '</span><span class="tx">' + esc(l.from) + ' ' + esc(tc(l.from_name)) + ' \u2192 ' + esc(l.to) + ' ' + esc(tc(l.to_name)) + ' <span class="dp-muted">(' + l.stops + ' stop' + (l.stops === 1 ? '' : 's') + ', ' + f1(l.km) + ' km)</span></span></li>'; }).join("")

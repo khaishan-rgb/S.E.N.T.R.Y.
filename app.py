@@ -9481,6 +9481,13 @@ async def dv2_plan(st, blocks, svc, d, run_i, traffic=True):
         pts = [stop_s[i] + off for off in (150.0, 300.0, 450.0) if stop_s[i] + off < lim]
         return sorted(pts, reverse=True)
 
+    def late_exits(i):
+        """V16.23: points along a long stop-less stretch after stop i (latest first), short of the blockage"""
+        lim = min(A - P["block_end_margin_m"] - 25.0, (stop_s[i + 1] - 20.0) if i + 1 < len(stop_s) else 1e18)
+        if lim - stop_s[i] < Q["late_exit_gap_m"]:
+            return []
+        return [lim - back for back in Q["late_exit_back_m"] if lim - back > stop_s[i] + 450.0]
+
     async def eval_pair(i, j):
         routes, err = await route_between_stops(ctx, i, j)
         routes = [(r, None) for r in routes]
@@ -9503,6 +9510,18 @@ async def dv2_plan(st, blocks, svc, d, run_i, traffic=True):
             else:
                 cand_routes = list(routes)
             await eval_routes(i, j, cand_routes, ok, reasons)
+        # V16.23 late exit: a long stretch with no stop between this stop and the blockage (an expressway) - also try staying on
+        # the normal route and leaving at a later exit; nearest the blockage first, 3 at a time, stop at the first batch that works
+        late = late_exits(i)
+        for b_ in range(0, len(late), Q["late_exit_batch"]):
+            batch = late[b_:b_ + Q["late_exit_batch"]]
+            got = await asyncio.gather(*[route_between_stops(ctx, i, j, s0) for s0 in batch])
+            more = [(r, s0) for s0, (rr, _) in zip(batch, got) for r in rr]
+            routes += more
+            k0 = len(ok)
+            await eval_routes(i, j, more, ok, reasons)
+            if len(ok) > k0:
+                break
         if ok:
             res, reason = "valid", f"{len(ok)} valid route(s)" + (" \u2014 found by continuing on the normal route to a later junction" if any(c.get("probe") for c in ok) else "")
         elif not routes:
@@ -9575,7 +9594,9 @@ async def dv2_plan(st, blocks, svc, d, run_i, traffic=True):
              "route_conf": (1.0 if str(r.get("router", "")).startswith("TomTom") else 0.8) - (0.2 if c["evidence"]["level"] == 3 else 0.0),
              "next_ok": bool(c["next_leg"]["ok"]), "next_name": c["next_leg"]["next_name"], "next_code": c["next_leg"]["next_code"],
              "instructions": c["instr"], "router": r.get("router", ""), "probe": bool(c.get("probe")), "free_start": bool(c.get("exit_differs")),
-             "bc": cx, "bc_label": cx["label"], "bc_points": cx["points"], "roads": cx["roads"], "leave_before_m": round(max(0.0, A - leave_s))}
+             "bc": cx, "bc_label": cx["label"], "bc_points": cx["points"], "roads": cx["roads"], "leave_before_m": round(max(0.0, A - leave_s)),
+             "keep_km": round(max(0.0, leave_s - stop_s[li]) / 1000.0, 1) if c.get("probe") else 0.0,          # V16.23: on the normal route past the stop
+             "keep_road": dv2_title(((r.get("steps") or [{}])[0].get("road") or "")) if c.get("probe") else ""}
         fp = dv2.footprint(m)
         m.update(footprint_label=fp["label"], footprint_index=fp["index"], footprint_score=fp["score"])
         m["warnings"], m["penalty"] = dv2.safeguards(m, limits)
@@ -9649,7 +9670,9 @@ async def dv2_plan(st, blocks, svc, d, run_i, traffic=True):
                 "leave": {"code": m["leave_code"], "name": m["leave_name"]}, "rejoin": {"code": m["rejoin_code"], "name": m["rejoin_name"]},
                 "next": {"code": m["next_code"], "name": m["next_name"], "ok": m["next_ok"]},
                 "roads": [dv2_title(g["road"]) for g in c["groups"] if g.get("road")], "instructions": m["instructions"],
-                "instruction_text": dv2.instruction_text(m["instructions"], m["rejoin_name"]),
+                "instruction_text": ([f"STAY on the normal route {m['keep_km']:.1f} km" + (f" ({m['keep_road']})" if m.get("keep_road") else "")] if m.get("keep_km", 0.0) >= 0.5 else [])
+                                    + dv2.instruction_text(m["instructions"], m["rejoin_name"]),
+                "keep_km": m.get("keep_km", 0.0), "keep_road": m.get("keep_road", ""),
                 "skipped": m["skipped"], "skipped_n": m["skipped_n"], "unavoidable": m["unavoidable"], "extra_skipped": m["extra_skipped"],
                 "div_km": m["div_km"], "normal_km": m["normal_km"], "added_km": m["added_km"], "added_min": m["added_min"],
                 "turns": m["turns"], "sharp": m["sharp"], "earlier": m["earlier"], "router": m["router"],
