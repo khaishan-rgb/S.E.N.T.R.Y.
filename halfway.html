@@ -2101,6 +2101,16 @@ document.addEventListener("click", function(e){
 .ln-sqc i.rl,.ln-ac i.rl{background:#f0506e}.ln-sqc i.dl,.ln-ac i.dl{background:#9f1239;color:#fff}.ln-sqc i.x,.ln-ac i.x{background:rgba(126,178,230,.12);color:var(--ds-faint,#5f7690)}
 .ln-hwt{display:flex;align-items:center;gap:8px 12px;flex-wrap:wrap;margin:0 0 10px;font-size:12.5px;color:var(--ds-mut,#8aa2bd)}.ln-hwt .ds-segm button{height:28px;font-size:12px;padding:0 10px}.ln-hwt .m{color:var(--ds-text-2,#b6c8dd);font-weight:600}
 .ln-fx{display:grid;grid-template-columns:1fr;gap:12px;margin-top:12px}
+.ln-sqc b.avg{display:grid;place-items:center;border-radius:6px;font:800 11.5px/1 var(--ds-font,inherit);color:#0b1626;margin-left:8px;min-height:100%;font-variant-numeric:tabular-nums;box-shadow:inset 0 0 0 2px rgba(255,255,255,.35)}
+.ln-sqc b.avg.r{background:#f0506e}.ln-sqc b.avg.y{background:#e8c547}.ln-sqc b.avg.g{background:#26c485}.ln-sqc b.avg.n{background:rgba(126,178,230,.14);color:var(--ds-text-2,#b6c8dd)}
+.ln-sqc b.avg.bs{background:#2563eb;color:#fff}.ln-sqc b.avg.ls{background:#93c5fd}.ln-sqc b.avg.ok{background:#26c485}.ln-sqc b.avg.rl{background:#f0506e}.ln-sqc b.avg.dl{background:#9f1239;color:#fff}
+.ln-sqhd .ln-sqc em{font:700 9.5px var(--ds-font,inherit);letter-spacing:.08em;text-transform:uppercase;color:var(--ds-mut,#8aa2bd);text-align:center;margin-left:8px;white-space:nowrap;font-style:normal}
+.ln-sqhd{margin-bottom:-1px}
+.ln-sqc .n0{display:none}
+.ln-fin{margin-top:4px;padding-top:6px;border-top:1px solid rgba(126,178,230,.18)}
+.ln-fin>span{color:#fff!important;font-weight:700!important}
+.ln-fin .fl{align-self:center;justify-self:end;font-size:11.5px;color:var(--ds-text-2,#b6c8dd);text-align:right;padding-right:2px;line-height:1.25}
+.ln-sqc b.avg.big{font-size:13.5px;min-height:34px;box-shadow:inset 0 0 0 2px rgba(255,255,255,.75)}
 .ln-pcw{margin-top:8px;padding-top:8px;border-top:1px dashed rgba(126,178,230,.22)}
 .ln-pc{display:grid;gap:4px;font-size:12.5px;color:var(--ds-text-2,#b6c8dd);line-height:1.45}.ln-pc b{color:#fff}
 .ln-pc .ln-gaps{gap:3px}.ln-pc .ln-gaps i{font-style:normal;font-size:11.5px;font-weight:700;min-width:26px;text-align:center;padding:1px 4px;border-radius:4px;color:#0b1626}
@@ -2142,6 +2152,8 @@ document.addEventListener("click", function(e){
   #lean #hoDir button{white-space:nowrap}
   .ln-row{grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"name val" "bar bar" "g g";gap:8px 12px}
   .ln-fx{grid-template-columns:1fr}
+  .ln-sqc.many .d{display:none}.ln-sqc.many .n0{display:inline}
+  .ln-sqhd .ln-sqc em{font-size:8px;letter-spacing:0;margin-left:4px}.ln-sqc b.avg{margin-left:4px;font-size:10.5px}
   .ln-sqr{grid-template-columns:58px minmax(0,1fr)}.ln-sqr>span{line-height:1.2}.ln-sqr>span em{display:block;font-size:10.5px}.ln-sqb{padding:12px 10px}
   .ln-in{grid-template-columns:minmax(0,1fr) auto}
   .ln-ht thead{display:none}.ln-ht tr{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"nm ew" "gp gp" "aw tt";gap:6px 12px;padding:10px 8px;border-bottom:1px solid rgba(126,178,230,.1)}
@@ -2257,6 +2269,7 @@ document.addEventListener("click", function(e){
   /* ---------- EWT bands for the squares: one square = one AITP on one trip */
   var BAND = {g:0.25, r:0.75}, COLR = {r:"#f0506e", y:"#e8c547", g:"#26c485"}, BNAME = {r:"red", y:"yellow", g:"green"};
   function band(v){ return v == null ? null : v <= BAND.g ? "g" : v <= BAND.r ? "y" : "r"; }
+  function avgE(p){ var L = pts(p); return L.length ? L.reduce(function(a, q){ return a + q.ewt; }, 0) / L.length : (p && p.ewt ? p.ewt.avg : null); }     // = the squares' average (no double rounding)
   function pts(p){ return ((p && p.ewt && p.ewt.points) || []).filter(function(q){ return q.ewt != null; }); }
   function counts(list){ var c = {r:0, y:0, g:0}; list.forEach(function(q){ c[band(q.ewt)]++; }); return c; }
   function cleanLbl(l){ return String(l || "").replace(/ \((dep|arr)\.\)$/, ""); }
@@ -2276,7 +2289,7 @@ document.addEventListener("click", function(e){
   }
   function ruleBox(r){
     var P = r.plans, N = P.none, A = P.adjust, pr = r.params || {}, sims = Number(r.sims || 1000).toLocaleString();
-    var aGain = N.ewt && A.ewt ? N.ewt.avg - A.ewt.avg : null, aMin = pr.ewt_adjust_min != null ? pr.ewt_adjust_min : 0.05, aOk = r.full_choice === "adjust";
+    var aGain = N.ewt && A.ewt ? avgE(N) - avgE(A) : null, aMin = pr.ewt_adjust_min != null ? pr.ewt_adjust_min : 0.05, aOk = r.full_choice === "adjust";
     var li = function(cls, txt, res){ return '<li class="' + cls + '"><i>' + (cls === "p" ? "✓" : cls === "f" ? "✗" : "–") + '</i><div>' + txt + (res ? '<div class="res">' + res + '</div>' : '') + '</div></li>'; };
     var h = '<div class="ln-rule"><h4>DECISION RULE &middot; THE SAME EVERY TIME &middot; CHOOSE THE SIMPLEST OPTION THAT CUTS EWT ENOUGH</h4><ol>';
     h += li(aOk ? "p" : "f", '<b>Trip adjustment</b> beats no action only if it cuts EWT by at least <b>' + f2(aMin) + ' min</b>.',
@@ -2306,8 +2319,8 @@ document.addEventListener("click", function(e){
     if(!r){ el.innerHTML = '<div class="ln-empty">' + (HO.svc ? "Type how late each trip is, then press <b>Compare options</b>. No action, Trip adjustment and Halfway deployment are simulated over the next trips and ranked by EWT." : "Enter a service first.") + '</div>'; return; }
     if(!r.ok){ el.innerHTML = '<div class="ln-empty hx-err">' + esc(r.error || "The comparison failed.") + '</div>'; return; }
     if(!r.plans || !r.plans.none){ el.innerHTML = '<div class="ln-empty"><b style="color:#fff">No recovery needed.</b> ' + esc(r.message || (r.why || [])[0] || "No trip would leave the first stop late.") + '</div>'; return; }
-    var P = r.plans, E = r.ewt || {}, base = P.none.ewt ? P.none.ewt.avg : null;
-    var keys = ORDER.filter(function(k){ return P[k] && P[k].ewt; }), vals = keys.map(function(k){ return P[k].ewt.avg; });
+    var P = r.plans, E = r.ewt || {}, base = P.none.ewt ? avgE(P.none) : null;
+    var keys = ORDER.filter(function(k){ return P[k] && P[k].ewt; }), vals = keys.map(function(k){ return avgE(P[k]); });
     var mx = Math.max.apply(null, vals.map(function(v){ return Math.max(0, v); }).concat([0.01])), lo = Math.min.apply(null, vals), best = keys[vals.indexOf(lo)];
     var C = E.continue || {}, npts = C.n_points || (P.none.ewt.n_points), bal = E.balance_trips || r.balance_trips;
     var h = '<div class="ln-what">Each option is measured the same way: ' + aitpBasis(r) + ', ' + esc(typeof balSpan === "function" ? balSpan(bal) : "") + '. <b>Average EWT = &Sigma; EWT of every AITP check &divide; number of checks.</b> <a href="#" id="lnHowEwt">How EWT is worked out</a></div>';
@@ -2316,7 +2329,7 @@ document.addEventListener("click", function(e){
     ORDER.forEach(function(k){
       var p = P[k];
       if(!p || !p.ewt){ h += '<div class="ln-row off" role="listitem"><div class="ln-name"><b>' + NAME[k] + '</b><small>' + (k === "halfway" ? "Not possible: no halfway stop can be reached in time." : "Not simulated in this run.") + '</small></div><div class="ln-bar"></div><div class="ln-val">&ndash;</div></div>'; return; }
-      var v = p.ewt.avg, rec = r.decision === k, d = base != null && k !== "none" ? v - base : null, pct = d != null && base > 0.005 ? Math.round(100 * -d / base) : null;
+      var v = avgE(p), rec = r.decision === k, d = base != null && k !== "none" ? v - base : null, pct = d != null && base > 0.005 ? Math.round(100 * -d / base) : null;
       var tip = NAME[k] + ": average EWT " + f2(v) + " min · max gap " + f0(p.det.max) + " min · " + ((p.det.km || 0) > 0 ? f1(p.det.km) + " km not run" : "no km lost") + (p.mc && p.mc.ewt_p85 != null ? " · stress test P85 " + f2(p.mc.ewt_p85) + " min" : "");
       h += '<div class="ln-row' + (rec ? " rec" : "") + '" role="listitem" data-k="' + k + '" title="' + esc(tip) + '"><div class="ln-name"><b>' + NAME[k] + (rec ? ' <span class="ln-chip rec">RECOMMENDED</span>' : '') + (k === best && keys.length > 1 ? ' <span class="ln-chip">LOWEST EWT</span>' : '') + '</b><small>' + planDesc(k, p, r) + '</small></div>'
         + '<div class="ln-bar" aria-hidden="true"><i style="width:' + Math.max(0.6, 100 * Math.max(0, v) / mx).toFixed(1) + '%"></i></div>'
@@ -2358,16 +2371,16 @@ document.addEventListener("click", function(e){
     var el = $("lnDec");
     if(!r || !r.ok){ el.innerHTML = '<div class="ln-empty">The recommendation appears here after <b>Compare options</b>.</div>'; return; }
     if(!r.plans || !r.plans.none){ el.innerHTML = '<div class="ln-pick"><div class="k">RECOMMENDED</div><h3>No action needed</h3><p>' + esc(r.message || "Every trip leaves on time.") + '</p></div>'; return; }
-    var P = r.plans, k = r.decision, p = P[k], N = P.none, base = N.ewt ? N.ewt.avg : null, v = p.ewt ? p.ewt.avg : null;
+    var P = r.plans, k = r.decision, p = P[k], N = P.none, base = N.ewt ? avgE(N) : null, v = p.ewt ? avgE(p) : null;
     var hw = (p.rows || []).filter(function(x){ return x.type === "halfway"; }), adj = p.n_adjusted || 0;
     var head = k === "halfway" ? hw.map(function(x){ return "Start Trip " + x.n + " halfway at " + esc(x.stop) + (x.code ? " (" + esc(x.code) + ")" : "") + " at " + esc(x.start_clock); }).join("<br>")
       : k === "adjust" ? "Keep every trip in full; hold or release " + adj + " departure" + (adj !== 1 ? "s" : "") : "Keep the natural departures &ndash; no change needed";
     var sub = k === "halfway" ? hw.map(function(x){ return (x.leave_clock ? "Bus leaves off-service at " + esc(x.leave_clock) + " · " : "") + f1(x.km_lost) + " km not run"; }).join("; ") + (r.needs_standby ? " · needs a standby bus at the stop (the late bus cannot get there in time)" : "") + (adj ? " · " + adj + " other departure" + (adj > 1 ? "s" : "") + " adjusted" : "")
       : k === "adjust" ? "No km lost" : "";
-    var cmpTo = k === "halfway" ? P[r.full_choice] : N, cv = cmpTo && cmpTo.ewt ? cmpTo.ewt.avg : null;
+    var cmpTo = k === "halfway" ? P[r.full_choice] : N, cv = cmpTo && cmpTo.ewt ? avgE(cmpTo) : null;
     var why = k === "halfway" ? "Lowest EWT: " + f2(v) + " min against " + f2(cv) + " min with " + NAME[r.full_choice].toLowerCase() + " (" + (r.ewt && r.ewt.improvement_pct != null ? Math.round(r.ewt.improvement_pct) + "% better" : "") + "), and it passes every check of the decision rule."
-      : k === "adjust" ? "Adjusting cuts EWT from " + f2(base) + " to " + f2(v) + " min without losing mileage" + (P.halfway && P.halfway.ewt ? "; halfway (" + f2(P.halfway.ewt.avg) + " min) does not cut enough more to be worth the km." : ".")
-      : "No option cuts EWT enough to be worth a change" + (P.adjust && P.adjust.ewt ? " (trip adjustment: " + f2(P.adjust.ewt.avg) + " min against " + f2(base) + " min)" : "") + ".";
+      : k === "adjust" ? "Adjusting cuts EWT from " + f2(base) + " to " + f2(v) + " min without losing mileage" + (P.halfway && P.halfway.ewt ? "; halfway (" + f2(avgE(P.halfway)) + " min) does not cut enough more to be worth the km." : ".")
+      : "No option cuts EWT enough to be worth a change" + (P.adjust && P.adjust.ewt ? " (trip adjustment: " + f2(avgE(P.adjust)) + " min against " + f2(base) + " min)" : "") + ".";
     var pct = base > 0.005 && v != null ? Math.round(100 * (base - v) / base) : null;
     var kpi = function(lbl, val, s, cls){ return '<div class="ln-kpi"><span>' + lbl + '</span><b>' + val + '</b>' + (s ? '<small class="' + (cls || "") + '">' + s + '</small>' : '') + '</div>'; };
     var dec = decision(r), others = ORDER.filter(function(x){ return x !== k && P[x]; });
@@ -2408,7 +2421,6 @@ document.addEventListener("click", function(e){
       if(q){ var o = offGap(q, H); h += '<div><b>' + esc(q.leg) + ' &middot; ' + esc(cleanLbl(q.label)) + '</b> &ndash; headway of each bus (min):</div><div class="ln-gaps">' + (q.h || []).map(function(x){ return '<i class="' + hwCls(x[1], H) + '" title="' + esc((x[0] === 0 ? "bus before the block" : x[0] > ((r.trips || []).length || 10) ? "next bus" : "T" + x[0]) + ": " + f1(x[1]) + " min") + '">' + f1(x[1]) + '</i>'; }).join("") + '</div>'
         + '<div>Most off schedule: <b>' + f1(o) + ' min</b> (' + (o - H >= 0 ? "+" : "&minus;") + f1(Math.abs(o - H)) + ' against ' + f1(H) + ') &ndash; the number in the square.</div>'; }
     } else {
-      h += '<div>Average EWT = &Sigma; ' + sm.toFixed(2) + ' &divide; ' + L.length + ' squares = <b>' + f2(L.length ? sm / L.length : null) + ' min</b></div>';
       if(q) h += '<div><b>' + esc(q.leg) + ' &middot; ' + esc(cleanLbl(q.label)) + '</b>: ' + (q.ewt == null ? "fewer than 2 gaps, no EWT" : 'AWT ' + q.sum_h2 + ' &divide; (2 &times; ' + q.sum_h + ') = ' + f2(q.awt) + ' &minus; SWT ' + f2(q.swt) + ' = <b>EWT ' + f2(q.ewt) + ' min</b>') + '</div>';
     }
     return h + '</div>';
@@ -2421,7 +2433,7 @@ document.addEventListener("click", function(e){
     var d1 = +(r.direction || HO.dir), d2 = retDir(), j = HO.setup || {}, first = (r.route && r.route.first) || j.first || "first stop", last = (r.route && r.route.last) || j.last || "last stop";
     var dirOf = function(lg){ return /^UP/.test(lg) ? d1 : d2; }, arrow = function(lg){ return /^UP/.test(lg) ? "→" : "←"; };
     var mx = 1; keys.forEach(function(k){ var c = {}; (P[k].ewt.points || []).forEach(function(q){ c[q.leg] = (c[q.leg] || 0) + 1; mx = Math.max(mx, c[q.leg]); }); });
-    var side = mx <= 10, nums = mx <= 16, fcls = mx <= 9 ? "" : mx <= 13 ? " f2" : " f3";
+    var side = mx <= 6, nums = mx <= 16, fcls = mx <= 9 ? "" : mx <= 13 ? " f2" : " f3";
     var leg = hw ? HWB.map(function(x){ return '<span><i class="' + x[0] + '"></i>' + x[1] + '</span>'; }).join(" ")
       : '<span><i class="r"></i>red &gt; ' + f2(BAND.r) + ' min, about a missed bus</span> <span><i class="y"></i>yellow ' + f2(BAND.g) + '&ndash;' + f2(BAND.r) + '</span> <span><i class="g"></i>green &le; ' + f2(BAND.g) + ', close to timetable</span>';
     var h = '<div class="ln-sqb" id="lnSq"><div class="ln-sqh"><h4>Every AITP, trip by trip &middot; ' + nb + ' balance trip' + (nb !== 1 ? "s" : "") + ' (' + esc(typeof balSpan === "function" ? balSpan(nb) : "") + ')</h4>'
@@ -2433,14 +2445,21 @@ document.addEventListener("click", function(e){
       else c = counts(pts(P[k]));
       var cnt = hw ? '<span><i class="dl"></i><b>' + (c.dl + c.rl) + '</b> longer</span> <span><i class="ok"></i><b>' + c.ok + '</b> on time</span> <span><i class="bs"></i><b>' + (c.bs + c.ls) + '</b> shorter</span>' : cntTxt(c);
       h += '<div class="ln-wp' + (r.decision === k ? " rec" : "") + '" data-k="' + k + '"><div class="ln-wh"><b>' + NAME[k] + (r.decision === k ? ' <span class="ln-chip rec">RECOMMENDED</span>' : '') + '</b><span class="ln-ac" style="margin:0">' + cnt + '</span></div><div class="ln-sqg">';
+      var gcols = 'grid-template-columns:repeat(' + mx + ',minmax(0,1fr)) minmax(46px,1.7fr);max-width:' + (mx * (nums ? 46 : 28) + 80) + 'px', vOf = function(q){ return hw ? offGap(q, H) : q.ewt; }, clOf = function(v){ return v == null ? "n" : hw ? hwCls(v, H) : band(v); };
+      var fmtV = function(v){ return v == null ? "–" : hw ? f1(v) : ewtTxt(v); }, allV = [];
+      h += '<div class="ln-sqr ln-sqhd"><span></span><div class="ln-sqc" style="' + gcols + '"><em style="grid-column:' + (mx + 1) + '">trip avg</em></div></div>';
       legs.forEach(function(lg){ var row = all.filter(function(q){ return q.leg === lg; });
         var lab = '<span>' + esc(lg) + ' <em>Dir ' + dirOf(lg) + ' ' + arrow(lg) + '</em></span>';
         if(!row.length){ h += '<div class="ln-sqr nodata">' + lab + '<div class="ln-nod">no AITP on this trip</div></div>'; return; }
-        h += '<div class="ln-sqr">' + lab + '<div class="ln-sqc' + (nums ? fcls : " sm") + '" style="grid-template-columns:repeat(' + mx + ',minmax(0,1fr));max-width:' + (mx * (nums ? 46 : 28)) + 'px">'
+        var vs = row.map(vOf).filter(function(v){ return v != null; }), av = vs.length ? vs.reduce(function(a, v){ return a + v; }, 0) / vs.length : null; allV = allV.concat(vs);
+        h += '<div class="ln-sqr">' + lab + '<div class="ln-sqc' + (nums ? fcls : " sm") + (mx > 6 ? " many" : "") + '" style="' + gcols + '">'
           + row.map(function(q){ var key = q.L + "|" + q.p, cl, txt, tip;
-            if(hw){ var g = offGap(q, H); cl = hwCls(g, H); txt = g == null ? "–" : f1(g); tip = g == null ? "no headway" : "headway most off schedule " + f1(g) + " min (" + (g - H >= 0 ? "+" : "−") + f1(Math.abs(g - H)) + " vs " + f1(H) + ")"; }
+            if(hw){ var g = offGap(q, H); cl = hwCls(g, H); txt = g == null ? "–" : (f1(g) === String(Math.round(g)) ? f1(g) : '<span class="d">' + f1(g) + '</span><span class="n0">' + Math.round(g) + '</span>'); tip = g == null ? "no headway" : "headway most off schedule " + f1(g) + " min (" + (g - H >= 0 ? "+" : "−") + f1(Math.abs(g - H)) + " vs " + f1(H) + ")"; }
             else { var b = q.ewt == null ? null : band(q.ewt); cl = b || "n"; txt = ewtTxt(q.ewt); tip = q.ewt == null ? "not enough buses for an EWT" : f2(q.ewt) + " min extra wait (" + BNAME[b] + ")"; }
-            return '<i class="' + cl + (SEL === key ? " sqon" : "") + '" data-s="' + key + '" tabindex="0" title="' + esc(lg + " · Dir " + dirOf(lg) + " · " + cleanLbl(q.label) + ": " + tip + " – tap for the numbers") + '">' + (nums ? txt : "") + '</i>'; }).join("") + '</div></div>'; });
+            return '<i class="' + cl + (SEL === key ? " sqon" : "") + '" data-s="' + key + '" tabindex="0" title="' + esc(lg + " · Dir " + dirOf(lg) + " · " + cleanLbl(q.label) + ": " + tip + " – tap for the numbers") + '">' + (nums ? txt : "") + '</i>'; }).join("")
+          + '<b class="avg ' + clOf(av) + '" style="grid-column:' + (mx + 1) + '" title="' + esc(lg + " average " + (hw ? "headway (of the squares)" : "EWT") + ": " + (av == null ? "–" : (hw ? f1(av) : f2(av)) + " min = Σ " + vs.reduce(function(a, v){ return a + v; }, 0).toFixed(2) + " ÷ " + vs.length)) + '">' + fmtV(av) + '</b></div></div>'; });
+      var fin = allV.length ? allV.reduce(function(a, v){ return a + v; }, 0) / allV.length : null;
+      h += '<div class="ln-sqr ln-fin"><span>' + (hw ? "Final avg" : "Final EWT") + '</span><div class="ln-sqc" style="' + gcols + '"><span class="fl" style="grid-column:1 / span ' + mx + '">' + (hw ? "average of all " : "average of all ") + allV.length + ' squares = &Sigma; ' + allV.reduce(function(a, v){ return a + v; }, 0).toFixed(2) + ' &divide; ' + allV.length + ' &rarr;</span><b class="avg big ' + clOf(fin) + '" style="grid-column:' + (mx + 1) + '">' + (fin == null ? "–" : hw ? f1(fin) : f2(fin)) + '</b></div></div>';
       h += '</div><div class="ln-pcw" data-k="' + k + '">' + panelCalc(r, k) + '</div></div>'; });
     h += '</div>';
     if(!hw) h += '<div class="ln-fx"><div class="f"><b>EWT at one AITP = AWT &minus; SWT</b><span>AWT (average wait) = &Sigma;h&sup2; &divide; (2 &times; &Sigma;h) &middot; SWT (timetable wait) = &Sigma;h<sub>s</sub>&sup2; &divide; (2 &times; &Sigma;h<sub>s</sub>)</span><span>h = the gaps between the buses passing that AITP on that trip, h<sub>s</sub> = the scheduled gaps. <b>Average EWT</b> of an option = &Sigma; EWT of its squares &divide; number of squares.</span></div></div>';
