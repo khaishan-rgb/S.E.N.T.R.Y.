@@ -2100,7 +2100,12 @@ document.addEventListener("click", function(e){
 .ln-sqc i.bs,.ln-ac i.bs{background:#2563eb;color:#fff}.ln-sqc i.ls,.ln-ac i.ls{background:#93c5fd}.ln-sqc i.ok,.ln-ac i.ok{background:#26c485}
 .ln-sqc i.rl,.ln-ac i.rl{background:#f0506e}.ln-sqc i.dl,.ln-ac i.dl{background:#9f1239;color:#fff}.ln-sqc i.x,.ln-ac i.x{background:rgba(126,178,230,.12);color:var(--ds-faint,#5f7690)}
 .ln-hwt{display:flex;align-items:center;gap:8px 12px;flex-wrap:wrap;margin:0 0 10px;font-size:12.5px;color:var(--ds-mut,#8aa2bd)}.ln-hwt .ds-segm button{height:28px;font-size:12px;padding:0 10px}.ln-hwt .m{color:var(--ds-text-2,#b6c8dd);font-weight:600}
-.ln-fx{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.3fr);gap:12px;margin-top:12px}
+.ln-fx{display:grid;grid-template-columns:1fr;gap:12px;margin-top:12px}
+.ln-pcw{margin-top:8px;padding-top:8px;border-top:1px dashed rgba(126,178,230,.22)}
+.ln-pc{display:grid;gap:4px;font-size:12.5px;color:var(--ds-text-2,#b6c8dd);line-height:1.45}.ln-pc b{color:#fff}
+.ln-pc .ln-gaps{gap:3px}.ln-pc .ln-gaps i{font-style:normal;font-size:11.5px;font-weight:700;min-width:26px;text-align:center;padding:1px 4px;border-radius:4px;color:#0b1626}
+.ln-pc .ln-gaps i.bs,.ln-pc .ln-gaps i.dl{color:#fff}
+.ln-gaps i.bs{background:#2563eb}.ln-gaps i.ls{background:#93c5fd}.ln-gaps i.ok{background:#26c485}.ln-gaps i.rl{background:#f0506e}.ln-gaps i.dl{background:#9f1239}
 .ln-fx>div{padding:10px 12px;border-radius:10px;border:1px dashed rgba(126,178,230,.3);background:rgba(4,12,24,.5);display:grid;gap:4px;font-size:13px;color:var(--ds-text-2,#b6c8dd);line-height:1.45;align-content:start}
 .ln-fx b{color:#fff}.ln-fx small{color:var(--ds-mut,#8aa2bd);font-size:12px}.ln-fx .e{border-style:solid;border-color:rgba(56,214,255,.35)}.ln-fx .r{font-size:14px;color:#fff}
 .ln-val em.fx{font-size:11.5px;color:var(--ds-mut,#8aa2bd)}
@@ -2383,79 +2388,70 @@ document.addEventListener("click", function(e){
   }
 
   /* ---------- full analysis, short: where and when passengers wait longer, one worked EWT example, the off-service route */
-  var SQV = (function(){ try{ return localStorage.getItem("rde.sqv") === "hw" ? "hw" : "ewt"; }catch(e){ return "ewt"; } })();      // what the squares show: EWT, or each bus's headway
-  var HWL = 0, SEL = null, SQREC = null;                            // headway view: which balance trip; EWT view: the square whose calculation is shown
-  /* headway bands (scheduled headway H): more than 2 min shorter = blue, 1-2 min shorter = light blue, up to 1 shorter / 2 longer = on time,
+  var SQV = (function(){ try{ return localStorage.getItem("rde.sqv") === "hw" ? "hw" : "ewt"; }catch(e){ return "ewt"; } })();      // what the squares show: EWT, or the headway
+  var SEL = null, SQREC = null;                                    // the AITP on one trip ("L|p") whose numbers each option shows under its squares
+  /* headway bands against the scheduled headway H: more than 2 min shorter = blue, 1-2 min shorter = light blue, up to 1 shorter / 2 longer = on time,
      2-3 min longer = red, more than 3 min longer = dark red */
   var HWB = [["bs", "&gt; 2 min shorter"], ["ls", "1&ndash;2 min shorter"], ["ok", "on time (1 shorter to 2 longer)"], ["rl", "2&ndash;3 min longer"], ["dl", "&gt; 3 min longer"]];
   function hwCls(g, H){ if(g == null) return "x"; var d = g - H; return d < -2 - 1e-9 ? "bs" : d < -1 - 1e-9 ? "ls" : d <= 2 + 1e-9 ? "ok" : d <= 3 + 1e-9 ? "rl" : "dl"; }
+  function offGap(q, H){ var g = null; (q.h || []).forEach(function(x){ if(g == null || Math.abs(x[1] - H) > Math.abs(g - H) + 1e-9 || (Math.abs(Math.abs(x[1] - H) - Math.abs(g - H)) <= 1e-9 && x[1] > g)) g = x[1]; }); return g; }   // the headway most off schedule
   function legList(r, P, keys){ var E = r.ewt || {}, nb = E.balance_trips || r.balance_trips || 0, legs = [];
     for(var L = 0; L < nb; L++) legs.push(typeof legNm === "function" ? legNm(L) : (L % 2 ? "DOWN " : "UP ") + (Math.floor(L / 2) + 1));
     keys.forEach(function(k){ (P[k].ewt.points || []).forEach(function(q){ if(legs.indexOf(q.leg) < 0) legs.push(q.leg); }); }); return legs; }
   function ewtTxt(v){ return v == null ? "–" : v < 1 ? f2(v).replace(/^(-?)0\./, "$1.") : (+v).toFixed(1); }
   function worstPt(p){ var L = pts(p), b = L.filter(function(q){ return !/\(arr\.\)$/.test(q.label); }); return (b.length ? b : L).sort(function(x, y){ return y.ewt - x.ewt; })[0] || null; }      // worst boarding AITP (not the terminal arrival)
-  function calcBox(r){                                            // the EWT formula + the numbers of one square
-    var P = r.plans, q = null, k = null;
-    if(SEL){ var s = SEL.split("|"); k = s[0]; q = P[k] && P[k].ewt ? (P[k].ewt.points || []).filter(function(x){ return x.L === +s[1] && x.p === +s[2]; })[0] : null; }
-    if(!q){ k = "none"; q = worstPt(P.none); if(q) SEL = k + "|" + q.L + "|" + q.p; }
-    var h = '<div class="ln-fx"><div class="f"><b>EWT at one AITP = AWT &minus; SWT</b><span>AWT (average wait) = &Sigma;h&sup2; &divide; (2 &times; &Sigma;h)</span><span>SWT (timetable wait) = &Sigma;h<sub>s</sub>&sup2; &divide; (2 &times; &Sigma;h<sub>s</sub>)</span><small>h = the gaps between the buses passing that AITP on that trip; h<sub>s</sub> = the scheduled gaps. Tap any square to see its numbers.</small></div>';
-    if(q){ var gs = (q.h || []).map(function(x){ return f1(x[1]); }).join(" · ");
-      h += '<div class="e"><b>' + esc(NAME[k]) + ' &middot; ' + esc(q.leg) + ' &middot; ' + esc(cleanLbl(q.label)) + '</b><span>Gaps between buses: ' + gs + ' min (' + (q.n_hw || (q.h || []).length) + ' gaps)</span>'
-        + (q.ewt == null ? '<span>Fewer than 2 gaps: no EWT here.</span>' : '<span>AWT = ' + q.sum_h2 + ' &divide; (2 &times; ' + q.sum_h + ') = <b>' + f2(q.awt) + '</b> min &nbsp;&middot;&nbsp; SWT = ' + q.sum_hs2 + ' &divide; (2 &times; ' + q.sum_hs + ') = <b>' + f2(q.swt) + '</b> min</span><span class="r">EWT = ' + f2(q.awt) + ' &minus; ' + f2(q.swt) + ' = <b>' + f2(q.ewt) + ' min</b></span>') + '</div>'; }
+  function ptAt(p, sel){ if(!sel || !p || !p.ewt) return null; var s = sel.split("|"); return (p.ewt.points || []).filter(function(q){ return q.L === +s[0] && q.p === +s[1]; })[0] || null; }
+  function panelCalc(r, k){                                         // under each option: its final EWT sum, and the numbers of the selected AITP on that trip
+    var P = r.plans, p = P[k], H = r.H || 10, L = pts(p), sm = L.reduce(function(a, q){ return a + q.ewt; }, 0), q = ptAt(p, SEL);
+    var h = '<div class="ln-pc">';
+    if(SQV === "hw"){
+      if(q){ var o = offGap(q, H); h += '<div><b>' + esc(q.leg) + ' &middot; ' + esc(cleanLbl(q.label)) + '</b> &ndash; headway of each bus (min):</div><div class="ln-gaps">' + (q.h || []).map(function(x){ return '<i class="' + hwCls(x[1], H) + '" title="' + esc((x[0] === 0 ? "bus before the block" : x[0] > ((r.trips || []).length || 10) ? "next bus" : "T" + x[0]) + ": " + f1(x[1]) + " min") + '">' + f1(x[1]) + '</i>'; }).join("") + '</div>'
+        + '<div>Most off schedule: <b>' + f1(o) + ' min</b> (' + (o - H >= 0 ? "+" : "&minus;") + f1(Math.abs(o - H)) + ' against ' + f1(H) + ') &ndash; the number in the square.</div>'; }
+    } else {
+      h += '<div>Average EWT = &Sigma; ' + sm.toFixed(2) + ' &divide; ' + L.length + ' squares = <b>' + f2(L.length ? sm / L.length : null) + ' min</b></div>';
+      if(q) h += '<div><b>' + esc(q.leg) + ' &middot; ' + esc(cleanLbl(q.label)) + '</b>: ' + (q.ewt == null ? "fewer than 2 gaps, no EWT" : 'AWT ' + q.sum_h2 + ' &divide; (2 &times; ' + q.sum_h + ') = ' + f2(q.awt) + ' &minus; SWT ' + f2(q.swt) + ' = <b>EWT ' + f2(q.ewt) + ' min</b>') + '</div>';
+    }
     return h + '</div>';
   }
   function squares(r){                                         // every AITP, trip by trip (every balance trip), in each trip's own direction of travel
     var P = r.plans, keys = ORDER.filter(function(k){ return P[k] && P[k].ewt; }); if(!keys.length) return "";
     if(SQREC !== r){ SQREC = r; SEL = null; }
-    var H = r.H || 10, E = r.ewt || {}, nb = E.balance_trips || r.balance_trips || 0, legs = legList(r, P, keys);
+    if(!SEL){ var w = worstPt(P.none); if(w) SEL = w.L + "|" + w.p; }
+    var H = r.H || 10, E = r.ewt || {}, nb = E.balance_trips || r.balance_trips || 0, legs = legList(r, P, keys), hw = SQV === "hw";
     var d1 = +(r.direction || HO.dir), d2 = retDir(), j = HO.setup || {}, first = (r.route && r.route.first) || j.first || "first stop", last = (r.route && r.route.last) || j.last || "last stop";
     var dirOf = function(lg){ return /^UP/.test(lg) ? d1 : d2; }, arrow = function(lg){ return /^UP/.test(lg) ? "→" : "←"; };
-    var h = '<div class="ln-sqb" id="lnSq"><div class="ln-sqh"><h4>Every AITP, trip by trip &middot; ' + nb + ' balance trip' + (nb !== 1 ? "s" : "") + ' (' + esc(typeof balSpan === "function" ? balSpan(nb) : "") + ')</h4>'
-      + '<div class="ds-segm" id="lnSqv" role="group" aria-label="What the squares show"><button type="button" data-v="ewt" aria-pressed="' + (SQV === "ewt") + '">EWT</button><button type="button" data-v="hw" aria-pressed="' + (SQV === "hw") + '">Headway</button></div></div>';
-    var dirs = '<div class="ln-dirs"><span><b>Dir ' + d1 + ' →</b> ' + esc(first) + ' to ' + esc(last) + '</span><span><b>Dir ' + d2 + ' ←</b> ' + esc(last) + ' back to ' + esc(first) + '</span><span>Squares run in the direction of travel: left = where that trip starts.</span></div>';
-    if(SQV === "hw"){
-      if(HWL >= legs.length) HWL = 0;
-      var lg = legs[HWL], n = (r.trips || []).length || 10, cols = 1;
-      keys.forEach(function(k){ cols = Math.max(cols, (P[k].ewt.points || []).filter(function(q){ return q.leg === lg; }).length); });
-      var nums = cols <= 16, fc = cols <= 9 ? "" : cols <= 13 ? " f2" : " f3";
-      h += '<div class="sub">One row per bus (T1&ndash;T' + n + ', as in step 1), one square per AITP on the trip you pick. The number is that bus&rsquo;s <b>headway</b> (min since the bus ahead) against the scheduled ' + f1(H) + ' min: '
-        + '<span class="ln-ac ln-hwl" style="display:inline-flex;margin:0">' + HWB.map(function(x){ return '<span><i class="' + x[0] + '"></i>' + x[1] + '</span>'; }).join(" ") + ' <span><i class="x"></i>bus not on this stretch</span></span></div>'
-        + dirs + '<div class="ln-hwt"><span>Trip</span><div class="ds-segm" id="lnHwL" role="group" aria-label="Balance trip">' + legs.map(function(x, i){ return '<button type="button" data-l="' + i + '" aria-pressed="' + (i === HWL) + '">' + esc(x) + '</button>'; }).join("") + '</div><span class="m">Dir ' + dirOf(lg) + ' ' + arrow(lg) + '</span></div>'
-        + '<div class="ln-wps' + (cols <= 10 ? "" : " wide") + '">';
-      keys.forEach(function(k){ var row = (P[k].ewt.points || []).filter(function(q){ return q.leg === lg; }).sort(function(a, b){ return a.p - b.p; });
-        var hwT = (P[k].rows || []).filter(function(x){ return x.type === "halfway"; }).map(function(x){ return x.n; }), buses = [];
-        for(var b = 1; b <= n; b++) buses.push(b);
-        if(row.some(function(q){ return (q.h || []).some(function(x){ return x[0] === n + 1; }); })) buses.push(n + 1);
-        var c = {bs:0, ls:0, ok:0, rl:0, dl:0}, body = "";
-        buses.forEach(function(b){ var lab = b > n ? "Next" : "T" + b + (hwT.indexOf(b) >= 0 ? " ½" : "");
-          body += '<div class="ln-sqr"><span>' + lab + '</span><div class="ln-sqc' + (nums ? fc : " sm") + '" style="grid-template-columns:repeat(' + cols + ',minmax(0,1fr));max-width:' + (cols * (nums ? 46 : 28)) + 'px">'
-            + row.map(function(q){ var x = (q.h || []).filter(function(y){ return y[0] === b; })[0], g = x ? x[1] : null, cl = hwCls(g, H); if(cl !== "x") c[cl]++;
-              var tip = lab + " · " + q.leg + " · " + cleanLbl(q.label) + ": " + (g == null ? (hwT.indexOf(b) >= 0 && q.L === 0 ? "not in service here (starts halfway further on)" : "no headway") : "headway " + f1(g) + " min (" + (g - H >= 0 ? "+" : "−") + f1(Math.abs(g - H)) + " vs " + f1(H) + ")");
-              return '<i class="' + cl + '" title="' + esc(tip) + '">' + (nums ? (g == null ? "–" : f1(g)) : "") + '</i>'; }).join("") + '</div></div>'; });
-        h += '<div class="ln-wp' + (r.decision === k ? " rec" : "") + '" data-k="' + k + '"><div class="ln-wh"><b>' + NAME[k] + (r.decision === k ? ' <span class="ln-chip rec">RECOMMENDED</span>' : '') + '</b><span class="ln-ac" style="margin:0"><span><i class="dl"></i><b>' + (c.dl + c.rl) + '</b> longer</span> <span><i class="ok"></i><b>' + c.ok + '</b> on time</span> <span><i class="bs"></i><b>' + (c.bs + c.ls) + '</b> shorter</span></span></div><div class="ln-sqg">' + body + '</div></div>'; });
-      return h + '</div></div>';
-    }
     var mx = 1; keys.forEach(function(k){ var c = {}; (P[k].ewt.points || []).forEach(function(q){ c[q.leg] = (c[q.leg] || 0) + 1; mx = Math.max(mx, c[q.leg]); }); });
-    var side = mx <= 10, nums2 = mx <= 16, fcls = mx <= 9 ? "" : mx <= 13 ? " f2" : " f3";
-    h += '<div class="sub">One square = one AITP on one trip; the number is its <b>EWT</b> (min of extra wait)' + (nums2 ? "" : " &ndash; hover a square to see it") + '. <span class="ln-ac" style="display:inline-flex;margin:0"><span><i class="r"></i>red &gt; ' + f2(BAND.r) + ' min, about a missed bus</span> <span><i class="y"></i>yellow ' + f2(BAND.g) + '&ndash;' + f2(BAND.r) + '</span> <span><i class="g"></i>green &le; ' + f2(BAND.g) + ', close to timetable</span></span></div>'
-      + dirs + '<div class="ln-wps' + (side ? "" : " wide") + '">';
-    if(!SEL){ var w = worstPt(P.none); if(w) SEL = "none|" + w.L + "|" + w.p; }
-    keys.forEach(function(k){ var all = P[k].ewt.points || [], c = counts(pts(P[k]));
-      h += '<div class="ln-wp' + (r.decision === k ? " rec" : "") + '" data-k="' + k + '"><div class="ln-wh"><b>' + NAME[k] + (r.decision === k ? ' <span class="ln-chip rec">RECOMMENDED</span>' : '') + '</b><span class="ln-ac" style="margin:0">' + cntTxt(c) + '</span></div><div class="ln-sqg">';
+    var side = mx <= 10, nums = mx <= 16, fcls = mx <= 9 ? "" : mx <= 13 ? " f2" : " f3";
+    var leg = hw ? HWB.map(function(x){ return '<span><i class="' + x[0] + '"></i>' + x[1] + '</span>'; }).join(" ")
+      : '<span><i class="r"></i>red &gt; ' + f2(BAND.r) + ' min, about a missed bus</span> <span><i class="y"></i>yellow ' + f2(BAND.g) + '&ndash;' + f2(BAND.r) + '</span> <span><i class="g"></i>green &le; ' + f2(BAND.g) + ', close to timetable</span>';
+    var h = '<div class="ln-sqb" id="lnSq"><div class="ln-sqh"><h4>Every AITP, trip by trip &middot; ' + nb + ' balance trip' + (nb !== 1 ? "s" : "") + ' (' + esc(typeof balSpan === "function" ? balSpan(nb) : "") + ')</h4>'
+      + '<div class="ds-segm" id="lnSqv" role="group" aria-label="What the squares show"><button type="button" data-v="ewt" aria-pressed="' + (!hw) + '">EWT</button><button type="button" data-v="hw" aria-pressed="' + hw + '">Headway</button></div></div>'
+      + '<div class="sub">One square = one AITP on one trip; ' + (hw ? 'the number is the <b>headway most off schedule</b> there (min, against the scheduled ' + f1(H) + ')' : 'the number is its <b>EWT</b> (min of extra wait)') + (nums ? "" : " &ndash; hover a square to see it") + '. Tap a square to see its numbers under each option. <span class="ln-ac" style="display:inline-flex;margin:0">' + leg + '</span></div>'
+      + '<div class="ln-dirs"><span><b>Dir ' + d1 + ' →</b> ' + esc(first) + ' to ' + esc(last) + '</span><span><b>Dir ' + d2 + ' ←</b> ' + esc(last) + ' back to ' + esc(first) + '</span><span>Squares run in the direction of travel: left = where that trip starts.</span></div><div class="ln-wps' + (side ? "" : " wide") + '">';
+    keys.forEach(function(k){ var all = P[k].ewt.points || [], c;
+      if(hw){ c = {bs:0, ls:0, ok:0, rl:0, dl:0}; all.forEach(function(q){ var cl = hwCls(offGap(q, H), H); if(cl !== "x") c[cl]++; }); }
+      else c = counts(pts(P[k]));
+      var cnt = hw ? '<span><i class="dl"></i><b>' + (c.dl + c.rl) + '</b> longer</span> <span><i class="ok"></i><b>' + c.ok + '</b> on time</span> <span><i class="bs"></i><b>' + (c.bs + c.ls) + '</b> shorter</span>' : cntTxt(c);
+      h += '<div class="ln-wp' + (r.decision === k ? " rec" : "") + '" data-k="' + k + '"><div class="ln-wh"><b>' + NAME[k] + (r.decision === k ? ' <span class="ln-chip rec">RECOMMENDED</span>' : '') + '</b><span class="ln-ac" style="margin:0">' + cnt + '</span></div><div class="ln-sqg">';
       legs.forEach(function(lg){ var row = all.filter(function(q){ return q.leg === lg; });
         var lab = '<span>' + esc(lg) + ' <em>Dir ' + dirOf(lg) + ' ' + arrow(lg) + '</em></span>';
         if(!row.length){ h += '<div class="ln-sqr nodata">' + lab + '<div class="ln-nod">no AITP on this trip</div></div>'; return; }
-        h += '<div class="ln-sqr">' + lab + '<div class="ln-sqc' + (nums2 ? fcls : " sm") + '" style="grid-template-columns:repeat(' + mx + ',minmax(0,1fr));max-width:' + (mx * (nums2 ? 46 : 28)) + 'px">'
-          + row.map(function(q){ var b = q.ewt == null ? null : band(q.ewt), key = k + "|" + q.L + "|" + q.p;
-            return '<i class="' + (b || "n") + (SEL === key ? " sqon" : "") + '" data-s="' + key + '" tabindex="0" title="' + esc(lg + " · Dir " + dirOf(lg) + " · " + cleanLbl(q.label) + ": " + (q.ewt == null ? "not enough buses for an EWT" : f2(q.ewt) + " min extra wait (" + BNAME[b] + ")") + " – tap for the calculation") + '">' + (nums2 ? ewtTxt(q.ewt) : "") + '</i>'; }).join("") + '</div></div>'; });
-      h += '</div></div>'; });
-    return h + '</div><div id="lnFxBox">' + calcBox(r) + '</div></div>';
+        h += '<div class="ln-sqr">' + lab + '<div class="ln-sqc' + (nums ? fcls : " sm") + '" style="grid-template-columns:repeat(' + mx + ',minmax(0,1fr));max-width:' + (mx * (nums ? 46 : 28)) + 'px">'
+          + row.map(function(q){ var key = q.L + "|" + q.p, cl, txt, tip;
+            if(hw){ var g = offGap(q, H); cl = hwCls(g, H); txt = g == null ? "–" : f1(g); tip = g == null ? "no headway" : "headway most off schedule " + f1(g) + " min (" + (g - H >= 0 ? "+" : "−") + f1(Math.abs(g - H)) + " vs " + f1(H) + ")"; }
+            else { var b = q.ewt == null ? null : band(q.ewt); cl = b || "n"; txt = ewtTxt(q.ewt); tip = q.ewt == null ? "not enough buses for an EWT" : f2(q.ewt) + " min extra wait (" + BNAME[b] + ")"; }
+            return '<i class="' + cl + (SEL === key ? " sqon" : "") + '" data-s="' + key + '" tabindex="0" title="' + esc(lg + " · Dir " + dirOf(lg) + " · " + cleanLbl(q.label) + ": " + tip + " – tap for the numbers") + '">' + (nums ? txt : "") + '</i>'; }).join("") + '</div></div>'; });
+      h += '</div><div class="ln-pcw" data-k="' + k + '">' + panelCalc(r, k) + '</div></div>'; });
+    h += '</div>';
+    if(!hw) h += '<div class="ln-fx"><div class="f"><b>EWT at one AITP = AWT &minus; SWT</b><span>AWT (average wait) = &Sigma;h&sup2; &divide; (2 &times; &Sigma;h) &middot; SWT (timetable wait) = &Sigma;h<sub>s</sub>&sup2; &divide; (2 &times; &Sigma;h<sub>s</sub>)</span><span>h = the gaps between the buses passing that AITP on that trip, h<sub>s</sub> = the scheduled gaps. <b>Average EWT</b> of an option = &Sigma; EWT of its squares &divide; number of squares.</span></div></div>';
+    return h + '</div>';
   }
   function sqWire(){
     var redraw = function(){ var old = $("lnSq"); if(old && HO.rec && HO.rec.ok){ old.outerHTML = squares(HO.rec); sqWire(); } };
     document.querySelectorAll("#lnSqv button").forEach(function(b){ b.onclick = function(){ SQV = b.dataset.v; try{ localStorage.setItem("rde.sqv", SQV); }catch(e){} redraw(); }; });
-    document.querySelectorAll("#lnHwL button").forEach(function(b){ b.onclick = function(){ HWL = +b.dataset.l; redraw(); }; });
-    document.querySelectorAll("#lnSq .ln-sqc i[data-s]").forEach(function(sq){ var go = function(){ SEL = sq.dataset.s; document.querySelectorAll("#lnSq .ln-sqc i.sqon").forEach(function(x){ x.classList.remove("sqon"); }); sq.classList.add("sqon"); $("lnFxBox").innerHTML = calcBox(HO.rec); };
+    document.querySelectorAll("#lnSq .ln-sqc i[data-s]").forEach(function(sq){ var go = function(){ SEL = sq.dataset.s;
+        document.querySelectorAll("#lnSq .ln-sqc i").forEach(function(x){ x.classList.toggle("sqon", x.dataset.s === SEL); });
+        document.querySelectorAll("#lnSq .ln-pcw").forEach(function(x){ x.innerHTML = panelCalc(HO.rec, x.dataset.k); }); };
       sq.onclick = go; sq.onkeydown = function(e){ if(e.key === "Enter" || e.key === " "){ e.preventDefault(); go(); } }; });
   }
   function howRender(r){
