@@ -56,6 +56,10 @@ Without `BUNCHING_ALWAYS_ON=1` the server records only while a Bunching page is 
 **Magnifying lens.** A 🔍 button sits on the map next to SETTINGS / LEGEND. First press ×4, second ×8, third off (Esc also switches it off).
 * Mouse: a round lens follows the pointer and shows the basemap plus every line, stop, arrow and label of the map, closer. Clicks go straight through it to the map, so you can tap the blocked road with the lens on.
 * Phone / tablet: the lens stays in the middle of the map. Drag the map until the road is under the cross, then tap the lens to tap that exact point.
+* **Press and hold anywhere on the map (no button needed)**: after 0.4 s without moving, the lens opens by itself at ×4 (or ×8 if the 🔍 button is set to ×8).
+  * Keep holding and slide to the exact spot. The map does not move while you hold; on a phone the lens sits above the finger, or below it near the top of the map, so the finger never hides the point.
+  * Let go to tap that spot (place or move the blockage). If the blockage is locked, the lens only shows ("view only") and nothing moves.
+  * A quick tap, a drag, a two-finger zoom, or holding the blockage ✕ / handles works exactly as before. Esc cancels.
 * Past the basemap's own maximum zoom the last tiles are enlarged instead of going blank. On phones the map hint now sits below the map buttons.
 
 **How the diversion road is found.**

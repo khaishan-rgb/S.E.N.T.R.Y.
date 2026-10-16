@@ -496,8 +496,9 @@
 
   /* ---------------------------------------------------------------- V16.23 magnifying lens (🔍): a round loupe that shows the map closer,
      with every line, stop, arrow and label on it. Mouse: it follows the pointer and clicks still reach the map underneath.
-     Touch: it sits in the middle of the map - move the map under it, tap the lens to tap that exact point. */
-  var LENS = {on:false, el:null, map:null, z:0, touch:false, grp:null, t:null, base:"", last:null};
+     Touch: it sits in the middle of the map - move the map under it, tap the lens to tap that exact point.
+     Press and hold anywhere on the map (mouse or finger): the lens opens by itself - see "press and hold" below. */
+  var LENS = {on:false, el:null, map:null, z:0, touch:false, grp:null, t:null, base:"", last:null, press:false};
   var LENS_STEPS = [0, 2, 3];                     // off, x4, x8 (zoom levels added)
   function lensBuild(){
     if(LENS.el) return;
@@ -519,7 +520,7 @@
     else if(ly instanceof L.Marker){ var mo = {icon:ly.options.icon, interactive:false, keyboard:false}; if(o.pane) mo.pane = o.pane; L.marker(ly.getLatLng(), mo).addTo(into); }
   }
   function lensSync(){                         // base map + every overlay, copied (only while the lens is on)
-    if(!LENS.on || !LENS.map) return;
+    if(!(LENS.on || LENS.press) || !LENS.map) return;
     var base = [];
     map.eachLayer(function(ly){ if(ly instanceof L.TileLayer) base.push(ly); });
     var key = base.map(function(b){ return b._url; }).join("|");
@@ -531,11 +532,12 @@
     LENS.grp.clearLayers();
     Object.keys(G).forEach(function(k){ lensCopy(G[k], LENS.grp); });
   }
-  function lensLater(){ if(!LENS.on) return; clearTimeout(LENS.t); LENS.t = setTimeout(lensSync, 120); }
+  function lensLater(){ if(!(LENS.on || LENS.press)) return; clearTimeout(LENS.t); LENS.t = setTimeout(lensSync, 120); }
   function lensView(ll){
-    if(!LENS.on || !ll) return;
-    LENS.map.setView(ll, Math.min(20, map.getZoom() + LENS.z), {animate:false});
-    LENS.el.querySelector(".dp-lens-z").textContent = "×" + Math.pow(2, LENS.z) + (LENS.touch ? " · tap to pick" : "");
+    if(!(LENS.on || LENS.press) || !ll) return;
+    var z = LENS.z || 2;                         // press and hold with the button off: x4
+    LENS.map.setView(ll, Math.min(20, map.getZoom() + z), {animate:false});
+    LENS.el.querySelector(".dp-lens-z").textContent = "×" + Math.pow(2, z) + (LENS.press ? (canPick() ? " · let go to pick" : " · view only") : LENS.touch ? " · tap to pick" : "");
   }
   function lensSet(step){
     LENS.z = step; LENS.on = step > 0; LENS.touch = !!(window.matchMedia && matchMedia("(hover: none), (pointer: coarse)").matches);
@@ -552,14 +554,70 @@
   }
   $("lensBtn").onclick = function(){ var i = LENS_STEPS.indexOf(LENS.z); lensSet(LENS.on ? LENS_STEPS[(i + 1) % LENS_STEPS.length] : 2); };
   map.on("mousemove", function(e){
-    LENS.last = e.latlng; if(!LENS.on || LENS.touch) return;
+    LENS.last = e.latlng; if(!LENS.on || LENS.touch || LENS.press) return;
     LENS.el.style.left = e.containerPoint.x + "px"; LENS.el.style.top = e.containerPoint.y + "px"; LENS.el.classList.add("on");
     lensView(e.latlng);
   });
   map.getContainer().addEventListener("mouseleave", function(){ if(LENS.on && !LENS.touch && LENS.el) LENS.el.classList.remove("on"); });
-  map.on("move zoom", function(){ if(LENS.on && LENS.touch) lensView(map.getCenter()); else if(LENS.on && LENS.last) lensView(LENS.last); });
+  map.on("move zoom", function(){ if(LENS.press) return; if(LENS.on && LENS.touch) lensView(map.getCenter()); else if(LENS.on && LENS.last) lensView(LENS.last); });
   map.on("layeradd layerremove", lensLater);
-  document.addEventListener("keydown", function(e){ if(e.key === "Escape" && LENS.on) lensSet(0); });
+  document.addEventListener("keydown", function(e){ if(e.key === "Escape"){ if(LENS.press) pressEnd(false); else if(LENS.on) lensSet(0); } });
+
+  /* press and hold on the map: the lens opens by itself (no button needed) after HOLD_MS without moving.
+     Keep holding and slide to the exact spot - on a phone the lens sits above the finger so the finger does not hide it.
+     Let go: that spot is tapped (blockage placed / moved). A locked blockage is not moved - the lens then only shows.
+     A quick tap, or pressing and dragging straight away, works exactly as before (tap / move the map). */
+  var PRESS = {t:null, id:null, x0:0, y0:0, touch:false, ll:null, until:0}, HOLD_MS = 400;
+  function canPick(){ var b = AB(); return !(S.blocks.length && !S.adding && b && b.locked); }   // the same rule as a map tap
+  function pressMove(cx, cy){
+    var r = map.getContainer().getBoundingClientRect();
+    var p = L.point(Math.max(0, Math.min(r.width, cx - r.left)), Math.max(0, Math.min(r.height, cy - r.top))), x = p.x, y = p.y;
+    if(PRESS.touch){ y = p.y - 120 < 95 ? p.y + 120 : p.y - 120; x = Math.max(70, Math.min(r.width - 70, p.x)); }
+    LENS.el.style.left = x + "px"; LENS.el.style.top = y + "px";
+    PRESS.ll = map.containerPointToLatLng(p); lensView(PRESS.ll);
+  }
+  function pressStart(){
+    PRESS.t = null; LENS.press = true; lensBuild();
+    if(map.dragging) map.dragging.disable();                        // the finger now moves the lens, not the map
+    map.getContainer().parentNode.classList.add("lens-press");
+    LENS.el.classList.remove("touch"); LENS.el.classList.add("on", "press");
+    LENS.map.invalidateSize(); lensSync(); pressMove(PRESS.x0, PRESS.y0);
+    if(PRESS.touch && navigator.vibrate) try{ navigator.vibrate(12); }catch(err){}
+  }
+  function pressCancel(){ if(PRESS.t){ clearTimeout(PRESS.t); PRESS.t = null; } if(!LENS.press) PRESS.id = null; }
+  function pressEnd(pick){
+    pressCancel(); if(!LENS.press) return;
+    var ll = PRESS.ll; LENS.press = false; PRESS.id = null; PRESS.until = Date.now() + 700;
+    if(map.dragging) map.dragging.enable();
+    map.getContainer().parentNode.classList.remove("lens-press");
+    LENS.el.classList.remove("press");
+    if(LENS.on && LENS.touch){ LENS.el.classList.add("touch"); LENS.el.style.left = ""; LENS.el.style.top = ""; LENS.map.invalidateSize(); lensView(map.getCenter()); }
+    else if(LENS.on) lensView(ll);                                  // mouse with the lens on: it keeps following the pointer
+    else LENS.el.classList.remove("on");
+    if(pick && ll && canPick()) map.fire("click", {latlng:ll});
+  }
+  (function(host){
+    host.addEventListener("pointerdown", function(e){
+      if(LENS.press){ pressEnd(false); return; }                     // a second finger (pinch): stop
+      if(PRESS.t){ pressCancel(); return; }
+      if(!e.isPrimary || (e.pointerType === "mouse" && e.button !== 0)) return;
+      var t = e.target;
+      if(!map.getContainer().contains(t) || (t.closest && t.closest(".leaflet-control-container, .leaflet-marker-icon.leaflet-interactive"))) return;   // not the zoom buttons, the blockage X or its handles
+      PRESS.id = e.pointerId; PRESS.x0 = e.clientX; PRESS.y0 = e.clientY; PRESS.touch = e.pointerType !== "mouse";
+      PRESS.t = setTimeout(pressStart, HOLD_MS);
+    }, true);
+    window.addEventListener("pointermove", function(e){
+      if(e.pointerId !== PRESS.id) return;
+      if(LENS.press){ e.preventDefault(); pressMove(e.clientX, e.clientY); }
+      else if(PRESS.t && Math.hypot(e.clientX - PRESS.x0, e.clientY - PRESS.y0) > 8) pressCancel();   // moving straight away: a normal map drag
+    }, true);
+    window.addEventListener("pointerup", function(e){ if(e.pointerId !== PRESS.id) return; if(LENS.press) pressEnd(true); else pressCancel(); }, true);
+    window.addEventListener("pointercancel", function(e){ if(e.pointerId !== PRESS.id) return; if(LENS.press) pressEnd(false); else pressCancel(); }, true);
+    host.addEventListener("contextmenu", function(e){ if(LENS.press || PRESS.t) e.preventDefault(); }, true);   // no long-press menu
+    host.addEventListener("click", function(e){                        // the browser's own click after letting go: already handled
+      if(PRESS.until && Date.now() < PRESS.until && map.getContainer().contains(e.target)){ e.stopPropagation(); e.preventDefault(); PRESS.until = 0; }
+    }, true);
+  })(map.getContainer().parentNode);
 
   hint("Tap the road where it is blocked");
   paintRec();

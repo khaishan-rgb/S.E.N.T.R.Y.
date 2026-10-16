@@ -79,9 +79,11 @@
 .dp-lens-x{position:absolute;left:50%;top:50%;width:26px;height:26px;transform:translate(-50%,-50%);z-index:800;pointer-events:none}
 .dp-lens-x:before,.dp-lens-x:after{content:"";position:absolute;background:#fff;box-shadow:0 0 0 1px rgba(0,0,0,.7)}
 .dp-lens-x:before{left:12px;top:0;width:2px;height:26px}.dp-lens-x:after{top:12px;left:0;height:2px;width:26px}
-.dp-lens-z{position:absolute;left:50%;bottom:10px;transform:translateX(-50%);z-index:800;padding:2px 8px;border-radius:999px;background:rgba(5,15,30,.85);color:#bfefff;font:700 10.5px var(--ds-font);letter-spacing:.06em;pointer-events:none;white-space:nowrap}
+.dp-lens-z{position:absolute;left:50%;bottom:16px;transform:translateX(-50%);z-index:800;padding:2px 8px;border-radius:999px;background:rgba(5,15,30,.85);color:#bfefff;font:700 10.5px var(--ds-font);letter-spacing:.06em;pointer-events:none;white-space:nowrap}
 .dp-lens.touch{left:50%;top:50%;width:170px;height:170px;pointer-events:auto;cursor:pointer}
 .dp-map.lens-hover .leaflet-container{cursor:crosshair}
+.dp-map.lens-press .leaflet-container{cursor:crosshair}
+.dp-map{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}   /* press and hold opens the lens, not a text / image menu */
 @media (prefers-reduced-motion:no-preference){.dp-lens.on{animation:dplens .14s ease-out}}
 @keyframes dplens{from{opacity:0;transform:translate(-50%,-50%) scale(.85)}to{opacity:1;transform:translate(-50%,-50%) scale(1)}}
 /* V16.23 double-deck stop chain */
