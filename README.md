@@ -66,17 +66,6 @@ Without `BUNCHING_ALWAYS_ON=1` the server records only while a Bunching page is 
 * Before this patch the search was stop-based only at the two ends. It starts after the last stop the bus can still reach before the blockage and rejoins at the nearest original stop after it.
 * The road between those two stops came from the routing engine. It was then checked every 25 m for: blocked road and direction, U-turn, wrong-way or prohibited turns, correct rejoin, and evidence that another LTA service runs those roads in that direction. Double-deck suitability came from the bus types of those services.
 
-**Late exit on expressways** (`late_exits` in `dv2_plan`, parameters `late_exit_*` in `dv2.PARAMS`).
-* The problem: a service on the BKE has no bus stop between Marsiling and Bukit Panjang. The engine only asked the routing engine for routes starting at a stop, or up to 450 m after it. So for a blockage near Bukit Panjang the diversion had to start at Marsiling, giving a 12 km Woodlands Road diversion.
-* Now, when the bus runs at least 1.2 km with no stop before the blockage, the engine also asks for routes starting further along that stretch: 150 m, 400 m, 800 m … 9 km before the blockage, nearest first.
-  * It asks 3 points at a time and stops at the first batch that gives a verified route, so the bus stays on its normal road and leaves at the last practical exit.
-  * These routes pass the same hard checks and scoring.
-  * The early (parallel-road) route stays as an alternative.
-* The panel then shows "Diversion begins: 7.0 km after Marsiling Stn — stays on the normal route (Bukit Timah Expressway) and turns off at the last practical exit before the blockage".
-* The Bus Captain instructions start with "STAY on the normal route 7.0 km (Bukit Timah Expressway)", and the brief reads "After Marsiling Stn, stay on the normal route for 7.0 km, then turn …".
-* Cost: up to 9 extra routing calls per rejoin stop tried, only on long stop-less stretches; routing results are cached for 10 minutes.
-* The road itself still comes from the routing engine (TomTom, bus mode, live traffic). Live bus positions are not used to choose the road. Live LTA Bus Arrival data only tells the planner which services run double-deckers.
-
 **New: double-deck stop chain** (`diversion.stop_chains`, `dv_dd_chains` in app.py). This is the controller's method: is this stop on a double-deck service? If yes, go to its next stop, and repeat until you reach the bus's own route after the blockage.
 * It starts from the last reachable stop and up to 4 stops before it, then moves only to the next stop of a service that already runs double-deckers, in that service's direction of travel. Bus types are learned from LTA Bus Arrival (`DD`) or entered by OCC.
 * It never steps across a blockage, stays within 4 km of it, and changes service only at a stop both services serve.
