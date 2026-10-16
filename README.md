@@ -52,6 +52,35 @@ Without `BUNCHING_ALWAYS_ON=1` the server records only while a Bunching page is 
 * Live bus positions: bus icons with an arrow for the travel direction, coloured by state; bunched road section highlighted red with a label, long gap dashed amber; smart zoom to the bunch, "Jump to" chips, All buses / Whole route; the map stops auto-moving once the controller zooms or drags it.
 * bunching.py: each bus in `seq` also carries `s_km` (position along the route) so heading arrows are correct on loop routes.
 
+## Diversion Planner — magnifying lens 🔍 and double-deck stop chain (patch on V16.19; app.py, diversion.py, diversion.js, diversion.html)
+**Magnifying lens.** A 🔍 button sits on the map next to SETTINGS / LEGEND. First press ×4, second ×8, third off (Esc also switches it off).
+* Mouse: a round lens follows the pointer and shows the basemap plus every line, stop, arrow and label of the map, closer. Clicks go straight through it to the map, so you can tap the blocked road with the lens on.
+* Phone / tablet: the lens stays in the middle of the map. Drag the map until the road is under the cross, then tap the lens to tap that exact point.
+* Past the basemap's own maximum zoom the last tiles are enlarged instead of going blank. On phones the map hint now sits below the map buttons.
+
+**How the diversion road is found.**
+* Before this patch the search was stop-based only at the two ends. It starts after the last stop the bus can still reach before the blockage and rejoins at the nearest original stop after it.
+* The road between those two stops came from the routing engine. It was then checked every 25 m for: blocked road and direction, U-turn, wrong-way or prohibited turns, correct rejoin, and evidence that another LTA service runs those roads in that direction. Double-deck suitability came from the bus types of those services.
+
+**New: double-deck stop chain** (`diversion.stop_chains`, `dv_dd_chains` in app.py). This is the controller's method: is this stop on a double-deck service? If yes, go to its next stop, and repeat until you reach the bus's own route after the blockage.
+* It starts from the last reachable stop and up to 4 stops before it, then moves only to the next stop of a service that already runs double-deckers, in that service's direction of travel. Bus types are learned from LTA Bus Arrival (`DD`) or entered by OCC.
+* It never steps across a blockage, stays within 4 km of it, and changes service only at a stop both services serve.
+* It finishes at the first stop on the bus's own route after the blockage. The shortest chain by LTA route distance wins, with a small cost per service change and per extra original stop skipped.
+* Services whose bus type is not known yet are allowed at 1.6× the cost and listed as "verify". Single-deck services are never used for a double-deck bus. A single-deck bus may use any service.
+* The chain's stops become waypoints for the routing engine (source `ddchain`). The 2 cheapest chains are always tested.
+* The route that comes back still passes the same hard validation and scoring, and the chain only proposes. If the chain route and a normal route use the same roads, the candidate is kept once and marked as found by the chain.
+* **Panel**: "Stop to stop on double-deck services" shows each service leg (e.g. *61 · 10003 → 10006, 5 stops, 1.6 km*), plus a warning when a service's bus type is not yet known.
+* **Map**: purple squares mark the chain's stops.
+* **Alternatives**: the chain route is tagged DD STOP CHAIN, and the route-search log shows the chain search result.
+* API (additive only):
+  * `/api/dv2/plan` adds `dd_chain` (search summary).
+  * Each candidate adds `dd_chain` (stops, legs with `codes`, km, transfers, unconfirmed) and `found_by`.
+* Settings in `diversion.PARAMS`: `chain_radius_m` 4000, `chain_transfer_m` 250, `chain_rejoin_stop_m` 150, `chain_unknown_factor` 1.6, `chain_max_m` 9000, `chain_edge_buffer_m` 25.
+* Limits:
+  * A chain is only as good as the learned bus types: a service seen only with single-deckers is excluded, one never seen is "verify".
+  * The road between two consecutive stops is the routing engine's.
+  * The blockage check on a stop-to-stop step uses the straight line between the stops (25 m buffer). The full route is then checked properly.
+
 ## V16.19 — AI-assisted route planning (AI Operational Review)
 Routing engine + operational rules + AI reasoning. Nothing in the routing, validation, blockage or service detection changed.
 * **Flow**: blockage → affected services → the engine searches diversion start × rejoin stops and keeps going until at least 5 distinct verified candidates exist where possible (up to 10 returned) → hard validation (blocked road / direction, U-turn, wrong-way or prohibited movement, restricted road, correct rejoin and onward movement) → operational scoring → **AI Operational Review** compares the verified candidates and recommends one → map and panel.

@@ -350,6 +350,11 @@
       arrows(G.div, c.line, "#fff", "arrows", 90);
       bounds.extend(c.line); bounds.extend(c.skip_line);
       L.marker(c.leave_pt, {pane:"marks", icon:icon("DIVERSION STARTS", "dp-lbl"), keyboard:false}).addTo(G.marks);
+      if(c.dd_chain) c.dd_chain.stops.slice(1, -1).forEach(function(s){
+        var lg = c.dd_chain.legs.filter(function(l){ return l.codes ? l.codes.indexOf(s.code) >= 0 : (l.from === s.code || l.to === s.code); }).map(function(l){ return l.svc; });
+        L.marker([s.lat, s.lon], {pane:"marks", keyboard:false, icon:L.divIcon({className:"", iconSize:[0, 0], html:'<div class="dp-ddstop"></div>'})})
+          .bindTooltip(esc(s.code + " " + s.name) + " \u2014 double-deck service " + esc(lg.join(" / ")) + " stops here").addTo(G.stops);
+      });
       L.marker(c.rejoin_pt, {pane:"marks", icon:L.divIcon({className:"", iconSize:[0, 0], html:'<div class="dp-lbl" style="--c:' + COL.rejoin + '">\u21aa REJOIN</div>'}), keyboard:false}).addTo(G.marks);
     }
     var skipped = {}, inb = {};
@@ -421,6 +426,10 @@
       + '<dt>Last normal stop served</dt><dd><b>' + esc(c.leave.code) + '</b> ' + esc(c.leave.name) + '</dd>'
       + '<dt>Diversion begins</dt><dd>after ' + esc(c.leave.name) + '</dd></dl>'
       + '<div class="dp-k">Recommended roads</div><ul class="dp-chain">' + c.roads.map(function(r, i){ return (i ? '<li class="ar">\u2192</li>' : '') + '<li>' + esc(r) + '</li>'; }).join("") + '<li class="ar">\u2192</li><li class="rj">\u21aa ' + esc(c.rejoin.name) + '</li></ul>'
+      + (c.dd_chain ? '<div class="dp-k">Stop to stop on double-deck services</div><ul class="dp-ddleg">' + c.dd_chain.legs.map(function(l){
+          return '<li><span class="sv">' + (l.own ? esc(x.service) + ' own' : esc(l.svc)) + '</span><span class="tx">' + esc(l.from) + ' ' + esc(tc(l.from_name)) + ' \u2192 ' + esc(l.to) + ' ' + esc(tc(l.to_name)) + ' <span class="dp-muted">(' + l.stops + ' stop' + (l.stops === 1 ? '' : 's') + ', ' + f1(l.km) + ' km)</span></span></li>'; }).join("")
+          + '</ul><p class="dp-muted" style="margin:4px 0 8px">Every stop on the way is already served by a service that runs double-deckers' + (c.dd_chain.transfers ? '; the route switches service at a stop both serve' : '') + '.'
+          + (c.dd_chain.unconfirmed && c.dd_chain.unconfirmed.length ? ' <span style="color:#ffd391">Bus type not yet known for ' + esc(c.dd_chain.unconfirmed.join(", ")) + ' \u2014 verify.</span>' : '') + '</p>' : '')
       + '<div class="dp-k">Bus captain instructions</div><ul class="dp-chain">' + c.instruction_text.map(function(t, i){ return (i ? '<li class="ar">\u2192</li>' : '') + '<li style="background:rgba(56,214,255,.1);border-color:rgba(56,214,255,.4);color:#dff6ff">' + esc(tc(t)) + '</li>'; }).join("") + '</ul>'
       + '<dl class="dp-kv">'
       + '<dt>Rejoin</dt><dd><b>' + esc(c.rejoin.code) + '</b> ' + esc(c.rejoin.name) + '</dd>'
@@ -439,7 +448,7 @@
     if(alts.length > 1) h += '<details class="dp-det"' + (S.view ? ' open' : '') + '><summary>Show alternatives (' + (alts.length - 1) + ')</summary><div style="margin-top:6px">' + alts.map(function(a){
         var tg = (a.tags || []).map(function(t){ return {A:"MIN SKIPPED STOPS", B:"SIMPLEST", C:"FASTEST"}[t]; }).filter(Boolean).join(" \u00b7 ");
         return '<button type="button" class="dp-alt" data-alt="' + esc(a.id) + '" aria-pressed="' + ((S.view || b.id) === a.id) + '"><b>' + (letterOf(a.id) ? 'Route ' + letterOf(a.id) + ' \u00b7 ' : '') + esc(a.leave.code) + ' \u2192 ' + esc(a.rejoin.code) + '</b>'
-          + (ai && ai.status === "ai" && a.id === ai.candidate_id ? '<span class="dp-tag" style="color:#ffd34d">\u2b50 AI</span>' : '') + (a.id === p.best.id ? '<span class="dp-tag" style="color:#9fdff5">ALGORITHM #1</span>' : '') + (a.id === b.id ? '<span class="dp-tag" style="color:#2ee59d">RECOMMENDED</span>' : '') + (tg ? '<span class="dp-tag">' + tg + '</span>' : '')
+          + (ai && ai.status === "ai" && a.id === ai.candidate_id ? '<span class="dp-tag" style="color:#ffd34d">\u2b50 AI</span>' : '') + (a.id === p.best.id ? '<span class="dp-tag" style="color:#9fdff5">ALGORITHM #1</span>' : '') + (a.id === b.id ? '<span class="dp-tag" style="color:#2ee59d">RECOMMENDED</span>' : '') + (a.dd_chain ? '<span class="dp-tag" style="color:#cdb9ff">DD STOP CHAIN</span>' : '') + (tg ? '<span class="dp-tag">' + tg + '</span>' : '')
           + '<br>' + esc(a.roads.join(" \u2192 ")) + '<br><span class="dp-muted">skips ' + a.skipped_n + ' \u00b7 ' + a.turns + ' turns \u00b7 ' + sgn(a.added_min) + ' min \u00b7 ' + sgn(a.added_km, 1) + ' km \u00b7 ' + esc(a.busroad_label) + ' bus-road \u00b7 ' + esc(a.confidence) + ' \u00b7 score ' + f0(a.score) + '</span></button>'; }).join("") + '</div></details>';
     h += '<details class="dp-det"><summary>OCC score ' + f0(c.score) + '/100 \u2014 how it is made</summary><div class="dp-muted" style="margin-top:6px">' + Object.keys(c.parts || {}).map(function(k){ return esc((S.cfg && S.cfg.weight_labels || {})[k] || k) + ' ' + f1(c.parts[k]); }).join(" \u00b7 ") + '. Scored only after every hard check passed (blocked road, U-turn, wrong-way, impossible turn, restricted road, rejoin direction, next original stop).</div></details>';
     h += attemptsHtml(p);
@@ -450,7 +459,8 @@
   function attemptsHtml(p){
     var at = p.attempts || []; if(!at.length) return "";
     return '<details class="dp-det"><summary>Route search \u2014 ' + at.length + ' diversion start \u00d7 rejoin combinations, ' + f0((p.search || {}).routes) + ' road routes checked</summary>'
-      + '<p class="dp-muted" style="margin:6px 0 0">Last reachable stop ' + esc((p.last_reachable || {}).code || "\u2013") + ' \u00b7 first stop after the blockage ' + esc((p.first_after || {}).code || "\u2013") + '. Nearest combinations first; earlier diversion starts only when they help.</p><ul class="dp-att">'
+      + '<p class="dp-muted" style="margin:6px 0 0">Last reachable stop ' + esc((p.last_reachable || {}).code || "\u2013") + ' \u00b7 first stop after the blockage ' + esc((p.first_after || {}).code || "\u2013") + '. Nearest combinations first; earlier diversion starts only when they help.</p>'
+      + (p.dd_chain ? '<p class="dp-muted" style="margin:6px 0 0"><b style="color:#cdb9ff">Double-deck stop chain:</b> ' + esc(p.dd_chain.text) + '</p>' : '') + '<ul class="dp-att">'
       + at.map(function(a){ var ok = a.result === "valid"; return '<li class="' + (ok ? "ok" : "no") + '"><span class="i">' + (ok ? "\u2713" : "\u2715") + '</span><span>' + (a.earlier ? '<em style="font-style:normal;color:#ffd391">earlier \u00b7 </em>' : '') + esc(a.from_code) + ' ' + esc(a.from_name) + ' \u2192 ' + esc(a.to_code) + ' ' + esc(a.to_name) + '</span><span class="r">' + esc(a.reason) + '</span></li>'; }).join("") + '</ul></details>';
   }
 
@@ -482,6 +492,74 @@
     saveW({limits:l}, {weights:w});
   };
   $("wReset").onclick = function(){ saveW({reset:true}, {reset:true}); };
+
+
+  /* ---------------------------------------------------------------- V16.23 magnifying lens (🔍): a round loupe that shows the map closer,
+     with every line, stop, arrow and label on it. Mouse: it follows the pointer and clicks still reach the map underneath.
+     Touch: it sits in the middle of the map - move the map under it, tap the lens to tap that exact point. */
+  var LENS = {on:false, el:null, map:null, z:0, touch:false, grp:null, t:null, base:"", last:null};
+  var LENS_STEPS = [0, 2, 3];                     // off, x4, x8 (zoom levels added)
+  function lensBuild(){
+    if(LENS.el) return;
+    var el = document.createElement("div"); el.className = "dp-lens"; el.setAttribute("aria-hidden", "true");
+    el.innerHTML = '<div class="dp-lens-map"></div><i class="dp-lens-x"></i><span class="dp-lens-z"></span>';
+    map.getContainer().parentNode.appendChild(el);
+    var lm = L.map(el.querySelector(".dp-lens-map"), {zoomControl:false, attributionControl:false, dragging:false, scrollWheelZoom:false, doubleClickZoom:false, boxZoom:false,
+      keyboard:false, touchZoom:false, tap:false, inertia:false, zoomAnimation:false, fadeAnimation:false, markerZoomAnimation:false, minZoom:10, maxZoom:20});
+    [["road", 400], ["orig", 410], ["skip", 415], ["alt", 420], ["div", 430], ["block", 440], ["arrows", 450], ["marks", 620]].forEach(function(p){ lm.createPane(p[0]).style.zIndex = p[1]; });
+    LENS.el = el; LENS.map = lm; LENS.grp = L.layerGroup().addTo(lm);
+    el.addEventListener("click", function(){ if(LENS.touch) map.fire("click", {latlng:map.getCenter()}); });
+  }
+  function lensCopy(ly, into){
+    if(ly instanceof L.LayerGroup){ ly.eachLayer(function(x){ lensCopy(x, into); }); return; }
+    var pn = ly.options && ly.options.pane, o = Object.assign({}, ly.options, {interactive:false});
+    delete o.pane; delete o.renderer; if(pn && LENS.map.getPane(pn)) o.pane = pn;       // never hand Leaflet an empty pane (a marker would fail)
+    if(ly instanceof L.CircleMarker) L.circleMarker(ly.getLatLng(), o).addTo(into);
+    else if(ly instanceof L.Polyline) (ly instanceof L.Polygon ? L.polygon : L.polyline)(ly.getLatLngs(), o).addTo(into);
+    else if(ly instanceof L.Marker){ var mo = {icon:ly.options.icon, interactive:false, keyboard:false}; if(o.pane) mo.pane = o.pane; L.marker(ly.getLatLng(), mo).addTo(into); }
+  }
+  function lensSync(){                         // base map + every overlay, copied (only while the lens is on)
+    if(!LENS.on || !LENS.map) return;
+    var base = [];
+    map.eachLayer(function(ly){ if(ly instanceof L.TileLayer) base.push(ly); });
+    var key = base.map(function(b){ return b._url; }).join("|");
+    if(key !== LENS.base){
+      LENS.map.eachLayer(function(ly){ if(ly instanceof L.TileLayer) LENS.map.removeLayer(ly); });
+      base.forEach(function(b){ L.tileLayer(b._url, Object.assign({}, b.options, {attribution:"", maxNativeZoom:b.options.maxNativeZoom || b.options.maxZoom || 19, maxZoom:22})).addTo(LENS.map); });   // beyond the tiles' own zoom: enlarge the last ones
+      LENS.base = key;
+    }
+    LENS.grp.clearLayers();
+    Object.keys(G).forEach(function(k){ lensCopy(G[k], LENS.grp); });
+  }
+  function lensLater(){ if(!LENS.on) return; clearTimeout(LENS.t); LENS.t = setTimeout(lensSync, 120); }
+  function lensView(ll){
+    if(!LENS.on || !ll) return;
+    LENS.map.setView(ll, Math.min(20, map.getZoom() + LENS.z), {animate:false});
+    LENS.el.querySelector(".dp-lens-z").textContent = "×" + Math.pow(2, LENS.z) + (LENS.touch ? " · tap to pick" : "");
+  }
+  function lensSet(step){
+    LENS.z = step; LENS.on = step > 0; LENS.touch = !!(window.matchMedia && matchMedia("(hover: none), (pointer: coarse)").matches);
+    var b = $("lensBtn"), host = map.getContainer().parentNode;
+    b.setAttribute("aria-pressed", String(LENS.on)); b.textContent = LENS.on ? "🔍 ×" + Math.pow(2, step) : "🔍";
+    b.title = LENS.on ? "Magnifying lens ×" + Math.pow(2, step) + (step === 2 ? " — click for ×8" : " — click to switch off") : "Magnifying lens: see the roads and stops closer";
+    if(!LENS.on){ if(LENS.el) LENS.el.classList.remove("on"); host.classList.remove("lens-hover"); if(/tap the lens/.test($("mapHint").textContent)) hint(""); return; }
+    lensBuild();
+    LENS.el.classList.toggle("touch", LENS.touch);
+    host.classList.toggle("lens-hover", !LENS.touch);
+    if(LENS.touch){ LENS.el.classList.add("on"); LENS.el.style.left = ""; LENS.el.style.top = ""; hint("Drag the map until the road is under the cross, then tap the lens"); }
+    LENS.map.invalidateSize(); LENS.base = ""; lensSync();
+    lensView(LENS.touch ? map.getCenter() : (LENS.last || map.getCenter()));
+  }
+  $("lensBtn").onclick = function(){ var i = LENS_STEPS.indexOf(LENS.z); lensSet(LENS.on ? LENS_STEPS[(i + 1) % LENS_STEPS.length] : 2); };
+  map.on("mousemove", function(e){
+    LENS.last = e.latlng; if(!LENS.on || LENS.touch) return;
+    LENS.el.style.left = e.containerPoint.x + "px"; LENS.el.style.top = e.containerPoint.y + "px"; LENS.el.classList.add("on");
+    lensView(e.latlng);
+  });
+  map.getContainer().addEventListener("mouseleave", function(){ if(LENS.on && !LENS.touch && LENS.el) LENS.el.classList.remove("on"); });
+  map.on("move zoom", function(){ if(LENS.on && LENS.touch) lensView(map.getCenter()); else if(LENS.on && LENS.last) lensView(LENS.last); });
+  map.on("layeradd layerremove", lensLater);
+  document.addEventListener("keydown", function(e){ if(e.key === "Escape" && LENS.on) lensSet(0); });
 
   hint("Tap the road where it is blocked");
   paintRec();

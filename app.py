@@ -8776,7 +8776,15 @@ async def route_between_stops(ctx, i, j, s0=None):
     a_ = (ctx["stops"][i]["lat"], ctx["stops"][i]["lon"]) if free else at(st0)
     b_ = at(max(stop_s[j] - 5.0, st0 + 10.0))
     h0, h1 = (None if free else ctx["heading"](a_)), ctx["heading"](b_)
-    reqs = [([a_, b_], P["alt_per_pair"], True, "router")]          # source codes: router | busvia | manual | adopt
+    reqs = [([a_, b_], P["alt_per_pair"], True, "router")]          # source codes: router | busvia | manual | adopt | ddchain
+    brs = {}
+    ch = (ctx.get("chains") or {}).get((i, j)) if s0 is None else None
+    if ch:          # V16.23: stop to stop along services that already run double-deckers (diversion.stop_chains)
+        coords_ = {c_: (ctx["st"]["stops"][c_]["lat"], ctx["st"]["stops"][c_]["lon"]) for c_ in ch["stops"] if c_ in ctx["st"]["stops"]}
+        vv = diversion.chain_vias(ch, coords_)
+        if vv:
+            reqs.append(([a_] + [v[0] for v in vv] + [b_], 0, True, "ddchain"))
+            brs[len(reqs) - 1] = [h0] + [v[1] for v in vv] + [h1]
     if not ctx["avoid"]:
         mid = ((a_[0] + b_[0]) / 2, (a_[1] + b_[1]) / 2)
         for v in sorted(ctx["bvias"], key=lambda v: diversion.dist_m(mid, v))[:3]:
@@ -8787,7 +8795,7 @@ async def route_between_stops(ctx, i, j, s0=None):
         for vv in (dn["vias"], list(reversed(dn["vias"]))):
             if len(vv) >= 2:
                 reqs.append(([a_] + [tuple(v) for v in vv] + [b_], 0, True, "manual" if dn["service"] == "OCC" else "adopt"))
-    res = await asyncio.gather(*[dv_osrm(c, alt, [h0] + [None] * (len(c) - 2) + [h1], ctx["avoid"] if av else None) for c, alt, av, _ in reqs])
+    res = await asyncio.gather(*[dv_osrm(c, alt, brs.get(k_) or ([h0] + [None] * (len(c) - 2) + [h1]), ctx["avoid"] if av else None) for k_, (c, alt, av, _) in enumerate(reqs)])
     out, err = [], None
     for x, (_, _, _, src) in zip(res, reqs):
         err = err or x.get("error")
@@ -8906,6 +8914,56 @@ async def dv_validate_route(ctx, r, i, j, s0=None):
 
 def st_ctx(ctx):
     return ctx["st"]
+
+
+def dv_dd_chains(st, svc, d, stops, ia, down, b0, block_lines, bus, upstream=4):
+    """V16.23 double-deck stop chain: from the last reachable stop (and up to `upstream` stops before it), move stop to stop
+    along services that already run double-deckers (LTA BusRoutes order, bus type learned from LTA Bus Arrival / OCC entries),
+    changing service only at a shared stop, until a stop on the own route after the blockage. -> ({(i, j): chain}, info)"""
+    P = diversion.PARAMS
+    tab = bt_table()
+    coords = {c: (x["lat"], x["lon"]) for c, x in st["stops"].items()}
+    bl0 = block_lines[0][0] if block_lines else None
+    if not bl0:
+        return {}, {"n": 0, "text": "no blockage"}
+    centre = bl0[len(bl0) // 2]
+    near = {c for c, q in coords.items() if diversion.dist_m(q, centre) <= P["chain_radius_m"]}
+    routes = {}
+    for key, rr in st["routes"].items():
+        if any(r["code"] in near for r in rr):
+            routes[key] = [(r["code"], r.get("dist")) for r in rr if r["code"] in coords]
+    starts_i = [i for i in range(ia, max(-1, ia - upstream - 1), -1)]
+    targets = {stops[j]["code"]: j - b0 for j in down}
+    res = diversion.stop_chains(routes, coords, lambda s_: bt_class(s_, tab), (svc, d), [stops[i]["code"] for i in starts_i], targets, block_lines, bus, centre, P)
+    out = {}
+    for i in starts_i:
+        for tcode, ch in (res.get(stops[i]["code"]) or {}).items():
+            j = next((jj for jj in down if stops[jj]["code"] == tcode), None)
+            if j is None or all(lg["own"] for lg in ch["legs"]):
+                continue        # only the own route: nothing new
+            out[(i, j)] = ch
+    svcs = {k[0] for k in routes}
+    n_dd = sum(1 for x in svcs if bt_class(x, tab) == "DD")
+    n_unk = sum(1 for x in svcs if bt_class(x, tab) is None)
+    best = min(out.values(), key=lambda c: c["cost"]) if out else None
+    info = {"n": len(out), "services_near": len(svcs), "dd_services": n_dd, "unknown_services": n_unk, "radius_km": round(P["chain_radius_m"] / 1000.0, 1),
+            "best": dv_chain_out(best, st) if best else None,
+            "text": (f"{len(out)} stop-to-stop chain(s) on double-deck services found; shortest {dv_chain_out(best, st)['text']}" if best else
+                     f"No stop-to-stop chain on double-deck services links a stop before the blockage to one after it within {P['chain_radius_m'] / 1000.0:g} km "
+                     f"({n_dd} of {len(svcs)} services nearby are known to run double-deckers, {n_unk} not known yet)")}
+    return out, info
+
+
+def dv_chain_out(ch, st):
+    """a chain for the page: the stops with names, one leg per service, and a one-line text"""
+    if not ch:
+        return None
+    nm = lambda c: (st["stops"].get(c) or {}).get("name", "")
+    stops_ = [{"code": c, "name": nm(c), "lat": st["stops"][c]["lat"], "lon": st["stops"][c]["lon"]} for c in ch["stops"] if c in st["stops"]]
+    legs = [{"svc": lg["svc"], "own": lg["own"], "from": lg["from"], "from_name": nm(lg["from"]), "to": lg["to"], "to_name": nm(lg["to"]),
+             "stops": len(lg["stops"]) - 1, "codes": list(lg["stops"]), "km": round(lg["m"] / 1000.0, 2)} for lg in ch["legs"]]
+    text = " → ".join([ch["stops"][0]] + [f"({lg['svc']}{' own route' if lg['own'] else ''}) {lg['to']}" for lg in legs]) + f", {ch['m'] / 1000.0:.1f} km"
+    return {"stops": stops_, "legs": legs, "km": round(ch["m"] / 1000.0, 2), "transfers": ch["transfers"], "unconfirmed": ch["unconfirmed"], "text": text}
 
 
 async def dv_stop_search(ctx):
@@ -9409,6 +9467,11 @@ async def dv2_plan(st, blocks, svc, d, run_i, traffic=True):
     weights = dv2_weights()
     limits = dv2_limits()
     b0 = down[0]
+    try:
+        ctx["chains"], chain_info = await asyncio.to_thread(dv_dd_chains, st, svc, d, stops, ia, down, b0, ctx["block_lines"], bus, Q["upstream_max"])
+    except Exception as e:
+        ctx["chains"], chain_info = {}, {"n": 0, "text": f"stop-chain search failed ({type(e).__name__})"}
+    base["dd_chain"] = chain_info
     evaluated, attempts, valid_all = {}, [], []
 
     def probes(i):
@@ -9480,7 +9543,10 @@ async def dv2_plan(st, blocks, svc, d, run_i, traffic=True):
                 reasons.append(f"rejoin stop {stops[c['pair'][1]]['code']} fails the next-leg check: {nxt['detail']}")
                 continue
             c["instr"], c["next_leg"], c["probe"] = instr, nxt, s0 is not None
-            if any(o["signature"] == c["signature"] and abs(o["div_m"] - c["div_m"]) < 150 and o["pair"] == c["pair"] for o in ok):
+            twin = next((o for o in ok if o["signature"] == c["signature"] and abs(o["div_m"] - c["div_m"]) < 150 and o["pair"] == c["pair"]), None)
+            if twin is not None:
+                if c.get("src") == "ddchain":
+                    twin["src"], twin["asked"] = "ddchain", c.get("asked")     # the same roads, proven stop by stop on double-deck services
                 continue
             ok.append(c)
 
@@ -9549,11 +9615,25 @@ async def dv2_plan(st, blocks, svc, d, run_i, traffic=True):
                     c["score"], c["parts"] = dv2.occ_score(c["m"], weights)
                     c["confidence"] = dv2.overall_confidence(c["m"])
                     valid_all.append(c)
+    # V16.23: always test the best double-deck stop chains too, so the stop-to-stop option can be compared
+    chain_todo = [ij for _, ij in sorted((ch["cost"], ij) for ij, ch in (ctx.get("chains") or {}).items() if ij not in evaluated)][:2]
+    if chain_todo:
+        res = await asyncio.gather(*[eval_pair(i, j) for i, j in chain_todo])
+        for ok in res:
+            for c in ok:
+                c["m"] = metrics(c)
+                c["score"], c["parts"] = dv2.occ_score(c["m"], weights)
+                c["confidence"] = dv2.overall_confidence(c["m"])
+                valid_all.append(c)
+    base["dd_chain"]["tested"] = sum(1 for c in valid_all if c.get("src") == "ddchain")
     # distinct candidates (same roads + same stops = one)
     uniq = []
-    for c in sorted(valid_all, key=lambda c: -c["score"]):
-        if not any(u["signature"] == c["signature"] and u["pair"] == c["pair"] for u in uniq):
+    for c in sorted(valid_all, key=lambda c: (-c["score"], c.get("src") != "ddchain")):
+        twin = next((u for u in uniq if u["signature"] == c["signature"] and u["pair"] == c["pair"]), None)
+        if twin is None:
             uniq.append(c)
+        elif c.get("src") == "ddchain" and twin.get("src") != "ddchain" and abs(twin["score"] - c["score"]) < 0.5:
+            twin["src"], twin["asked"] = "ddchain", c.get("asked")         # same roads: the stop chain proves them stop by stop
     strong = [c for c in uniq if c["confidence"] in ("HIGH", "MEDIUM")]
     attempts.sort(key=lambda a: (a["extra"], a["earlier"]))
     base["attempts"] = attempts
@@ -9581,7 +9661,9 @@ async def dv2_plan(st, blocks, svc, d, run_i, traffic=True):
                 "line": [[round(p[0], 6), round(p[1], 6)] for p in diversion.simplify(seg, 400)],
                 "skip_line": [[round(p[0], 6), round(p[1], 6)] for p in diversion.simplify(skip_line, 200)],
                 "leave_pt": [round(c["dep"]["leave_pt"][0], 6), round(c["dep"]["leave_pt"][1], 6)],
-                "rejoin_pt": [round(c["dep"]["rejoin_pt"][0], 6), round(c["dep"]["rejoin_pt"][1], 6)]}
+                "rejoin_pt": [round(c["dep"]["rejoin_pt"][0], 6), round(c["dep"]["rejoin_pt"][1], 6)],
+                "found_by": c.get("src", "router"),
+                "dd_chain": dv_chain_out((ctx.get("chains") or {}).get(c.get("asked")), st) if c.get("src") == "ddchain" else None}
 
     pool = strong or uniq
     if not pool:

@@ -78,6 +78,13 @@ PARAMS = {
     "excess_ratio": 3.0,
     "hub_services": 8,          # a stop served by at least this many services is a transfer hub
     "max_options": 4,
+    # ---- V16.23 double-deck stop chain: stop to stop along services that already run double-deckers
+    "chain_radius_m": 4000.0,     # stops considered: this far from the blockage
+    "chain_transfer_m": 250.0,    # cost of switching to another service at a shared stop (prefers staying on one service)
+    "chain_rejoin_stop_m": 150.0,  # cost per original stop rejoined after the first stop past the blockage (prefers an early rejoin)
+    "chain_unknown_factor": 1.6,  # services whose bus type is not known yet: allowed, but each metre counts 1.6x and the chain is flagged
+    "chain_max_m": 9000.0,        # longest chain kept
+    "chain_edge_buffer_m": 25.0,  # a stop-to-stop link that comes this close to the blocked section (away from its ends) is closed
     # V16.15 — several blockages, major-road policy, recommendation, network plan
     "merge_gap_m": 1500.0,      # two blocked runs on one service line closer than this are bypassed by ONE diversion
     "class_step_m": 20.0,       # road-class sampling interval along a diversion
@@ -1374,3 +1381,148 @@ def select_best_diversion(opts, search=None):
     return {"action": "divert", "option": best["n"], "route_if_extended": None,
             "headline": f"RECOMMENDED: {best['name']} VIA " + " \u2192 ".join(r.upper() for r in best["roads"][:4]),
             "reasons": reasons, "cautions": [] if best["confidence"] == "HIGH" else ["MEDIUM confidence: limited bus-road evidence \u2014 confirm the roads."]}
+
+
+
+# ------------------------------------------------------------------------------------------------ V16.23 double-deck stop chain
+def stop_chains(routes, coords, svc_class, own_key, starts, targets, block_lines, bus="dd", centre=None, P=PARAMS):
+    """The OCC rule of thumb, made exact: from a stop the bus can still reach, move only to the NEXT stop of a service that
+    already runs double-deckers there (a road those buses really drive, in that direction); switch service only at a stop both
+    serve; repeat until a stop on the bus's own route after the blockage is reached. Shortest such chain by road distance
+    (LTA BusRoutes distances), with a small cost per service change and per extra original stop skipped. Dijkstra over
+    (stop, service) states.
+      routes      {(svc, d): [(code, dist_km), ...]} in stop order (LTA BusRoutes)
+      coords      {code: (lat, lon)}
+      svc_class   svc -> "DD" | "SD" | None (not known yet)
+      own_key     (svc, d) of the diverted service: its own stops before the blockage are always usable
+      starts      [stop code]: where the bus can leave its route (last reachable stop and a few before it)
+      targets     {stop code: extra stops skipped after the first stop past the blockage}
+      block_lines [(line, directed)]
+    -> {start code: {target code: chain}}; chain = {"stops", "legs": [{"svc", "d", "from", "to", "m"}], "m", "cost", "transfers", "unconfirmed"}"""
+    import heapq
+    R = P["chain_radius_m"]
+    if centre is None:
+        pts_ = [coords[c] for c in list(starts) + list(targets) if c in coords]
+        centre = (sum(p[0] for p in pts_) / len(pts_), sum(p[1] for p in pts_) / len(pts_)) if pts_ else None
+    if centre is None:
+        return {}
+
+    def near(c):
+        q = coords.get(c)
+        return q is not None and dist_m(q, centre) <= R
+
+    def ok_svc(key):
+        if key == own_key:
+            return 1.0
+        if bus != "dd":
+            return 1.0
+        k = svc_class(key[0])
+        return 1.0 if k == "DD" else (P["chain_unknown_factor"] if k is None else None)
+
+    closed_cache = {}
+
+    def closed(a, b):
+        k = (a, b)
+        if k not in closed_cache:
+            closed_cache[k] = not validate_block_avoidance([coords[a], coords[b]], block_lines, P["chain_edge_buffer_m"], P)[0]
+        return closed_cache[k]
+
+    nxt, at_stop, factor = {}, {}, {}
+    for key, seq in routes.items():
+        f = ok_svc(key)
+        if f is None:
+            continue
+        for (a, da), (b, db) in zip(seq, seq[1:]):
+            if a == b or not (near(a) and near(b)):
+                continue
+            if closed(a, b):
+                continue
+            m = (db - da) * 1000.0 if (da is not None and db is not None and db > da) else dist_m(coords[a], coords[b]) * 1.3
+            if m <= 0 or m > 3000:
+                continue
+            nxt.setdefault((a, key), []).append((b, m))
+            at_stop.setdefault(a, set()).add(key)
+            at_stop.setdefault(b, set()).add(key)
+            factor[key] = f
+    out = {}
+    for s0 in starts:
+        if s0 not in at_stop:
+            continue
+        best, prev, heap = {}, {}, []
+        for key in at_stop[s0]:
+            c0 = 0.0 if key == own_key else P["chain_transfer_m"]
+            st_ = (s0, key)
+            best[st_] = c0
+            heapq.heappush(heap, (c0, 0.0, s0, key))
+        found = {}
+        while heap:
+            cost, m, code, key = heapq.heappop(heap)
+            if cost > best.get((code, key), 1e18) + 1e-9 or m > P["chain_max_m"]:
+                continue
+            if code in targets and code != s0 and code not in found:
+                found[code] = (cost + P["chain_rejoin_stop_m"] * targets[code], m, (code, key))
+                if len(found) >= len(targets):
+                    break
+                continue          # the chain ends where it rejoins the route
+            for b, L in nxt.get((code, key), ()):
+                nc = cost + L * factor[key]
+                if nc < best.get((b, key), 1e18) - 1e-9:
+                    best[(b, key)] = nc
+                    prev[(b, key)] = (code, key, L)
+                    heapq.heappush(heap, (nc, m + L, b, key))
+            for k2 in at_stop.get(code, ()):
+                if k2 != key:
+                    nc = cost + P["chain_transfer_m"]
+                    if nc < best.get((code, k2), 1e18) - 1e-9:
+                        best[(code, k2)] = nc
+                        prev[(code, k2)] = (code, key, 0.0)
+                        heapq.heappush(heap, (nc, m, code, k2))
+        res = {}
+        for tcode, (cost, m, st_) in found.items():
+            path, cur = [], st_
+            while cur in prev:
+                pc, pk, L = prev[cur]
+                path.append((pc, pk, cur[0], cur[1], L))
+                cur = (pc, pk)
+            path.reverse()
+            legs = []
+            for a, ka, b, kb, L in path:
+                if L <= 0:
+                    continue            # a service change at the same stop
+                if legs and legs[-1]["svc"] == kb[0] and legs[-1]["d"] == kb[1] and legs[-1]["to"] == a:
+                    legs[-1]["to"], legs[-1]["m"], legs[-1]["stops"] = b, legs[-1]["m"] + L, legs[-1]["stops"] + [b]
+                else:
+                    legs.append({"svc": kb[0], "d": kb[1], "from": a, "to": b, "m": L, "stops": [a, b], "own": kb == own_key})
+            if not legs:
+                continue
+            stops_ = [legs[0]["from"]]
+            for lg in legs:
+                stops_ += lg["stops"][1:]
+            unk = sorted({lg["svc"] for lg in legs if not lg["own"] and bus == "dd" and svc_class(lg["svc"]) is None})
+            res[tcode] = {"start": s0, "end": tcode, "stops": stops_, "legs": legs, "m": round(m, 1), "cost": round(cost, 1),
+                          "transfers": sum(1 for x, y in zip(legs, legs[1:]) if (x["svc"], x["d"]) != (y["svc"], y["d"])), "unconfirmed": unk}
+        out[s0] = res
+    return out
+
+
+def chain_vias(chain, coords, max_n=10):
+    """the chain's stops the routing engine must pass (each with the heading of the service there), at most max_n:
+    every service change is kept, the rest spread evenly. -> [((lat, lon), bearing)]"""
+    st_ = chain["stops"]
+    if len(st_) <= 2:
+        return []
+    keep = set()
+    for lg in chain["legs"][1:]:
+        keep.add(lg["from"])
+    inner = st_[1:-1]
+    rest = [c for c in inner if c not in keep]
+    room = max(0, max_n - len(keep))
+    if rest and room:
+        step = max(1.0, len(rest) / room)
+        keep |= {rest[int(k * step)] for k in range(min(room, len(rest)))}
+    out = []
+    for i, c in enumerate(st_):
+        if 0 < i < len(st_) - 1 and c in keep and c in coords:
+            a_, b_ = st_[i - 1], st_[i + 1]          # heading through the stop: from the stop before to the stop after (fits a stop on a corner too)
+            out.append((coords[c], bearing(coords[a_], coords[b_]) if a_ in coords and b_ in coords else None))
+    return out[:max_n]

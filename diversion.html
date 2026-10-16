@@ -70,6 +70,26 @@
 .dp-mapbtn{position:absolute;right:10px;top:10px;z-index:650;display:flex;gap:6px}
 .dp-mapbtn button{height:34px;padding:0 11px;border-radius:9px;border:1px solid var(--ds-line-2);background:rgba(5,15,30,.92);color:#e6f1ff;font:700 11px var(--ds-font);letter-spacing:.08em;cursor:pointer}
 .dp-mapbtn button:focus-visible{outline:2px solid var(--ds-cyan)}
+.dp-mapbtn button[aria-pressed="true"]#lensBtn{border-color:var(--ds-cyan);background:rgba(56,214,255,.18);color:#fff}
+/* V16.23 magnifying lens: a round loupe that shows the map closer, with every line, stop and label */
+.dp-lens{position:absolute;z-index:700;width:190px;height:190px;border-radius:50%;overflow:hidden;border:3px solid #38d6ff;box-shadow:0 0 0 2px rgba(0,0,0,.65),0 12px 34px rgba(0,0,0,.65),inset 0 0 18px rgba(0,0,0,.45);pointer-events:none;visibility:hidden;transform:translate(-50%,-50%);background:#06101d}
+.dp-lens.on{visibility:visible}
+.dp-lens .dp-lens-map{position:absolute;inset:0;background:#06101d}
+.dp-lens .dp-lens-map .leaflet-control-container{display:none}
+.dp-lens-x{position:absolute;left:50%;top:50%;width:26px;height:26px;transform:translate(-50%,-50%);z-index:800;pointer-events:none}
+.dp-lens-x:before,.dp-lens-x:after{content:"";position:absolute;background:#fff;box-shadow:0 0 0 1px rgba(0,0,0,.7)}
+.dp-lens-x:before{left:12px;top:0;width:2px;height:26px}.dp-lens-x:after{top:12px;left:0;height:2px;width:26px}
+.dp-lens-z{position:absolute;left:50%;bottom:10px;transform:translateX(-50%);z-index:800;padding:2px 8px;border-radius:999px;background:rgba(5,15,30,.85);color:#bfefff;font:700 10.5px var(--ds-font);letter-spacing:.06em;pointer-events:none;white-space:nowrap}
+.dp-lens.touch{left:50%;top:50%;width:170px;height:170px;pointer-events:auto;cursor:pointer}
+.dp-map.lens-hover .leaflet-container{cursor:crosshair}
+@media (prefers-reduced-motion:no-preference){.dp-lens.on{animation:dplens .14s ease-out}}
+@keyframes dplens{from{opacity:0;transform:translate(-50%,-50%) scale(.85)}to{opacity:1;transform:translate(-50%,-50%) scale(1)}}
+/* V16.23 double-deck stop chain */
+.dp-ddstop{width:12px;height:12px;border-radius:3px;background:#a07bff;border:2px solid #fff;transform:translate(-50%,-50%);box-shadow:0 0 0 1px rgba(0,0,0,.6)}
+.dp-ddleg{display:grid;grid-template-columns:auto minmax(0,1fr);gap:2px 8px;align-items:baseline;margin:0;padding:0;list-style:none}
+.dp-ddleg li{display:contents}
+.dp-ddleg .sv{font:700 11px var(--ds-font);padding:2px 7px;border-radius:6px;background:rgba(160,123,255,.18);border:1px solid rgba(160,123,255,.55);color:#e5dcff;white-space:nowrap}
+.dp-ddleg .tx{font-size:12.5px;color:var(--ds-text-2);line-height:1.45;padding:2px 0}
 .dp-arrow{width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-bottom:12px solid var(--c);filter:drop-shadow(0 0 1.5px #fff) drop-shadow(0 0 1px #fff);transform-origin:50% 50%}
 .dp-handle{width:18px;height:18px;border-radius:50%;background:#fff;border:4px solid #ff5566;box-shadow:0 0 0 4px rgba(255,85,102,.3);transform:translate(-50%,-50%);cursor:grab}
 .dp-x{transform:translate(-50%,-50%);width:30px;height:30px;border-radius:8px;background:#c81e36;border:2px solid #fff;color:#fff;display:flex;align-items:center;justify-content:center;font:700 16px var(--ds-font);box-shadow:0 4px 12px rgba(0,0,0,.5)}
@@ -134,6 +154,7 @@ path.dp-anim{stroke-dasharray:14 9;animation:dpdash 1.2s linear infinite}
 }
 /* phone: search + map first, then panels */
 @media (max-width:699px){
+  .dp-maphint{top:52px}                                 /* V16.23: below the map buttons (lens, settings, legend) on phones */
   .dp{display:flex;flex-direction:column;height:auto;padding:8px 8px calc(80px + env(safe-area-inset-bottom,0px));gap:8px}
   .dp-col{overflow:visible}
   .dp-map{height:58vh;min-height:320px;order:2}
@@ -220,7 +241,7 @@ path.dp-anim{stroke-dasharray:14 9;animation:dpdash 1.2s linear infinite}
     <div id="map"></div>
     <div class="dp-maphint" id="mapHint">Tap the road where it is blocked</div>
     <div class="dp-bin" id="dpBin" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6"/></svg><span>Drop here to delete</span></div>
-    <div class="dp-mapbtn"><button type="button" id="wBtn" title="Diversion limits and score weights" aria-label="Diversion settings">SETTINGS</button><button type="button" id="lgBtn" aria-pressed="true">LEGEND</button></div>
+    <div class="dp-mapbtn"><button type="button" id="lensBtn" aria-pressed="false" title="Magnifying lens: see the roads and stops closer" aria-label="Magnifying lens">&#x1F50D;</button><button type="button" id="wBtn" title="Diversion limits and score weights" aria-label="Diversion settings">SETTINGS</button><button type="button" id="lgBtn" aria-pressed="true">LEGEND</button></div>
     <div class="dp-legend" id="legend">
       <i style="border-color:#38d6ff"></i><span>Original service route</span>
       <i style="border-color:#e0263f"></i><span>Blocked road (arrows = blocked direction)</span>
@@ -230,6 +251,7 @@ path.dp-anim{stroke-dasharray:14 9;animation:dpdash 1.2s linear infinite}
       <i class="dot" style="background:#2f8cff"></i><span>Stop served</span>
       <i class="dot" style="background:#e0a020"></i><span>Stop skipped</span>
       <i class="dot" style="background:#12a865"></i><span>Rejoin stop</span>
+      <i class="dot" style="background:#a07bff;border-radius:3px"></i><span>Stop on a double-deck service the diversion follows</span>
     </div>
   </section>
 
