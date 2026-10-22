@@ -1624,6 +1624,13 @@ async def basemap_js():
     return Response(js, media_type="application/javascript", headers={"Cache-Control": "public, max-age=600"})
 
 
+@app.get("/map3d.js")
+async def map3d_js():
+    """V16.24: the shared 3D map (Route Traffic, Diversion Maps, Halfway Planner) - MapLibre GL + OpenFreeMap, loaded by the browser only when 3D is opened"""
+    from fastapi.responses import Response
+    return Response((HERE / "map3d.js").read_text(encoding="utf-8"), media_type="application/javascript", headers={"Cache-Control": "public, max-age=600"})
+
+
 # ---- V15.9 shared command-platform design system + single-source navigation registry.
 # Loaded by pages one at a time as they are redesigned; pages that don't include them are unaffected.
 @app.get("/design-system.css")

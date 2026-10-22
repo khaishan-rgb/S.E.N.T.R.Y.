@@ -282,6 +282,16 @@ path.dp-anim{stroke-dasharray:14 9;animation:dpdash 1.2s linear infinite}
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="/basemap.js"></script>
+<!-- V16.24: the shared 3D map (as on Route Traffic). 3D button in the map toolbar; the blockage stands up as a red barrier. -->
+<script src="/map3d.js"></script>
+<script>
+if(window.SG3D) SG3D.auto("map", {key:"dv.3d", z:560, id:"dv3dBtn", button:{into:".dp-mapbtn", first:true}, compass:"top-right", attrib:"bottom-left",
+  vars:{"--sg3d-ct":"52px", "--sg3d-ol":"10px", "--sg3d-or":"auto", "--sg3d-ob":"auto", "--sg3d-ot":"84px"},
+  varsSmall:{"--sg3d-ct":"92px", "--sg3d-ol":"auto", "--sg3d-or":"10px", "--sg3d-ob":"auto", "--sg3d-ot":"150px"},
+  walls:{label:"Raise blockage", title:"Show the blocked road as a raised red barrier", panes:{block:6}, heights:{"#e0263f":22}, on:true},
+  hide:["#lensBtn"],
+  hint:(window.matchMedia && matchMedia("(pointer: coarse)").matches) ? "3D view: two fingers to turn and tilt. Tap a road to place a blockage and tap a route to view it, as usual." : "3D view: right-drag (or Ctrl + drag) to turn and tilt. Click a road to place a blockage and click a route to view it, as usual."});
+</script>
 <script src="/diversion.js"></script>
 </body>
 </html>

@@ -508,6 +508,14 @@ body.navmode .chips,body.navmode .legend{display:none}
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="/basemap.js"></script>
+<!-- V16.24: the shared 3D map (as on Route Traffic): a 3D button at the bottom right of the map. -->
+<script src="/map3d.js"></script>
+<script>
+if(window.SG3D) SG3D.auto("map", {key:"hwos.3d", z:450, compass:"top-right", lift:".bm", below:"#chips", small:999, row:true, attribSmall:"top-right",
+  vars:{"--sg3d-br":"10px", "--sg3d-bb":"34px", "--sg3d-or":"72px", "--sg3d-ob":"34px", "--sg3d-ct":"var(--sg3d-below)"},
+  varsSmall:{"--sg3d-bb":"auto", "--sg3d-bt":"var(--sg3d-below)", "--sg3d-or":"62px", "--sg3d-ob":"auto", "--sg3d-ot":"calc(var(--sg3d-below) + 3px)", "--sg3d-ct":"calc(var(--sg3d-below) + 54px)"},
+  toast:function(m, ms){ if(typeof toast === "function") toast(m, ms); }});
+</script>
 <script>
 "use strict";
 /* ===================== SG Transport Pulse V14.1 · Halfway Planner =====================

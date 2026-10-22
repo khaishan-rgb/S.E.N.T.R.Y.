@@ -316,6 +316,16 @@ tr.sel .radio{border-color:var(--ai);background:radial-gradient(circle,var(--ai)
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="/basemap.js"></script>
+<!-- V16.24: the shared 3D map (as on Route Traffic) on both maps of this page: a 3D button at the bottom right of each map. -->
+<script src="/map3d.js"></script>
+<script>
+if(window.SG3D){
+  SG3D.auto("map", {key:"hw.3d", z:450, compass:"top-left", attrib:"top-left", vars:{"--sg3d-br":"10px", "--sg3d-bb":"10px", "--sg3d-or":"72px", "--sg3d-ob":"10px", "--sg3d-ct":"84px"},
+    varsSmall:{"--sg3d-or":"10px", "--sg3d-ob":"64px"}});
+  SG3D.auto("omap", {key:"hwo.3d", z:450, compass:"top-left", attrib:"top-left", vars:{"--sg3d-br":"10px", "--sg3d-bb":"10px", "--sg3d-or":"72px", "--sg3d-ob":"10px", "--sg3d-ct":"84px"},
+    varsSmall:{"--sg3d-or":"10px", "--sg3d-ob":"64px"}});
+}
+</script>
 <script>
 "use strict";
 /* SG Transport Pulse V15.1 - Halfway Planner.

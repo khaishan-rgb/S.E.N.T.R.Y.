@@ -1,30 +1,41 @@
 # SG Transport Pulse V16.19 — Operational Intelligence & Service Recovery Platform
 
-## Route Traffic — 3D view (index.html only)
-A **3D VIEW** button on the Route Traffic map, above the compass, tilts the map and shows the buildings in 3D. Press it again (**2D VIEW**) to return to the flat map at the same place. The page remembers the last choice in the browser.
-* **What you see**:
-  * A dark navy map with the buildings raised to their real height (from OpenStreetMap).
-  * The route in its LTA speed-band colours, with a soft glow.
-  * Bus stops, and the live buses as the same bus icons. Close up, each bus is also drawn as a small 3D bus along the road.
-  * Incidents, road works, cameras, rainfall, the island speed layer and the TomTom colours, whichever layers are switched on.
-* **Same map, same data**: the 3D map is a live copy of the normal map.
-  * Every refresh, filter, layer chip and service selection shows in 3D straight away.
-  * Tapping a stop or a bus works as before: the same arrivals panel and popups, shown in 3D.
-  * "Fit to route", flying to a bus and the + / − buttons move the 3D camera.
-  * Moving the 3D map moves the normal map too.
+## 3D maps — Route Traffic, Diversion Maps, Halfway Planner (shared `map3d.js`)
+One shared 3D map, the same on all three pages. A **3D** button tilts the map and shows the buildings in 3D; press **2D** to return to the flat map at the same place. Each map remembers its last choice in the browser.
+* **Where the button is**:
+
+  | Page | Button | Options |
+  |---|---|---|
+  | Route Traffic | round **3D VIEW** button above the compass | Buildings · **Raise slow traffic** (moderate 14 m, slow 34 m, congested 60 m) · Tilt |
+  | Diversion Maps | **3D** in the map toolbar, before the lens / SETTINGS / LEGEND | Buildings · **Raise blockage** (the blocked road as a red barrier, on by default) · Tilt |
+  | Halfway Planner (`/halfway`) | on both maps (options map and off-service route map), bottom right | Buildings · Tilt |
+  | Halfway Planner (`/halfway/os`) | bottom right; on phones at the top right, clear of the bottom panel | Buildings · Tilt |
+
+* **Same map, same data**: the 3D map is a live copy of the page's own map.
+  * Every line, stop, bus, arrow, label and layer chip carries over: traffic colours, island speed, TomTom colours, incidents, road works, cameras and rain; on Diversion Maps the diversion, alternatives, blockage, double-deck chain stops and arrows.
+  * Every refresh and selection shows straight away.
+* **Taps and clicks work as in 2D**: they run the page's own handlers.
+  * Stop and bus popups open in 3D; Route Traffic arrivals update inside them.
+  * Hovering shows the same tooltips.
+  * Clicking an alternative route selects it.
+  * Tapping an empty road on Diversion Maps places a blockage (or says it is locked).
+  * "Fit to route", flying to a bus and the + / − buttons move the 3D camera; moving the 3D map moves the normal map too.
+* **What stays 2D**:
+  * The diversion lens (🔍) is hidden in 3D.
+  * Dragging the blockage ends works in 2D only.
 * **Controls**:
   * Right-drag, or Ctrl + drag, to turn and tilt; two fingers on a phone.
-  * The small compass top right resets north.
-  * Options next to the 3D button:
-    * **Buildings** shows or hides the 3D buildings.
-    * **Raise slow traffic** turns slow and congested stretches into raised bands: moderate 14 m, slow 34 m, congested 60 m, so the slowest stand tallest.
-    * **Tilt** steps through 60° / 75° / 45° / flat.
-  * On phones these are small icon buttons in the right-hand column.
+  * The small compass resets north.
+  * On phones the options are icon buttons: 🏢 buildings, ▲ raise, 60° tilt.
+  * Close up on Route Traffic, each live bus is also drawn as a small 3D bus along the road.
 * **Free, no key**: MapLibre GL JS 4.7.1 (from unpkg, like Leaflet) and OpenFreeMap vector tiles (OpenStreetMap data with building heights).
-  * Nothing is downloaded until 3D is first opened, and the 2D map is unchanged.
-  * If the vector tiles are blocked on a network, the 3D view uses the normal basemap, tilted, and says so.
+  * Nothing is downloaded until a 3D button is first pressed, then the library is loaded once for the page. The 2D maps are unchanged.
+  * If the vector tiles are blocked on a network, the 3D view shows the normal basemap, tilted, and says so.
   * If the library cannot load, or the device has no WebGL, the page stays in 2D with a message.
-* No server change: no new API and no new setting.
+* **Files**:
+  * `map3d.js` (new, served at `/map3d.js` by a small route in `app.py`).
+  * A short setup block in `index.html`, `diversion.html`, `halfway_planner.html` and `hplanner.html`, saying where the button and options go on that page.
+  * No other server change, no new API, no new setting.
 
 ## Recovery Decision Engine — lean view: Enter → Compare on EWT → Decide (halfway.html only)
 The page (`/recovery`) now opens on three steps. Engine, APIs, Settings tab and every earlier figure are unchanged; the long analysis is kept, folded under **Full analysis**.
