@@ -1,5 +1,31 @@
 # SG Transport Pulse V16.19 — Operational Intelligence & Service Recovery Platform
 
+## Route Traffic — 3D view (index.html only)
+A **3D VIEW** button on the Route Traffic map, above the compass, tilts the map and shows the buildings in 3D. Press it again (**2D VIEW**) to return to the flat map at the same place. The page remembers the last choice in the browser.
+* **What you see**:
+  * A dark navy map with the buildings raised to their real height (from OpenStreetMap).
+  * The route in its LTA speed-band colours, with a soft glow.
+  * Bus stops, and the live buses as the same bus icons. Close up, each bus is also drawn as a small 3D bus along the road.
+  * Incidents, road works, cameras, rainfall, the island speed layer and the TomTom colours, whichever layers are switched on.
+* **Same map, same data**: the 3D map is a live copy of the normal map.
+  * Every refresh, filter, layer chip and service selection shows in 3D straight away.
+  * Tapping a stop or a bus works as before: the same arrivals panel and popups, shown in 3D.
+  * "Fit to route", flying to a bus and the + / − buttons move the 3D camera.
+  * Moving the 3D map moves the normal map too.
+* **Controls**:
+  * Right-drag, or Ctrl + drag, to turn and tilt; two fingers on a phone.
+  * The small compass top right resets north.
+  * Options next to the 3D button:
+    * **Buildings** shows or hides the 3D buildings.
+    * **Raise slow traffic** turns slow and congested stretches into raised bands: moderate 14 m, slow 34 m, congested 60 m, so the slowest stand tallest.
+    * **Tilt** steps through 60° / 75° / 45° / flat.
+  * On phones these are small icon buttons in the right-hand column.
+* **Free, no key**: MapLibre GL JS 4.7.1 (from unpkg, like Leaflet) and OpenFreeMap vector tiles (OpenStreetMap data with building heights).
+  * Nothing is downloaded until 3D is first opened, and the 2D map is unchanged.
+  * If the vector tiles are blocked on a network, the 3D view uses the normal basemap, tilted, and says so.
+  * If the library cannot load, or the device has no WebGL, the page stays in 2D with a message.
+* No server change: no new API and no new setting.
+
 ## Recovery Decision Engine — lean view: Enter → Compare on EWT → Decide (halfway.html only)
 The page (`/recovery`) now opens on three steps. Engine, APIs, Settings tab and every earlier figure are unchanged; the long analysis is kept, folded under **Full analysis**.
 * **Lean Six Sigma basis.** One decision metric — **EWT** (Excess Wait Time: the extra minutes the average passenger waits beyond the timetable). Two guardrails only — **max gap** and **km not run**. One fixed decision rule. No duplicated figures (EWT was shown four times before). Page length with one late trip: desktop 5.4 → 2.1 screens, phone 10.6 → 3.9 screens.
