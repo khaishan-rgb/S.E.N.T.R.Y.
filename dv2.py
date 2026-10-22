@@ -12,12 +12,13 @@ import diversion as D
 
 # OCC DIVERSION SCORE weights (percent). Tunable from the page (stored by the server).
 # HARD limits on a diversion (applied before scoring; a candidate over any limit is rejected, never ranked)
-DEFAULT_LIMITS = {"max_extra_km": 3.0, "max_extra_min": 10.0, "max_ratio": 3.0, "max_skipped": 8, "dd_sd_roads": 1}
+DEFAULT_LIMITS = {"max_extra_km": 3.0, "max_extra_min": 10.0, "max_ratio": 3.0, "max_skipped": 8, "dd_sd_roads": 1, "dd_weight_roads": 1}
 LIMIT_LABELS = {"max_extra_km": ["Extra distance safeguard", "km", 0.5, 15.0, 0.5],
                 "max_extra_min": ["Extra running time safeguard", "min", 2.0, 40.0, 1.0],
                 "max_ratio": ["Length vs the normal section safeguard", "\u00d7", 1.5, 8.0, 0.5],
                 "max_skipped": ["Stops skipped safeguard", "stops", 1, 20, 1],
-                "dd_sd_roads": ["Double-deckers on roads where only single-deck services run", "1 = allowed, flagged to confirm \u00b7 0 = never", 0, 1, 1]}
+                "dd_sd_roads": ["Double-deckers on roads where only single-deck services run", "1 = allowed, flagged to confirm \u00b7 0 = never", 0, 1, 1],
+                "dd_weight_roads": ["Double-deckers on another service's diversion where TomTom shows a weight limit (height is fine)", "1 = allowed, flagged to confirm \u00b7 0 = never", 0, 1, 1]}
 
 
 def safeguards(m, L):
@@ -73,6 +74,12 @@ PARAMS = {
     "early_rejoin_tries": 6,     # at most this many such routing requests per plan
     "dd_height_m": 4.6,          # clearance a double-decker needs (OpenStreetMap maxheight below this: not permitted)
     "sd_height_m": 3.4,          # ...a single-deck bus
+    # V16.25 share pass: every affected service is also checked against the other affected services' best diversions
+    "share_max": 4,              # other services' diversions tried per service
+    "share_on_route_m": 40.0,    # their turn-off / rejoin point must lie on this service's own route (within this distance)
+    "share_follow_m": 60.0,      # the routing engine's route must stay within this of their roads...
+    "share_follow_frac": 0.85,   # ...for at least this share of them (else it went another way)
+    "share_weight_pen": 8.0,     # score penalty when TomTom shows a weight limit on those roads (double-decker, flagged)
 }
 
 TURN_WORDS = [(20, "STRAIGHT"), (60, "SLIGHT"), (120, ""), (165, "SHARP")]
@@ -300,8 +307,12 @@ def why_this(best, ctx_m):
         out.append(f"Rejoins at the nearest practical stop \u2014 {m['rejoin_name']}, {m['nearer_than'][0]} stop(s) earlier than the top-scoring route ({m['nearer_than'][1]})")
     if m.get("early_turn"):
         out.append("Turns back early from the wider diversion to reach that stop")
+    if m.get("shared_from"):
+        out.append(f"Same roads as service {m['shared_from']}'s diversion \u2014 checked again for this bus (its own stops and size)")
     if m.get("dd_sd"):
         out.append(f"Double-decker on {m['dd_sd']}: only single-deck services run there \u2014 confirm the bus fits (no low trees or bridges)")
+    if m.get("tt_weight"):
+        out.append(f"Double-decker on {m['tt_weight']}: TomTom's map shows a weight limit under the bus's 18 t (the height is fine) \u2014 confirm buses may use it")
     if m["leave_after_ia"] >= 0 and not m["earlier"]:
         out.append(f"Continues the normal route as long as practical \u2014 serves every reachable stop up to {m['leave_name']}")
     elif m["earlier"]:

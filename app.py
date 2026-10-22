@@ -7105,6 +7105,9 @@ DV_TT_MODE = os.getenv("DIVERSION_TOMTOM_MODE", "bus").strip().lower()      # To
 DV_TT_STATS = {"ok": 0, "fail": 0, "capped": 0, "error": None}
 # vehicle dimensions sent to TomTom (m, kg): double-deck 4.4 m high; articulated 18 m long
 DV_TT_DIMS = {"dd": (4.4, 2.55, 12.0, 18000), "sd": (3.2, 2.55, 12.0, 16000), "bd": (3.2, 2.55, 18.0, 25000)}
+# V16.25: diagnosis only (which of a double-decker's dimensions TomTom refuses on a road): its height with a single-decker's
+# weight, and its weight with a single-decker's height
+DV_TT_DIMS.update({"dd_ht": (4.4, 2.55, 12.0, 16000), "dd_wt": (3.2, 2.55, 12.0, 18000)})
 _TT_MAN = {"DEPART": ("depart", ""), "ARRIVE": ("arrive", ""), "ARRIVE_LEFT": ("arrive", ""), "ARRIVE_RIGHT": ("arrive", ""),
            "STRAIGHT": ("continue", "straight"), "KEEP_RIGHT": ("fork", "slight right"), "KEEP_LEFT": ("fork", "slight left"),
            "BEAR_RIGHT": ("turn", "slight right"), "BEAR_LEFT": ("turn", "slight left"), "TURN_RIGHT": ("turn", "right"),
@@ -9444,7 +9447,7 @@ async def api_dv2_affected(request: Request):
     return {"ok": True, "services": out, "basis": basis, "dir": body.get("dir") or "both"}
 
 
-async def dv2_plan(st, blocks, svc, d, run_i, traffic=True):
+async def dv2_plan(st, blocks, svc, d, run_i, traffic=True, donors=None):
     P, Q = diversion.PARAMS, dv2.PARAMS
     mids = [b["line"][len(b["line"]) // 2] for b in blocks]
     line, src = await dv_line(st, svc, d, focus=mids)
@@ -9642,6 +9645,10 @@ async def dv2_plan(st, blocks, svc, d, run_i, traffic=True):
             m["warnings"].append(f"Double-decker on {m['dd_sd']}: only single-deck services run there \u2014 confirm the bus fits (trees, bridges)")
             m["penalty"] = round(m["penalty"] + min(12.0, 5.0 + 6.0 * sum(x["m"] for x in sdl) / 1000.0), 1)
         m["early_turn"] = c.get("src") == "early"
+        if c.get("tt_weight"):                                            # V16.25: TomTom shows a weight limit there (height fine)
+            m["tt_weight"] = c["tt_weight"]
+            m["warnings"].append(f"Double-decker on {c['tt_weight']}: TomTom's map shows a weight limit under 18 t \u2014 confirm buses may use it")
+            m["penalty"] = round(m["penalty"] + Q["share_weight_pen"], 1)
         return m
 
     # progressive search: nearest combinations first; stop expanding soon after a strong valid diversion
@@ -9725,6 +9732,127 @@ async def dv2_plan(st, blocks, svc, d, run_i, traffic=True):
                 valid_all.append(c2)
             if ok2:
                 break
+    # V16.25 share pass: the other affected services' best diversions (sent by the page once every service is analysed) are
+    # tried for THIS service - from its own stops, for its own bus size - so services at the same blockage never end up on
+    # different routes without a reason. Each one is either adopted as a candidate or comes back with the exact reason.
+    shared, shared_c = [], []
+    win0 = max(0.0, A - 3000.0)
+
+    def share_geom(dn):
+        """where the other service's diversion turns off / comes back onto THIS service's route, and its off-route points"""
+        dl = [(float(p_[0]), float(p_[1])) for p_ in (dn.get("line") or [])][:600]
+        lp = (float(dn["leave_pt"][0]), float(dn["leave_pt"][1]))
+        if len(dl) < 2:
+            return None, "no route line"
+        dd_ = diversion.densify(dl, 25.0)
+        wc = diversion.cum_m(win)
+        dl_m, sl, _, _ = diversion.nearest_on_line(lp, win, wc)
+        sl += win0
+        if dl_m > Q["share_on_route_m"] or sl > A + P["block_end_margin_m"]:
+            return None, f"turns off where service {svc} does not run before the blockage"
+        prj = [diversion.nearest_on_line(p_, win, wc) for p_ in dd_]
+        k_end = next((k for k, x in enumerate(prj) if x[0] <= Q["share_on_route_m"] and x[1] + win0 >= B + P["block_end_margin_m"]), None)
+        if k_end is None:
+            return None, f"does not come back onto service {svc}'s route after the blockage"
+        sr = prj[k_end][1] + win0
+        off = [dd_[k] for k in range(k_end) if prj[k][0] > 50.0]
+        if not off:
+            return None, f"stays on service {svc}'s own route"
+        return {"dd": dd_[:k_end + 1], "off": off, "sl": sl, "sr": sr, "lp": lp, "rp": dd_[k_end]}, ""
+
+    def near_frac(pts, ref, tol):
+        if not pts or len(ref) < 2:
+            return 0.0
+        rc = diversion.cum_m(ref)
+        return sum(1 for p_ in pts if diversion.nearest_on_line(p_, ref, rc)[0] <= tol) / len(pts)
+
+    def follows(r, g, expect_m):
+        """the routing engine's route really drives the other service's roads (no way round, no extra loop)"""
+        rl = r.get("line") or []
+        return (len(rl) >= 2 and diversion.line_m(rl) <= 1.25 * expect_m + 300.0
+                and near_frac(g["off"][::max(1, len(g["off"]) // 40)], rl, Q["share_follow_m"]) >= Q["share_follow_frac"])
+
+    async def share_one(dn):
+        sv_ = str(dn.get("service") or "?")[:8]
+        out_ = {"from": sv_, "roads": [str(x)[:60] for x in (dn.get("roads") or [])][:8], "ok": False, "used": False, "reason": ""}
+        try:
+            g, why_ = await asyncio.to_thread(share_geom, dn)
+        except (TypeError, ValueError, KeyError, IndexError):
+            g, why_ = None, "incomplete route data"
+        if g is None:
+            out_["reason"] = why_[:1].upper() + why_[1:]
+            return out_, []
+        i = max([k for k in range(ia + 1) if stop_s[k] <= g["sl"] + 1.0], default=None)
+        j = min([k for k in down if stop_s[k] >= g["sr"] - 1.0], default=None)
+        if i is None or j is None:
+            out_["reason"] = "Turns off before the first stop of the route" if i is None else "Comes back too far down the route"
+            return out_, []
+        free = dv_free_start(ctx, i)
+        a_ = (stops[i]["lat"], stops[i]["lon"]) if free else at(stop_s[i] + 1.0)
+        b_ = at(max(stop_s[j] - 5.0, stop_s[i] + 10.0))
+        off = g["off"]
+        nv = min(6, len(off))
+        vias = [off[round(k * (len(off) - 1) / max(1, nv - 1))] for k in range(nv)]
+        brs = [None if free else heading(a_)] + [None] * nv + [heading(b_)]
+        expect = max(0.0, g["sl"] - stop_s[i]) + diversion.line_m(g["dd"]) + max(0.0, stop_s[j] - g["sr"])
+        tt = dv_use_tomtom()
+        rr = await dv_osrm([a_] + vias + [b_], 0, brs, ctx["avoid"])
+        got = [r for r in rr.get("routes") or [] if (not tt or str(r.get("router", "")).startswith("TomTom")) and follows(r, g, expect)]
+        ok2, rs2 = [], []
+        if got:
+            await eval_routes(i, j, [(dict(r, _src="shared"), None) for r in got], ok2, rs2)
+        reason = ""
+        if not got:
+            other = [dv2_title(x.get("road") or "") for r in rr.get("routes") or [] for x in r.get("steps") or []]
+            miss = [x for x in out_["roads"][1:] if x not in other] or out_["roads"][1:] or out_["roads"]
+            where = ", ".join(list(dict.fromkeys(miss))[:3]) or "those roads"
+            reason = f"The routing engine would not drive a {'double' if bus == 'dd' else 'single'}-deck bus along {where}"
+            if tt and bus == "dd":                       # which limit? the double-decker's height, or its weight
+                coords_d = [g["lp"]] + vias + [g["rp"]]
+                brs_d = [diversion.bearing(g["dd"][0], g["dd"][1])] + [None] * (nv + 1)
+                exp_d = diversion.line_m(g["dd"])
+
+                async def fits(key):
+                    x = await tt_route(coords_d, 0, brs_d, key, ctx["avoid"])
+                    return [r for r in x.get("routes") or [] if follows(r, g, exp_d)], (x.get("error") if not x.get("routes") else None)
+                (full, e1), (h_only, e2), (w_only, e3) = await asyncio.gather(fits("dd"), fits("dd_wt"), fits("dd_ht"))
+                if full:
+                    reason = f"TomTom takes a double-decker along {where} only from service {sv_}'s turn-off, not from stop {stops[i]['code']}"
+                elif e1 and e2 and e3:
+                    reason += f" (TomTom could not be asked why: {e1})"
+                elif h_only and not w_only:
+                    reason = f"TomTom's map has a height limit under 4.4 m on {where} \u2014 too low for a double-deck bus"
+                elif w_only and not h_only:
+                    reason = f"TomTom's map has a weight limit under 18 t on {where}"
+                    if not limits.get("dd_weight_roads", 1):
+                        reason += " (OCC setting: double-deckers never)"
+                    else:              # the height is fine: drive it as a double-decker but flag the weight limit to confirm
+                        x = await tt_route([a_] + vias + [b_], 0, brs, "dd_ht", ctx["avoid"])
+                        got_w = [dict(r, _src="shared") for r in x.get("routes") or [] if follows(r, g, expect)]
+                        if got_w:
+                            await eval_routes(i, j, [(r, None) for r in got_w], ok2, rs2)
+                            for c2 in ok2:
+                                c2["tt_weight"] = where
+                        if not ok2:
+                            reason += "; from this service's stops: " + (dv2.best_reason(rs2) if rs2 else "no road route")
+                else:
+                    reason = f"TomTom's map keeps a 4.4 m, 18 t double-decker off {where}"
+        elif not ok2:
+            reason = dv2.best_reason(rs2) if rs2 else "No verified road connection found"
+        for c2 in ok2:
+            c2["shared_from"] = sv_
+            c2["m"] = metrics(c2)
+            c2["score"], c2["parts"] = dv2.occ_score(c2["m"], weights)
+            c2["confidence"] = dv2.overall_confidence(c2["m"])
+        out_["reason"] = reason
+        attempts.append({"from_code": stops[i]["code"], "from_name": stops[i]["name"], "to_code": stops[j]["code"], "to_name": stops[j]["name"],
+                         "extra": (ia - i) + (j - b0), "earlier": i < ia, "routes": len(rr.get("routes") or []), "result": "valid" if ok2 else "fail",
+                         "reason": f"service {sv_}'s diversion: " + ("valid for this bus too" if ok2 else reason)})
+        return out_, ok2
+    for out_, cs in await asyncio.gather(*[share_one(dn) for dn in (donors or [])[:Q["share_max"]] if isinstance(dn, dict)]):
+        shared.append(out_)
+        shared_c.append(cs)
+        valid_all.extend(cs)
     # distinct candidates (same roads + same stops = one)
     uniq = []
     for c in sorted(valid_all, key=lambda c: (-c["score"], c.get("src") != "ddchain")):
@@ -9733,6 +9861,13 @@ async def dv2_plan(st, blocks, svc, d, run_i, traffic=True):
             uniq.append(c)
         elif c.get("src") == "ddchain" and twin.get("src") != "ddchain" and abs(twin["score"] - c["score"]) < 0.5:
             twin["src"], twin["asked"] = "ddchain", c.get("asked")         # same roads: the stop chain proves them stop by stop
+    shared_u = []                                                         # V16.25: the candidate each shared diversion became
+    for cs in shared_c:
+        tw = next((u for c in cs for u in uniq if u is c or (u["signature"] == c["signature"] and u["pair"] == c["pair"])), None)
+        if tw is not None:
+            tw.setdefault("shared_from", cs[0]["shared_from"])
+            tw["m"]["shared_from"] = tw["shared_from"]
+        shared_u.append(tw)
     strong = [c for c in uniq if c["confidence"] in ("HIGH", "MEDIUM")]
     attempts.sort(key=lambda a: (a["extra"], a["earlier"]))
     base["attempts"] = attempts
@@ -9763,11 +9898,27 @@ async def dv2_plan(st, blocks, svc, d, run_i, traffic=True):
                 "skip_line": [[round(p[0], 6), round(p[1], 6)] for p in diversion.simplify(skip_line, 200)],
                 "leave_pt": [round(c["dep"]["leave_pt"][0], 6), round(c["dep"]["leave_pt"][1], 6)],
                 "rejoin_pt": [round(c["dep"]["rejoin_pt"][0], 6), round(c["dep"]["rejoin_pt"][1], 6)],
-                "found_by": c.get("src", "router"),
+                "found_by": c.get("src", "router"), "shared_from": c.get("shared_from"),
                 "dd_chain": dv_chain_out((ctx.get("chains") or {}).get(c.get("asked")), st) if c.get("src") == "ddchain" else None}
 
     pool = strong or uniq
+    base["shared"] = shared
+
+    def share_report(best=None):
+        for out_, c in zip(shared, shared_u):
+            if c is None:
+                continue
+            out_["ok"], out_["id"] = True, f"{c['m']['leave_code']}-{c['m']['rejoin_code']}-{c['signature'][:24]}"
+            out_["leave"], out_["rejoin"], out_["skipped_n"] = c["m"]["leave_code"], c["m"]["rejoin_code"], c["m"]["skipped_n"]
+            if best is None:
+                out_["reason"] = "Valid for this bus, but low confidence"
+            elif c is best:
+                out_["used"], out_["reason"] = True, "Used \u2014 this is the recommended diversion"
+            else:
+                out_["reason"] = (f"Valid for service {svc} too, but not chosen ({c['confidence'].lower()} confidence): " if not any(c is x for x in pool) else
+                                  f"Valid for service {svc} too, but not chosen: ") + dv2.why_not(best, c, ctx_m)["text"]
     if not pool:
+        share_report()
         base.update(status="none", headline="NO SUITABLE DIVERSION FOUND \u2014 CONTROLLER REVIEW REQUIRED", candidates=[], failures=dv2.explain_failure(attempts),
                     why=[], why_not=[])
         return base
@@ -9786,6 +9937,10 @@ async def dv2_plan(st, blocks, svc, d, run_i, traffic=True):
     for t, c in tags.items():
         tag_of.setdefault(id(c), []).append(t)
     others = [c for c in uniq if c is not best][:Q["max_candidates"] - 1]
+    for c in shared_u:                       # V16.25: another service's diversion that works for this bus is always shown
+        if c is not None and c is not best and not any(c is x for x in others):
+            others = others[:Q["max_candidates"] - 2] + [c]
+    share_report(best)
     base["status"] = "divert" if best["confidence"] in ("HIGH", "MEDIUM") and sensible(best) else "review"
     base["headline"] = ("RECOMMENDED DIVERSION" if base["status"] == "divert" else
                         "NO SUITABLE DIVERSION FOUND \u2014 CONTROLLER REVIEW REQUIRED" + (" (best route is large and complex for a Bus Captain)" if not sensible(best) else " (low confidence only)"))
@@ -9811,12 +9966,18 @@ async def api_dv2_plan(request: Request):
     if not blocks or not svc:
         return JSONResponse({"error": "A blockage and a service are required."}, status_code=400)
     traffic = body.get("traffic") is not False
+    donors = []                    # V16.25: the other affected services' best diversions, to be tried for this service too
+    for dn in (body.get("donors") if isinstance(body.get("donors"), list) else [])[:dv2.PARAMS["share_max"]]:
+        if isinstance(dn, dict) and isinstance(dn.get("line"), list) and isinstance(dn.get("leave_pt"), list) and isinstance(dn.get("rejoin_pt"), list):
+            donors.append({"service": str(dn.get("service") or "")[:8], "line": dn["line"][:600], "leave_pt": dn["leave_pt"][:2],
+                           "rejoin_pt": dn["rejoin_pt"][:2], "roads": [str(x)[:60] for x in (dn.get("roads") or [])[:8]]})
     st = await static()
     key = "dv2plan:" + hashlib.sha1(json.dumps([[[round(p[0], 5), round(p[1], 5)] for p in b["line"]] for b in blocks]
-                                               + [blocks[0]["directed"], svc, d, run_i, traffic, dv2_weights()]).encode()).hexdigest()[:24]
+                                               + [blocks[0]["directed"], svc, d, run_i, traffic, dv2_weights()]
+                                               + ([donors, dv2_limits()] if donors else [])).encode()).hexdigest()[:24]
 
     async def factory():
-        r = await dv2_plan(st, blocks, svc, d, run_i, traffic)
+        r = await dv2_plan(st, blocks, svc, d, run_i, traffic, donors)
         return r, 120, bool(r.get("ok"))
     return copy.deepcopy(await cached(key, factory))
 

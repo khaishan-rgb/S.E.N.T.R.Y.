@@ -103,6 +103,22 @@ Without `BUNCHING_ALWAYS_ON=1` the server records only while a Bunching page is 
 * Before this patch the search was stop-based only at the two ends. It starts after the last stop the bus can still reach before the blockage and rejoins at the nearest original stop after it.
 * The road between those two stops came from the routing engine. It was then checked every 25 m for: blocked road and direction, U-turn, wrong-way or prohibited turns, correct rejoin, and evidence that another LTA service runs those roads in that direction. Double-deck suitability came from the bus types of those services.
 
+**Every service checked against the other services' diversions** (V16.25 share pass: `share_one` in `dv2_plan`, `api_dv2_plan` in app.py; `sharePass` / `shareHtml` in diversion.js; `share_*` in `dv2.PARAMS`)
+
+Why 67 / 75 / 170 / 961 got a long Hillview loop while 178 / 184 got the short Upper Bukit Timah Rd → Hillview Road one:
+* Live bus positions are not used to pick the road. Each service is planned on its own, from its own stops, and the routing engine (TomTom) is asked for that service's bus size: a double-decker is sent as 4.4 m high and 18 t, a single-decker as 3.2 m and 16 t (`DV_TT_DIMS`). Live LTA Bus Arrival data only says which services run double-deckers; live traffic only decides which road is fastest.
+* 178 and 184 are recorded as single-deck, so TomTom offered them the short loop. For the double-deck services TomTom never offered it, so a much longer route won.
+* 75 and 170 do not stop at 43089, so their diversion starts at 43069.
+
+Now, once every affected service has been analysed, the page asks again for each service with the other services' best diversions (up to 4 different ones):
+* The server takes the other service's roads, finds where they leave and rejoin THIS service's route, and asks the routing engine again from this service's own stops, for this bus's size, through those roads.
+* If the route drives those roads and passes every hard check, it joins the candidates (tagged **SAME AS 178**) and the normal scoring and nearest-rejoin rule decide. The panel's "Why this route?" says "Same roads as service 178's diversion".
+* If TomTom will not drive a double-decker there, the planner asks TomTom twice more to find out why: with the double-decker's height and a single-decker's weight, and the other way round.
+  * **Height limit** (under 4.4 m in TomTom's map): a hard stop. The panel says "TomTom's map has a height limit under 4.4 m on Hillview Road — too low for a double-deck bus".
+  * **Weight limit only** (under 18 t, height fine): the route is used, flagged **PLEASE CONFIRM — TomTom's map shows a weight limit under 18 t — confirm buses may use it**, confidence at most MEDIUM, 8-point penalty. The new SETTINGS limit **Double-deckers on another service's diversion where TomTom shows a weight limit** controls this: 1 = allowed and flagged (default), 0 = never.
+* Every service's panel has a section **Other services' diversions — checked for this bus**, with ✓ used / ✓ valid but not chosen (and why, tap to view it) / ✕ the exact reason. The service list shows "checking other services' routes" while this runs, then "· same as 178" when a service takes another service's route.
+* Cost: one extra plan request per service (most routing calls come from the 10-minute cache) plus up to 5 TomTom calls per other service's diversion (1 when it simply works). The AI Operational Review is asked again with the same list, so it compares the same candidates.
+
 **Nearest rejoin stop; double-deckers on single-deck roads** (V16.24, `dv2_plan` / `dv_validate_route` in app.py, `dv2.py`, `diversion.py`)
 
 Why Service 67 got a long Bukit Batok route at Hillview while 170 got the short one:
