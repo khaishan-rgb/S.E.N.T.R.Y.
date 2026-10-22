@@ -1,5 +1,39 @@
 # SG Transport Pulse V16.19 — Operational Intelligence & Service Recovery Platform
 
+## Diversion Planner, lean (V16.26) — 7 steps, draw your own, the OCC message, saved cases
+`diversion.html` / `diversion.js`; server: `/api/dv2/manual`, `/api/dv2/cases*` and the "prefer" donors in `dv2_plan` (app.py); 3D: `map3d.js`.
+
+The page is now seven short steps (left: 1–3, right: 4–7; on a phone they follow each other under the map):
+1. **Road** — search, tap the blocked road (unchanged).
+2. **Blockage** — direction, lock, add, clear (unchanged). **Drag the ✕ to the bin to delete — now in 3D too.**
+3. **Operator & services** — operator filter and the affected services. If this road was diverted before, a purple box shows the saved case: *"📁 Diverted here before — 12 Oct 2026 08:15 · svc 67, 75 · drawn by OCC · followed 2× … Do you want to follow this diverted route?"* **FOLLOW** checks every service on that route (see below); **NOT NOW** hides it; older cases with **1 of 3 ▸**.
+4. **Diversion suggestion** — lean: the route in one line (*Upp Bt Timah Rd > Hillview Rd > Hillview Ave > Hillview Rd > Upp Bt Timah Rd (Back on route)*), stops skipped, extra km / min, turns, any PLEASE CONFIRM, the Bus Captain brief, and the other services' routes checked for this bus. Everything else (AI review, turn by turn, checks, why / why not, score) is folded under **Details**. An alternative can now be chosen: **USE THIS ROUTE**.
+5. **Draw your own** (new) — **DRAW ON MAP** (or ✏ DRAW MY OWN in step 4): tap along the roads from where the bus leaves its route to where it is back on route. The taps are joined along the roads (OpenStreetMap routing, `/api/dv2/manual`); UNDO / CLEAR / DONE / CANCEL on the map. **CHECK & USE** (all affected services, or the selected one) asks the planner again for each service with the drawn route as the controller's choice:
+   * passes every hard check → it becomes that service's recommendation ("drawn by OCC");
+   * fails a check → it is still used, as a **CONTROLLER DECISION** with the failed check shown in red (e.g. a height limit) and the stops it skips — as agreed: allow, flagged;
+   * does not touch the service's route → not used for it, with the reason. **REMOVE** goes back to the planner's routes.
+6. **Recommendation** (new) — the message in the OCC format, grouped by route, ready to **COPY** into the chat:
+   ```
+   Diverted Route 1 : [67, 75, 170]
+   C'wealth Ave > Holland Ave > Holland Rd > Ulu Pandan Rd > Clementi Rd > C'wealth Ave West > Nth Buona Vista Rd (Back on route)
+
+   Bus stops skipped: 3 (BS 11259, BS 11381 & BS 11181)
+
+   Diverted Runs:
+   10957407 / SBS8973R / BC 61748
+   10957403 / SBS8772D / BC 74237
+
+   Total Mileage salvaged: 10.2km.
+   ```
+   Road names use the LTA short forms (Rd, Ave, Upp, Nth, Bt, C'wealth …). For each route type the **Diverted runs** (one per line: run / bus / BC). **Mileage salvaged** = diversion km × number of runs (shown as "auto: 5.1 km × 2 runs = 10.2 km"); type a figure to override it.
+7. **Save** — an optional note and **SAVE CASE**: the blockage, every route with its services, skipped stops, runs, mileage, the message and whether the route was drawn by OCC (saved for everyone, table `dv2_case`). **Saved cases** lists them (OPEN puts the blockage back and follows its route; DELETE).
+
+**Learning from saved cases.** When a blockage is set, `/api/dv2/cases/near` finds saved cases on the same stretch of road (within 60 m along it, or the same middle point within 150 m) in the same blocked direction ("both" matches either). The best is offered first: routes OCC **drew or edited** count 1.5×, each time a case was **followed again** adds 0.25 (up to 4), and older cases fade (age ÷ 120 days). Following a case and saving again counts as "followed". This is learning from OCC's own decisions (case-based), not a trained model: nothing is guessed, every suggested route is checked again for each bus before it is used.
+
+**How a drawn / saved route is checked** (server, `share_one` in `dv2_plan`): donors with `"prefer": true` (and `label`, `for` = the services that used it). The route must start and end on the service's own route around the blockage (a service that does not stop where the route turns keeps going on its normal road and turns there). It goes through the same routing (TomTom with the bus's size, the height / weight check) and hard checks; when valid it is recommended (`preferred`), otherwise the reason and `geom` (leave / rejoin stop, skipped stops, km) come back so the page can show it as a controller decision. The AI review is not asked to second-guess the controller's own route.
+
+**3D on this page**: **+ / −** zoom buttons; **press and hold** opens a round 3D magnifier (×4, the same lines, stops and blockage) — slide to the spot and let go to tap it, "view only" while the blockage is locked; **drag the ✕** (after UNLOCK) or the white handles in 3D exactly as in 2D, including onto the bin; while drawing, every tap is a point (also on top of a line or a stop).
+
 ## 3D maps — Route Traffic, Diversion Maps, Halfway Planner (shared `map3d.js`)
 One shared 3D map, the same on all three pages. A **3D** button tilts the map and shows the buildings in 3D; press **2D** to return to the flat map at the same place. Each map remembers its last choice in the browser.
 * **Where the button is**:

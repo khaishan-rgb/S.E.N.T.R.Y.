@@ -8855,6 +8855,20 @@ async def validate_next_original_leg(ctx, j):
     return res
 
 
+def dv_road_at(steps, pt, tol=35.0):
+    """V16.26: the named road of the routing step passing closest to pt (within tol m), '' when none"""
+    best, bd = "", tol
+    for st_ in steps or []:
+        nm = (st_.get("road") or "").strip()
+        if not nm:
+            continue
+        for q in (st_.get("line") or [])[::2]:
+            d_ = diversion.dist_m(pt, q)
+            if d_ < bd:
+                best, bd = nm, d_
+    return best
+
+
 async def dv_validate_route(ctx, r, i, j, s0=None):
     """HARD validation of one engine route for the pair (i, j), in order. -> (candidate | None, reject reason)"""
     P, line, cum, stop_s, A, B = ctx["P"], ctx["line"], ctx["cum"], ctx["stop_s"], ctx["A"], ctx["B"]
@@ -9600,6 +9614,9 @@ async def dv2_plan(st, blocks, svc, d, run_i, traffic=True, donors=None):
                 reasons.append(f"rejoin stop {stops[c['pair'][1]]['code']} fails the next-leg check: {nxt['detail']}")
                 continue
             c["instr"], c["next_leg"], c["probe"], c["s0"] = instr, nxt, s0 is not None, s0
+            pts_, i0_, i1_ = c["dep"]["pts"], c["dep"]["i0"], c["dep"]["i1"]                  # V16.26: the road before / after the diversion
+            c["from_road"] = dv2_title(dv_road_at(r.get("steps"), pts_[max(0, i0_ - 2)])) if i0_ >= 2 else ""
+            c["back_road"] = dv2_title(rj_road or dv_road_at(r.get("steps"), pts_[min(len(pts_) - 1, i1_ + 2)]))
             twin = next((o for o in ok if o["signature"] == c["signature"] and abs(o["div_m"] - c["div_m"]) < 150 and o["pair"] == c["pair"]), None)
             if twin is not None:
                 if c.get("src") == "ddchain":
@@ -9735,30 +9752,32 @@ async def dv2_plan(st, blocks, svc, d, run_i, traffic=True, donors=None):
     # V16.25 share pass: the other affected services' best diversions (sent by the page once every service is analysed) are
     # tried for THIS service - from its own stops, for its own bus size - so services at the same blockage never end up on
     # different routes without a reason. Each one is either adopted as a candidate or comes back with the exact reason.
+    # V16.26: the same pass checks a route the controller DREW on the map, or the route of a saved past case ("prefer": the
+    # controller's choice - used whenever it passes the checks; when it does not, the reason and the stops it would skip come back).
     shared, shared_c = [], []
     win0 = max(0.0, A - 3000.0)
 
     def share_geom(dn):
-        """where the other service's diversion turns off / comes back onto THIS service's route, and its off-route points"""
+        """where the other diversion leaves / comes back onto THIS service's route, and its off-route points"""
         dl = [(float(p_[0]), float(p_[1])) for p_ in (dn.get("line") or [])][:600]
-        lp = (float(dn["leave_pt"][0]), float(dn["leave_pt"][1]))
         if len(dl) < 2:
             return None, "no route line"
         dd_ = diversion.densify(dl, 25.0)
         wc = diversion.cum_m(win)
-        dl_m, sl, _, _ = diversion.nearest_on_line(lp, win, wc)
-        sl += win0
-        if dl_m > Q["share_on_route_m"] or sl > A + P["block_end_margin_m"]:
-            return None, f"turns off where service {svc} does not run before the blockage"
         prj = [diversion.nearest_on_line(p_, win, wc) for p_ in dd_]
-        k_end = next((k for k, x in enumerate(prj) if x[0] <= Q["share_on_route_m"] and x[1] + win0 >= B + P["block_end_margin_m"]), None)
+        on = Q["share_on_route_m"]
+        k_off = next((k for k, x in enumerate(prj) if x[0] > 50.0), None)          # where it first leaves this service's route
+        if k_off is None:
+            return None, f"stays on {svc_txt}'s own route"
+        k_st = max([k for k in range(k_off) if prj[k][0] <= on and prj[k][1] + win0 <= A + P["block_end_margin_m"]], default=None)
+        if k_st is None:
+            return None, f"turns off where {svc_txt} does not run before the blockage"
+        k_end = next((k for k in range(k_off, len(prj)) if prj[k][0] <= on and prj[k][1] + win0 >= B + P["block_end_margin_m"]), None)
         if k_end is None:
-            return None, f"does not come back onto service {svc}'s route after the blockage"
-        sr = prj[k_end][1] + win0
-        off = [dd_[k] for k in range(k_end) if prj[k][0] > 50.0]
-        if not off:
-            return None, f"stays on service {svc}'s own route"
-        return {"dd": dd_[:k_end + 1], "off": off, "sl": sl, "sr": sr, "lp": lp, "rp": dd_[k_end]}, ""
+            return None, f"does not come back onto {svc_txt}'s route after the blockage"
+        sl, sr = prj[k_st][1] + win0, prj[k_end][1] + win0
+        off = [dd_[k] for k in range(k_st, k_end) if prj[k][0] > 50.0]
+        return {"dd": dd_[k_st:k_end + 1], "off": off, "sl": sl, "sr": sr, "lp": dd_[k_st], "rp": dd_[k_end]}, ""
 
     def near_frac(pts, ref, tol):
         if not pts or len(ref) < 2:
@@ -9767,14 +9786,17 @@ async def dv2_plan(st, blocks, svc, d, run_i, traffic=True, donors=None):
         return sum(1 for p_ in pts if diversion.nearest_on_line(p_, ref, rc)[0] <= tol) / len(pts)
 
     def follows(r, g, expect_m):
-        """the routing engine's route really drives the other service's roads (no way round, no extra loop)"""
+        """the routing engine's route really drives the other diversion's roads (no way round, no extra loop)"""
         rl = r.get("line") or []
         return (len(rl) >= 2 and diversion.line_m(rl) <= 1.25 * expect_m + 300.0
                 and near_frac(g["off"][::max(1, len(g["off"]) // 40)], rl, Q["share_follow_m"]) >= Q["share_follow_frac"])
 
     async def share_one(dn):
-        sv_ = str(dn.get("service") or "?")[:8]
-        out_ = {"from": sv_, "roads": [str(x)[:60] for x in (dn.get("roads") or [])][:8], "ok": False, "used": False, "reason": ""}
+        sv_ = str(dn.get("service") or "?")[:12]
+        lab = str(dn.get("label") or "")[:60]
+        who_ = lab or f"service {sv_}"
+        out_ = {"from": sv_, "label": lab, "prefer": bool(dn.get("prefer")), "roads": [str(x)[:60] for x in (dn.get("roads") or [])][:12],
+                "ok": False, "used": False, "reason": ""}
         try:
             g, why_ = await asyncio.to_thread(share_geom, dn)
         except (TypeError, ValueError, KeyError, IndexError):
@@ -9787,6 +9809,10 @@ async def dv2_plan(st, blocks, svc, d, run_i, traffic=True, donors=None):
         if i is None or j is None:
             out_["reason"] = "Turns off before the first stop of the route" if i is None else "Comes back too far down the route"
             return out_, []
+        # what it means for this service even if it fails a check (the controller may still decide to use it)
+        out_["geom"] = {"leave": {"code": stops[i]["code"], "name": stops[i]["name"]}, "rejoin": {"code": stops[j]["code"], "name": stops[j]["name"]},
+                        "skipped": [{"code": stops[k]["code"], "name": stops[k]["name"]} for k in range(len(stops)) if g["sl"] + 1.0 < stop_s[k] < g["sr"] - 1.0],
+                        "km": round(diversion.line_m(g["dd"]) / 1000.0, 2)}
         free = dv_free_start(ctx, i)
         a_ = (stops[i]["lat"], stops[i]["lon"]) if free else at(stop_s[i] + 1.0)
         b_ = at(max(stop_s[j] - 5.0, stop_s[i] + 10.0))
@@ -9817,11 +9843,11 @@ async def dv2_plan(st, blocks, svc, d, run_i, traffic=True, donors=None):
                     return [r for r in x.get("routes") or [] if follows(r, g, exp_d)], (x.get("error") if not x.get("routes") else None)
                 (full, e1), (h_only, e2), (w_only, e3) = await asyncio.gather(fits("dd"), fits("dd_wt"), fits("dd_ht"))
                 if full:
-                    reason = f"TomTom takes a double-decker along {where} only from service {sv_}'s turn-off, not from stop {stops[i]['code']}"
+                    reason = f"TomTom takes a double-decker along {where} only from {who_}'s turn-off, not from stop {stops[i]['code']}"
                 elif e1 and e2 and e3:
                     reason += f" (TomTom could not be asked why: {e1})"
                 elif h_only and not w_only:
-                    reason = f"TomTom's map has a height limit under 4.4 m on {where} \u2014 too low for a double-deck bus"
+                    reason = f"TomTom's map has a height limit under 4.4 m on {where} — too low for a double-deck bus"
                 elif w_only and not h_only:
                     reason = f"TomTom's map has a weight limit under 18 t on {where}"
                     if not limits.get("dd_weight_roads", 1):
@@ -9840,15 +9866,19 @@ async def dv2_plan(st, blocks, svc, d, run_i, traffic=True, donors=None):
         elif not ok2:
             reason = dv2.best_reason(rs2) if rs2 else "No verified road connection found"
         for c2 in ok2:
-            c2["shared_from"] = sv_
+            c2["shared_from"], c2["shared_label"] = sv_, lab
+            if dn.get("prefer"):
+                c2["prefer"], c2["prefer_for"] = True, [str(x)[:8] for x in (dn.get("for") or [])][:30]
             c2["m"] = metrics(c2)
+            c2["m"]["shared_label"] = lab
             c2["score"], c2["parts"] = dv2.occ_score(c2["m"], weights)
             c2["confidence"] = dv2.overall_confidence(c2["m"])
         out_["reason"] = reason
         attempts.append({"from_code": stops[i]["code"], "from_name": stops[i]["name"], "to_code": stops[j]["code"], "to_name": stops[j]["name"],
                          "extra": (ia - i) + (j - b0), "earlier": i < ia, "routes": len(rr.get("routes") or []), "result": "valid" if ok2 else "fail",
-                         "reason": f"service {sv_}'s diversion: " + ("valid for this bus too" if ok2 else reason)})
+                         "reason": f"{who_}'s diversion: " + ("valid for this bus too" if ok2 else reason)})
         return out_, ok2
+    svc_txt = f"service {svc}"
     for out_, cs in await asyncio.gather(*[share_one(dn) for dn in (donors or [])[:Q["share_max"]] if isinstance(dn, dict)]):
         shared.append(out_)
         shared_c.append(cs)
@@ -9867,6 +9897,12 @@ async def dv2_plan(st, blocks, svc, d, run_i, traffic=True, donors=None):
         if tw is not None:
             tw.setdefault("shared_from", cs[0]["shared_from"])
             tw["m"]["shared_from"] = tw["shared_from"]
+            if any(c.get("prefer") for c in cs):                         # V16.26: the controller's route (drawn / past case)
+                tw["prefer"], tw["shared_from"], tw["shared_label"] = True, cs[0]["shared_from"], cs[0].get("shared_label", "")
+                tw["prefer_for"] = cs[0].get("prefer_for") or []
+                tw["m"]["shared_from"] = tw["shared_from"]
+            tw.setdefault("shared_label", cs[0].get("shared_label", ""))
+            tw["m"]["shared_label"] = tw["shared_label"]
         shared_u.append(tw)
     strong = [c for c in uniq if c["confidence"] in ("HIGH", "MEDIUM")]
     attempts.sort(key=lambda a: (a["extra"], a["earlier"]))
@@ -9900,7 +9936,9 @@ async def dv2_plan(st, blocks, svc, d, run_i, traffic=True, donors=None):
                 "skip_line": [[round(p[0], 6), round(p[1], 6)] for p in diversion.simplify(skip_line, 200)],
                 "leave_pt": [round(c["dep"]["leave_pt"][0], 6), round(c["dep"]["leave_pt"][1], 6)],
                 "rejoin_pt": [round(c["dep"]["rejoin_pt"][0], 6), round(c["dep"]["rejoin_pt"][1], 6)],
-                "found_by": c.get("src", "router"), "shared_from": c.get("shared_from"),
+                "found_by": c.get("src", "router"), "shared_from": c.get("shared_from"), "shared_label": c.get("shared_label") or "",
+                "preferred": m.get("preferred") or "", "back_road": c.get("back_road", ""),
+                "from_road": c.get("from_road") or (dv2_title(str(blocks[0].get("road") or "")) if A - c["dep"]["leave_s"] < 2000.0 else ""),
                 "dd_chain": dv_chain_out((ctx.get("chains") or {}).get(c.get("asked")), st) if c.get("src") == "ddchain" else None}
 
     pool = strong or uniq
@@ -9941,6 +9979,12 @@ async def dv2_plan(st, blocks, svc, d, run_i, traffic=True, donors=None):
         if cs is not best and cs["m"]["div_km"] < best["m"]["div_km"] - Q["share_shorter_km"]:
             cs["m"]["consistent"] = (cs["shared_from"], best["m"]["div_km"])
             best = cs
+    # V16.26: a route the controller chose (drawn on the map, or followed from a saved case) wins whenever it passed the checks
+    pref = [c for c in uniq if c.get("prefer")]
+    if pref:
+        cp = min(pref, key=lambda c: (svc not in (c.get("prefer_for") or []), c["m"]["div_km"]))
+        cp["m"]["preferred"] = cp.get("shared_label") or "OCC"
+        best = cp
     early_alts = [c for c in uniq if c["m"]["leave_index"] < best["m"]["leave_index"]]
     best["m"]["preserved_vs_early"] = max([c["m"]["skipped_n"] - best["m"]["skipped_n"] for c in early_alts] + [0])
     tags = dv2.tag_alternatives(pool)
@@ -9952,7 +9996,7 @@ async def dv2_plan(st, blocks, svc, d, run_i, traffic=True, donors=None):
         if c is not None and c is not best and not any(c is x for x in others):
             others = others[:Q["max_candidates"] - 2] + [c]
     share_report(best)
-    base["status"] = "divert" if best["confidence"] in ("HIGH", "MEDIUM") and sensible(best) else "review"
+    base["status"] = "divert" if (best["confidence"] in ("HIGH", "MEDIUM") and sensible(best)) or best.get("prefer") else "review"
     base["headline"] = ("RECOMMENDED DIVERSION" if base["status"] == "divert" else
                         "NO SUITABLE DIVERSION FOUND \u2014 CONTROLLER REVIEW REQUIRED" + (" (best route is large and complex for a Bus Captain)" if not sensible(best) else " (low confidence only)"))
     base["best"] = summary(best, tag_of.get(id(best), []))
@@ -9980,8 +10024,10 @@ async def api_dv2_plan(request: Request):
     donors = []                    # V16.25: the other affected services' best diversions, to be tried for this service too
     for dn in (body.get("donors") if isinstance(body.get("donors"), list) else [])[:dv2.PARAMS["share_max"]]:
         if isinstance(dn, dict) and isinstance(dn.get("line"), list) and isinstance(dn.get("leave_pt"), list) and isinstance(dn.get("rejoin_pt"), list):
-            donors.append({"service": str(dn.get("service") or "")[:8], "line": dn["line"][:600], "leave_pt": dn["leave_pt"][:2],
-                           "rejoin_pt": dn["rejoin_pt"][:2], "roads": [str(x)[:60] for x in (dn.get("roads") or [])[:8]]})
+            donors.append({"service": str(dn.get("service") or "")[:12], "line": dn["line"][:600], "leave_pt": dn["leave_pt"][:2],
+                           "rejoin_pt": dn["rejoin_pt"][:2], "roads": [str(x)[:60] for x in (dn.get("roads") or [])[:12]],
+                           "label": str(dn.get("label") or "")[:60], "prefer": bool(dn.get("prefer")),          # V16.26: drawn / past-case route
+                           "for": [str(x)[:8] for x in (dn.get("for") or [])[:30]] if isinstance(dn.get("for"), list) else []})
     st = await static()
     key = "dv2plan:" + hashlib.sha1(json.dumps([[[round(p[0], 5), round(p[1], 5)] for p in b["line"]] for b in blocks]
                                                + [blocks[0]["directed"], svc, d, run_i, traffic, dv2_weights()]
@@ -9992,6 +10038,209 @@ async def api_dv2_plan(request: Request):
         return r, 120, bool(r.get("ok"))
     return copy.deepcopy(await cached(key, factory))
 
+
+# =========================================================================== V16.26 hand-drawn diversions and saved case studies
+@app.post("/api/dv2/manual")
+async def api_dv2_manual(request: Request):
+    """A diversion the controller draws: the tapped points joined along the roads. OpenStreetMap routing follows the taps
+    faithfully (TomTom when OSRM is unreachable). Each service is then checked on it by /api/dv2/plan ("prefer" donor)."""
+    body = _dv_body(await request.body())
+    pts = []
+    for p in (body.get("points") if isinstance(body.get("points"), list) else [])[:30]:
+        try:
+            q = (float(p[0]), float(p[1]))
+        except (TypeError, ValueError, IndexError, KeyError):
+            continue
+        if 1.1 < q[0] < 1.55 and 103.5 < q[1] < 104.2:
+            pts.append(q)
+    if len(pts) < 2:
+        return JSONResponse({"error": "Tap at least 2 points along the roads: where the bus leaves its route, the roads it takes, where it is back on route."}, status_code=400)
+    res = await os_osrm(pts, alternatives=0, continue_straight=True)
+    routes, router = res.get("routes") or [], "OpenStreetMap"
+    if not routes and dv_use_tomtom():
+        res = await tt_route(pts, 0, None, "sd", None)
+        routes, router = res.get("routes") or [], "TomTom"
+    if not routes:
+        return {"ok": True, "snapped": False, "line": [[round(p[0], 6), round(p[1], 6)] for p in pts], "km": round(diversion.line_m(pts) / 1000.0, 2),
+                "roads": [], "router": "", "note": "These points could not be joined along the roads — the straight lines between the taps are kept."}
+    r = routes[0]
+    roads = []
+    for st_ in r.get("steps") or []:
+        nm = dv2_title((st_.get("road") or "").strip())
+        if nm and (not roads or roads[-1] != nm):
+            roads.append(nm)
+    far = max(diversion.nearest_on_line(p, r["line"])[0] for p in pts)
+    return {"ok": True, "snapped": True, "line": [[round(p[0], 6), round(p[1], 6)] for p in diversion.simplify(r["line"], 500)],
+            "km": round(diversion.line_m(r["line"]) / 1000.0, 2), "roads": roads, "router": router,
+            "note": "" if far < 60.0 else f"One tap is {far:.0f} m from the joined roads — check the route on the map."}
+
+
+def dv2_case_db():
+    dv2_db()
+    bb_sql("CREATE TABLE IF NOT EXISTS dv2_case(id INTEGER PRIMARY KEY AUTOINCREMENT, ts REAL, by_name TEXT, road TEXT, lat REAL, lon REAL, "
+           "data TEXT, followed INTEGER DEFAULT 0, from_case INTEGER, manual INTEGER DEFAULT 0)")
+
+
+def _cpts(v, n):
+    out = []
+    for p in (v if isinstance(v, list) else [])[:n]:
+        try:
+            out.append([round(float(p[0]), 6), round(float(p[1]), 6)])
+        except (TypeError, ValueError, IndexError, KeyError):
+            continue
+    return out
+
+
+def _cnum(v, d=0.0):
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return d
+
+
+def dv2_case_clean(body):
+    """a saved case study: the blockage, each diverted route with its services, the message and the controller's notes"""
+    blocks = [{"line": _cpts(b.get("line"), 400), "dir": str(b.get("dir") or "")[:6], "road": str(b.get("road") or "")[:80]}
+              for b in (body.get("blocks") if isinstance(body.get("blocks"), list) else [])[:8] if isinstance(b, dict)]
+    page = [{"cor": _cpts(b.get("cor"), 3000), "cm": [round(_cnum(x), 1) for x in (b.get("cm") if isinstance(b.get("cm"), list) else [])[:3000]],
+             "a": _cnum(b.get("a")), "b": _cnum(b.get("b")), "road": str(b.get("road") or "")[:80], "dir": str(b.get("dir") or "")[:6],
+             "labels": {k: (str(v)[:60] if not isinstance(v, (int, float)) else v) for k, v in (b.get("labels") or {}).items()
+                        if k in ("fwd", "rev", "fwd_bearing", "rev_bearing")} if isinstance(b.get("labels"), dict) else {}}
+            for b in (body.get("page") if isinstance(body.get("page"), list) else [])[:8] if isinstance(b, dict)]
+    routes = []
+    for r in (body.get("routes") if isinstance(body.get("routes"), list) else [])[:12]:
+        if not isinstance(r, dict):
+            continue
+        lp, rp = _cpts([r.get("leave_pt")], 1), _cpts([r.get("rejoin_pt")], 1)
+        routes.append({"n": int(_cnum(r.get("n"), len(routes) + 1)), "services": [str(x)[:8] for x in (r.get("services") or [])[:40]],
+                       "roads": [str(x)[:60] for x in (r.get("roads") or [])[:20]], "text": str(r.get("text") or "")[:600],
+                       "line": _cpts(r.get("line"), 500), "leave_pt": lp[0] if lp else None, "rejoin_pt": rp[0] if rp else None,
+                       "skipped": [{"code": str(x.get("code") or "")[:6], "name": str(x.get("name") or "")[:60]} for x in (r.get("skipped") or [])[:40] if isinstance(x, dict)],
+                       "km": round(_cnum(r.get("km")), 2), "runs": str(r.get("runs") or "")[:2000], "mileage": str(r.get("mileage") or "")[:20],
+                       "source": str(r.get("source") or "")[:20], "flags": [str(x)[:240] for x in (r.get("flags") or [])[:10]]})
+    services = [{"service": str(s_.get("service") or "")[:8], "direction": int(_cnum(s_.get("direction"), 1)), "run": int(_cnum(s_.get("run"), 0)),
+                 "route": int(_cnum(s_.get("route"), 0)), "leave": str(s_.get("leave") or "")[:6], "rejoin": str(s_.get("rejoin") or "")[:6],
+                 "source": str(s_.get("source") or "")[:20]}
+                for s_ in (body.get("services") if isinstance(body.get("services"), list) else [])[:60] if isinstance(s_, dict)]
+    fc = body.get("from_case")
+    return {"v": 1, "blocks": blocks, "page": page, "routes": routes, "services": services, "text": str(body.get("text") or "")[:6000],
+            "note": str(body.get("note") or "")[:1000], "from_case": int(fc) if isinstance(fc, (int, float)) and fc > 0 else None}
+
+
+def dv2_case_brief(r, data=None, full=False):
+    try:
+        d = data or json.loads(r["data"] or "{}")
+    except ValueError:
+        d = {}
+    out = {"id": r["id"], "ts": r["ts"], "date": datetime.fromtimestamp(r["ts"], SGT).strftime("%d %b %Y"), "time": datetime.fromtimestamp(r["ts"], SGT).strftime("%H:%M"),
+           "by": r["by_name"] or "", "road": r["road"] or "", "followed": int(r["followed"] or 0), "manual": bool(r["manual"]), "note": d.get("note", ""),
+           "services": [s_["service"] for s_ in d.get("services", [])],
+           "routes": [{k: v for k, v in x.items() if full or k not in ("line", "runs")} for x in d.get("routes", [])]}
+    if full:
+        out.update(blocks=d.get("blocks", []), page=d.get("page", []), text=d.get("text", ""), service_detail=d.get("services", []))
+    return out
+
+
+@app.post("/api/dv2/cases")
+async def api_dv2_case_save(request: Request):
+    """save a case study (shared by everyone): next time this road is blocked the planner offers its route again"""
+    dv2_case_db()
+    d = dv2_case_clean(_dv_body(await request.body()))
+    if not d["blocks"] or not d["routes"]:
+        return JSONResponse({"error": "Nothing to save yet: a blockage and at least one diverted route are needed."}, status_code=400)
+    b0 = d["blocks"][0]["line"] or [[0.0, 0.0]]
+    mid = b0[len(b0) // 2]
+    manual = any(x["source"] == "manual" for x in d["routes"])
+    cid = bb_insert("INSERT INTO dv2_case(ts, by_name, road, lat, lon, data, followed, from_case, manual) VALUES (?,?,?,?,?,?,0,?,?)",
+                    (time.time(), _who(request), d["blocks"][0]["road"], mid[0], mid[1], json.dumps(d), d["from_case"], 1 if manual else 0))
+    if not cid:
+        return JSONResponse({"error": "The case could not be saved (database unavailable)."}, status_code=503)
+    if d["from_case"]:
+        bb_sql("UPDATE dv2_case SET followed = followed + 1 WHERE id = ?", (d["from_case"],))
+    r = bb_sql("SELECT * FROM dv2_case WHERE id = ?", (cid,), fetch=True)
+    return {"ok": True, "case": dv2_case_brief(r[0]) if r else {"id": cid}}
+
+
+@app.get("/api/dv2/cases")
+async def api_dv2_case_list(limit: int = 50):
+    dv2_case_db()
+    rows = bb_sql("SELECT * FROM dv2_case ORDER BY ts DESC LIMIT ?", (max(1, min(200, int(limit))),), fetch=True) or []
+    return {"cases": [dv2_case_brief(r) for r in rows], "saved": bool(BB.get("db_ok"))}
+
+
+@app.get("/api/dv2/cases/{cid}")
+async def api_dv2_case_get(cid: int):
+    dv2_case_db()
+    r = bb_sql("SELECT * FROM dv2_case WHERE id = ?", (cid,), fetch=True)
+    if not r:
+        return JSONResponse({"error": "Case not found."}, status_code=404)
+    return {"case": dv2_case_brief(r[0], full=True)}
+
+
+@app.post("/api/dv2/cases/{cid}/delete")
+async def api_dv2_case_delete(cid: int):
+    dv2_case_db()
+    bb_sql("DELETE FROM dv2_case WHERE id = ?", (cid,))
+    return {"ok": True}
+
+
+def dv2_case_match(now, old):
+    """0..1: how well a saved blockage matches the current one (same stretch of road, same blocked direction)"""
+    best = 0.0
+    for a in now:
+        la = a["line"]
+        ca = diversion.cum_m(la)
+        ma = diversion.point_at(la, ca, ca[-1] / 2.0)
+        da = diversion.densify(la, 20.0)
+        for b in old:
+            lb = b["line"]
+            if len(lb) < 2:
+                continue
+            cb = diversion.cum_m(lb)
+            db = diversion.densify(lb, 20.0)
+            ov = max(sum(1 for p in db if diversion.nearest_on_line(p, la, ca)[0] <= 60.0) / len(db),
+                     sum(1 for p in da if diversion.nearest_on_line(p, lb, cb)[0] <= 60.0) / len(da))
+            if ov < 0.3:
+                if diversion.dist_m(ma, diversion.point_at(lb, cb, cb[-1] / 2.0)) > 150.0:
+                    continue
+                ov = 0.3
+            if a["directed"] and b["directed"]:
+                ha = diversion.nearest_on_line(ma, la, ca)[3]
+                hb = diversion.nearest_on_line(ma, lb, cb)[3]
+                if diversion.angdiff(ha, hb) > 60.0:
+                    continue
+            best = max(best, ov)
+    return best
+
+
+@app.post("/api/dv2/cases/near")
+async def api_dv2_case_near(request: Request):
+    """saved cases for (about) this blockage, best first: same place and direction, routes the controller drew or edited,
+    routes followed again before, and recent ones rank higher (the planner learns from what OCC actually did)"""
+    dv2_case_db()
+    now = dv2_blocks(_dv_body(await request.body()))
+    if not now:
+        return {"cases": []}
+    mid = now[0]["line"][len(now[0]["line"]) // 2]
+    out = []
+    for r in bb_sql("SELECT * FROM dv2_case ORDER BY ts DESC LIMIT 500", fetch=True) or []:
+        if r["lat"] is None or diversion.dist_m(mid, (r["lat"], r["lon"])) > 3000.0:
+            continue
+        try:
+            d = json.loads(r["data"] or "{}")
+        except ValueError:
+            continue
+        old = dv2_blocks({"blocks": d.get("blocks", [])})
+        mt = await asyncio.to_thread(dv2_case_match, now, old)
+        if mt < 0.3:
+            continue
+        age = max(0.0, (time.time() - (r["ts"] or 0)) / 86400.0)
+        rel = mt * (1.0 + 0.5 * bool(r["manual"]) + 0.25 * min(4, int(r["followed"] or 0))) / (1.0 + age / 120.0)
+        c = dv2_case_brief(r, d, full=True)
+        c["match"], c["rank"] = round(mt, 2), round(rel, 3)
+        out.append(c)
+    out.sort(key=lambda c: -c["rank"])
+    return {"cases": out[:3]}
 
 
 # =========================================================================== V16.19 AI-assisted route planning (AI Operational Review)

@@ -40,7 +40,7 @@
   var map = L.map("map", {zoomControl:true, minZoom:10, maxZoom:20, maxBounds:[[1.10, 103.50], [1.55, 104.20]]}).setView([1.3521, 103.8198], 12);
   [["road", 400], ["orig", 410], ["skip", 415], ["alt", 420], ["div", 430], ["block", 440], ["arrows", 450], ["marks", 620]].forEach(function(p){ map.createPane(p[0]).style.zIndex = p[1]; });
   var G = {};
-  ["road", "block", "orig", "skip", "alt", "div", "stops", "marks", "find"].forEach(function(k){ G[k] = L.layerGroup().addTo(map); });
+  ["road", "block", "orig", "skip", "alt", "div", "stops", "marks", "find", "draw"].forEach(function(k){ G[k] = L.layerGroup().addTo(map); });
   function icon(html, cls){ return L.divIcon({className:"", iconSize:[0, 0], html:'<div class="' + (cls || "") + '">' + html + '</div>'}); }
   function rline(pts, color, o, grp){
     o = o || {}; var w = o.weight || 6;
@@ -142,7 +142,7 @@
   function AB(){ return S.blocks[S.bi] || null; }
   function bLineOf(b){ return cutLine(b.cor, b.cm, b.a, b.b); }
   function allDirs(){ return S.blocks.length > 0 && S.blocks.every(function(b){ return !!b.dir; }); }
-  map.on("click", function(e){ if(!BIN.drag) placeBlock(e.latlng); });
+  map.on("click", function(e){ if(S.draw && S.draw.on){ drawAdd(e.latlng); return; } if(!BIN.drag) placeBlock(e.latlng); });
   function placeBlock(ll){
     var replace = S.blocks.length > 0 && !S.adding;
     if(replace && AB() && AB().locked){
@@ -251,14 +251,17 @@
     if(S.blocks.some(function(b){ return b.locked; }) && !confirm("Clear all blockages, including locked ones?")) return; S.blocks = []; S.bi = -1; S.adding = false; resetServices(); G.block.clearLayers(); paintBlockCard(); hint("Tap the road where it is blocked"); };
 
   /* ---------------------------------------------------------------- 4. affected services, each analysed automatically */
-  function resetServices(){ S.ai = {}; S.share = {}; S.donors = {}; S.run++; S.services = []; S.plans = {}; S.sel = null; S.view = null; $("cSvc").hidden = true; clearServiceMap(); paintRec(); }
+  function resetState(){ S.ai = {}; S.share = {}; S.donors = {}; S.plans = {}; S.pick = {}; S.forced = {}; S.base = {}; S.follow = null; S.followRes = null; S.cases = []; S.caseI = 0; S.caseOff = false; S.runs = {}; S.mil = {}; S.saved = null; S.drawRes = null; S.msgSig = ""; }
+  S.pick = {}; S.forced = {}; S.base = {}; S.runs = {}; S.mil = {}; S.cases = [];
+  function resetServices(){ resetState(); S.run++; S.services = []; S.sel = null; S.view = null; $("cSvc").hidden = true; $("caseBox").hidden = true; drawReset(); clearServiceMap(); paintRec(); }
   function keyOf(x){ return x.service + "|" + x.direction + "|" + (x.run || 0); }
   function payload(){ return {blocks:S.blocks.map(function(b){ return {line:bLineOf(b), dir:b.dir, road:b.road}; })}; }
   S.op = "";
   function visibleServices(){ return S.services.filter(function(x){ return !S.op || String(x.operator || "").toUpperCase() === S.op; }); }
   $("fOp").onchange = function(){ S.op = this.value; if(S.sel && !visibleServices().some(function(x){ return keyOf(x) === S.sel; })){ S.sel = null; clearServiceMap(); paintRec(); } paintServices(); if(S.services.length) analyseAll(S.run); };
   function runAffected(){
-    var run = ++S.run; S.services = []; S.plans = {}; S.share = {}; S.donors = {}; S.ai = {}; S.sel = null; S.view = null; clearServiceMap(); paintRec();
+    var run = ++S.run, keepFollow = S.follow; resetState(); S.follow = keepFollow; S.services = []; S.sel = null; S.view = null; clearServiceMap(); paintRec(); drawReset();
+    findCases(run);
     $("cSvc").hidden = false; $("svcList").innerHTML = '<p class="dp-muted"><span class="dp-spin"></span>Finding services whose route runs along the blocked section in the blocked direction\u2026</p>';
     post("/api/dv2/affected", payload()).then(function(j){
       if(run !== S.run) return;
@@ -286,7 +289,7 @@
           });
         })(x, k);
       }
-      if(!queue.length && !busy) sharePass(run);
+      if(!queue.length && !busy) secondPass(run);
     }
     next();
   }
@@ -314,8 +317,15 @@
       S.share[o.k] = "queued";
       queue.push({k:o.k, x:o.x, donors:ds.slice(0, 4).map(function(d){ return {service:d.service, line:d.line, leave_pt:d.leave_pt, rejoin_pt:d.rejoin_pt, roads:d.roads}; })});
     });
-    if(!queue.length) return;
-    var busy = 0;
+    if(!queue.length){ paintMsg(); return; }
+    replan(run, queue, "done");
+  }
+  /* V16.26: re-plan services with given routes ("donors"): the other services' routes (share pass), a saved case's route (follow)
+     or a route drawn on the map. prefer = the controller's choice: the server uses it whenever it passes the checks. */
+  function replan(run, items, mark, each){
+    var queue = items.slice(), busy = 0, fin = false;
+    items.forEach(function(o){ S.share[o.k] = "queued"; });
+    paintServices();
     function next(){
       if(run !== S.run) return;
       while(busy < 2 && queue.length){
@@ -325,25 +335,31 @@
             if(run !== S.run) return;
             busy--;
             if(p && p.ok){
-              S.plans[o.k] = p; S.donors[o.k] = o.donors; S.share[o.k] = "done";
-              delete S.ai[o.k];                                  // the AI review compares the new candidate set (with the same donors)
+              S.plans[o.k] = p; S.donors[o.k] = o.donors; S.share[o.k] = mark;
+              delete S.ai[o.k]; delete S.pick[o.k];              // the AI review compares the new candidate set (with the same donors)
+              if(each) each(o, p);
               if(S.sel === o.k){ S.view = null; showSelected(); }
             } else S.share[o.k] = "failed";
-            paintServices(); if(S.sel === o.k) paintRec();
+            paintServices(); if(S.sel === o.k) paintRec(); paintMsg();
             next();
           });
         })(o);
       }
+      if(!queue.length && !busy && !fin){ fin = true; if(each) each(null); paintMsg(); }
     }
     next();
   }
+  function secondPass(run){ if(S.follow) followPass(run); else sharePass(run); paintMsg(); }
   function stTxt(p, k){
     var sh = k && (S.share[k] === "pending" || S.share[k] === "queued") ? ' \u00b7 <span class="dp-spin"></span>checking other services\u2019 routes' : '';
     if(!p) return ['<span class="dp-st wait">QUEUED</span>', ""];
     if(p.pending) return ['<span class="dp-st run"><span class="dp-spin"></span>ANALYSING</span>', "Searching diversion start \u00d7 rejoin stop\u2026"];
     if(p.ok === false || p.error) return ['<span class="dp-st no">ERROR</span>', esc(p.error || "")];
     var b = p.best;
-    if(p.status === "divert") return ['<span class="dp-st ok">DIVERT \u00b7 ' + esc(b.confidence) + '</span>', esc(b.leave.code) + " \u2192 " + esc(b.rejoin.code) + " \u00b7 skips " + b.skipped_n + " \u00b7 " + b.turns + " turns" + (b.shared_from ? " \u00b7 same as " + esc(b.shared_from) : "") + sh];
+    var fz = k && S.forced[k];
+    if(fz) return ['<span class="dp-st no">CONTROLLER ROUTE</span>', esc(fz.geom.leave.code) + " \u2192 " + esc(fz.geom.rejoin.code) + " \u00b7 skips " + fz.geom.skipped.length + " \u00b7 \u26a0 fails a check" + sh];
+    if(p.status === "divert") return ['<span class="dp-st ok">DIVERT \u00b7 ' + esc(b.confidence) + '</span>', esc(b.leave.code) + " \u2192 " + esc(b.rejoin.code) + " \u00b7 skips " + b.skipped_n + " \u00b7 " + b.turns + " turns"
+      + (b.preferred ? " \u00b7 " + esc(b.preferred) : b.shared_from ? " \u00b7 same as " + esc(b.shared_from) : "") + sh];
     if(p.status === "review") return ['<span class="dp-st rev">REVIEW</span>', "Low-confidence route only" + sh];
     return ['<span class="dp-st no">NO VERIFIED ROUTE</span>', "Controller review required" + sh];
   }
@@ -354,7 +370,7 @@
     $("svcList").innerHTML = vis.map(function(x){ var k = keyOf(x), t = stTxt(S.plans[k], k);
       return '<button type="button" class="dp-svc" role="listitem" data-k="' + esc(k) + '" aria-pressed="' + (S.sel === k) + '"><span class="num">' + esc(x.service) + '</span><span class="to">D' + x.direction + ' \u00b7 to ' + esc(x.destination || "") + (x.operator ? ' \u00b7 ' + esc(x.operator) : '') + '</span>' + t[0] + '<span class="rs">' + t[1] + '</span></button>'; }).join("");
     $("svcList").querySelectorAll(".dp-svc").forEach(function(b){ b.onclick = function(){ selectService(b.dataset.k); }; });
-    paintCommon();
+    paintCommon(); paintDraw(); paintMsg();
   }
   /* V16.25: do the affected services share one diversion? (OCC wants one short route for all of them when it works) */
   function rkey(b){ return ((b.off_roads && b.off_roads.length ? b.off_roads : b.roads) || []).join(" \u2192 "); }      // the roads off the route
@@ -364,17 +380,14 @@
     var sharing = ks.some(function(k){ return S.share[k] === "pending" || S.share[k] === "queued"; });
     if(sharing){ el.textContent = "Checking whether every service can use the same short diversion\u2026"; return; }
     if(ks.some(function(k){ var p = S.plans[k]; return !p || p.pending; })){ el.textContent = base; return; }
-    var ok = vis.filter(function(x){ var p = S.plans[keyOf(x)]; return p && p.ok; });
-    if(ok.length < 2){ el.textContent = base; return; }
-    var keyOfSvc = {}, g = {};
-    ok.forEach(function(x){ var p = S.plans[keyOf(x)]; if(p.status === "divert" && p.best && !p.best.shared_from) keyOfSvc[x.service] = rkey(p.best); });
-    ok.forEach(function(x){ var p = S.plans[keyOf(x)]; if(p.status !== "divert" || !p.best) return;
-      var key = (p.best.shared_from && keyOfSvc[p.best.shared_from]) || rkey(p.best); (g[key] = g[key] || []).push(x.service); });
-    var top = Object.keys(g).sort(function(a, b){ return g[b].length - g[a].length; })[0];
-    if(!top || g[top].length < 2){ el.textContent = "Each service needs its own diversion \u2014 tap one to see why it cannot use the others\u2019."; return; }
-    var diff = ok.filter(function(x){ return g[top].indexOf(x.service) < 0; }).map(function(x){ return x.service; });
-    el.innerHTML = diff.length ? '<b style="color:#ffd391">Same diversion for ' + g[top].length + ' of ' + ok.length + ' services</b> (' + esc(g[top].join(", ")) + '): ' + esc(top) + '. Different: <b>' + esc(diff.join(", ")) + '</b> \u2014 tap one to see why.'
-      : '<b style="color:#2ee59d">\u2713 All ' + ok.length + ' services use the same diversion:</b> ' + esc(top) + '.';
+    var gs = groups(), all = [];                                           // V16.26: the routes the services will really run (step 6)
+    gs.list.forEach(function(g){ all = all.concat(g.svcs); }); all = all.concat(gs.none);
+    if(all.length < 2){ el.textContent = base; return; }
+    var top = gs.list.slice().sort(function(a, b){ return b.svcs.length - a.svcs.length; })[0];
+    if(!top || top.svcs.length < 2){ el.textContent = "Each service needs its own diversion \u2014 tap one to see why it cannot use the others\u2019."; return; }
+    var diff = all.filter(function(sv){ return top.svcs.indexOf(sv) < 0; });
+    el.innerHTML = diff.length ? '<b style="color:#ffd391">Same diversion for ' + top.svcs.length + ' of ' + all.length + ' services</b> (' + esc(top.svcs.join(", ")) + '): ' + esc(routeText(top.f.c || top.f)) + '. Different: <b>' + esc(diff.join(", ")) + '</b> \u2014 tap one to see why.'
+      : '<b style="color:#2ee59d">\u2713 All ' + all.length + ' services use the same diversion:</b> ' + esc(routeText(top.f.c || top.f)) + '.';
   }
   function selectService(k){ S.sel = k; S.view = null; paintServices(); showSelected(); }
   function showSelected(){ var p = S.plans[S.sel]; if(p && p.ok) fetchAI(S.sel); paintRec(); drawService(p); }
@@ -384,6 +397,8 @@
   S.ai = {};
   function aiOf(){ var a = S.ai[S.sel]; return a && !a.pending ? a : null; }
   function recOf(p){
+    if(p && S.sel && S.pick[S.sel] && p.candidates){ var pk = p.candidates.filter(function(x){ return x.id === S.pick[S.sel]; })[0]; if(pk) return pk; }
+    if(p && p.best && p.best.preferred) return p.best;                  // the controller's own route (drawn / past case)
     var a = aiOf();
     if(a && a.status === "ai" && p && p.candidates){ var c = p.candidates.filter(function(x){ return x.id === a.candidate_id; })[0]; if(c) return c; }
     return p ? p.best : null;
@@ -392,7 +407,7 @@
   function candOf(p){ if(!p || !p.candidates) return null; return S.view ? (p.candidates.filter(function(c){ return c.id === S.view; })[0] || recOf(p)) : recOf(p); }
   function fetchAI(k){
     var x = S.services.filter(function(s){ return keyOf(s) === k; })[0], p = S.plans[k];
-    if(!x || !p || !p.ok || !(p.candidates || []).length || S.ai[k]) return;
+    if(!x || !p || !p.ok || !(p.candidates || []).length || S.ai[k] || (p.best && p.best.preferred)) return;
     S.ai[k] = {pending:true}; var run = S.run, dn = S.donors[k];
     post("/api/diversion/ai_route_plan", Object.assign(payload(), {service:x.service, direction:x.direction, run:x.run || 0}, dn ? {donors:dn} : {}), 120000).then(function(r){
       if(run !== S.run || S.donors[k] !== dn) return;
@@ -402,7 +417,8 @@
   }
   function drawService(p){
     clearServiceMap(); if(!p || p.pending || !p.ok) return;
-    var c = candOf(p), b = recOf(p), bounds = L.latLngBounds(bLineOf(AB() || S.blocks[0]));
+    var c = candOf(p), b = recOf(p), bounds = L.latLngBounds(bLineOf(AB() || S.blocks[0])), fz = !S.view && S.forced[S.sel];
+    if(fz){ c = null; rline(fz.line, "#c792ff", {pane:"div", weight:7, cls:"dp-anim"}, G.div).bindTooltip("Controller route (fails a check): " + esc(routeText(fz)), {sticky:true}); arrows(G.div, fz.line, "#fff", "arrows", 90); bounds.extend(fz.line); }
     S.blocks.forEach(function(x){ bounds.extend(bLineOf(x)); });
     rline(p.original_line, COL.orig, {pane:"orig", weight:5, casing:.6}, G.orig); arrows(G.orig, p.original_line, COL.orig, "arrows", 140);
     if(c){
@@ -411,7 +427,7 @@
         var lt = letterOf(o.id);
         L.polyline(o.line, {pane:"alt", color:o === b ? COL.div : COL.alt, weight:o === b ? 5 : 4, opacity:o === b ? .5 : .32, dashArray:o === b ? null : "6 7"})
           .bindTooltip((lt ? "Alternative " + lt + ": " : (o === b ? "Recommended: " : "Alternative: ")) + o.roads.join(" \u2192 ") + " \u2014 tap to view", {sticky:true})
-          .on("click", function(){ S.view = o.id === b.id ? null : o.id; showSelected(); }).addTo(G.alt);
+          .on("click", function(){ if(S.draw && S.draw.on) return; S.view = o.id === b.id ? null : o.id; showSelected(); }).addTo(G.alt);
       });
       L.polyline(c.skip_line, {pane:"skip", color:"#fff", weight:11, opacity:.7, interactive:false}).addTo(G.skip);
       L.polyline(c.skip_line, {pane:"skip", color:COL.skip, weight:7, dashArray:"8 8"}).bindTooltip("Original section skipped", {sticky:true}).addTo(G.skip);
@@ -429,11 +445,13 @@
     }
     var skipped = {}, inb = {};
     if(c) c.skipped.forEach(function(s){ skipped[s.code] = true; if(s.in_block) inb[s.code] = true; });
+    else if(fz) fz.geom.skipped.forEach(function(s){ skipped[s.code] = true; });
+    var rjc = c ? c.rejoin.code : fz ? fz.geom.rejoin.code : null, lvc = c ? c.leave.code : fz ? fz.geom.leave.code : null;
     (p.stops || []).forEach(function(s){
-      var role = c && s.code === c.rejoin.code ? "rejoin" : skipped[s.code] ? (inb[s.code] || s.in_block ? "inblock" : "skip") : (s.in_block ? "inblock" : "served");
+      var role = s.code === rjc ? "rejoin" : skipped[s.code] ? (inb[s.code] || s.in_block ? "inblock" : "skip") : (s.in_block ? "inblock" : "served");
       var col = {rejoin:COL.rejoin, skip:COL.skip, inblock:COL.inblock, served:COL.served}[role];
       var lab = s.code + " " + s.name + " \u2014 " + {rejoin:"rejoin stop", skip:"skipped", inblock:"skipped (inside the blockage)", served:"served"}[role];
-      var big = role === "rejoin" || (c && s.code === c.leave.code), cls = "dp-stop" + (big ? " big" : "") + (role === "skip" || role === "inblock" ? " x" : "");
+      var big = role === "rejoin" || s.code === lvc, cls = "dp-stop" + (big ? " big" : "") + (role === "skip" || role === "inblock" ? " x" : "");
       L.marker([s.lat, s.lon], {pane:"marks", keyboard:false, icon:L.divIcon({className:"", iconSize:[0, 0], html:'<div class="' + cls + '" style="--c:' + col + '"></div>'})})
         .bindTooltip(esc(lab)).addTo(G.stops);
     });
@@ -471,62 +489,85 @@
   var FPC = {SMALL:"#2ee59d", MEDIUM:"#ffb547", LARGE:"#ff5566"};
   function paintRec(){
     var el = $("recBody"), p = S.sel ? S.plans[S.sel] : null, x = S.services.filter(function(s){ return keyOf(s) === S.sel; })[0];
+    paintDraw(); paintMsg();
     if(!S.blocks.length){ el.innerHTML = '<p class="dp-empty">Search a road, tap the blocked segment and choose the blocked direction. Every affected service is then analysed automatically and the easiest practical diversion appears here.</p>'; return; }
     if(!allDirs()){ el.innerHTML = '<p class="dp-empty">Choose the blocked direction' + (S.blocks.length > 1 ? ' for every blockage' : '') + ' to find the affected services.</p>'; return; }
     if(!x){ el.innerHTML = '<p class="dp-empty">Select an affected service.</p>'; return; }
-    var head = '<div class="dp-rec-h"><span class="no">' + esc(x.service) + '</span><div class="meta"><b>Service ' + esc(x.service) + ' \u00b7 Direction ' + x.direction + '</b>to ' + esc(x.destination || "") + (p && p.bus_type ? ' \u00b7 ' + (p.bus_type === "DD" ? "double-deck" : "single-deck") : '') + '</div></div>';
-    if(!p || p.pending){ el.innerHTML = head + '<p class="dp-muted"><span class="dp-spin"></span>Analysing: how far the bus can keep its normal route, where it must leave it, and the nearest stop it can rejoin correctly\u2026</p>'; return; }
+    var head = '<div class="dp-rec-h"><span class="no">' + esc(x.service) + '</span><div class="meta"><b>Service ' + esc(x.service) + ' · Direction ' + x.direction + '</b>to ' + esc(x.destination || "") + (p && p.bus_type ? ' · ' + (p.bus_type === "DD" ? "double-deck" : "single-deck") : '') + '</div></div>';
+    if(!p || p.pending){ el.innerHTML = head + '<p class="dp-muted"><span class="dp-spin"></span>Analysing: how far the bus can keep its normal route, where it must leave it, and the nearest stop it can rejoin correctly…</p>'; return; }
     if(!p.ok){ el.innerHTML = head + '<div class="dp-banner no"><b>COULD NOT ANALYSE</b>' + esc(p.error || "") + '</div>'; return; }
-    var c = candOf(p), b = recOf(p), h = head, ai = S.ai[S.sel];
-    if(p.status === "none" || !b){
-      h += '<div class="dp-banner no"><b>\u26a0 NO VERIFIED DIVERSION FOUND</b>Controller review required. A correct \u201cno route\u201d is better than a wrong diversion.</div>'
-        + (p.failures && p.failures.length ? '<div class="dp-k">Why</div><ul class="dp-why dp-fail">' + p.failures.map(function(f){ return '<li>' + esc(f) + '</li>'; }).join("") + '</ul>' : '')
-        + shareHtml(p, x) + attemptsHtml(p);
-      el.innerHTML = h; return;
+    var c = candOf(p), b = recOf(p), h = head, ai = S.ai[S.sel], fz = S.forced[S.sel], drawBtn = '<div class="dp-acts"><button type="button" class="ds-btn sm" id="recDraw">✏ DRAW MY OWN</button></div>';
+    if(fz && !S.view){                                                   // V16.26: the controller's route, used although it fails a check
+      h += '<div class="dp-flag"><b>CONTROLLER DECISION — FAILS A CHECK</b>' + esc(fz.reason || "") + '</div>'
+        + '<div class="dp-sum"><div class="rt">' + esc(routeText(fz)) + '</div><div class="meta">' + esc(fz.label) + ' · after ' + esc(fz.geom.leave.code) + ' ' + esc(fz.geom.leave.name) + ' · back at ' + esc(fz.geom.rejoin.code) + ' ' + esc(fz.geom.rejoin.name)
+        + ' · ' + skipTxt(fz.geom.skipped) + ' · ' + f1(fz.geom.km) + ' km</div></div>'
+        + '<div class="dp-acts"><button type="button" class="ds-btn sm" id="unForce">USE THE SUGGESTION INSTEAD</button></div>' + shareHtml(p, x);
+      el.innerHTML = h; $("unForce").onclick = function(){ delete S.forced[S.sel]; paintServices(); showSelected(); }; return;
     }
-    h += aiStages(p, ai, b);
-    h += p.status === "divert" ? '<div class="dp-banner ok"><b>' + (ai && ai.status === "ai" ? "\u2b50 AI RECOMMENDED" + (letterOf(b.id) ? " \u00b7 ROUTE " + letterOf(b.id) : "") : "ALGORITHM RECOMMENDED") + '</b>Easiest practical diversion that keeps the most useful part of the route.</div>'
-      : '<div class="dp-banner rev"><b>NO SUITABLE DIVERSION FOUND \u2014 CONTROLLER REVIEW REQUIRED</b>' + esc(String(p.headline || "").replace(/^.*REQUIRED\s*/, "") || "Only a low-confidence route was found") + ' \u2014 shown for reference, not recommended.</div>';
-    if(c.bc_brief) h += '<div class="dp-brief"><div class="dp-k" style="margin:0 0 4px">Brief for the Bus Captain</div>' + esc(c.bc_brief) + '</div>';
+    if(p.status === "none" || !b){
+      h += '<div class="dp-banner no"><b>⚠ NO VERIFIED DIVERSION FOUND</b>Controller review required. A correct “no route” is better than a wrong diversion. You can draw your own (step 5).</div>'
+        + (p.failures && p.failures.length ? '<div class="dp-k">Why</div><ul class="dp-why dp-fail">' + p.failures.map(function(f){ return '<li>' + esc(f) + '</li>'; }).join("") + '</ul>' : '')
+        + drawBtn + shareHtml(p, x) + attemptsHtml(p);
+      el.innerHTML = h; wireRec(el, b); return;
+    }
+    var aiChip = !ai || ai.pending ? (b.preferred || S.pick[S.sel] ? '' : '<span class="dp-muted"><span class="dp-spin"></span>AI review…</span>')
+      : ai.status === "ai" ? '<span class="dp-tag" style="color:#ffd34d;margin:0">⭐ AI ' + (ai.agrees ? 'agrees' : 'picked Route ' + esc((ai.ai || {}).recommended_candidate || "")) + '</span>' : '';
+    var lead = b.preferred ? "THE CONTROLLER'S ROUTE · " + b.preferred.toUpperCase() : S.pick[S.sel] ? "YOUR CHOICE" + (letterOf(b.id) ? " · ROUTE " + letterOf(b.id) : "")
+      : ai && ai.status === "ai" ? "⭐ AI RECOMMENDED" + (letterOf(b.id) ? " · ROUTE " + letterOf(b.id) : "") : "ALGORITHM RECOMMENDED";
+    h += p.status === "divert" || S.pick[S.sel] ? '<div class="dp-banner ok"><b>' + lead + '</b>' + (b.shared_from && !b.preferred ? 'Same diversion as service ' + esc(b.shared_from) + '. ' : '') + 'Checked for this bus: every hard check passed.</div>'
+      : '<div class="dp-banner rev"><b>NO SUITABLE DIVERSION FOUND — CONTROLLER REVIEW REQUIRED</b>' + esc(String(p.headline || "").replace(/^.*REQUIRED\s*/, "") || "Only a low-confidence route was found") + ' — shown for reference, not recommended.</div>';
+    if(c !== b) h += '<div class="dp-banner rev"><b>SHOWING AN ALTERNATIVE</b><div class="dp-acts"><button type="button" class="ds-btn sm pri" id="useAlt">USE THIS ROUTE</button><button type="button" class="ds-btn sm" id="backRec">BACK TO RECOMMENDED</button></div></div>';
+    else if(S.pick[S.sel]) h += '<div class="dp-acts" style="margin:-4px 0 8px"><button type="button" class="ds-btn sm ghost" id="unPick">BACK TO THE SUGGESTION</button></div>';
+    h += '<div class="dp-sum"><div class="rt">' + esc(routeText(c)) + '</div><div class="meta">' + skipTxt(c.skipped) + ' · ' + sgn(c.added_km, 1) + ' km · ' + sgn(c.added_min) + ' min · ' + c.turns + ' turns · ' + esc(c.confidence) + ' confidence</div></div>';
+    if(aiChip) h += '<div class="dp-chips">' + aiChip + '</div>';
     var ddw = (c.warnings || []).some(function(w){ return /^Double-decker on /.test(w); });     // V16.24: a double-decker on a single-deck road: confirm
-    if(c.warnings && c.warnings.length) h += '<div class="dp-banner rev" style="border-style:dashed"><b>' + (ddw ? 'PLEASE CONFIRM' : 'SAFEGUARD' + (c.warnings.length > 1 ? 'S' : '') + ' EXCEEDED') + '</b>' + c.warnings.map(esc).join(" \u00b7 ") + (ddw ? '' : ' \u2014 still the best verified option; please confirm.') + '</div>';
-    if(c !== b) h += '<div class="dp-banner rev"><b>SHOWING AN ALTERNATIVE</b><button type="button" class="ds-btn sm" id="backRec" style="margin-top:6px">BACK TO RECOMMENDED</button></div>';
-    var lr = p.last_reachable || {}, earlier = c.earlier;
-    h += '<dl class="dp-kv">'
-      + (earlier ? '<dt>Last reachable stop</dt><dd>' + esc(lr.code) + ' ' + esc(lr.name) + ' <span style="color:#ffd391">\u2014 no practical escape after it</span></dd>' : '')
+    if(c.warnings && c.warnings.length) h += '<div class="dp-banner rev" style="border-style:dashed"><b>' + (ddw ? 'PLEASE CONFIRM' : 'SAFEGUARD' + (c.warnings.length > 1 ? 'S' : '') + ' EXCEEDED') + '</b>' + c.warnings.map(esc).join(" · ") + (ddw ? '' : ' — still the best verified option; please confirm.') + '</div>';
+    if(c.bc_brief) h += '<div class="dp-brief"><div class="dp-k" style="margin:0 0 4px">Brief for the Bus Captain</div>' + esc(c.bc_brief) + '</div>';
+    h += drawBtn + shareHtml(p, x);
+    // the full working, folded away (lean): AI review, roads, turn by turn, checks, why / why not
+    var lr = p.last_reachable || {}, earlier = c.earlier, d = aiStages(p, ai, b);
+    d += '<dl class="dp-kv">'
+      + (earlier ? '<dt>Last reachable stop</dt><dd>' + esc(lr.code) + ' ' + esc(lr.name) + ' <span style="color:#ffd391">— no practical escape after it</span></dd>' : '')
       + '<dt>Last normal stop served</dt><dd><b>' + esc(c.leave.code) + '</b> ' + esc(c.leave.name) + '</dd>'
-      + '<dt>Diversion begins</dt><dd>' + (c.keep_km >= 0.5 ? '<b>' + f1(c.keep_km) + ' km after ' + esc(c.leave.name) + '</b> \u2014 stays on the normal route' + (c.keep_road ? ' (' + esc(c.keep_road) + ')' : '') + ' and turns off at the last practical exit before the blockage' : 'after ' + esc(c.leave.name)) + '</dd></dl>'
-      + '<div class="dp-k">Recommended roads</div><ul class="dp-chain">' + c.roads.map(function(r, i){ return (i ? '<li class="ar">\u2192</li>' : '') + '<li>' + esc(r) + '</li>'; }).join("") + '<li class="ar">\u2192</li><li class="rj">\u21aa ' + esc(c.rejoin.name) + '</li></ul>'
+      + '<dt>Diversion begins</dt><dd>' + (c.keep_km >= 0.5 ? '<b>' + f1(c.keep_km) + ' km after ' + esc(c.leave.name) + '</b> — stays on the normal route' + (c.keep_road ? ' (' + esc(c.keep_road) + ')' : '') + ' and turns off at the last practical exit before the blockage' : 'after ' + esc(c.leave.name)) + '</dd></dl>'
+      + '<div class="dp-k">Recommended roads</div><ul class="dp-chain">' + c.roads.map(function(r, i){ return (i ? '<li class="ar">→</li>' : '') + '<li>' + esc(r) + '</li>'; }).join("") + '<li class="ar">→</li><li class="rj">↪ ' + esc(c.rejoin.name) + '</li></ul>'
       + (c.dd_chain ? '<div class="dp-k">Stop to stop on ' + (p.bus_type === "SD" ? 'bus' : 'double-deck') + ' services</div><ul class="dp-ddleg">' + c.dd_chain.legs.map(function(l){
-          return '<li><span class="sv">' + (l.own ? esc(x.service) + ' own' : esc(l.svc)) + '</span><span class="tx">' + esc(l.from) + ' ' + esc(tc(l.from_name)) + ' \u2192 ' + esc(l.to) + ' ' + esc(tc(l.to_name)) + ' <span class="dp-muted">(' + l.stops + ' stop' + (l.stops === 1 ? '' : 's') + ', ' + f1(l.km) + ' km)</span></span></li>'; }).join("")
+          return '<li><span class="sv">' + (l.own ? esc(x.service) + ' own' : esc(l.svc)) + '</span><span class="tx">' + esc(l.from) + ' ' + esc(tc(l.from_name)) + ' → ' + esc(l.to) + ' ' + esc(tc(l.to_name)) + ' <span class="dp-muted">(' + l.stops + ' stop' + (l.stops === 1 ? '' : 's') + ', ' + f1(l.km) + ' km)</span></span></li>'; }).join("")
           + '</ul><p class="dp-muted" style="margin:4px 0 8px">Every stop on the way is already served by ' + (p.bus_type === "SD" ? 'a bus service' : 'a service that runs double-deckers') + (c.dd_chain.transfers ? '; the route switches service at a stop both serve' : '') + '.'
-          + (c.dd_chain.unconfirmed && c.dd_chain.unconfirmed.length ? ' <span style="color:#ffd391">Bus type not yet known for ' + esc(c.dd_chain.unconfirmed.join(", ")) + ' \u2014 verify.</span>' : '') + '</p>' : '')
-      + '<div class="dp-k">Bus captain instructions</div><ul class="dp-chain">' + c.instruction_text.map(function(t, i){ return (i ? '<li class="ar">\u2192</li>' : '') + '<li style="background:rgba(56,214,255,.1);border-color:rgba(56,214,255,.4);color:#dff6ff">' + esc(tc(t)) + '</li>'; }).join("") + '</ul>'
+          + (c.dd_chain.unconfirmed && c.dd_chain.unconfirmed.length ? ' <span style="color:#ffd391">Bus type not yet known for ' + esc(c.dd_chain.unconfirmed.join(", ")) + ' — verify.</span>' : '') + '</p>' : '')
+      + '<div class="dp-k">Bus captain instructions</div><ul class="dp-chain">' + c.instruction_text.map(function(t, i){ return (i ? '<li class="ar">→</li>' : '') + '<li style="background:rgba(56,214,255,.1);border-color:rgba(56,214,255,.4);color:#dff6ff">' + esc(tc(t)) + '</li>'; }).join("") + '</ul>'
       + '<dl class="dp-kv">'
       + '<dt>Rejoin</dt><dd><b>' + esc(c.rejoin.code) + '</b> ' + esc(c.rejoin.name) + '</dd>'
-      + '<dt>Next original stop verified</dt><dd>' + (c.next.ok ? '\u2713 ' : '') + esc(c.next.code || "") + ' ' + esc(c.next.name || "") + '</dd>'
-      + '<dt>Stops skipped</dt><dd><b>' + c.skipped_n + '</b>' + (c.skipped.length ? ' \u00b7 ' + c.skipped.map(function(s){ return esc(s.code) + (s.in_block ? "*" : ""); }).join(", ") : '') + (c.unavoidable ? ' <span class="dp-muted">(* inside the blockage)</span>' : '') + '</dd>'
+      + '<dt>Next original stop verified</dt><dd>' + (c.next.ok ? '✓ ' : '') + esc(c.next.code || "") + ' ' + esc(c.next.name || "") + '</dd>'
+      + '<dt>Stops skipped</dt><dd><b>' + c.skipped_n + '</b>' + (c.skipped.length ? ' · ' + c.skipped.map(function(s){ return esc(s.code) + (s.in_block ? "*" : ""); }).join(", ") : '') + (c.unavoidable ? ' <span class="dp-muted">(* inside the blockage)</span>' : '') + '</dd>'
       + '<dt>Extra distance</dt><dd>' + sgn(c.added_km, 1) + ' km</dd>'
       + '<dt>Extra time</dt><dd>' + sgn(c.added_min) + ' min</dd>'
-      + '<dt>Turns</dt><dd>' + c.turns + (c.sharp ? ' (' + c.sharp + ' sharp)' : '') + (c.bc && c.bc.right ? ' \u00b7 ' + c.bc.right + ' right' : '') + (c.bc && c.bc.close_turns ? ' \u00b7 ' + c.bc.close_turns + ' close together' : '') + '</dd>'
-      + '<dt>BC complexity</dt><dd>' + pill(c.bc_label || "\u2013", LVL[c.bc_label] || "#8a97a8") + ' <span class="dp-muted">' + (c.bc ? c.bc.roads + ' road' + (c.bc.roads === 1 ? '' : 's') + (c.bc.unfamiliar_share > 0.5 ? ' \u00b7 mostly roads no bus uses' : '') + (c.bc.minor_share > 0.3 ? ' \u00b7 small roads' : '') : '') + '</span></dd>'
-      + '<dt>Diversion footprint</dt><dd>' + pill(c.footprint_label || "\u2013", FPC[c.footprint_label] || "#8a97a8") + ' <span class="dp-muted">' + f1(c.div_km) + ' km off route \u00b7 leaves ' + km(c.leave_before_m || 0) + ' before, rejoins ' + km(Math.max(0, c.rejoin_after_m || 0)) + ' after the blockage</span></dd>'
+      + '<dt>Turns</dt><dd>' + c.turns + (c.sharp ? ' (' + c.sharp + ' sharp)' : '') + (c.bc && c.bc.right ? ' · ' + c.bc.right + ' right' : '') + (c.bc && c.bc.close_turns ? ' · ' + c.bc.close_turns + ' close together' : '') + '</dd>'
+      + '<dt>BC complexity</dt><dd>' + pill(c.bc_label || "–", LVL[c.bc_label] || "#8a97a8") + ' <span class="dp-muted">' + (c.bc ? c.bc.roads + ' road' + (c.bc.roads === 1 ? '' : 's') + (c.bc.unfamiliar_share > 0.5 ? ' · mostly roads no bus uses' : '') + (c.bc.minor_share > 0.3 ? ' · small roads' : '') : '') + '</span></dd>'
+      + '<dt>Diversion footprint</dt><dd>' + pill(c.footprint_label || "–", FPC[c.footprint_label] || "#8a97a8") + ' <span class="dp-muted">' + f1(c.div_km) + ' km off route · leaves ' + km(c.leave_before_m || 0) + ' before, rejoins ' + km(Math.max(0, c.rejoin_after_m || 0)) + ' after the blockage</span></dd>'
       + '<dt>Bus-road confidence</dt><dd>' + pill(c.busroad_label, CONF[c.busroad_label] || "#8a97a8") + ' <span class="dp-muted">' + esc(c.evidence_text) + '</span></dd>'
       + '<dt>Overall confidence</dt><dd>' + pill(c.confidence, CONF[c.confidence]) + ' <span class="dp-muted">OCC score ' + f0(c.score) + '/100</span></dd></dl>';
-    h += shareHtml(p, x);                                                 // V16.25: other services' diversions, checked for this bus
-    if(c === b && p.why && p.why.length) h += '<div class="dp-k">Why this route?</div><ul class="dp-why">' + p.why.map(function(t){ return '<li>' + esc(t) + '</li>'; }).join("") + '</ul>';
-    if(c === b && p.why_not && p.why_not.length) h += '<div class="dp-k">Why not\u2026</div>' + p.why_not.map(function(w){ return '<div class="dp-not"><b>' + esc(tc(w.title)) + '</b>' + esc(w.text) + '</div>'; }).join("");
+    if(c === b && p.why && p.why.length) d += '<div class="dp-k">Why this route?</div><ul class="dp-why">' + p.why.map(function(t){ return '<li>' + esc(t) + '</li>'; }).join("") + '</ul>';
+    if(c === b && p.why_not && p.why_not.length) d += '<div class="dp-k">Why not…</div>' + p.why_not.map(function(w){ return '<div class="dp-not"><b>' + esc(tc(w.title)) + '</b>' + esc(w.text) + '</div>'; }).join("");
+    d += '<div class="dp-muted" style="margin-top:6px">OCC score ' + f0(c.score) + '/100: ' + Object.keys(c.parts || {}).map(function(k){ return esc((S.cfg && S.cfg.weight_labels || {})[k] || k) + ' ' + f1(c.parts[k]); }).join(" · ") + '. Scored only after every hard check passed (blocked road, U-turn, wrong-way, impossible turn, restricted road, rejoin direction, next original stop).</div>';
+    h += '<details class="dp-det" id="recMore"' + (S.more ? ' open' : '') + '><summary>Details — why this route, turn by turn, checks</summary><div style="margin-top:6px">' + d + '</div></details>';
     var alts = (p.candidates || []).slice().sort(function(x, y){ return (letterOf(x.id) || "z").localeCompare(letterOf(y.id) || "z"); });
     if(alts.length > 1) h += '<details class="dp-det"' + (S.view ? ' open' : '') + '><summary>Show alternatives (' + (alts.length - 1) + ')</summary><div style="margin-top:6px">' + alts.map(function(a){
-        var tg = (a.tags || []).map(function(t){ return {A:"MIN SKIPPED STOPS", B:"SIMPLEST", C:"FASTEST"}[t]; }).filter(Boolean).join(" \u00b7 ");
-        return '<button type="button" class="dp-alt" data-alt="' + esc(a.id) + '" aria-pressed="' + ((S.view || b.id) === a.id) + '"><b>' + (letterOf(a.id) ? 'Route ' + letterOf(a.id) + ' \u00b7 ' : '') + esc(a.leave.code) + ' \u2192 ' + esc(a.rejoin.code) + '</b>'
-          + (ai && ai.status === "ai" && a.id === ai.candidate_id ? '<span class="dp-tag" style="color:#ffd34d">\u2b50 AI</span>' : '') + (a.id === p.best.id ? '<span class="dp-tag" style="color:#9fdff5">ALGORITHM #1</span>' : '') + (a.id === b.id ? '<span class="dp-tag" style="color:#2ee59d">RECOMMENDED</span>' : '') + (a.dd_chain ? '<span class="dp-tag" style="color:#cdb9ff">' + (p.bus_type === "SD" ? 'STOP CHAIN' : 'DD STOP CHAIN') + '</span>' : '') + (a.found_by === "early" ? '<span class="dp-tag" style="color:#9fdff5">NEAREST REJOIN</span>' : '') + (a.shared_from ? '<span class="dp-tag" style="color:#ffd391">SAME AS ' + esc(a.shared_from) + '</span>' : '') + (tg ? '<span class="dp-tag">' + tg + '</span>' : '')
-          + '<br>' + esc(a.roads.join(" \u2192 ")) + '<br><span class="dp-muted">skips ' + a.skipped_n + ' \u00b7 ' + a.turns + ' turns \u00b7 ' + sgn(a.added_min) + ' min \u00b7 ' + sgn(a.added_km, 1) + ' km \u00b7 ' + esc(a.busroad_label) + ' bus-road \u00b7 ' + esc(a.confidence) + ' \u00b7 score ' + f0(a.score) + '</span></button>'; }).join("") + '</div></details>';
-    h += '<details class="dp-det"><summary>OCC score ' + f0(c.score) + '/100 \u2014 how it is made</summary><div class="dp-muted" style="margin-top:6px">' + Object.keys(c.parts || {}).map(function(k){ return esc((S.cfg && S.cfg.weight_labels || {})[k] || k) + ' ' + f1(c.parts[k]); }).join(" \u00b7 ") + '. Scored only after every hard check passed (blocked road, U-turn, wrong-way, impossible turn, restricted road, rejoin direction, next original stop).</div></details>';
+        var tg = (a.tags || []).map(function(t){ return {A:"MIN SKIPPED STOPS", B:"SIMPLEST", C:"FASTEST"}[t]; }).filter(Boolean).join(" · ");
+        return '<button type="button" class="dp-alt" data-alt="' + esc(a.id) + '" aria-pressed="' + ((S.view || b.id) === a.id) + '"><b>' + (letterOf(a.id) ? 'Route ' + letterOf(a.id) + ' · ' : '') + esc(a.leave.code) + ' → ' + esc(a.rejoin.code) + '</b>'
+          + (ai && ai.status === "ai" && a.id === ai.candidate_id ? '<span class="dp-tag" style="color:#ffd34d">⭐ AI</span>' : '') + (a.id === p.best.id ? '<span class="dp-tag" style="color:#9fdff5">ALGORITHM #1</span>' : '') + (a.id === b.id ? '<span class="dp-tag" style="color:#2ee59d">RECOMMENDED</span>' : '') + (a.dd_chain ? '<span class="dp-tag" style="color:#cdb9ff">' + (p.bus_type === "SD" ? 'STOP CHAIN' : 'DD STOP CHAIN') + '</span>' : '') + (a.found_by === "early" ? '<span class="dp-tag" style="color:#9fdff5">NEAREST REJOIN</span>' : '') + (a.shared_from ? '<span class="dp-tag" style="color:#ffd391">' + (a.preferred ? esc(a.preferred).toUpperCase() : 'SAME AS ' + esc(a.shared_from)) + '</span>' : '') + (tg ? '<span class="dp-tag">' + tg + '</span>' : '')
+          + '<br>' + esc(a.roads.join(" → ")) + '<br><span class="dp-muted">skips ' + a.skipped_n + ' · ' + a.turns + ' turns · ' + sgn(a.added_min) + ' min · ' + sgn(a.added_km, 1) + ' km · ' + esc(a.busroad_label) + ' bus-road · ' + esc(a.confidence) + ' · score ' + f0(a.score) + '</span></button>'; }).join("") + '</div></details>';
     h += attemptsHtml(p);
     el.innerHTML = h;
+    wireRec(el, b, c);
+  }
+  function wireRec(el, b, c){
     var br = $("backRec"); if(br) br.onclick = function(){ S.view = null; showSelected(); };
-    el.querySelectorAll("[data-alt]").forEach(function(a){ a.onclick = function(){ S.view = a.dataset.alt === b.id ? null : a.dataset.alt; showSelected(); };
+    var ua = $("useAlt"); if(ua) ua.onclick = function(){ S.pick[S.sel] = c.id; S.view = null; paintServices(); showSelected(); toast("Route chosen for this service"); };
+    var up = $("unPick"); if(up) up.onclick = function(){ delete S.pick[S.sel]; showSelected(); };
+    var rd = $("recDraw"); if(rd) rd.onclick = function(){ drawStart(); };
+    var mo = $("recMore"); if(mo) mo.ontoggle = function(){ S.more = mo.open; };
+    el.querySelectorAll("[data-alt]").forEach(function(a){ a.onclick = function(){ S.view = b && a.dataset.alt === b.id ? null : a.dataset.alt; showSelected(); };
       if(a.tagName === "LI") a.onkeydown = function(e){ if(e.key === "Enter" || e.key === " "){ e.preventDefault(); a.onclick(); } }; });
   }
   function shareHtml(p, x){
@@ -621,7 +662,7 @@
     if(!(LENS.on || LENS.press) || !ll) return;
     var z = LENS.z || 2;                         // press and hold with the button off: x4
     LENS.map.setView(ll, Math.min(20, map.getZoom() + z), {animate:false});
-    LENS.el.querySelector(".dp-lens-z").textContent = "×" + Math.pow(2, z) + (LENS.press ? (canPick() ? " · let go to pick" : " · view only") : LENS.touch ? " · tap to pick" : "");
+    LENS.el.querySelector(".dp-lens-z").textContent = "×" + Math.pow(2, z) + (LENS.press ? " · " + window.DV_LENS_LABEL() : LENS.touch ? " · tap to pick" : "");
   }
   function lensSet(step){
     LENS.z = step; LENS.on = step > 0; LENS.touch = !!(window.matchMedia && matchMedia("(hover: none), (pointer: coarse)").matches);
@@ -652,7 +693,10 @@
      Let go: that spot is tapped (blockage placed / moved). A locked blockage is not moved - the lens then only shows.
      A quick tap, or pressing and dragging straight away, works exactly as before (tap / move the map). */
   var PRESS = {t:null, id:null, x0:0, y0:0, touch:false, ll:null, until:0}, HOLD_MS = 400;
-  function canPick(){ var b = AB(); return !(S.blocks.length && !S.adding && b && b.locked); }   // the same rule as a map tap
+  function canPick(){ if(S.draw && S.draw.on) return true; var b = AB(); return !(S.blocks.length && !S.adding && b && b.locked); }   // the same rule as a map tap
+  window.DV_LENS_CAN = function(){ return canPick(); };
+  window.DV_CLICK_THROUGH = function(){ return !!(S.draw && S.draw.on); };     // 3D: while drawing, every tap is a point
+  window.DV_LENS_LABEL = function(){ return S.draw && S.draw.on ? "let go to add a point" : canPick() ? "let go to pick" : "view only"; };   // the 3D magnifier
   function pressMove(cx, cy){
     var r = map.getContainer().getBoundingClientRect();
     var p = L.point(Math.max(0, Math.min(r.width, cx - r.left)), Math.max(0, Math.min(r.height, cy - r.top))), x = p.x, y = p.y;
@@ -702,6 +746,281 @@
       if(PRESS.until && Date.now() < PRESS.until && map.getContainer().contains(e.target)){ e.stopPropagation(); e.preventDefault(); PRESS.until = 0; }
     }, true);
   })(map.getContainer().parentNode);
+
+  /* ================================================================ V16.26 lean planner: 5 draw your own, 6 the recommendation
+     message (as OCC sends it), 7 save the case - and saved cases offered again when the same road is blocked */
+  var ABR = [[/\bAvenue\b/g, "Ave"], [/\bRoad\b/g, "Rd"], [/\bStreet\b/g, "St"], [/\bDrive\b/g, "Dr"], [/\bCrescent\b/g, "Cres"], [/\bExpressway\b/g, "Expwy"],
+    [/\bBoulevard\b/g, "Blvd"], [/\bCentral\b/g, "Ctrl"], [/\bPlace\b/g, "Pl"], [/\bLane\b/g, "Ln"], [/\bTerrace\b/g, "Ter"], [/\bClose\b/g, "Cl"], [/\bSquare\b/g, "Sq"],
+    [/\bGardens?\b/g, "Gdns"], [/\bHeights\b/g, "Hts"], [/\bIndustrial\b/g, "Ind"], [/\bJunction\b/g, "Jct"], [/\bInterchange\b/g, "Int"], [/\bStation\b/g, "Stn"],
+    [/\bUpper\b/g, "Upp"], [/\bNorth\b/g, "Nth"], [/\bSouth\b/g, "Sth"], [/\bCommonwealth\b/g, "C'wealth"], [/\bBukit\b/g, "Bt"], [/\bJalan\b/g, "Jln"],
+    [/\bLorong\b/g, "Lor"], [/\bTanjong\b/g, "Tg"], [/\bKampong\b/g, "Kg"], [/\bMount\b/g, "Mt"]];
+  function abbr(r){ var t = tc(r); ABR.forEach(function(a){ t = t.replace(a[0], a[1]); }); return t; }
+  function chainRaw(c){ var out = []; [c.from_road].concat(c.roads || [], [c.back_road]).filter(Boolean).forEach(function(x){ if(out[out.length - 1] !== x) out.push(x); }); return out; }
+  function chain(c){ var out = []; chainRaw(c).map(abbr).forEach(function(x){ if(out[out.length - 1] !== x) out.push(x); }); return out; }
+  function routeText(c){ var ch = chain(c); return ch.length ? ch.join(" > ") + " (Back on route)" : "(route drawn on the map)"; }
+  function joinAnd(a){ return a.length < 2 ? (a[0] || "") : a.slice(0, -1).join(", ") + " & " + a[a.length - 1]; }
+  function skipCount(list){ list = list || []; return list.length + (list.length ? " (" + joinAnd(list.map(function(s){ return "BS " + s.code; })) + ")" : ""); }
+  function skipTxt(list){ return "Skips " + esc(skipCount(list)); }
+  function uniqA(a){ return a.filter(function(x, i){ return a.indexOf(x) === i; }); }
+
+  /* the route each service will really run: the controller's choice, else the recommendation */
+  function finalOf(k){
+    var fz = S.forced[k];
+    if(fz) return {src:fz.src, label:fz.label, roads:fz.roads, key:"M:" + fz.roads.join("|"), skipped:fz.geom.skipped, km:fz.geom.km, line:fz.line,
+                   leave_pt:fz.line[0], rejoin_pt:fz.line[fz.line.length - 1], leave:fz.geom.leave, rejoin:fz.geom.rejoin, flags:[fz.label + ": " + (fz.reason || "fails a check")], c:fz};
+    var p = S.plans[k]; if(!p || !p.ok || !p.best || p.pending) return null;
+    var c = S.pick[k] ? (p.candidates || []).filter(function(x){ return x.id === S.pick[k]; })[0] : null;
+    if(!c && p.status !== "divert") return null;
+    var a = S.ai[k];
+    if(!c && !p.best.preferred && a && a.status === "ai") c = (p.candidates || []).filter(function(x){ return x.id === a.candidate_id; })[0];
+    c = c || p.best;
+    var src = S.pick[k] ? "alternative" : c.preferred ? (S.share[k] === "manual" ? "manual" : "case") : (a && a.status === "ai" && c.id !== p.best.id ? "ai" : "algorithm");
+    var used = c.preferred ? (p.shared || []).filter(function(x){ return x.used; })[0] : null;     // the controller's route: grouped with the same route used anyway elsewhere
+    return {src:src, label:c.preferred || "", roads:c.roads, key:used ? "M:" + (used.roads || []).join("|") : rkey(c), skipped:c.skipped || [], km:c.div_km || 0, line:c.line, leave_pt:c.leave_pt, rejoin_pt:c.rejoin_pt,
+            leave:c.leave, rejoin:c.rejoin, flags:c.warnings || [], c:c};
+  }
+  function groups(){
+    var list = [], by = {}, none = [];
+    visibleServices().forEach(function(x){
+      var k = keyOf(x), p = S.plans[k]; if(!p || p.pending) return;
+      var f = finalOf(k); if(!f){ if(p.ok && none.indexOf(x.service) < 0) none.push(x.service); return; }
+      var g = by[f.key];
+      if(!g){ g = by[f.key] = {key:f.key, f:f, svcs:[], skipped:[], kms:[], srcs:[], flags:[], items:[]}; list.push(g); }
+      if(g.svcs.indexOf(x.service) < 0) g.svcs.push(x.service);
+      f.skipped.forEach(function(s){ if(!g.skipped.some(function(y){ return y.code === s.code; })) g.skipped.push(s); });
+      g.kms.push(f.km || 0); g.srcs.push(f.src); g.items.push({x:x, k:k, f:f});
+      f.flags.forEach(function(t){ if(g.flags.indexOf(t) < 0) g.flags.push(t); });
+    });
+    list.forEach(function(g, i){ g.n = i + 1; g.km = Math.round(g.kms.reduce(function(a, b){ return a + b; }, 0) / g.kms.length * 10) / 10; });
+    return {list:list, none:none};
+  }
+  function runsOf(g){ return String(S.runs[g.key] || "").split(/\n/).map(function(t){ return t.trim(); }).filter(Boolean); }
+  function milAuto(g){ return Math.round(g.km * runsOf(g).length * 10) / 10; }
+  function milOf(g){ var v = String(S.mil[g.key] || "").trim(); return v !== "" && !isNaN(+v) ? (Math.round(+v * 10) / 10).toFixed(1) : milAuto(g).toFixed(1); }
+  function msgText(gs){
+    var L_ = [];
+    gs.list.forEach(function(g){
+      if(L_.length) L_.push("");
+      L_.push("Diverted Route " + g.n + " : [" + g.svcs.join(", ") + "]");
+      L_.push(routeText(g.f.c || g.f));
+      L_.push("", "Bus stops skipped: " + skipCount(g.skipped), "", "Diverted Runs:");
+      var rs = runsOf(g); L_.push(rs.length ? rs.join("\n") : "–");
+      L_.push("", "Total Mileage salvaged: " + milOf(g) + "km.");
+    });
+    if(gs.none.length) L_.push("", "No verified diversion yet: " + gs.none.join(", ") + " (controller review)");
+    return L_.join("\n");
+  }
+  function paintMsg(){
+    var gs = groups(), has = gs.list.length > 0;
+    $("cMsg").hidden = !has; $("cSave").hidden = !has;
+    if(!has){ S.msgSig = ""; return; }
+    $("mText").textContent = msgText(gs);
+    var sig = gs.list.map(function(g){ return g.n + ":" + g.key + ":" + g.svcs.join(","); }).join("|");
+    S.msgG = gs.list;
+    if(sig !== S.msgSig){
+      S.msgSig = sig;
+      $("mEdit").innerHTML = gs.list.map(function(g, i){
+        return '<div class="dp-medit"><h4>Route ' + g.n + ' · ' + esc(g.svcs.join(", ")) + '</h4>'
+          + (g.flags.length ? '<div class="dp-muted" style="color:#ffc3ca">⚠ ' + esc(g.flags.join(" · ")) + '</div>' : '')
+          + '<label for="mr' + i + '">Diverted runs — one per line: run / bus / BC</label><textarea class="dp-ta" id="mr' + i + '" data-i="' + i + '" rows="2" placeholder="10957407 / SBS8973R / BC 61748">' + esc(S.runs[g.key] || "") + '</textarea>'
+          + '<label for="mm' + i + '">Mileage salvaged (km)</label><input class="dp-in" id="mm' + i + '" data-m="' + i + '" inputmode="decimal" value="' + esc(S.mil[g.key] || "") + '" placeholder="auto"> <span class="dp-muted" data-auto="' + i + '"></span></div>'; }).join("");
+      $("mEdit").querySelectorAll("textarea[data-i]").forEach(function(t){ t.oninput = function(){ S.runs[S.msgG[+t.dataset.i].key] = t.value; msgRefresh(); }; });
+      $("mEdit").querySelectorAll("input[data-m]").forEach(function(t){ t.oninput = function(){ S.mil[S.msgG[+t.dataset.m].key] = t.value; msgRefresh(); }; });
+    }
+    autoHints(gs.list);
+  }
+  function autoHints(list){ list.forEach(function(g, i){ var e = $("mEdit").querySelector('[data-auto="' + i + '"]'); if(e) e.textContent = "auto: " + g.km.toFixed(1) + " km × " + runsOf(g).length + " run" + (runsOf(g).length === 1 ? "" : "s") + " = " + milAuto(g).toFixed(1) + " km"; }); }
+  function msgRefresh(){ var gs = groups(); $("mText").textContent = msgText(gs); autoHints(gs.list); }
+  $("mCopy").onclick = function(){
+    var t = $("mText").textContent, done = function(){ toast("Copied — paste it into the chat"); };
+    if(navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(done, function(){ fallbackCopy(t); done(); }); else { fallbackCopy(t); done(); }
+  };
+  function fallbackCopy(t){ var a = document.createElement("textarea"); a.value = t; a.style.position = "fixed"; a.style.opacity = "0"; document.body.appendChild(a); a.select(); try{ document.execCommand("copy"); }catch(e){} a.remove(); }
+
+  /* ---------------------------------------------------------------- 5. draw your own diversion on the map */
+  S.draw = {on:false, pts:[], line:null, roads:[], km:0, snapped:false, note:""}; S.drawFor = "all";
+  function drawOff(){ $("drawBar").hidden = true; var m = document.querySelector(".dp-map"); if(m) m.classList.remove("drawing"); }
+  function drawReset(){ S.draw = {on:false, pts:[], line:null, roads:[], km:0, snapped:false, note:""}; S.drawRes = null; if(G.draw) G.draw.clearLayers(); drawOff(); paintDraw(); }
+  function drawStart(){
+    if(!S.services.length){ toast("Place the blockage and choose its direction first"); return; }
+    S.draw.on = true; S.view = null; $("drawBar").hidden = false; document.querySelector(".dp-map").classList.add("drawing"); drawBar(); hint(""); drawMap(); paintDraw();
+    var r = $("map").getBoundingClientRect(); if(r.top < 0 || r.bottom > window.innerHeight) $("map").scrollIntoView({block:"center", behavior:"smooth"});
+  }
+  function drawBar(){ var d = S.draw; $("drawTxt").textContent = d.pts.length ? d.pts.length + " point" + (d.pts.length === 1 ? "" : "s") + (d.line ? " · " + f1(d.km) + " km · " + chain({roads:d.roads}).join(" > ") : "") + " — keep tapping, or DONE"
+    : "Tap along the roads: where the bus leaves its route → the roads → where it is back on route"; }
+  function drawAdd(ll){ S.draw.pts.push([+ll.lat.toFixed(6), +ll.lng.toFixed(6)]); S.draw.line = null; drawMap(); drawBar(); clearTimeout(S.drawT); S.drawT = setTimeout(drawSnap, 300); }
+  function drawSnap(){
+    var d = S.draw, n = d.pts.length; if(n < 2){ drawMap(); paintDraw(); return; }
+    post("/api/dv2/manual", {points:d.pts}, 30000).then(function(j){
+      if(S.draw !== d || d.pts.length !== n) return;
+      if(j && j.ok){ d.line = j.line; d.roads = j.roads || []; d.km = j.km || 0; d.snapped = !!j.snapped; d.note = j.note || ""; }
+      else toast((j && j.error) || "Could not join the points along the roads");
+      drawMap(); drawBar(); paintDraw();
+    });
+  }
+  function drawMap(){
+    G.draw.clearLayers(); var d = S.draw;
+    if(d.line){ L.polyline(d.line, {pane:"div", color:"#fff", weight:11, opacity:.8, interactive:false}).addTo(G.draw);
+      L.polyline(d.line, {pane:"div", color:"#c792ff", weight:7, dashArray:d.snapped ? null : "8 8"}).bindTooltip("Your route: " + esc(chain({roads:d.roads}).join(" > ") || "drawn"), {sticky:true}).addTo(G.draw); }
+    else if(d.pts.length > 1) L.polyline(d.pts, {pane:"div", color:"#c792ff", weight:4, dashArray:"6 8", interactive:false}).addTo(G.draw);
+    if(d.on) d.pts.forEach(function(p, i){ L.marker(p, {pane:"marks", interactive:false, keyboard:false, icon:icon(String(i + 1), "dp-dpt")}).addTo(G.draw); });
+  }
+  $("dUndo").onclick = function(){ S.draw.pts.pop(); S.draw.line = null; drawMap(); drawBar(); clearTimeout(S.drawT); S.drawT = setTimeout(drawSnap, 200); };
+  $("dClear").onclick = function(){ S.draw.pts = []; S.draw.line = null; drawMap(); drawBar(); paintDraw(); };
+  $("dDone").onclick = function(){
+    if(S.draw.pts.length < 2){ toast("Tap at least 2 points along the roads"); return; }
+    S.draw.on = false; drawOff(); if(!S.draw.line) drawSnap(); drawMap(); paintDraw();
+    var c = $("cDraw"); if(c && c.scrollIntoView) c.scrollIntoView({block:"nearest", behavior:"smooth"});
+  };
+  $("dCancel").onclick = function(){ var had = !!S.draw.line; S.draw.on = false; drawOff(); if(!had) drawReset(); else { drawMap(); paintDraw(); } };
+  function paintDraw(){
+    var el = $("drawBody"); if(!el) return;
+    $("cDraw").hidden = !S.services.length;
+    var d = S.draw;
+    if(d.on){ el.innerHTML = '<p class="dp-muted" style="margin:0">Drawing on the map — ' + d.pts.length + ' point' + (d.pts.length === 1 ? '' : 's') + (d.line ? ' · ' + f1(d.km) + ' km' : '') + '. Press DONE on the map when finished.</p>'; return; }
+    if(!d.line){ el.innerHTML = '<p class="dp-muted" style="margin:0 0 8px">Not happy with the suggestion? Tap your route on the map: the planner joins the taps along the roads and checks it for every service.</p><button type="button" class="ds-btn sm" id="dStart">✏ DRAW ON MAP</button>';
+      $("dStart").onclick = drawStart; return; }
+    var sel = S.services.filter(function(x){ return keyOf(x) === S.sel; })[0];
+    var h = '<div class="dp-sum"><div class="rt">' + esc(routeText({roads:d.roads})) + '</div><div class="meta">' + f1(d.km) + ' km' + (d.snapped ? '' : ' · not matched to roads') + (d.note ? ' · ' + esc(d.note) : '') + '</div></div>'
+      + '<label class="dp-op"><span>Use for</span><select id="dFor" aria-label="Use the drawn route for"><option value="all">All affected services</option>' + (sel ? '<option value="sel"' + (S.drawFor === "sel" ? ' selected' : '') + '>Service ' + esc(sel.service) + ' only</option>' : '') + '</select></label>'
+      + '<div class="dp-acts"><button type="button" class="ds-btn sm pri" id="dUse">CHECK &amp; USE</button><button type="button" class="ds-btn sm" id="dEdit">EDIT</button><button type="button" class="ds-btn sm ghost" id="dRemove">REMOVE</button></div>';
+    if(S.drawRes) h += '<ul class="dp-res2">' + Object.keys(S.drawRes).map(function(k){
+        var r = S.drawRes[k], sv = k.split("|")[0], cls = {used:"ok", flag:"fl"}[r.state] || "no", ic = {used:"✓", flag:"⚠", pending:"…"}[r.state] || "✕";
+        var t = {used:"uses it — every check passed", flag:"uses it as a controller decision — fails a check", pending:"checking…"}[r.state] || "not used";
+        return '<li class="' + cls + '"><span class="i">' + ic + '</span><span><b>' + esc(sv) + '</b> ' + t + '</span>' + (r.reason ? '<span class="r">' + esc(r.reason) + '</span>' : '') + '</li>'; }).join("") + '</ul>';
+    el.innerHTML = h;
+    $("dFor").onchange = function(){ S.drawFor = this.value; };
+    $("dUse").onclick = applyDrawn;
+    $("dEdit").onclick = function(){ drawStart(); };
+    $("dRemove").onclick = function(){ undoReplan("manual"); drawReset(); paintServices(); showSelected(); };
+  }
+  function applyDrawn(){
+    var d = S.draw; if(!d.line) return;
+    var dn = [{service:"OCC", label:"drawn by OCC", prefer:true, line:d.line, leave_pt:d.line[0], rejoin_pt:d.line[d.line.length - 1], roads:d.roads}];
+    var only = S.drawFor === "sel" && S.sel ? S.sel : null;
+    var items = visibleServices().filter(function(x){ var k = keyOf(x), p = S.plans[k]; return (!only || k === only) && p && p.ok; }).map(function(x){
+      var k = keyOf(x); if(!S.base[k]) S.base[k] = S.plans[k]; return {k:k, x:x, donors:dn}; });
+    if(!items.length){ toast("No analysed service to use it for yet"); return; }
+    S.drawRes = {}; items.forEach(function(o){ S.drawRes[o.k] = {state:"pending"}; delete S.forced[o.k]; }); paintDraw();
+    replan(S.run, items, "manual", function(o, p){
+      if(!o){ paintDraw(); toast("Drawn route checked for " + items.length + " service" + (items.length === 1 ? "" : "s")); return; }
+      var sh = (p.shared || []).filter(function(s){ return s.from === "OCC"; })[0] || {};
+      if(p.best && p.best.preferred){ S.drawRes[o.k] = {state:"used"}; }
+      else if(sh.geom){ S.forced[o.k] = {src:"manual", label:"drawn by OCC", roads:d.roads, line:d.line, geom:sh.geom, reason:sh.reason}; S.drawRes[o.k] = {state:"flag", reason:sh.reason}; }
+      else S.drawRes[o.k] = {state:"no", reason:sh.reason || "not on this service's route"};
+      paintDraw();
+    });
+  }
+  function undoReplan(mark){                       // back to the plans from before the controller's route
+    Object.keys(S.base).forEach(function(k){
+      if(S.share[k] !== mark) return;
+      S.plans[k] = S.base[k]; delete S.base[k]; S.share[k] = "done"; delete S.donors[k]; delete S.ai[k]; delete S.pick[k];
+    });
+    var src = {manual:"manual", follow:"case"}[mark] || mark;
+    Object.keys(S.forced).forEach(function(k){ if(S.forced[k].src === src) delete S.forced[k]; });
+  }
+
+  /* ---------------------------------------------------------------- saved cases: offered again, followed, opened */
+  function findCases(run){
+    post("/api/dv2/cases/near", payload(), 20000).then(function(j){ if(run !== S.run) return; S.cases = (j && j.cases) || []; S.caseI = 0; paintCase(); });
+  }
+  function followOf(c){
+    var lab = "the " + c.date + " route";
+    return {id:c.id, date:c.date, label:lab, donors:(c.routes || []).filter(function(r){ return r.line && r.line.length > 1; }).slice(0, 4).map(function(r){
+      return {service:"CASE", label:lab, prefer:true, "for":r.services || [], line:r.line, leave_pt:r.leave_pt || r.line[0], rejoin_pt:r.rejoin_pt || r.line[r.line.length - 1], roads:r.roads || []}; })};
+  }
+  function followPass(run){
+    if(run !== S.run || !S.follow) return;
+    var vis = visibleServices();
+    if(vis.some(function(x){ var p = S.plans[keyOf(x)]; return !p || p.pending; })) return;
+    S.followRes = S.followRes || {};
+    var items = vis.filter(function(x){ var k = keyOf(x), p = S.plans[k]; return p && p.ok && ["follow", "pending", "queued"].indexOf(S.share[k]) < 0; }).map(function(x){
+      var k = keyOf(x); if(!S.base[k]) S.base[k] = S.plans[k]; S.followRes[k] = {state:"pending"}; return {k:k, x:x, donors:S.follow.donors}; });
+    paintCase();
+    if(items.length) replan(run, items, "follow", function(o, p){
+      if(o){
+        var sh = (p.shared || []).filter(function(s){ return s.from === "CASE"; }), g = sh.filter(function(s){ return s.geom; })[0];
+        S.followRes[o.k] = p.best && p.best.preferred ? {state:"used"} : g ? {state:"flag", reason:g.reason, sh:g} : {state:"no", reason:(sh[0] || {}).reason || "not on this service's route"};
+      }
+      paintCase();
+    });
+  }
+  function paintCase(){
+    var el = $("caseBox"); if(!el) return;
+    if(S.follow){
+      el.hidden = false;
+      var rs = S.followRes || {};
+      el.innerHTML = '📁 <b>Following ' + esc(S.follow.label) + '</b>'
+        + '<ul class="dp-res2">' + Object.keys(rs).map(function(k){
+          var r = rs[k], sv = k.split("|")[0], forced = S.forced[k] && S.forced[k].src === "case";
+          var cls = r.state === "used" || forced ? "ok" : r.state === "flag" ? "fl" : "no", ic = r.state === "used" || forced ? "✓" : r.state === "flag" ? "⚠" : r.state === "pending" ? "…" : "✕";
+          var t = r.state === "used" ? "same route — every check passed" : forced ? "same route — controller decision (fails a check)" : r.state === "flag" ? "not used: fails a check" : r.state === "pending" ? "checking…" : "not used";
+          return '<li class="' + cls + '"><span class="i">' + ic + '</span><span><b>' + esc(sv) + '</b> ' + t + (r.state === "flag" && !forced ? ' <button type="button" class="dp-link" data-any="' + esc(k) + '">USE ANYWAY</button>' : '') + '</span>'
+            + (r.reason && r.state !== "used" ? '<span class="r">' + esc(r.reason) + '</span>' : '') + '</li>'; }).join("") + '</ul>'
+        + '<div class="dp-acts"><button type="button" class="ds-btn sm ghost" id="cfStop">STOP FOLLOWING</button></div>';
+      el.querySelectorAll("[data-any]").forEach(function(b){ b.onclick = function(){
+        var k = b.dataset.any, r = S.followRes[k], dn = S.follow.donors.filter(function(x){ return x.roads.join("|") === (r.sh.roads || []).join("|"); })[0] || S.follow.donors[0];
+        S.forced[k] = {src:"case", label:S.follow.label, roads:dn.roads, line:dn.line, geom:r.sh.geom, reason:r.reason}; paintCase(); paintServices(); if(S.sel === k) showSelected(); paintMsg(); }; });
+      $("cfStop").onclick = function(){ undoReplan("follow"); S.follow = null; S.followRes = null; paintCase(); paintServices(); showSelected(); paintMsg(); };
+      return;
+    }
+    var c = S.cases[S.caseI];
+    if(!c || S.caseOff){ el.hidden = true; return; }
+    el.hidden = false;
+    el.innerHTML = '📁 <b>Diverted here before</b> — ' + esc(c.date) + ' ' + esc(c.time) + (c.services.length ? ' · svc ' + esc(uniqA(c.services).join(", ")) : '') + (c.manual ? ' · drawn by OCC' : '') + (c.followed ? ' · followed ' + c.followed + '×' : '')
+      + (c.routes || []).map(function(r){ return '<span class="rt">' + ((c.routes || []).length > 1 ? 'Route ' + r.n + ': ' : '') + esc(r.text || routeText({roads:r.roads})) + '</span>'; }).join("")
+      + (c.note ? '<span class="dp-muted">' + esc(c.note) + '</span>' : '')
+      + '<div style="margin-top:6px">Do you want to follow this diverted route?</div><div class="dp-acts"><button type="button" class="ds-btn sm pri" id="cfFollow">FOLLOW</button><button type="button" class="ds-btn sm ghost" id="cfNo">NOT NOW</button>'
+      + (S.cases.length > 1 ? '<button type="button" class="ds-btn sm ghost" id="cfNext">' + (S.caseI + 1) + ' of ' + S.cases.length + ' ▸</button>' : '') + '</div>';
+    $("cfFollow").onclick = function(){ S.follow = followOf(c); S.followRes = {}; paintCase(); followPass(S.run); };
+    $("cfNo").onclick = function(){ S.caseOff = true; paintCase(); };
+    var nx = $("cfNext"); if(nx) nx.onclick = function(){ S.caseI = (S.caseI + 1) % S.cases.length; paintCase(); };
+  }
+  $("cList").onclick = function(){ openCases(); };
+  $("cClose").onclick = function(){ $("cModal").hidden = true; $("cList").focus(); };
+  function openCases(){
+    $("cModal").hidden = false; $("cRows").innerHTML = '<p class="dp-muted"><span class="dp-spin"></span>Loading…</p>';
+    get("/api/dv2/cases?limit=60").then(function(j){
+      var cs = (j && j.cases) || [];
+      $("cRows").innerHTML = cs.length ? cs.map(function(c){
+        return '<div class="dp-crow"><b>' + esc(c.date) + ' ' + esc(c.time) + '</b> · ' + esc(c.road) + (c.services.length ? ' · svc ' + esc(uniqA(c.services).join(", ")) : '') + ' · by ' + esc(c.by)
+          + (c.manual ? ' · drawn by OCC' : '') + (c.followed ? ' · followed ' + c.followed + '×' : '')
+          + (c.routes || []).map(function(r){ return '<span class="rt">' + ((c.routes || []).length > 1 ? 'Route ' + r.n + ': ' : '') + esc(r.text) + '</span>'; }).join("")
+          + (c.note ? '<span class="dp-muted">' + esc(c.note) + '</span>' : '')
+          + '<div class="dp-acts"><button type="button" class="ds-btn sm" data-open="' + c.id + '">OPEN</button><button type="button" class="ds-btn sm ghost" data-del="' + c.id + '">DELETE</button></div></div>'; }).join("")
+        : '<p class="dp-empty">No saved cases yet. Step 7 saves one.</p>';
+      $("cRows").querySelectorAll("[data-open]").forEach(function(b){ b.onclick = function(){ openCase(+b.dataset.open); }; });
+      $("cRows").querySelectorAll("[data-del]").forEach(function(b){ b.onclick = function(){ if(!confirm("Delete this saved case for everyone?")) return; post("/api/dv2/cases/" + b.dataset.del + "/delete", {}).then(openCases); }; });
+    });
+  }
+  function openCase(id){
+    get("/api/dv2/cases/" + id).then(function(j){
+      var c = j && j.case; if(!c){ toast((j && j.error) || "Case not found"); return; }
+      if(!c.page || !c.page.length){ toast("This case has no blockage to show"); return; }
+      S.blocks = c.page.filter(function(b){ return b.cor && b.cor.length > 1; }).map(function(b){
+        return {cor:b.cor, cm:b.cm && b.cm.length === b.cor.length ? b.cm : cumM(b.cor), a:b.a, b:b.b, road:b.road, labels:b.labels || {}, dir:b.dir || "both", locked:true}; });
+      if(!S.blocks.length){ toast("This case has no blockage to show"); return; }
+      S.bi = 0; S.adding = false; $("cModal").hidden = true;
+      paintBlockCard(); drawBlocks(true); S.follow = followOf(c); S.followRes = {}; runAffected(); toast("Case opened — every service is checked on its route");
+    });
+  }
+
+  /* ---------------------------------------------------------------- 7. save the case (shared by everyone) */
+  $("sSave").onclick = function(){
+    var gs = groups(); if(!gs.list.length){ toast("Nothing to save yet"); return; }
+    var rt = gs.list.map(function(g){ var s_ = g.srcs.indexOf("manual") >= 0 ? "manual" : g.srcs.indexOf("case") >= 0 ? "case" : g.srcs[0];
+      return {n:g.n, services:g.svcs, roads:chainRaw(g.f.c || g.f), text:routeText(g.f.c || g.f), line:g.f.line, leave_pt:g.f.leave_pt, rejoin_pt:g.f.rejoin_pt,
+              skipped:g.skipped.map(function(s){ return {code:s.code, name:s.name}; }), km:g.km, runs:S.runs[g.key] || "", mileage:milOf(g), source:s_, flags:g.flags}; });
+    var sv = []; gs.list.forEach(function(g){ g.items.forEach(function(it){ sv.push({service:it.x.service, direction:it.x.direction, run:it.x.run || 0, route:g.n, leave:(it.f.leave || {}).code, rejoin:(it.f.rejoin || {}).code, source:it.f.src}); }); });
+    var body = {blocks:payload().blocks, page:S.blocks.map(function(b){ return {cor:b.cor, cm:b.cm, a:b.a, b:b.b, road:b.road, labels:b.labels, dir:b.dir}; }),
+                routes:rt, services:sv, text:$("mText").textContent, note:$("sNote").value, from_case:S.follow ? S.follow.id : null};
+    $("sSave").disabled = true;
+    post("/api/dv2/cases", body).then(function(j){
+      $("sSave").disabled = false;
+      if(j && j.ok){ S.saved = j.case.id; $("sMsg").textContent = "Saved as case #" + j.case.id + " · " + j.case.date + " " + j.case.time; toast("Saved — next time this road is blocked, the planner offers this route"); }
+      else toast((j && j.error) || "Could not save the case");
+    });
+  };
 
   hint("Tap the road where it is blocked");
   paintRec();

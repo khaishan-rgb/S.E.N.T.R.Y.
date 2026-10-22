@@ -20,7 +20,12 @@
      lift     selector of marker icons lifted above the 3D bodies when close up (e.g. ".bm")
      wire     function(popupElement) for buttons inside mirrored popups
      hide     selectors hidden while in 3D (e.g. a 2D-only tool)
-     hint     first-time tip, mapClicks (default true): a tap on empty 3D map is a tap on the 2D map */
+     hint     first-time tip, mapClicks (default true): a tap on empty 3D map is a tap on the 2D map
+     zoom     true: + / - zoom buttons on the 3D map (V16.26)
+     drag     (default true) draggable 2D markers can be dragged in 3D too: the 2D marker moves and gets dragstart / drag / dragend
+     lens     {label: fn -> text, can: fn -> bool, pick: fn(latlng)}: press and hold on the 3D map opens a magnifier (x4); let go to
+              tap that point (default: a click on the 2D map there, when can() allows it)
+     clickThrough  fn -> true while every tap must reach the 2D map (e.g. drawing), even on top of a line with a tooltip */
 (function(){
   "use strict";
   if(typeof L === "undefined" || window.SG3D) return;
@@ -69,7 +74,15 @@
     ".maplibregl-popup.sg3d-tip .maplibregl-popup-tip{display:none}",
     ".maplibregl-popup.sg3d-pop.maplibregl-popup-anchor-bottom .maplibregl-popup-tip{border-top-color:#fff}.maplibregl-popup.sg3d-pop.maplibregl-popup-anchor-top .maplibregl-popup-tip{border-bottom-color:#fff}",
     ".maplibregl-popup.sg3d-pop.maplibregl-popup-anchor-left .maplibregl-popup-tip{border-right-color:#fff}.maplibregl-popup.sg3d-pop.maplibregl-popup-anchor-right .maplibregl-popup-tip{border-left-color:#fff}",
+    ".sg3d-lens{position:absolute;z-index:calc(var(--sg3d-z,750) + 4);width:190px;height:190px;border-radius:50%;overflow:hidden;border:3px solid #38d6ff;background:#0a1830;",
+    "  box-shadow:0 0 0 2px rgba(0,0,0,.65),0 12px 34px rgba(0,0,0,.65);pointer-events:none;visibility:hidden;transform:translate(-50%,-50%)}",
+    ".sg3d-lens.on{visibility:visible}.sg3d-lens-map,.sg3d-lens-map.maplibregl-map{position:absolute;inset:0}",
+    ".sg3d-lens-x{position:absolute;left:50%;top:50%;width:26px;height:26px;transform:translate(-50%,-50%);z-index:3}",
+    ".sg3d-lens-x:before,.sg3d-lens-x:after{content:\"\";position:absolute;background:#fff;box-shadow:0 0 0 1px rgba(0,0,0,.7)}",
+    ".sg3d-lens-x:before{left:12px;top:0;width:2px;height:26px}.sg3d-lens-x:after{top:12px;left:0;height:2px;width:26px}",
+    ".sg3d-lens-z{position:absolute;left:50%;bottom:16px;transform:translateX(-50%);z-index:3;padding:2px 8px;border-radius:999px;background:rgba(5,15,30,.85);color:#bfefff;font:700 10.5px Inter,system-ui,sans-serif;white-space:nowrap}",
     "@media (max-width:760px){",
+    "  .sg3d-lens{width:170px;height:170px}",
     "  .sg3d-btn{width:46px;height:46px;font-size:14px}.sg3d-btn small{font-size:7.5px}",
     "  .sg3d-opt{flex-direction:column;padding:0;gap:6px;background:none;border:0;box-shadow:none}",
     "  .sg3d-opt button{width:46px;height:40px;padding:0;font-size:13px;font-weight:700;background:rgba(6,17,32,.93);box-shadow:0 6px 18px rgba(0,10,30,.4)}",
@@ -191,8 +204,8 @@
 
     /* overlay layers: the mirror of the 2D map, drawn above the basemap */
     var E = function(){ return {type:"FeatureCollection", features:[]}; };
-    function overlays(){
-      var ml = R.ml;
+    function overlays(ml){
+      ml = ml || R.ml;
       ["ov-fill-s", "ov-line-s", "ov-circ-s", "ov-wall-s", "ov-body-s"].forEach(function(s){ ml.addSource(s, {type:"geojson", data:E(), tolerance:.2}); });
       ml.addLayer({id:"ov-fill", type:"fill", source:"ov-fill-s", paint:{"fill-color":["get", "fc"], "fill-opacity":["get", "fo"]}}, "building-flat");
       ml.addLayer({id:"ov-fill-edge", type:"line", source:"ov-fill-s", filter:[">", ["get", "w"], 0], paint:{"line-color":["get", "c"], "line-width":["get", "w"], "line-opacity":["get", "o"]}}, "building-flat");
@@ -248,22 +261,33 @@
       e.style.zIndex = String(10 + Math.round((ly.options.zIndexOffset || 0) / 10));
       e.style.pointerEvents = ly.options.interactive === false ? "none" : "auto";
       if(ly.options.title) e.title = ly.options.title;
-      e.addEventListener("click", function(ev){ ev.stopPropagation(); if(clicks(ly)) fire(ly, ly.getLatLng()); else { var t = tipOf(ly); if(t) tipShow(t, ly.getLatLng(), "m" + L.stamp(ly)); } });
+      e.addEventListener("click", function(ev){ ev.stopPropagation(); if(Date.now() < (R.noClick || 0)) return; if(clicks(ly)) fire(ly, ly.getLatLng()); else { var t = tipOf(ly); if(t) tipShow(t, ly.getLatLng(), "m" + L.stamp(ly)); } });
       e.addEventListener("mouseenter", function(){ var t = tipOf(ly); if(t) tipShow(t, ly.getLatLng(), "m" + L.stamp(ly)); });
       e.addEventListener("mouseleave", function(){ if(R.tipId === "m" + L.stamp(ly)) tipHide(); });
       return e;
+    }
+    function dragWire(mm, ly){                                           // V16.26: drag in 3D = drag on the 2D map (e.g. the blockage to the bin)
+      var ev = function(){ var p = mm.getLngLat(), ll = L.latLng(p.lat, p.lng); ly.setLatLng(ll); return {latlng:ll, originalEvent:R.ptr ? {clientX:R.ptr[0], clientY:R.ptr[1]} : null}; };
+      mm.on("dragstart", function(){ R.dragging = true; tipHide(); ly.fire("dragstart", ev());
+        // let go OUTSIDE the 3D canvas (e.g. on the page's bin): MapLibre only ends a marker drag on a mouseup over the map, so end it here
+        var up = function(){ window.removeEventListener("mouseup", up, true); setTimeout(function(){ if(R.dragging && R.ml) R.ml.fire("mouseup"); }, 0); };
+        window.addEventListener("mouseup", up, true); });
+      mm.on("drag", function(){ ly.fire("drag", ev()); later(); });
+      mm.on("dragend", function(){ var e = ev(); R.dragging = false; R.noClick = Date.now() + 400; e.distance = 1; ly.fire("dragend", e); later(); });
     }
     function syncMarkers(marks){
       var seen = {};
       marks.forEach(function(ly){
         var id = L.stamp(ly), ic = ly.options.icon, o = (ic && ic.options) || {}, html = o.html || o.iconUrl || "";
-        var key = (o.className || "") + "|" + html + "|" + ly.options.opacity + "|" + ly.options.zIndexOffset;
+        var drag = opts.drag !== false && !!(ly.dragging && ly.dragging.enabled && ly.dragging.enabled());
+        var key = (o.className || "") + "|" + html + "|" + ly.options.opacity + "|" + ly.options.zIndexOffset + "|" + drag;
         seen[id] = 1; var cur = R.mk[id];
         if(cur && cur.key !== key){ cur.m.remove(); cur = null; }
         if(!cur){
           var sz = o.iconSize ? L.point(o.iconSize) : L.point(0, 0), an = o.iconAnchor ? L.point(o.iconAnchor) : sz.divideBy(2), rot = /rotate\(/.test(html);   // rotated arrows turn with the map
-          cur = R.mk[id] = {key:key, m:new maplibregl.Marker({element:markerEl(ly), anchor:"top-left", offset:[-an.x, -an.y], rotationAlignment:rot ? "map" : "viewport", pitchAlignment:rot ? "map" : "viewport"})
-            .setLngLat(ll2(ly.getLatLng())).addTo(R.ml)};
+          cur = R.mk[id] = {key:key, mo:{anchor:"top-left", offset:[-an.x, -an.y], rotationAlignment:rot ? "map" : "viewport", pitchAlignment:rot ? "map" : "viewport"}};
+          cur.m = new maplibregl.Marker(Object.assign({element:markerEl(ly), draggable:drag}, cur.mo)).setLngLat(ll2(ly.getLatLng())).addTo(R.ml);
+          if(drag) dragWire(cur.m, ly);
         } else cur.m.setLngLat(ll2(ly.getLatLng()));
       });
       Object.keys(R.mk).forEach(function(id){ if(!seen[id]){ R.mk[id].m.remove(); delete R.mk[id]; } });
@@ -288,7 +312,9 @@
       ml.getSource("ov-circ-s").setData(FC(c.F.circ)); ml.getSource("ov-wall-s").setData(FC(R.walls ? c.F.wall : []));
       if(typeof opts.bodies === "function"){ try{ bodies = opts.bodies(SG3D) || []; }catch(e){ bodies = []; } }
       ml.getSource("ov-body-s").setData(FC(bodies));
+      R.fc = {"ov-fill-s":FC(c.F.fill), "ov-line-s":FC(c.F.line), "ov-circ-s":FC(c.F.circ), "ov-wall-s":FC(R.walls ? c.F.wall : []), "ov-body-s":FC(bodies)};
       syncMarkers(c.marks); syncRasters(c.rasters);
+      if(LZ.on) lensData();
       R.count = {lines:c.F.line.length, circles:c.F.circ.length, fills:c.F.fill.length, walls:c.F.wall.length, markers:c.marks.length, rasters:c.rasters.length, bodies:bodies.length};
     }
     function later(){ if(!R.on || !R.ready) return; clearTimeout(R.t); R.t = setTimeout(sync, 120); }
@@ -358,14 +384,18 @@
       var c = map.getCenter(), ml = new maplibregl.Map({container:el, style:style(), center:[c.lng, c.lat], zoom:map.getZoom() - 1, pitch:0, bearing:0,
         minZoom:9.5, maxZoom:19, maxPitch:75, maxBounds:[[103.4, 1.05], [104.3, 1.6]], antialias:!coarse, attributionControl:false, fadeDuration:0, dragRotate:true, touchPitch:true});
       R.ml = ml;
-      ml.addControl(new maplibregl.NavigationControl({showZoom:false, visualizePitch:true}), opts.compass || "top-right");
+      ml.addControl(new maplibregl.NavigationControl({showZoom:!!opts.zoom, visualizePitch:true}), opts.compass || "top-right");
       ml.addControl(new maplibregl.AttributionControl({compact:true, customAttribution:'<a href="https://openfreemap.org" target="_blank" rel="noopener">OpenFreeMap</a>'}), (small() && opts.attribSmall) || opts.attrib || "bottom-right");
       if(coarse || host.clientWidth < 520) ml.once("idle", function(){ var a = el.querySelector(".maplibregl-ctrl-attrib"); if(a) a.classList.remove("maplibregl-compact-show"); });   // small maps: start folded (i)
       ml.once("style.load", function(){                                  // not "load": that waits for every tile source, and never comes if one is blocked
-        overlays(); R.ready = true; applyOpt(); el.classList.remove("busy");
+        overlays(ml); R.ready = true; applyOpt(); el.classList.remove("busy");
         sync(); intro();
         var under = function(pt, pad){ return ml.queryRenderedFeatures([[pt.x - pad, pt.y - pad], [pt.x + pad, pt.y + pad]], {layers:QL}); };
         ml.on("click", function(e){
+          if(Date.now() < (R.noClick || 0)) return;
+          var ll0 = L.latLng(e.lngLat.lat, e.lngLat.lng);
+          if(typeof opts.clickThrough === "function" && opts.clickThrough()){ tipHide();
+            map.fire("click", {latlng:ll0, layerPoint:map.latLngToLayerPoint(ll0), containerPoint:map.latLngToContainerPoint(ll0), originalEvent:{}}); return; }
           var fs = under(e.point, 6).filter(function(f){ return f.properties.i || f.properties.t; });
           if(!fs.length){ tipHide(); if(opts.mapClicks !== false && !R.pop){ var ll = L.latLng(e.lngLat.lat, e.lngLat.lng);
             map.fire("click", {latlng:ll, layerPoint:map.latLngToLayerPoint(ll), containerPoint:map.latLngToContainerPoint(ll), originalEvent:{}}); } return; }
@@ -422,9 +452,84 @@
         say("The 3D view could not be loaded (no connection to the map library). The normal map still works.", 7000);
       }).then(function(){ btn.disabled = false; });
     }
+    /* V16.26 press and hold on the 3D map: a round magnifier (a second, small 3D map x4 with the same lines and markers).
+       Keep holding and slide to the exact spot; let go to tap it. A quick tap or a drag works as before. */
+    var LZ = {t:null, on:false, el:null, ml:null, ready:false, id:null, x0:0, y0:0, touch:false, ll:null, mk:[]};
+    document.addEventListener("pointermove", function(e){ R.ptr = [e.clientX, e.clientY]; }, {passive:true, capture:true});
+    document.addEventListener("touchmove", function(e){ if(e.touches[0]) R.ptr = [e.touches[0].clientX, e.touches[0].clientY]; }, {passive:true, capture:true});
+    function lensBuild(){
+      if(LZ.el) return;
+      var e = document.createElement("div"); e.className = "sg3d-lens"; e.setAttribute("aria-hidden", "true");
+      e.innerHTML = '<div class="sg3d-lens-map"></div><i class="sg3d-lens-x"></i><span class="sg3d-lens-z"></span>';
+      host.appendChild(e); LZ.el = e;
+      try{
+        LZ.ml = new maplibregl.Map({container:e.querySelector(".sg3d-lens-map"), style:style(), interactive:false, attributionControl:false, fadeDuration:0, antialias:false,
+          center:R.ml.getCenter(), zoom:R.ml.getZoom(), pitch:R.ml.getPitch(), bearing:R.ml.getBearing(), maxZoom:21, maxPitch:75});
+        LZ.ml.once("style.load", function(){ overlays(LZ.ml); LZ.ready = true;
+          LZ.ml.setLayoutProperty("building-3d", "visibility", R.bld ? "visible" : "none"); LZ.ml.setLayoutProperty("building-flat", "visibility", R.bld ? "none" : "visible"); lensData(); });
+      }catch(err){ LZ.ml = null; }
+    }
+    function lensData(){
+      if(!LZ.ml || !LZ.ready || !R.fc) return;
+      Object.keys(R.fc).forEach(function(k){ var s_ = LZ.ml.getSource(k); if(s_) s_.setData(R.fc[k]); });
+      LZ.mk.forEach(function(m){ m.remove(); }); LZ.mk = [];
+      Object.keys(R.mk).forEach(function(id){ var cur = R.mk[id], e2 = cur.m.getElement().cloneNode(true); e2.style.pointerEvents = "none";
+        LZ.mk.push(new maplibregl.Marker(Object.assign({element:e2}, cur.mo)).setLngLat(cur.m.getLngLat()).addTo(LZ.ml)); });
+    }
+    function lensMove(cx, cy){
+      var r = el.getBoundingClientRect(), x = Math.max(0, Math.min(r.width, cx - r.left)), y = Math.max(0, Math.min(r.height, cy - r.top)), lx = x, ly_ = y;
+      if(LZ.touch){ ly_ = y - 120 < 95 ? y + 120 : y - 120; lx = Math.max(70, Math.min(r.width - 70, x)); }
+      LZ.el.style.left = lx + "px"; LZ.el.style.top = ly_ + "px";
+      LZ.ll = R.ml.unproject([x, y]);
+      if(LZ.ml) LZ.ml.jumpTo({center:LZ.ll, zoom:Math.min(21, R.ml.getZoom() + 2), pitch:R.ml.getPitch(), bearing:R.ml.getBearing()});
+      var can = !opts.lens.can || opts.lens.can();
+      LZ.el.querySelector(".sg3d-lens-z").textContent = "\u00d74 \u00b7 " + (typeof opts.lens.label === "function" ? opts.lens.label() : (can ? "let go to pick" : "view only"));
+    }
+    var HANDLERS = ["dragPan", "dragRotate", "touchZoomRotate", "touchPitch"];
+    function lensStart(){
+      LZ.t = null; if(!R.on || !R.ready) return;
+      LZ.on = true; lensBuild();
+      HANDLERS.forEach(function(h){ if(R.ml[h] && R.ml[h].disable) R.ml[h].disable(); });
+      LZ.el.classList.add("on"); if(LZ.ml) LZ.ml.resize(); lensData(); lensMove(LZ.x0, LZ.y0); tipHide();
+      if(LZ.touch && navigator.vibrate) try{ navigator.vibrate(12); }catch(err){}
+    }
+    function lensCancel(){ if(LZ.t){ clearTimeout(LZ.t); LZ.t = null; } if(!LZ.on) LZ.id = null; }
+    function lensEnd(pick){
+      lensCancel(); if(!LZ.on) return;
+      LZ.on = false; LZ.id = null; R.noClick = Date.now() + 700;
+      HANDLERS.forEach(function(h){ if(R.ml[h] && R.ml[h].enable) R.ml[h].enable(); });
+      LZ.el.classList.remove("on");
+      if(pick && LZ.ll && (!opts.lens.can || opts.lens.can())){
+        var ll = L.latLng(LZ.ll.lat, LZ.ll.lng);
+        if(typeof opts.lens.pick === "function") opts.lens.pick(ll);
+        else map.fire("click", {latlng:ll, layerPoint:map.latLngToLayerPoint(ll), containerPoint:map.latLngToContainerPoint(ll), originalEvent:{}});
+      }
+    }
+    if(opts.lens){
+      el.addEventListener("pointerdown", function(e){
+        if(!R.on || !R.ready) return;
+        if(LZ.on){ lensEnd(false); return; }                             // a second finger (pinch): stop
+        if(LZ.t){ lensCancel(); return; }
+        if(!e.isPrimary || (e.pointerType === "mouse" && (e.button !== 0 || e.ctrlKey))) return;
+        if(e.target.closest && e.target.closest(".sg3dm, .maplibregl-ctrl, .maplibregl-popup, .maplibregl-marker")) return;   // not the blockage X, handles, buttons
+        LZ.id = e.pointerId; LZ.x0 = e.clientX; LZ.y0 = e.clientY; LZ.touch = e.pointerType !== "mouse";
+        lensBuild();                                                     // built (and its tiles loading) while the finger is held
+        if(LZ.ml) try{ var r0 = el.getBoundingClientRect(); LZ.ml.jumpTo({center:R.ml.unproject([e.clientX - r0.left, e.clientY - r0.top]), zoom:Math.min(21, R.ml.getZoom() + 2), pitch:R.ml.getPitch(), bearing:R.ml.getBearing()}); }catch(err){}
+        LZ.t = setTimeout(lensStart, opts.lens.hold || 400);
+      }, true);
+      window.addEventListener("pointermove", function(e){
+        if(e.pointerId !== LZ.id) return;
+        if(LZ.on){ e.preventDefault(); lensMove(e.clientX, e.clientY); }
+        else if(LZ.t && Math.hypot(e.clientX - LZ.x0, e.clientY - LZ.y0) > 8) lensCancel();   // moving straight away: a normal 3D pan
+      }, true);
+      window.addEventListener("pointerup", function(e){ if(e.pointerId !== LZ.id) return; if(LZ.on) lensEnd(true); else lensCancel(); }, true);
+      window.addEventListener("pointercancel", function(e){ if(e.pointerId !== LZ.id) return; if(LZ.on) lensEnd(false); else lensCancel(); }, true);
+      el.addEventListener("contextmenu", function(e){ if(LZ.on || LZ.t) e.preventDefault(); }, true);
+      document.addEventListener("keydown", function(e){ if(e.key === "Escape" && LZ.on) lensEnd(false); });
+    }
     btn.addEventListener("click", function(){ set(!R.on); });
     setBtn(); applyOpt();
-    var ctl = {set:set, state:R, sync:sync, map:map, host:host, button:btn};
+    var ctl = {set:set, state:R, sync:sync, map:map, host:host, button:btn, lens:LZ};
     map._sg3d = ctl; SG3D.list.push(ctl);
     if(ls(opts.key) === "1") setTimeout(function(){ set(true); }, 400);  // the controller's last choice on this map
     return ctl;

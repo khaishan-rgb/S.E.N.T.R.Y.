@@ -61,7 +61,7 @@
 /* map */
 .dp-map{position:relative;border-radius:14px;overflow:hidden;border:1px solid var(--ds-line);min-height:300px;background:#06101d}
 #map{position:absolute;inset:0}
-.dp-maphint{position:absolute;left:50%;top:12px;transform:translateX(-50%);z-index:650;padding:8px 14px;border-radius:999px;background:rgba(5,15,30,.92);border:1px solid rgba(56,214,255,.5);color:#dff6ff;font-size:12.5px;box-shadow:0 6px 18px rgba(0,0,0,.45);pointer-events:none;max-width:calc(100% - 24px);text-align:center}
+.dp-maphint{position:absolute;left:50%;top:52px;transform:translateX(-50%);z-index:650;padding:8px 14px;border-radius:999px;background:rgba(5,15,30,.92);border:1px solid rgba(56,214,255,.5);color:#dff6ff;font-size:12.5px;box-shadow:0 6px 18px rgba(0,0,0,.45);pointer-events:none;max-width:calc(100% - 112px);text-align:center}   /* V16.26: below the map toolbar, clear of the zoom / compass buttons */
 .dp-maphint[hidden]{display:none}
 .dp-legend{position:absolute;right:10px;bottom:22px;z-index:600;display:grid;grid-template-columns:auto 1fr;gap:4px 8px;align-items:center;padding:8px 10px;border-radius:10px;background:rgba(5,15,30,.9);border:1px solid var(--ds-line);font-size:11.5px;color:var(--ds-text-2)}
 .dp-legend i{display:inline-block;width:24px;height:0;border-top:5px solid;outline:1.5px solid #fff}
@@ -200,6 +200,44 @@ path.dp-anim{stroke-dasharray:14 9;animation:dpdash 1.2s linear infinite}
 .dp-stages .n{width:22px;height:22px;border-radius:50%;background:rgba(56,214,255,.15);color:#9fdff5;display:flex;align-items:center;justify-content:center;font:700 11px var(--ds-font)}
 .dp-ai{margin:0 0 10px;padding:10px 12px;border-radius:10px;border:1px solid rgba(255,211,77,.5);background:rgba(255,211,77,.06)}
 .dp-ai p{margin:0 0 6px;color:#fff5d6;font-size:13.5px;line-height:1.45}
+/* V16.26 lean planner: compact suggestion, drawing, the recommendation message, saved cases */
+.dp-sum{margin:0 0 8px;font-size:13.5px;line-height:1.5;color:var(--ds-text)}
+.dp-sum .rt{color:#fff;font-weight:600}
+.dp-sum .rt i{font-style:normal;color:#9fe8c4}
+.dp-sum .meta{color:var(--ds-text-2);font-size:12.5px;margin-top:3px}
+.dp-chips{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 8px}
+.dp-acts{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 0}
+.dp-msg{margin:0;padding:12px;border-radius:10px;background:#f7f9fc;color:#1b2533;font:14px/1.55 "SFMono-Regular",Menlo,Consolas,"Liberation Mono",monospace;white-space:pre-wrap;word-break:break-word;max-height:420px;overflow:auto}
+.dp-ta{width:100%;min-height:40px;padding:8px 10px;border-radius:9px;border:1px solid var(--ds-line-2);background:#081426;color:#fff;font:13px var(--ds-font);resize:vertical}
+.dp-ta:focus,.dp-in:focus{outline:2px solid var(--ds-cyan);outline-offset:1px}
+.dp-in{padding:6px 8px;border-radius:8px;border:1px solid var(--ds-line-2);background:#081426;color:#fff;font:13px var(--ds-font);width:90px}
+.dp-medit{border-top:1px solid var(--ds-line);margin-top:10px;padding-top:8px}
+.dp-medit h4{margin:0 0 6px;font:700 11px var(--ds-font);letter-spacing:.1em;color:var(--ds-cyan);text-transform:uppercase}
+.dp-medit label{display:block;font-size:12px;color:var(--ds-mut);margin:6px 0 3px}
+.dp-link{border:0;background:none;color:var(--ds-cyan);font:600 12px var(--ds-font);cursor:pointer;padding:2px 0;letter-spacing:0;text-transform:none}
+.dp-case{margin:0 0 10px;padding:10px 12px;border-radius:10px;border:1px solid rgba(199,146,255,.6);background:rgba(199,146,255,.09);font-size:13px;color:#ece0ff}
+.dp-case[hidden]{display:none}
+.dp-case b{color:#fff}
+.dp-case .rt{display:block;margin:4px 0;color:#fff}
+.dp-flag{border-radius:10px;padding:9px 11px;margin:0 0 8px;font-size:12.5px;background:rgba(255,85,102,.1);border:1px dashed rgba(255,85,102,.7);color:#ffc3ca}
+.dp-flag b{display:block;color:#fff;letter-spacing:.06em;font-size:11.5px;margin-bottom:2px}
+.dp-drawbar{position:absolute;left:10px;right:10px;bottom:12px;z-index:900;display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:8px 10px;border-radius:12px;background:rgba(5,15,30,.95);border:1px solid #c792ff;color:#efe4ff;font-size:12.5px;box-shadow:0 8px 24px rgba(0,0,0,.5)}
+.dp-drawbar[hidden]{display:none}
+.dp-drawbar b{color:#fff}
+.dp-drawbar span{flex:1 1 100%;min-width:0;order:-1;margin-left:0}
+.dp-drawbar b{order:-2}
+.dp-map.drawing .dp-legend{display:none}
+.dp-map.drawing .leaflet-marker-icon,.dp-map.drawing .sg3dm{pointer-events:none!important}   /* while drawing, a tap on a stop or label is a point too */
+.dp-dpt{transform:translate(-50%,-50%);width:20px;height:20px;border-radius:50%;background:#c792ff;border:2px solid #fff;color:#1a0b2e;display:flex;align-items:center;justify-content:center;font:700 10px var(--ds-font);box-shadow:0 2px 6px rgba(0,0,0,.6)}
+.dp-res2{list-style:none;margin:6px 0 0;padding:0;font-size:12.5px}
+.dp-res2 li{display:grid;grid-template-columns:18px minmax(0,1fr);gap:1px 6px;padding:4px 0;border-top:1px solid var(--ds-line)}
+.dp-res2 li:first-child{border-top:0}
+.dp-res2 .i{font-weight:700}.dp-res2 .ok .i{color:var(--ds-green)}.dp-res2 .fl .i{color:#ff8a96}.dp-res2 .no .i{color:var(--ds-mut)}
+.dp-res2 .r{grid-column:2;color:var(--ds-mut)}
+.dp-crow{border:1px solid var(--ds-line);border-radius:10px;padding:9px 11px;margin:0 0 8px;font-size:12.5px;color:var(--ds-text-2)}
+.dp-crow b{color:#fff}
+.dp-crow .rt{display:block;color:#dff6ff;margin:3px 0}
+@media (max-width:699px){ #cDraw{order:6} #cMsg{order:7} #cSave{order:8} .dp-drawbar{bottom:8px;left:6px;right:6px} }
 </style>
 </head>
 <body>
@@ -212,15 +250,14 @@ path.dp-anim{stroke-dasharray:14 9;animation:dpdash 1.2s linear infinite}
         <input id="q" class="ds-input" type="search" autocomplete="off" placeholder="Search road, junction, bus stop, landmark…" aria-label="Search road, junction, bus stop or landmark" aria-autocomplete="list" aria-controls="qList">
         <ul id="qList" class="dp-res" role="listbox" hidden></ul>
       </div>
-      <p class="dp-hint" id="hint"><span class="dp-step">1</span> Search a road or place, then <b>tap the blocked road on the map</b>. Search more roads (or "Road A / Road B") to highlight several and see where they meet.</p>
+      <p class="dp-hint" id="hint"><span class="dp-step">1</span> Search a road, then <b>tap the blocked road on the map</b>.</p>
       <div id="hlBox" hidden><div class="dp-k" style="margin-top:8px">Highlighted roads</div><div id="hlList" class="dp-hlist"></div></div>
     </section>
     <section class="dp-card" id="cBlock" hidden aria-label="Blockage">
-      <div class="dp-k"><span class="dp-step">2</span> Blocked road segment <span class="sp"></span><span id="bCount"></span></div>
+      <div class="dp-k"><span class="dp-step">2</span> Blockage <span class="sp"></span><span id="bCount"></span></div>
       <div id="bList" class="dp-blist" role="list"></div>
       <div class="dp-road" id="bRoad"></div>
       <div class="dp-sub" id="bLen"></div>
-      <div class="dp-k"><span class="dp-step">3</span> Blocked direction</div>
       <p class="dp-ask" id="bAsk">Which direction is blocked?</p>
       <div class="dp-dir" role="radiogroup" aria-label="Blocked direction" id="bDir">
         <button type="button" role="radio" aria-checked="false" data-d="fwd"><span class="dp-arr" id="arrFwd">&#x279C;</span><span id="lblFwd"></span></button>
@@ -228,10 +265,11 @@ path.dp-anim{stroke-dasharray:14 9;animation:dpdash 1.2s linear infinite}
         <button type="button" role="radio" aria-checked="false" data-d="both"><span class="dp-arr">&#x2194;</span><span>Both directions</span></button>
       </div>
       <div class="dp-row"><button type="button" class="ds-btn sm dp-lock" id="bLock" aria-pressed="false">&#x1F513; LOCK</button><button type="button" class="ds-btn sm" id="bAdd" aria-pressed="false">+ ADD ANOTHER BLOCKAGE</button><button type="button" class="ds-btn sm ghost" id="bZoom">ZOOM</button><button type="button" class="ds-btn sm ghost" id="bClear">CLEAR ALL</button></div>
-      <p class="dp-hint">Drag the white handles to set where a blocked section starts and ends. <b>Hold the &#x2715; and drag it to the bin</b> (top right of the map) to delete a blockage. A blockage <b>locks</b> once its direction is chosen, so taps on the map cannot move it by accident &mdash; press UNLOCK to change it.</p>
+      <p class="dp-hint">White ends: resize. <b>Drag the &#x2715; to the bin</b> (right of the map) to delete &mdash; in 2D and 3D. It locks once the direction is set.</p>
     </section>
     <section class="dp-card" id="cSvc" hidden aria-label="Affected services">
-      <div class="dp-k"><span class="dp-step">4</span> Affected services <span class="sp"></span><span id="svcCount"></span></div>
+      <div class="dp-k"><span class="dp-step">3</span> Operator &amp; services <span class="sp"></span><span id="svcCount"></span></div>
+      <div id="caseBox" class="dp-case" hidden></div>
       <label class="dp-op"><span>Transport operator</span><select id="fOp" aria-label="Transport operator"><option value="">All operators</option><option value="SBST">SBS Transit</option><option value="SMRT">SMRT</option><option value="TTS">Tower Transit</option><option value="GAS">Go-Ahead</option></select></label>
       <div id="svcList" role="list"></div>
       <p class="dp-hint" id="svcNote"></p>
@@ -242,6 +280,8 @@ path.dp-anim{stroke-dasharray:14 9;animation:dpdash 1.2s linear infinite}
   <section class="dp-map" aria-label="Map">
     <div id="map"></div>
     <div class="dp-maphint" id="mapHint">Tap the road where it is blocked</div>
+    <div class="dp-drawbar" id="drawBar" hidden role="toolbar" aria-label="Drawing"><b>&#x270F; Drawing</b><span id="drawTxt">Tap along the roads: where the bus leaves its route &rarr; the roads &rarr; where it is back on route</span>
+      <button type="button" class="ds-btn sm" id="dUndo">UNDO</button><button type="button" class="ds-btn sm" id="dClear">CLEAR</button><button type="button" class="ds-btn sm pri" id="dDone">DONE</button><button type="button" class="ds-btn sm ghost" id="dCancel">CANCEL</button></div>
     <div class="dp-bin" id="dpBin" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6"/></svg><span>Drop here to delete</span></div>
     <div class="dp-mapbtn"><button type="button" id="lensBtn" aria-pressed="false" title="Magnifying lens: see the roads and stops closer" aria-label="Magnifying lens">&#x1F50D;</button><button type="button" id="wBtn" title="Diversion limits and score weights" aria-label="Diversion settings">SETTINGS</button><button type="button" id="lgBtn" aria-pressed="true">LEGEND</button></div>
     <div class="dp-legend" id="legend">
@@ -259,8 +299,22 @@ path.dp-anim{stroke-dasharray:14 9;animation:dpdash 1.2s linear infinite}
 
   <aside class="dp-col dp-right" aria-label="Diversion recommendation">
     <section class="dp-card" id="cRec" aria-live="polite">
-      <div class="dp-k"><span class="dp-step">5</span> Diversion recommendation</div>
+      <div class="dp-k"><span class="dp-step">4</span> Diversion suggestion</div>
       <div id="recBody"><p class="dp-empty">Search a road, tap the blocked segment and choose the blocked direction. Every affected service is then analysed automatically and the easiest practical diversion appears here.</p></div>
+    </section>
+    <section class="dp-card" id="cDraw" hidden aria-label="Draw your own diversion">
+      <div class="dp-k"><span class="dp-step">5</span> Draw your own <span class="sp"></span><span class="dp-muted" style="letter-spacing:0;text-transform:none">optional</span></div>
+      <div id="drawBody"></div>
+    </section>
+    <section class="dp-card" id="cMsg" hidden aria-label="Recommendation message">
+      <div class="dp-k"><span class="dp-step">6</span> Recommendation <span class="sp"></span><button type="button" class="ds-btn sm" id="mCopy">COPY</button></div>
+      <pre class="dp-msg" id="mText"></pre>
+      <div id="mEdit"></div>
+    </section>
+    <section class="dp-card" id="cSave" hidden aria-label="Save">
+      <div class="dp-k"><span class="dp-step">7</span> Save <span class="sp"></span><button type="button" class="dp-link" id="cList">Saved cases</button></div>
+      <textarea id="sNote" class="dp-ta" rows="2" placeholder="Note (optional) e.g. cause, OCC contact, how it went" aria-label="Note"></textarea>
+      <div class="dp-row"><button type="button" class="ds-btn sm pri" id="sSave">SAVE CASE</button><span class="dp-muted" id="sMsg"></span></div>
     </section>
   </aside>
 </main>
@@ -278,6 +332,14 @@ path.dp-anim{stroke-dasharray:14 9;animation:dpdash 1.2s linear infinite}
     <div class="dp-row" style="justify-content:flex-end"><button type="button" class="ds-btn sm ghost" id="wReset">RESET</button><button type="button" class="ds-btn sm ghost" id="wCancel">CANCEL</button><button type="button" class="ds-btn sm pri" id="wSave">SAVE &amp; RE-ANALYSE</button></div>
   </div>
 </div>
+<div class="dp-modal" id="cModal" hidden role="dialog" aria-modal="true" aria-labelledby="cTitle">
+  <div class="box">
+    <h2 id="cTitle" style="margin:0 0 6px;font-size:17px;color:#fff">Saved cases</h2>
+    <p class="dp-muted" style="margin:0 0 10px">Saved for everyone. When the same road is blocked again, the planner offers the saved route first &mdash; routes OCC drew or followed again rank highest.</p>
+    <div id="cRows"></div>
+    <div class="dp-row" style="justify-content:flex-end"><button type="button" class="ds-btn sm ghost" id="cClose">CLOSE</button></div>
+  </div>
+</div>
 <div class="dp-toast" id="toast" role="status"></div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -286,11 +348,12 @@ path.dp-anim{stroke-dasharray:14 9;animation:dpdash 1.2s linear infinite}
 <script src="/map3d.js"></script>
 <script>
 if(window.SG3D) SG3D.auto("map", {key:"dv.3d", z:560, id:"dv3dBtn", button:{into:".dp-mapbtn", first:true}, compass:"top-right", attrib:"bottom-left",
-  vars:{"--sg3d-ct":"52px", "--sg3d-ol":"10px", "--sg3d-or":"auto", "--sg3d-ob":"auto", "--sg3d-ot":"84px"},
-  varsSmall:{"--sg3d-ct":"92px", "--sg3d-ol":"auto", "--sg3d-or":"10px", "--sg3d-ob":"auto", "--sg3d-ot":"150px"},
+  vars:{"--sg3d-ct":"52px", "--sg3d-ol":"10px", "--sg3d-or":"auto", "--sg3d-ob":"auto", "--sg3d-ot":"100px"},
+  varsSmall:{"--sg3d-ct":"92px", "--sg3d-ol":"auto", "--sg3d-or":"10px", "--sg3d-ob":"auto", "--sg3d-ot":"196px"},
   walls:{label:"Raise blockage", title:"Show the blocked road as a raised red barrier", panes:{block:6}, heights:{"#e0263f":22}, on:true},
-  hide:["#lensBtn"],
-  hint:(window.matchMedia && matchMedia("(pointer: coarse)").matches) ? "3D view: two fingers to turn and tilt. Tap a road to place a blockage and tap a route to view it, as usual." : "3D view: right-drag (or Ctrl + drag) to turn and tilt. Click a road to place a blockage and click a route to view it, as usual."});
+  hide:["#lensBtn"], zoom:true, clickThrough:function(){ return !!(window.DV_CLICK_THROUGH && DV_CLICK_THROUGH()); },
+  lens:{label:function(){ return window.DV_LENS_LABEL ? DV_LENS_LABEL() : "let go to pick"; }, can:function(){ return window.DV_LENS_CAN ? DV_LENS_CAN() : true; }},
+  hint:(window.matchMedia && matchMedia("(pointer: coarse)").matches) ? "3D view: two fingers to turn and tilt. Tap a road to place a blockage, press and hold to magnify, drag the \u2715 to the bin to delete." : "3D view: right-drag (or Ctrl + drag) to turn and tilt. Click a road to place a blockage, press and hold to magnify, drag the \u2715 to the bin to delete."});
 </script>
 <script src="/diversion.js"></script>
 </body>
