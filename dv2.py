@@ -12,11 +12,12 @@ import diversion as D
 
 # OCC DIVERSION SCORE weights (percent). Tunable from the page (stored by the server).
 # HARD limits on a diversion (applied before scoring; a candidate over any limit is rejected, never ranked)
-DEFAULT_LIMITS = {"max_extra_km": 3.0, "max_extra_min": 10.0, "max_ratio": 3.0, "max_skipped": 8}
+DEFAULT_LIMITS = {"max_extra_km": 3.0, "max_extra_min": 10.0, "max_ratio": 3.0, "max_skipped": 8, "dd_sd_roads": 1}
 LIMIT_LABELS = {"max_extra_km": ["Extra distance safeguard", "km", 0.5, 15.0, 0.5],
                 "max_extra_min": ["Extra running time safeguard", "min", 2.0, 40.0, 1.0],
                 "max_ratio": ["Length vs the normal section safeguard", "\u00d7", 1.5, 8.0, 0.5],
-                "max_skipped": ["Stops skipped safeguard", "stops", 1, 20, 1]}
+                "max_skipped": ["Stops skipped safeguard", "stops", 1, 20, 1],
+                "dd_sd_roads": ["Double-deckers on roads where only single-deck services run", "1 = allowed, flagged to confirm \u00b7 0 = never", 0, 1, 1]}
 
 
 def safeguards(m, L):
@@ -60,6 +61,18 @@ PARAMS = {
     "early_probe": 4,         # always also check this many earlier diversion starts (to prove or disprove an early turn-off)
     "early_window_m": 3000.0,  # ...and every stop back to the start of the route (e.g. an interchange) within this distance
     "impossible_turn_deg": 165.0,
+    # V16.23 late exit: when the bus runs a long stretch with no stop before the blockage (an expressway such as the BKE),
+    # also ask the routing engine from points further along that stretch, nearest the blockage first, so the bus can stay
+    # on its normal route and leave at the last practical exit instead of at the last stop kilometres earlier
+    "late_exit_gap_m": 1200.0,                                              # only for a stretch at least this long
+    "late_exit_back_m": (150.0, 400.0, 800.0, 1300.0, 2000.0, 3000.0, 4500.0, 6500.0, 9000.0),   # probe points: this far before the blockage
+    "late_exit_batch": 3,                                                   # asked 3 at a time; stop at the first batch that works
+    # V16.24 nearest rejoin (OCC rule: always try to connect back at the nearest stop the service serves)
+    "near_rejoin_pts": 10.0,     # a route rejoining nearer wins over the top score if it is within this many points of it
+    "early_rejoin_m": 400.0,     # a diversion passing this close to an earlier stop of the route is also tried back to that stop
+    "early_rejoin_tries": 6,     # at most this many such routing requests per plan
+    "dd_height_m": 4.6,          # clearance a double-decker needs (OpenStreetMap maxheight below this: not permitted)
+    "sd_height_m": 3.4,          # ...a single-deck bus
 }
 
 TURN_WORDS = [(20, "STRAIGHT"), (60, "SLIGHT"), (120, ""), (165, "SHARP")]
@@ -191,8 +204,10 @@ def bc_sentence(m, instr):
         else:
             bits.append(f"{words.get(x['turn'], x['turn'].lower())} {road}")
     start = f"After {m['leave_name']} ({m['leave_code']})" if not m.get("free_start") else f"Leave {m['leave_name']} ({m['leave_code']})"
+    if m.get("keep_km", 0.0) >= 0.5 and not m.get("free_start"):           # V16.23 late exit: say where the bus really turns off
+        start += f", stay on the normal route for {m['keep_km']:.1f} km" + (f" ({m['keep_road']})" if m.get("keep_road") else "") + ", then"
     body = ", ".join(bits) if bits else "follow the diversion"
-    return f"{start}, {body} and resume the normal route at {m['rejoin_name']} ({m['rejoin_code']})."
+    return f"{start}{' ' if start.endswith(' then') else ', '}{body} and resume the normal route at {m['rejoin_name']} ({m['rejoin_code']})."
 
 
 def impossible_turn(instr, P=PARAMS):
@@ -279,13 +294,23 @@ def why_this(best, ctx_m):
     """bullet reasons for the recommended diversion"""
     m = best["m"]
     out = []
+    if ctx_m.get("b0") is not None and m["rejoin_index"] == ctx_m["b0"]:
+        out.append(f"Rejoins at the nearest stop after the blockage \u2014 {m['rejoin_name']}")
+    elif m.get("nearer_than"):
+        out.append(f"Rejoins at the nearest practical stop \u2014 {m['rejoin_name']}, {m['nearer_than'][0]} stop(s) earlier than the top-scoring route ({m['nearer_than'][1]})")
+    if m.get("early_turn"):
+        out.append("Turns back early from the wider diversion to reach that stop")
+    if m.get("dd_sd"):
+        out.append(f"Double-decker on {m['dd_sd']}: only single-deck services run there \u2014 confirm the bus fits (no low trees or bridges)")
     if m["leave_after_ia"] >= 0 and not m["earlier"]:
         out.append(f"Continues the normal route as long as practical \u2014 serves every reachable stop up to {m['leave_name']}")
     elif m["earlier"]:
         out.append(f"Earlier diversion point needed: no practical escape after {ctx_m['ia_name']}, so the bus leaves after {m['leave_name']}")
     if m.get("free_start"):
         out.append(f"Leaves {m['leave_name']} by a different exit \u2014 the normal exit leads straight into the blockage")
-    if m.get("probe"):
+    if m.get("probe") and m.get("keep_km", 0.0) >= 1.0:
+        out.append(f"Stays on the normal route for {m['keep_km']:.1f} km past {m['leave_name']} and turns off at the last practical exit before the blockage")
+    elif m.get("probe"):
         out.append("Keeps to the normal route past the stop and turns off at a later junction (the immediate turn-off does not work)")
     if m["preserved_vs_early"] > 0:
         out.append(f"Preserves {m['preserved_vs_early']} more original stop(s) than the earliest diversion checked")

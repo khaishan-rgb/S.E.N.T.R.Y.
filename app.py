@@ -8897,6 +8897,11 @@ async def dv_validate_route(ctx, r, i, j, s0=None):
     suit = diversion.validate_road_suitability(cl, flags, P)
     if not suit["ok"]:
         return None, suit["text"]
+    if ways:                                                              # V16.24: a real height limit is a hard stop
+        need = dv2.PARAMS["dd_height_m"] if ctx["bus"] == "dd" else dv2.PARAMS["sd_height_m"]
+        low = await asyncio.to_thread(dv_low_clearance, seg, ways, need)
+        if low:
+            return None, f"Height limit {low[0][1]:.1f} m on {low[0][0]} \u2014 too low for a {'double' if ctx['bus'] == 'dd' else 'single'}-deck bus"
     # bus-road evidence: services in the same direction (level 1), bus stops (level 2), road class (level 3)
     box = diversion.bbox(seg, 300)
     net = await asyncio.to_thread(dv_busnet, st_ctx(ctx), box)
@@ -8912,7 +8917,7 @@ async def dv_validate_route(ctx, r, i, j, s0=None):
         if unk and await dv_probe_types(st_ctx(ctx), unk, box):
             br = await asyncio.to_thread(dv_bus_road, c, net, ctx["bus"], bt_table())
     stops_along = await asyncio.to_thread(dv_stops_along, st_ctx(ctx), seg)
-    ev = diversion.validate_bus_road_evidence(br, stops_along, div_m / 1000.0, ctx["bus"])
+    ev = diversion.validate_bus_road_evidence(br, stops_along, div_m / 1000.0, ctx["bus"], allow_sd=ctx.get("dd_sd_ok", False))
     if not ev["ok"]:
         return None, ev["text"]
     c.update(bus_road=br, evidence=ev, suit=suit)
@@ -8921,6 +8926,28 @@ async def dv_validate_route(ctx, r, i, j, s0=None):
 
 def st_ctx(ctx):
     return ctx["st"]
+
+
+def dv_low_clearance(seg, ways, need_m):
+    """V16.24: OpenStreetMap height limits (maxheight) on the roads the route really drives along (same heading), lower than the
+    bus needs -> [(road name, limit m)]"""
+    out = {}
+    if not ways or len(seg) < 2:
+        return []
+    low = [(w, offservice.parse_len_m((w.get("acc") or {}).get("maxheight"))) for w in ways]
+    low = [(w, h) for w, h in low if h is not None and h < need_m and len(w.get("geom") or []) >= 2]
+    if not low:
+        return []
+    pts = diversion.densify(seg, 20.0)
+    for k in range(len(pts) - 1):
+        brg = diversion.bearing(pts[k], pts[k + 1])
+        for w, h in low:
+            d, _, i_, wb = diversion.nearest_on_line(pts[k], w["geom"])
+            a = diversion.angdiff(brg, wb)
+            if d <= 12.0 and (a <= 30.0 or a >= 150.0):
+                nm = w.get("name") or "an unnamed road"
+                out[nm] = min(h, out.get(nm, 99.0))
+    return sorted(out.items(), key=lambda x: x[1])
 
 
 def dv_dd_chains(st, svc, d, stops, ia, down, b0, block_lines, bus, upstream=4):
@@ -8955,8 +8982,8 @@ def dv_dd_chains(st, svc, d, stops, ia, down, b0, block_lines, bus, upstream=4):
     best = min(out.values(), key=lambda c: c["cost"]) if out else None
     info = {"n": len(out), "services_near": len(svcs), "dd_services": n_dd, "unknown_services": n_unk, "radius_km": round(P["chain_radius_m"] / 1000.0, 1),
             "best": dv_chain_out(best, st) if best else None,
-            "text": (f"{len(out)} stop-to-stop chain(s) on double-deck services found; shortest {dv_chain_out(best, st)['text']}" if best else
-                     f"No stop-to-stop chain on double-deck services links a stop before the blockage to one after it within {P['chain_radius_m'] / 1000.0:g} km "
+            "text": (f"{len(out)} stop-to-stop chain(s) on {'double-deck' if bus == 'dd' else 'bus'} services found; shortest {dv_chain_out(best, st)['text']}" if best else
+                     f"No stop-to-stop chain on {'double-deck' if bus == 'dd' else 'bus'} services links a stop before the blockage to one after it within {P['chain_radius_m'] / 1000.0:g} km "
                      f"({n_dd} of {len(svcs)} services nearby are known to run double-deckers, {n_unk} not known yet)")}
     return out, info
 
@@ -9473,6 +9500,7 @@ async def dv2_plan(st, blocks, svc, d, run_i, traffic=True):
         return base
     weights = dv2_weights()
     limits = dv2_limits()
+    ctx["dd_sd_ok"] = bool(limits.get("dd_sd_roads", 1))              # V16.24: double-deckers on single-deck-only roads: flagged (1) or never (0)
     b0 = down[0]
     try:
         ctx["chains"], chain_info = await asyncio.to_thread(dv_dd_chains, st, svc, d, stops, ia, down, b0, ctx["block_lines"], bus, Q["upstream_max"])
@@ -9487,6 +9515,13 @@ async def dv2_plan(st, blocks, svc, d, run_i, traffic=True):
         lim = min(A - P["block_end_margin_m"] - 25.0, (stop_s[i + 1] - 20.0) if i + 1 < len(stop_s) else 1e18)
         pts = [stop_s[i] + off for off in (150.0, 300.0, 450.0) if stop_s[i] + off < lim]
         return sorted(pts, reverse=True)
+
+    def late_exits(i):
+        """V16.23: points along a long stop-less stretch after stop i (latest first), short of the blockage"""
+        lim = min(A - P["block_end_margin_m"] - 25.0, (stop_s[i + 1] - 20.0) if i + 1 < len(stop_s) else 1e18)
+        if lim - stop_s[i] < Q["late_exit_gap_m"]:
+            return []
+        return [lim - back for back in Q["late_exit_back_m"] if lim - back > stop_s[i] + 450.0]
 
     async def eval_pair(i, j):
         routes, err = await route_between_stops(ctx, i, j)
@@ -9510,6 +9545,18 @@ async def dv2_plan(st, blocks, svc, d, run_i, traffic=True):
             else:
                 cand_routes = list(routes)
             await eval_routes(i, j, cand_routes, ok, reasons)
+        # V16.23 late exit: a long stretch with no stop between this stop and the blockage (an expressway) - also try staying on
+        # the normal route and leaving at a later exit; nearest the blockage first, 3 at a time, stop at the first batch that works
+        late = late_exits(i)
+        for b_ in range(0, len(late), Q["late_exit_batch"]):
+            batch = late[b_:b_ + Q["late_exit_batch"]]
+            got = await asyncio.gather(*[route_between_stops(ctx, i, j, s0) for s0 in batch])
+            more = [(r, s0) for s0, (rr, _) in zip(batch, got) for r in rr]
+            routes += more
+            k0 = len(ok)
+            await eval_routes(i, j, more, ok, reasons)
+            if len(ok) > k0:
+                break
         if ok:
             res, reason = "valid", f"{len(ok)} valid route(s)" + (" \u2014 found by continuing on the normal route to a later junction" if any(c.get("probe") for c in ok) else "")
         elif not routes:
@@ -9549,7 +9596,7 @@ async def dv2_plan(st, blocks, svc, d, run_i, traffic=True):
             if not nxt["ok"]:
                 reasons.append(f"rejoin stop {stops[c['pair'][1]]['code']} fails the next-leg check: {nxt['detail']}")
                 continue
-            c["instr"], c["next_leg"], c["probe"] = instr, nxt, s0 is not None
+            c["instr"], c["next_leg"], c["probe"], c["s0"] = instr, nxt, s0 is not None, s0
             twin = next((o for o in ok if o["signature"] == c["signature"] and abs(o["div_m"] - c["div_m"]) < 150 and o["pair"] == c["pair"]), None)
             if twin is not None:
                 if c.get("src") == "ddchain":
@@ -9568,7 +9615,7 @@ async def dv2_plan(st, blocks, svc, d, run_i, traffic=True):
         sk = diversion.stops_in(stop_s, leave_s + 1.0, rejoin_s - 1.0)
         cx = dv2.bc_complexity(c["instr"], c["groups"], c["suit"], c["evidence"])
         bl, bsc = dv2.busroad_label(c["evidence"], c["suit"])
-        dd_doubt = bus == "dd" and (c.get("bus_road") or {}).get("dd") == "UNCONFIRMED"
+        dd_doubt = bus == "dd" and (c.get("bus_road") or {}).get("dd") in ("UNCONFIRMED", "SD_ONLY")
         m = {"leave_index": li, "rejoin_index": rj, "leave_name": stops[li]["name"], "leave_code": stops[li]["code"],
              "rejoin_name": stops[rj]["name"], "rejoin_code": stops[rj]["code"], "earlier": li < ia, "leave_after_ia": li - ia,
              "skipped": [{"code": stops[k]["code"], "name": stops[k]["name"], "lat": stops[k]["lat"], "lon": stops[k]["lon"],
@@ -9582,10 +9629,19 @@ async def dv2_plan(st, blocks, svc, d, run_i, traffic=True):
              "route_conf": (1.0 if str(r.get("router", "")).startswith("TomTom") else 0.8) - (0.2 if c["evidence"]["level"] == 3 else 0.0),
              "next_ok": bool(c["next_leg"]["ok"]), "next_name": c["next_leg"]["next_name"], "next_code": c["next_leg"]["next_code"],
              "instructions": c["instr"], "router": r.get("router", ""), "probe": bool(c.get("probe")), "free_start": bool(c.get("exit_differs")),
-             "bc": cx, "bc_label": cx["label"], "bc_points": cx["points"], "roads": cx["roads"], "leave_before_m": round(max(0.0, A - leave_s))}
+             "bc": cx, "bc_label": cx["label"], "bc_points": cx["points"], "roads": cx["roads"], "leave_before_m": round(max(0.0, A - leave_s)),
+             "keep_km": round(max(0.0, leave_s - stop_s[li]) / 1000.0, 1) if c.get("probe") else 0.0,          # V16.23: on the normal route past the stop
+             "keep_road": dv2_title(((r.get("steps") or [{}])[0].get("road") or "")) if c.get("probe") else ""}
         fp = dv2.footprint(m)
         m.update(footprint_label=fp["label"], footprint_index=fp["index"], footprint_score=fp["score"])
         m["warnings"], m["penalty"] = dv2.safeguards(m, limits)
+        br_ = c.get("bus_road") or {}
+        if bus == "dd" and br_.get("dd") == "SD_ONLY":                    # V16.24: allowed, but the controller must confirm
+            sdl = br_.get("sd_only") or []
+            m["dd_sd"] = ", ".join(sorted({x["road"] for x in sdl})[:3]) or "part of the route"
+            m["warnings"].append(f"Double-decker on {m['dd_sd']}: only single-deck services run there \u2014 confirm the bus fits (trees, bridges)")
+            m["penalty"] = round(m["penalty"] + min(12.0, 5.0 + 6.0 * sum(x["m"] for x in sdl) / 1000.0), 1)
+        m["early_turn"] = c.get("src") == "early"
         return m
 
     # progressive search: nearest combinations first; stop expanding soon after a strong valid diversion
@@ -9633,6 +9689,42 @@ async def dv2_plan(st, blocks, svc, d, run_i, traffic=True):
                 c["confidence"] = dv2.overall_confidence(c["m"])
                 valid_all.append(c)
     base["dd_chain"]["tested"] = sum(1 for c in valid_all if c.get("src") == "ddchain")
+    # V16.24 turn back early: a valid diversion that passes close to an earlier stop of the bus's own route (before the stop
+    # it rejoins at) is also asked back to THAT stop - the OCC rule: always connect back at the nearest stop the service serves
+    tries = 0
+    for c in sorted(valid_all, key=lambda c: -c["score"])[:3]:
+        rj, seg_ = c["pair"][1], c["seg"]
+        if rj <= b0 or tries >= Q["early_rejoin_tries"] or len(seg_) < 3:
+            continue
+        scum = diversion.cum_m(seg_)
+        offk = [k for k, p in enumerate(seg_) if diversion.nearest_on_line(p, line, cum)[0] > 60.0]
+        for j2 in [j for j in down if j < rj]:
+            dd_, pos_, _, _ = diversion.nearest_on_line((stops[j2]["lat"], stops[j2]["lon"]), seg_, scum)
+            pre = [k for k in offk if scum[k] < pos_ - 30.0]
+            if dd_ > Q["early_rejoin_m"] or not pre or tries >= Q["early_rejoin_tries"]:
+                continue
+            tries += 1
+            ap = diversion.point_at(seg_, scum, pos_)
+            vias = [seg_[k] for k in pre[::max(1, len(pre) // 5)]][:5] + [ap]
+            a0 = c["r"]["line"][0]
+            b_ = at(max(stop_s[j2] - 5.0, stop_s[c["asked"][0]] + 10.0))
+            rr = await dv_osrm([a0] + vias + [b_], 0, [None if c.get("free") else heading(a0)] + [None] * len(vias) + [heading(b_)], ctx["avoid"])
+            got = [(dict(r, _src="early"), c.get("s0")) for r in rr.get("routes") or []]
+            ok2, rs2 = [], []
+            if got:
+                await eval_routes(c["asked"][0], j2, got, ok2, rs2)
+            i0 = c["asked"][0]
+            attempts.append({"from_code": stops[i0]["code"], "from_name": stops[i0]["name"], "to_code": stops[j2]["code"], "to_name": stops[j2]["name"],
+                             "extra": (ia - i0) + (j2 - b0), "earlier": i0 < ia, "routes": len(got), "result": "valid" if ok2 else "fail",
+                             "reason": ("turns back early from the diversion to the nearer stop" if ok2 else
+                                        "turning back early: " + (dv2.best_reason(rs2) if rs2 else "no road route"))})
+            for c2 in ok2:
+                c2["m"] = metrics(c2)
+                c2["score"], c2["parts"] = dv2.occ_score(c2["m"], weights)
+                c2["confidence"] = dv2.overall_confidence(c2["m"])
+                valid_all.append(c2)
+            if ok2:
+                break
     # distinct candidates (same roads + same stops = one)
     uniq = []
     for c in sorted(valid_all, key=lambda c: (-c["score"], c.get("src") != "ddchain")):
@@ -9645,7 +9737,7 @@ async def dv2_plan(st, blocks, svc, d, run_i, traffic=True):
     attempts.sort(key=lambda a: (a["extra"], a["earlier"]))
     base["attempts"] = attempts
     base["search"] = {"pairs": len(attempts), "routes": sum(a["routes"] for a in attempts), "levels_used": (strong_at if strong_at is not None else len(levels) - 1)}
-    ctx_m = {"ia_name": stops[ia]["name"]}
+    ctx_m = {"ia_name": stops[ia]["name"], "b0": b0}
 
     def summary(c, tags=()):
         m = c["m"]
@@ -9656,7 +9748,9 @@ async def dv2_plan(st, blocks, svc, d, run_i, traffic=True):
                 "leave": {"code": m["leave_code"], "name": m["leave_name"]}, "rejoin": {"code": m["rejoin_code"], "name": m["rejoin_name"]},
                 "next": {"code": m["next_code"], "name": m["next_name"], "ok": m["next_ok"]},
                 "roads": [dv2_title(g["road"]) for g in c["groups"] if g.get("road")], "instructions": m["instructions"],
-                "instruction_text": dv2.instruction_text(m["instructions"], m["rejoin_name"]),
+                "instruction_text": ([f"STAY on the normal route {m['keep_km']:.1f} km" + (f" ({m['keep_road']})" if m.get("keep_road") else "")] if m.get("keep_km", 0.0) >= 0.5 else [])
+                                    + dv2.instruction_text(m["instructions"], m["rejoin_name"]),
+                "keep_km": m.get("keep_km", 0.0), "keep_road": m.get("keep_road", ""),
                 "skipped": m["skipped"], "skipped_n": m["skipped_n"], "unavoidable": m["unavoidable"], "extra_skipped": m["extra_skipped"],
                 "div_km": m["div_km"], "normal_km": m["normal_km"], "added_km": m["added_km"], "added_min": m["added_min"],
                 "turns": m["turns"], "sharp": m["sharp"], "earlier": m["earlier"], "router": m["router"],
@@ -9679,7 +9773,12 @@ async def dv2_plan(st, blocks, svc, d, run_i, traffic=True):
         return base
     def sensible(c):        # final human check: could OCC explain this to a Bus Captain who does not know the area?
         return not (c["m"]["bc_label"] == "HIGH" and c["m"]["footprint_label"] == "LARGE")
-    best = max(pool, key=lambda c: (c["confidence"] != "LOW", sensible(c), c["score"]))
+    best0 = max(pool, key=lambda c: (c["confidence"] != "LOW", sensible(c), c["score"]))
+    near = [c for c in pool if (c["confidence"] != "LOW") == (best0["confidence"] != "LOW") and sensible(c) == sensible(best0)
+            and c["score"] >= best0["score"] - Q["near_rejoin_pts"]]
+    best = min(near, key=lambda c: (c["m"]["rejoin_index"], -c["score"]))      # V16.24: the nearest practical rejoin stop
+    if best is not best0 and best["m"]["rejoin_index"] < best0["m"]["rejoin_index"]:
+        best["m"]["nearer_than"] = (best0["m"]["rejoin_index"] - best["m"]["rejoin_index"], best0["m"]["rejoin_name"])
     early_alts = [c for c in uniq if c["m"]["leave_index"] < best["m"]["leave_index"]]
     best["m"]["preserved_vs_early"] = max([c["m"]["skipped_n"] - best["m"]["skipped_n"] for c in early_alts] + [0])
     tags = dv2.tag_alternatives(pool)

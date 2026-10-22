@@ -103,6 +103,38 @@ Without `BUNCHING_ALWAYS_ON=1` the server records only while a Bunching page is 
 * Before this patch the search was stop-based only at the two ends. It starts after the last stop the bus can still reach before the blockage and rejoins at the nearest original stop after it.
 * The road between those two stops came from the routing engine. It was then checked every 25 m for: blocked road and direction, U-turn, wrong-way or prohibited turns, correct rejoin, and evidence that another LTA service runs those roads in that direction. Double-deck suitability came from the bus types of those services.
 
+**Nearest rejoin stop; double-deckers on single-deck roads** (V16.24, `dv2_plan` / `dv_validate_route` in app.py, `dv2.py`, `diversion.py`)
+
+Why Service 67 got a long Bukit Batok route at Hillview while 170 got the short one:
+* For a double-deck bus, a route was rejected outright if any stretch of it is a road where only single-deck services run (from the learned bus types). A service whose type is not known yet counts as double-deck.
+* 67 runs double-deckers. If 170 is recorded as single-deck, 170 may use the Hillview Avenue loop; for 67 every short route was rejected.
+* 67 was then pushed onto the double-deck stop chain: leaving one stop earlier and rejoining far down at Bukit Timah, skipping 5 stops.
+
+Now:
+* **Single-deck-only roads are allowed for a double-decker, flagged**.
+  * The panel shows **PLEASE CONFIRM — Double-decker on Hillview Avenue: only single-deck services run there — confirm the bus fits (trees, bridges)**.
+  * Confidence is at most MEDIUM, and a small score penalty applies (5 points + 6 per km, max 12).
+  * The new SETTINGS limit **Double-deckers on roads where only single-deck services run** controls this: 1 = allowed and flagged (default), 0 = never (the old rule).
+* **A real height limit is still a hard stop**: an OpenStreetMap `maxheight` below 4.6 m for a double-decker, or 3.4 m for a single-deck bus, on a road the route drives along. The route search shows "Height limit 4.0 m on … — too low for a double-deck bus".
+* **Nearest rejoin stop first**:
+  * Among the good routes (within 10 points of the top score), the one that rejoins at the nearest stop after the blockage is recommended.
+  * The panel says "Rejoins at the nearest stop after the blockage — …", or how many stops earlier it rejoins than the top-scoring route.
+* **Turn back early**:
+  * When a diversion passes within 400 m of an earlier stop of the bus's own route, the planner also asks the routing engine to turn back from there to that nearer stop. At most 6 requests per plan.
+  * If it passes every check it competes, tagged NEAREST REJOIN, with "Turns back early from the wider diversion to reach that stop".
+* For a single-deck bus the stop chain is labelled "Stop to stop on bus services" (any service can be followed).
+
+**Late exit on expressways** (`late_exits` in `dv2_plan`, parameters `late_exit_*` in `dv2.PARAMS`).
+* The problem: a service on the BKE has no bus stop between Marsiling and Bukit Panjang. The engine only asked the routing engine for routes starting at a stop, or up to 450 m after it. So for a blockage near Bukit Panjang the diversion had to start at Marsiling, giving a 12 km Woodlands Road diversion.
+* Now, when the bus runs at least 1.2 km with no stop before the blockage, the engine also asks for routes starting further along that stretch: 150 m, 400 m, 800 m … 9 km before the blockage, nearest first.
+  * It asks 3 points at a time and stops at the first batch that gives a verified route, so the bus stays on its normal road and leaves at the last practical exit.
+  * These routes pass the same hard checks and scoring.
+  * The early (parallel-road) route stays as an alternative.
+* The panel then shows "Diversion begins: 7.0 km after Marsiling Stn — stays on the normal route (Bukit Timah Expressway) and turns off at the last practical exit before the blockage".
+* The Bus Captain instructions start with "STAY on the normal route 7.0 km (Bukit Timah Expressway)", and the brief reads "After Marsiling Stn, stay on the normal route for 7.0 km, then turn …".
+* Cost: up to 9 extra routing calls per rejoin stop tried, only on long stop-less stretches; routing results are cached for 10 minutes.
+* The road itself still comes from the routing engine (TomTom, bus mode, live traffic). Live bus positions are not used to choose the road. Live LTA Bus Arrival data only tells the planner which services run double-deckers.
+
 **New: double-deck stop chain** (`diversion.stop_chains`, `dv_dd_chains` in app.py). This is the controller's method: is this stop on a double-deck service? If yes, go to its next stop, and repeat until you reach the bus's own route after the blockage.
 * It starts from the last reachable stop and up to 4 stops before it, then moves only to the next stop of a service that already runs double-deckers, in that service's direction of travel. Bus types are learned from LTA Bus Arrival (`DD`) or entered by OCC.
 * It never steps across a blockage, stays within 4 km of it, and changes service only at a stop both services serve.

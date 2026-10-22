@@ -1299,12 +1299,13 @@ def validate_road_suitability(classes, osm_flags=None, P=PARAMS):
     return {"ok": True, "level": round(level, 3), "text": txt, "small_share": share["small"]}
 
 
-def validate_bus_road_evidence(busroad, stops_along, km, bus="dd"):
+def validate_bus_road_evidence(busroad, stops_along, km, bus="dd", allow_sd=False):
     """LEVEL 1: another LTA service already runs this road in the same direction (strongest);
-    LEVEL 2: the road has bus stops along it; LEVEL 3: road class only. HARD reject: a double-decker on roads
-    where only single-deck services run. -> dict(ok, level, score 0..1, text)"""
+    LEVEL 2: the road has bus stops along it; LEVEL 3: road class only. A double-decker on roads where only single-deck
+    services run: HARD reject, or (allow_sd, V16.24) allowed and flagged for the controller to confirm.
+    -> dict(ok, level, score 0..1, text)"""
     br = busroad or {}
-    if bus == "dd" and br.get("dd") == "SD_ONLY":
+    if bus == "dd" and br.get("dd") == "SD_ONLY" and not allow_sd:
         return {"ok": False, "level": 0, "score": 0.0, "text": br.get("text", "only single-deck services run there")}
     cov = float(br.get("coverage") or 0.0)
     per_km = stops_along / km if km > 0.05 else 0.0
@@ -1322,6 +1323,8 @@ def validate_bus_road_evidence(busroad, stops_along, km, bus="dd"):
         txt = "no bus service or bus stop on these roads \u2014 road class only"
     if bus == "dd" and br.get("dd") == "UNCONFIRMED" and lvl == 1:
         txt += "; double-deck operation not yet confirmed"
+    if bus == "dd" and br.get("dd") == "SD_ONLY":
+        txt += "; only single-deck services run on " + ", ".join(sorted({g["road"] for g in br.get("sd_only") or []})[:3]) + " \u2014 confirm a double-decker fits"
     return {"ok": True, "level": lvl, "score": sc, "text": txt, "coverage": round(cov, 2), "stops_along": stops_along,
             "dd": br.get("dd")}
 

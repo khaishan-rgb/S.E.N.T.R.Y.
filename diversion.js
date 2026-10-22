@@ -353,7 +353,7 @@
       if(c.dd_chain) c.dd_chain.stops.slice(1, -1).forEach(function(s){
         var lg = c.dd_chain.legs.filter(function(l){ return l.codes ? l.codes.indexOf(s.code) >= 0 : (l.from === s.code || l.to === s.code); }).map(function(l){ return l.svc; });
         L.marker([s.lat, s.lon], {pane:"marks", keyboard:false, icon:L.divIcon({className:"", iconSize:[0, 0], html:'<div class="dp-ddstop"></div>'})})
-          .bindTooltip(esc(s.code + " " + s.name) + " \u2014 double-deck service " + esc(lg.join(" / ")) + " stops here").addTo(G.stops);
+          .bindTooltip(esc(s.code + " " + s.name) + " \u2014 " + (p.bus_type === "SD" ? "service " : "double-deck service ") + esc(lg.join(" / ")) + " stops here").addTo(G.stops);
       });
       L.marker(c.rejoin_pt, {pane:"marks", icon:L.divIcon({className:"", iconSize:[0, 0], html:'<div class="dp-lbl" style="--c:' + COL.rejoin + '">\u21aa REJOIN</div>'}), keyboard:false}).addTo(G.marks);
     }
@@ -418,17 +418,18 @@
     h += p.status === "divert" ? '<div class="dp-banner ok"><b>' + (ai && ai.status === "ai" ? "\u2b50 AI RECOMMENDED" + (letterOf(b.id) ? " \u00b7 ROUTE " + letterOf(b.id) : "") : "ALGORITHM RECOMMENDED") + '</b>Easiest practical diversion that keeps the most useful part of the route.</div>'
       : '<div class="dp-banner rev"><b>NO SUITABLE DIVERSION FOUND \u2014 CONTROLLER REVIEW REQUIRED</b>' + esc(String(p.headline || "").replace(/^.*REQUIRED\s*/, "") || "Only a low-confidence route was found") + ' \u2014 shown for reference, not recommended.</div>';
     if(c.bc_brief) h += '<div class="dp-brief"><div class="dp-k" style="margin:0 0 4px">Brief for the Bus Captain</div>' + esc(c.bc_brief) + '</div>';
-    if(c.warnings && c.warnings.length) h += '<div class="dp-banner rev" style="border-style:dashed"><b>SAFEGUARD' + (c.warnings.length > 1 ? 'S' : '') + ' EXCEEDED</b>' + c.warnings.map(esc).join(" \u00b7 ") + ' \u2014 still the best verified option; please confirm.</div>';
+    var ddw = (c.warnings || []).some(function(w){ return /^Double-decker on /.test(w); });     // V16.24: a double-decker on a single-deck road: confirm
+    if(c.warnings && c.warnings.length) h += '<div class="dp-banner rev" style="border-style:dashed"><b>' + (ddw ? 'PLEASE CONFIRM' : 'SAFEGUARD' + (c.warnings.length > 1 ? 'S' : '') + ' EXCEEDED') + '</b>' + c.warnings.map(esc).join(" \u00b7 ") + (ddw ? '' : ' \u2014 still the best verified option; please confirm.') + '</div>';
     if(c !== b) h += '<div class="dp-banner rev"><b>SHOWING AN ALTERNATIVE</b><button type="button" class="ds-btn sm" id="backRec" style="margin-top:6px">BACK TO RECOMMENDED</button></div>';
     var lr = p.last_reachable || {}, earlier = c.earlier;
     h += '<dl class="dp-kv">'
       + (earlier ? '<dt>Last reachable stop</dt><dd>' + esc(lr.code) + ' ' + esc(lr.name) + ' <span style="color:#ffd391">\u2014 no practical escape after it</span></dd>' : '')
       + '<dt>Last normal stop served</dt><dd><b>' + esc(c.leave.code) + '</b> ' + esc(c.leave.name) + '</dd>'
-      + '<dt>Diversion begins</dt><dd>after ' + esc(c.leave.name) + '</dd></dl>'
+      + '<dt>Diversion begins</dt><dd>' + (c.keep_km >= 0.5 ? '<b>' + f1(c.keep_km) + ' km after ' + esc(c.leave.name) + '</b> \u2014 stays on the normal route' + (c.keep_road ? ' (' + esc(c.keep_road) + ')' : '') + ' and turns off at the last practical exit before the blockage' : 'after ' + esc(c.leave.name)) + '</dd></dl>'
       + '<div class="dp-k">Recommended roads</div><ul class="dp-chain">' + c.roads.map(function(r, i){ return (i ? '<li class="ar">\u2192</li>' : '') + '<li>' + esc(r) + '</li>'; }).join("") + '<li class="ar">\u2192</li><li class="rj">\u21aa ' + esc(c.rejoin.name) + '</li></ul>'
-      + (c.dd_chain ? '<div class="dp-k">Stop to stop on double-deck services</div><ul class="dp-ddleg">' + c.dd_chain.legs.map(function(l){
+      + (c.dd_chain ? '<div class="dp-k">Stop to stop on ' + (p.bus_type === "SD" ? 'bus' : 'double-deck') + ' services</div><ul class="dp-ddleg">' + c.dd_chain.legs.map(function(l){
           return '<li><span class="sv">' + (l.own ? esc(x.service) + ' own' : esc(l.svc)) + '</span><span class="tx">' + esc(l.from) + ' ' + esc(tc(l.from_name)) + ' \u2192 ' + esc(l.to) + ' ' + esc(tc(l.to_name)) + ' <span class="dp-muted">(' + l.stops + ' stop' + (l.stops === 1 ? '' : 's') + ', ' + f1(l.km) + ' km)</span></span></li>'; }).join("")
-          + '</ul><p class="dp-muted" style="margin:4px 0 8px">Every stop on the way is already served by a service that runs double-deckers' + (c.dd_chain.transfers ? '; the route switches service at a stop both serve' : '') + '.'
+          + '</ul><p class="dp-muted" style="margin:4px 0 8px">Every stop on the way is already served by ' + (p.bus_type === "SD" ? 'a bus service' : 'a service that runs double-deckers') + (c.dd_chain.transfers ? '; the route switches service at a stop both serve' : '') + '.'
           + (c.dd_chain.unconfirmed && c.dd_chain.unconfirmed.length ? ' <span style="color:#ffd391">Bus type not yet known for ' + esc(c.dd_chain.unconfirmed.join(", ")) + ' \u2014 verify.</span>' : '') + '</p>' : '')
       + '<div class="dp-k">Bus captain instructions</div><ul class="dp-chain">' + c.instruction_text.map(function(t, i){ return (i ? '<li class="ar">\u2192</li>' : '') + '<li style="background:rgba(56,214,255,.1);border-color:rgba(56,214,255,.4);color:#dff6ff">' + esc(tc(t)) + '</li>'; }).join("") + '</ul>'
       + '<dl class="dp-kv">'
@@ -448,7 +449,7 @@
     if(alts.length > 1) h += '<details class="dp-det"' + (S.view ? ' open' : '') + '><summary>Show alternatives (' + (alts.length - 1) + ')</summary><div style="margin-top:6px">' + alts.map(function(a){
         var tg = (a.tags || []).map(function(t){ return {A:"MIN SKIPPED STOPS", B:"SIMPLEST", C:"FASTEST"}[t]; }).filter(Boolean).join(" \u00b7 ");
         return '<button type="button" class="dp-alt" data-alt="' + esc(a.id) + '" aria-pressed="' + ((S.view || b.id) === a.id) + '"><b>' + (letterOf(a.id) ? 'Route ' + letterOf(a.id) + ' \u00b7 ' : '') + esc(a.leave.code) + ' \u2192 ' + esc(a.rejoin.code) + '</b>'
-          + (ai && ai.status === "ai" && a.id === ai.candidate_id ? '<span class="dp-tag" style="color:#ffd34d">\u2b50 AI</span>' : '') + (a.id === p.best.id ? '<span class="dp-tag" style="color:#9fdff5">ALGORITHM #1</span>' : '') + (a.id === b.id ? '<span class="dp-tag" style="color:#2ee59d">RECOMMENDED</span>' : '') + (a.dd_chain ? '<span class="dp-tag" style="color:#cdb9ff">DD STOP CHAIN</span>' : '') + (tg ? '<span class="dp-tag">' + tg + '</span>' : '')
+          + (ai && ai.status === "ai" && a.id === ai.candidate_id ? '<span class="dp-tag" style="color:#ffd34d">\u2b50 AI</span>' : '') + (a.id === p.best.id ? '<span class="dp-tag" style="color:#9fdff5">ALGORITHM #1</span>' : '') + (a.id === b.id ? '<span class="dp-tag" style="color:#2ee59d">RECOMMENDED</span>' : '') + (a.dd_chain ? '<span class="dp-tag" style="color:#cdb9ff">' + (p.bus_type === "SD" ? 'STOP CHAIN' : 'DD STOP CHAIN') + '</span>' : '') + (a.found_by === "early" ? '<span class="dp-tag" style="color:#9fdff5">NEAREST REJOIN</span>' : '') + (tg ? '<span class="dp-tag">' + tg + '</span>' : '')
           + '<br>' + esc(a.roads.join(" \u2192 ")) + '<br><span class="dp-muted">skips ' + a.skipped_n + ' \u00b7 ' + a.turns + ' turns \u00b7 ' + sgn(a.added_min) + ' min \u00b7 ' + sgn(a.added_km, 1) + ' km \u00b7 ' + esc(a.busroad_label) + ' bus-road \u00b7 ' + esc(a.confidence) + ' \u00b7 score ' + f0(a.score) + '</span></button>'; }).join("") + '</div></details>';
     h += '<details class="dp-det"><summary>OCC score ' + f0(c.score) + '/100 \u2014 how it is made</summary><div class="dp-muted" style="margin-top:6px">' + Object.keys(c.parts || {}).map(function(k){ return esc((S.cfg && S.cfg.weight_labels || {})[k] || k) + ' ' + f1(c.parts[k]); }).join(" \u00b7 ") + '. Scored only after every hard check passed (blocked road, U-turn, wrong-way, impossible turn, restricted road, rejoin direction, next original stop).</div></details>';
     h += attemptsHtml(p);
@@ -460,7 +461,7 @@
     var at = p.attempts || []; if(!at.length) return "";
     return '<details class="dp-det"><summary>Route search \u2014 ' + at.length + ' diversion start \u00d7 rejoin combinations, ' + f0((p.search || {}).routes) + ' road routes checked</summary>'
       + '<p class="dp-muted" style="margin:6px 0 0">Last reachable stop ' + esc((p.last_reachable || {}).code || "\u2013") + ' \u00b7 first stop after the blockage ' + esc((p.first_after || {}).code || "\u2013") + '. Nearest combinations first; earlier diversion starts only when they help.</p>'
-      + (p.dd_chain ? '<p class="dp-muted" style="margin:6px 0 0"><b style="color:#cdb9ff">Double-deck stop chain:</b> ' + esc(p.dd_chain.text) + '</p>' : '') + '<ul class="dp-att">'
+      + (p.dd_chain ? '<p class="dp-muted" style="margin:6px 0 0"><b style="color:#cdb9ff">' + (p.bus_type === "SD" ? 'Stop-to-stop chain' : 'Double-deck stop chain') + ':</b> ' + esc(p.dd_chain.text) + '</p>' : '') + '<ul class="dp-att">'
       + at.map(function(a){ var ok = a.result === "valid"; return '<li class="' + (ok ? "ok" : "no") + '"><span class="i">' + (ok ? "\u2713" : "\u2715") + '</span><span>' + (a.earlier ? '<em style="font-style:normal;color:#ffd391">earlier \u00b7 </em>' : '') + esc(a.from_code) + ' ' + esc(a.from_name) + ' \u2192 ' + esc(a.to_code) + ' ' + esc(a.to_name) + '</span><span class="r">' + esc(a.reason) + '</span></li>'; }).join("") + '</ul></details>';
   }
 
