@@ -354,6 +354,27 @@
     $("svcList").innerHTML = vis.map(function(x){ var k = keyOf(x), t = stTxt(S.plans[k], k);
       return '<button type="button" class="dp-svc" role="listitem" data-k="' + esc(k) + '" aria-pressed="' + (S.sel === k) + '"><span class="num">' + esc(x.service) + '</span><span class="to">D' + x.direction + ' \u00b7 to ' + esc(x.destination || "") + (x.operator ? ' \u00b7 ' + esc(x.operator) : '') + '</span>' + t[0] + '<span class="rs">' + t[1] + '</span></button>'; }).join("");
     $("svcList").querySelectorAll(".dp-svc").forEach(function(b){ b.onclick = function(){ selectService(b.dataset.k); }; });
+    paintCommon();
+  }
+  /* V16.25: do the affected services share one diversion? (OCC wants one short route for all of them when it works) */
+  function rkey(b){ return ((b.off_roads && b.off_roads.length ? b.off_roads : b.roads) || []).join(" \u2192 "); }      // the roads off the route
+  function paintCommon(){
+    var el = $("svcNote"), vis = visibleServices(), ks = vis.map(keyOf), base = "Each service-direction is analysed on its own. Tap one to see its diversion.";
+    if(!el || !vis.length) return;
+    var sharing = ks.some(function(k){ return S.share[k] === "pending" || S.share[k] === "queued"; });
+    if(sharing){ el.textContent = "Checking whether every service can use the same short diversion\u2026"; return; }
+    if(ks.some(function(k){ var p = S.plans[k]; return !p || p.pending; })){ el.textContent = base; return; }
+    var ok = vis.filter(function(x){ var p = S.plans[keyOf(x)]; return p && p.ok; });
+    if(ok.length < 2){ el.textContent = base; return; }
+    var keyOfSvc = {}, g = {};
+    ok.forEach(function(x){ var p = S.plans[keyOf(x)]; if(p.status === "divert" && p.best && !p.best.shared_from) keyOfSvc[x.service] = rkey(p.best); });
+    ok.forEach(function(x){ var p = S.plans[keyOf(x)]; if(p.status !== "divert" || !p.best) return;
+      var key = (p.best.shared_from && keyOfSvc[p.best.shared_from]) || rkey(p.best); (g[key] = g[key] || []).push(x.service); });
+    var top = Object.keys(g).sort(function(a, b){ return g[b].length - g[a].length; })[0];
+    if(!top || g[top].length < 2){ el.textContent = "Each service needs its own diversion \u2014 tap one to see why it cannot use the others\u2019."; return; }
+    var diff = ok.filter(function(x){ return g[top].indexOf(x.service) < 0; }).map(function(x){ return x.service; });
+    el.innerHTML = diff.length ? '<b style="color:#ffd391">Same diversion for ' + g[top].length + ' of ' + ok.length + ' services</b> (' + esc(g[top].join(", ")) + '): ' + esc(top) + '. Different: <b>' + esc(diff.join(", ")) + '</b> \u2014 tap one to see why.'
+      : '<b style="color:#2ee59d">\u2713 All ' + ok.length + ' services use the same diversion:</b> ' + esc(top) + '.';
   }
   function selectService(k){ S.sel = k; S.view = null; paintServices(); showSelected(); }
   function showSelected(){ var p = S.plans[S.sel]; if(p && p.ok) fetchAI(S.sel); paintRec(); drawService(p); }

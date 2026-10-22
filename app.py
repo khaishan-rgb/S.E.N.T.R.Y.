@@ -9633,8 +9633,8 @@ async def dv2_plan(st, blocks, svc, d, run_i, traffic=True, donors=None):
              "next_ok": bool(c["next_leg"]["ok"]), "next_name": c["next_leg"]["next_name"], "next_code": c["next_leg"]["next_code"],
              "instructions": c["instr"], "router": r.get("router", ""), "probe": bool(c.get("probe")), "free_start": bool(c.get("exit_differs")),
              "bc": cx, "bc_label": cx["label"], "bc_points": cx["points"], "roads": cx["roads"], "leave_before_m": round(max(0.0, A - leave_s)),
-             "keep_km": round(max(0.0, leave_s - stop_s[li]) / 1000.0, 1) if c.get("probe") else 0.0,          # V16.23: on the normal route past the stop
-             "keep_road": dv2_title(((r.get("steps") or [{}])[0].get("road") or "")) if c.get("probe") else ""}
+             "keep_km": round(max(0.0, leave_s - stop_s[li]) / 1000.0, 1) if (c.get("probe") or c.get("src") == "shared") else 0.0,  # V16.23: on the normal route past the stop
+             "keep_road": dv2_title(((r.get("steps") or [{}])[0].get("road") or "")) if (c.get("probe") or c.get("src") == "shared") else ""}
         fp = dv2.footprint(m)
         m.update(footprint_label=fp["label"], footprint_index=fp["index"], footprint_score=fp["score"])
         m["warnings"], m["penalty"] = dv2.safeguards(m, limits)
@@ -9883,6 +9883,8 @@ async def dv2_plan(st, blocks, svc, d, run_i, traffic=True, donors=None):
                 "leave": {"code": m["leave_code"], "name": m["leave_name"]}, "rejoin": {"code": m["rejoin_code"], "name": m["rejoin_name"]},
                 "next": {"code": m["next_code"], "name": m["next_name"], "ok": m["next_ok"]},
                 "roads": [dv2_title(g["road"]) for g in c["groups"] if g.get("road")], "instructions": m["instructions"],
+                "off_roads": [dv2_title(g["road"]) for g in c["groups"] if g.get("road") and any(        # V16.25: only the roads OFF the route
+                    diversion.nearest_on_line(p_, line, cum)[0] > P["on_route_m"] for p_ in (g.get("line") or [])[::max(1, len(g.get("line") or []) // 8)])],
                 "instruction_text": ([f"STAY on the normal route {m['keep_km']:.1f} km" + (f" ({m['keep_road']})" if m.get("keep_road") else "")] if m.get("keep_km", 0.0) >= 0.5 else [])
                                     + dv2.instruction_text(m["instructions"], m["rejoin_name"]),
                 "keep_km": m.get("keep_km", 0.0), "keep_road": m.get("keep_road", ""),
@@ -9930,6 +9932,15 @@ async def dv2_plan(st, blocks, svc, d, run_i, traffic=True, donors=None):
     best = min(near, key=lambda c: (c["m"]["rejoin_index"], -c["score"]))      # V16.24: the nearest practical rejoin stop
     if best is not best0 and best["m"]["rejoin_index"] < best0["m"]["rejoin_index"]:
         best["m"]["nearer_than"] = (best0["m"]["rejoin_index"] - best["m"]["rejoin_index"], best0["m"]["rejoin_name"])
+    # V16.25 consistency (OCC rule: keep diversions short, and let every affected service use the same short one when it can):
+    # a shorter route another service already uses wins, if it is as practical and skips at most 1 more stop
+    same = [c for c in pool if c.get("shared_from") and (c["confidence"] != "LOW") == (best["confidence"] != "LOW") and sensible(c) == sensible(best)
+            and c["m"]["skipped_n"] <= best["m"]["skipped_n"] + Q["share_extra_skip"]]
+    if same:
+        cs = min(same, key=lambda c: (c["m"]["div_km"], c["m"]["rejoin_index"], -c["score"]))
+        if cs is not best and cs["m"]["div_km"] < best["m"]["div_km"] - Q["share_shorter_km"]:
+            cs["m"]["consistent"] = (cs["shared_from"], best["m"]["div_km"])
+            best = cs
     early_alts = [c for c in uniq if c["m"]["leave_index"] < best["m"]["leave_index"]]
     best["m"]["preserved_vs_early"] = max([c["m"]["skipped_n"] - best["m"]["skipped_n"] for c in early_alts] + [0])
     tags = dv2.tag_alternatives(pool)
@@ -10006,6 +10017,8 @@ Judge in roughly this priority:
 10 additional running time, then additional distance.
 A slightly longer route with fewer turns on main roads that skips fewer stops and rejoins cleanly usually beats a shorter one
 through small streets. Skipping 2 stops is generally better than 6 unless there is a strong operational reason.
+OCC also wants every affected service on the same short diversion: a candidate marked same_route_as_other_affected_service
+is the route another affected service uses - prefer it when it is about as practical and not longer.
 
 Rules: use ONLY the facts given for each candidate - do not assume anything about roads from your own knowledge, and never
 mention a road, stop or turn that is not in the facts. You must choose one of the given candidate letters.
@@ -10031,7 +10044,8 @@ def dv_ai_facts(c):
             "extra_distance_km": c["added_km"], "extra_time_min": c["added_min"], "distance_off_route_km": c["div_km"],
             "leaves_route_m_before_blockage": c.get("leave_before_m", 0), "rejoins_m_after_blockage": max(0, c.get("rejoin_after_m", 0)),
             "diversion_footprint": c.get("footprint_label"), "bus_captain_complexity": c.get("bc_label"),
-            "safeguards_exceeded": c.get("warnings") or [], "u_turn": "none (validated)", "earlier_diversion_point": bool(c.get("earlier"))}
+            "safeguards_exceeded": c.get("warnings") or [], "u_turn": "none (validated)", "earlier_diversion_point": bool(c.get("earlier")),
+            "same_route_as_other_affected_service": c.get("shared_from") or None}
 
 
 def dv_ai_parse(text, letters):

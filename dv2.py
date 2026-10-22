@@ -80,6 +80,8 @@ PARAMS = {
     "share_follow_m": 60.0,      # the routing engine's route must stay within this of their roads...
     "share_follow_frac": 0.85,   # ...for at least this share of them (else it went another way)
     "share_weight_pen": 8.0,     # score penalty when TomTom shows a weight limit on those roads (double-decker, flagged)
+    "share_shorter_km": 0.1,     # consistency: another service's route that works for this bus and is this much shorter wins...
+    "share_extra_skip": 1,       # ...if it skips at most this many more stops
 }
 
 TURN_WORDS = [(20, "STRAIGHT"), (60, "SLIGHT"), (120, ""), (165, "SHARP")]
@@ -307,14 +309,20 @@ def why_this(best, ctx_m):
         out.append(f"Rejoins at the nearest practical stop \u2014 {m['rejoin_name']}, {m['nearer_than'][0]} stop(s) earlier than the top-scoring route ({m['nearer_than'][1]})")
     if m.get("early_turn"):
         out.append("Turns back early from the wider diversion to reach that stop")
-    if m.get("shared_from"):
+    if m.get("consistent"):
+        out.append(f"Same short diversion as service {m['consistent'][0]}: {m['div_km']:.1f} km off the route instead of {m['consistent'][1]:.1f} km \u2014 the affected services keep to one route")
+    elif m.get("shared_from"):
         out.append(f"Same roads as service {m['shared_from']}'s diversion \u2014 checked again for this bus (its own stops and size)")
+    if m.get("shared_from") and m.get("keep_km", 0.0) >= 0.3:
+        out.append(f"Stays on the normal route for {m['keep_km']:.1f} km past {m['leave_name']}, then turns off where service {m['shared_from']} does")
     if m.get("dd_sd"):
         out.append(f"Double-decker on {m['dd_sd']}: only single-deck services run there \u2014 confirm the bus fits (no low trees or bridges)")
     if m.get("tt_weight"):
         out.append(f"Double-decker on {m['tt_weight']}: TomTom's map shows a weight limit under the bus's 18 t (the height is fine) \u2014 confirm buses may use it")
     if m["leave_after_ia"] >= 0 and not m["earlier"]:
         out.append(f"Continues the normal route as long as practical \u2014 serves every reachable stop up to {m['leave_name']}")
+    elif m["earlier"] and m.get("shared_from"):
+        out.append(f"Turns off before {ctx_m['ia_name']} to take the same road as service {m['shared_from']}")
     elif m["earlier"]:
         out.append(f"Earlier diversion point needed: no practical escape after {ctx_m['ia_name']}, so the bus leaves after {m['leave_name']}")
     if m.get("free_start"):
