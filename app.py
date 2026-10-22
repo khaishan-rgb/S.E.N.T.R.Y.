@@ -8855,6 +8855,29 @@ async def validate_next_original_leg(ctx, j):
     return res
 
 
+def dv_run_vias(pts, n_max=6, turn_deg=35.0, min_run=80.0):
+    """V16.26b: waypoints in the MIDDLE of each straight stretch of a route (never at a junction), so the routing engine cannot
+    reach one from a side road or the other carriageway and add turns. None when the line has no stretch that long."""
+    if len(pts) < 2:
+        return None
+    d = diversion.densify(pts, 20.0)
+    if len(d) < 3:
+        return None
+    brg = [diversion.bearing(d[k], d[k + 1]) for k in range(len(d) - 1)]
+    cuts = [0] + [k for k in range(1, len(brg)) if diversion.angdiff(brg[k - 1], brg[k]) > turn_deg] + [len(d) - 1]
+    runs = []
+    for a, b in zip(cuts, cuts[1:]):
+        seg = d[a:b + 1]
+        if len(seg) < 2:
+            continue
+        lm = diversion.line_m(seg)
+        if lm >= min_run:
+            runs.append((lm, diversion.point_at(seg, diversion.cum_m(seg), lm / 2.0), a))
+    if not runs:
+        return None
+    return [x[1] for x in sorted(sorted(runs, key=lambda x: -x[0])[:n_max], key=lambda x: x[2])]
+
+
 def dv_road_at(steps, pt, tol=35.0):
     """V16.26: the named road of the routing step passing closest to pt (within tol m), '' when none"""
     best, bd = "", tol
@@ -9817,8 +9840,11 @@ async def dv2_plan(st, blocks, svc, d, run_i, traffic=True, donors=None):
         a_ = (stops[i]["lat"], stops[i]["lon"]) if free else at(stop_s[i] + 1.0)
         b_ = at(max(stop_s[j] - 5.0, stop_s[i] + 10.0))
         off = g["off"]
-        nv = min(6, len(off))
-        vias = [off[round(k * (len(off) - 1) / max(1, nv - 1))] for k in range(nv)]
+        vias = dv_run_vias(off)                                          # V16.26b: mid-stretch waypoints: no extra turns
+        if not vias:
+            nv = min(6, len(off))
+            vias = [off[round(k * (len(off) - 1) / max(1, nv - 1))] for k in range(nv)]
+        nv = len(vias)
         brs = [None if free else heading(a_)] + [None] * nv + [heading(b_)]
         expect = max(0.0, g["sl"] - stop_s[i]) + diversion.line_m(g["dd"]) + max(0.0, stop_s[j] - g["sr"])
         tt = dv_use_tomtom()
@@ -10040,10 +10066,128 @@ async def api_dv2_plan(request: Request):
 
 
 # =========================================================================== V16.26 hand-drawn diversions and saved case studies
+def dv_turns(steps):
+    """turns a Bus Captain makes on a routing result: (turns, U-turns, turns closer than 80 m to the previous one)"""
+    n = u = z = 0
+    acc, last = 0.0, None
+    for st_ in steps or []:
+        man, mod = (st_.get("man") or ""), (st_.get("mod") or "")
+        if man not in ("depart", "arrive"):
+            turn = man in ("roundabout", "rotary", "roundabout turn") or mod in ("left", "right", "sharp left", "sharp right", "uturn")
+            if mod == "uturn":
+                u += 1
+            if turn:
+                n += 1
+                if last is not None and acc - last < 0.08:
+                    z += 1
+                last = acc
+        acc += float(st_.get("km") or 0.0)
+    return n, u, z
+
+
+async def dv2_draw_route(taps, mode="smart", ref=None, block_lines=None):
+    """V16.26b: the route the controller means when tapping along the roads.
+    exact: through every tap. smart (default): the same, then every tap that only adds turns is treated as 'on the way' and
+    dropped when the route still passes within 60 m of it - the fewest turns, no U-turns, no zigzag through side roads.
+    Taps carry the drawing direction (so each one is matched to the carriageway going that way), and the first / last tap are
+    put onto the bus's own route, leaving and rejoining in its direction."""
+    P = diversion.PARAMS
+    raw = list(taps)
+    t, merged = [raw[0]], [0]
+    for k, p in enumerate(raw[1:], 1):                                   # double taps
+        if diversion.dist_m(t[-1], p) > 25.0:
+            t.append(p)
+            merged.append(len(t) - 1)
+        else:
+            merged.append(len(t) - 1)
+    if len(t) < 2:
+        t = [raw[0], raw[-1]]
+        merged = [0] + [1] * (len(raw) - 1)
+    start, end, h0, h1 = t[0], t[-1], None, None
+    if ref and len(ref) >= 2:                                            # onto the bus's own route, in its direction
+        rc = diversion.cum_m(ref)
+        d0, s0, _, hh0 = diversion.nearest_on_line(start, ref, rc)
+        d1, s1, _, hh1 = diversion.nearest_on_line(end, ref, rc)
+        if d0 <= 120.0:
+            start, h0 = diversion.point_at(ref, rc, s0), hh0
+        if d1 <= 120.0:
+            end, h1 = diversion.point_at(ref, rc, s1), hh1
+    mids = t[1:-1]
+    seq = [start] + mids + [end]
+    hd = [diversion.bearing(seq[k - 1], seq[k + 1]) for k in range(1, len(seq) - 1)]   # the drawing direction at each tap
+
+    async def go(keep):
+        coords = [start] + [mids[i] for i in keep] + [end]
+        tries = [[h0] + [hd[i] for i in keep] + [h1], [h0] + [None] * len(keep) + [h1], None]
+        for brs in tries:
+            r = await os_osrm(coords, alternatives=0 if keep else 2, bearings=brs, continue_straight=True)
+            if r.get("routes"):
+                return r["routes"]
+        if dv_use_tomtom():
+            r = await tt_route(coords, 0, None, "sd", None)
+            return r.get("routes") or []
+        return []
+
+    def judge(r, keep):
+        ln = r.get("line") or []
+        if len(ln) < 2:
+            return None
+        lc = diversion.cum_m(ln)
+        far = [diversion.nearest_on_line(p, ln, lc)[0] for p in t]
+        n, u, z = dv_turns(r.get("steps"))
+        km_ = diversion.line_m(ln) / 1000.0
+        through = False
+        if block_lines:
+            ok_, _ = diversion.validate_block_avoidance(ln, block_lines, None, P)
+            through = not ok_
+        cost = km_ + 0.45 * n + 6.0 * u + 1.5 * z + (25.0 if through else 0.0)
+        return {"r": r, "keep": list(keep), "far": far, "turns": n, "uturns": u, "zig": z, "km": km_, "through": through, "cost": cost}
+
+    allk = list(range(len(mids)))
+    exact = [j for j in (judge(r, allk) for r in await go(allk)) if j]
+    exact = min(exact, key=lambda j: j["cost"]) if exact else None
+    best = exact
+    if mode == "smart":
+        tol = 60.0
+        covers = lambda j: j and max(j["far"]) <= tol and not j["through"]
+        pool = [exact] if covers(exact) else []
+        pool += [j for j in (judge(r, []) for r in await go([])) if covers(j)]           # straight from start to end
+        keep = list(allk)
+        cur = exact
+        for i in list(allk):                                            # each tap: does the route need it?
+            trial = [x for x in keep if x != i]
+            js = [j for j in (judge(r, trial) for r in await go(trial)) if covers(j)]
+            if js:
+                jb = min(js, key=lambda j: j["cost"])
+                if cur is None or not covers(cur) or jb["cost"] <= cur["cost"] + 0.05:
+                    keep, cur = trial, jb
+                    pool.append(jb)
+        if pool:
+            best = min(pool, key=lambda j: (j["cost"], -len(j["keep"])))
+    if not best:
+        return None
+    r = best["r"]
+    roads = []
+    for st_ in r.get("steps") or []:
+        nm = dv2_title((st_.get("road") or "").strip())
+        if nm and (not roads or roads[-1] != nm):
+            roads.append(nm)
+    kept = set(best["keep"])
+    state = []
+    for k in range(len(raw)):
+        ci = merged[k]
+        state.append("start" if ci == 0 else "end" if ci == len(t) - 1 else ("kept" if (ci - 1) in kept else "on the way"))
+    return {"line": [[round(p[0], 6), round(p[1], 6)] for p in diversion.simplify(r["line"], 500)], "km": round(best["km"], 2), "roads": roads,
+            "router": r.get("router") or "OpenStreetMap", "turns": best["turns"], "uturns": best["uturns"], "zig": best["zig"], "through": best["through"],
+            "taps": state, "far": round(max(best["far"]), 0),
+            "exact": {"turns": exact["turns"], "uturns": exact["uturns"], "km": round(exact["km"], 2)} if exact else None}
+
+
 @app.post("/api/dv2/manual")
 async def api_dv2_manual(request: Request):
-    """A diversion the controller draws: the tapped points joined along the roads. OpenStreetMap routing follows the taps
-    faithfully (TomTom when OSRM is unreachable). Each service is then checked on it by /api/dv2/plan ("prefer" donor)."""
+    """A diversion the controller draws: the tapped points joined along the roads (OpenStreetMap routing; TomTom when OSRM is
+    unreachable). mode "smart" (default) cleans it up to what the controller means: fewest turns, no U-turn, no zigzag, start
+    and end on the bus's route ("ref"); "exact" goes through every tap. Each service is then checked on it by /api/dv2/plan."""
     body = _dv_body(await request.body())
     pts = []
     for p in (body.get("points") if isinstance(body.get("points"), list) else [])[:30]:
@@ -10055,24 +10199,20 @@ async def api_dv2_manual(request: Request):
             pts.append(q)
     if len(pts) < 2:
         return JSONResponse({"error": "Tap at least 2 points along the roads: where the bus leaves its route, the roads it takes, where it is back on route."}, status_code=400)
-    res = await os_osrm(pts, alternatives=0, continue_straight=True)
-    routes, router = res.get("routes") or [], "OpenStreetMap"
-    if not routes and dv_use_tomtom():
-        res = await tt_route(pts, 0, None, "sd", None)
-        routes, router = res.get("routes") or [], "TomTom"
-    if not routes:
-        return {"ok": True, "snapped": False, "line": [[round(p[0], 6), round(p[1], 6)] for p in pts], "km": round(diversion.line_m(pts) / 1000.0, 2),
-                "roads": [], "router": "", "note": "These points could not be joined along the roads — the straight lines between the taps are kept."}
-    r = routes[0]
-    roads = []
-    for st_ in r.get("steps") or []:
-        nm = dv2_title((st_.get("road") or "").strip())
-        if nm and (not roads or roads[-1] != nm):
-            roads.append(nm)
-    far = max(diversion.nearest_on_line(p, r["line"])[0] for p in pts)
-    return {"ok": True, "snapped": True, "line": [[round(p[0], 6), round(p[1], 6)] for p in diversion.simplify(r["line"], 500)],
-            "km": round(diversion.line_m(r["line"]) / 1000.0, 2), "roads": roads, "router": router,
-            "note": "" if far < 60.0 else f"One tap is {far:.0f} m from the joined roads — check the route on the map."}
+    mode = "exact" if str(body.get("mode") or "smart").lower() == "exact" else "smart"
+    ref = [tuple(p) for p in _cpts(body.get("ref"), 3000)] or None
+    blocks = dv2_blocks(body) if body.get("blocks") else []
+    res = await dv2_draw_route(pts, mode, ref, [(b_["line"], bool(b_["directed"])) for b_ in blocks] or None)
+    if not res:
+        return {"ok": True, "snapped": False, "mode": mode, "line": [[round(p[0], 6), round(p[1], 6)] for p in pts], "km": round(diversion.line_m(pts) / 1000.0, 2),
+                "roads": [], "router": "", "turns": None, "taps": ["kept"] * len(pts),
+                "note": "These points could not be joined along the roads — the straight lines between the taps are kept."}
+    note = []
+    if res["through"]:
+        note.append("this route still drives through the blocked section — tap a way round it")
+    if res["far"] > 60.0:
+        note.append(f"one tap is {res['far']:.0f} m from the joined roads — check the route on the map")
+    return dict(res, ok=True, snapped=True, mode=mode, note="; ".join(note))
 
 
 def dv2_case_db():

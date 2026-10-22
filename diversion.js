@@ -838,22 +838,30 @@
   function fallbackCopy(t){ var a = document.createElement("textarea"); a.value = t; a.style.position = "fixed"; a.style.opacity = "0"; document.body.appendChild(a); a.select(); try{ document.execCommand("copy"); }catch(e){} a.remove(); }
 
   /* ---------------------------------------------------------------- 5. draw your own diversion on the map */
-  S.draw = {on:false, pts:[], line:null, roads:[], km:0, snapped:false, note:""}; S.drawFor = "all";
+  function newDraw(mode){ return {on:false, pts:[], line:null, roads:[], km:0, snapped:false, note:"", mode:mode || "smart", taps:[], turns:null, uturns:0, exact:null, busy:false, got:""}; }
+  S.draw = newDraw(); S.drawFor = "all"; S.drawReq = 0;
   function drawOff(){ $("drawBar").hidden = true; var m = document.querySelector(".dp-map"); if(m) m.classList.remove("drawing"); }
-  function drawReset(){ S.draw = {on:false, pts:[], line:null, roads:[], km:0, snapped:false, note:""}; S.drawRes = null; if(G.draw) G.draw.clearLayers(); drawOff(); paintDraw(); }
+  function drawReset(){ S.draw = newDraw(S.draw && S.draw.mode); S.drawRes = null; if(G.draw) G.draw.clearLayers(); drawOff(); paintDraw(); }
   function drawStart(){
     if(!S.services.length){ toast("Place the blockage and choose its direction first"); return; }
     S.draw.on = true; S.view = null; $("drawBar").hidden = false; document.querySelector(".dp-map").classList.add("drawing"); drawBar(); hint(""); drawMap(); paintDraw();
     var r = $("map").getBoundingClientRect(); if(r.top < 0 || r.bottom > window.innerHeight) $("map").scrollIntoView({block:"center", behavior:"smooth"});
   }
-  function drawBar(){ var d = S.draw; $("drawTxt").textContent = d.pts.length ? d.pts.length + " point" + (d.pts.length === 1 ? "" : "s") + (d.line ? " · " + f1(d.km) + " km · " + chain({roads:d.roads}).join(" > ") : "") + " — keep tapping, or DONE"
+  function drawBar(){ var d = S.draw; $("drawTxt").textContent = d.pts.length ? d.pts.length + " point" + (d.pts.length === 1 ? "" : "s") + (d.line ? " · " + f1(d.km) + " km · " + chain({roads:d.roads}).join(" > ") : "") + " — keep tapping, or DONE (it then cleans up the turns)"
     : "Tap along the roads: where the bus leaves its route → the roads → where it is back on route"; }
   function drawAdd(ll){ S.draw.pts.push([+ll.lat.toFixed(6), +ll.lng.toFixed(6)]); S.draw.line = null; drawMap(); drawBar(); clearTimeout(S.drawT); S.drawT = setTimeout(drawSnap, 300); }
-  function drawSnap(){
+  /* V16.26b: while tapping, the taps are joined as they are; on DONE the server works out what the controller means (smart):
+     the fewest turns, no U-turn into a side road for a tap that was only on the way, start / end on the bus's route */
+  function drawSnap(final){
     var d = S.draw, n = d.pts.length; if(n < 2){ drawMap(); paintDraw(); return; }
-    post("/api/dv2/manual", {points:d.pts}, 30000).then(function(j){
-      if(S.draw !== d || d.pts.length !== n) return;
-      if(j && j.ok){ d.line = j.line; d.roads = j.roads || []; d.km = j.km || 0; d.snapped = !!j.snapped; d.note = j.note || ""; }
+    var mode = final ? d.mode : "exact", req = ++S.drawReq, p0 = S.sel && S.plans[S.sel], ref = p0 && p0.original_line;
+    if(!ref) Object.keys(S.plans).forEach(function(k){ var q = S.plans[k]; if(!ref && q && q.original_line) ref = q.original_line; });
+    d.busy = !!final; paintDraw();
+    post("/api/dv2/manual", Object.assign({points:d.pts, mode:mode, blocks:payload().blocks}, ref ? {ref:ref} : {}), 60000).then(function(j){
+      if(S.draw !== d || req !== S.drawReq) return;
+      d.busy = false;
+      if(j && j.ok){ d.line = j.line; d.roads = j.roads || []; d.km = j.km || 0; d.snapped = !!j.snapped; d.note = j.note || ""; d.turns = j.turns; d.uturns = j.uturns || 0;
+        d.taps = j.taps || []; d.exact = j.exact || null; d.got = mode; }
       else toast((j && j.error) || "Could not join the points along the roads");
       drawMap(); drawBar(); paintDraw();
     });
@@ -863,13 +871,13 @@
     if(d.line){ L.polyline(d.line, {pane:"div", color:"#fff", weight:11, opacity:.8, interactive:false}).addTo(G.draw);
       L.polyline(d.line, {pane:"div", color:"#c792ff", weight:7, dashArray:d.snapped ? null : "8 8"}).bindTooltip("Your route: " + esc(chain({roads:d.roads}).join(" > ") || "drawn"), {sticky:true}).addTo(G.draw); }
     else if(d.pts.length > 1) L.polyline(d.pts, {pane:"div", color:"#c792ff", weight:4, dashArray:"6 8", interactive:false}).addTo(G.draw);
-    if(d.on) d.pts.forEach(function(p, i){ L.marker(p, {pane:"marks", interactive:false, keyboard:false, icon:icon(String(i + 1), "dp-dpt")}).addTo(G.draw); });
+    if(d.on || d.line) d.pts.forEach(function(p, i){ L.marker(p, {pane:"marks", interactive:false, keyboard:false, icon:icon(String(i + 1), "dp-dpt" + (!d.on && d.taps[i] === "on the way" ? " off" : ""))}).addTo(G.draw); });
   }
   $("dUndo").onclick = function(){ S.draw.pts.pop(); S.draw.line = null; drawMap(); drawBar(); clearTimeout(S.drawT); S.drawT = setTimeout(drawSnap, 200); };
   $("dClear").onclick = function(){ S.draw.pts = []; S.draw.line = null; drawMap(); drawBar(); paintDraw(); };
   $("dDone").onclick = function(){
     if(S.draw.pts.length < 2){ toast("Tap at least 2 points along the roads"); return; }
-    S.draw.on = false; drawOff(); if(!S.draw.line) drawSnap(); drawMap(); paintDraw();
+    S.draw.on = false; drawOff(); drawSnap(true); drawMap(); paintDraw();
     var c = $("cDraw"); if(c && c.scrollIntoView) c.scrollIntoView({block:"nearest", behavior:"smooth"});
   };
   $("dCancel").onclick = function(){ var had = !!S.draw.line; S.draw.on = false; drawOff(); if(!had) drawReset(); else { drawMap(); paintDraw(); } };
@@ -877,11 +885,18 @@
     var el = $("drawBody"); if(!el) return;
     $("cDraw").hidden = !S.services.length;
     var d = S.draw;
+    if(d.busy){ el.innerHTML = '<p class="dp-muted" style="margin:0"><span class="dp-spin"></span>Working out the route you mean: the fewest turns, no U-turns, along your taps…</p>'; return; }
     if(d.on){ el.innerHTML = '<p class="dp-muted" style="margin:0">Drawing on the map — ' + d.pts.length + ' point' + (d.pts.length === 1 ? '' : 's') + (d.line ? ' · ' + f1(d.km) + ' km' : '') + '. Press DONE on the map when finished.</p>'; return; }
     if(!d.line){ el.innerHTML = '<p class="dp-muted" style="margin:0 0 8px">Not happy with the suggestion? Tap your route on the map: the planner joins the taps along the roads and checks it for every service.</p><button type="button" class="ds-btn sm" id="dStart">✏ DRAW ON MAP</button>';
       $("dStart").onclick = drawStart; return; }
     var sel = S.services.filter(function(x){ return keyOf(x) === S.sel; })[0];
-    var h = '<div class="dp-sum"><div class="rt">' + esc(routeText({roads:d.roads})) + '</div><div class="meta">' + f1(d.km) + ' km' + (d.snapped ? '' : ' · not matched to roads') + (d.note ? ' · ' + esc(d.note) : '') + '</div></div>'
+    var onWay = d.taps.filter(function(t){ return t === "on the way"; }).length, ex = d.exact;
+    var h = '<div class="dp-sum"><div class="rt">' + esc(routeText({roads:d.roads})) + '</div><div class="meta">' + f1(d.km) + ' km'
+        + (d.turns != null ? ' · ' + d.turns + ' turn' + (d.turns === 1 ? '' : 's') + (d.uturns ? ' · ' + d.uturns + ' U-turn' + (d.uturns === 1 ? '' : 's') : ' · no U-turn') : '')
+        + (d.snapped ? '' : ' · not matched to roads') + (d.note ? ' · <span style="color:#ffc3ca">' + esc(d.note) + '</span>' : '') + '</div></div>'
+      + (d.got === "smart" ? '<p class="dp-muted" style="margin:0 0 8px">Cleaned up to what you mean' + (onWay ? ': ' + onWay + ' tap' + (onWay === 1 ? ' was' : 's were') + ' only on the way (faded on the map), so the route goes straight there' : ': every tap is on it')
+          + (ex && (ex.turns > d.turns || ex.uturns > d.uturns) ? '. Exactly through your taps it would be ' + ex.turns + ' turns' + (ex.uturns ? ' with ' + ex.uturns + ' U-turn' + (ex.uturns === 1 ? '' : 's') : '') + ', ' + f1(ex.km) + ' km' : '') + '.</p>' : '')
+      + '<label class="dp-op"><span>Join the taps</span><select id="dMode" aria-label="How to join the taps"><option value="smart"' + (d.mode === "smart" ? ' selected' : '') + '>Smart — fewest turns</option><option value="exact"' + (d.mode === "exact" ? ' selected' : '') + '>Exactly through my taps</option></select></label>'
       + '<label class="dp-op"><span>Use for</span><select id="dFor" aria-label="Use the drawn route for"><option value="all">All affected services</option>' + (sel ? '<option value="sel"' + (S.drawFor === "sel" ? ' selected' : '') + '>Service ' + esc(sel.service) + ' only</option>' : '') + '</select></label>'
       + '<div class="dp-acts"><button type="button" class="ds-btn sm pri" id="dUse">CHECK &amp; USE</button><button type="button" class="ds-btn sm" id="dEdit">EDIT</button><button type="button" class="ds-btn sm ghost" id="dRemove">REMOVE</button></div>';
     if(S.drawRes) h += '<ul class="dp-res2">' + Object.keys(S.drawRes).map(function(k){
@@ -890,6 +905,7 @@
         return '<li class="' + cls + '"><span class="i">' + ic + '</span><span><b>' + esc(sv) + '</b> ' + t + '</span>' + (r.reason ? '<span class="r">' + esc(r.reason) + '</span>' : '') + '</li>'; }).join("") + '</ul>';
     el.innerHTML = h;
     $("dFor").onchange = function(){ S.drawFor = this.value; };
+    $("dMode").onchange = function(){ S.draw.mode = this.value; drawSnap(true); };
     $("dUse").onclick = applyDrawn;
     $("dEdit").onclick = function(){ drawStart(); };
     $("dRemove").onclick = function(){ undoReplan("manual"); drawReset(); paintServices(); showSelected(); };

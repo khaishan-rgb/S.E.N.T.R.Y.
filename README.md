@@ -12,6 +12,14 @@ The page is now seven short steps (left: 1–3, right: 4–7; on a phone they fo
    * passes every hard check → it becomes that service's recommendation ("drawn by OCC");
    * fails a check → it is still used, as a **CONTROLLER DECISION** with the failed check shown in red (e.g. a height limit) and the stops it skips — as agreed: allow, flagged;
    * does not touch the service's route → not used for it, with the reason. **REMOVE** goes back to the planner's routes.
+   * **Smart joining (V16.26b, `dv2_draw_route` in app.py).** While tapping, the taps are joined as they are. On **DONE** the planner works out the route you mean, so there are no turns here and there:
+     * every tap carries the drawing direction, so it is matched to the carriageway going that way (no loop round to reach the other side);
+     * the first and last taps are put onto the bus's own route, leaving and rejoining in its direction;
+     * a tap that only adds turns (e.g. a tap that landed in a side lane) counts as "on the way" and is dropped, but only if the route still passes within 60 m of it. A tap that really chooses a road stays;
+     * among the results, the one with the fewest turns wins: no U-turns, no two turns within 80 m, not through the blockage, then the shortest.
+     
+     Step 5 says what it did, e.g. *"4 turns · no U-turn. Cleaned up to what you mean: 1 tap was only on the way (faded on the map), so the route goes straight there. Exactly through your taps it would be 6 turns with 1 U-turn, 1.9 km."* **Join the taps: Smart / Exactly through my taps** switches between the two. This is route logic, not an AI guess.
+   * The per-service check then sends the routing engine waypoints in the middle of each straight stretch of the drawn route, never at a junction (`dv_run_vias`). The re-routed version for each bus therefore keeps the same turns. The same applies to other services' routes in the share pass.
 6. **Recommendation** (new) — the message in the OCC format, grouped by route, ready to **COPY** into the chat:
    ```
    Diverted Route 1 : [67, 75, 170]
