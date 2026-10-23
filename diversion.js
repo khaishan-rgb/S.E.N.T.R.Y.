@@ -520,6 +520,7 @@
     else if(S.pick[S.sel]) h += '<div class="dp-acts" style="margin:-4px 0 8px"><button type="button" class="ds-btn sm ghost" id="unPick">BACK TO THE SUGGESTION</button></div>';
     h += '<div class="dp-sum"><div class="rt">' + esc(routeText(c)) + '</div><div class="meta">' + skipTxt(c.skipped) + ' · ' + sgn(c.added_km, 1) + ' km · ' + sgn(c.added_min) + ' min · ' + c.turns + ' turns · ' + esc(c.confidence) + ' confidence</div></div>';
     if(aiChip) h += '<div class="dp-chips">' + aiChip + '</div>';
+    if(p.router_note) h += '<p class="dp-muted" style="margin:0 0 8px;color:#ffd391">\u24d8 ' + esc(p.router_note) + '</p>';      // V16.26e: TomTom budget used up
     var ddw = (c.warnings || []).some(function(w){ return /^Double-decker on /.test(w); });     // V16.24: a double-decker on a single-deck road: confirm
     if(c.warnings && c.warnings.length) h += '<div class="dp-banner rev" style="border-style:dashed"><b>' + (ddw ? 'PLEASE CONFIRM' : 'SAFEGUARD' + (c.warnings.length > 1 ? 'S' : '') + ' EXCEEDED') + '</b>' + c.warnings.map(esc).join(" · ") + (ddw ? '' : ' — still the best verified option; please confirm.') + '</div>';
     if(c.bc_brief) h += '<div class="dp-brief"><div class="dp-k" style="margin:0 0 4px">Brief for the Bus Captain</div>' + esc(c.bc_brief) + '</div>';
@@ -577,7 +578,7 @@
     var ids = {}; (p.candidates || []).forEach(function(c){ ids[c.id] = 1; });
     return '<div class="dp-k">Other services\u2019 diversions \u2014 checked for this bus</div><ul class="dp-att dp-share">' + sh.map(function(s){
       var view = s.ok && !s.used && ids[s.id];
-      return '<li class="' + (s.ok ? "ok" : "no") + '"' + (view ? ' data-alt="' + esc(s.id) + '" role="button" tabindex="0" style="cursor:pointer" title="Show this route on the map"' : '') + '><span class="i">' + (s.ok ? "\u2713" : "\u2715") + '</span><span><b>Service ' + esc(s.from) + '</b> ' + esc((s.roads || []).join(" \u2192 "))
+      return '<li class="' + (s.ok ? "ok" : "no") + '"' + (view ? ' data-alt="' + esc(s.id) + '" role="button" tabindex="0" style="cursor:pointer" title="Show this route on the map"' : '') + '><span class="i">' + (s.ok ? "\u2713" : "\u2715") + '</span><span><b>' + (s.label ? esc(s.label.charAt(0).toUpperCase() + s.label.slice(1)) : 'Service ' + esc(s.from)) + '</b> ' + esc((s.roads || []).filter(function(r){ return !/^\(?unnamed/i.test(r); }).join(" \u2192 "))
         + (s.ok ? ' <span class="dp-muted">(' + esc(s.leave || "") + ' \u2192 ' + esc(s.rejoin || "") + ', skips ' + (s.skipped_n || 0) + ')</span>' : '') + (view ? ' <span style="color:#9fdff5">\u2014 view</span>' : '') + '</span><span class="r">' + esc(s.reason || "") + '</span></li>'; }).join("")
       + '</ul><p class="dp-muted" style="margin:4px 0 0">Each one was asked again from service ' + esc(x.service) + '\u2019s own stops for a ' + (p.bus_type === "SD" ? 'single' : 'double') + '-deck bus. Live bus positions are not used.</p>';
   }
@@ -755,7 +756,7 @@
     [/\bUpper\b/g, "Upp"], [/\bNorth\b/g, "Nth"], [/\bSouth\b/g, "Sth"], [/\bCommonwealth\b/g, "C'wealth"], [/\bBukit\b/g, "Bt"], [/\bJalan\b/g, "Jln"],
     [/\bLorong\b/g, "Lor"], [/\bTanjong\b/g, "Tg"], [/\bKampong\b/g, "Kg"], [/\bMount\b/g, "Mt"]];
   function abbr(r){ var t = tc(r); ABR.forEach(function(a){ t = t.replace(a[0], a[1]); }); return t; }
-  function chainRaw(c){ var out = []; [c.from_road].concat(c.roads || [], [c.back_road]).filter(Boolean).forEach(function(x){ if(out[out.length - 1] !== x) out.push(x); }); return out; }
+  function chainRaw(c){ var out = []; [c.from_road].concat(c.roads || [], [c.back_road]).filter(function(x){ return x && !/^\(?unnamed/i.test(x); }).forEach(function(x){ if(out[out.length - 1] !== x) out.push(x); }); return out; }
   function chain(c){ var out = []; chainRaw(c).map(abbr).forEach(function(x){ if(out[out.length - 1] !== x) out.push(x); }); return out; }
   function routeText(c){ var ch = chain(c); return ch.length ? ch.join(" > ") + " (Back on route)" : "(route drawn on the map)"; }
   function joinAnd(a){ return a.length < 2 ? (a[0] || "") : a.slice(0, -1).join(", ") + " & " + a[a.length - 1]; }

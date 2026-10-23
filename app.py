@@ -5529,6 +5529,27 @@ def tt_headers():
     return {"Referer": TT["referer"]} if TT["referer"] else {}
 
 
+# V16.26e: TomTom's free quota is counted per API (Routing has its own monthly allowance), so the diversion planner's routing
+# calls get their own daily budget instead of sharing TOMTOM_DAILY_CAP with the traffic collector (which polls all day).
+# TOMTOM_ROUTING_CAP (default 600 a day, about 18,600 a month: inside a 20,000-a-month free Routing allowance).
+TT_RT = {"day": "", "n": 0, "cap": int(os.getenv("TOMTOM_ROUTING_CAP", "600") or 600)}
+
+
+def tt_route_spend():
+    """Count one routing call against today's routing budget. False = budget used up (OpenStreetMap routing is used instead)."""
+    day = now_sgt().strftime("%Y-%m-%d")
+    if TT_RT["day"] != day:
+        TT_RT["day"], TT_RT["n"] = day, 0
+    if TT_RT["n"] >= TT_RT["cap"]:
+        return False
+    TT_RT["n"] += 1
+    return True
+
+
+def tt_route_left():
+    return TT_RT["cap"] - (TT_RT["n"] if TT_RT["day"] == now_sgt().strftime("%Y-%m-%d") else 0)
+
+
 def tt_spend():
     """Count one call against today's cap. False = cap reached, do not call."""
     day = now_sgt().strftime("%Y-%m-%d")
@@ -7170,7 +7191,7 @@ async def tt_route(coords, alternatives=0, bearings=None, bus="dd", avoid=None):
     key = "tt_route:" + hashlib.sha1(json.dumps([locs, {k: v for k, v in prm.items() if k != "key"}, body]).encode()).hexdigest()[:24]
 
     async def factory():
-        if not tt_spend():
+        if not tt_route_spend():
             DV_TT_STATS["capped"] += 1
             return {"routes": [], "error": "TomTom daily cap reached"}, 60, False
         try:
@@ -7196,16 +7217,18 @@ async def dv_osrm(coords, alternatives, bearings=None, avoid=None):
     or when TomTom fails / its daily cap is reached. Buses may not U-turn: OSRM gets no turning back at via points and the
     start / end heading; any U-turn left in a result from either router is rejected by diversion.uturns()."""
     async with DV_OSRM_SEM:
+        tt_err_ = None
         if dv_use_tomtom():
             res = await tt_route(coords, alternatives, bearings, DV_BUS.get(), avoid)
             if res.get("routes"):
                 return res
+            tt_err_ = res.get("error")                                  # None = TomTom answered "no route" (a real answer)
         res = await os_osrm(coords, alternatives=alternatives, bearings=bearings, continue_straight=True)
         if bearings and not res.get("routes"):
             res = await os_osrm(coords, alternatives=alternatives, continue_straight=True)
         for r in res.get("routes") or []:
             r.setdefault("router", "OSRM (OpenStreetMap)")
-        return res
+        return dict(res, tt_error=tt_err_) if tt_err_ else res
 
 
 def lta_cat(v):
@@ -9225,6 +9248,7 @@ async def api_dv2_limits_set(request: Request):
 @app.get("/api/dv2/config")
 async def api_dv2_config():
     return {"tomtom_map": bool(TT["key"]), "router": "TomTom Routing (bus mode)" if dv_use_tomtom() else "OSRM (OpenStreetMap)",
+            "tomtom_routing_left": tt_route_left() if dv_use_tomtom() else None, "tomtom_routing_cap": TT_RT["cap"] if dv_use_tomtom() else None,
             "weights": dv2_weights(), "weight_labels": dv2.WEIGHT_LABELS, "default_weights": dv2.DEFAULT_WEIGHTS,
             "limits": dv2_limits(), "limit_labels": dv2.LIMIT_LABELS, "default_limits": dv2.DEFAULT_LIMITS,
             "buffer_m": diversion.PARAMS["block_buffer_m"], "map_error": TT_MAP["error"]}
@@ -9847,8 +9871,8 @@ async def dv2_plan(st, blocks, svc, d, run_i, traffic=True, donors=None):
         nv = len(vias)
         brs = [None if free else heading(a_)] + [None] * nv + [heading(b_)]
         expect = max(0.0, g["sl"] - stop_s[i]) + diversion.line_m(g["dd"]) + max(0.0, stop_s[j] - g["sr"])
-        tt = dv_use_tomtom()
         rr = await dv_osrm([a_] + vias + [b_], 0, brs, ctx["avoid"])
+        tt = dv_use_tomtom() and not rr.get("tt_error")                  # V16.26e: TomTom out of budget / down: OpenStreetMap's route counts
         got = [r for r in rr.get("routes") or [] if (not tt or str(r.get("router", "")).startswith("TomTom")) and follows(r, g, expect)]
         ok2, rs2 = [], []
         if got:
@@ -10032,6 +10056,9 @@ async def dv2_plan(st, blocks, svc, d, run_i, traffic=True, donors=None):
     base["failures"] = dv2.explain_failure(attempts)
     base["weights"] = weights
     base["limits"] = limits
+    if dv_use_tomtom() and tt_route_left() <= 0:                         # V16.26e
+        base["router_note"] = ("TomTom's routing budget for today is used up (TOMTOM_ROUTING_CAP) \u2014 routes come from OpenStreetMap: no live traffic "
+                               "and no bus size in the router; OpenStreetMap height limits and the bus-service checks still apply")
     return base
 
 
