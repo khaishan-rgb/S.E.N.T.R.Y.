@@ -360,7 +360,10 @@
     if(fz) return ['<span class="dp-st no">CONTROLLER ROUTE</span>', esc(fz.geom.leave.code) + " \u2192 " + esc(fz.geom.rejoin.code) + " \u00b7 skips " + fz.geom.skipped.length + " \u00b7 \u26a0 fails a check" + sh];
     if(p.status === "divert") return ['<span class="dp-st ok">DIVERT \u00b7 ' + esc(b.confidence) + '</span>', esc(b.leave.code) + " \u2192 " + esc(b.rejoin.code) + " \u00b7 skips " + b.skipped_n + " \u00b7 " + b.turns + " turns"
       + (b.preferred ? " \u00b7 " + esc(b.preferred) : b.shared_from ? " \u00b7 same as " + esc(b.shared_from) : "") + sh];
-    if(p.status === "review") return ['<span class="dp-st rev">REVIEW</span>', "Low-confidence route only" + sh];
+    if(p.status === "review"){                                           // V16.26f: say what it has, and what the other services' routes did
+      var fl = (p.shared || []).filter(function(x){ return !x.ok; })[0];
+      return ['<span class="dp-st rev">REVIEW</span>', (b ? esc(b.leave.code) + " \u2192 " + esc(b.rejoin.code) + " \u00b7 low confidence" : "Low-confidence route only")
+        + (fl ? " \u00b7 " + esc(fl.label || "service " + fl.from) + "'s route: " + esc(String(fl.reason || "").slice(0, 90)) : "") + sh]; }
     return ['<span class="dp-st no">NO VERIFIED ROUTE</span>', "Controller review required" + sh];
   }
   function paintServices(){
@@ -521,7 +524,7 @@
     h += '<div class="dp-sum"><div class="rt">' + esc(routeText(c)) + '</div><div class="meta">' + skipTxt(c.skipped) + ' · ' + sgn(c.added_km, 1) + ' km · ' + sgn(c.added_min) + ' min · ' + c.turns + ' turns · ' + esc(c.confidence) + ' confidence</div></div>';
     if(aiChip) h += '<div class="dp-chips">' + aiChip + '</div>';
     if(p.router_note) h += '<p class="dp-muted" style="margin:0 0 8px;color:#ffd391">\u24d8 ' + esc(p.router_note) + '</p>';      // V16.26e: TomTom budget used up
-    var ddw = (c.warnings || []).some(function(w){ return /^Double-decker on /.test(w); });     // V16.24: a double-decker on a single-deck road: confirm
+    var ddw = (c.warnings || []).some(function(w){ return /^Double-decker on |^Please confirm/.test(w); });     // V16.24: a double-decker on a single-deck road: confirm
     if(c.warnings && c.warnings.length) h += '<div class="dp-banner rev" style="border-style:dashed"><b>' + (ddw ? 'PLEASE CONFIRM' : 'SAFEGUARD' + (c.warnings.length > 1 ? 'S' : '') + ' EXCEEDED') + '</b>' + c.warnings.map(esc).join(" · ") + (ddw ? '' : ' — still the best verified option; please confirm.') + '</div>';
     if(c.bc_brief) h += '<div class="dp-brief"><div class="dp-k" style="margin:0 0 4px">Brief for the Bus Captain</div>' + esc(c.bc_brief) + '</div>';
     h += drawBtn + shareHtml(p, x);
@@ -849,13 +852,39 @@
     var r = $("map").getBoundingClientRect(); if(r.top < 0 || r.bottom > window.innerHeight) $("map").scrollIntoView({block:"center", behavior:"smooth"});
   }
   function drawBar(){
-    var d = S.draw, miss = d.taps.map(function(t, i){ return t === "missed" ? i + 1 : 0; }).filter(Boolean);
+    var d = S.draw, miss = d.taps.map(function(t, i){ return t === "missed" ? i + 1 : 0; }).filter(Boolean), bt = (d.backtracks || [])[0];
     $("drawTxt").textContent = d.pts.length ? d.pts.length + " point" + (d.pts.length === 1 ? "" : "s") + (d.line ? " · " + f1(d.km) + " km" + (d.turns != null ? " · " + d.turns + " turn" + (d.turns === 1 ? "" : "s") : "") + " · " + chain({roads:d.roads}).join(" > ") : "")
-      + (miss.length ? " · ⚠ tap " + miss.join(", ") + " can't be reached that way (see the arrows / ⛔)" : " — keep tapping, or DONE")
+      + (miss.length ? " · ⚠ tap " + miss.join(", ") + " can't be reached that way (see the arrows / ⛔)"
+         : bt ? " · ⚠ " + (bt.kind === "uturn" ? "U-turn" : "turns back") + " near tap " + bt.tap + ": drag tap " + bt.tap + " to the bus's side of the road or before the junction"
+         : " — keep tapping, or DONE")
       : "Tap along the roads: where the bus leaves its route → the roads → where it is back on route";
-    var lg = $("drawLeg"); if(lg) lg.textContent = S.rules && S.rules.zoom ? "Zoom in to see which way the roads go and the banned turns" : "Grey arrows: one-way roads, the way traffic goes · ⛔ banned turn (tap / hover it) · your route has white arrows";
+    var lg = $("drawLeg"); if(lg) lg.textContent = (S.rules && S.rules.zoom ? "Zoom in to see which way the roads go and the banned turns" : "Grey arrows: one-way roads · ⛔ banned turn · white arrows: your route")
+      + " · hold and drag a point to move it · tap a point to select it · tap on your route to add a point there";
+    var del = $("dDel"); if(del){ del.hidden = S.drawSel == null || S.drawSel >= d.pts.length; del.textContent = "DELETE POINT " + ((S.drawSel || 0) + 1); }
   }
-  function drawAdd(ll){ S.draw.pts.push([+ll.lat.toFixed(6), +ll.lng.toFixed(6)]); S.draw.line = null; drawMap(); drawBar(); clearTimeout(S.drawT); S.drawT = setTimeout(drawSnap, 450); }
+  /* V16.26f: a new tap ON the joined route goes between the two taps it lies between (so a point can be added in the middle);
+     anywhere else it is the next point */
+  function drawAdd(ll){
+    var d = S.draw, p = [+ll.lat.toFixed(6), +ll.lng.toFixed(6)], at = d.pts.length;
+    if(d.line && d.pts.length >= 2){
+      var c = cumM(d.line), n = nearestOn(p, d.line, c);
+      if(n.d <= 30){
+        var pos = d.pts.map(function(q){ return nearestOn(q, d.line, c).s; });
+        for(var k = 0; k < pos.length - 1; k++) if(pos[k] < n.s && n.s < pos[k + 1]){ at = k + 1; break; }
+      }
+    }
+    d.pts.splice(at, 0, p); S.drawSel = null; d.taps = []; d.backtracks = [];
+    drawMap(); drawBar(); clearTimeout(S.drawT); S.drawT = setTimeout(drawSnap, 450);
+  }
+  function drawMove(i, ll){                                              // a point dragged to a new place
+    var d = S.draw; if(!d.pts[i]) return;
+    d.pts[i] = [+ll.lat.toFixed(6), +ll.lng.toFixed(6)]; S.drawSel = i;
+    drawBar(); clearTimeout(S.drawT); S.drawT = setTimeout(function(){ drawSnap(!d.on); }, 150);
+  }
+  function drawPick(i){                                                  // a point tapped: select it (DELETE POINT on the bar)
+    if(!S.draw.on){ S.drawSel = i; drawStart(); return; }
+    S.drawSel = S.drawSel === i ? null : i; drawMap(); drawBar();
+  }
   /* V16.26b/d: the taps are joined the way the controller means them (smart, unless "exactly through my taps" is chosen) - while
      tapping too, so what you see is what you get: the fewest turns, no U-turn, the router picks the junction near your first tap */
   function drawSnap(final){
@@ -868,7 +897,7 @@
       if(S.draw !== d || req !== S.drawReq) return;
       d.busy = false;
       if(j && j.ok){ d.line = j.line; d.roads = j.roads || []; d.km = j.km || 0; d.snapped = !!j.snapped; d.note = j.note || ""; d.turns = j.turns; d.uturns = j.uturns || 0;
-        d.taps = j.taps || []; d.exact = j.exact || null; d.got = mode; d.ends = j.ends || {}; }
+        d.taps = j.taps || []; d.exact = j.exact || null; d.got = mode; d.ends = j.ends || {}; d.backtracks = j.backtracks || []; }
       else toast((j && j.error) || "Could not join the points along the roads");
       drawMap(); drawBar(); paintDraw();
     });
@@ -879,10 +908,18 @@
       L.polyline(d.line, {pane:"div", color:"#c792ff", weight:7, dashArray:d.snapped ? null : "8 8"}).bindTooltip("Your route: " + esc(chain({roads:d.roads}).join(" > ") || "drawn"), {sticky:true}).addTo(G.draw);
       arrows(G.draw, d.line, "#fff", "arrows", 90); }                    // V16.26d: which way the bus drives it
     else if(d.pts.length > 1) L.polyline(d.pts, {pane:"div", color:"#c792ff", weight:4, dashArray:"6 8", interactive:false}).addTo(G.draw);
+    (d.backtracks || []).forEach(function(b){                            // V16.26f: where it turns back, and why
+      L.marker(b.at, {pane:"marks", keyboard:false, icon:L.divIcon({className:"", iconSize:[0, 0], html:'<div class="dp-ut">' + (b.kind === "uturn" ? "U" : "↺") + '</div>'})})
+        .bindTooltip((b.kind === "uturn" ? "U-turn here" : "The route turns back here (round a block / the other side of the road)") + " — it cannot reach tap " + b.tap
+          + " going forward. Drag tap " + b.tap + " to the side of the road the bus is on, or before the junction.").addTo(G.draw);
+    });
     if(d.on || d.line) d.pts.forEach(function(p, i){
-      var st = d.taps[i], cls = "dp-dpt" + (st === "missed" ? " bad" : !d.on && st === "on the way" ? " off" : "");
-      var m = L.marker(p, {pane:"marks", interactive:st === "missed", keyboard:false, icon:icon(String(i + 1), cls)}).addTo(G.draw);
-      if(st === "missed") m.bindTooltip("Tap " + (i + 1) + ": the route cannot get here the way you drew it — a one-way road or a banned turn? (arrows / ⛔)");
+      var st = d.taps[i], cls = "dp-dpt" + (st === "missed" ? " bad" : !d.on && st === "on the way" ? " off" : "") + (S.drawSel === i ? " sel" : "");
+      var m = L.marker(p, {pane:"marks", draggable:true, autoPan:true, keyboard:false, title:"Point " + (i + 1) + " — hold and drag to move · tap to select",
+        icon:L.divIcon({className:"dp-dpt-m", iconSize:[0, 0], html:'<div class="' + cls + '">' + (i + 1) + '</div>'})}).addTo(G.draw);
+      m.on("dragend", function(e){ drawMove(i, e.target.getLatLng()); });
+      m.on("click", function(e){ if(e && e.originalEvent && L.DomEvent) L.DomEvent.stopPropagation(e); drawPick(i); });
+      if(st === "missed") m.bindTooltip("Tap " + (i + 1) + ": the route cannot get here the way you drew it — a one-way road or a banned turn? (arrows / ⛔) Drag it.");
     });
   }
 
@@ -920,8 +957,10 @@
     });
   }
   map.on("moveend", function(){ if(rulesOn()) rulesLater(); });
-  $("dUndo").onclick = function(){ S.draw.pts.pop(); S.draw.line = null; drawMap(); drawBar(); clearTimeout(S.drawT); S.drawT = setTimeout(drawSnap, 200); };
-  $("dClear").onclick = function(){ S.draw.pts = []; S.draw.line = null; drawMap(); drawBar(); paintDraw(); };
+  $("dUndo").onclick = function(){ S.draw.pts.pop(); S.drawSel = null; S.draw.line = null; drawMap(); drawBar(); clearTimeout(S.drawT); S.drawT = setTimeout(drawSnap, 200); };
+  $("dDel").onclick = function(){ var i = S.drawSel; if(i == null) return; S.draw.pts.splice(i, 1); S.drawSel = null; S.draw.taps = []; S.draw.backtracks = []; if(S.draw.pts.length < 2) S.draw.line = null;
+    drawMap(); drawBar(); clearTimeout(S.drawT); S.drawT = setTimeout(drawSnap, 150); };
+  $("dClear").onclick = function(){ S.draw.pts = []; S.drawSel = null; S.draw.line = null; S.draw.backtracks = []; drawMap(); drawBar(); paintDraw(); };
   $("dDone").onclick = function(){
     if(S.draw.pts.length < 2){ toast("Tap at least 2 points along the roads"); return; }
     S.draw.on = false; drawOff(); drawSnap(true); drawMap(); paintDraw();

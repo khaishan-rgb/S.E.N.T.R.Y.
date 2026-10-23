@@ -10029,6 +10029,15 @@ async def dv2_plan(st, blocks, svc, d, run_i, traffic=True, donors=None):
         if cs is not best and cs["m"]["div_km"] < best["m"]["div_km"] - Q["share_shorter_km"]:
             cs["m"]["consistent"] = (cs["shared_from"], best["m"]["div_km"])
             best = cs
+    # V16.26f: no confident route of its own (it would be REVIEW): the route another affected service uses wins, if it passed
+    # every hard check for this bus and is not large-and-complex
+    if not (best["confidence"] in ("HIGH", "MEDIUM") and sensible(best)):
+        sh_ok = [c for c in uniq if c.get("shared_from") and sensible(c)]
+        if sh_ok:
+            cs = min(sh_ok, key=lambda c: (c["confidence"] == "LOW", c["m"]["div_km"]))
+            if cs is not best:
+                cs["m"]["rescued"] = cs["shared_from"]
+                best = cs
     # V16.26: a route the controller chose (drawn on the map, or followed from a saved case) wins whenever it passed the checks
     pref = [c for c in uniq if c.get("prefer")]
     if pref:
@@ -10046,7 +10055,13 @@ async def dv2_plan(st, blocks, svc, d, run_i, traffic=True, donors=None):
         if c is not None and c is not best and not any(c is x for x in others):
             others = others[:Q["max_candidates"] - 2] + [c]
     share_report(best)
-    base["status"] = "divert" if (best["confidence"] in ("HIGH", "MEDIUM") and sensible(best)) or best.get("prefer") else "review"
+    # V16.26f: a route that passed every hard check for this bus and is the route other affected services already use is not left
+    # on REVIEW for low confidence alone (weak bus-road evidence): it is recommended, with a PLEASE CONFIRM - one route for all
+    same_low = bool(best.get("shared_from")) and best["confidence"] == "LOW" and sensible(best)
+    if same_low:
+        best["m"]["warnings"] = list(best["m"]["warnings"]) + [f"Please confirm: low confidence for this bus ({best['m']['busroad_label'].lower()} bus-road evidence), "
+                                                               f"but it passed every hard check and service {best['shared_from']} uses the same route"]
+    base["status"] = "divert" if (best["confidence"] in ("HIGH", "MEDIUM") and sensible(best)) or best.get("prefer") or same_low else "review"
     base["headline"] = ("RECOMMENDED DIVERSION" if base["status"] == "divert" else
                         "NO SUITABLE DIVERSION FOUND \u2014 CONTROLLER REVIEW REQUIRED" + (" (best route is large and complex for a Bus Captain)" if not sensible(best) else " (low confidence only)"))
     base["best"] = summary(best, tag_of.get(id(best), []))
@@ -10093,6 +10108,33 @@ async def api_dv2_plan(request: Request):
 
 
 # =========================================================================== V16.26 hand-drawn diversions and saved case studies
+def dv_backtracks(r):
+    """V16.26f: where a joined route turns back on itself - a U-turn, or round a block / through a gap in the divider back
+    along the other carriageway (it comes back within 25 m of where it already was, 120 m+ earlier). [(kind, (lat, lon))]"""
+    ev = [("uturn", tuple(st_["line"][0])) for st_ in r.get("steps") or [] if (st_.get("mod") or "") == "uturn" and st_.get("line")]
+    d = diversion.densify(r.get("line") or [], 20.0)
+    grid, k = {}, 0
+    cell = lambda p: (int(p[0] * 3600.0), int(p[1] * 3600.0))            # ~30 m cells
+    while k < len(d):
+        p, c = d[k], cell(d[k])
+        hit = next((j for dx in (-1, 0, 1) for dy in (-1, 0, 1) for j in grid.get((c[0] + dx, c[1] + dy), [])
+                    if j < k - 6 and diversion.dist_m(p, d[j]) < 25.0), None)
+        if hit is not None:
+            mid = d[(hit + k) // 2]                                      # the far end of the loop: where it turned back
+            ev.append(("loop", tuple(mid)))
+            for q in range(k, min(len(d), k + 15)):
+                grid.setdefault(cell(d[q]), []).append(q)
+            k += 15
+            continue
+        grid.setdefault(c, []).append(k)
+        k += 1
+    out = []
+    for kind, at_ in sorted(ev, key=lambda e: e[0] != "uturn"):           # one event per place, a real U-turn first
+        if all(diversion.dist_m(at_, o[1]) > 120.0 for o in out):
+            out.append((kind, at_))
+    return out
+
+
 def dv_turns(steps):
     """turns a Bus Captain makes on a routing result: (turns, U-turns, turns closer than 80 m to the previous one)"""
     n = u = z = 0
@@ -10244,8 +10286,10 @@ async def dv2_draw_route(taps, mode="smart", ref=None, block_lines=None, lead=No
         if block_lines:
             ok_, _ = diversion.validate_block_avoidance(ln, block_lines, None, P)
             through = not ok_
-        cost = km_ + 0.45 * n + 6.0 * u + 1.5 * z + (25.0 if through else 0.0)
-        return {"r": r, "keep": list(keep), "far": far, "turns": n, "uturns": u, "zig": z, "km": km_, "through": through, "cost": cost}
+        bt = dv_backtracks(r)
+        loops = sum(1 for kd, _ in bt if kd == "loop")
+        cost = km_ + 0.45 * n + 6.0 * u + 4.0 * loops + 1.5 * z + (25.0 if through else 0.0)
+        return {"r": r, "keep": list(keep), "far": far, "turns": n, "uturns": u, "zig": z, "km": km_, "through": through, "cost": cost, "bt": bt}
 
     allk = list(range(len(mids)))
     exact = [j for j in (judge(r, allk) for r in await go(allk)) if j]
@@ -10288,6 +10332,8 @@ async def dv2_draw_route(taps, mode="smart", ref=None, block_lines=None, lead=No
     return {"line": [[round(p[0], 6), round(p[1], 6)] for p in diversion.simplify(r["line"], 500)], "km": round(best["km"], 2), "roads": roads,
             "router": r.get("router") or "OpenStreetMap", "turns": best["turns"], "uturns": best["uturns"], "zig": best["zig"], "through": best["through"],
             "taps": state, "tap_far": [round(best["far"][merged[k]]) for k in range(len(raw))], "far": round(max(best["far"]), 0), "ends": ends,
+            "backtracks": [{"kind": kd, "at": [round(a_[0], 6), round(a_[1], 6)],
+                            "tap": min(range(len(raw)), key=lambda q: diversion.dist_m(raw[q], a_)) + 1} for kd, a_ in best["bt"]],
             "exact": {"turns": exact["turns"], "uturns": exact["uturns"], "km": round(exact["km"], 2)} if exact else None}
 
 
@@ -10400,6 +10446,9 @@ async def api_dv2_manual(request: Request):
     if missed:
         note.append(("taps " + ", ".join(missed) if len(missed) > 1 else "tap " + missed[0]) + " cannot be reached the way you drew it — "
                     "probably a one-way road or a banned turn: see the road arrows and ⛔ signs on the map")
+    for b_ in (res.get("backtracks") or [])[:2]:                        # V16.26f: why it turns back, and what to do
+        note.append(("U-turn" if b_["kind"] == "uturn" else "the route turns back (round a block)") + f" near tap {b_['tap']} \u2014 it cannot reach "
+                    f"tap {b_['tap']} going forward: drag tap {b_['tap']} to the side of the road the bus is on, or before the junction")
     return dict(res, ok=True, snapped=True, mode=mode, note="; ".join(note))
 
 

@@ -311,7 +311,9 @@ def why_this(best, ctx_m):
         out.append(f"Rejoins at the nearest practical stop \u2014 {m['rejoin_name']}, {m['nearer_than'][0]} stop(s) earlier than the top-scoring route ({m['nearer_than'][1]})")
     if m.get("early_turn"):
         out.append("Turns back early from the wider diversion to reach that stop")
-    if m.get("consistent") and not m.get("preferred"):
+    if m.get("rescued") and not m.get("preferred"):
+        out.append(f"Same route as service {m['rescued']} \u2014 this bus had no confident route of its own, and this one passed every hard check for it")
+    elif m.get("consistent") and not m.get("preferred"):
         out.append(f"Same short diversion as service {m['consistent'][0]}: {m['div_km']:.1f} km off the route instead of {m['consistent'][1]:.1f} km \u2014 the affected services keep to one route")
     elif m.get("shared_from") and not m.get("preferred"):
         out.append(f"Same roads as service {m['shared_from']}'s diversion \u2014 checked again for this bus (its own stops and size)")
