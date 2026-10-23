@@ -1,5 +1,55 @@
 # SG Transport Pulse V16.19 — Operational Intelligence & Service Recovery Platform
 
+## Halfway Planner: the ticked bus covers a gap on the next direction, before vs after simulation (V16.28)
+**Example.** D1 Bus 6 is ticked, and D2 Bus 3 runs 30 min behind D2 Bus 4. The plan for Bus 6:
+1. It completes D1 to the interchange.
+2. It rests (the minimum break, 7 min by default).
+3. It runs off-service by real road to a D2 stop in the middle of the D2 Bus 4 → Bus 3 gap.
+
+D2 keeps running all this time, because D2 buses are never held to wait for Bus 6. So the stop where Bus 6 can catch the middle of the gap is well down D2. Each option shows how far along the route it is (**% of D2**).
+
+The entry point is worked out from the timings, not set to a fixed percentage. The inputs are when Bus 6 arrives, the rest, the off-service time by real road, and 2 min between stops in service. The recommended stop is the first one where Bus 6 can be in the middle of the gap; earlier stops give an uneven split.
+
+**Gap to cover.** It is chosen under the bus tables: "*D1 Bus 6 goes halfway on D2 to cover the gap ahead of [▾]*".
+* **Auto** picks the longest gap Bus 6 can actually reach. A longer gap it cannot catch, such as one whose front bus is already at the last stop, is skipped.
+* OCC can pick any other gap from the list.
+* The route diagram outlines the chosen gap in purple ("30 min gap · to cover"), and the table marks the bus behind it.
+
+**Its empty slot.** Bus 6 no longer departs the interchange, so the two buses ahead of its slot depart **later** and the two behind it depart **earlier**. In the example, D1 Bus 8 and 7 depart later and D1 Bus 5 and 4 earlier. The limits are the usual ones: 10 min at most, and an earlier departure never cuts into the minimum break.
+* In this mode the departures are always re-spaced, and the plan says so.
+* The bus table shows what the selected plan does to each bus: *dep +3 min*, *dep −2 min*, *halfway → Stop 44 · 73%*.
+
+**Before vs after simulation** is a new section 10 at the end, laid out like the Recovery Decision Engine:
+* **Verdict and KPIs.** The verdict is one of:
+  * *Recommended*: average EWT down by at least 0.1 min and 5%.
+  * *Marginal*: EWT barely changes.
+  * *Not better than no action*.
+
+  The KPIs are average EWT before → after, EWT from the entry stop on, the largest gap after entry, red AITPs, the entry stop with its %, and the departures re-spaced.
+* **Compare on EWT, lower is better.** Three options:
+  * **No action**: Bus 6 runs its full trip and the gap stays.
+  * **Halfway only**: no departure changes, so its slot stays empty.
+  * **Halfway + regulation**: this is the plan.
+* **Every AITP.** One square per AITP of the next direction for each option. The AITPs are the AITP setting at the top (every N stops plus the last stop).
+  * Squares are coloured by EWT band (≤ 0.5 / ≤ 1 / ≤ 2 / > 2 min), with an EWT / Headway toggle.
+  * The average column equals the option's EWT.
+* **Every trip down the route.** A time against stop chart of the next direction:
+  * after: solid lines (later departures amber, earlier departures cyan);
+  * before: dashed grey lines;
+  * Bus 6 in purple: its rest, the off-service run and its entry;
+  * the gap to cover shaded red.
+* EWT at one AITP = Σh² ÷ (2 Σh) − H/2 over the buses passing it. An option's EWT is the average over its AITPs.
+
+**API (additive).** `/api/hplan/plan` has two new parameters.
+* `gap=auto|<bus no.>` covers the gap ahead of that bus on the next direction.
+* `aitp=N` sets the AITPs used for the EWT.
+
+New fields in the result:
+* top level: `target`, `lane_gaps`, `points[].pct`, `no_action.pts` and `sim`;
+* each candidate: `pct` and `variants.{only,adj}`, each with its EWT and per-AITP squares.
+
+Without `gap`, the plan is exactly as before. Bus labels now carry the direction ("D1 Bus 8").
+
 ## Halfway Planner: route diagram & buses, tick the halfway bus (V16.27)
 **The filter row.** *Late bus* and *Late min* are gone. New field **AITP, every [5] BS**: the timing points on the route diagram are every N bus stops (1–20, remembered in this browser). The last stop of each direction is always a timing point.
 

@@ -17,8 +17,9 @@ Assumptions (all shown to the controller):
 import math
 
 P0 = {"stop_min": 2.0, "break_min": 7.0, "hold_max": 5.0, "adv_max": 5.0, "adj_cost": 0.002, "n_points": 12, "max_reach_min": 60.0,
-      "slow_max": 8.0, "slow_min": 1.0, "even_tol": 2.0, "slow_gate": 0.02, "dep_later_max": 10.0, "dep_earlier_max": 10.0, "layover": 10.0}
-MODEL = "hwplan-15.4-os"
+      "slow_max": 8.0, "slow_min": 1.0, "even_tol": 2.0, "slow_gate": 0.02, "dep_later_max": 10.0, "dep_earlier_max": 10.0, "layover": 10.0,
+      "aitp": 0}                                                    # V16.28: EWT at the AITPs (every N stops + the last); 0 = n_points spread
+MODEL = "hwplan-16.28-gap"
 
 
 def hhmm(m):
@@ -86,7 +87,7 @@ def plan(ctx, reach):
         dep = max(b["ready"], slot, now)
         units.append({"uid": f"N{b['num']}", "num": b["num"], "kind": "next_trip", "dep": dep, "slot": slot, "ready": b["ready"], "arr": b["arr"],
                       "slack": max(0.0, dep - max(b["ready"], now)), "movable": True, "late": b["num"] == Cn,
-                      "label": f"Bus {b['num']}", "src": f"Bus {b['num']} after its {tl} trip"})
+                      "label": f"{tl} Bus {b['num']}", "src": f"{tl} Bus {b['num']} after its {tl} trip"})
     ci = next(i for i, u in enumerate(units) if u["uid"] == f"N{Cn}")
     C = units[ci]
     roles = {}
@@ -103,6 +104,27 @@ def plan(ctx, reach):
         INS = C
     for r, u in roles.items():
         u["role"] = r
+    # ---- V16.28 the gap on the next direction that Bus C covers. OCC picks it by the bus behind it (default: the longest gap). The next
+    # direction keeps running while Bus C completes its trip and takes its break, so the gap is caught further down the route.
+    vq = lambda b: b["q"] if b["w"] is None else -float(b["w"]) / SM          # stop progress now; layover = before the first stop
+    o_lane = sorted(o_all, key=lambda b: -vq(b))
+    lane_gaps = [{"front": a["num"], "rear": b["num"], "minutes": _r((vq(a) - vq(b)) * SM),
+                  "rear_at": (f"{O['stops'][0]['code']} {O['stops'][0]['name']} (layover)" if b["w"] is not None
+                              else f"{O['stops'][min(nO - 1, int(round(b['q'])))]['code']} {O['stops'][min(nO - 1, int(round(b['q'])))]['name']}")}
+                 for a, b in zip(o_lane, o_lane[1:])]
+    def mk_tg(g_, auto, note):
+        return dict(g_, front_uid=f"O{g_['front']}", rear_uid=f"O{g_['rear']}", auto=auto, front_label=f"{ol} Bus {g_['front']}",
+                    rear_label=f"{ol} Bus {g_['rear']}", prolonged=g_["minutes"] >= 1.5 * H, note=note)
+    TG, tg_note, tgt = None, None, ctx.get("target")
+    if tgt is not None and not OSM and not loop and lane_gaps:
+        want = tgt.get("rear") if isinstance(tgt, dict) else None
+        pick = next((g for g in lane_gaps if want not in (None, "") and str(g["rear"]) == str(want)), None)
+        if want not in (None, "") and pick is None:
+            tg_note = f"{ol} Bus {want} has no bus ahead of it in the data now - the longest gap is used instead."
+        if pick is None:
+            pick = max(lane_gaps, key=lambda g: (g["minutes"], -lane_gaps.index(g)))
+        TG = mk_tg(pick, want in (None, "") or tg_note is not None, tg_note)
+    WHO = "the OS bus" if OSM else f"{tl} Bus {Cn}"
     # ---- arrival times (2 min per stop in service)
     def times(u, dep=None, entry=None):
         out = {}
@@ -116,10 +138,14 @@ def plan(ctx, reach):
         d = u["dep"] if dep is None else dep
         return {k: d + SM * k for k in range(nO)}
 
-    step = max(1, (nO - 2) // int(P["n_points"]))
-    points = list(range(1, nO, step))
-    if nO - 1 not in points:
-        points.append(nO - 1)
+    NA = int(float(P.get("aitp") or 0))
+    if NA > 0:                                                    # V16.28: the AITPs of the route diagram (every N stops, first and last)
+        points = sorted(set(list(range(0, nO, NA)) + [nO - 1]))
+    else:
+        step = max(1, (nO - 2) // int(P["n_points"]))
+        points = list(range(1, nO, step))
+        if nO - 1 not in points:
+            points.append(nO - 1)
 
     TRIM = bool(P.get("edge_trim"))                                # TEST MODE: gaps at the edge of the entered fleet are not real
     EDGE = max(2.5 * H, float(P.get("edge_gap") or 0.0) + H)
@@ -145,6 +171,18 @@ def plan(ctx, reach):
             vals.append(e); mx = max(mx, max(gaps)); mn = min(mn, min(gaps)); perk[k] = (gaps, sq)
         return (sum(vals) / len(vals) if vals else None), mx, (mn if mn < 1e9 else None), perk
 
+    def pts_of(per):
+        """per-AITP figures for the before / after squares: EWT, largest gap, the gap most off the target headway."""
+        out = []
+        for k in points:
+            if k not in per:
+                out.append(None)
+                continue
+            g_ = per[k][0]; e_ = ewt(g_, H)
+            out.append({"ewt": None if e_ is None else round(e_, 3), "max": _r(max(g_)), "off": _r(max(g_, key=lambda v: abs(v - H))), "n": len(g_) + 1})
+        return out
+    vsum = lambda v: {"ewt": round(v["e"], 3), "max_hw": _r(v["mx"]), "pts": pts_of(v["per"])} if isinstance(v, dict) else None
+
     base = {u["uid"]: times(u) for u in units}
     e0, mx0, mn0, per0 = evaluate(base)
     if e0 is None:
@@ -166,7 +204,6 @@ def plan(ctx, reach):
         out.sort(key=lambda x: x["t"])
         return out
 
-    cands, infeasible = [], {"no_route": 0, "too_far": 0, "no_benefit": 0, "no_gap": 0, "behind_rear": 0}
     U = {u["uid"]: u for u in units}
     Bu = roles.get("B")
     SLOW_MAX, SLOW_MIN, TOL, GATE = float(P["slow_max"]), float(P["slow_min"]), float(P["even_tol"]), float(P["slow_gate"])
@@ -229,12 +266,19 @@ def plan(ctx, reach):
               for i in range(max(0, first - 1), min(len(seq_ids) - 1, last + 1))] if win else []
 
     def entry_plan(j, e_j, tabbase):
-        """aim Bus C at the middle of the prolonged headway at stop j (bus ahead of its slot -> next bus, without Bus C)."""
-        others = sorted((t[j], uid) for uid, t in tabbase.items() if j in t and uid != INS["uid"])
-        f = (tabbase[Bu["uid"]][j], Bu["uid"]) if (Bu and j in tabbase[Bu["uid"]]) else max((x for x in others if x[0] <= e_j), default=None)
-        if not f:
-            return None
-        nx = min((x for x in others if x[0] > f[0]), default=None) or (f[0] + 2.0 * H, None)
+        """aim Bus C at the middle of the prolonged headway at stop j (bus ahead of its slot -> next bus, without Bus C);
+           V16.28 with a chosen gap: the middle of that gap where it is at stop j (both buses keep running)."""
+        if TG:
+            a_, b_ = tabbase.get(TG["front_uid"], {}).get(j), tabbase.get(TG["rear_uid"], {}).get(j)
+            if a_ is None or b_ is None or b_ <= a_:
+                return None
+            f, nx = (a_, TG["front_uid"]), (b_, TG["rear_uid"])
+        else:
+            others = sorted((t[j], uid) for uid, t in tabbase.items() if j in t and uid != INS["uid"])
+            f = (tabbase[Bu["uid"]][j], Bu["uid"]) if (Bu and j in tabbase[Bu["uid"]]) else max((x for x in others if x[0] <= e_j), default=None)
+            if not f:
+                return None
+            nx = min((x for x in others if x[0] > f[0]), default=None) or (f[0] + 2.0 * H, None)
         mid = (f[0] + nx[0]) / 2.0
         te = max(e_j, mid)
         if te >= nx[0] - 0.5:
@@ -245,62 +289,82 @@ def plan(ctx, reach):
             return None
         return {"f": f, "nx": nx, "mid": mid, "te": te, "tab": tab, "e": e, "mx": mx, "per": per, "imb": abs((te - f[0]) - (nx[0] - te))}
 
-    for j in range(1, nO - 1):
-        rr = reach.get(j)
-        if not rr:
-            infeasible["no_route"] += 1
-            continue
-        rmin, rkm, rsrc = rr
-        if rmin > float(P["max_reach_min"]):
-            infeasible["too_far"] += 1
-            continue
-        e_j = INS["ready"] + rmin                                # earliest the halfway bus can be at this stop
-        if not OSM and e_j >= full_dep + SM * j - 0.5:
-            infeasible["no_benefit"] += 1                        # the full trip from the interchange would get there first
-            continue
-        pl = entry_plan(j, e_j, baseA)
-        if pl is None:
-            infeasible["no_gap"] += 1
-            continue
-        if pl == "behind":
-            infeasible["behind_rear"] += 1
-            continue
-        pl0 = entry_plan(j, e_j, base)                            # same stop without the interchange adjustments (for comparison)
-        use_adj = bool(dep_adj) and not (isinstance(pl0, dict) and pl0["e"] <= pl["e"] + 1e-9 and pl0["imb"] <= max(TOL, pl["imb"]))
-        if not use_adj and isinstance(pl0, dict):
-            pl, pl0 = pl0, pl                                     # the halfway works better without moving the other buses
-        cadj = dict(dep_adj) if use_adj else {}
-        te, tab, f, nx = pl["te"], pl["tab"], pl["f"], pl["nx"]
-        fu = U[f[1]]
-        behind = sorted((t[j], uid) for uid, t in tab.items() if j in t and t[j] > te + 1e-6 and uid != INS["uid"])
-        ru = U[behind[0][1]] if behind else None
-        tp = lambda u: tab[u["uid"]].get(j) if u else None
-        dn_pts = [k for k in points if k >= j]
-        dn_mx = max((max(pl["per"][k][0]) for k in dn_pts if k in pl["per"]), default=None)
-        wait = te - e_j
-        J = pl["e"] + float(P["adj_cost"]) * sum(abs(v) for v in cadj.values())
-        key = (0 if pl["imb"] <= TOL else 1, pl["imb"] if pl["imb"] > TOL else 0.0, J)
-        cands.append({"j": j, "no": j + 1, "code": O["stops"][j]["code"], "name": O["stops"][j]["name"], "lat": O["stops"][j]["lat"], "lon": O["stops"][j]["lon"],
-                      "skip": j, "avoided": _r(SM * j), "os_min": _r(rmin), "os_km": _r(rkm, 2), "os_src": rsrc,
-                      "ready": hhmm(INS["ready"]), "leave": hhmm(INS["ready"] + wait), "wait": _r(wait), "earliest": hhmm(e_j),
-                      "entry": _r(te), "entry_clock": hhmm(te), "net": _r(SM * j - rmin),
-                      "gap": {"front": fu["label"], "front_role": fu.get("role"), "rear": U[nx[1]]["label"] if nx[1] else "the next trip (beyond the forecast)",
-                              "rear_role": U[nx[1]].get("role") if nx[1] else None, "t_front": hhmm(f[0]), "t_rear": hhmm(nx[0]),
-                              "minutes": _r(nx[0] - f[0]), "minutes_raw": _r(pl0["nx"][0] - pl0["f"][0]) if (use_adj and isinstance(pl0, dict)) else None,
-                              "hold": 0.0, "mid": hhmm(pl["mid"]), "split": [_r(te - f[0]), _r(nx[0] - te)], "imbalance": _r(pl["imb"]), "even": pl["imb"] <= TOL},
-                      "front": {"uid": fu["uid"], "num": fu["num"], "role": fu.get("role"), "label": fu["label"], "pass": hhmm(tp(fu)), "adj": cadj.get(fu["uid"], 0.0),
-                                "dep": hhmm(fu["dep"]), "movable": fu["movable"]},
-                      "rear": ({"uid": ru["uid"], "num": ru["num"], "role": ru.get("role"), "label": ru["label"], "pass": hhmm(tp(ru)), "adj": cadj.get(ru["uid"], 0.0),
-                                "dep": hhmm(ru["dep"])} if ru else None),
-                      "slows": [], "rear_log": [], "use_adj": use_adj,
-                      "dep_adj": [dict(a_, adj=(a_["adj"] if use_adj else 0.0), dep_new=(a_["dep_new"] if use_adj else a_["dep"]),
-                                       reason=(a_["reason"] if use_adj else ("not needed for this plan" if a_["adj"] else a_["reason"]))) for a_ in adj_list],
-                      "ewt_noadj": round(pl0["e"], 3) if (use_adj and isinstance(pl0, dict)) else None,
-                      "ewt_adj": round(pl0["e"], 3) if (not use_adj and dep_adj and isinstance(pl0, dict)) else None,
-                      "gap_before": _r(te - tp(fu)) if tp(fu) is not None else None, "gap_after": _r(tp(ru) - te) if ru and tp(ru) is not None else None,
-                      "max_hw": _r(dn_mx if dn_mx is not None else pl["mx"]), "max_hw_all": _r(pl["mx"]), "ewt": round(pl["e"], 3), "score": J,
-                      "gain": round(e0 - pl["e"], 3), "km_skipped": _r(O["ss"][j], 2), "rkey": key + (j,),
-                      "adj": dict(cadj), "_tab": tab, "_adj": dict(cadj)})
+    def scan():
+        cands, infeasible = [], {"no_route": 0, "too_far": 0, "no_benefit": 0, "no_gap": 0, "behind_rear": 0}
+        for j in range(1, nO - 1):
+            rr = reach.get(j)
+            if not rr:
+                infeasible["no_route"] += 1
+                continue
+            rmin, rkm, rsrc = rr
+            if rmin > float(P["max_reach_min"]):
+                infeasible["too_far"] += 1
+                continue
+            e_j = INS["ready"] + rmin                                # earliest the halfway bus can be at this stop
+            if not OSM and e_j >= full_dep + SM * j - 0.5:
+                infeasible["no_benefit"] += 1                        # the full trip from the interchange would get there first
+                continue
+            pl = entry_plan(j, e_j, baseA)
+            if pl is None:
+                infeasible["no_gap"] += 1
+                continue
+            if pl == "behind":
+                infeasible["behind_rear"] += 1
+                continue
+            pl0 = entry_plan(j, e_j, base)                            # same stop without the interchange adjustments (for comparison)
+            v_adj, v_only = pl, (pl0 if isinstance(pl0, dict) else None)
+            # V16.28: covering a gap elsewhere always leaves Bus C's slot empty, so the buses around it are always re-spaced
+            use_adj = bool(dep_adj) and (bool(TG) or not (isinstance(pl0, dict) and pl0["e"] <= pl["e"] + 1e-9 and pl0["imb"] <= max(TOL, pl["imb"])))
+            if not use_adj and isinstance(pl0, dict):
+                pl, pl0 = pl0, pl                                     # the halfway works better without moving the other buses
+            cadj = dict(dep_adj) if use_adj else {}
+            te, tab, f, nx = pl["te"], pl["tab"], pl["f"], pl["nx"]
+            fu = U[f[1]]
+            behind = sorted((t[j], uid) for uid, t in tab.items() if j in t and t[j] > te + 1e-6 and uid != INS["uid"])
+            ru = U[behind[0][1]] if behind else None
+            tp = lambda u: tab[u["uid"]].get(j) if u else None
+            dn_pts = [k for k in points if k >= j]
+            dn_mx = max((max(pl["per"][k][0]) for k in dn_pts if k in pl["per"]), default=None)
+            wait = te - e_j
+            J = pl["e"] + float(P["adj_cost"]) * sum(abs(v) for v in cadj.values())
+            key = (0 if pl["imb"] <= TOL else 1, pl["imb"] if pl["imb"] > TOL else 0.0, J)
+            cands.append({"j": j, "no": j + 1, "code": O["stops"][j]["code"], "name": O["stops"][j]["name"], "lat": O["stops"][j]["lat"], "lon": O["stops"][j]["lon"],
+                          "skip": j, "avoided": _r(SM * j), "os_min": _r(rmin), "os_km": _r(rkm, 2), "os_src": rsrc,
+                          "ready": hhmm(INS["ready"]), "leave": hhmm(INS["ready"] + wait), "wait": _r(wait), "earliest": hhmm(e_j),
+                          "entry": _r(te), "entry_clock": hhmm(te), "net": _r(SM * j - rmin),
+                          "gap": {"front": fu["label"], "front_role": fu.get("role"), "rear": U[nx[1]]["label"] if nx[1] else "the next trip (beyond the forecast)",
+                                  "rear_role": U[nx[1]].get("role") if nx[1] else None, "t_front": hhmm(f[0]), "t_rear": hhmm(nx[0]),
+                                  "minutes": _r(nx[0] - f[0]), "minutes_raw": _r(pl0["nx"][0] - pl0["f"][0]) if (use_adj and isinstance(pl0, dict)) else None,
+                                  "hold": 0.0, "mid": hhmm(pl["mid"]), "split": [_r(te - f[0]), _r(nx[0] - te)], "imbalance": _r(pl["imb"]), "even": pl["imb"] <= TOL},
+                          "front": {"uid": fu["uid"], "num": fu["num"], "role": fu.get("role"), "label": fu["label"], "pass": hhmm(tp(fu)), "adj": cadj.get(fu["uid"], 0.0),
+                                    "dep": hhmm(fu["dep"]), "movable": fu["movable"]},
+                          "rear": ({"uid": ru["uid"], "num": ru["num"], "role": ru.get("role"), "label": ru["label"], "pass": hhmm(tp(ru)), "adj": cadj.get(ru["uid"], 0.0),
+                                    "dep": hhmm(ru["dep"])} if ru else None),
+                          "slows": [], "rear_log": [], "use_adj": use_adj,
+                          "dep_adj": [dict(a_, adj=(a_["adj"] if use_adj else 0.0), dep_new=(a_["dep_new"] if use_adj else a_["dep"]),
+                                           reason=(a_["reason"] if use_adj else ("not needed for this plan" if a_["adj"] else a_["reason"]))) for a_ in adj_list],
+                          "ewt_noadj": round(pl0["e"], 3) if (use_adj and isinstance(pl0, dict)) else None,
+                          "ewt_adj": round(pl0["e"], 3) if (not use_adj and dep_adj and isinstance(pl0, dict)) else None,
+                          "gap_before": _r(te - tp(fu)) if tp(fu) is not None else None, "gap_after": _r(tp(ru) - te) if ru and tp(ru) is not None else None,
+                          "max_hw": _r(dn_mx if dn_mx is not None else pl["mx"]), "max_hw_all": _r(pl["mx"]), "ewt": round(pl["e"], 3), "score": J,
+                          "gain": round(e0 - pl["e"], 3), "km_skipped": _r(O["ss"][j], 2), "rkey": key + (j,),
+                          "pct": int(round(100.0 * O["ss"][j] / max(1e-9, O["ss"][-1]))), "entry_min": round(te, 2), "leave_min": round(INS["ready"] + wait, 2),
+                          "variants": {"only": vsum(v_only), "adj": vsum(v_adj) if dep_adj else None},   # the before / after squares
+                          "adj": dict(cadj), "_tab": tab, "_adj": dict(cadj)})
+        return cands, infeasible
+    if TG and TG["auto"]:                                         # V16.28 auto: the longest gap Bus C can actually reach (mid-gap if possible)
+        tried = []
+        for g_ in sorted(lane_gaps, key=lambda g: -g["minutes"]):
+            TG = mk_tg(g_, True, tg_note)
+            cs_, inf_ = scan()
+            tried.append((TG, cs_, inf_))
+            if any(c_["gap"]["even"] for c_ in cs_):
+                break
+        TG, cands, infeasible = (next((t_ for t_ in tried if any(c_["gap"]["even"] for c_ in t_[1])), None)
+                                 or next((t_ for t_ in tried if t_[1]), None) or tried[0])
+        TG["skipped"] = [{"front": t_[0]["front"], "rear": t_[0]["rear"], "minutes": t_[0]["minutes"]} for t_ in tried if t_[0] is not TG]
+    else:
+        cands, infeasible = scan()
     # RECOMMENDED: the first stop where Bus C can land in the middle of the prolonged headway (fewest stops skipped);
     # if no stop allows an even split, the most even one. Lowest whole-route EWT is shown alongside.
     cands.sort(key=lambda x: x["rkey"][:2] + (x["j"],))
@@ -365,18 +429,22 @@ def plan(ctx, reach):
         fixed = [f"{a_['label']} not adjusted ({a_['reason']})" for a_ in al if not a_["adj"] and a_["reason"] not in ("", "no change needed", "not needed for this plan")]
         return parts, fixed
 
-    WHO = "the OS bus" if OSM else f"Bus {Cn}"
+    LATE = f" ({D:g} min late)" if D else ""
 
     def why(x):
         g = x["gap"]
         parts, fixed = adj_sentence(x)
         s = ""
+        if TG:                                                    # V16.28: the gap OCC chose on the next direction
+            s += (f"{WHO} covers the {TG['minutes']:.0f}-min gap between {TG['front_label']} and {TG['rear_label']} (now at {TG['rear_at']}). "
+                  f"{ol} keeps running while {WHO} completes {tl} and takes its break, so that gap is caught further down {ol}: "
+                  f"Stop {x['no']}, {x['pct']}% along the route. ")
         if OSM:
             s += (f"Bus {Cn} completes {tl} {D:g} min late and runs its {ol} trip from {O['stops'][0]['name']} at {hhmm(full_dep)} (full trip). "
                   f"An extra OS bus with a Bus Captain fills the gap instead. ")
         if parts:
             s += ((f"The interchange headway around the late Bus {Cn} is evened out: " if OSM else
-                   f"Bus {Cn}'s departure slot at {O['stops'][0]['name']} is empty, so the interchange headway is closed by spacing the buses around it evenly: ")
+                   f"{WHO}'s departure slot at {O['stops'][0]['name']} is empty, so the interchange headway is closed by spacing the buses around it evenly: ")
                   + "; ".join(parts) + ". ")
         if fixed:
             s += " ".join(fixed) + ". "
@@ -387,7 +455,7 @@ def plan(ctx, reach):
             s += (f"The OS bus is available at {INS['src']} from {x['ready']}; the real road route to Stop {x['no']} (BS {x['code']}) takes about "
                   f"{x['os_min']:.0f} min ({x['os_km']:.1f} km) - earliest arrival {x['earliest']}. ")
         else:
-            s += (f"Bus {Cn} completes {tl} at {hhmm(t_buses[c]['arr'])} ({D:g} min late), is ready at {x['ready']} after the {BRK:g}-min break, and the real road route "
+            s += (f"{WHO} completes {tl} at {hhmm(t_buses[c]['arr'])}{LATE}, is ready at {x['ready']} after the {BRK:g}-min break, and the real road route "
                   f"to Stop {x['no']} (BS {x['code']}) takes about {x['os_min']:.0f} min ({x['os_km']:.1f} km) - earliest arrival {x['earliest']}. ")
         if x["wait"] and x["wait"] >= 0.5:
             s += f"It therefore leaves {'its start point' if OSM else 'the interchange'} {x['wait']:.0f} min later ({x['leave']}) so it enters exactly mid-gap at {x['entry_clock']}. "
@@ -406,11 +474,13 @@ def plan(ctx, reach):
                   f"but it splits the gap {best_ewt['gap']['split'][0]:.0f} / {best_ewt['gap']['split'][1]:.0f} min.")
         return s
 
+    GAPW = "" if OSM else f" {WHO} leaves"
+
     def actions(x):
         steps, n = [], 1
         for a_ in [a for a in x["dep_adj"] if a["role"] in ("A", "B")]:
             if a_["adj"] > 0:
-                steps.append({"n": n, "bus": a_["label"], "role": a_["role"], "kind": "hold", "text": f"Depart the interchange {a_['adj']:.0f} min later ({a_['dep']} \u2192 {a_['dep_new']}) to close the headway gap.", "time": a_["dep_new"]})
+                steps.append({"n": n, "bus": a_["label"], "role": a_["role"], "kind": "hold", "text": f"Depart the interchange {a_['adj']:.0f} min later ({a_['dep']} \u2192 {a_['dep_new']}) to close the headway gap{GAPW}.", "time": a_["dep_new"]})
             else:
                 steps.append({"n": n, "bus": a_["label"], "role": a_["role"], "kind": "monitor", "text": f"Depart as planned ({a_['dep']}) \u2013 {a_['reason'] or 'no change needed'}.", "time": a_["dep"]})
             n += 1
@@ -425,12 +495,12 @@ def plan(ctx, reach):
         if not OSM:
           steps.append({"n": n, "bus": f"{tl} Bus {Cn}", "role": "C", "kind": "halfway",
                       "text": f"Complete {tl}. Arrive {ol} interchange {hhmm(t_buses[c]['arr'])}. Break until {x['ready']}.{wtxt}"
-                              f"{'.' if wtxt else ''} Depart off-service {x['leave']} to Stop {x['no']} (BS {x['code']} {x['name']}), arrive and enter {ol} at {x['entry_clock']} "
-                              f"({x['gap']['split'][0]:.0f} min behind {x['gap']['front']}). Continue to the final stop.",
+                              f"{'.' if wtxt else ''} Depart off-service {x['leave']} to Stop {x['no']} (BS {x['code']} {x['name']}, {x['pct']}% along {ol}), arrive and enter {ol} at {x['entry_clock']} "
+                              f"({x['gap']['split'][0]:.0f} min behind {x['gap']['front']}, {x['gap']['split'][1]:.0f} min ahead of {x['gap']['rear']}). Continue to the final stop.",
                       "time": x["entry_clock"]}); n += 1
         for a_ in [a for a in x["dep_adj"] if a["role"] in ("D", "E")]:
             if a_["adj"] < 0:
-                steps.append({"n": n, "bus": a_["label"], "role": a_["role"], "kind": "advance", "text": f"Depart the interchange {-a_['adj']:.0f} min earlier ({a_['dep']} \u2192 {a_['dep_new']}) to close the headway gap.", "time": a_["dep_new"]})
+                steps.append({"n": n, "bus": a_["label"], "role": a_["role"], "kind": "advance", "text": f"Depart the interchange {-a_['adj']:.0f} min earlier ({a_['dep']} \u2192 {a_['dep_new']}) to close the headway gap{GAPW}.", "time": a_["dep_new"]})
             else:
                 steps.append({"n": n, "bus": a_["label"], "role": a_["role"], "kind": "monitor", "text": f"Depart as planned ({a_['dep']}) \u2013 {a_['reason'] or 'no change needed'}.", "time": a_["dep"]})
             n += 1
@@ -441,7 +511,7 @@ def plan(ctx, reach):
         x["why"] = why(x)
         x["actions"] = actions(x)
     ring0 = [roles[r] for r in ("A", "B", "C", "D", "E") if r in roles]
-    noaction = {"ewt": round(e0, 3), "max_hw": _r(mx0), "min_hw": _r(mn0), "risk": risk,
+    noaction = {"ewt": round(e0, 3), "max_hw": _r(mx0), "min_hw": _r(mn0), "risk": risk, "pts": pts_of(per0),
                 "seq": [{"role": u["role"], "num": u["num"], "label": u["label"], "dep": _r(u["dep"]), "clock": hhmm(u["dep"]), "late": u["uid"] == C["uid"],
                          "in_service": u["kind"] == "in_service"} for u in ring0]}
     strip = lambda x: {k: v for k, v in x.items() if not k.startswith("_") and k not in ("score", "rkey")}
@@ -455,7 +525,12 @@ def plan(ctx, reach):
             "dep_adj": adj_list, "test": TRIM,
             "ic_hw_before": [_r(h) for i, h in enumerate(ic_hw0) if not (TRIM and i == 0 and h > EDGE)],
             "ic_hw_after": [_r(h) for i, h in enumerate(ic_hw1) if not (TRIM and i == 0 and h > EDGE)],
-            "infeasible": infeasible, "n_stops": nO, "points": [{"no": k + 1, "code": O["stops"][k]["code"]} for k in points]}
+            "infeasible": infeasible, "n_stops": nO,
+            "points": [{"no": k + 1, "j": k, "code": O["stops"][k]["code"], "name": O["stops"][k]["name"], "pct": int(round(100.0 * O["ss"][k] / max(1e-9, O["ss"][-1])))} for k in points],
+            "aitp": NA or None, "target": ({k: v for k, v in TG.items()} if TG else None), "lane_gaps": lane_gaps,
+            "now_min": round(now, 2), "c_arr_min": round(t_buses[c]["arr"], 2), "c_ready_min": round(C["ready"], 2), "c_full_dep_min": round(full_dep, 2),
+            "sim": {"ins": INS["uid"], "units": [{"uid": u["uid"], "num": u["num"], "label": u["label"], "kind": u["kind"], "role": u.get("role"),
+                                                  "q": _r(u.get("q"), 3), "dep": round(u["dep"], 2)} for u in units]}}
 
 
 def _shift(clock, m):

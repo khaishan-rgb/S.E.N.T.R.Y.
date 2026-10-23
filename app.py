@@ -4759,9 +4759,11 @@ import hwplan
 
 @app.get("/api/hplan/plan")
 async def api_hp_plan(snap: str = "", bus: str = "", delay: str = "20", brk: str = "", stop_min: str = "", layover: str = "",
-                      mode: str = "late", os_from: str = "", os_time: str = ""):
+                      mode: str = "late", os_from: str = "", os_time: str = "", gap: str = "", aitp: str = ""):
     """Late bus completes its trip; its NEXT trip starts halfway. Every stop of the next direction is tested with real-road off-service
-    time from the interchange; front bus hold / rear bus advance chosen per stop; ranked by downstream EWT. Live data unchanged."""
+    time from the interchange; front bus hold / rear bus advance chosen per stop; ranked by downstream EWT. Live data unchanged.
+    V16.28 (additive): gap=auto|<bus no.> - the ticked bus covers that gap on the next direction (the gap ahead of that bus; auto = the
+    longest), the buses around its empty slot are re-spaced; aitp=N - EWT at the AITPs (every N stops, first and last)."""
     S = HP_SNAP.get(snap)
     if not S:
         return {"ok": False, "error": "The live snapshot has expired. Load the live buses again.", "expired": True}
@@ -4777,6 +4779,8 @@ async def api_hp_plan(snap: str = "", bus: str = "", delay: str = "20", brk: str
             Pp["stop_min"] = max(0.5, min(6.0, float(stop_min)))
         if str(layover).strip():
             Pp["layover"] = max(0.0, min(40.0, float(layover)))
+        if str(aitp).strip():
+            Pp["aitp"] = max(1, min(20, int(float(aitp))))
     except ValueError:
         return {"ok": False, "error": "Lateness, break and stop-to-stop time must be numbers."}
     g = S["g"]
@@ -4834,6 +4838,9 @@ async def api_hp_plan(snap: str = "", bus: str = "", delay: str = "20", brk: str
     if S.get("test") and S.get("partial"):
         Pp["edge_trim"] = True; Pp["edge_gap"] = S.get("test_gap")              # partial test fleet: ignore the gaps at its two ends
     base_ctx = {"now": S["now_min"], "late": {"bus": int(bus), "delay": D}, "T": T, "O": O, "P": Pp}
+    gp = str(gap or "").strip().lower()
+    if gp and gp not in ("slot", "own") and mode != "os":                 # V16.28: cover a gap on the next direction
+        base_ctx["target"] = {"rear": None if gp == "auto" else re.sub(r"\D", "", gp) or None}
     if mode == "os":                                                   # V15.4: an extra OS bus + Bus Captain goes halfway; Bus C runs its next trip late
         frm = (os_from or "").strip()
         if not frm or frm.lower() in ("ic", "interchange", "first"):
