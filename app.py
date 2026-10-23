@@ -8861,49 +8861,31 @@ async def route_between_stops(ctx, i, j, s0=None):
 
 
 async def validate_next_original_leg(ctx, j):
-    """MANDATORY: from rejoin stop D the bus must be able to continue to the next original stop E on the original
-    route, in the right direction, with no U-turn and clear of the blockage (routing engine, cached per stop)."""
+    """MANDATORY: after rejoining at stop D the bus carries on along its OWN route to its next stop E, and that stretch must
+    be clear of the blockage (in the blocked direction). -> {ok, next_code, next_name, detail}, cached per stop.
+    V16.26h: checked on the bus's own route line (checked against LTA's stop distances), no longer by asking the routing
+    engine to drive D -> E again. The bus runs D -> E every day, but a re-routed D -> E could fail on the router's own map:
+    TomTom takes the bus's heading at the start only, so on a dual carriageway the end point could land on the other side
+    and the route turned round to reach it ("next leg requires a U-turn"); or its map refused a 4.4 m / 18 t bus on a road
+    the bus uses daily. Which way the bus arrives at D is checked separately (validate_rejoin_direction)."""
     key = (ctx.get("bkey"), ctx["svc"], ctx["d"], j)
     if len(ctx["next_cache"]) > 3000:
         ctx["next_cache"].clear()
     if key in ctx["next_cache"]:
         return ctx["next_cache"][key]
-    stops, stop_s, at, P = ctx["stops"], ctx["stop_s"], ctx["at"], ctx["P"]
+    stops, stop_s, P = ctx["stops"], ctx["stop_s"], ctx["P"]
     if j + 1 >= len(stops):
         res = {"ok": True, "next_code": "", "next_name": "end of route", "detail": "rejoin stop is the last stop of the route"}
         ctx["next_cache"][key] = res
         return res
-    sa, sb = stop_s[j] + 5.0, max(stop_s[j + 1] - 5.0, stop_s[j] + 10.0)
-    a_, b_ = at(sa), at(sb)
-    normal = stop_s[j + 1] - stop_s[j]
-    # V16.26g: the heading at each end is the route's own at THAT position (a loop route passes the same road both ways)
-    rr = await dv_osrm([a_, b_], 0, [ctx["heading"](a_, sa), ctx["heading"](b_, sb)], ctx["avoid"])
-    res = {"ok": False, "next_code": stops[j + 1]["code"], "next_name": stops[j + 1]["name"], "detail": "no road route to the next stop"}
+    nc, nn = stops[j + 1]["code"], stops[j + 1]["name"]
+    m = stop_s[j + 1] - stop_s[j]
     own = diversion.cut(ctx["line"], ctx["cum"], stop_s[j], stop_s[j + 1])
-    own_ut = diversion.uturns(own, None, P) if len(own) >= 3 else []    # the bus's NORMAL route turns round here itself
-    for r in rr.get("routes") or []:
-        ok, why = diversion.validate_no_uturn(r["line"], r.get("steps"), ctx["line"], ctx["cum"], stop_s[j], P, ahead=(stop_s[j], stop_s[j + 1] + 30.0))
-        if not ok and why == "requires a U-turn" and own_ut and \
-                all(any(diversion.dist_m(u, o) <= 80.0 for o in own_ut) for u in diversion.uturns(r["line"], r.get("steps"), P)):
-            ok = True               # V16.26g: the same turn-round the bus makes on its normal route between these two stops
+    res = {"ok": True, "next_code": nc, "next_name": nn, "detail": f"{m:.0f} m on its own route to {nc}, clear of the blockage"}
+    if len(own) >= 2:
+        ok, why = diversion.validate_block_avoidance(own, ctx["block_lines"], None, P)
         if not ok:
-            res["detail"] = "next leg " + why
-            continue
-        ok, why = diversion.validate_block_avoidance(r["line"], ctx["block_lines"], None, P)
-        if not ok:
-            res["detail"] = "next leg " + why
-            continue
-        m = r["km"] * 1000.0
-        if abs(m - normal) > max(P["next_leg_tol_abs_m"], P["next_leg_tol_rel"] * normal):
-            res["detail"] = f"next leg is {m:.0f} m by road vs {normal:.0f} m on the original route"
-            continue
-        pts = diversion.densify(r["line"], 20.0)
-        on = sum(1 for p in pts if diversion.nearest_on_line(p, ctx["line"], ctx["cum"])[0] <= 30.0) / max(1, len(pts))
-        if on < P["next_leg_on_route"]:
-            res["detail"] = f"next leg leaves the original route ({on * 100:.0f}% on it)"
-            continue
-        res = {"ok": True, "next_code": stops[j + 1]["code"], "next_name": stops[j + 1]["name"], "detail": f"{m:.0f} m on the original route"}
-        break
+            res = {"ok": False, "next_code": nc, "next_name": nn, "detail": f"its own route on to {nc} {why}"}
     ctx["next_cache"][key] = res
     return res
 
