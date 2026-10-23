@@ -4812,7 +4812,8 @@ async def api_hp_plan(snap: str = "", bus: str = "", delay: str = "20", brk: str
         if S.get("test") and S.get("partial"):
             Pp["edge_trim"] = True; Pp["edge_gap"] = S.get("test_gap")          # only a partial test fleet has an edge
         res = await asyncio.to_thread(hwplan.plan_os, {"now": S["now_min"], "X": X, "Y": Y, "P": Pp, "os": {"t0": t0, "label": olabel, "lat": org[0], "lon": org[1]},
-                                                       "late": {"bus": int(bus), "delay": D} if has_bus and D > 0 else None}, reach)
+                                                       "late": {"bus": int(bus), "delay": D} if has_bus and D > 0 else None,
+                                                       "gap_rear": int(re.sub(r"\D", "", gap)) if re.sub(r"\D", "", gap or "") else None}, reach)
         res.update(snap=snap, service=S["svc"], routing="real road routing (OSRM)" if offs else f"estimate ({off_err or 'road routing unavailable'})")
         return res
     T = mk(g, S["buses"], S["d"])

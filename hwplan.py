@@ -12,7 +12,8 @@ Assumptions (all shown to the controller):
   * off-service running: real road routing from the interchange (passed in as `reach`), never stops x 2 min;
   * departures from the interchange follow regular slots at the target headway; a bus departs at max(ready, slot), so a bus that
     arrives with layover to spare can be advanced (up to its slack) and a bus that has not departed can be held;
-  * EWT = sum(h^2) / (2 sum h) - H/2 at monitoring points along the whole next direction, averaged (minutes).
+  * EWT = sum(h^2) / (2 sum h) - H/2 at monitoring points along the whole next direction, averaged (minutes). V16.28: at each point
+    every trip counts - the buses that have already passed it too - so a gap that has already left the first stop still counts there.
 """
 import math
 
@@ -156,9 +157,8 @@ def plan(ctx, reach):
         vals, mx, mn, perk = [], 0.0, 1e9, {}
         for k in points:
             seq = sorted((t[k], uid) for uid, t in tab.items() if k in t)
-            past = [x for x in seq if x[0] <= now]
-            fut = [x for x in seq if x[0] > now]
-            sq = ([past[-1]] if past else []) + fut
+            sq = seq                                                 # V16.28: every trip counts at every AITP - also the buses that have
+                                                                     # already passed it (a gap left behind at the first stop still counts)
             gaps = [b[0] - a[0] for a, b in zip(sq, sq[1:])]
             if TRIM:                                                 # drop fleet-edge gaps that do not touch the scenario (B, C, D, E)
                 keep = [i for i, g in enumerate(gaps) if not (g > EDGE and sq[i][1] not in RS and sq[i + 1][1] not in RS)]
@@ -630,9 +630,8 @@ def plan_os(ctx, reach):
         vals, mx, mn, perk = [], 0.0, 1e9, {}
         for k in points:
             seq = sorted((t[k], uid) for uid, t in tab.items() if k in t)
-            past = [x for x in seq if x[0] <= now]
-            fut = [x for x in seq if x[0] > now]
-            sq = ([past[-1]] if past else []) + fut
+            sq = seq                                                 # V16.28: every trip counts at every AITP - also the buses that have
+                                                                     # already passed it (a gap left behind at the first stop still counts)
             gaps = [b[0] - a[0] for a, b in zip(sq, sq[1:])]
             if TRIM:
                 gaps = [g for i, g in enumerate(gaps) if not (g > EDGE and sq[i][1] not in keep_uids and sq[i + 1][1] not in keep_uids)]
@@ -924,7 +923,8 @@ def plan_os(ctx, reach):
             "H": _r(H), "H_src": X.get("H_src"), "stop_min": SM, "break_min": float(P["break_min"]), "layover": LAY,
             "late_bus": Ln, "delay": LD, "c_arr": None, "c_ready": None, "c_full_dep": None,
             "os": {"label": ctx["os"].get("label"), "ready": hhmm(t0), "lat": ctx["os"].get("lat"), "lon": ctx["os"].get("lon")},
-            "gap_info": {"front": F["label"], "rear": R["label"], "minutes": _r(gap0), "front_kind": F["kind"], "rear_kind": R["kind"]},
+            "gap_info": {"front": F["label"], "rear": R["label"], "minutes": _r(gap0), "front_kind": F["kind"], "rear_kind": R["kind"],
+                         "front_num": F["num"], "rear_num": R["num"], "chosen": ctx.get("gap_rear") is not None and R["num"] == ctx.get("gap_rear")},
             "interchange": {"code": stops[0]["code"], "name": stops[0]["name"], "lat": stops[0]["lat"], "lon": stops[0]["lon"]},
             "roles": {r: {"num": u["num"], "label": u["label"], "kind": u["kind"]} for r, u in roles.items()},
             "no_action": noaction, "candidates": [strip(x) for x in cands], "best": best["code"] if best else None,

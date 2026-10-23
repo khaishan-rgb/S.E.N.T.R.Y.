@@ -108,6 +108,11 @@ body.hdr-min .hdr .ttl .ic{width:32px;height:32px;font-size:18px}
 .fl-gap small{color:var(--mut);font-size:12px;flex-basis:100%}
 .ft .tag.hold{background:var(--holdBg);color:#ffc56b}.ft .tag.early{background:rgba(95,208,255,.14);color:#8fdcff}.ft .tag.hw{background:rgba(180,107,255,.18);color:#d9b8ff}
 .ft .tag.tg{background:rgba(180,107,255,.18);color:#d9b8ff;border:1px solid rgba(180,107,255,.5)}
+.ft td.cvc{white-space:nowrap}.ft td.cvc input{width:18px;height:18px;accent-color:#b46bff;cursor:pointer;vertical-align:middle}
+.ft td.cvc .cv-auto{display:inline-block;margin-left:5px;font-size:10.5px;font-weight:800;color:#d9b8ff;vertical-align:middle}
+.ft tr.cv td{background:rgba(180,107,255,.08)}.ft tr.cv td:first-child{box-shadow:inset 3px 0 0 #b46bff}
+.fl-gap .fl-undo{height:30px;padding:0 10px;font-size:12px}
+.fl-gap .fl-warn{flex-basis:100%;color:#ffb3b8;font-size:12.5px}
 /* V16.28 before vs after simulation (as in the Recovery Decision Engine) */
 .r5{grid-template-columns:minmax(0,1fr)}
 .sm-hero{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:12px;align-items:stretch}
@@ -491,8 +496,8 @@ $("svc").addEventListener("change", () => { const v = $("svc").value.trim().toUp
   if(!ST.test){ if(!(ST.base && !ST.base.test && String(ST.base.service).toUpperCase() === v)) loadSnap(); } else ST.svc = v; });
 $("svc").addEventListener("keydown", e => { if(e.key === "Enter"){ e.preventDefault(); loadSnap(); } });
 const setDir = d => { ST.dir = d; $("d1").setAttribute("aria-pressed", String(d === 1)); $("d2").setAttribute("aria-pressed", String(d === 2)); };
-$("d1").onclick = () => { if(ST.dir !== 1){ setDir(1); if(ST.svc) loadSnap(); } };
-$("d2").onclick = () => { if(ST.dir !== 2){ setDir(2); if(ST.svc) loadSnap(); } };
+$("d1").onclick = () => { if(ST.dir !== 1){ setDir(1); ST.gap = null; if(ST.svc) loadSnap(); } };
+$("d2").onclick = () => { if(ST.dir !== 2){ setDir(2); ST.gap = null; if(ST.svc) loadSnap(); } };
 $("bus").onchange = () => { ST.bus = $("bus").value ? +$("bus").value : null; schedule(); reqPaint(); };
 $("late").addEventListener("change", () => { ST.late = Math.max(0, Math.min(120, Math.round(+$("late").value || 0))); $("late").value = ST.late; schedule(); });
 $("sort").onchange = () => { ST.sort = $("sort").value; renderOptions(); };
@@ -517,6 +522,7 @@ function reqPaint(){
 }
 
 function setRec(m){
+  if(m !== ST.rec) ST.gap = null;                                          // V16.28: OS bus and Bus C cover gaps on different lanes
   ST.rec = m; $("rC").setAttribute("aria-pressed", String(m === "late")); $("rOS").setAttribute("aria-pressed", String(m === "os"));
   $("dirLab").textContent = m === "os" ? "Direction (gap)" : "Direction";
   if(ST.snap){ const o = $("bus").options[0]; if(o) o.textContent = m === "os" ? "No late bus \u2013 use the longest gap" : "Select the late bus"; }
@@ -700,13 +706,7 @@ function renderDiagram(){
 }
 
 /* V16.28: the gap the ticked bus covers on the next direction - from the plan, or OCC's choice before the plan is back */
-function diagTarget(){
-  if(ST.rec === "os" || !ST.tick) return null;
-  const r = ST.res;
-  if(r && r.target && r.late_dir === ST.tick.dir && String(r.late_bus) === String(ST.tick.id)) return {dir:r.next_dir, rear:r.target.rear, front:r.target.front};
-  if(ST.gap){ const nl = fleetLanes(ST.snap).find(l => l.dir !== ST.tick.dir); return nl ? {dir:nl.dir, rear:ST.gap} : null; }
-  return null;
-}
+function diagTarget(){ const ci = coverInfo(); return ci && ci.cur != null ? {dir:ci.dir, rear:ci.cur} : null; }
 function planTags(){                                                       // "dir|bus" -> what the selected plan does to that bus
   const r = ST.res, x = r ? cand(ST.sel) : null, out = {};
   if(!x || r.mode === "os" || !ST.tick || r.late_dir !== ST.tick.dir || String(r.late_bus) !== String(ST.tick.id)) return out;
@@ -719,23 +719,24 @@ function planTags(){                                                       // "d
 function renderFleetTable(){
   const el = $("fleet"), sn = ST.snap, Ls = fleetLanes(sn), os = ST.rec === "os";
   if(!Ls.length){ el.innerHTML = ""; return; }
-  const baseL = fleetLanes(ST.base), TAGS = planTags(), TG_ = diagTarget();
+  const baseL = fleetLanes(ST.base), TAGS = planTags(), TG_ = diagTarget(), CI = coverInfo();
   el.innerHTML = `<div class="fl-dirs">${Ls.map(l => {
     const rows = laneRows(l), bl = baseL.find(x => x.dir === l.dir), removed = (bl ? bl.buses : []).filter(b => ST.edits.remove.some(e => e.dir === l.dir && String(e.id) === String(b.id)));
     const opts = sel => l.stops.map(s => `<option value="${s.j}"${sel === s.j ? " selected" : ""}>${esc(stopTxt(s))}</option>`).join("");
     return `<div class="fl-dir"><h3>D${l.dir} to ${esc(l.last)}<span>${l.buses.length} bus${l.buses.length === 1 ? "" : "es"} · target headway ${f0(l.H)} min</span></h3>
-      <div class="tw" style="max-height:none"><table class="t ft"><thead><tr>${os ? "" : `<th title="Tick the bus that goes halfway">Halfway</th>`}<th class="l">Bus</th><th>Dir</th><th class="l">Location BS</th><th>Headway</th><th></th></tr></thead><tbody>
+      <div class="tw" style="max-height:none"><table class="t ft"><thead><tr>${os ? "" : `<th title="Tick the bus that goes halfway">Halfway</th>`}<th class="l">Bus</th><th>Dir</th><th class="l">Location BS</th><th>Headway</th>${CI && CI.dir === l.dir ? `<th title="Tick the gap (ahead of that bus) to cover; untick = auto, the longest">Cover gap</th>` : ""}<th></th></tr></thead><tbody>
       ${rows.map(r => { const b = r.b, tk = isTick(l.dir, b.id), j = l.stops.findIndex(s => b.near && s.code === b.near.code);
-        return `<tr class="${tk ? "tk" : ""}">${os ? "" : `<td><input type="checkbox" class="tkb" data-dir="${l.dir}" data-id="${esc(b.id)}"${tk ? " checked" : ""} aria-label="D${l.dir} Bus ${esc(b.id)} goes halfway"></td>`}
+        const cv = !!(CI && CI.dir === l.dir && CI.cur != null && String(CI.cur) === String(b.id));
+        return `<tr class="${tk ? "tk" : ""}${cv ? " cv" : ""}">${os ? "" : `<td><input type="checkbox" class="tkb" data-dir="${l.dir}" data-id="${esc(b.id)}"${tk ? " checked" : ""} aria-label="D${l.dir} Bus ${esc(b.id)} goes halfway"></td>`}
           <td class="l"><b>Bus ${esc(b.id)}</b>${b.added ? '<span class="tag add">added</span>' : b.moved ? '<span class="tag mv">moved</span>' : ""}${TAGS[`${l.dir}|${b.id}`] || ""}</td><td>D${l.dir}</td>
           <td class="l"><select class="loc" data-dir="${l.dir}" data-id="${esc(b.id)}" aria-label="Location of D${l.dir} Bus ${esc(b.id)}">${b.wait != null ? `<option value="" selected>Layover ${esc(l.stops[0].code)} · dep in ${f0(b.wait)} min</option>` : ""}${opts(b.wait != null ? -1 : j)}</select></td>
-          <td><span class="hwc ${r.cls}" title="${r.hw == null ? "No bus ahead on this direction" : `${f0(r.hw)} min behind the bus ahead (target ${f0(l.H)})`}">${r.hw == null ? "–" : f0(r.hw) + " min"}</span>${TG_ && TG_.dir === l.dir && String(TG_.rear) === String(b.id) ? '<br><span class="tag tg">gap to cover</span>' : ""}</td>
+          <td><span class="hwc ${r.cls}" title="${r.hw == null ? "No bus ahead on this direction" : `${f0(r.hw)} min behind the bus ahead (target ${f0(l.H)})`}">${r.hw == null ? "–" : f0(r.hw) + " min"}</span></td>${CI && CI.dir === l.dir ? `<td class="cvc">${r.ahead ? `<input type="checkbox" class="cvb" data-id="${esc(b.id)}"${cv ? " checked" : ""} aria-label="Cover the gap ahead of D${l.dir} Bus ${esc(b.id)}">${cv && CI.manual == null ? '<small class="cv-auto">auto</small>' : ""}` : "\u2013"}</td>` : ""}
           <td><button type="button" class="rm" data-dir="${l.dir}" data-id="${esc(b.id)}" title="Remove this bus (it is not really there)" aria-label="Remove D${l.dir} Bus ${esc(b.id)}">✕</button></td></tr>`; }).join("")}
       ${removed.map(b => `<tr class="rmv">${os ? "" : "<td></td>"}<td class="l"><b>Bus ${esc(b.id)}</b></td><td>D${l.dir}</td><td class="l">${esc(b.near ? b.near.code + " " + b.near.name : "")}</td><td>removed</td><td><button type="button" class="fl-undo" data-dir="${l.dir}" data-id="${esc(b.id)}">UNDO</button></td></tr>`).join("")}
       </tbody></table></div>
       <div class="fl-add">Missing bus? Add one at <select class="addat" data-dir="${l.dir}" aria-label="Stop for a new D${l.dir} bus">${opts(-1)}</select><button type="button" class="addb" data-dir="${l.dir}">ADD BUS</button></div></div>`; }).join("")}</div>
     ${gapPick(Ls)}
-    <p class="fl-note">${os ? `<b>OS bus:</b> the OS bus fills the longest gap on D${ST.dir} (no tick needed). Change the direction in the header.` : ST.tick ? `<b>D${ST.tick.dir} Bus ${esc(ST.tick.id)}</b> goes halfway on its next trip (from where it is now). The options below are ranked by forecast EWT.` : `Tick the bus that goes <b>halfway</b> – in the table or on the diagram. It is planned from where it is now.`}
+    <p class="fl-note">${os ? `<b>OS bus:</b> the OS bus fills the longest gap on D${ST.dir} (auto), or the gap you tick under Cover gap. Change the direction in the header.` : ST.tick ? `<b>D${ST.tick.dir} Bus ${esc(ST.tick.id)}</b> goes halfway on its next trip (from where it is now). The options below are ranked by forecast EWT.` : `Tick the bus that goes <b>halfway</b> – in the table or on the diagram. It is planned from where it is now.`}
     Headway = minutes behind the bus ahead on the same direction (${f0(ST.sm)} min between stops).${nEdits() ? ` <button type="button" class="fl-undo" id="flReset">UNDO ALL CHANGES</button>` : ""}</p>`;
   el.querySelectorAll(".tkb").forEach(c => c.onchange = () => setTick(+c.dataset.dir, c.dataset.id));
   el.querySelectorAll(".rm").forEach(b => b.onclick = () => editFleet("remove", {dir:+b.dataset.dir, id:b.dataset.id}));
@@ -743,18 +744,32 @@ function renderFleetTable(){
   el.querySelectorAll(".loc").forEach(s => s.onchange = () => { if(s.value === "") return; editFleet("move", {dir:+s.dataset.dir, id:s.dataset.id, j:+s.value}); });
   el.querySelectorAll(".addb").forEach(b => b.onclick = () => { const s = el.querySelector(`.addat[data-dir="${b.dataset.dir}"]`); editFleet("add", {dir:+b.dataset.dir, j:+s.value}); });
   if($("flReset")) $("flReset").onclick = () => { ST.edits = {remove:[], add:[], move:[]}; applyFleet(); };
-  if($("flGap")) $("flGap").onchange = e => { ST.gap = e.target.value || null; ST.res = null; ST.sel = null; renderFleet(); renderAll(); stat("Planning\u2026"); schedule(); };
+  const regap = v => { ST.gap = v; ST.res = null; ST.sel = null; renderFleet(); renderAll(); stat("Planning\u2026"); schedule(); };
+  el.querySelectorAll(".cvb").forEach(c => c.onchange = () => regap(c.checked ? c.dataset.id : null));      // untick = back to auto
+  if($("flAuto")) $("flAuto").onclick = () => regap(null);
 }
-function gapPick(Ls){                                                      // V16.28: which gap on the next direction the ticked bus covers
-  if(ST.rec === "os" || !ST.tick) return "";
-  const nl = Ls.find(l => l.dir !== ST.tick.dir); if(!nl) return "";
-  const r = ST.res, mine = r && r.target && r.late_dir === ST.tick.dir && String(r.late_bus) === String(ST.tick.id) ? r.target : null;
-  const gaps = laneRows(nl).filter(x => x.ahead && x.hw != null).map(x => ({rear:x.b.id, front:x.ahead.b.id, hw:x.hw})).sort((a, b) => b.hw - a.hw);
-  const brk = r && r.break_min != null ? r.break_min : (ST.brk || 7);
-  return `<div class="fl-gap"><span><b>D${ST.tick.dir} Bus ${esc(ST.tick.id)}</b> goes halfway on D${nl.dir} to cover the gap ahead of</span>
-    <select id="flGap" aria-label="The gap on D${nl.dir} that D${ST.tick.dir} Bus ${esc(ST.tick.id)} covers"><option value=""${ST.gap ? "" : " selected"}>${mine && mine.auto ? `Auto \u2013 D${nl.dir} Bus ${esc(mine.rear)} (${f0(mine.minutes)} min, the longest it can reach)` : "Auto \u2013 the longest gap it can reach"}</option>
-    ${gaps.map(g => `<option value="${esc(g.rear)}"${ST.gap != null && String(ST.gap) === String(g.rear) ? " selected" : ""}>D${nl.dir} Bus ${esc(g.rear)} \u2013 ${f0(g.hw)} min behind Bus ${esc(g.front)}${g.hw >= 1.5 * nl.H ? " (prolonged)" : ""}</option>`).join("")}</select>
-    <small>D${nl.dir} keeps running while it completes D${ST.tick.dir} and rests ${f0(brk)} min, so it meets the gap further down D${nl.dir}; its empty slot at the interchange is closed by moving the buses ahead later and behind earlier.${mine && mine.note ? " " + esc(mine.note) : ""}</small></div>`;
+function coverInfo(){                                                      // V16.28: the lane whose gaps can be covered, and the gap covered now
+  const sn = ST.snap; if(!sn) return null;
+  const os = ST.rec === "os", Ls = fleetLanes(sn);
+  if(!os && !ST.tick) return null;
+  const lane = os ? Ls.find(l => l.dir === ST.dir) : Ls.find(l => l.dir !== ST.tick.dir); if(!lane) return null;
+  const r = ST.res; let auto = null;
+  if(r && os && r.mode === "os" && r.gap_info && r.gap_info.rear_num != null) auto = r.gap_info.rear_num;
+  if(r && !os && r.target && ST.tick && r.late_dir === ST.tick.dir && String(r.late_bus) === String(ST.tick.id)) auto = r.target.rear;
+  return {dir:lane.dir, lane, os, manual:ST.gap, cur:ST.gap != null ? ST.gap : auto};
+}
+function gapPick(Ls){                                                      // V16.28: which gap the halfway / OS bus covers - auto or OCC's tick
+  const ci = coverInfo(); if(!ci) return "";
+  const r = ST.res, rows = laneRows(ci.lane), cr = ci.cur != null ? rows.find(x => String(x.b.id) === String(ci.cur)) : null;
+  const who = ci.os ? "The OS bus" : `<b>D${ST.tick.dir} Bus ${esc(ST.tick.id)}</b> goes halfway on D${ci.dir} and`;
+  const brk = r && r.break_min != null ? r.break_min : (ST.brk || 7), tg = r && r.target;
+  const skipped = !ci.os && ci.manual == null && tg && tg.skipped && tg.skipped.length ? ` (${tg.skipped.map(g => `D${ci.dir} Bus ${esc(g.rear)}'s ${f0(g.minutes)}-min gap`).join(", ")} cannot be reached in time)` : "";
+  const what = cr && cr.ahead ? `the gap ahead of <b>D${ci.dir} Bus ${esc(cr.b.id)}</b> (${f0(cr.hw)} min, behind Bus ${esc(cr.ahead.b.id)})` : `the longest gap on D${ci.dir}`;
+  const mine = r && (ci.os ? r.mode === "os" : !!(r.target && r.late_dir === ST.tick.dir && String(r.late_bus) === String(ST.tick.id)));
+  const none = mine && !(r.candidates || []).length;
+  return `<div class="fl-gap"><span>${who} covers ${what} \u2013 ${ci.manual != null ? "<b>your choice</b>" : `auto: the longest it can reach${skipped}`}.</span>${ci.manual != null ? `<button type="button" class="fl-undo" id="flAuto">BACK TO AUTO</button>` : ""}
+    ${none ? `<b class="fl-warn">${ci.os ? "The OS bus" : `D${ST.tick.dir} Bus ${esc(ST.tick.id)}`} cannot get into this gap in time: the bus behind it passes every stop first. Tick another gap${ci.manual != null ? " or go back to auto" : ""}.</b>` : ""}
+    <small>Tick <b>Cover gap</b> in the D${ci.dir} table to cover another gap.${ci.os ? "" : ` D${ci.dir} keeps running while it completes D${ST.tick.dir} and rests ${f0(brk)} min, so it meets the gap further down D${ci.dir}; its empty slot at the interchange is closed by moving the buses ahead later and behind earlier.`}${tg && tg.note ? " " + esc(tg.note) : ""}</small></div>`;
 }
 function laneStops(dir){ const l = fleetLanes(ST.snap).concat(fleetLanes(ST.base)).find(x => x.dir === dir); return l ? l.stops : []; }
 function editFleet(kind, e){
@@ -808,7 +823,7 @@ async function runPlan(){
   if(!ST.snap || (ST.bus == null && ST.rec !== "os")) return;
   const my = ++ST.seq; stat(ST.rec === "os" ? "Planning the OS bus\u2026" : `Planning recovery for Bus ${ST.bus}\u2026`);
   let r = await api(`/api/hplan/plan?${q({snap:ST.snap.snap, bus:ST.bus, delay:ST.late, brk:ST.brk, stop_min:ST.sm, layover:ST.lay, mode:ST.rec === "os" ? "os" : "", os_from:ST.rec === "os" ? $("osFrom").value.trim() : "", os_time:ST.rec === "os" ? $("osTime").value.trim() : "",
-    gap:ST.rec === "os" ? "" : (ST.gap || "auto"), aitp:ST.aitp})}`, 90000);
+    gap:ST.rec === "os" ? (ST.gap || "") : (ST.gap || "auto"), aitp:ST.aitp})}`, 90000);
   if(r.expired){ await loadSnap(); return; }
   if(my !== ST.seq) return;
   if(!r.ok){ stat(r.error || "Planning failed.", true); ST.res = null; renderAll(); return; }
@@ -1079,7 +1094,7 @@ function simOpts(r, x){
 }
 function renderSim(){
   const r = ST.res, x = r ? cand(ST.sel) : null, el = $("sim");
-  if(!r || !x){ el.innerHTML = `<div class="empty">${r && r.mode === "os" ? "Pick an OS option to compare." : "Tick the bus that goes halfway: no action, halfway only and halfway + regulation are simulated and compared on EWT at every AITP."}</div>`; return; }
+  if(!r || !x){ el.innerHTML = `<div class="empty">${r && !(r.candidates || []).length ? "No halfway stop works for this gap, so there is nothing to simulate: tick another gap under Cover gap, or go back to auto." : r && r.mode === "os" ? "Pick an OS option to compare." : "Tick the bus that goes halfway: no action, halfway only and halfway + regulation are simulated and compared on EWT at every AITP."}</div>`; return; }
   if(!r.no_action.pts || !x.variants){ el.innerHTML = `<div class="empty">The before / after simulation is worked out for Bus C halfway (tick a bus in Route diagram &amp; buses).</div>`; return; }
   const {L, pick} = simOpts(r, x), base = L[0], ch = L.find(o => o.k === pick), nd = `D${r.next_dir}`, W_ = whoC(r), tg = r.target, H = r.H;
   const ei = Math.max(0, r.points.findIndex(p => p.j >= x.j)), n = r.points.length;
@@ -1116,23 +1131,21 @@ function renderSim(){
   const hw = ST.simV === "hw", val = p => p == null ? null : hw ? p.off : p.ewt, clsOf = p => p == null ? "n" : hw ? HB(p.off, H) : EB(p.ewt);
   const fmt = v => v == null ? "–" : hw ? f0(v) : f2(v);
   const cols = `grid-template-columns:minmax(170px,auto) repeat(${n},minmax(50px,1fr)) 72px`;
-  const tip = (o, p, i) => { const P_ = r.points[i]; return `${o.name} · Stop ${P_.no} ${P_.code} ${P_.name} (${P_.pct}%): ` + (p ? `EWT ${f2(p.ewt)} min · largest gap ${f0(p.max)} min · most off target ${f0(p.off)} min${p.pair ? ` (${p.pair[0]} → ${p.pair[1]})` : ""} · ${p.n} buses from now on` : "not enough buses"); };
+  const tip = (o, p, i) => { const P_ = r.points[i]; return `${o.name} · Stop ${P_.no} ${P_.code} ${P_.name} (${P_.pct}%): ` + (p ? `EWT ${f2(p.ewt)} min · largest gap ${f0(p.max)} min · most off target ${f0(p.off)} min${p.pair ? ` (${p.pair[0]} → ${p.pair[1]})` : ""} · ${p.n} trips` : "not enough buses"); };
   const avgOf = o => { if(!hw) return o.ewt; const v = o.pts.filter(p => p && p.off != null).map(p => p.off); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null; };
-  const stops_ = L_ => L_.length <= 3 ? L_.map(p => `Stop ${p.no}`).join(L_.length === 2 ? " and " : ", ") : `Stop ${L_[0].no} to Stop ${L_[L_.length - 1].no}`;
-  const passed = tg ? r.points.filter((p, i) => base.pts[i] && base.pts[i].tg == null && p.j < x.j) : [], coming = tg ? r.points.filter((p, i) => base.pts[i] && base.pts[i].tg != null) : [];
-  let sqNote = `Each square counts the buses that pass that AITP from now on: the last one that has passed it, then every bus still to come.`;
-  if(tg && passed.length && coming.length) sqNote += ` The ${f0(tg.minutes)}-min gap ${tg.front_label} → ${tg.rear_label} has already gone past ${stops_(passed)} (${tg.rear_label} is at ${tg.rear_at} now), so with no action ${passed.length > 1 ? "those AITPs" : "that AITP"} only see${passed.length > 1 ? "" : "s"} the regular ${f0(H)}-min gaps. ◆ = the AITPs it still has to pass.`;
+  let sqNote = `Each square counts every trip at that AITP – the buses that have already passed it as well as the ones still to come – so a gap that has already left the first stop still counts there.`;
+  if(tg) sqNote += ` The ${f0(tg.minutes)}-min gap ${tg.front_label} → ${tg.rear_label} is in every square with no action; ${W_} closes it from Stop ${x.no} on (${f0(x.gap.split[0])} / ${f0(x.gap.split[1])} min).`;
   h += `<div class="sm-h"><h3>Every AITP on ${nd} – ${hw ? "the headway most off target (min)" : "EWT (min of extra wait)"}</h3><span class="sp"></span><span class="sm-seg" role="group" aria-label="What the squares show"><button type="button" data-v="ewt" aria-pressed="${!hw}">EWT</button><button type="button" data-v="hw" aria-pressed="${hw}">Headway</button></span></div>
     <p class="sm-sub">${esc(sqNote)}</p>
     <div class="sq-wrap"><div class="sq" style="${cols}"><span class="lab"></span>${r.points.map((p, i) => `<span class="hd ${i === ei ? "ent" : ""}" title="${esc(p.code + " " + p.name)}">${i === ei ? "▼ enters<br>" : ""}Stop ${p.no}<br>${p.pct}%</span>`).join("")}<span class="hd">average</span>
     ${L.map(o => `<span class="lab${o.k === pick ? " pick" : ""}">${esc(o.name)}${o.k === pick ? ' <span class="chip rec">PLAN</span>' : ""}</span>${o.pts.map((p, i) =>
-        `<i class="${clsOf(p)}${i === ei ? " ent" : ""}${o.k === "none" && p && p.tg != null ? " tg" : ""}${o.k === pick ? " pk" : ""}" title="${esc(tip(o, p, i))}">${fmt(val(p))}</i>`).join("")}
+        `<i class="${clsOf(p)}${i === ei ? " ent" : ""}${o.k === pick ? " pk" : ""}" title="${esc(tip(o, p, i))}">${fmt(val(p))}</i>`).join("")}
       <b class="avg${o.k === pick ? " pk" : ""}">${hw ? f1(avgOf(o)) : f3(o.ewt)}</b>`).join("")}
     <span class="lab dl">Change with the plan</span>${ch.pts.map((p, i) => { const a = val(base.pts[i]), b = val(p), d = a == null || b == null ? null : b - a, e = hw ? 0.5 : 0.005;
         return `<i class="dl ${d == null ? "" : d < -e ? "dn" : d > e ? "up" : "eq"}${i === ei ? " ent" : ""}" title="${esc(`Stop ${r.points[i].no}: ${fmt(a)} → ${fmt(b)}`)}">${d == null ? "–" : Math.abs(d) < e ? "0" : (d < 0 ? "▼" : "▲") + (hw ? f0(Math.abs(d)) : f2(Math.abs(d)))}</i>`; }).join("")}
       ${(() => { const a = avgOf(base), b = avgOf(ch), d = a == null || b == null ? null : b - a, e = hw ? 0.05 : 0.0005; return `<b class="avg dl ${d == null ? "" : d < -e ? "dn" : d > e ? "up" : "eq"}">${d == null ? "–" : (d < 0 ? "▼" : d > 0 ? "▲" : "") + (hw ? f1(Math.abs(d)) : f3(Math.abs(d)))}</b>`; })()}</div></div>
     <div class="sm-key">${hw ? `<span><i class="sw g"></i>on target (−2 to +2)</span><span><i class="sw y"></i>2–4 min longer</span><span><i class="sw o"></i>5–9 min longer</span><span><i class="sw r"></i>10+ min longer</span><span><i class="sw b"></i>&gt; 2 min shorter</span>`
-      : `<span><i class="sw g"></i>≤ 0.5</span><span><i class="sw y"></i>≤ 1</span><span><i class="sw o"></i>≤ 2</span><span><i class="sw r"></i>&gt; 2 min</span>`}<span><i class="sw" style="background:#b46bff;border-color:#b46bff;width:4px"></i>where ${esc(W_)} enters</span>${tg ? `<span><b style="color:#d9b8ff">◆</b> the ${f0(tg.minutes)}-min gap still to pass (no action)</span>` : ""}<span><b style="color:#5ff0b4">▼</b> / <b style="color:#ff8f9c">▲</b> less / more than no action</span></div>`;
+      : `<span><i class="sw g"></i>≤ 0.5</span><span><i class="sw y"></i>≤ 1</span><span><i class="sw o"></i>≤ 2</span><span><i class="sw r"></i>&gt; 2 min</span>`}<span><i class="sw" style="background:#b46bff;border-color:#b46bff;width:4px"></i>where ${esc(W_)} enters</span><span><b style="color:#5ff0b4">▼</b> / <b style="color:#ff8f9c">▲</b> less / more than no action</span></div>`;
   // trips down the route
   h += `<div class="sm-h"><h3>Simulation – every ${nd} trip down the route</h3><span class="sp"></span><span class="sm-seg" role="group" aria-label="Show"><button type="button" data-s="both" aria-pressed="${ST.simShow === "both"}">Before + after</button><button type="button" data-s="before" aria-pressed="${ST.simShow === "before"}">Before</button><button type="button" data-s="after" aria-pressed="${ST.simShow === "after"}">After</button></span></div>
     <div class="sm-tsd" id="simTsd">${simChart(r, x)}</div>
@@ -1436,9 +1449,6 @@ document.addEventListener("click", e => { const mm = $("mobileMore"); if(mm && m
   function zone(beforeSel, n, title, sub, ai){ var el = page && page.querySelector(beforeSel); if(!el) return;
     var z = document.createElement("div"); z.className = "hz" + (ai ? " ai" : ""); z.innerHTML = "<i>" + n + "</i>" + title + (sub ? " <small>" + esc(sub) + "</small>" : ""); el.parentNode.insertBefore(z, el); }
   if(page){
-    var ln = document.createElement("div"); ln.className = "hp-link";
-    ln.innerHTML = DS.sev("ai", "RECOVERY") + '<span>The <b>Recovery Decision Engine</b> decides <b>what</b> recovery to use; this planner works out <b>where, when and how</b> a halfway recovery happens.</span><a class="ds-btn sm" href="/recovery' + (ST.svc ? "?svc=" + encodeURIComponent(ST.svc) : "") + '">Recovery Decision Engine</a>';
-    var r1 = page.querySelector(".row.r1"); if(r1) r1.parentNode.insertBefore(ln, r1);
     zone(".row.r1", 1, "CURRENT SERVICE CONDITION", "late bus, next-direction forecast and no-action impact");
     zone(".row.r2", 2, "CANDIDATE HALFWAY POINTS", "select a stop \u2014 map, forecast and timeline update", true);
     zone(".row.r3", 3, "FORECAST AFTER DEPLOYMENT", "bus movement, off-service route, downstream headways and EWT");

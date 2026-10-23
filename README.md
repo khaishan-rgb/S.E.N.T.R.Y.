@@ -10,10 +10,14 @@ D2 keeps running all this time, because D2 buses are never held to wait for Bus 
 
 The entry point is worked out from the timings, not set to a fixed percentage. The inputs are when Bus 6 arrives, the rest, the off-service time by real road, and 2 min between stops in service. The recommended stop is the first one where Bus 6 can be in the middle of the gap; earlier stops give an uneven split.
 
-**Gap to cover.** It is chosen under the bus tables: "*D1 Bus 6 goes halfway on D2 to cover the gap ahead of [▾]*".
-* **Auto** picks the longest gap Bus 6 can actually reach. A longer gap it cannot catch, such as one whose front bus is already at the last stop, is skipped.
-* OCC can pick any other gap from the list.
-* The route diagram outlines the chosen gap in purple ("30 min gap · to cover"), and the table marks the bus behind it.
+**Gap to cover: auto, or OCC's own tick.** The table of the direction the halfway bus goes on (D2 here) has a **Cover gap** column, one tick per bus.
+* Ticking a bus means "cover the gap ahead of this bus". Only one gap is ticked at a time.
+* **Auto** is the default and ticks the longest gap the bus can actually reach, marked *auto*. A longer gap it cannot catch, such as one whose front bus is already at the last stop, is skipped, and the line under the tables says so.
+* OCC can tick any other gap, so any halfway bus can cover any gap. For example, Bus 6 can cover the gap ahead of Bus 2 instead of Bus 3's.
+* Unticking it, or **BACK TO AUTO**, returns to the longest gap.
+* If the ticked gap cannot be reached in time, the page says so. No halfway stop works then, and the simulation says there is nothing to compare.
+* **OS bus** mode has the same Cover gap tick on its one direction. The OS planner uses the ticked gap; auto is the longest.
+* The route diagram outlines the covered gap in purple ("30 min gap · to cover"), and its row in the table is highlighted.
 
 **Its empty slot.** Bus 6 no longer departs the interchange, so the two buses ahead of its slot depart **later** and the two behind it depart **earlier**. In the example, D1 Bus 8 and 7 depart later and D1 Bus 5 and 4 earlier. The limits are the usual ones: 10 min at most, and an earlier departure never cuts into the minimum break.
 * In this mode the departures are always re-spaced, and the plan says so.
@@ -34,8 +38,8 @@ The entry point is worked out from the timings, not set to a fixed percentage. T
   * Squares are dark tinted cells with coloured figures. EWT bands: ≤ 0.5 / ≤ 1 / ≤ 2 / > 2 min.
   * The Headway toggle shows the gap most off target, graded against the target headway: on target within ±2 min, 2–4 longer, 5–9 longer, 10+ longer, more than 2 shorter. So on a 10-min service, 15 and 30 look different.
   * A **Change with the plan** row shows ▼ / ▲ against no action at each AITP. The average column equals the option's EWT.
-  * Each square counts only the buses that pass it from now on. A gap that has already gone past an AITP (for example, the gap's rear bus is already beyond Stop 6) does not show there.
-  * The note above the squares names those AITPs. ◆ marks the ones the chosen gap still has to pass, and each square's tooltip names the two buses either side of its gap.
+  * **Every trip counts at every AITP**: the buses that have already passed it as well as the ones still to come. So a 30-min gap that has already left the first stop still counts at Stop 1. With no action, the gap is in every square; the plan closes it only from the entry stop on.
+  * Each square's tooltip names the two buses either side of its gap.
 * **Every trip down the route.** A time against stop chart of the next direction:
   * after: solid lines (later departures amber, earlier departures cyan);
   * before: dashed grey lines;
@@ -43,8 +47,10 @@ The entry point is worked out from the timings, not set to a fixed percentage. T
   * the gap to cover shaded red.
 * EWT at one AITP = Σh² ÷ (2 Σh) − H/2 over the buses passing it. An option's EWT is the average over its AITPs.
 
+**Recovery Decision Engine banner.** The banner ("The Recovery Decision Engine decides what recovery to use…") is no longer shown on the Halfway Planner. The engine itself and its page are unchanged.
+
 **API (additive).** `/api/hplan/plan` has two new parameters.
-* `gap=auto|<bus no.>` covers the gap ahead of that bus on the next direction.
+* `gap=auto|<bus no.>` covers the gap ahead of that bus on the next direction. In OS mode, `gap=<bus no.>` is the gap the OS bus fills (`gap_info.rear_num` / `chosen` in the result).
 * `aitp=N` sets the AITPs used for the EWT.
 
 New fields in the result:
