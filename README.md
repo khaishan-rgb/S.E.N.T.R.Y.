@@ -19,6 +19,19 @@ The page is now seven short steps (left: 1–3, right: 4–7; on a phone they fo
      * among the results, the one with the fewest turns wins: no U-turns, no two turns within 80 m, not through the blockage, then the shortest.
      
      Step 5 says what it did, e.g. *"4 turns · no U-turn. Cleaned up to what you mean: 1 tap was only on the way (faded on the map), so the route goes straight there. Exactly through your taps it would be 6 turns with 1 U-turn, 1.9 km."* **Join the taps: Smart / Exactly through my taps** switches between the two. This is route logic, not an AI guess.
+   * **Start and end anywhere sensible (V16.26c).** The drawing no longer has to start on the bus's own (blue) route:
+     * **on the green route** (the current suggestion): the bus follows the green route from where it leaves its route to your first tap, then your way. Ending on the green route works the same, back to its rejoin;
+     * **anywhere else**: it is joined from the nearest practical point of the bus's route **before** the blockage (and back to it **after** the blockage), trying 3 points and keeping the join with the fewest turns.
+     
+     Step 5 says which, e.g. *"Starts on the green route: the bus follows it from where it leaves its route to your first tap."* Before this change, a drawing starting on the green route gave "Turns off where service 170 does not run before the blockage".
+   * **Road directions and banned turns while drawing (V16.26d, `/api/dv2/roadrules`).** While drawing (and until the drawn route is removed), the map shows data from OpenStreetMap, fetched for the visible area from zoom 15 and cached for a day:
+     * **one-way roads** as grey lines with arrows in the direction traffic goes. Each side of a dual road is one, so you can see which carriageway goes which way;
+     * **banned turns** as ⛔ badges at the junction, turned to face the way you approach: *No right turn from Choa Chu Kang Avenue 3 into Choa Chu Kang Avenue 5*. A dashed badge means buses are exempt (`except=psv`);
+     * your own route with **white arrows** showing the way the bus drives it.
+     
+     A tap the route cannot reach the way it was drawn turns **red**, with the note *"tap 2 cannot be reached the way you drew it — probably a one-way road or a banned turn: see the road arrows and ⛔ signs"*. The joining uses OpenStreetMap car rules, so a turn only buses may make (dashed ⛔) cannot be drawn through yet; the per-service check uses TomTom in bus mode.
+   * **First tap just past the junction (V16.26d).** A first tap near the bus's route means "leave the route around here". The router starts 150 m earlier on the route and picks the junction itself, so a tap placed a little past the junction no longer causes a loop back. The same applies at the end, 150 m later. The live join while tapping is now the smart one too, so what you see is what you get.
+   * **End taps never snap back before the blockage (V16.26d).** A last tap near the bus's route is only put onto it **after** the blockage, and a first tap only **before** it. Before this, a last tap near the skipped part could give a 0.0 km route.
    * The per-service check then sends the routing engine waypoints in the middle of each straight stretch of the drawn route, never at a junction (`dv_run_vias`). The re-routed version for each bus therefore keeps the same turns. The same applies to other services' routes in the share pass.
 6. **Recommendation** (new) — the message in the OCC format, grouped by route, ready to **COPY** into the chat:
    ```
