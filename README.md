@@ -1,5 +1,33 @@
 # SG Transport Pulse V16.19 — Operational Intelligence & Service Recovery Platform
 
+## Halfway Planner: route diagram & buses, tick the halfway bus (V16.27)
+**The filter row.** *Late bus* and *Late min* are gone. New field **AITP, every [5] BS**: the timing points on the route diagram are every N bus stops (1–20, remembered in this browser). The last stop of each direction is always a timing point.
+
+**Route diagram & buses** (a new card straight after the filter, Live and Test). It works like the AVLC route diagram:
+* D1 runs left to right on top, D2 right to left below, joined by the terminal loops. The yellow boxes are the AITP timing points, with the stop code written downwards.
+* Every bus from the API (or the test fleet) is a box on its stop: Bus number, minutes behind the bus ahead, and ± against the target headway.
+* Colours: green = on target, amber = 2+ min longer, red = prolonged (1.5× or more, shaded on the route with "N min gap"), blue = too close (half or less). A bus in layover sits just before the first stop.
+* Under the diagram, one table per direction: **Halfway (tick) | Bus | Dir | Location BS | Headway | ✕**.
+
+**Correcting missing or wrong data.** These changes never touch the live data. The server keeps an edited copy (`POST /api/hplan/edit`), and the card says how many changes OCC has made.
+* **Add**: "Missing bus? Add one at [stop] ADD BUS" adds a bus there.
+* **Remove**: ✕ takes a bus out. It is shown struck through with UNDO.
+* **Move**: change *Location BS* to move a bus to another stop.
+* **UNDO ALL CHANGES** goes back to the data as received. Loading the service again also starts fresh.
+
+**Tick → halfway options.** In **Bus C halfway**, tick the bus that goes halfway, in either direction, in the table or by clicking its box on the diagram. Only one bus can be ticked.
+* The bus is planned from where it is on the road now, with no lateness added. The halfway options (entry stop, prolonged gap → split, entry time, off-service road, stops skipped) appear below as before.
+* The options are ranked by **forecast EWT**, and the AI recommended stop is marked.
+* The header says "Next: tick the bus that goes halfway" and the card glows until a bus is ticked.
+
+Changing D1 / D2 in the header reloads that direction and clears the tick, because bus numbers restart in each direction (D2 Bus 4 and D1 Bus 4 are different buses).
+
+**OS bus.** Only the direction chosen in the header is shown, with no tick column. The OS bus fills the longest gap on that direction, and adding or removing buses changes which gap that is.
+
+**API (additive).**
+* `/api/hplan/snapshot` and `/api/hplan/testsnap` now also return `opp.stops`, so both directions can be drawn.
+* `POST /api/hplan/edit {snap, dir, edits:{remove:[{dir,id}], move:[{dir,id,stop|j}], add:[{dir,stop|j}]}}` returns a new snapshot (same shape, `edited:true`, `base`). Its main direction is `dir`, the ticked bus's direction. `/api/hplan/plan` works on it unchanged. An expired snapshot returns `{expired:true}`, and the page reloads the buses.
+
 ## Diversion Maps: start / end time, TV broadcast, History (V16.27)
 Three tabs at the top of Diversion Maps: **PLANNER · HISTORY · TV BROADCAST** (the TV tab opens a new window and shows how many diversions are live).
 

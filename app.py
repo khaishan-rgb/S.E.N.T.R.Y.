@@ -4362,7 +4362,8 @@ async def api_hp_snapshot(service: str = "", direction: int = 1):
             opp = {"g": g2, "buses": b2, "dir": od}
     sid = hashlib.sha1(f"{svc}|{direction}|{time.time()}".encode()).hexdigest()[:12]
     hp_prune()
-    HP_SNAP[sid] = {"created": time.time(), "svc": svc, "d": direction, "g": g, "buses": buses, "now_min": now_min, "P": P, "opp": opp}
+    HP_SNAP[sid] = {"created": time.time(), "svc": svc, "d": direction, "g": g, "buses": buses, "now_min": now_min, "P": P, "opp": opp,
+                    "dirs": dirs, "now_s": now.strftime("%H:%M:%S")}
     cands, unresolved, cinfo = ho_candidates(svc, direction, stops, "", "auto", g["prep"], P)
     strip_b = lambda bs: [{k: v for k, v in b.items() if k not in ("s", "offset")} for b in bs]
     return {"ok": True, "snap": sid, "service": svc, "direction": direction, "directions": dirs, "now": now.strftime("%H:%M:%S"), "now_min": round(now_min, 2),
@@ -4371,7 +4372,7 @@ async def api_hp_snapshot(service: str = "", direction: int = 1):
             "stops": [{"j": i, "code": s_["code"], "name": s_["name"], "lat": s_["lat"], "lon": s_["lon"], "km": round(ss[i], 2)} for i, s_ in enumerate(stops)],
             "line": ho_simplify(line, 500), "buses": strip_b(buses), "bus_error": bus_err, "off_route": off_route,
             "opp": ({"direction": opp["dir"], "line": ho_simplify(opp["g"]["line"], 400), "buses": strip_b(opp["buses"]), "km": round(opp["g"]["prep"]["km"], 2),
-                     "first": opp["g"]["stops"][0]["name"], "last": opp["g"]["stops"][-1]["name"], "H": opp["g"]["H"]} if opp else None),
+                     "first": opp["g"]["stops"][0]["name"], "last": opp["g"]["stops"][-1]["name"], "H": opp["g"]["H"], "stops": hp_stops(opp["g"])} if opp else None),
             "candidates": {"scope": cinfo.get("scope_used"), "approved": cinfo.get("approved"), "tested": len(cands), "unresolved": unresolved},
             "source": "LTA DataMall Bus Arrival (live) \u00b7 route running times from LTA speed bands" if g["traffic_ok"] else "LTA DataMall Bus Arrival (live) \u00b7 running times at the fallback speed (no speed bands)"}
 
@@ -4472,7 +4473,7 @@ async def api_hp_testsnap(service: str = "", direction: int = 1, time_: str = Qu
     sid = hashlib.sha1(f"test|{svc}|{direction}|{time.time()}".encode()).hexdigest()[:12]
     hp_prune()
     HP_SNAP[sid] = {"created": time.time(), "svc": svc, "d": direction, "g": g, "buses": tb, "now_min": float(t0), "P": P, "opp": opp, "test": True,
-                    "partial": total < fit_total, "test_gap": LG}
+                    "partial": total < fit_total, "test_gap": LG, "dirs": dirs, "now_s": hplan.hhmm(t0) + ":00"}
     stops, ss, line = g["stops"], g["prep"]["stop_s"], g["line"]
     strip_b = lambda bs: [{k: v for k, v in b.items() if k not in ("s", "offset")} for b in bs]
     return {"ok": True, "test": True, "snap": sid, "service": svc, "direction": direction, "directions": dirs, "now": hplan.hhmm(t0) + ":00", "now_min": float(t0),
@@ -4481,11 +4482,96 @@ async def api_hp_testsnap(service: str = "", direction: int = 1, time_: str = Qu
             "stops": [{"j": i, "code": s_["code"], "name": s_["name"], "lat": s_["lat"], "lon": s_["lon"], "km": round(ss[i], 2)} for i, s_ in enumerate(stops)],
             "line": ho_simplify(line, 500), "buses": strip_b(tb), "bus_error": None, "off_route": 0,
             "opp": ({"direction": opp["dir"], "line": ho_simplify(opp["g"]["line"], 400), "buses": strip_b(opp["buses"]), "km": round(opp["g"]["prep"]["km"], 2),
-                     "first": opp["g"]["stops"][0]["name"], "last": opp["g"]["stops"][-1]["name"], "H": H} if opp else None),
+                     "first": opp["g"]["stops"][0]["name"], "last": opp["g"]["stops"][-1]["name"], "H": H, "stops": hp_stops(opp["g"])} if opp else None),
             "test_info": {"time": hplan.hhmm(t0), "headway": H, "buses": nb, "fit": fit, "placed": len(tb), "placed_opp": len(opp["buses"]) if opp else 0,
                           "offset": off, "stop_min": sm, "gap": LG, "gap_at": gap_at if LG else None, "layover": lay,
                           "waiting": sum(1 for b in tb + ob if b.get("wait") is not None)},
             "source": "TEST MODE \u00b7 synthetic evenly spaced buses on the real route (not live)"}
+
+
+def hp_stops(g):
+    ss = g["prep"]["stop_s"]
+    return [{"j": i, "code": s_["code"], "name": s_["name"], "lat": s_["lat"], "lon": s_["lon"], "km": round(ss[i], 2)} for i, s_ in enumerate(g["stops"])]
+
+
+def hp_edit_fleet(S, d_main, edits):
+    """V16.27: OCC corrects the fleet the planner sees (DataMall can miss a bus or show one that is not there): remove a bus, move it to
+    another stop, add a missing one at a stop. Returns a NEW snapshot (the live / test one is never changed) whose main direction is
+    d_main (the direction of the bus that goes halfway). Edits: {remove:[{dir,id}], move:[{dir,id,stop|j}], add:[{dir,stop|j}]}."""
+    lanes = {S["d"]: (S["g"], copy.deepcopy(S["buses"]))}
+    if S.get("opp"):
+        lanes[S["opp"]["dir"]] = (S["opp"]["g"], copy.deepcopy(S["opp"]["buses"]))
+    if d_main not in lanes:
+        raise ValueError(f"Direction {d_main} is not part of this service.")
+
+    def at_stop(g, e):
+        stops, ss = g["stops"], g["prep"]["stop_s"]
+        j = e.get("j")
+        if not (isinstance(j, int) and 0 <= j < len(stops) and (not e.get("stop") or stops[j]["code"] == str(e["stop"]))):
+            j = next((i for i, x in enumerate(stops) if x["code"] == str(e.get("stop") or "").strip()), None)
+        if j is None:
+            raise ValueError(f"Bus stop {e.get('stop') or e.get('j')} is not on this direction.")
+        st0 = stops[j]
+        return j, {"s": ss[j], "lat": st0["lat"], "lon": st0["lon"], "km": round(ss[j], 2), "near": {"code": st0["code"], "name": st0["name"]}, "near_name": st0["name"],
+                   "next": None, "offset": 0.0, "load": None, "type": None, "monitored": 0}
+    def lane(e):
+        try:
+            return lanes[int(e.get("dir") or 0)]
+        except (KeyError, TypeError, ValueError):
+            raise ValueError(f"Direction {e.get('dir')} is not part of this service.")
+    for e in (edits.get("remove") or [])[:60]:
+        g, bs = lane(e)
+        bs[:] = [b for b in bs if str(b["id"]) != str(e.get("id"))]
+    for e in (edits.get("move") or [])[:60]:
+        g, bs = lane(e)
+        b = next((x for x in bs if str(x["id"]) == str(e.get("id"))), None)
+        if b is None:
+            continue
+        j, pos = at_stop(g, e)
+        b.pop("wait", None)
+        b.update(pos, moved=True)
+    for e in (edits.get("add") or [])[:30]:
+        g, bs = lane(e)
+        j, pos = at_stop(g, e)
+        nid = max([int(x["id"]) for x in bs if str(x["id"]).isdigit()] + [0]) + 1
+        bs.append(dict(pos, id=nid, added=True))
+    for g, bs in lanes.values():
+        bs.sort(key=lambda b: (b["s"], -float(b.get("wait") or 0.0)))
+    g, bs = lanes[d_main]
+    od = next((d_ for d_ in lanes if d_ != d_main), None)
+    return {**S, "created": time.time(), "d": d_main, "g": g, "buses": bs, "opp": ({"g": lanes[od][0], "buses": lanes[od][1], "dir": od} if od is not None else None),
+            "edited": True}
+
+
+@app.post("/api/hplan/edit")
+async def api_hp_edit(request: Request):
+    """V16.27: the live / test fleet with OCC's corrections (add / remove / move buses) and the direction of the bus that goes halfway
+    -> a new snapshot id (same shape as /api/hplan/snapshot) for planning. The snapshot it starts from is never changed."""
+    try:
+        body = json.loads((await request.body()) or b"{}")
+    except ValueError:
+        return {"ok": False, "error": "Bad request."}
+    base = HP_SNAP.get(str(body.get("snap") or ""))
+    if not base:
+        return {"ok": False, "error": "The live snapshot has expired. Load the buses again.", "expired": True}
+    try:
+        d_main = int(body.get("dir") or base["d"])
+        S = hp_edit_fleet(base, d_main, body.get("edits") or {})
+    except (ValueError, TypeError) as e:
+        return {"ok": False, "error": str(e)}
+    sid = hashlib.sha1(f"edit|{body.get('snap')}|{time.time()}".encode()).hexdigest()[:12]
+    hp_prune()
+    HP_SNAP[sid] = S
+    g, opp = S["g"], S.get("opp")
+    stops = g["stops"]
+    strip_b = lambda bs: [{k: v for k, v in b.items() if k not in ("s", "offset")} for b in bs]
+    return {"ok": True, "snap": sid, "base": body.get("snap"), "edited": True, "test": bool(S.get("test")), "service": S["svc"], "direction": S["d"],
+            "directions": S.get("dirs") or sorted({S["d"]} | ({opp["dir"]} if opp else set())), "now": S.get("now_s") or hplan.hhmm(S["now_min"]) + ":00",
+            "now_min": round(S["now_min"], 2), "H": g["H"], "H_src": g["H_src"], "traffic_ok": g.get("traffic_ok"),
+            "route": {"km": round(g["prep"]["km"], 2), "run_min": round(g["tau"][-1], 1) if g.get("tau") else None, "first": stops[0]["name"], "last": stops[-1]["name"], "n_stops": len(stops)},
+            "stops": hp_stops(g), "line": ho_simplify(g["line"], 500), "buses": strip_b(S["buses"]), "bus_error": None, "off_route": 0,
+            "opp": ({"direction": opp["dir"], "line": ho_simplify(opp["g"]["line"], 400), "buses": strip_b(opp["buses"]), "km": round(opp["g"]["prep"]["km"], 2),
+                     "first": opp["g"]["stops"][0]["name"], "last": opp["g"]["stops"][-1]["name"], "H": opp["g"]["H"], "stops": hp_stops(opp["g"])} if opp else None)}
 
 
 async def hp_live_buses(svc, direction, g, P):
