@@ -389,16 +389,38 @@ def plan(ctx, reach):
                         "in_service": u["kind"] == "in_service", "late": u["uid"] == C["uid"]})
         return out
 
+    def near_gap(tab, k):
+        """V16.28: the buses round the gap Bus C covers, at stop k in passing order - one more ahead of it and one more behind it."""
+        ids = [uid for _, uid in sorted((t[k], uid) for uid, t in tab.items() if k in t and uid != INS["uid"])]
+        if TG["front_uid"] not in ids or TG["rear_uid"] not in ids:
+            return []
+        return ids[max(0, ids.index(TG["front_uid"]) - 1): ids.index(TG["rear_uid"]) + 2]
+
+    def seq_ids(tab, k, ids, adj=None):
+        out = []
+        for uid in ids:
+            u, t = U.get(uid), tab.get(uid, {}).get(k)
+            if u is None or t is None:
+                continue
+            out.append({"uid": uid, "num": u["num"], "role": u.get("role"), "t": _r(t), "clock": hhmm(t), "label": u["label"], "adj": (adj or {}).get(uid, 0.0),
+                        "gap": "front" if uid == TG["front_uid"] else "rear" if uid == TG["rear_uid"] else None})
+        out.sort(key=lambda x: x["t"])
+        return out
+
     def detail(x):
         tab, adj, j = x["_tab"], x["_adj"], x["j"]
         cols = [j] + [k for k in (j + 5, j + 10, j + 15) if k < nO]
         ring = [roles[r] for r in ("A", "B", "C", "D", "E") if r in roles]
         if OSM:
             ring = ring[:ring.index(C) + 1] + [INS] + ring[ring.index(C) + 1:]
+        if TG and not OSM:                                        # V16.28: the gap's two buses with Bus C first, then the re-spaced ones
+            gx = [U[TG["front_uid"]], C, U[TG["rear_uid"]]]
+            ring = gx + [u for u in ring if u not in gx]
         rows = []
         for u in ring:
             t = tab.get(u["uid"], {})
-            rows.append({"role": u["role"], "num": u["num"], "label": u["label"], "halfway": u["uid"] == INS["uid"],
+            rows.append({"role": u.get("role"), "num": u["num"], "label": u["label"], "halfway": u["uid"] == INS["uid"],
+                         "gap": ("front" if u["uid"] == TG["front_uid"] else "rear" if u["uid"] == TG["rear_uid"] else None) if TG else None,
                          "dep": None if u["uid"] == INS["uid"] else hhmm((u["dep"] + adj.get(u["uid"], 0.0)) if u["kind"] == "next_trip" else u["dep"]),
                          "adj": adj.get(u["uid"], 0.0), "slow": False, "pass": [hhmm(t.get(k)) if t.get(k) is not None else None for k in cols],
                          "t": [_r(t.get(k)) if t.get(k) is not None else None for k in cols]})
@@ -416,7 +438,10 @@ def plan(ctx, reach):
             row["hw"] = [_r(h) for h in hws]
             row["max_hw"] = _r(max([h for h in hws if h is not None], default=0.0)) if any(h is not None for h in hws) else None
         return {"cols": [{"j": k, "no": k + 1, "code": O["stops"][k]["code"], "name": O["stops"][k]["name"]} for k in cols], "rows": rows,
-                "before": seq_at(base, j), "after": seq_at(tab, j, adj), "ic_before": ic_lane(None), "ic_after": ic_lane(adj)}
+                # at the halfway stop: with a chosen gap, the buses round that gap (where Bus C goes); otherwise the buses round Bus C's slot
+                "before": seq_ids(base, j, near_gap(base, j)) if TG else seq_at(base, j),
+                "after": seq_ids(tab, j, near_gap(tab, j) + [INS["uid"]], adj) if TG else seq_at(tab, j, adj),
+                "ic_before": ic_lane(None), "ic_after": ic_lane(adj)}
 
     def adj_sentence(x):
         al = x["dep_adj"]

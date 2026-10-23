@@ -874,7 +874,7 @@ function lane(items, o){
   it.forEach(x => {
     const cx = x._x, tx = X(x.t);
     lvl = cx - lastX < (W < 560 ? 40 : 64) ? (lvl + 1) % 3 : 0; lastX = cx;
-    const ly = rowY - 22 - lvl * 26;
+    const ly = rowY - 30 - lvl * 28;                                       // labels clear of the bus box (V16.28)
     const col = {A:"#1e6fd9", B:"#f08c00", C:"#d7263d", D:"#1f9d55", E:"#7c4dff", OS:"#0b2545"}[x.role] || "#8a98a9";
     s += `<line x1="${cx}" y1="${rowY + 11}" x2="${tx}" y2="${axY}" stroke="${col}" stroke-dasharray="2 3"/><circle cx="${tx}" cy="${axY}" r="3.5" fill="#fff" stroke="${col}" stroke-width="2"/>`;
     s += `<rect x="${cx - 11}" y="${rowY - 11}" width="22" height="22" rx="5" fill="${col}"${x.halfway ? ' stroke="#0f9d58" stroke-width="3"' : ""}/><text x="${cx}" y="${rowY + 5}" text-anchor="middle" style="font-size:${(x.role || "").length > 1 ? 9.5 : 13}px;font-weight:800;fill:#fff">${esc(x.role || "\u2022")}</text>`;
@@ -888,7 +888,7 @@ function lane(items, o){
   });
   return s + `</svg>`;
 }
-const laneH = n => 150;
+const laneH = n => 164;
 function span(lists){ const ts = lists.flat().map(x => x.t).filter(t => t != null); const a = Math.min(...ts), b = Math.max(...ts); return [Math.floor((a - 4) / 10) * 10, Math.ceil((b + 4) / 10) * 10]; }
 const W = el => Math.max(320, (el.clientWidth || 700) - 4);
 
@@ -982,17 +982,17 @@ function renderBA(){
   const d = x.detail, nd = `D${r.next_dir}`;
   $("h6t").textContent = `${nd} bus movement at Stop ${x.no} \u2013 before vs after`;
   const H_ = HWR();
-  const lab = (s, after) => ({role:s.role, t:s.t, clock:s.clock, halfway:after && s.role === H_,
+  const lab = (s, after) => ({role:s.role, t:s.t, clock:s.clock, halfway:after && s.role === H_, gap:s.gap,
     label:s.role === "OS" ? "OS bus (halfway)" : s.role === "C" ? `${s.label || "Bus C"}${after && H_ === "C" ? " (halfway)" : r.delay > 0 ? " (late)" : ""}` : (s.label || `Bus ${s.role}`).replace(" (at interchange)", ""),
     short:after && s.role === H_ ? "halfway" : s.adj > 0 ? `+${f0(s.adj)}` : s.adj < 0 ? `${sgn(s.adj)}` : null,
-    note:after && s.role === H_ ? `enter Stop ${x.no}` : s.adj > 0 ? `dep. later +${f0(s.adj)}` : s.adj < 0 ? `dep. earlier ${sgn(s.adj)}` : "",
-    noteCol:s.adj < 0 ? "#0f9d58" : after && s.role === "C" ? "#d7263d" : "#e8590c"});
+    note:after && s.role === H_ ? `enter Stop ${x.no}` : s.adj > 0 ? `dep. later +${f0(s.adj)}` : s.adj < 0 ? `dep. earlier ${sgn(s.adj)}` : s.gap === "front" ? "ahead of the gap" : s.gap === "rear" ? "behind the gap" : "",
+    noteCol:s.adj < 0 ? "#0f9d58" : after && s.role === "C" ? "#d7263d" : s.gap && !s.adj ? "#8aa2bd" : "#e8590c"});
   const bef = d.before.map(s => lab(s, false)), aft = d.after.map(s => lab(s, true));
   const [t0, t1] = span([bef, aft]), w = W(el);
   const na = r.no_action;
   el.innerHTML = `<div class="lane before"><h3>Before (no intervention)</h3><span class="meta">Max HW <b>${f0(na.max_hw)} min</b> \u00b7 EWT <b>${f3(na.ewt)}</b> \u00b7 bunching <b>${esc(na.risk)}</b></span>${lane(bef, {W:w - 24, t0, t1, h:laneH(), id:"b", band:true, aria:"Before"})}</div>
     <div class="lane after"><h3>After (halfway at Stop ${x.no})</h3><span class="meta">Max HW <b>${f0(x.max_hw)} min</b> \u00b7 EWT <b style="color:var(--ok)">${f3(x.ewt)}</b></span>${lane(aft, {W:w - 24, t0, t1, h:laneH(), id:"a", after:true, aria:"After"})}</div>
-    <p class="note" style="margin:0">Times when each bus passes Stop ${x.no} (${esc(x.code)} ${esc(x.name)}). Orange = departs the interchange later, green = departs earlier, red band = gap of 1.5\u00d7 the ${f0(r.H)}-min headway or more.</p>`;
+    <p class="note" style="margin:0">Times when each bus passes Stop ${x.no} (${esc(x.code)} ${esc(x.name)}).${r.target ? ` The buses round the ${f0(x.gap.minutes)}-min gap ${esc(r.target.front_label)} \u2192 ${esc(r.target.rear_label)} that ${esc(whoC(r))} covers: ${f0(x.gap.split[0])} / ${f0(x.gap.split[1])} min after. The departures re-spaced round its empty slot are in the Interchange view.` : ""} Orange = departs the interchange later, green = departs earlier, red band = gap of 1.5\u00d7 the ${f0(r.H)}-min headway or more.</p>`;
 }
 
 function renderBAic(r, x, el){
@@ -1017,7 +1017,7 @@ function renderDown(){
   $("h8t").textContent = `Downstream headway forecast (after halfway at Stop ${x.no})`;
   const hv = h => h == null ? "" : `<span class="hwv ${h >= 1.5 * H || h < 0.5 * H ? "bad" : Math.abs(h - H) <= 0.3 * H ? "good" : ""}">hw ${f0(h)}</span>`;
   el.innerHTML = `<thead><tr><th class="l">Bus</th><th>${r.mode === "os" ? "Left the first stop" : `Interchange depart (D${r.next_dir})`}</th>${d.cols.map(c => `<th>Stop ${c.no}<br><span style="font-weight:500">${esc(c.code)}</span></th>`).join("")}<th>Max headway (from Stop ${x.no})</th></tr></thead>
-    <tbody>${d.rows.map(row => `<tr style="cursor:default"><td class="l"><span class="bb ${row.role}">${row.role}</span> ${esc(row.role === "OS" ? "OS bus (halfway)" : row.role === "C" ? (row.halfway ? `Bus C (${row.num}) halfway` : `Bus C (${row.num}) late, full trip`) : busName(row.role, row.num, (r.roles[row.role] || {}).kind))}</td>
+    <tbody>${d.rows.map(row => `<tr style="cursor:default"><td class="l"><span class="bb ${row.role || "x"}">${row.role || "\u2022"}</span> ${esc(row.role === "OS" ? "OS bus (halfway)" : row.role === "C" ? (row.halfway ? `${row.label || `Bus C (${row.num})`} halfway` : `${row.label || `Bus C (${row.num})`} late, full trip`) : row.role ? busName(row.role, row.num, (r.roles[row.role] || {}).kind) : (row.label || `Bus ${row.num}`))}${row.gap ? ` <span class="pill grey">${row.gap === "front" ? "ahead of the gap" : "behind the gap"}</span>` : ""}</td>
       <td class="num">${row.halfway ? "\u2014" : esc(row.dep || "")}${row.adj ? ` <span class="pill ${row.adj > 0 ? "hold" : ""}" style="${row.adj < 0 ? "background:var(--okBg);color:var(--ok)" : ""}">${row.slow ? `\u{1F422} slow ${sgn(row.adj)}` : sgn(row.adj)}</span>` : ""}</td>
       ${row.pass.map((p, i) => `<td class="num ${row.halfway ? "cH" : ""}">${p ? `<b>${esc(p)}</b>` : "\u2013"}${hv(row.hw[i])}</td>`).join("")}<td class="num"><b>${f0(row.max_hw)} min</b></td></tr>`).join("")}</tbody>`;
   $("dnNote").textContent = `hw = headway to the bus ahead at that stop (all buses on D${r.next_dir}, ${r.stop_min} min between stops). The EWT also counts the stops before Stop ${x.no}, ${r.mode === "os" ? "which the OS bus does not serve (Bus C serves them late)" : "which Bus C skips"}.` + (r.test ? " Test mode: blank = the edge of the entered test fleet (no real bus ahead), left out of the EWT and max headway." : "");
@@ -1398,7 +1398,7 @@ document.addEventListener("click", e => { const mm = $("mobileMore"); if(mm && m
 .osm .dot{width:30px;height:30px;border-radius:9px;display:grid;place-items:center;border:1.5px solid var(--c,var(--ds-cyan));color:var(--c,var(--ds-cyan));background:#081426;font:700 12px var(--ds-font)}
 .osm b{display:block;color:#fff;font-size:13.5px}.osm small{display:block;color:var(--ds-mut);font-size:12px;margin-top:2px;line-height:1.4}
 .osm .t{font:600 13px var(--ds-font);font-variant-numeric:tabular-nums;color:var(--ds-text-2);white-space:nowrap}
-.osm .off{--c:var(--ds-purple)} .osm .in{--c:var(--ds-green)}
+.osm .off{--c:var(--ds-purple)} .osm .svc{--c:var(--ds-green)}
 .osm-h{display:flex;align-items:center;gap:8px;font:600 11px/1 var(--ds-font);letter-spacing:.14em;color:#cdb9ff;margin-top:12px}
 </style>
 <script>
@@ -1436,8 +1436,8 @@ document.addEventListener("click", e => { const mm = $("mobileMore"); if(mm && m
       + '<div class="st off"><span class="dot">2</span><span><b>Off-service route</b><small>' + (ok ? esc((rt.roads || []).slice(0, 4).join(" \u2192 ") || "real road route") : rt.loading ? "Calculating the real road route\u2026" : rt.error ? "Road route unavailable: " + esc(rt.error) : "Routing-table estimate") + '</small>'
         + '<small>' + fk(km) + ' \u00b7 ' + f0(mins) + ' min' + (ok && rt.time_src ? ' (' + esc(rt.time_src) + ')' : '') + (tk ? ' \u00b7 traffic: ' + esc(tk) : '') + (inc ? ' \u00b7 ' + esc(inc) : '') + '</small>'
         + (chk ? '<small style="margin-top:6px">Route check for this bus type ' + chk + (rt.status_text ? ' ' + esc(rt.status_text) : '') + '</small>' : '') + '</span><span class="t">' + f0(mins) + ' min</span></div>'
-      + '<div class="st in"><span class="dot">3</span><span><b>Halfway entry \u00b7 Stop ' + esc(x.no) + ' ' + esc(x.code) + '</b><small>' + esc(x.name || "") + ' \u00b7 direction D' + esc(r.next_dir || ST.dir) + '</small></span><span class="t">enter ' + esc(x.entry_clock || "\u2013") + '</span></div>'
-      + '<div class="st in"><span class="dot">4</span><span><b>Resume passenger service</b><small>Continues in service to the end of the direction' + (x.gap && x.gap.split ? ' \u00b7 gap split ' + f0(x.gap.split[0]) + ' / ' + f0(x.gap.split[1]) + ' min' : '') + '</small></span><span class="t"></span></div></div>';
+      + '<div class="st svc"><span class="dot">3</span><span><b>Halfway entry \u00b7 Stop ' + esc(x.no) + ' ' + esc(x.code) + '</b><small>' + esc(x.name || "") + ' \u00b7 direction D' + esc(r.next_dir || ST.dir) + '</small></span><span class="t">enter ' + esc(x.entry_clock || "\u2013") + '</span></div>'
+      + '<div class="st svc"><span class="dot">4</span><span><b>Resume passenger service</b><small>Continues in service to the end of the direction' + (x.gap && x.gap.split ? ' \u00b7 gap split ' + f0(x.gap.split[0]) + ' / ' + f0(x.gap.split[1]) + ' min' : '') + '</small></span><span class="t"></span></div></div>';
   }
   if(typeof drawSel === "function"){ var o = window.drawSel; window.drawSel = function(){ try{ return o.apply(this, arguments); } finally{ try{ render(); }catch(e){ console.error(e); } } }; }
   render();
