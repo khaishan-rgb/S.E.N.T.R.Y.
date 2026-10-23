@@ -172,14 +172,23 @@ def plan(ctx, reach):
         return (sum(vals) / len(vals) if vals else None), mx, (mn if mn < 1e9 else None), perk
 
     def pts_of(per):
-        """per-AITP figures for the before / after squares: EWT, largest gap, the gap most off the target headway."""
+        """per-AITP figures for the before / after squares: EWT, largest gap, the gap most off the target headway and the two buses
+           either side of it, and (V16.28) the chosen gap's minutes if it still passes this AITP (None = it has passed already)."""
+        lab = lambda uid: U[uid]["label"] if uid in U else ("OS bus" if uid == "OS" else str(uid))
         out = []
         for k in points:
             if k not in per:
                 out.append(None)
                 continue
-            g_ = per[k][0]; e_ = ewt(g_, H)
-            out.append({"ewt": None if e_ is None else round(e_, 3), "max": _r(max(g_)), "off": _r(max(g_, key=lambda v: abs(v - H))), "n": len(g_) + 1})
+            g_, sq_ = per[k]; e_ = ewt(g_, H)
+            pr, tgm = None, None
+            if len(g_) == len(sq_) - 1:                            # (test mode can leave fleet-edge gaps out: then no pairs)
+                io = max(range(len(g_)), key=lambda i: abs(g_[i] - H))
+                pr = [lab(sq_[io][1]), lab(sq_[io + 1][1])]
+                if TG:
+                    tgm = next((_r(g_[i]) for i in range(len(g_)) if sq_[i][1] == TG["front_uid"] and sq_[i + 1][1] == TG["rear_uid"]), None)
+            out.append({"ewt": None if e_ is None else round(e_, 3), "max": _r(max(g_)), "off": _r(max(g_, key=lambda v: abs(v - H))), "n": len(g_) + 1,
+                        "pair": pr, "tg": tgm})
         return out
     vsum = lambda v: {"ewt": round(v["e"], 3), "max_hw": _r(v["mx"]), "pts": pts_of(v["per"])} if isinstance(v, dict) else None
 

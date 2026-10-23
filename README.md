@@ -31,8 +31,11 @@ The entry point is worked out from the timings, not set to a fixed percentage. T
   * **Halfway only**: no departure changes, so its slot stays empty.
   * **Halfway + regulation**: this is the plan.
 * **Every AITP.** One square per AITP of the next direction for each option. The AITPs are the AITP setting at the top (every N stops plus the last stop).
-  * Squares are coloured by EWT band (≤ 0.5 / ≤ 1 / ≤ 2 / > 2 min), with an EWT / Headway toggle.
-  * The average column equals the option's EWT.
+  * Squares are dark tinted cells with coloured figures. EWT bands: ≤ 0.5 / ≤ 1 / ≤ 2 / > 2 min.
+  * The Headway toggle shows the gap most off target, graded against the target headway: on target within ±2 min, 2–4 longer, 5–9 longer, 10+ longer, more than 2 shorter. So on a 10-min service, 15 and 30 look different.
+  * A **Change with the plan** row shows ▼ / ▲ against no action at each AITP. The average column equals the option's EWT.
+  * Each square counts only the buses that pass it from now on. A gap that has already gone past an AITP (for example, the gap's rear bus is already beyond Stop 6) does not show there.
+  * The note above the squares names those AITPs. ◆ marks the ones the chosen gap still has to pass, and each square's tooltip names the two buses either side of its gap.
 * **Every trip down the route.** A time against stop chart of the next direction:
   * after: solid lines (later departures amber, earlier departures cyan);
   * before: dashed grey lines;

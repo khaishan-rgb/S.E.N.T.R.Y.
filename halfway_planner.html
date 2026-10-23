@@ -130,8 +130,8 @@ body.hdr-min .hdr .ttl .ic{width:32px;height:32px;font-size:18px}
 .sm-row{display:grid;grid-template-columns:minmax(150px,1.1fr) minmax(0,2fr) 128px;gap:12px;align-items:center;border:1px solid var(--line);border-radius:10px;padding:9px 12px;background:#0a1729}
 .sm-row.pick{border-color:var(--ai);background:var(--aiBg)}
 .sm-row .nm b{display:block;color:#fff;font-size:13.5px}.sm-row .nm small{display:block;color:var(--mut);font-size:11.5px;line-height:1.35;margin-top:2px}
-.sm-row .bar_{height:14px;border-radius:7px;background:#12263f;overflow:hidden}.sm-row .bar_ i{display:block;height:100%;border-radius:7px;background:#5b6b7f}
-.sm-row.pick .bar_ i{background:var(--ai)}.sm-row.none .bar_ i{background:#7a2c3a}
+.sm-row .bar_{height:12px;border-radius:6px;background:#0d1d33;overflow:hidden}.sm-row .bar_ i{display:block;height:100%;border-radius:6px;background:#5f7690}
+.sm-row.only .bar_ i{background:#7d6bb8}.sm-row.pick .bar_ i{background:linear-gradient(90deg,#2f8cff,#22d3ee)}.sm-row.none .bar_ i{background:#5f7690}
 .sm-row .v{text-align:right}.sm-row .v b{font-size:18px;color:#fff;font-variant-numeric:tabular-nums}.sm-row .v em{display:block;font-style:normal;font-size:11.5px;font-weight:700;color:var(--mut)}
 .sm-row .v em.dn{color:#5ff0b4}.sm-row .v em.up{color:#ff8a96}
 .chip{display:inline-block;font-size:10px;font-weight:800;letter-spacing:.06em;border-radius:999px;padding:2px 7px;margin-left:6px;vertical-align:1px;background:#12305a;color:#9fd0ff}
@@ -141,12 +141,26 @@ body.hdr-min .hdr .ttl .ic{width:32px;height:32px;font-size:18px}
 .sq .lab{font-size:12px;color:#cfe0f3;font-weight:700;padding-right:8px;white-space:nowrap}
 .sq .hd{font-size:10.5px;color:var(--mut);text-align:center;line-height:1.15;white-space:nowrap}
 .sq .hd.ent{color:#d9b8ff;font-weight:800}
-.sq i{display:grid;place-items:center;height:30px;min-width:44px;border-radius:6px;font-style:normal;font-size:12px;font-weight:800;color:#06121f;font-variant-numeric:tabular-nums}
-.sq i.g{background:#26c485}.sq i.y{background:#e8c547}.sq i.o{background:#f59a3d}.sq i.r{background:#f0506e;color:#fff}.sq i.b{background:#5fa8ff}.sq i.n{background:#12263f;color:var(--mut)}
+/* the squares: dark tinted cells with coloured figures (V16.28), in the colours of the headway chips */
+.sq i,.sm-key i.sw{--bg:#0d1d33;--bd:#1d3556;--tx:var(--mut)}
+.sq i{position:relative;display:grid;place-items:center;height:32px;min-width:46px;border-radius:7px;font-style:normal;font-size:12.5px;font-weight:800;font-variant-numeric:tabular-nums;background:var(--bg);border:1px solid var(--bd);color:var(--tx)}
+.sq i.g,.sm-key i.g{--bg:rgba(46,229,157,.12);--bd:rgba(46,229,157,.42);--tx:#6ff2bd}
+.sq i.y,.sm-key i.y{--bg:rgba(232,197,71,.12);--bd:rgba(232,197,71,.42);--tx:#f2d675}
+.sq i.o,.sm-key i.o{--bg:rgba(255,154,61,.13);--bd:rgba(255,154,61,.48);--tx:#ffb26b}
+.sq i.r,.sm-key i.r{--bg:rgba(255,85,102,.15);--bd:rgba(255,85,102,.55);--tx:#ff8f9c}
+.sq i.b,.sm-key i.b{--bg:rgba(110,168,255,.13);--bd:rgba(110,168,255,.48);--tx:#9cc4ff}
+.sq i.pk{border-width:1.5px;box-shadow:0 0 0 1px rgba(47,140,255,.22)}
 .sq i.ent{box-shadow:-3px 0 0 #b46bff}
-.sq b.avg{display:grid;place-items:center;height:30px;min-width:56px;border-radius:6px;border:1px solid var(--line2);color:#fff;font-size:13px;font-variant-numeric:tabular-nums}
+.sq i.tg:after{content:"\25c6";position:absolute;top:1px;right:4px;font-size:8px;color:#d9b8ff}
+.sq i.dl{--bg:transparent;--bd:transparent;height:24px;font-size:11.5px}.sq i.dl.dn{--tx:#5ff0b4}.sq i.dl.up{--tx:#ff8f9c}.sq i.dl.eq{--tx:var(--faint)}
+.sq .lab.pick{color:#fff}.sq .lab.dl{color:var(--mut);font-weight:600;font-size:11.5px}
+.sq b.avg{display:grid;place-items:center;height:32px;min-width:58px;border-radius:7px;border:1px solid var(--line2);background:#0b1a2e;color:#fff;font-size:13px;font-variant-numeric:tabular-nums}
+.sq b.avg.pk{border-color:var(--ai);background:var(--aiBg)}
+.sq b.avg.dl{height:24px;border:0;background:transparent;font-size:12px}.sq b.avg.dl.dn{color:#5ff0b4}.sq b.avg.dl.up{color:#ff8f9c}
+.sm-sub{margin:-2px 0 8px;font-size:12px;color:var(--mut);line-height:1.45}
 .sm-key{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:11.5px;color:var(--mut);margin-top:8px}
 .sm-key i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:5px;vertical-align:-2px}
+.sm-key i.sw{background:var(--bg);border:1px solid var(--bd)}
 .sm-key i.l{width:22px;height:0;border-top:2px solid;border-radius:0;vertical-align:3px}
 .sm-tsd{overflow-x:auto;border:1px solid var(--line);border-radius:10px;background:#071324}
 .sm-tsd svg{display:block;width:100%;height:auto;min-width:760px}
@@ -1045,7 +1059,7 @@ function renderChart(){
    Σh² ÷ (2 Σh) − H/2 over the buses passing it; the option's EWT = the average of its AITPs. No action (the ticked bus runs its full trip)
    vs Halfway only (no departure changes - its slot stays empty) vs Halfway + regulation (the buses around its slot re-spaced = the plan). */
 const EB = v => v == null ? "n" : v <= 0.5 ? "g" : v <= 1 ? "y" : v <= 2 ? "o" : "r";            // the RDE's evaluation-point bands
-const HB = (g, H) => g == null ? "n" : g - H > 3 ? "r" : g - H > 2 ? "o" : g - H < -2 ? "b" : "g";
+const HB = (g, H) => g == null ? "n" : g - H < -2 ? "b" : g - H <= 2 ? "g" : g - H <= 4 ? "y" : g - H < 10 ? "o" : "r";   // graded, so 15 and 30 on a 10-min service differ
 const f2 = x => x == null ? "–" : (Math.round(x * 100) / 100).toFixed(2);
 const hm = t => { const m = ((Math.round(t) % 1440) + 1440) % 1440; return `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`; };
 ST.simV = "ewt"; try{ if(localStorage.getItem("hw.simv") === "hw") ST.simV = "hw"; }catch(e){}
@@ -1098,16 +1112,27 @@ function renderSim(){
     return `<div class="sm-row ${o.k === pick ? "pick" : ""} ${o.k}" role="listitem" data-k="${o.k}"><div class="nm"><b>${esc(o.name)}${o.k === pick ? ' <span class="chip rec">THE PLAN</span>' : ""}</b><small>${esc(o.sub)}</small></div>
       <div class="bar_" aria-hidden="true"><i style="width:${Math.max(1, 100 * Math.max(0, o.ewt) / mx).toFixed(1)}%"></i></div>
       <div class="v"><b>${f3(o.ewt)}</b> min<em class="${d == null ? "" : d < -0.005 ? "dn" : d > 0.005 ? "up" : ""}">${d == null ? "the baseline" : d < -0.005 ? `▼ ${f3(-d)}${p_ != null ? ` (${p_}%)` : ""}` : d > 0.005 ? `▲ ${f3(d)} vs no action` : "same as no action"}</em><em>max gap ${f0(o.max)} min</em></div></div>`; }).join("")}</div>`;
-  // every AITP, every option
+  // every AITP, every option, and the change the plan makes (V16.28: tinted squares, the gap OCC chose marked ◆)
   const hw = ST.simV === "hw", val = p => p == null ? null : hw ? p.off : p.ewt, clsOf = p => p == null ? "n" : hw ? HB(p.off, H) : EB(p.ewt);
-  const cols = `grid-template-columns:minmax(150px,auto) repeat(${n},minmax(46px,1fr)) 64px`;
+  const fmt = v => v == null ? "–" : hw ? f0(v) : f2(v);
+  const cols = `grid-template-columns:minmax(170px,auto) repeat(${n},minmax(50px,1fr)) 72px`;
+  const tip = (o, p, i) => { const P_ = r.points[i]; return `${o.name} · Stop ${P_.no} ${P_.code} ${P_.name} (${P_.pct}%): ` + (p ? `EWT ${f2(p.ewt)} min · largest gap ${f0(p.max)} min · most off target ${f0(p.off)} min${p.pair ? ` (${p.pair[0]} → ${p.pair[1]})` : ""} · ${p.n} buses from now on` : "not enough buses"); };
+  const avgOf = o => { if(!hw) return o.ewt; const v = o.pts.filter(p => p && p.off != null).map(p => p.off); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null; };
+  const stops_ = L_ => L_.length <= 3 ? L_.map(p => `Stop ${p.no}`).join(L_.length === 2 ? " and " : ", ") : `Stop ${L_[0].no} to Stop ${L_[L_.length - 1].no}`;
+  const passed = tg ? r.points.filter((p, i) => base.pts[i] && base.pts[i].tg == null && p.j < x.j) : [], coming = tg ? r.points.filter((p, i) => base.pts[i] && base.pts[i].tg != null) : [];
+  let sqNote = `Each square counts the buses that pass that AITP from now on: the last one that has passed it, then every bus still to come.`;
+  if(tg && passed.length && coming.length) sqNote += ` The ${f0(tg.minutes)}-min gap ${tg.front_label} → ${tg.rear_label} has already gone past ${stops_(passed)} (${tg.rear_label} is at ${tg.rear_at} now), so with no action ${passed.length > 1 ? "those AITPs" : "that AITP"} only see${passed.length > 1 ? "" : "s"} the regular ${f0(H)}-min gaps. ◆ = the AITPs it still has to pass.`;
   h += `<div class="sm-h"><h3>Every AITP on ${nd} – ${hw ? "the headway most off target (min)" : "EWT (min of extra wait)"}</h3><span class="sp"></span><span class="sm-seg" role="group" aria-label="What the squares show"><button type="button" data-v="ewt" aria-pressed="${!hw}">EWT</button><button type="button" data-v="hw" aria-pressed="${hw}">Headway</button></span></div>
+    <p class="sm-sub">${esc(sqNote)}</p>
     <div class="sq-wrap"><div class="sq" style="${cols}"><span class="lab"></span>${r.points.map((p, i) => `<span class="hd ${i === ei ? "ent" : ""}" title="${esc(p.code + " " + p.name)}">${i === ei ? "▼ enters<br>" : ""}Stop ${p.no}<br>${p.pct}%</span>`).join("")}<span class="hd">average</span>
-    ${L.map(o => `<span class="lab">${esc(o.name)}</span>${o.pts.map((p, i) => { const v = val(p);
-        return `<i class="${clsOf(p)}${i === ei ? " ent" : ""}" title="${esc(`${o.name} · Stop ${r.points[i].no} ${r.points[i].code} ${r.points[i].name} (${r.points[i].pct}%): ` + (p ? `EWT ${f2(p.ewt)} min · largest gap ${f0(p.max)} min · most off target ${f0(p.off)} min · ${p.n} buses` : "not enough buses"))}">${v == null ? "–" : hw ? f0(v) : f2(v)}</i>`; }).join("")}
-      <b class="avg">${hw ? f1((o.pts.filter(p => p && p.off != null).reduce((s, p) => s + p.off, 0)) / Math.max(1, o.pts.filter(p => p && p.off != null).length)) : f3(o.ewt)}</b>`).join("")}</div></div>
-    <div class="sm-key">${hw ? `<span><i style="background:#26c485"></i>on target (−2 to +2)</span><span><i style="background:#f59a3d"></i>2–3 min longer</span><span><i style="background:#f0506e"></i>&gt; 3 min longer</span><span><i style="background:#5fa8ff"></i>&gt; 2 min shorter</span>`
-      : `<span><i style="background:#26c485"></i>≤ 0.5</span><span><i style="background:#e8c547"></i>≤ 1</span><span><i style="background:#f59a3d"></i>≤ 2</span><span><i style="background:#f0506e"></i>&gt; 2 min</span>`}<span><i style="background:#b46bff;width:4px"></i>where ${esc(W_)} enters</span></div>`;
+    ${L.map(o => `<span class="lab${o.k === pick ? " pick" : ""}">${esc(o.name)}${o.k === pick ? ' <span class="chip rec">PLAN</span>' : ""}</span>${o.pts.map((p, i) =>
+        `<i class="${clsOf(p)}${i === ei ? " ent" : ""}${o.k === "none" && p && p.tg != null ? " tg" : ""}${o.k === pick ? " pk" : ""}" title="${esc(tip(o, p, i))}">${fmt(val(p))}</i>`).join("")}
+      <b class="avg${o.k === pick ? " pk" : ""}">${hw ? f1(avgOf(o)) : f3(o.ewt)}</b>`).join("")}
+    <span class="lab dl">Change with the plan</span>${ch.pts.map((p, i) => { const a = val(base.pts[i]), b = val(p), d = a == null || b == null ? null : b - a, e = hw ? 0.5 : 0.005;
+        return `<i class="dl ${d == null ? "" : d < -e ? "dn" : d > e ? "up" : "eq"}${i === ei ? " ent" : ""}" title="${esc(`Stop ${r.points[i].no}: ${fmt(a)} → ${fmt(b)}`)}">${d == null ? "–" : Math.abs(d) < e ? "0" : (d < 0 ? "▼" : "▲") + (hw ? f0(Math.abs(d)) : f2(Math.abs(d)))}</i>`; }).join("")}
+      ${(() => { const a = avgOf(base), b = avgOf(ch), d = a == null || b == null ? null : b - a, e = hw ? 0.05 : 0.0005; return `<b class="avg dl ${d == null ? "" : d < -e ? "dn" : d > e ? "up" : "eq"}">${d == null ? "–" : (d < 0 ? "▼" : d > 0 ? "▲" : "") + (hw ? f1(Math.abs(d)) : f3(Math.abs(d)))}</b>`; })()}</div></div>
+    <div class="sm-key">${hw ? `<span><i class="sw g"></i>on target (−2 to +2)</span><span><i class="sw y"></i>2–4 min longer</span><span><i class="sw o"></i>5–9 min longer</span><span><i class="sw r"></i>10+ min longer</span><span><i class="sw b"></i>&gt; 2 min shorter</span>`
+      : `<span><i class="sw g"></i>≤ 0.5</span><span><i class="sw y"></i>≤ 1</span><span><i class="sw o"></i>≤ 2</span><span><i class="sw r"></i>&gt; 2 min</span>`}<span><i class="sw" style="background:#b46bff;border-color:#b46bff;width:4px"></i>where ${esc(W_)} enters</span>${tg ? `<span><b style="color:#d9b8ff">◆</b> the ${f0(tg.minutes)}-min gap still to pass (no action)</span>` : ""}<span><b style="color:#5ff0b4">▼</b> / <b style="color:#ff8f9c">▲</b> less / more than no action</span></div>`;
   // trips down the route
   h += `<div class="sm-h"><h3>Simulation – every ${nd} trip down the route</h3><span class="sp"></span><span class="sm-seg" role="group" aria-label="Show"><button type="button" data-s="both" aria-pressed="${ST.simShow === "both"}">Before + after</button><button type="button" data-s="before" aria-pressed="${ST.simShow === "before"}">Before</button><button type="button" data-s="after" aria-pressed="${ST.simShow === "after"}">After</button></span></div>
     <div class="sm-tsd" id="simTsd">${simChart(r, x)}</div>
