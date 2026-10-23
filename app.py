@@ -6362,6 +6362,26 @@ async def api_auth_logout():
 # AUTH_GATE=0 keeps the login page but does not block anything.
 _GATE_OPEN = ("/login", "/api/auth/", "/api/health", "/app-shell.js", "/design-system.css", "/basemap.js", "/nav-registry.js", "/favicon")
 
+# V16.27: a TV / LED panel shows the live diversions without signing in (a login session expires). Set DIVERSION_TV_KEY in the
+# Render Environment and open /diversion/tv?key=<that key> once on the TV: a TV cookie then opens ONLY the TV page, its script,
+# the 3D map script and the read-only list of live diversions. Without DIVERSION_TV_KEY the TV page needs a normal login.
+TV_KEY = os.getenv("DIVERSION_TV_KEY", "").strip()
+_TV_PATHS = ("/diversion/tv", "/diversion-tv.js", "/api/dv2/live", "/map3d.js")
+
+
+def _tv_token():
+    return hashlib.sha256(("sentry-tv:" + TV_KEY).encode()).hexdigest()
+
+
+def tv_access(request):
+    """0 = no TV access, 1 = the TV cookie, 2 = the key in the link (the cookie is set)"""
+    if not TV_KEY or request.url.path not in _TV_PATHS or request.method != "GET":
+        return 0
+    import hmac
+    if hmac.compare_digest(request.query_params.get("key", ""), TV_KEY):
+        return 2
+    return 1 if hmac.compare_digest(request.cookies.get("sentry_tv", ""), _tv_token()) else 0
+
 
 @app.middleware("http")
 async def login_gate(request: Request, call_next):
@@ -6370,6 +6390,12 @@ async def login_gate(request: Request, call_next):
     path = request.url.path
     if request.method == "OPTIONS" or path.startswith(_GATE_OPEN) or auth.read(request.cookies.get(auth.COOKIE, "")):
         return await call_next(request)
+    tv = tv_access(request)
+    if tv:
+        resp = await call_next(request)
+        if tv == 2:
+            resp.set_cookie("sentry_tv", _tv_token(), max_age=400 * 86400, httponly=True, samesite="lax", secure=request.url.scheme == "https", path="/")
+        return resp
     if path.startswith("/api/"):
         return JSONResponse({"error": "Sign in required.", "login": "/login"}, status_code=401)
     from urllib.parse import quote
@@ -8522,6 +8548,28 @@ async def diversion_classic_page():
     return _page("diversion_classic.html")
 
 
+@app.get("/diversion/tv", response_class=HTMLResponse)
+async def diversion_tv_page():
+    """V16.27: live diversions for a TV / LED panel (full screen, no menu)"""
+    return _page("diversion_tv.html")
+
+
+@app.get("/diversion-tv.js")
+async def diversion_tv_js():
+    return Response((HERE / "diversion_tv.js").read_text(encoding="utf-8"), media_type="application/javascript", headers={"Cache-Control": "no-cache"})
+
+
+@app.get("/diversion/history", response_class=HTMLResponse)
+async def diversion_history_page():
+    """V16.27: saved diversions - filter, duplicate with a new period, end, export to Excel"""
+    return _page("diversion_history.html")
+
+
+@app.get("/diversion-history.js")
+async def diversion_history_js():
+    return Response((HERE / "diversion_history.js").read_text(encoding="utf-8"), media_type="application/javascript", headers={"Cache-Control": "no-cache"})
+
+
 @app.get("/diversion-classic.js")
 async def diversion_classic_js():
     return Response((HERE / "diversion_classic.js").read_text(encoding="utf-8"), media_type="application/javascript",
@@ -10475,10 +10523,19 @@ async def api_dv2_manual(request: Request):
     return dict(res, ok=True, snapped=True, mode=mode, note="; ".join(note))
 
 
+DV2_CASE_COLS = {"ok": False}
+
+
 def dv2_case_db():
     dv2_db()
     bb_sql("CREATE TABLE IF NOT EXISTS dv2_case(id INTEGER PRIMARY KEY AUTOINCREMENT, ts REAL, by_name TEXT, road TEXT, lat REAL, lon REAL, "
            "data TEXT, followed INTEGER DEFAULT 0, from_case INTEGER, manual INTEGER DEFAULT 0)")
+    if not DV2_CASE_COLS["ok"]:          # V16.27: the diversion's period (start / end time); cases saved before have none
+        cols = {r_["name"] for r_ in (bb_sql("PRAGMA table_info(dv2_case)", fetch=True) or [])}
+        for c_ in ("start_ts", "end_ts"):
+            if cols and c_ not in cols:
+                bb_sql(f"ALTER TABLE dv2_case ADD COLUMN {c_} REAL")
+        DV2_CASE_COLS["ok"] = bool(cols)
 
 
 def _cpts(v, n):
@@ -10498,6 +10555,44 @@ def _cnum(v, d=0.0):
         return d
 
 
+def dv2_stop_ref(v):
+    return {"code": str(v.get("code") or "")[:6], "name": str(v.get("name") or "")[:60]} if isinstance(v, dict) else None
+
+
+def dv2_ll(x):
+    try:
+        la, lo = float(x.get("lat")), float(x.get("lon"))
+        return {"lat": round(la, 6), "lon": round(lo, 6)} if (la or lo) else {}
+    except (TypeError, ValueError):
+        return {}
+
+
+def dv2_when(v):
+    """V16.27: a start / end time from the page -> epoch seconds | None. 'YYYY-MM-DDTHH:MM' is Singapore time (what OCC typed);
+    epoch seconds are taken as they are. Raises ValueError for anything else."""
+    if v is None or (isinstance(v, str) and not v.strip()):
+        return None
+    if isinstance(v, (int, float)) and not isinstance(v, bool):
+        return float(v) if v > 0 else None
+    t = datetime.fromisoformat(str(v).strip()[:32])
+    return (t if t.tzinfo else t.replace(tzinfo=SGT)).timestamp()
+
+
+def dv2_fmt(ts, f="%d %b %Y %H:%M"):
+    return datetime.fromtimestamp(ts, SGT).strftime(f) if ts else ""
+
+
+def dv2_state(r, now=None):
+    """live | upcoming | ended | saved (no period: saved before V16.27)"""
+    st, en = r.get("start_ts"), r.get("end_ts")
+    if st is None:
+        return "saved"
+    now = now or time.time()
+    if now < st:
+        return "upcoming"
+    return "ended" if en is not None and now >= en else "live"
+
+
 def dv2_case_clean(body):
     """a saved case study: the blockage, each diverted route with its services, the message and the controller's notes"""
     blocks = [{"line": _cpts(b.get("line"), 400), "dir": str(b.get("dir") or "")[:6], "road": str(b.get("road") or "")[:80]}
@@ -10515,16 +10610,24 @@ def dv2_case_clean(body):
         routes.append({"n": int(_cnum(r.get("n"), len(routes) + 1)), "services": [str(x)[:8] for x in (r.get("services") or [])[:40]],
                        "roads": [str(x)[:60] for x in (r.get("roads") or [])[:20]], "text": str(r.get("text") or "")[:600],
                        "line": _cpts(r.get("line"), 500), "leave_pt": lp[0] if lp else None, "rejoin_pt": rp[0] if rp else None,
-                       "skipped": [{"code": str(x.get("code") or "")[:6], "name": str(x.get("name") or "")[:60]} for x in (r.get("skipped") or [])[:40] if isinstance(x, dict)],
+                       "skipped": [dict({"code": str(x.get("code") or "")[:6], "name": str(x.get("name") or "")[:60]}, **dv2_ll(x)) for x in (r.get("skipped") or [])[:40] if isinstance(x, dict)],
                        "km": round(_cnum(r.get("km")), 2), "runs": str(r.get("runs") or "")[:2000], "mileage": str(r.get("mileage") or "")[:20],
-                       "source": str(r.get("source") or "")[:20], "flags": [str(x)[:240] for x in (r.get("flags") or [])[:10]]})
+                       "source": str(r.get("source") or "")[:20], "flags": [str(x)[:240] for x in (r.get("flags") or [])[:10]],
+                       # V16.27: what the TV needs to replay the diversion road by road
+                       "legs": [{"road": str(x.get("road") or "")[:60], "turn": str(x.get("turn") or "")[:16], "s": round(_cnum(x.get("s")), 1)}
+                                for x in (r.get("legs") if isinstance(r.get("legs"), list) else [])[:30] if isinstance(x, dict)],
+                       "from_road": str(r.get("from_road") or "")[:60], "back_road": str(r.get("back_road") or "")[:60],
+                       "leave": dv2_stop_ref(r.get("leave")), "rejoin": dv2_stop_ref(r.get("rejoin")),
+                       "orig": _cpts(r.get("orig"), 500), "skip_line": _cpts(r.get("skip_line"), 500),
+                       "added_km": round(_cnum(r.get("added_km")), 2), "added_min": round(_cnum(r.get("added_min")), 1), "turns": int(_cnum(r.get("turns"), 0))})
     services = [{"service": str(s_.get("service") or "")[:8], "direction": int(_cnum(s_.get("direction"), 1)), "run": int(_cnum(s_.get("run"), 0)),
                  "route": int(_cnum(s_.get("route"), 0)), "leave": str(s_.get("leave") or "")[:6], "rejoin": str(s_.get("rejoin") or "")[:6],
                  "source": str(s_.get("source") or "")[:20]}
                 for s_ in (body.get("services") if isinstance(body.get("services"), list) else [])[:60] if isinstance(s_, dict)]
     fc = body.get("from_case")
     return {"v": 1, "blocks": blocks, "page": page, "routes": routes, "services": services, "text": str(body.get("text") or "")[:6000],
-            "note": str(body.get("note") or "")[:1000], "from_case": int(fc) if isinstance(fc, (int, float)) and fc > 0 else None}
+            "note": str(body.get("note") or "")[:1000], "from_case": int(fc) if isinstance(fc, (int, float)) and fc > 0 else None,
+            "_start": body.get("start"), "_end": body.get("end")}
 
 
 def dv2_case_brief(r, data=None, full=False):
@@ -10535,7 +10638,11 @@ def dv2_case_brief(r, data=None, full=False):
     out = {"id": r["id"], "ts": r["ts"], "date": datetime.fromtimestamp(r["ts"], SGT).strftime("%d %b %Y"), "time": datetime.fromtimestamp(r["ts"], SGT).strftime("%H:%M"),
            "by": r["by_name"] or "", "road": r["road"] or "", "followed": int(r["followed"] or 0), "manual": bool(r["manual"]), "note": d.get("note", ""),
            "services": [s_["service"] for s_ in d.get("services", [])],
-           "routes": [{k: v for k, v in x.items() if full or k not in ("line", "runs")} for x in d.get("routes", [])]}
+           "routes": [{k: v for k, v in x.items() if full or k not in ("line", "runs", "orig", "skip_line", "legs")} for x in d.get("routes", [])]}
+    st, en = r.get("start_ts"), r.get("end_ts")                         # V16.27: the period
+    out.update(start_ts=st, end_ts=en, start=dv2_fmt(st), end=dv2_fmt(en), start_in=dv2_fmt(st, "%Y-%m-%dT%H:%M"), end_in=dv2_fmt(en, "%Y-%m-%dT%H:%M"),
+               state=dv2_state(r), from_case=r.get("from_case"), blocked=", ".join(dict.fromkeys(b.get("road", "") for b in d.get("blocks", []) if b.get("road"))) or (r["road"] or ""),
+               dir_txt=", ".join(dict.fromkeys(((p_.get("labels") or {}).get(p_.get("dir")) or ("Both directions" if p_.get("dir") == "both" else "")) for p_ in d.get("page", []))).strip(", "))
     if full:
         out.update(blocks=d.get("blocks", []), page=d.get("page", []), text=d.get("text", ""), service_detail=d.get("services", []))
     return out
@@ -10548,11 +10655,15 @@ async def api_dv2_case_save(request: Request):
     d = dv2_case_clean(_dv_body(await request.body()))
     if not d["blocks"] or not d["routes"]:
         return JSONResponse({"error": "Nothing to save yet: a blockage and at least one diverted route are needed."}, status_code=400)
+    try:
+        st, en = dv2_period(d.pop("_start", None), d.pop("_end", None))
+    except ValueError as e:
+        return JSONResponse({"error": str(e)}, status_code=400)
     b0 = d["blocks"][0]["line"] or [[0.0, 0.0]]
     mid = b0[len(b0) // 2]
     manual = any(x["source"] == "manual" for x in d["routes"])
-    cid = bb_insert("INSERT INTO dv2_case(ts, by_name, road, lat, lon, data, followed, from_case, manual) VALUES (?,?,?,?,?,?,0,?,?)",
-                    (time.time(), _who(request), d["blocks"][0]["road"], mid[0], mid[1], json.dumps(d), d["from_case"], 1 if manual else 0))
+    cid = bb_insert("INSERT INTO dv2_case(ts, by_name, road, lat, lon, data, followed, from_case, manual, start_ts, end_ts) VALUES (?,?,?,?,?,?,0,?,?,?,?)",
+                    (time.time(), _who(request), d["blocks"][0]["road"], mid[0], mid[1], json.dumps(d), d["from_case"], 1 if manual else 0, st, en))
     if not cid:
         return JSONResponse({"error": "The case could not be saved (database unavailable)."}, status_code=503)
     if d["from_case"]:
@@ -10582,6 +10693,216 @@ async def api_dv2_case_delete(cid: int):
     dv2_case_db()
     bb_sql("DELETE FROM dv2_case WHERE id = ?", (cid,))
     return {"ok": True}
+
+
+# ---- V16.27: the diversion's period, live diversions for the TV, history (filter, duplicate, end, export to Excel)
+def dv2_period(start, end, default_start=None):
+    """-> (start_ts, end_ts). No start: default_start (None = a case without a period). End is optional ("until further notice")."""
+    try:
+        st, en = dv2_when(start), dv2_when(end)
+    except (TypeError, ValueError):
+        raise ValueError("The start or end time is not a valid date and time.")
+    st = st if st is not None else default_start
+    if en is not None and st is None:
+        st = time.time()
+    if en is not None and en <= st:
+        raise ValueError("The end time must be after the start time.")
+    return st, en
+
+
+def dv2_case_row(cid):
+    r = bb_sql("SELECT * FROM dv2_case WHERE id = ?", (cid,), fetch=True)
+    return r[0] if r else None
+
+
+@app.get("/api/dv2/live")
+async def api_dv2_live(case: int = 0):
+    """what the TV shows: every diversion whose period covers now (start <= now < end, or no end yet), oldest first, and the ones
+    starting in the next 24 h. case=ID: that one record only (preview on the TV, whatever its period)."""
+    dv2_case_db()
+    now = time.time()
+    if case:
+        r = dv2_case_row(case)
+        return {"ok": True, "now": now, "preview": True, "live": [dv2_case_brief(r, full=True)] if r else [], "upcoming": []}
+    rows = bb_sql("SELECT * FROM dv2_case WHERE start_ts IS NOT NULL AND start_ts <= ? AND (end_ts IS NULL OR end_ts > ?) ORDER BY start_ts",
+                  (now + 24 * 3600.0, now), fetch=True) or []
+    return {"ok": True, "now": now, "preview": False, "saved": bool(BB.get("db_ok")),
+            "live": [dv2_case_brief(r, full=True) for r in rows if r["start_ts"] <= now][:12],
+            "upcoming": [dv2_case_brief(r) for r in rows if r["start_ts"] > now][:12]}
+
+
+def dv2_history_rows(frm="", to="", road="", service="", state="", limit=300):
+    """saved diversions, newest first, whose period overlaps [frm, to] (dates, Singapore time), on a road / for a service"""
+    now = time.time()
+    try:
+        lo = datetime.fromisoformat(frm).replace(tzinfo=SGT).timestamp() if frm else None
+        hi = (datetime.fromisoformat(to).replace(tzinfo=SGT) + timedelta(days=1)).timestamp() if to else None
+    except ValueError:
+        raise ValueError("Dates must be YYYY-MM-DD.")
+    rows = bb_sql("SELECT * FROM dv2_case ORDER BY COALESCE(start_ts, ts) DESC LIMIT 3000", fetch=True) or []
+    q, sv = road.strip().lower(), service.strip().upper()
+    out = []
+    for r in rows:
+        a = r.get("start_ts") or r["ts"]
+        b = r.get("end_ts") or (max(now, a) if dv2_state(r, now) in ("live", "upcoming") else a)
+        if (lo is not None and b < lo) or (hi is not None and a >= hi):
+            continue
+        if state and dv2_state(r, now) != state:
+            continue
+        if q or sv:
+            try:
+                d = json.loads(r["data"] or "{}")
+            except ValueError:
+                d = {}
+            if q and q not in " ".join([r["road"] or ""] + [b_.get("road", "") for b_ in d.get("blocks", [])]
+                                       + [x.get("text", "") + " " + " ".join(x.get("roads", [])) for x in d.get("routes", [])]).lower():
+                continue
+            if sv and sv not in [str(x.get("service", "")).upper() for x in d.get("services", [])]:
+                continue
+        out.append(r)
+        if len(out) >= limit:
+            break
+    return out
+
+
+@app.get("/api/dv2/history")
+async def api_dv2_history(frm: str = Query("", alias="from"), to: str = "", road: str = "", service: str = "", state: str = "", limit: int = 300):
+    dv2_case_db()
+    try:
+        rows = dv2_history_rows(frm, to, road, service, state, max(1, min(1000, int(limit))))
+    except ValueError as e:
+        return JSONResponse({"error": str(e)}, status_code=400)
+    return {"cases": [dv2_case_brief(r) for r in rows], "saved": bool(BB.get("db_ok")), "now": time.time()}
+
+
+@app.post("/api/dv2/cases/{cid}/duplicate")
+async def api_dv2_case_duplicate(cid: int, request: Request):
+    """use a past diversion again: the same blockage, routes and message as a NEW record with its own start / end time"""
+    dv2_case_db()
+    body = _dv_body(await request.body())
+    r = dv2_case_row(cid)
+    if not r:
+        return JSONResponse({"error": "Case not found."}, status_code=404)
+    try:
+        st, en = dv2_period(body.get("start"), body.get("end"), default_start=time.time())
+    except ValueError as e:
+        return JSONResponse({"error": str(e)}, status_code=400)
+    try:
+        d = json.loads(r["data"] or "{}")
+    except ValueError:
+        d = {}
+    d["from_case"] = cid
+    if isinstance(body.get("note"), str):
+        d["note"] = body["note"][:1000]
+    nid = bb_insert("INSERT INTO dv2_case(ts, by_name, road, lat, lon, data, followed, from_case, manual, start_ts, end_ts) VALUES (?,?,?,?,?,?,0,?,?,?,?)",
+                    (time.time(), _who(request), r["road"], r["lat"], r["lon"], json.dumps(d), cid, r["manual"], st, en))
+    if not nid:
+        return JSONResponse({"error": "Could not save the copy (database unavailable)."}, status_code=503)
+    bb_sql("UPDATE dv2_case SET followed = followed + 1 WHERE id = ?", (cid,))      # used again: ranks higher next time
+    return {"ok": True, "case": dv2_case_brief(dv2_case_row(nid))}
+
+
+@app.post("/api/dv2/cases/{cid}/times")
+async def api_dv2_case_times(cid: int, request: Request):
+    """change the start / end time of a record; {"end_now": true} ends a live diversion now (an upcoming one is called off)"""
+    dv2_case_db()
+    body = _dv_body(await request.body())
+    r = dv2_case_row(cid)
+    if not r:
+        return JSONResponse({"error": "Case not found."}, status_code=404)
+    now = time.time()
+    if body.get("end_now"):
+        en = now
+        st = min(r.get("start_ts") or r["ts"], now - 1.0)                # an upcoming one is called off: it never runs
+    else:
+        try:
+            st, en = dv2_period(body.get("start", r.get("start_ts")), body.get("end") if "end" in body else r.get("end_ts"), default_start=r.get("start_ts") or r["ts"])
+        except ValueError as e:
+            return JSONResponse({"error": str(e)}, status_code=400)
+    bb_sql("UPDATE dv2_case SET start_ts = ?, end_ts = ? WHERE id = ?", (st, en, cid))
+    return {"ok": True, "case": dv2_case_brief(dv2_case_row(cid))}
+
+
+DV2_STATE_TXT = {"live": "LIVE", "upcoming": "Upcoming", "ended": "Ended", "saved": "No period"}
+
+
+def dv2_history_xlsx(rows):
+    """Excel: one row per diverted route, one per service, and the message of each record"""
+    import io
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill, Alignment
+    from openpyxl.utils import get_column_letter
+    wb = Workbook()
+    head_f, head_fill = Font(bold=True, color="FFFFFF"), PatternFill("solid", fgColor="0B1A2E")
+    when = lambda ts: datetime.fromtimestamp(ts, SGT).replace(tzinfo=None) if ts else None
+
+    def sheet(ws, title, cols, data, widths):
+        ws.title = title
+        ws.append(cols)
+        for c_ in ws[1]:
+            c_.font, c_.fill, c_.alignment = head_f, head_fill, Alignment(vertical="center", wrap_text=True)
+        for row in data:
+            ws.append(row)
+        for i, w in enumerate(widths, 1):
+            ws.column_dimensions[get_column_letter(i)].width = w
+        for row in ws.iter_rows(min_row=2):
+            for c_ in row:
+                if isinstance(c_.value, datetime):
+                    c_.number_format = "dd mmm yyyy hh:mm"
+                c_.alignment = Alignment(vertical="top", wrap_text=isinstance(c_.value, str) and len(c_.value) > 40)
+        ws.freeze_panes = "A2"
+        if data:
+            ws.auto_filter.ref = ws.dimensions
+
+    R, SV, M = [], [], []
+    for r in rows:
+        try:
+            d = json.loads(r["data"] or "{}")
+        except ValueError:
+            d = {}
+        b = dv2_case_brief(r, data=d)
+        st0, en0, stt = when(r.get("start_ts")), when(r.get("end_ts")), DV2_STATE_TXT.get(b["state"], b["state"])
+        for x in d.get("routes", []):
+            sk = x.get("skipped") or []
+            try:
+                mil = float(x.get("mileage") or "")
+            except ValueError:
+                mil = x.get("mileage") or None
+            R.append([r["id"], stt, st0, en0 if en0 else ("Until further notice" if b["state"] in ("live", "upcoming") else None), b["blocked"], b["dir_txt"],
+                      x.get("n"), ", ".join(x.get("services") or []), x.get("text", ""), len(sk), ", ".join("BS " + s_["code"] for s_ in sk),
+                      x.get("km") or None, len([t for t in str(x.get("runs") or "").splitlines() if t.strip()]) or None, str(x.get("runs") or "").strip() or None,
+                      mil, {"manual": "Drawn by OCC", "case": "Saved case", "ai": "AI review", "alternative": "Alternative", "algorithm": "Planner"}.get(x.get("source"), x.get("source") or ""),
+                      b["note"], b["by"], when(r["ts"])])
+        rt = {x.get("n"): x for x in d.get("routes", [])}
+        for s_ in d.get("services", []):
+            x = rt.get(s_.get("route")) or {}
+            SV.append([r["id"], stt, st0, en0, b["blocked"], s_.get("service"), s_.get("direction"), s_.get("route"), s_.get("leave"), s_.get("rejoin"),
+                       x.get("text", ""), {"manual": "Drawn by OCC", "case": "Saved case"}.get(s_.get("source"), s_.get("source") or "")])
+        M.append([r["id"], stt, st0, en0, b["blocked"], d.get("text", "")])
+    wb_ws = wb.active
+    sheet(wb_ws, "Diversions", ["Case", "Status", "Start", "End", "Blocked road", "Direction", "Route", "Services", "Diversion route", "Stops skipped",
+                                "Skipped stops", "Diversion km", "Runs", "Diverted runs", "Mileage salvaged (km)", "Route by", "Note", "Saved by", "Saved at"],
+          R, [7, 10, 17, 17, 24, 13, 7, 18, 60, 8, 30, 10, 6, 34, 12, 13, 30, 14, 17])
+    sheet(wb.create_sheet(), "Services", ["Case", "Status", "Start", "End", "Blocked road", "Service", "Direction", "Route", "Leave stop", "Rejoin stop",
+                                          "Diversion route", "Route by"], SV, [7, 10, 17, 17, 24, 9, 9, 7, 11, 11, 60, 13])
+    sheet(wb.create_sheet(), "Messages", ["Case", "Status", "Start", "End", "Blocked road", "OCC message"], M, [7, 10, 17, 17, 24, 90])
+    bio = io.BytesIO()
+    wb.save(bio)
+    return bio.getvalue()
+
+
+@app.get("/api/dv2/history/export")
+async def api_dv2_history_export(frm: str = Query("", alias="from"), to: str = "", road: str = "", service: str = "", state: str = ""):
+    from fastapi.responses import Response as _Resp
+    dv2_case_db()
+    try:
+        rows = dv2_history_rows(frm, to, road, service, state, 1000)
+    except ValueError as e:
+        return JSONResponse({"error": str(e)}, status_code=400)
+    data = await asyncio.to_thread(dv2_history_xlsx, rows)
+    name = "diversions_" + (frm or "all") + ("_to_" + to if to else "") + ".xlsx"
+    return _Resp(data, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                 headers={"Content-Disposition": f'attachment; filename="{name}"', "Cache-Control": "no-store"})
 
 
 def dv2_case_match(now, old):

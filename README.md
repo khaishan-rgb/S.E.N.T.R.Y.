@@ -1,12 +1,69 @@
 # SG Transport Pulse V16.19 — Operational Intelligence & Service Recovery Platform
 
+## Diversion Maps: start / end time, TV broadcast, History (V16.27)
+Three tabs at the top of Diversion Maps: **PLANNER · HISTORY · TV BROADCAST** (the TV tab opens a new window and shows how many diversions are live).
+
+**Start and end time.** Step 7 (Save) now has **Start** and **End**, in Singapore time whatever the computer's clock zone.
+* Start is filled in with *now* and keeps following the clock until you change it.
+* Leave End empty for "until further notice". The end must be after the start.
+* A saved diversion is **live** from its start until its end (or until someone ends it), **upcoming** before its start, and **ended** after its end. Cases saved before V16.27 have no period: they show "no period" and are never live.
+* After saving, step 7 says e.g. *"Saved as case #7 · LIVE now on the TV until further notice"*.
+
+**TV broadcast — `/diversion/tv`** (`diversion_tv.html`, `diversion_tv.js`), for a 90-inch TV or LED panel. It is one full screen with no menu, and needs no keyboard or mouse.
+* **What it shows:** every live diversion in turn, one route at a time.
+  1. A 3D overview of the closure and the diversion (the bus travels left to right, like the ribbon).
+  2. The camera rides behind a glowing bus as it drives the diversion. A sat-nav card shows the next turn and how far ("410 m · Turn right into East Link · Now on Upp Bt Timah Rd").
+  3. The overview again, then the next one.
+* **Route ribbon:** the road-by-road strip at the bottom, e.g. *Upp Bt Timah Rd ↰ Hillview Rd ↱ Hillview Ave ↱ … Back on route at BS 43029*. The road the bus is on lights up. Cyan = its normal route, green = the diversion roads; the turns sit between them.
+* **Side panel:** the road closed and its direction, the diverted services drawn like a bus's amber destination display, the stops not served, the diversion km and the extra km / minutes, "Live since 08:15 · Ends 18:00 · 2 h 10 min left" (or until further notice), and the OCC note.
+* **Footer:** the next diversion on screen, and the ones starting in the next 24 h.
+* **Housekeeping:** it refreshes every 30 s. If the network drops it keeps showing the last update with *"Connection lost"*. With nothing live it says *"All bus services are on their normal routes"* and when the next one starts. The clock is Singapore time.
+* **Sizing:** everything scales with the screen (1rem = 1/120 of the width), so 1080p and 4K look the same. Other screen shapes are letterboxed.
+* **3D and 2D:** 3D uses MapLibre GL 4.7.1 with OpenFreeMap tiles (no key). A TV without WebGL gets the same show on a 2D map (Leaflet with the platform basemap). A slow TV switches itself to flat buildings.
+* **Link options:**
+  * `?case=ID` previews one saved record (History: PREVIEW ON TV).
+  * `?lite=1` gives flat buildings.
+  * `?2d=1` forces the 2D map.
+  * `?speed=N` runs it N times faster (demos).
+* **Keys** (if a keyboard is attached): F full screen, → next, ← previous, Space pause.
+* **TV extras:** the mouse pointer hides after 3 s, the screen is kept awake where the browser allows it, and the page reloads itself every 6 h.
+* **TV without a login (recommended).** A login session expires (`AUTH_SESSION_HOURS`), so a wall TV would end up on the sign-in page.
+  1. Set **`DIVERSION_TV_KEY`** (a long random value) in the **Render Environment**. Never put it in GitHub.
+  2. Open `/diversion/tv?key=<that value>` once on the TV.
+
+  A TV cookie (400 days) then opens **only** the TV page, its script, the 3D map script and the read-only live list (`/api/dv2/live`). It cannot open the planner, the history, saving or anything else. Change the key to sign every TV out. Without `DIVERSION_TV_KEY` the TV page uses the normal login.
+
+**History — `/diversion/history`** (`diversion_history.html`, `diversion_history.js`).
+* **Find:** filter by **From / To** (the period overlaps those days; the last 30 days by default), **Road** (the road closed or any road of the route), **Service** and **Status** (live now / upcoming / ended / no period). The filters and the open record are kept in the page link.
+* **List:** status, period ("23 Oct 13:30 – until further notice · running 1 h", "lasted 4 h"), road closed and direction, services, route, saved by.
+* **Open a record** for its map (original route, diversion, closure), period, who saved it (and which record it was copied from), the note, every route (services, roads, stops skipped, km, runs, mileage) and the OCC message with COPY. Then:
+  * **DUPLICATE…** uses it again as a new record with a new Start (now) and End (empty = until further notice), and a note. It counts as "used again" for the planner's past-case suggestions.
+  * **END NOW** ends a live one (it comes off the TV); on an upcoming one it calls it off.
+  * **CHANGE TIMES…** edits the start or end.
+  * **PREVIEW ON TV** opens `/diversion/tv?case=ID`; **OPEN IN PLANNER** opens `/diversion?case=ID`, which puts the blockage back and follows its route.
+  * **DELETE** removes it for everyone.
+* **EXPORT TO EXCEL** downloads what the filters show (`diversions_<from>_to_<to>.xlsx`) with three sheets:
+  * **Diversions** — one row per diverted route: case, status, start, end, road closed, direction, route no., services, the road-by-road route, stops skipped (count and BS codes), diversion km, runs and the run list, mileage salvaged, drawn by OCC / planner, note, saved by and at.
+  * **Services** — one row per service: leave and rejoin stop, route.
+  * **Messages** — the OCC message of each record.
+
+  Real Excel dates, a frozen header and filters.
+
+**Server (app.py).**
+* `dv2_case` gets `start_ts` / `end_ts`; the columns are added to an existing database by themselves.
+* `POST /api/dv2/cases` takes `start` / `end` (`YYYY-MM-DDTHH:MM`, Singapore time).
+* `GET /api/dv2/live[?case=ID]` lists the live diversions (full routes) and the ones starting in the next 24 h.
+* `GET /api/dv2/history?from&to&road&service&state` returns the list; `GET /api/dv2/history/export` returns the same as .xlsx (openpyxl).
+* `POST /api/dv2/cases/{id}/duplicate {start, end, note}` makes the copy; `POST /api/dv2/cases/{id}/times {start, end}` or `{end_now:true}` changes the times.
+* Saved routes now also keep what the TV replays: the road-by-road legs with their positions, the roads before and after, the leave / rejoin stops, the original route and the skipped part, the skipped stops' positions, and the extra km / minutes.
+
 ## Diversion Planner, lean (V16.26) — 7 steps, draw your own, the OCC message, saved cases
 `diversion.html` / `diversion.js`; server: `/api/dv2/manual`, `/api/dv2/cases*` and the "prefer" donors in `dv2_plan` (app.py); 3D: `map3d.js`.
 
 The page is now seven short steps (left: 1–3, right: 4–7; on a phone they follow each other under the map):
 1. **Road** — search, tap the blocked road (unchanged).
 2. **Blockage** — direction, lock, add, clear (unchanged). **Drag the ✕ to the bin to delete — now in 3D too.**
-3. **Operator & services** — operator filter and the affected services. If this road was diverted before, a purple box shows the saved case: *"📁 Diverted here before — 12 Oct 2026 08:15 · svc 67, 75 · drawn by OCC · followed 2× … Do you want to follow this diverted route?"* **FOLLOW** checks every service on that route (see below); **NOT NOW** hides it; older cases with **1 of 3 ▸**.
+3. **Operator & services** — operator filter, **Services** (V16.26i: a drop-down with **Select all** and a tick for each affected service-direction, e.g. *"67, 75 (2 of 3)"*) and the affected services. Only the ticked services (under the operator filter) are analysed, check each other's routes, go into the recommendation message and are saved. Unticking one that was already analysed just hides it, and ticking it again analyses it if needed. The ticks stay when the blockage is adjusted, and the drop-down lists only the chosen operator's services. If this road was diverted before, a purple box shows the saved case: *"📁 Diverted here before — 12 Oct 2026 08:15 · svc 67, 75 · drawn by OCC · followed 2× … Do you want to follow this diverted route?"* **FOLLOW** checks every service on that route (see below); **NOT NOW** hides it; older cases with **1 of 3 ▸**.
 4. **Diversion suggestion** — lean: the route in one line (*Upp Bt Timah Rd > Hillview Rd > Hillview Ave > Hillview Rd > Upp Bt Timah Rd (Back on route)*), stops skipped, extra km / min, turns, any PLEASE CONFIRM, the Bus Captain brief, and the other services' routes checked for this bus. Everything else (AI review, turn by turn, checks, why / why not, score) is folded under **Details**. An alternative can now be chosen: **USE THIS ROUTE**.
 5. **Draw your own** (new) — **DRAW ON MAP** (or ✏ DRAW MY OWN in step 4): tap along the roads from where the bus leaves its route to where it is back on route. The taps are joined along the roads (OpenStreetMap routing, `/api/dv2/manual`); UNDO / CLEAR / DONE / CANCEL on the map. **CHECK & USE** (all affected services, or the selected one) asks the planner again for each service with the drawn route as the controller's choice:
    * passes every hard check → it becomes that service's recommendation ("drawn by OCC");

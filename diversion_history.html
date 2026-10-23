@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#040a14">
+<title>Diversion history · SG Transport Pulse</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="/design-system.css">
+<script src="/app-shell.js" data-module="diversion"></script>
+<style>
+/* V16.27 Diversion history: every saved diversion with its period - search, open, duplicate with a new start / end, end, export */
+.hx{display:grid;grid-template-columns:minmax(0,1fr) 440px;grid-template-rows:auto minmax(0,1fr);gap:10px;height:calc(100vh - var(--ds-cmd-h));min-height:560px;padding:10px 12px;box-sizing:border-box}
+.hx *,.hx *:before,.hx *:after{box-sizing:border-box}
+.hx-card{background:var(--ds-panel,rgba(8,20,38,.86));border:1px solid var(--ds-line);border-radius:14px;padding:14px;min-height:0}
+.hx-top{grid-column:1 / -1;display:flex;flex-direction:column;gap:12px}
+.hx-row{display:flex;align-items:center;gap:10px 14px;flex-wrap:wrap}
+.hx-row .sp{flex:1}
+.dv-tabs{display:flex;gap:3px;padding:3px;border:1px solid var(--ds-line-2);border-radius:11px;background:#06111f;flex:0 0 330px}
+.dv-tabs a{flex:1;display:flex;align-items:center;justify-content:center;gap:5px;min-height:34px;padding:0 6px;border-radius:8px;color:var(--ds-text-2);text-decoration:none;font:700 11.5px var(--ds-font);letter-spacing:.08em;text-transform:uppercase;white-space:nowrap}
+.dv-tabs a:hover{color:#fff;background:rgba(255,255,255,.04)}
+.dv-tabs a[aria-current="page"]{color:var(--ds-cyan);background:rgba(56,214,255,.14);box-shadow:inset 0 0 0 1px rgba(56,214,255,.35)}
+.dv-tabs a:focus-visible{outline:2px solid var(--ds-cyan);outline-offset:1px}
+.dv-tabs .lv{min-width:16px;height:16px;padding:0 4px;border-radius:8px;background:#e0263f;color:#fff;font:700 10px/16px var(--ds-font);letter-spacing:0;text-align:center}
+.dv-tabs .lv[hidden]{display:none}
+.hx-f{display:flex;flex-wrap:wrap;align-items:flex-end;gap:8px 10px;min-width:0}
+.hx-f label{display:flex;flex-direction:column;gap:4px;font:600 11px var(--ds-font);color:var(--ds-mut);min-width:0}
+.hx-f .ds-input,.hx-f .ds-select{height:36px;font-size:13.5px;color-scheme:dark}
+.hx-f .w-d{width:150px}.hx-f .w-r{width:210px}.hx-f .w-s{width:110px}.hx-f .w-t{width:140px}
+.hx-f .sp{flex:1}
+.hx-list{display:flex;flex-direction:column;padding:0;overflow:hidden}
+.hx-sum{display:flex;align-items:center;gap:14px;padding:12px 14px;border-bottom:1px solid var(--ds-line);font-size:13px;color:var(--ds-text-2)}
+.hx-sum b{color:#fff}
+.hx-sum .sp{flex:1}
+.hx-scroll{overflow:auto;min-height:0;flex:1;scrollbar-width:thin}
+table.hx-t{width:100%;border-collapse:collapse;font-size:13px}
+.hx-t th{position:sticky;top:0;z-index:1;background:#081628;text-align:left;font:600 11.5px var(--ds-font);color:var(--ds-mut);padding:9px 10px;border-bottom:1px solid var(--ds-line-2);white-space:nowrap}
+.hx-t td{padding:10px;border-bottom:1px solid var(--ds-line);vertical-align:top;color:var(--ds-text-2)}
+.hx-t tr{cursor:pointer}
+.hx-t tbody tr:hover td{background:rgba(56,214,255,.05)}
+.hx-t tr[aria-selected="true"] td{background:rgba(56,214,255,.1)}
+.hx-t tr[aria-selected="true"] td:first-child{box-shadow:inset 3px 0 0 var(--ds-cyan)}
+.hx-t td.rd b{display:block;color:#fff;font-weight:600}
+.hx-t td.rt{color:#cfe3f7;max-width:420px}
+.hx-t .per{white-space:nowrap}.hx-t .per small{display:block;color:var(--ds-mut)}
+.hx-t tr:focus-visible{outline:2px solid var(--ds-cyan);outline-offset:-2px}
+.st{display:inline-block;font:700 10px var(--ds-font);letter-spacing:.08em;padding:3px 8px;border-radius:999px;border:1px solid currentColor;white-space:nowrap}
+.st.live{color:#ff8a96;background:rgba(255,85,102,.1)}.st.upcoming{color:var(--ds-amber)}.st.ended{color:var(--ds-mut)}.st.saved{color:#7f93ab;border-style:dashed}
+.sv{display:inline-block;margin:0 4px 4px 0;padding:2px 7px;border-radius:6px;background:#140e04;border:1px solid #3d2c0d;color:var(--ds-amber);font:700 12px var(--ds-font)}
+.hx-empty{padding:28px 16px;color:var(--ds-mut);font-size:13.5px;line-height:1.5}
+.hx-det{display:flex;flex-direction:column;gap:12px;overflow:auto;scrollbar-width:thin}
+.hx-det[hidden]{display:none}
+.hx-map{height:230px;border-radius:10px;overflow:hidden;border:1px solid var(--ds-line);flex:none;background:#081428}
+.hx-h{display:flex;align-items:flex-start;gap:10px}
+.hx-h h2{margin:0;font:700 18px var(--ds-display,var(--ds-font));color:#fff;flex:1;min-width:0}
+.hx-h h2 small{display:block;font:500 12.5px var(--ds-font);color:var(--ds-mut);margin-top:3px}
+.hx-k{font:600 11.5px var(--ds-font);color:var(--ds-mut);margin:0 0 5px}
+.hx-p{margin:0;font-size:13px;color:var(--ds-text-2);line-height:1.45}
+.hx-p b{color:#fff}
+.hx-rt{border:1px solid var(--ds-line);border-radius:10px;padding:10px 12px;font-size:13px;color:var(--ds-text-2)}
+.hx-rt + .hx-rt{margin-top:8px}
+.hx-rt .tx{display:block;color:#dff6ff;font-weight:600;margin:5px 0 4px;line-height:1.4}
+.hx-msg{margin:0;padding:10px 12px;border-radius:10px;background:#050f1d;border:1px solid var(--ds-line);color:#dbe8f6;font:12.5px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;white-space:pre-wrap;max-height:220px;overflow:auto}
+.hx-acts{display:flex;flex-wrap:wrap;gap:6px}
+.hx-box{border:1px solid rgba(56,214,255,.35);background:rgba(56,214,255,.05);border-radius:10px;padding:12px}
+.hx-box[hidden]{display:none}
+.hx-box h3{margin:0 0 4px;font:700 13.5px var(--ds-font);color:#fff}
+.hx-when{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:8px 0}
+.hx-when label{display:flex;flex-direction:column;gap:4px;font:600 11px var(--ds-font);color:var(--ds-mut);min-width:0}
+.hx-when .ds-input{height:34px;font-size:13px;color-scheme:dark}
+.hx-box .ds-input.note{height:34px;font-size:13px;margin-bottom:8px}
+.hx-err{color:#ff8a96;font-size:12.5px;margin:4px 0 0}
+.hx-err:empty{display:none}
+.hx-ph{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:6px;color:var(--ds-mut);font-size:13.5px;min-height:200px}
+.hx-toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:4000;padding:10px 16px;border-radius:10px;background:#0b1d33;border:1px solid var(--ds-line-2);color:#fff;font-size:13px;opacity:0;pointer-events:none;transition:opacity .2s;max-width:calc(100vw - 32px)}
+.hx-toast.on{opacity:1}
+a.ds-btn{text-decoration:none}
+@media (max-width:1199px){.hx{grid-template-columns:minmax(0,1fr) 380px}.hx-t .by{display:none}}
+@media (max-width:899px){
+  .hx{display:flex;flex-direction:column;height:auto;min-height:0}
+  .hx-list{max-height:none}.hx-scroll{overflow:visible}
+  .dv-tabs{flex:1 1 100%}
+  .hx-row #fXls{flex:1 1 100%}
+  .hx-f label{flex:1 1 140px}.hx-f .w-d,.hx-f .w-r,.hx-f .w-s,.hx-f .w-t{width:100%}
+  .hx-t thead{display:none}
+  .hx-t,.hx-t tbody,.hx-t tr,.hx-t td{display:block;width:100%}
+  .hx-t tr{padding:10px 12px;border-bottom:1px solid var(--ds-line)}
+  .hx-t td{padding:2px 0;border:0}
+  .hx-t td.rt{max-width:none}
+  .hx-t .by{display:none}
+}
+</style>
+</head>
+<body>
+<main class="ds-main hx" id="main">
+  <section class="hx-card hx-top" aria-label="Find diversions">
+    <div class="hx-row">
+    <nav class="dv-tabs" aria-label="Diversion Maps">
+      <a href="/diversion">Planner</a><a href="/diversion/history" aria-current="page">History</a><a href="/diversion/tv" target="_blank" rel="noopener" title="Open the TV broadcast (live diversions) in a new window">TV broadcast<span class="lv" id="tvLive" hidden></span><svg width="11" height="11" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+    </nav>
+    <h1 class="ds-sr">Diversion history</h1>
+    <span class="sp"></span>
+    <a class="ds-btn" id="fXls" href="/api/dv2/history/export" download>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12m-5-5 5 5 5-5M5 21h14"/></svg>EXPORT TO EXCEL</a>
+    </div>
+    <form class="hx-f" id="f" autocomplete="off">
+      <label>From<input type="date" class="ds-input w-d" id="fFrom" aria-label="From date"></label>
+      <label>To<input type="date" class="ds-input w-d" id="fTo" aria-label="To date"></label>
+      <label>Road<input type="search" class="ds-input w-r" id="fRoad" placeholder="e.g. Upper Bukit Timah"></label>
+      <label>Service<input type="search" class="ds-input w-s" id="fSvc" placeholder="e.g. 67" inputmode="text"></label>
+      <label>Status<select class="ds-select w-t" id="fState"><option value="">All</option><option value="live">Live now</option><option value="upcoming">Upcoming</option><option value="ended">Ended</option><option value="saved">No period</option></select></label>
+      <button type="submit" class="ds-btn pri">SEARCH</button>
+    </form>
+  </section>
+  <section class="hx-card hx-list" aria-label="Saved diversions">
+    <div class="hx-sum" id="sum" role="status"><span>Loading…</span></div>
+    <div class="hx-scroll">
+      <table class="hx-t" id="tbl">
+        <thead><tr><th scope="col">Status</th><th scope="col">Period</th><th scope="col">Road closed</th><th scope="col">Services</th><th scope="col">Diversion route</th><th scope="col" class="by">Saved by</th></tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+      <div class="hx-empty" id="none" hidden></div>
+    </div>
+  </section>
+  <section class="hx-card hx-det" id="det" aria-label="The selected diversion">
+    <div class="hx-ph" id="ph"><b style="color:#fff">Pick a diversion</b>Its map, routes and message show here, with duplicate, end and preview on the TV.</div>
+  </section>
+</main>
+<div class="hx-toast" id="toast" role="status"></div>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="/basemap.js"></script>
+<script src="/diversion-history.js"></script>
+</body>
+</html>

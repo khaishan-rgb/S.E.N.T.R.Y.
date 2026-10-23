@@ -186,6 +186,36 @@ path.dp-anim{stroke-dasharray:14 9;animation:dpdash 1.2s linear infinite}
 .dp-bin.hot{transform:scale(1.12);background:#c81e36;color:#fff;border-style:solid;border-color:#fff}
 .dp-op{display:flex;align-items:center;gap:8px;margin:6px 0 8px;font-size:12px;color:var(--ds-mut)}
 .dp-op select{flex:1;min-width:0;padding:6px 8px;border-radius:8px;border:1px solid var(--ds-line-2);background:#081426;color:#e6f1ff;font:13px var(--ds-font)}
+/* V16.26i: Services - multi-select drop-down (tick per service-direction, Select all) */
+.dp-op>span:first-child{flex:0 0 112px}
+/* V16.27: Planner / History / TV broadcast tabs, and the diversion's period */
+.dv-tabs{display:flex;gap:3px;padding:3px;margin:0 0 12px;border:1px solid var(--ds-line-2);border-radius:11px;background:#06111f}
+.dv-tabs a{flex:1;display:flex;align-items:center;justify-content:center;gap:5px;min-height:34px;padding:0 6px;border-radius:8px;color:var(--ds-text-2);text-decoration:none;font:700 11.5px var(--ds-font);letter-spacing:.08em;text-transform:uppercase;white-space:nowrap}
+.dv-tabs a:hover{color:#fff;background:rgba(255,255,255,.04)}
+.dv-tabs a[aria-current="page"]{color:var(--ds-cyan);background:rgba(56,214,255,.14);box-shadow:inset 0 0 0 1px rgba(56,214,255,.35)}
+.dv-tabs a:focus-visible{outline:2px solid var(--ds-cyan);outline-offset:1px}
+.dv-tabs .lv{min-width:16px;height:16px;padding:0 4px;border-radius:8px;background:#e0263f;color:#fff;font:700 10px/16px var(--ds-font);letter-spacing:0;text-align:center}
+.dv-tabs .lv[hidden]{display:none}
+.dp-when{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.dp-when label{display:flex;flex-direction:column;gap:3px;font-size:11px;color:var(--ds-mut);letter-spacing:.06em;text-transform:uppercase;font-weight:700;min-width:0}
+.dp-dt{width:100%;min-width:0;padding:7px 8px;border-radius:8px;border:1px solid var(--ds-line-2);background:#081426;color:#e6f1ff;font:13px var(--ds-font);color-scheme:dark}
+.dp-dt:focus{outline:2px solid var(--ds-cyan);outline-offset:1px}
+.dp-ms{position:relative}
+.dp-ms-btn{flex:1;min-width:0;display:flex;align-items:center;gap:6px;padding:6px 8px;border-radius:8px;border:1px solid var(--ds-line-2);background:#081426;color:#e6f1ff;font:13px var(--ds-font);text-align:left;cursor:pointer}
+.dp-ms-btn #fSvcTxt{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dp-ms-btn .car{color:var(--ds-mut);font-size:11px}
+.dp-ms-btn:disabled{opacity:.55;cursor:default}
+.dp-ms-btn[aria-expanded="true"],.dp-ms-btn:focus-visible{border-color:var(--ds-cyan);outline:none}
+.dp-ms-panel{position:absolute;left:0;right:0;top:calc(100% + 4px);z-index:40;background:#0b1a2e;border:1px solid var(--ds-line-2);border-radius:10px;box-shadow:0 12px 32px rgba(0,0,0,.55);padding:4px}
+.dp-ms-panel[hidden]{display:none}
+.dp-ms-all,.dp-ms-it{display:flex;align-items:center;gap:8px;padding:7px 8px;border-radius:7px;cursor:pointer;color:#e6f1ff;font-size:13px;min-width:0}
+.dp-ms-all{font-weight:600;border-bottom:1px solid var(--ds-line-2);border-radius:7px 7px 0 0;margin-bottom:2px}
+.dp-ms-all:hover,.dp-ms-it:hover{background:rgba(58,209,255,.08)}
+.dp-ms-it b{flex:0 0 42px}
+.dp-ms-it span{flex:1;min-width:0;color:var(--ds-mut);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dp-ms-list{max-height:260px;overflow:auto}
+.dp-ms input{accent-color:var(--ds-cyan);width:16px;height:16px;margin:0;flex:0 0 auto}
+.dp-ms-foot{display:flex;align-items:center;gap:8px;justify-content:space-between;border-top:1px solid var(--ds-line-2);margin-top:2px;padding:6px 4px 2px;font-size:11px;color:var(--ds-mut)}
 .dp-h3{margin:12px 0 4px;font:700 11px var(--ds-font);letter-spacing:.12em;text-transform:uppercase;color:var(--ds-cyan)}
 .dp-lim{display:grid;grid-template-columns:1fr 90px 44px;gap:8px;align-items:center;margin:4px 0;font-size:13px;color:var(--ds-text)}
 .dp-lim input{padding:5px 8px;border-radius:7px;border:1px solid var(--ds-line-2);background:#081426;color:#fff;font:13px var(--ds-font);width:100%}
@@ -254,7 +284,10 @@ path.dp-anim{stroke-dasharray:14 9;animation:dpdash 1.2s linear infinite}
 <main class="ds-main dp" id="main">
   <aside class="dp-col dp-left" aria-label="Search and blockage">
     <section class="dp-card" id="cSearch">
-      <h1 class="dp-h1">Diversion Planner</h1>
+      <nav class="dv-tabs" aria-label="Diversion Maps">
+        <a href="/diversion" aria-current="page">Planner</a><a href="/diversion/history">History</a><a href="/diversion/tv" target="_blank" rel="noopener" id="tvTab" title="Open the TV broadcast (live diversions) in a new window">TV broadcast<span class="lv" id="tvLive" hidden></span><svg width="11" height="11" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+      </nav>
+      <h1 class="dp-h1 ds-sr">Diversion Planner</h1>
       <div class="dp-search" role="combobox" aria-expanded="false" aria-owns="qList" aria-haspopup="listbox" id="qBox">
         <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2"/><path d="M20 20l-4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
         <input id="q" class="ds-input" type="search" autocomplete="off" placeholder="Search road, junction, bus stop, landmark…" aria-label="Search road, junction, bus stop or landmark" aria-autocomplete="list" aria-controls="qList">
@@ -281,6 +314,14 @@ path.dp-anim{stroke-dasharray:14 9;animation:dpdash 1.2s linear infinite}
       <div class="dp-k"><span class="dp-step">3</span> Operator &amp; services <span class="sp"></span><span id="svcCount"></span></div>
       <div id="caseBox" class="dp-case" hidden></div>
       <label class="dp-op"><span>Transport operator</span><select id="fOp" aria-label="Transport operator"><option value="">All operators</option><option value="SBST">SBS Transit</option><option value="SMRT">SMRT</option><option value="TTS">Tower Transit</option><option value="GAS">Go-Ahead</option></select></label>
+      <div class="dp-op dp-ms" id="fSvc"><span>Services</span>
+        <button type="button" class="dp-ms-btn" id="fSvcBtn" aria-haspopup="true" aria-expanded="false" aria-controls="fSvcPanel" disabled><span id="fSvcTxt">All services</span><span class="car" aria-hidden="true">&#9662;</span></button>
+        <div class="dp-ms-panel" id="fSvcPanel" hidden role="group" aria-label="Choose services">
+          <label class="dp-ms-all"><input type="checkbox" id="fSvcAll" checked>Select all</label>
+          <div class="dp-ms-list" id="fSvcList"></div>
+          <div class="dp-ms-foot"><span>Only the ticked services are planned, share routes, go into the message and are saved.</span><button type="button" class="ds-btn sm pri" id="fSvcDone">DONE</button></div>
+        </div>
+      </div>
       <div id="svcList" role="list"></div>
       <p class="dp-hint" id="svcNote"></p>
     </section>
@@ -324,6 +365,11 @@ path.dp-anim{stroke-dasharray:14 9;animation:dpdash 1.2s linear infinite}
     </section>
     <section class="dp-card" id="cSave" hidden aria-label="Save">
       <div class="dp-k"><span class="dp-step">7</span> Save <span class="sp"></span><button type="button" class="dp-link" id="cList">Saved cases</button></div>
+      <div class="dp-when">
+        <label><span>Start</span><input type="datetime-local" id="sStart" class="dp-dt" aria-label="Diversion start date and time"></label>
+        <label><span>End</span><input type="datetime-local" id="sEnd" class="dp-dt" aria-label="Diversion end date and time (optional)"></label>
+      </div>
+      <p class="dp-muted" id="sWhen" style="margin:4px 0 8px">End empty = until further notice. While it runs it is shown on the TV broadcast.</p>
       <textarea id="sNote" class="dp-ta" rows="2" placeholder="Note (optional) e.g. cause, OCC contact, how it went" aria-label="Note"></textarea>
       <div class="dp-row"><button type="button" class="ds-btn sm pri" id="sSave">SAVE CASE</button><span class="dp-muted" id="sMsg"></span></div>
     </section>
@@ -346,7 +392,7 @@ path.dp-anim{stroke-dasharray:14 9;animation:dpdash 1.2s linear infinite}
 <div class="dp-modal" id="cModal" hidden role="dialog" aria-modal="true" aria-labelledby="cTitle">
   <div class="box">
     <h2 id="cTitle" style="margin:0 0 6px;font-size:17px;color:#fff">Saved cases</h2>
-    <p class="dp-muted" style="margin:0 0 10px">Saved for everyone. When the same road is blocked again, the planner offers the saved route first &mdash; routes OCC drew or followed again rank highest.</p>
+    <p class="dp-muted" style="margin:0 0 10px">Saved for everyone. When the same road is blocked again, the planner offers the saved route first &mdash; routes OCC drew or followed again rank highest. <a href="/diversion/history" style="color:var(--ds-cyan)">History &rsaquo;</a> to search, duplicate with new times, end or export to Excel.</p>
     <div id="cRows"></div>
     <div class="dp-row" style="justify-content:flex-end"><button type="button" class="ds-btn sm ghost" id="cClose">CLOSE</button></div>
   </div>

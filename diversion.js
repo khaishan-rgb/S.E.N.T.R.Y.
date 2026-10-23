@@ -253,20 +253,58 @@
   /* ---------------------------------------------------------------- 4. affected services, each analysed automatically */
   function resetState(){ S.ai = {}; S.share = {}; S.donors = {}; S.plans = {}; S.pick = {}; S.forced = {}; S.base = {}; S.follow = null; S.followRes = null; S.cases = []; S.caseI = 0; S.caseOff = false; S.runs = {}; S.mil = {}; S.saved = null; S.drawRes = null; S.msgSig = ""; }
   S.pick = {}; S.forced = {}; S.base = {}; S.runs = {}; S.mil = {}; S.cases = [];
-  function resetServices(){ resetState(); S.run++; S.services = []; S.sel = null; S.view = null; $("cSvc").hidden = true; $("caseBox").hidden = true; drawReset(); clearServiceMap(); paintRec(); }
+  function resetServices(){ resetState(); S.run++; S.services = []; svcPickOpen(false); S.sel = null; S.view = null; $("cSvc").hidden = true; $("caseBox").hidden = true; drawReset(); clearServiceMap(); paintRec(); }
   function keyOf(x){ return x.service + "|" + x.direction + "|" + (x.run || 0); }
   function payload(){ return {blocks:S.blocks.map(function(b){ return {line:bLineOf(b), dir:b.dir, road:b.road}; })}; }
   S.op = "";
-  function visibleServices(){ return S.services.filter(function(x){ return !S.op || String(x.operator || "").toUpperCase() === S.op; }); }
-  $("fOp").onchange = function(){ S.op = this.value; if(S.sel && !visibleServices().some(function(x){ return keyOf(x) === S.sel; })){ S.sel = null; clearServiceMap(); paintRec(); } paintServices(); if(S.services.length) analyseAll(S.run); };
+  /* V16.26i: Services - a drop-down with a tick per affected service-direction and Select all. Only the ticked ones (under the
+     operator filter) are analysed, share routes with each other, go into the message and are saved. S.pickSvc: null = all */
+  S.pickSvc = null;
+  function opOk(x){ return !S.op || String(x.operator || "").toUpperCase() === S.op; }
+  function picked(x){ return !S.pickSvc || !!S.pickSvc[keyOf(x)]; }
+  function visibleServices(){ return S.services.filter(function(x){ return opOk(x) && picked(x); }); }
+  function svcPickPaint(){
+    var all = S.services.filter(opOk), on = all.filter(picked), nums = [];
+    on.forEach(function(x){ if(nums.indexOf(x.service) < 0) nums.push(x.service); });
+    $("fSvcTxt").textContent = !S.services.length ? "All services" : !all.length ? "No services for this operator" : on.length === all.length ? "All services (" + all.length + ")"
+      : !on.length ? "None selected" : nums.join(", ") + " (" + on.length + " of " + all.length + ")";
+    var ca = $("fSvcAll"); ca.checked = all.length > 0 && on.length === all.length; ca.indeterminate = on.length > 0 && on.length < all.length;
+    $("fSvcBtn").disabled = !S.services.length;
+    if($("fSvcPanel").hidden) return;
+    $("fSvcList").innerHTML = all.map(function(x){ var k = keyOf(x);
+      return '<label class="dp-ms-it"><input type="checkbox" data-k="' + esc(k) + '"' + (picked(x) ? ' checked' : '') + '><b>' + esc(x.service) + '</b><span>D' + x.direction
+        + (x.run ? ' (pass ' + (x.run + 1) + ')' : '') + ' \u00b7 to ' + esc(x.destination || "") + (x.operator ? ' \u00b7 ' + esc(x.operator) : '') + '</span></label>'; }).join("");
+    $("fSvcList").querySelectorAll("input").forEach(function(c){ c.onchange = function(){ var on_ = c.checked; svcPickSet(function(sel){ sel[c.dataset.k] = on_; }); }; });
+  }
+  function svcPickSet(fn){
+    var sel = {}; S.services.forEach(function(x){ sel[keyOf(x)] = picked(x); });
+    fn(sel);
+    S.pickSvc = S.services.every(function(x){ return sel[keyOf(x)]; }) ? null : sel;
+    svcFilterChanged();
+  }
+  function svcPickKeep(){                                                // a new list of services: keep the controller's ticks where they still apply
+    if(S.pickSvc){ var sel = {}, any = false; S.services.forEach(function(x){ var k = keyOf(x); sel[k] = !!S.pickSvc[k]; any = any || sel[k]; }); S.pickSvc = any ? sel : null; }
+    svcPickPaint();
+  }
+  function svcFilterChanged(){
+    if(S.sel && !visibleServices().some(function(x){ return keyOf(x) === S.sel; })){ S.sel = null; clearServiceMap(); paintRec(); }
+    svcPickPaint(); paintServices(); if(S.services.length) analyseAll(S.run);
+  }
+  function svcPickOpen(on){ $("fSvcPanel").hidden = !on; $("fSvcBtn").setAttribute("aria-expanded", on ? "true" : "false"); svcPickPaint(); }
+  $("fOp").onchange = function(){ S.op = this.value; svcFilterChanged(); };
+  $("fSvcAll").onchange = function(){ var on = this.checked; svcPickSet(function(sel){ S.services.filter(opOk).forEach(function(x){ sel[keyOf(x)] = on; }); }); };
+  $("fSvcBtn").onclick = function(){ svcPickOpen($("fSvcPanel").hidden); };
+  $("fSvcDone").onclick = function(){ svcPickOpen(false); $("fSvcBtn").focus(); };
+  document.addEventListener("pointerdown", function(e){ if(!$("fSvcPanel").hidden && !(e.target.closest && e.target.closest("#fSvc"))) svcPickOpen(false); });
+  $("fSvc").addEventListener("keydown", function(e){ if(e.key === "Escape" && !$("fSvcPanel").hidden){ e.stopPropagation(); svcPickOpen(false); $("fSvcBtn").focus(); } });
   function runAffected(){
-    var run = ++S.run, keepFollow = S.follow; resetState(); S.follow = keepFollow; S.services = []; S.sel = null; S.view = null; clearServiceMap(); paintRec(); drawReset();
+    var run = ++S.run, keepFollow = S.follow; resetState(); S.follow = keepFollow; S.services = []; svcPickOpen(false); S.sel = null; S.view = null; clearServiceMap(); paintRec(); drawReset();
     findCases(run);
     $("cSvc").hidden = false; $("svcList").innerHTML = '<p class="dp-muted"><span class="dp-spin"></span>Finding services whose route runs along the blocked section in the blocked direction\u2026</p>';
     post("/api/dv2/affected", payload()).then(function(j){
       if(run !== S.run) return;
       if(j.error){ $("svcList").innerHTML = '<p class="dp-muted">' + esc(j.error) + '</p>'; return; }
-      S.services = j.services || [];
+      S.services = j.services || []; svcPickKeep();
       $("svcCount").textContent = S.services.length ? S.services.length + " service-direction" + (S.services.length === 1 ? "" : "s") : "";
       $("svcNote").textContent = S.services.length ? "Each service-direction is analysed on its own. Tap one to see its diversion." : "";
       if(!S.services.length){ $("svcList").innerHTML = '<p class="dp-empty">No bus service runs along this section in the blocked direction' + (S.blocks.some(function(b){ return b.dir !== "both"; }) ? " (services on the other carriageway are not affected)" : "") + '.</p>'; return; }
@@ -274,7 +312,7 @@
     });
   }
   function analyseAll(run){
-    var queue = visibleServices().filter(function(x){ return !S.plans[keyOf(x)]; }), busy = 0;   // only what the operator filter shows
+    var queue = visibleServices().filter(function(x){ return !S.plans[keyOf(x)]; }), busy = 0;   // only what the operator / services filter shows
     function next(){
       if(run !== S.run) return;
       while(busy < 2 && queue.length){
@@ -384,8 +422,11 @@
   }
   function paintServices(){
     var vis = visibleServices();
-    $("svcCount").textContent = S.services.length ? (S.op ? vis.length + " of " : "") + S.services.length + " service-direction" + (S.services.length === 1 ? "" : "s") : "";
-    if(S.services.length && !vis.length){ $("svcList").innerHTML = '<p class="dp-empty">None of the ' + S.services.length + ' affected service-directions is operated by ' + esc($("fOp").selectedOptions[0].text) + '.</p>'; return; }
+    $("svcCount").textContent = S.services.length ? (vis.length < S.services.length ? vis.length + " of " : "") + S.services.length + " service-direction" + (S.services.length === 1 ? "" : "s") : "";
+    if(S.services.length && !vis.length){
+      $("svcList").innerHTML = S.services.some(opOk) ? '<p class="dp-empty">No service selected \u2014 tick the services to plan under <b>Services</b> above.</p>'
+        : '<p class="dp-empty">None of the ' + S.services.length + ' affected service-directions is operated by ' + esc($("fOp").selectedOptions[0].text) + '.</p>';
+      paintMsg(); return; }
     $("svcList").innerHTML = vis.map(function(x){ var k = keyOf(x), t = stTxt(S.plans[k], k);
       return '<button type="button" class="dp-svc" role="listitem" data-k="' + esc(k) + '" aria-pressed="' + (S.sel === k) + '"><span class="num">' + esc(x.service) + '</span><span class="to">D' + x.direction + ' \u00b7 to ' + esc(x.destination || "") + (x.operator ? ' \u00b7 ' + esc(x.operator) : '') + '</span>' + t[0] + '<span class="rs">' + t[1] + '</span></button>'; }).join("");
     $("svcList").querySelectorAll(".dp-svc").forEach(function(b){ b.onclick = function(){ selectService(b.dataset.k); }; });
@@ -830,9 +871,23 @@
     if(gs.none.length) L_.push("", "No verified diversion yet: " + gs.none.join(", ") + " (controller review)");
     return L_.join("\n");
   }
+  /* V16.27: the diversion's period. Times are Singapore time whatever the computer's clock zone. */
+  function sgtNow(){ return new Date(Date.now() + 8 * 3600e3).toISOString().slice(0, 16); }
+  function sgtTxt(v){ if(!v) return ""; var d = new Date(v + ":00Z"); return d.getUTCDate() + " " + "Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec".split(" ")[d.getUTCMonth()] + " " + v.slice(11, 16); }
+  function whenPaint(){
+    var a = $("sStart").value, b = $("sEnd").value, now = sgtNow();
+    $("sWhen").textContent = b && a && b <= a ? "\u26a0 The end must be after the start."
+      : (a > now ? "Starts " + sgtTxt(a) : "Live from " + sgtTxt(a)) + (b ? " until " + sgtTxt(b) : " until further notice (leave End empty)") + ". While it runs it is shown on the TV broadcast.";
+    $("sWhen").style.color = b && a && b <= a ? "#ff8a96" : "";
+  }
+  $("sStart").addEventListener("input", function(){ S.startSet = true; whenPaint(); }); $("sEnd").addEventListener("input", whenPaint);
+  setInterval(function(){ if(!S.startSet && $("sStart").value && !$("cSave").hidden){ $("sStart").value = sgtNow(); whenPaint(); } }, 30000);   // Start follows "now" until OCC sets it
+  function tvCount(){ get("/api/dv2/live").then(function(j){ var n = j && j.live ? j.live.length : 0, el = $("tvLive"); if(!el) return; el.hidden = !n; el.textContent = n; el.title = n + " live diversion" + (n === 1 ? "" : "s") + " on the TV"; }); }
+  tvCount();
   function paintMsg(){
     var gs = groups(), has = gs.list.length > 0;
     $("cMsg").hidden = !has; $("cSave").hidden = !has;
+    if(has && !$("sStart").value){ $("sStart").value = sgtNow(); whenPaint(); }
     if(!has){ S.msgSig = ""; return; }
     $("mText").textContent = msgText(gs);
     var sig = gs.list.map(function(g){ return g.n + ":" + g.key + ":" + g.svcs.join(","); }).join("|");
@@ -1111,7 +1166,7 @@
     get("/api/dv2/cases?limit=60").then(function(j){
       var cs = (j && j.cases) || [];
       $("cRows").innerHTML = cs.length ? cs.map(function(c){
-        return '<div class="dp-crow"><b>' + esc(c.date) + ' ' + esc(c.time) + '</b> · ' + esc(c.road) + (c.services.length ? ' · svc ' + esc(uniqA(c.services).join(", ")) : '') + ' · by ' + esc(c.by)
+        return '<div class="dp-crow"><b>' + esc(c.date) + ' ' + esc(c.time) + '</b>' + (c.state === "live" ? ' <span class="dp-st no" style="font-size:10px">LIVE</span>' : c.state === "upcoming" ? ' <span class="dp-st rev" style="font-size:10px">STARTS ' + esc(c.start) + '</span>' : '') + ' · ' + esc(c.road) + (c.services.length ? ' · svc ' + esc(uniqA(c.services).join(", ")) : '') + ' · by ' + esc(c.by)
           + (c.manual ? ' · drawn by OCC' : '') + (c.followed ? ' · followed ' + c.followed + '×' : '')
           + (c.routes || []).map(function(r){ return '<span class="rt">' + ((c.routes || []).length > 1 ? 'Route ' + r.n + ': ' : '') + esc(r.text) + '</span>'; }).join("")
           + (c.note ? '<span class="dp-muted">' + esc(c.note) + '</span>' : '')
@@ -1137,19 +1192,29 @@
   $("sSave").onclick = function(){
     var gs = groups(); if(!gs.list.length){ toast("Nothing to save yet"); return; }
     var rt = gs.list.map(function(g){ var s_ = g.srcs.indexOf("manual") >= 0 ? "manual" : g.srcs.indexOf("case") >= 0 ? "case" : g.srcs[0];
-      return {n:g.n, services:g.svcs, roads:chainRaw(g.f.c || g.f), text:routeText(g.f.c || g.f), line:g.f.line, leave_pt:g.f.leave_pt, rejoin_pt:g.f.rejoin_pt,
-              skipped:g.skipped.map(function(s){ return {code:s.code, name:s.name}; }), km:g.km, runs:S.runs[g.key] || "", mileage:milOf(g), source:s_, flags:g.flags}; });
+      var c0 = g.f.c || g.f, p0 = S.plans[g.items[0].k] || {};
+      return {n:g.n, services:g.svcs, roads:chainRaw(c0), text:routeText(c0), line:g.f.line, leave_pt:g.f.leave_pt, rejoin_pt:g.f.rejoin_pt,
+              skipped:g.skipped.map(function(s){ return {code:s.code, name:s.name, lat:s.lat, lon:s.lon}; }), km:g.km, runs:S.runs[g.key] || "", mileage:milOf(g), source:s_, flags:g.flags,
+              // V16.27: what the TV needs to replay it road by road
+              legs:(c0.instructions || []).map(function(x){ return {road:x.road, turn:x.turn, s:x.s}; }), from_road:c0.from_road || c0.keep_road || "", back_road:c0.back_road || "",
+              leave:g.f.leave || null, rejoin:g.f.rejoin || null, orig:p0.original_line || [], skip_line:c0.skip_line || [], added_km:c0.added_km || 0, added_min:c0.added_min || 0, turns:c0.turns || 0}; });
     var sv = []; gs.list.forEach(function(g){ g.items.forEach(function(it){ sv.push({service:it.x.service, direction:it.x.direction, run:it.x.run || 0, route:g.n, leave:(it.f.leave || {}).code, rejoin:(it.f.rejoin || {}).code, source:it.f.src}); }); });
+    var t0 = $("sStart").value || sgtNow(), t1 = $("sEnd").value;
+    if(t1 && t1 <= t0){ toast("The end time must be after the start time"); $("sEnd").focus(); return; }
     var body = {blocks:payload().blocks, page:S.blocks.map(function(b){ return {cor:b.cor, cm:b.cm, a:b.a, b:b.b, road:b.road, labels:b.labels, dir:b.dir}; }),
-                routes:rt, services:sv, text:$("mText").textContent, note:$("sNote").value, from_case:S.follow ? S.follow.id : null};
+                routes:rt, services:sv, text:$("mText").textContent, note:$("sNote").value, from_case:S.follow ? S.follow.id : null, start:t0, end:t1 || ""};
     $("sSave").disabled = true;
     post("/api/dv2/cases", body).then(function(j){
       $("sSave").disabled = false;
-      if(j && j.ok){ S.saved = j.case.id; $("sMsg").textContent = "Saved as case #" + j.case.id + " · " + j.case.date + " " + j.case.time; toast("Saved — next time this road is blocked, the planner offers this route"); }
+      if(j && j.ok){ var c = j.case; S.saved = c.id;
+        $("sMsg").textContent = "Saved as case #" + c.id + " \u00b7 " + (c.state === "live" ? "LIVE now on the TV" + (c.end ? " until " + c.end : " until further notice") : c.state === "upcoming" ? "starts " + c.start : "ended " + c.end);
+        toast(c.state === "live" ? "Saved \u2014 live on the TV broadcast now" : "Saved \u2014 next time this road is blocked, the planner offers this route"); tvCount(); }
       else toast((j && j.error) || "Could not save the case");
     });
   };
 
   hint("Tap the road where it is blocked");
   paintRec();
+  var qCase = +(new URLSearchParams(location.search).get("case") || 0);      // V16.27: /diversion?case=ID (History: OPEN IN PLANNER)
+  if(qCase) openCase(qCase);
 })();

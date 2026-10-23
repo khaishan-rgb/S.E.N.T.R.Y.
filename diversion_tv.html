@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#040a14">
+<title>Live diversions · TV · SG Transport Pulse</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+/* V16.27 TV broadcast - live diversions for a 90-inch TV / LED panel. Everything is sized in rem and 1rem = 1/120 of the screen
+   width (16 px on a 1920 x 1080 screen, 32 px on 4K), so the layout is the same on any 16:9 screen; other shapes fit inside.
+   Colours follow the planner's legend: cyan = normal route, green = diversion, red = road closed, amber = stops not served. */
+:root{--bg:#040a14;--panel:#07111f;--line:#14304f;--ice:#eaf4ff;--mut:#8fa7c4;--dim:#56708f;--cyan:#38d6ff;--green:#2ee59d;--red:#ff3b52;--amber:#ffb547;
+  --cond:"IBM Plex Sans Condensed","IBM Plex Sans","Arial Narrow",system-ui,sans-serif;--sans:"IBM Plex Sans",system-ui,sans-serif}
+html{font-size:min(calc(100vw / 120), calc(100vh / 67.5));background:var(--bg)}
+body{margin:0;background:var(--bg);color:var(--ice);font:400 1.5rem/1.35 var(--sans);overflow:hidden;-webkit-font-smoothing:antialiased;font-variant-numeric:tabular-nums}
+*{box-sizing:border-box}
+.tv{position:fixed;left:50%;top:50%;width:120rem;height:67.5rem;transform:translate(-50%,-50%);display:grid;grid-template-rows:6rem minmax(0,1fr) 12.5rem 3.75rem;overflow:hidden;
+  background:radial-gradient(120rem 60rem at 30% 40%,#0a1a33 0,#040a14 70%)}
+.tv.nocur{cursor:none}
+
+/* header */
+.top{display:flex;align-items:center;gap:2.5rem;padding:0 2.5rem;border-bottom:1px solid var(--line)}
+.brand{display:flex;align-items:center;gap:1.1rem;min-width:0}
+.brand svg{width:2.6rem;height:2.6rem;flex:none}
+.brand .nm{font:500 1.15rem var(--sans);color:var(--mut)}
+.brand h1{margin:0;font:600 2.3rem/1 var(--cond);letter-spacing:.01em;color:var(--ice);white-space:nowrap}
+.brand .pv{font:600 1.1rem var(--sans);color:#1b1206;background:var(--amber);border-radius:.4rem;padding:.25rem .7rem}
+.cnt{display:flex;align-items:center;gap:.7rem;font:600 1.6rem var(--cond);color:var(--ice);padding:.45rem 1.1rem;border-radius:2rem;background:rgba(255,59,82,.12);border:1px solid rgba(255,59,82,.4)}
+.cnt .dot{width:.85rem;height:.85rem;border-radius:50%;background:var(--red);box-shadow:0 0 0 0 rgba(255,59,82,.7);animation:pulse 2s infinite}
+.cnt.zero{background:rgba(46,229,157,.08);border-color:rgba(46,229,157,.35)}.cnt.zero .dot{background:var(--green);animation:none}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(255,59,82,.6)}70%{box-shadow:0 0 0 .9rem rgba(255,59,82,0)}100%{box-shadow:0 0 0 0 rgba(255,59,82,0)}}
+.pips{flex:1;display:flex;gap:.5rem;justify-content:flex-end;align-items:center}
+.pips i{display:block;width:3.2rem;height:.4rem;border-radius:.2rem;background:#163050;overflow:hidden}
+.pips i b{display:block;height:100%;width:0;background:var(--cyan)}
+.pips i.done b{width:100%;background:#2b5a86}
+.clock{display:flex;flex-direction:column;align-items:flex-end;line-height:1}
+.clock b{font:600 3.1rem/1 var(--cond);letter-spacing:.02em}
+.clock span{font:500 1.15rem var(--sans);color:var(--mut);margin-top:.35rem}
+
+/* map + side panel */
+.body{display:grid;grid-template-columns:minmax(0,1fr) 33rem;min-height:0}
+.mapbox{position:relative;min-height:0;overflow:hidden;border-right:1px solid var(--line)}
+#map{position:absolute;inset:0;z-index:0;background:#081428}
+.legend{position:absolute;left:1.6rem;bottom:1.4rem;display:flex;gap:1.6rem;padding:.7rem 1.2rem;border-radius:.8rem;background:rgba(4,10,20,.82);border:1px solid var(--line);font:500 1.2rem var(--sans);color:var(--mut);z-index:3}
+.legend span{display:flex;align-items:center;gap:.55rem;white-space:nowrap}
+.legend i{display:block;width:2.2rem;height:.45rem;border-radius:.25rem}
+/* sat-nav style card: the next turn, how far, the road the bus is on */
+.nav{position:absolute;left:1.6rem;top:1.6rem;z-index:4;display:grid;grid-template-columns:5.4rem minmax(0,1fr);gap:.4rem 1.3rem;align-items:center;min-width:30rem;max-width:44rem;
+  padding:1.2rem 1.6rem 1.1rem 1.2rem;border-radius:1.1rem;background:rgba(4,12,24,.9);border:1px solid rgba(46,229,157,.5);box-shadow:0 .8rem 2.4rem rgba(0,0,0,.5)}
+.nav[hidden]{display:none}
+.nav .ic{grid-row:span 2;width:5.4rem;height:5.4rem;border-radius:1rem;background:var(--green);color:#03231a;display:grid;place-items:center}
+.nav .ic svg{width:3.8rem;height:3.8rem}
+.nav .d{font:700 3.2rem/1 var(--cond);color:#fff}
+.nav .a{font:500 1.5rem/1.2 var(--sans);color:#c9f5e3}.nav .a b{display:block;font:700 2.3rem/1.1 var(--cond);color:#fff;margin-top:.15rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nav .now{grid-column:1 / -1;border-top:1px solid #173653;margin-top:.5rem;padding-top:.6rem;font:500 1.3rem var(--sans);color:var(--mut)}.nav .now b{color:var(--ice);font:600 1.45rem var(--cond)}
+.nav.route{border-color:rgba(56,214,255,.5)}.nav.route .ic{background:var(--cyan);color:#022233}
+.tvbus{width:2.2rem;height:4.8rem;border-radius:.8rem .8rem .5rem .5rem;background:linear-gradient(180deg,#f4fffa,#b9f5dc);border:.18rem solid #fff;position:relative;
+  box-shadow:0 0 1rem rgba(46,229,157,.95),0 0 3rem rgba(46,229,157,.55)}
+.tvbus:before{content:"";position:absolute;left:.25rem;right:.25rem;top:.3rem;height:.85rem;border-radius:.45rem;background:#0b2b22}
+.tvbus:after{content:"";position:absolute;left:.45rem;right:.45rem;bottom:.45rem;top:1.6rem;border-radius:.3rem;background:rgba(11,43,34,.18)}
+.mk{font:600 1.15rem/1.15 var(--sans);color:#fff;padding:.4rem .7rem;border-radius:.5rem;white-space:nowrap;box-shadow:0 .3rem 1rem rgba(0,0,0,.5)}
+.mk.closed{margin-bottom:1.2rem}.mk.leave{margin-right:1.2rem}.mk.back{margin-left:1.2rem}
+.mk small{display:block;font:500 1rem var(--sans);opacity:.85}
+.mk.closed{background:#c4102a;border:1px solid #ff8a98}
+.mk.leave,.mk.back{background:rgba(4,12,24,.92);border:1px solid var(--cyan)}
+.mk.skip{background:rgba(40,26,4,.92);border:1px solid var(--amber);color:#ffe2b0;font-size:1rem;padding:.25rem .5rem}
+.tv-dot{width:1rem;height:1rem;border-radius:50%;border:.2rem solid #fff}
+
+.side{display:flex;flex-direction:column;gap:2rem;padding:2.2rem 2.4rem;min-height:0;overflow:hidden;background:linear-gradient(180deg,rgba(7,17,31,.6),rgba(7,17,31,.95))}
+.lab{display:flex;align-items:center;gap:.6rem;font:500 1.3rem var(--sans);color:var(--mut);margin:0 0 .5rem}
+.lab i{display:block;width:.9rem;height:.9rem;border-radius:.2rem}
+.closed h2{margin:0;font:700 3.3rem/1.02 var(--cond);color:#fff;text-wrap:balance}
+.closed p{margin:.5rem 0 0;font:500 1.6rem var(--sans);color:#ffb3bd}
+.leds{display:flex;flex-wrap:wrap;gap:.8rem}
+/* service numbers as a bus's amber dot-matrix destination display */
+.led{position:relative;display:inline-flex;align-items:center;justify-content:center;min-width:6.4rem;height:5rem;padding:0 1rem;border-radius:.6rem;background:#0d0903;border:1px solid #3b2a0c;
+  box-shadow:inset 0 0 1.2rem rgba(0,0,0,.8);filter:drop-shadow(0 0 .35rem rgba(255,181,71,.55))}
+.led:before{content:"";position:absolute;inset:.35rem;border-radius:.3rem;background:radial-gradient(circle,rgba(255,181,71,.10) 32%,transparent 38%) 0 0/.42rem .42rem}
+.led b{position:relative;font:700 3.7rem/1 var(--cond);color:var(--amber);letter-spacing:.04em;
+  -webkit-mask:radial-gradient(circle,#000 46%,transparent 54%) 0 0/.42rem .42rem;mask:radial-gradient(circle,#000 46%,transparent 54%) 0 0/.42rem .42rem}
+.routeof{margin:.7rem 0 0;font:500 1.3rem var(--sans);color:var(--mut)}
+.skips{list-style:none;margin:0;padding:0;display:grid;gap:.45rem}
+.skips li{display:grid;grid-template-columns:5.6rem minmax(0,1fr);gap:.8rem;align-items:baseline;font:500 1.45rem/1.25 var(--sans);color:#ffe2b0}
+.skips li b{font:600 1.45rem var(--cond);color:var(--amber)}
+.skips li span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#e9d4ad}
+.skips .more{color:var(--mut)}
+.skips .none{display:block;font:500 1.45rem var(--sans);color:var(--mut)}
+.when b{display:block;font:600 2.2rem/1.1 var(--cond);color:#fff}
+.when span{display:block;font:500 1.35rem var(--sans);color:var(--mut);margin-top:.25rem}
+.when .left{color:var(--cyan)}
+.facts{display:flex;gap:2rem}
+.facts div b{display:block;font:600 2.2rem/1.1 var(--cond);color:#fff}
+.facts div span{font:500 1.2rem var(--sans);color:var(--mut)}
+.note{margin:auto 0 0;font:400 1.3rem/1.35 var(--sans);color:#c4d3e6;border-left:.3rem solid #2b4a70;padding-left:1rem}
+.note[hidden]{display:none}
+
+/* the route ribbon - road by road, the bus's progress */
+.ribbon{position:relative;display:flex;flex-direction:column;justify-content:center;padding:0 2.6rem;border-top:1px solid var(--line);background:linear-gradient(180deg,#061223,#050d1a)}
+.rhead{display:flex;align-items:baseline;gap:1.2rem;font:500 1.3rem var(--sans);color:var(--mut);margin-bottom:.6rem}
+.rhead b{font:600 1.5rem var(--cond);color:var(--ice)}
+.track{display:flex;align-items:stretch;gap:0;min-width:0;--rf:2.3rem}
+.cap{flex:none;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;width:9rem;text-align:center;padding-bottom:.1rem}
+.cap .ring{width:2rem;height:2rem;border-radius:50%;border:.35rem solid var(--cyan);background:var(--bg);margin:.2rem 0 .4rem}
+.cap b{font:600 1.2rem/1.1 var(--sans);color:var(--ice)}
+.cap span{font:500 1.05rem/1.15 var(--sans);color:var(--mut);max-width:9rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.seg{flex:1 1 0;min-width:0;display:flex;flex-direction:column;justify-content:flex-end;position:relative}
+.seg .nm{font:600 var(--rf)/1.05 var(--cond);color:#a9c2dd;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:0 .4rem .5rem;text-align:center;transition:color .4s}
+.seg .bar{position:relative;height:1.1rem;border-radius:.55rem;background:rgba(46,229,157,.16);border:1px solid rgba(46,229,157,.45);overflow:hidden}
+.seg .bar i{position:absolute;left:0;top:0;bottom:0;width:calc(var(--p,0) * 100%);background:var(--green)}
+.seg .km{font:500 1.05rem var(--sans);color:var(--dim);text-align:center;padding-top:.35rem;height:1.6rem}
+.seg.route .bar{background:rgba(56,214,255,.12);border-color:rgba(56,214,255,.45)}.seg.route .bar i{background:var(--cyan)}
+.seg.done .nm{color:#6f8eb0}
+.seg.on .nm{color:#fff;text-shadow:0 0 1.2rem rgba(46,229,157,.55)}
+.seg.route.on .nm{text-shadow:0 0 1.2rem rgba(56,214,255,.55)}
+.seg.on .bar{box-shadow:0 0 1.2rem rgba(46,229,157,.5)}
+.seg.on .bar i:after{content:"";position:absolute;right:-.2rem;top:50%;width:1.5rem;height:1.5rem;margin-top:-.75rem;border-radius:50%;background:#fff;box-shadow:0 0 .9rem #fff,0 0 1.8rem var(--green)}
+.jn{flex:none;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;width:3.4rem;z-index:2}
+.jn .t{width:3rem;height:3rem;border-radius:50%;background:#0a1a2f;border:.2rem solid var(--green);display:grid;place-items:center;margin-bottom:-.95rem;color:#fff}
+.jn .t svg{width:1.9rem;height:1.9rem}
+.jn .u{height:1.6rem;margin-top:1.3rem}
+.jn.passed .t{background:var(--green);color:#04210f}
+.empty{position:absolute;inset:6rem 0 3.75rem 0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;z-index:6;background:radial-gradient(70rem 40rem at 50% 45%,#0a1f3a 0,#040a14 75%)}
+.empty[hidden]{display:none}
+.empty svg{width:7rem;height:7rem;margin-bottom:1.6rem}
+.empty h2{margin:0;font:600 4.4rem/1.05 var(--cond);color:#fff;max-width:70rem;text-wrap:balance}
+.empty p{margin:1.2rem 0 0;font:500 1.8rem var(--sans);color:var(--mut)}
+
+.foot{display:flex;align-items:center;gap:2rem;padding:0 2.6rem;border-top:1px solid var(--line);font:500 1.35rem var(--sans);color:var(--mut);white-space:nowrap;overflow:hidden}
+.foot b{font:600 1.45rem var(--cond);color:var(--ice);font-weight:600}
+.foot .it{display:flex;gap:.7rem;align-items:baseline}
+.foot .it em{font-style:normal;color:var(--amber)}
+.foot .sp{flex:1}
+.off{position:absolute;right:2rem;top:6.8rem;z-index:8;padding:.6rem 1.1rem;border-radius:.6rem;background:#3a0d14;border:1px solid var(--red);font:600 1.25rem var(--sans);color:#ffd2d8}
+.off[hidden]{display:none}
+.fs{position:absolute;right:35rem;top:7.4rem;z-index:9;padding:.7rem 1.2rem;border-radius:.6rem;border:1px solid var(--line);background:rgba(4,12,24,.9);color:var(--ice);font:600 1.2rem var(--sans);cursor:pointer;opacity:0;transition:opacity .3s}
+.tv.ui .fs{opacity:1}
+.fs:focus-visible{outline:.2rem solid var(--cyan);opacity:1}
+.fade{animation:fade .6s ease-out}
+@keyframes fade{from{opacity:0}to{opacity:1}}
+/* 2D fallback map (no WebGL on this TV) */
+.leaflet-container{background:#081428!important}
+.lf-bus{display:inline-block}
+@media (prefers-reduced-motion:reduce){.cnt .dot{animation:none}.fade{animation:none}}
+</style>
+</head>
+<body>
+<div class="tv" id="tv">
+  <header class="top">
+    <div class="brand">
+      <svg viewBox="0 0 48 48" aria-hidden="true"><rect x="3" y="3" width="42" height="42" rx="11" fill="#0b2340" stroke="#38d6ff" stroke-width="2"/><path d="M12 31c5-1 7-12 13-12s7 9 11 9" fill="none" stroke="#2ee59d" stroke-width="3.4" stroke-linecap="round"/><circle cx="12" cy="31" r="3.4" fill="#38d6ff"/><circle cx="36" cy="28" r="3.4" fill="#38d6ff"/></svg>
+      <div><div class="nm">SG Transport Pulse</div><h1 id="title">Live diversions</h1></div>
+      <span class="pv" id="pv" hidden>Preview</span>
+    </div>
+    <div class="cnt zero" id="cnt"><span class="dot"></span><span id="cntT">Checking…</span></div>
+    <div class="pips" id="pips" aria-hidden="true"></div>
+    <div class="clock"><b id="clk">--:--</b><span id="date"></span></div>
+  </header>
+  <main class="body">
+    <section class="mapbox" aria-label="Map of the diversion">
+      <div id="map"></div>
+      <div class="nav" id="nav" hidden><span class="ic" id="navI"></span><span class="d" id="navD"></span><span class="a" id="navA"></span><span class="now" id="navNow"></span></div>
+      <div class="legend" aria-hidden="true"><span><i style="background:var(--cyan)"></i>Normal route</span><span><i style="background:var(--green)"></i>Diversion</span><span><i style="background:var(--red)"></i>Road closed</span><span><i style="background:var(--amber);width:1rem;height:1rem;border-radius:50%"></i>Stop not served</span></div>
+    </section>
+    <aside class="side" id="side" aria-live="polite">
+      <div class="closed"><p class="lab"><i style="background:var(--red)"></i>Road closed</p><h2 id="road"></h2><p id="dir"></p></div>
+      <div><p class="lab">Diverted services</p><div class="leds" id="leds"></div><p class="routeof" id="routeOf"></p></div>
+      <div id="skipBox"><p class="lab"><i style="background:var(--amber);border-radius:50%"></i>Stops not served</p><ul class="skips" id="skips"></ul></div>
+      <div class="facts" id="facts"></div>
+      <div class="when" id="when"></div>
+      <p class="note" id="note" hidden></p>
+    </aside>
+  </main>
+  <section class="ribbon" id="ribbon" aria-label="The diversion, road by road">
+    <div class="rhead" id="rhead"></div>
+    <div class="track" id="track"></div>
+  </section>
+  <footer class="foot" id="foot"></footer>
+  <div class="empty" id="empty" hidden>
+    <svg viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="21" fill="none" stroke="#2ee59d" stroke-width="2.5"/><path d="M15 24.5l6 6 12-13" fill="none" stroke="#2ee59d" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    <h2>All bus services are on their normal routes</h2>
+    <p id="emptyP">No diversion is live right now.</p>
+  </div>
+  <div class="off" id="off" hidden></div>
+  <button type="button" class="fs" id="fs">Full screen (F)</button>
+</div>
+<script src="/diversion-tv.js"></script>
+</body>
+</html>
