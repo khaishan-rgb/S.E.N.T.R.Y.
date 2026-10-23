@@ -7546,8 +7546,9 @@ async def dv_options_core(st, blocks, svc, d, run_i, closure, bus, dims, others,
     sec_line = diversion.cut(line, cum, A, B)
     jx, jr = [], []
 
-    def heading(p):
-        return diversion.nearest_on_line(p, line, cum)[3]
+    def heading(p, s=None):
+        # V16.26g: with s (m along the route) the route's heading at THAT passage - see dv_heading_near
+        return dv_heading_near(p, line, cum, s) if s is not None else diversion.nearest_on_line(p, line, cum)[3]
 
     def at(s_):
         return diversion.point_at(line, cum, max(0.0, min(cum[-1], s_)))
@@ -8787,6 +8788,27 @@ def dv_stops_along(st, seg, tol=25.0, ends_m=60.0):
 _TERMINAL_RX = re.compile(r"\b(INT|INTERCHANGE|TER|TERMINAL|BUS PK|BUS PARK|DEPOT)\b", re.I)
 
 
+def dv_heading_near(p, line, cum, s, span=40.0):
+    """V16.26g: the bus's heading at p, from the piece of its route around position s (m along the route) only.
+    A loop route, or a road the bus drives out and back on, passes the same spot twice - once each way. The nearest piece
+    of line alone can then be the OTHER passage: the routing engine was told the bus faces the wrong way at the stop, and
+    its route turned round (a U-turn) to get there. Same tie-break as nearest_on_line (the first piece)."""
+    px, py = diversion.xy(p)
+    best, brg = 1e18, None
+    for i in range(len(line) - 1):
+        if cum[i + 1] < s - span or cum[i] > s + span:
+            continue
+        ax, ay = diversion.xy(line[i])
+        bx, by = diversion.xy(line[i + 1])
+        dx, dy = bx - ax, by - ay
+        L2 = dx * dx + dy * dy
+        t = 0.0 if L2 < 1e-9 else max(0.0, min(1.0, ((px - ax) * dx + (py - ay) * dy) / L2))
+        d = math.hypot(px - (ax + t * dx), py - (ay + t * dy))
+        if d < best:
+            best, brg = d, diversion.bearing(line[i], line[i + 1])
+    return brg if brg is not None else diversion.nearest_on_line(p, line, cum)[3]
+
+
 def dv_free_start(ctx, i):
     """A bus at an interchange / terminal, or at the first stop of its trip, can leave by ANY exit (e.g. turn right
     out of the interchange instead of the normal left). Stops named "Opp / Aft / Bef ... Int" are on the road outside."""
@@ -8807,8 +8829,9 @@ async def route_between_stops(ctx, i, j, s0=None):
     free = s0 is None and dv_free_start(ctx, i)
     # free start: from the stop itself (inside the interchange), no forced heading - the routing engine picks the exit
     a_ = (ctx["stops"][i]["lat"], ctx["stops"][i]["lon"]) if free else at(st0)
-    b_ = at(max(stop_s[j] - 5.0, st0 + 10.0))
-    h0, h1 = (None if free else ctx["heading"](a_)), ctx["heading"](b_)
+    b_s = max(stop_s[j] - 5.0, st0 + 10.0)
+    b_ = at(b_s)
+    h0, h1 = (None if free else ctx["heading"](a_, st0)), ctx["heading"](b_, b_s)
     reqs = [([a_, b_], P["alt_per_pair"], True, "router")]          # source codes: router | busvia | manual | adopt | ddchain
     brs = {}
     ch = (ctx.get("chains") or {}).get((i, j)) if s0 is None else None
@@ -8850,12 +8873,19 @@ async def validate_next_original_leg(ctx, j):
         res = {"ok": True, "next_code": "", "next_name": "end of route", "detail": "rejoin stop is the last stop of the route"}
         ctx["next_cache"][key] = res
         return res
-    a_, b_ = at(stop_s[j] + 5.0), at(max(stop_s[j + 1] - 5.0, stop_s[j] + 10.0))
+    sa, sb = stop_s[j] + 5.0, max(stop_s[j + 1] - 5.0, stop_s[j] + 10.0)
+    a_, b_ = at(sa), at(sb)
     normal = stop_s[j + 1] - stop_s[j]
-    rr = await dv_osrm([a_, b_], 0, [ctx["heading"](a_), ctx["heading"](b_)], ctx["avoid"])
+    # V16.26g: the heading at each end is the route's own at THAT position (a loop route passes the same road both ways)
+    rr = await dv_osrm([a_, b_], 0, [ctx["heading"](a_, sa), ctx["heading"](b_, sb)], ctx["avoid"])
     res = {"ok": False, "next_code": stops[j + 1]["code"], "next_name": stops[j + 1]["name"], "detail": "no road route to the next stop"}
+    own = diversion.cut(ctx["line"], ctx["cum"], stop_s[j], stop_s[j + 1])
+    own_ut = diversion.uturns(own, None, P) if len(own) >= 3 else []    # the bus's NORMAL route turns round here itself
     for r in rr.get("routes") or []:
-        ok, why = diversion.validate_no_uturn(r["line"], r.get("steps"), ctx["line"], ctx["cum"], stop_s[j], P)
+        ok, why = diversion.validate_no_uturn(r["line"], r.get("steps"), ctx["line"], ctx["cum"], stop_s[j], P, ahead=(stop_s[j], stop_s[j + 1] + 30.0))
+        if not ok and why == "requires a U-turn" and own_ut and \
+                all(any(diversion.dist_m(u, o) <= 80.0 for o in own_ut) for u in diversion.uturns(r["line"], r.get("steps"), P)):
+            ok = True               # V16.26g: the same turn-round the bus makes on its normal route between these two stops
         if not ok:
             res["detail"] = "next leg " + why
             continue
@@ -8929,7 +8959,8 @@ async def dv_validate_route(ctx, r, i, j, s0=None):
     ok, why = diversion.validate_block_avoidance(r["line"], ctx["block_lines"], None, P)
     if not ok:
         return None, why
-    ok, why = await asyncio.to_thread(diversion.validate_no_uturn, r["line"], r.get("steps"), line, cum, st0 - 5.0, P, 150.0 if free else 0.0)
+    ok, why = await asyncio.to_thread(diversion.validate_no_uturn, r["line"], r.get("steps"), line, cum, st0 - 5.0, P, 150.0 if free else 0.0,
+                                      (B, stop_s[j] + 30.0))
     if not ok:
         return None, why
     dep = await asyncio.to_thread(diversion.departure, r["line"], line, cum, None, (st0 - 45.0, st0 + 60.0), free, stop_s[i])
@@ -9112,7 +9143,7 @@ async def dv_stop_search(ctx):
             for c in valid:         # MANDATORY: the bus can continue from its real rejoin stop to the next original stop
                 nxt = await validate_next_original_leg(ctx, c["pair"][1])
                 if not nxt["ok"]:
-                    reasons.append(f"rejoin stop {stops[c['pair'][1]]['code']} fails the next-leg check: {nxt['detail']}")
+                    reasons.append(f"rejoin stop {stops[c['pair'][1]]['code']} fails the next-leg check (from there on to its next stop {nxt['next_code'] or 'on the route'}): {nxt['detail']}")
                     continue
                 c["next_leg"] = nxt
                 c["earlier"] = c["pair"][0] < ia
@@ -9537,8 +9568,9 @@ async def dv2_plan(st, blocks, svc, d, run_i, traffic=True, donors=None):
         except Exception:
             bvias = []
 
-    def heading(p):
-        return diversion.nearest_on_line(p, line, cum)[3]
+    def heading(p, s=None):
+        # V16.26g: with s (m along the route) the route's heading at THAT passage - see dv_heading_near
+        return dv_heading_near(p, line, cum, s) if s is not None else diversion.nearest_on_line(p, line, cum)[3]
 
     def at(s_):
         return diversion.point_at(line, cum, max(0.0, min(cum[-1], s_)))
@@ -9638,7 +9670,7 @@ async def dv2_plan(st, blocks, svc, d, run_i, traffic=True, donors=None):
             if c is None:
                 reasons.append(why)
                 continue
-            ap = diversion.nearest_on_line(c["dep"]["leave_pt"], line, cum)[3]
+            ap = heading(c["dep"]["leave_pt"], c["dep"]["leave_s"])
             c["exit_differs"] = False
             if c.get("free"):         # free start: a different exit only if the bus really sets off another way than its route
                 rl = c["r"]["line"]
@@ -9647,7 +9679,7 @@ async def dv2_plan(st, blocks, svc, d, run_i, traffic=True, donors=None):
                 nm_ = (stops[c["asked"][0]].get("name") or "").upper()
                 off_ = diversion.nearest_on_line((stops[c["asked"][0]]["lat"], stops[c["asked"][0]]["lon"]), line, cum)[0]
                 interchange_like = (bool(_TERMINAL_RX.search(nm_)) and not nm_.startswith(("OPP ", "AFT ", "BEF "))) or off_ >= 20.0
-                if interchange_like and diversion.angdiff(h0, diversion.nearest_on_line(rl[0], line, cum)[3]) > 60.0:
+                if interchange_like and diversion.angdiff(h0, heading(rl[0], stop_s[c["asked"][0]])) > 60.0:
                     ap, c["exit_differs"] = None, True
             dp = diversion.bearing(at(c["dep"]["rejoin_s"]), at(c["dep"]["rejoin_s"] + 25.0))
             rj_road = dv2._road_starting_near(r.get("steps"), c["dep"]["rejoin_pt"], 40.0)     # the road the bus rejoins
@@ -9658,7 +9690,7 @@ async def dv2_plan(st, blocks, svc, d, run_i, traffic=True, donors=None):
                 continue
             nxt = await validate_next_original_leg(ctx, c["pair"][1])
             if not nxt["ok"]:
-                reasons.append(f"rejoin stop {stops[c['pair'][1]]['code']} fails the next-leg check: {nxt['detail']}")
+                reasons.append(f"rejoin stop {stops[c['pair'][1]]['code']} fails the next-leg check (from there on to its next stop {nxt['next_code'] or 'on the route'}): {nxt['detail']}")
                 continue
             c["instr"], c["next_leg"], c["probe"], c["s0"] = instr, nxt, s0 is not None, s0
             pts_, i0_, i1_ = c["dep"]["pts"], c["dep"]["i0"], c["dep"]["i1"]                  # V16.26: the road before / after the diversion
@@ -9778,8 +9810,10 @@ async def dv2_plan(st, blocks, svc, d, run_i, traffic=True, donors=None):
             ap = diversion.point_at(seg_, scum, pos_)
             vias = [seg_[k] for k in pre[::max(1, len(pre) // 5)]][:5] + [ap]
             a0 = c["r"]["line"][0]
-            b_ = at(max(stop_s[j2] - 5.0, stop_s[c["asked"][0]] + 10.0))
-            rr = await dv_osrm([a0] + vias + [b_], 0, [None if c.get("free") else heading(a0)] + [None] * len(vias) + [heading(b_)], ctx["avoid"])
+            sb2 = max(stop_s[j2] - 5.0, stop_s[c["asked"][0]] + 10.0)
+            b_ = at(sb2)
+            sa2 = c["s0"] if c.get("s0") is not None else stop_s[c["asked"][0]] + 1.0
+            rr = await dv_osrm([a0] + vias + [b_], 0, [None if c.get("free") else heading(a0, sa2)] + [None] * len(vias) + [heading(b_, sb2)], ctx["avoid"])
             got = [(dict(r, _src="early"), c.get("s0")) for r in rr.get("routes") or []]
             ok2, rs2 = [], []
             if got:
@@ -9818,6 +9852,12 @@ async def dv2_plan(st, blocks, svc, d, run_i, traffic=True, donors=None):
             return None, f"stays on {svc_txt}'s own route"
         k_st = max([k for k in range(k_off) if prj[k][0] <= on and prj[k][1] + win0 <= A + P["block_end_margin_m"]], default=None)
         if k_st is None:
+            # V16.26g: a route that goes the OTHER way past the blockage (a service in the opposite direction, when both
+            # directions are blocked) is never mixed in: each direction is planned on its own
+            pre = [prj[k][1] + win0 for k in range(k_off) if prj[k][0] <= on]
+            post = [prj[k][1] + win0 for k in range(k_off, len(prj)) if prj[k][0] <= on]
+            if pre and post and min(pre) >= B - P["block_end_margin_m"] and max(post) <= A + P["block_end_margin_m"]:
+                return None, f"goes the other way past the blockage (the opposite direction to {svc_txt}) \u2014 each direction is planned on its own"
             return None, f"turns off where {svc_txt} does not run before the blockage"
         k_end = next((k for k in range(k_off, len(prj)) if prj[k][0] <= on and prj[k][1] + win0 >= B + P["block_end_margin_m"]), None)
         if k_end is None:
@@ -9862,14 +9902,15 @@ async def dv2_plan(st, blocks, svc, d, run_i, traffic=True, donors=None):
                         "km": round(diversion.line_m(g["dd"]) / 1000.0, 2)}
         free = dv_free_start(ctx, i)
         a_ = (stops[i]["lat"], stops[i]["lon"]) if free else at(stop_s[i] + 1.0)
-        b_ = at(max(stop_s[j] - 5.0, stop_s[i] + 10.0))
+        sb_ = max(stop_s[j] - 5.0, stop_s[i] + 10.0)
+        b_ = at(sb_)
         off = g["off"]
         vias = dv_run_vias(off)                                          # V16.26b: mid-stretch waypoints: no extra turns
         if not vias:
             nv = min(6, len(off))
             vias = [off[round(k * (len(off) - 1) / max(1, nv - 1))] for k in range(nv)]
         nv = len(vias)
-        brs = [None if free else heading(a_)] + [None] * nv + [heading(b_)]
+        brs = [None if free else heading(a_, stop_s[i] + 1.0)] + [None] * nv + [heading(b_, sb_)]
         expect = max(0.0, g["sl"] - stop_s[i]) + diversion.line_m(g["dd"]) + max(0.0, stop_s[j] - g["sr"])
         rr = await dv_osrm([a_] + vias + [b_], 0, brs, ctx["avoid"])
         tt = dv_use_tomtom() and not rr.get("tt_error")                  # V16.26e: TomTom out of budget / down: OpenStreetMap's route counts

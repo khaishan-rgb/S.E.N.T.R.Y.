@@ -1236,9 +1236,11 @@ def validate_block_avoidance(route_line, block_lines, buffer_m=None, P=PARAMS):
     return True, ""
 
 
-def validate_no_uturn(route_line, steps, svc_line, svc_cum, start_s, P=PARAMS, skip_start_m=0.0):
+def validate_no_uturn(route_line, steps, svc_line, svc_cum, start_s, P=PARAMS, skip_start_m=0.0, ahead=None):
     """HARD: no U-turn of any kind (explicit, at a junction or roundabout, round a block, doubling back) and no
-    backtracking onto the original route upstream of where the diversion starts. -> (ok, detail)"""
+    backtracking onto the original route upstream of where the diversion starts. -> (ok, detail)
+    ahead = (lo, hi) m: the bus's own route still to come. A loop route (or a road the bus drives out and back on) passes
+    the same road twice, once each way: a point on the route ahead is not "going back" even if the earlier passage is there too."""
     if not skip_start_m and len(route_line) >= 2 and start_s is not None:
         # heading backwards at the very start (against the bus's direction) is a U-turn, however short
         rc = cum_m(route_line)
@@ -1259,6 +1261,10 @@ def validate_no_uturn(route_line, steps, svc_line, svc_cum, start_s, P=PARAMS, s
         for p in densify(route_line, 15.0)[2:]:
             d, s_ = project_window(p, svc_line, svc_cum, 0.0, lim)
             if s_ is not None and d <= 15.0:
+                if ahead is not None:
+                    d2, s2 = project_window(p, svc_line, svc_cum, ahead[0], ahead[1])
+                    if s2 is not None and d2 <= 15.0:
+                        continue
                 return False, "goes back towards the previous stop"
     return True, ""
 

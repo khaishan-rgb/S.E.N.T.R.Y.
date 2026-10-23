@@ -302,6 +302,22 @@
     return {service:x.service, line:b.line, leave_pt:b.leave_pt, rejoin_pt:b.rejoin_pt, roads:b.roads || [], km:b.div_km || 0,
             sig:(b.roads || []).join("|") + "@" + b.rejoin_pt.map(function(v){ return v.toFixed(3); }).join(",")};
   }
+  /* V16.26g: another service's route is offered only if it runs the SAME way past the blockage. With a blockage in both
+     directions the services the other way are planned on their own - their route would take this bus back the way it came. */
+  function otherWay(p, d){
+    var L0 = p && p.original_line; if(!L0 || L0.length < 2 || p.block_a == null || p.block_b == null || !d.leave_pt || !d.rejoin_pt) return false;
+    var c = cumM(L0), w0 = Math.max(0, p.block_a - 3000), a = p.block_a - w0, b = p.block_b - w0;
+    function on(q, lo, hi){                                              // within 80 m of this service's route between lo and hi (m)
+      for(var i = 0; i < L0.length - 1; i++){ if(c[i + 1] < lo || c[i] > hi) continue;
+        var ax = L0[i][1] * KX, ay = L0[i][0] * KY, bx = L0[i + 1][1] * KX, by = L0[i + 1][0] * KY, px = q[1] * KX, py = q[0] * KY;
+        var dx = bx - ax, dy = by - ay, L2 = dx * dx + dy * dy, t = L2 < 1e-9 ? 0 : Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / L2));
+        var sg = c[i] + t * (c[i + 1] - c[i]), sc = Math.max(lo, Math.min(hi, sg));             // only the part of the route in the window
+        if(sc !== sg) t = c[i + 1] > c[i] ? (sc - c[i]) / (c[i + 1] - c[i]) : 0;
+        if(Math.hypot(px - (ax + t * dx), py - (ay + t * dy)) <= 80) return true; }
+      return false;
+    }
+    return on(d.leave_pt, b - 60, b + 3000) && on(d.rejoin_pt, a - 3000, a + 60) && !(on(d.leave_pt, a - 3000, a + 60) && on(d.rejoin_pt, b - 60, b + 3000));
+  }
   function sharePass(run){
     if(run !== S.run) return;
     var vis = visibleServices();
@@ -311,7 +327,7 @@
       var p = S.plans[o.k]; if(!p || !p.ok || S.share[o.k]) return;
       var seen = {}, ds = [];
       if(o.d) seen[o.d.sig] = 1;
-      all.forEach(function(q){ if(q.x.service === o.x.service || !q.d || seen[q.d.sig]) return; seen[q.d.sig] = 1; ds.push(q.d); });
+      all.forEach(function(q){ if(q.x.service === o.x.service || !q.d || seen[q.d.sig] || otherWay(p, q.d)) return; seen[q.d.sig] = 1; ds.push(q.d); });
       ds.sort(function(a, b){ return a.km - b.km; });
       if(!ds.length){ S.share[o.k] = "none"; return; }
       S.share[o.k] = "queued";
