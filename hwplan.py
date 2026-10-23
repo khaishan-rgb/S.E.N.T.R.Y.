@@ -188,9 +188,22 @@ def plan(ctx, reach):
                 if TG:
                     tgm = next((_r(g_[i]) for i in range(len(g_)) if sq_[i][1] == TG["front_uid"] and sq_[i + 1][1] == TG["rear_uid"]), None)
             out.append({"ewt": None if e_ is None else round(e_, 3), "max": _r(max(g_)), "off": _r(max(g_, key=lambda v: abs(v - H))), "n": len(g_) + 1,
-                        "pair": pr, "tg": tgm})
+                        "pair": pr, "tg": tgm, "avg": round(sum(v * v for v in g_) / sum(g_), 2), "mean": round(sum(g_) / len(g_), 2),
+                        "on": sum(1 for v in g_ if abs(v - H) <= 2.0 + 1e-9), "ng": len(g_)})
         return out
-    vsum = lambda v: {"ewt": round(v["e"], 3), "max_hw": _r(v["mx"]), "pts": pts_of(v["per"])} if isinstance(v, dict) else None
+
+    def hw_avg(per, ks=None):
+        """V16.28: the AVERAGE headway passengers wait for at the AITPs (not the maximum): at each AITP sum(h^2) / sum(h) - a long gap
+           counts more because more passengers arrive in it (= H + 2 x EWT; a plain mean of the gaps does not change when a bus is only
+           moved) - averaged over the AITPs; and the share of headways on target (within 2 min of H)."""
+        ks = [k for k in (points if ks is None else ks) if k in per]
+        if not ks:
+            return None, None
+        av = sum(sum(v * v for v in per[k][0]) / sum(per[k][0]) for k in ks) / len(ks)
+        ng = sum(len(per[k][0]) for k in ks)
+        on = sum(1 for k in ks for v in per[k][0] if abs(v - H) <= 2.0 + 1e-9)
+        return round(av, 2), (round(100.0 * on / ng, 1) if ng else None)
+    vsum = lambda v: dict(zip(("avg_hw", "on_pct"), hw_avg(v["per"])), ewt=round(v["e"], 3), max_hw=_r(v["mx"]), pts=pts_of(v["per"])) if isinstance(v, dict) else None
 
     base = {u["uid"]: times(u) for u in units}
     e0, mx0, mn0, per0 = evaluate(base)
@@ -358,6 +371,7 @@ def plan(ctx, reach):
                           "max_hw": _r(dn_mx if dn_mx is not None else pl["mx"]), "max_hw_all": _r(pl["mx"]), "ewt": round(pl["e"], 3), "score": J,
                           "gain": round(e0 - pl["e"], 3), "km_skipped": _r(O["ss"][j], 2), "rkey": key + (j,),
                           "pct": int(round(100.0 * O["ss"][j] / max(1e-9, O["ss"][-1]))), "entry_min": round(te, 2), "leave_min": round(INS["ready"] + wait, 2),
+                          "avg_hw_after": hw_avg(pl["per"], [k for k in points if k >= j])[0], "avg_hw_after_none": hw_avg(per0, [k for k in points if k >= j])[0],
                           "variants": {"only": vsum(v_only), "adj": vsum(v_adj) if dep_adj else None},   # the before / after squares
                           "adj": dict(cadj), "_tab": tab, "_adj": dict(cadj)})
         return cands, infeasible
@@ -546,6 +560,7 @@ def plan(ctx, reach):
         x["actions"] = actions(x)
     ring0 = [roles[r] for r in ("A", "B", "C", "D", "E") if r in roles]
     noaction = {"ewt": round(e0, 3), "max_hw": _r(mx0), "min_hw": _r(mn0), "risk": risk, "pts": pts_of(per0),
+                "avg_hw": hw_avg(per0)[0], "on_pct": hw_avg(per0)[1],
                 "seq": [{"role": u["role"], "num": u["num"], "label": u["label"], "dep": _r(u["dep"]), "clock": hhmm(u["dep"]), "late": u["uid"] == C["uid"],
                          "in_service": u["kind"] == "in_service"} for u in ring0]}
     strip = lambda x: {k: v for k, v in x.items() if not k.startswith("_") and k not in ("score", "rkey")}

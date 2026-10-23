@@ -1,5 +1,57 @@
 # SG Transport Pulse V16.19 — Operational Intelligence & Service Recovery Platform
 
+## Halfway Planner: lean flow, 1 key settings → 2 generate → 3 ROI (V16.28)
+The page is now three steps. Everything else is folded under **More detail**, which is closed by default.
+
+1. **Key settings & buses**
+   * The key settings: minimum break, scheduled layover, and stop-to-stop time in service. They used to be in the setup card.
+   * The route diagram and the bus tables, where you fill the columns:
+     * **Halfway**: tick the bus that goes halfway;
+     * **Cover gap**: the gap it fills (auto: the longest);
+     * add, remove or move a bus.
+2. **Halfway plan**
+   * Press **GENERATE HALFWAY PLAN**. Nothing is planned until then.
+   * Any change in step 1 clears the plan, and the header says "Next: press GENERATE HALFWAY PLAN".
+   * The plan shows:
+     * the bus → stop and how far along the route (%);
+     * how the gap is split (e.g. 30 → 15 / 15);
+     * complete → rest → off-service → enter, with times;
+     * up to six other stops to pick from;
+     * **Tell the bus captains**: LATER / HALFWAY / EARLIER with times, and *Copy plan for broadcast*.
+3. **ROI: EWT earned**
+   * **EWT earned**: minutes per passenger and %, with a verdict: worth deploying / marginal / not better than no action.
+   * Six KPIs:
+     * average EWT (all AITPs);
+     * EWT from the entry stop on;
+     * average headway as passengers wait;
+     * headways on target (±2 min);
+     * cost: stops and km not run in service, the off-service km and minutes, departures moved;
+     * return per km not run.
+   * The Recovery Decision Engine's decision rule (≥ 0.10 min, ≥ 5%, ≥ 0.02 min per km), with each check shown.
+   * The three options (No action / Halfway only / Halfway + regulation), as averages.
+
+**Averages, not maximums.**
+* **Average headway as passengers wait** = Σh² ÷ Σh at each AITP, averaged over the AITPs. A long gap counts more because more passengers arrive in it. It equals the target headway + 2 × EWT.
+* A plain mean of the gaps is in each square's tooltip. It does not change when a bus is only moved, so it is not used as the measure.
+* "Max gap" / "Max HW" are replaced by the average in the ROI, the squares (Headway view), the options table (Avg HW after), the bus movement lanes and the no-action card.
+* `no_action` and each candidate's `variants.{only,adj}` now carry `avg_hw` and `on_pct`. Each candidate also carries `avg_hw_after` and `avg_hw_after_none`, and each AITP square `avg`, `mean`, `on` and `ng`.
+
+**More detail** (open it from the summary, or from *Every AITP and every trip ▸* in step 3) holds:
+* every AITP (squares) and every trip down the route (timeline);
+* all halfway stops (map and table);
+* the setup and no-action cards;
+* bus movement, the off-service route, downstream headways, EWT by stop, and the controller action plan.
+
+The section numbers and the Recovery Decision Engine headers are gone. The mobile tabs are no longer used: the page is one short scroll.
+
+**Phone layout.**
+* **Header fixed:** the filter header no longer slides 56 px down over step 1 (a design-system top offset meant for a sticky header).
+* **Bus tables:** each bus is a two-line card. The first line has the halfway tick, the bus with its tags, the headway, the cover tick and ✕; the stop picker sits underneath, so nothing scrolls sideways.
+* **Route diagram:** opens on the ticked bus.
+* **Step 2:** the other stops are one row you can swipe sideways, and each instruction puts the time and LATER / HALFWAY / EARLIER on one line with the text below.
+* **Step 3:** smaller figures. Space is kept for the bottom navigation bar.
+* **More detail:** at most 8 stop cards.
+
 ## Halfway Planner: the ticked bus covers a gap on the next direction, before vs after simulation (V16.28)
 **Example.** D1 Bus 6 is ticked, and D2 Bus 3 runs 30 min behind D2 Bus 4. The plan for Bus 6:
 1. It completes D1 to the interchange.
