@@ -1,7 +1,7 @@
 # SG Transport Pulse V16.19 — Operational Intelligence & Service Recovery Platform
 
-## Halfway Planner: step 3 is now the driver briefing (V16.28)
-Step 3 exists for one job: the interchange staff **show the bus captain which way to drive off service**, from the interchange to the stop where the bus enters service. It replaces the earlier 2D / 3D / 4D network simulator in step 3. The page now reads: 1 Key settings & buses → 2 Generate the halfway plan → **3 Driver briefing** → 4 ROI: EWT earned.
+## Halfway Planner: the driver briefing, step 4 (V16.28)
+The driver briefing exists for one job: the interchange staff **show the bus captain which way to drive off service**, from the interchange to the stop where the bus enters service. It replaces the earlier 2D / 3D / 4D network simulator. It sits after the ROI, just above More detail. The page now reads: 1 Key settings & buses → 2 Generate the halfway plan → 3 ROI: EWT earned → **4 Driver briefing**.
 
 **At the top: the trip in one line.** For example, "D1 Bus 6 · D2 Stop 0 17:18 → Stop 44 · BS 20043 17:42", with chips for km off service, drive minutes, % expressway and number of turns. Below it is one line on why this route was chosen, e.g. "simpler than the fastest route (22% expressway, 11 turns, 9 roads) for +2 min".
 
@@ -13,7 +13,7 @@ Step 3 exists for one job: the interchange staff **show the bus captain which wa
 * **The clock.** The clock shows the time at that point of the drive (e.g. 17:20) with km to go and the arrival time.
 * **The road ribbon.** Along the bottom, each road is a segment (Toa Payoh Lor 6 → Pan-Island Expwy → Ctrl Expwy → Ang Mo Kio Ave 3). It fills as the bus drives, and expressways carry a badge. On a phone the expressways show their code (PIE, CTE) and the road the bus is on gets the most room.
 * **SHOW DRIVER.** The map goes full screen so it can be turned round to the driver. In full screen, space plays or pauses, ← → step through the turns, and Esc leaves (where the browser has no full-screen API, a full-window view is used).
-* **3D or 2D.** 3D uses MapLibre GL 4.7.1 with OpenFreeMap buildings, loaded only when step 3 opens. Without WebGL, or if the library cannot be reached, the same briefing plays on the flat Leaflet map and the page says so.
+* **3D or 2D.** 3D uses MapLibre GL 4.7.1 with OpenFreeMap buildings, loaded only when the briefing first draws. Without WebGL, or if the library cannot be reached, the same briefing plays on the flat Leaflet map and the page says so.
 
 **The turn-by-turn list** (beside the map; under it on a phone). Each row is one instruction with its icon, lane hint, distance on that road, and clock time. Clicking a row jumps the camera to that turn. The last row is "Arrive at BS 20043 … – the stop is on your left". Under the list: which buses are ahead and behind once Bus 6 is in service ("D2 Bus 4 about 15 min ahead, D2 Bus 3 about 15 min behind").
 
@@ -29,7 +29,7 @@ Step 3 exists for one job: the interchange staff **show the bus captain which wa
   * `side` on the arrival step.
 * `offservice.parse_osrm` keeps, for each step: `loc` (the junction point), `lanes` (indications and valid), `dest` (OSRM destinations), `exits` and `rexit` (roundabout exit number).
 
-Code: `hwjs` is not shipped. The briefing is inside `halfway_planner.html`. The old step-3 simulator code (`osSim`, 2D / 3D / 4D) is no longer on the page.
+Code: `hwjs` is not shipped. The briefing is inside `halfway_planner.html`. The old simulator code (`osSim`, 2D / 3D / 4D) is no longer on the page.
 
 Tests:
 * `r3d/t_halfway_sim.js`: the briefing in 2D, on desktop and phone (63 checks).
