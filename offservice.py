@@ -96,8 +96,14 @@ def parse_osrm(j):
                 man = st.get("maneuver") or {}
                 road = (st.get("name") or "").strip() or (st.get("ref") or "").strip()
                 cls = {c for it in (st.get("intersections") or []) for c in (it.get("classes") or [])}
+                it0 = (st.get("intersections") or [{}])[0] or {}
+                loc = man.get("location")
                 steps.append({"road": road, "ref": (st.get("ref") or "").strip(), "km": (st.get("distance") or 0) / 1000.0, "min": (st.get("duration") or 0) / 60.0,
-                              "man": man.get("type") or "", "mod": man.get("modifier") or "", "line": g, "motorway": "motorway" in cls})
+                              "man": man.get("type") or "", "mod": man.get("modifier") or "", "line": g, "motorway": "motorway" in cls,
+                              # V16.28 driver briefing: where the manoeuvre is, the lanes to use, exit number, signposted destination, roundabout exit
+                              "loc": [loc[1], loc[0]] if loc and len(loc) == 2 else (g[0] if g else None),
+                              "lanes": [{"ind": list(l.get("indications") or []), "ok": bool(l.get("valid"))} for l in (it0.get("lanes") or [])],
+                              "dest": (st.get("destinations") or "").strip(), "exits": str(st.get("exits") or "").strip(), "rexit": man.get("exit")})
         if len(line) >= 2:
             out.append({"line": line, "km": (r.get("distance") or 0) / 1000.0 or line_km(line), "osrm_min": (r.get("duration") or 0) / 60.0, "steps": steps})
     return out

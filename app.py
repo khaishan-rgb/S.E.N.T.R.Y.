@@ -4909,7 +4909,7 @@ async def api_hp_route(snap: str = "", stop: str = "", mode: str = "late", bus: 
             "arrive_clock": hplan.hhmm(lv + x["time_min"]), "entry_clock": hplan.hhmm(lv + x["time_min"] + prep), "prep_min": prep,
             "status": x["status"], "status_label": offservice.STATUS_TXT[x["status"]], "status_text": x["status_text"], "findings": x["findings"][:8],
             "line": offservice.simplify(x["line"], 300), "traffic": x["traffic"], "roads": [q_["road"] for q_ in x["groups"]],
-            "steps": hplan.instructions(x.get("steps") or [], stops[j]["code"], stops[j]["name"]),
+            "steps": hplan.instructions(x.get("steps") or [], stops[j]["code"], stops[j]["name"], scale=(x["time_min"] / x["osrm_min"]) if x.get("osrm_min") else None),
             "alternatives": [{"label": o["label"], "km": round(o["km"], 2), "time_min": round(o["time_min"], 1), "status": o["status"], "tags": o["tags"],
                               "chosen": o["idx"] == pick, "xway_share": (o.get("simple") or {}).get("xway_share"), "n_turns": o.get("n_turns"), "n_roads": len(o.get("groups") or []),
                               "line": offservice.simplify(o["line"], 80)} for o in R["options"]],

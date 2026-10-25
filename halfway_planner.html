@@ -260,98 +260,86 @@ details.ln-more .row{margin-top:12px}
 .sm-tsd svg{display:block;width:100%;height:auto;min-width:760px}
 .sm-fx{margin-top:10px;font-size:12px;color:var(--mut);line-height:1.5}
 .sm-fx b{color:#cfe0f3}
-/* V16.28 off-service route + simulator */
-.os-rt{display:flex;flex-direction:column;gap:8px}
-.os-chips{display:flex;flex-wrap:wrap;gap:6px}
-.os-chip{display:inline-flex;align-items:baseline;gap:6px;padding:6px 10px;border-radius:9px;border:1px solid var(--line2);background:#0a1729;font-size:12px;color:var(--mut)}
-.os-chip b{font-size:16px;font-weight:900;color:#fff;font-variant-numeric:tabular-nums}.os-chip.x{border-color:#1f6f8a}.os-chip.x b{color:#7fe7ff}
-.os-flow{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;align-items:stretch;gap:6px 22px}
-.os-flow li{position:relative;display:flex;flex-direction:column;justify-content:center;min-width:0;max-width:240px;padding:7px 11px;border-radius:9px;border:1px solid var(--line2);background:#0b1a2e}
-.os-flow li:not(:last-child):after{content:"\2192";position:absolute;right:-17px;top:50%;transform:translateY(-50%);color:#7fe7ff;font-weight:900}
-.os-flow b{font-size:13px;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.os-flow small{font-size:11.5px;color:var(--mut);font-variant-numeric:tabular-nums}
-.os-flow .os-st.x{border-color:#22d3ee;background:linear-gradient(180deg,rgba(34,211,238,.14),#0b1a2e)}.os-flow .os-st.x b{color:#bff3ff}
-.os-flow .os-end{border-color:#b46bff;background:rgba(180,107,255,.10)}.os-flow .os-end.s{border-color:#5f7ea6;background:#0a1729}
-.os-flow .os-st.wait b{color:var(--mut)}
-.os-why{margin:0;font-size:12.5px;color:#cfe0f3;line-height:1.45}.os-why b{color:#fff}.os-why span{color:var(--mut)}
-.os-ctl{display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;margin:12px 0 8px}
-.os-play{height:40px;padding:0 16px;border-radius:9px;border:1px solid #22d3ee;background:linear-gradient(90deg,#2f8cff,#22d3ee);color:#04121f;font-weight:900;letter-spacing:.05em;font-size:12.5px;cursor:pointer;min-width:104px}
-.os-jump{display:flex;flex-wrap:wrap;gap:4px}
-.os-jump button{display:flex;flex-direction:column;align-items:flex-start;gap:1px;padding:4px 9px;border-radius:8px;border:1px solid var(--line2);background:#0a1729;color:#cfe0f3;cursor:pointer;min-height:40px}
-.os-jump button b{font-size:13px;font-variant-numeric:tabular-nums;color:#fff}.os-jump button small{font-size:10.5px;color:var(--mut);white-space:nowrap}
-.os-jump button[aria-pressed="true"]{border-color:#22d3ee;background:#0d2a40}
-.os-time{display:flex;align-items:center;gap:8px;flex:1 1 220px;min-width:0}.os-time input{flex:1;min-width:0;accent-color:#22d3ee}
-.os-clock{font:800 13px var(--font);color:#fff;font-variant-numeric:tabular-nums;white-space:nowrap}
-.os-which{display:none;gap:4px}.os-which button{flex:1;height:38px;border-radius:8px;border:1px solid var(--line2);background:#0a1729;color:#cfe0f3;font-weight:800;font-size:12px;cursor:pointer}
-.os-which button[aria-pressed="true"]{border-color:#22d3ee;background:#0d2a40;color:#fff}
-.os-sim{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
-.os-cell{position:relative;border:1px solid var(--line2);border-radius:10px;overflow:hidden;min-width:0}
-.os-map{height:400px;background:#0a1424}
-.os-tag{position:absolute;top:8px;left:50px;z-index:650;padding:4px 9px;border-radius:7px;font:900 11.5px var(--font);letter-spacing:.08em;background:#0b1a2ee6;border:1px solid var(--line2);color:#fff;pointer-events:none}
-.os-tag.r{border-color:#7a2433;color:#ff8a96}.os-tag.g{border-color:#1c6a4c;color:#5ff0b4}
-.os-stat{position:absolute;left:8px;right:8px;bottom:8px;z-index:650;display:grid;grid-template-columns:auto minmax(0,1fr);gap:0 10px;align-items:center;padding:7px 10px;border-radius:9px;background:#0b1a2ef0;border:1px solid var(--line2);pointer-events:none}
-.os-stat b{grid-row:span 2;font-size:22px;font-weight:900;font-variant-numeric:tabular-nums;color:#5ff0b4}.os-stat b.a{color:#ffc56b}.os-stat b.r{color:#ff8a96}
-.os-stat span{font-size:12px;color:#cfe0f3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.os-stat em{font-style:normal;font-size:12px;color:#d9b8ff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.os-bus{transform:translate(-50%,-50%);display:grid;place-items:center;min-width:19px;height:19px;padding:0 3px;border-radius:10px;font:900 10.5px/1 var(--font);white-space:nowrap;color:#04121f;background:#9fc6f0;border:1.5px solid #fff;box-shadow:0 1px 4px #0008}
-.os-bus.n{background:#22d3ee}.os-bus.j{background:#ffb547}.os-bus.c{background:#b46bff;color:#fff;font-size:11.5px;height:22px;padding:0 8px;border-radius:11px;box-shadow:0 0 0 4px rgba(180,107,255,.35)}
-.os-gap{transform:translate(-50%,-140%);display:inline-block;padding:2px 7px;border-radius:7px;font:900 12px var(--font);white-space:nowrap;color:#fff;background:#d6455a;border:1.5px solid #fff}.os-gap.a{background:#c8861f}.os-gap.lo{transform:translate(-50%,45%)}
-.os-pin{transform:translate(-50%,-175%);display:inline-block;padding:2px 7px;border-radius:7px;font:800 11px var(--font);white-space:nowrap;color:#04121f;background:#5ff0b4;border:1.5px solid #fff}
-.os-leg{display:flex;flex-wrap:wrap;gap:4px 14px;margin-top:8px;font-size:11.5px;color:var(--mut)}
-.os-leg i{display:inline-block;width:14px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px}
-.os-leg i.c{background:#b46bff}.os-leg i.o{background:#9fc6f0}.os-leg i.n{background:#22d3ee}.os-leg i.j{background:#ffb547}.os-leg i.ga{background:#ffb547;height:4px;vertical-align:2px}.os-leg i.gr{background:#ff5566;height:4px;vertical-align:2px}.os-leg i.rt{background:#b46bff;height:4px;vertical-align:2px}
-.os-note{margin:6px 0 0;font-size:11.5px;color:var(--mut);line-height:1.45}
-/* V16.28 simulator 2D / 3D / 4D */
-.os-modes{display:flex;gap:0;border:1px solid #1f6f8a;border-radius:10px;overflow:hidden;background:#06121f;box-shadow:0 0 18px rgba(34,211,238,.12) inset}
-.os-modes button{height:40px;min-width:48px;padding:0 12px;border:0;border-right:1px solid #12344a;background:transparent;color:#8fb3d4;font:900 13px var(--font);letter-spacing:.08em;cursor:pointer}
-.os-modes button:last-child{border-right:0}
-.os-modes button[aria-pressed="true"]{color:#04121f;background:linear-gradient(135deg,#7fe7ff,#22d3ee);text-shadow:none;box-shadow:0 0 16px rgba(34,211,238,.55)}
-.os-modes button[data-m="4d"]:not([aria-pressed="true"]){color:#d9b8ff}
-.lnx .o4{position:relative;height:540px;border-radius:12px;overflow:hidden;border:1px solid #1f4468;background:radial-gradient(120% 80% at 50% 0%,#0d2547 0%,#050d1a 70%);box-shadow:0 0 0 1px rgba(34,211,238,.08),0 18px 40px rgba(0,8,24,.5)}
-.o4[hidden]{display:none!important}
-.o4 .o4-map,.o4 .o4-map.maplibregl-map{position:absolute;inset:0;width:auto;height:auto}
-.o4-busy{position:absolute;inset:0;z-index:5;display:none;place-items:center;color:#bff3ff;font:800 13px var(--font);letter-spacing:.14em;background:rgba(4,12,26,.6)}
-.o4.busy .o4-busy{display:grid}
-.o4-hud{position:absolute;z-index:4;padding:10px 12px;border-radius:12px;background:rgba(6,18,34,.58);border:1px solid rgba(34,211,238,.28);backdrop-filter:blur(10px) saturate(1.3);-webkit-backdrop-filter:blur(10px) saturate(1.3);box-shadow:0 10px 30px rgba(0,6,20,.45);color:#dff6ff}
-.o4-tl{top:10px;left:10px;display:flex;flex-direction:column;gap:6px;max-width:300px}
-.o4-mode{font:900 11px var(--font);letter-spacing:.16em;color:#7fe7ff}
-.o4-clock{font:900 34px/1 var(--font);font-variant-numeric:tabular-nums;color:#fff;text-shadow:0 0 18px rgba(34,211,238,.65)}
-.o4-sub{font:700 12px var(--font);color:#8fb3d4;font-variant-numeric:tabular-nums}
-.o4-seg{display:flex;border:1px solid #1f4468;border-radius:9px;overflow:hidden}
-.o4-seg[hidden]{display:none}
-.o4-seg button{flex:1;height:32px;padding:0 10px;border:0;background:rgba(4,14,28,.6);color:#9fc6f0;font:800 11px var(--font);letter-spacing:.06em;cursor:pointer;white-space:nowrap}
-.o4-seg button+button{border-left:1px solid #1f4468}
-.o4-seg button[aria-pressed="true"]{background:rgba(34,211,238,.22);color:#fff;box-shadow:0 0 12px rgba(34,211,238,.35) inset}
-.o4-bl{left:10px;bottom:10px;width:min(330px,calc(100% - 20px))}
-.o4-gh{font:900 10.5px var(--font);letter-spacing:.14em;color:#8fb3d4;margin-bottom:6px}
-.o4-g{display:grid;grid-template-columns:78px minmax(0,1fr) 62px;align-items:center;gap:8px;margin:3px 0;opacity:.62}
-.o4-g.on{opacity:1}
-.o4-g span{font:800 10.5px var(--font);letter-spacing:.06em;color:#cfe0f3}
-.o4-g i{position:relative;height:8px;border-radius:5px;background:rgba(95,126,166,.25);overflow:hidden}
-.o4-g i em{position:absolute;left:0;top:0;bottom:0;border-radius:5px;background:#2ee59d;box-shadow:0 0 10px #2ee59d}
-.o4-g i em.a{background:#ffb547;box-shadow:0 0 10px #ffb547}.o4-g i em.r{background:#ff5566;box-shadow:0 0 12px #ff5566}
-.o4-g i u{position:absolute;top:-2px;bottom:-2px;width:2px;background:#7fe7ff;opacity:.8}
-.o4-g b{font:900 18px var(--font);font-variant-numeric:tabular-nums;text-align:right;color:#5ff0b4}.o4-g b small{font-size:10px;color:#8fb3d4}
-.o4-g b.a{color:#ffc56b}.o4-g b.r{color:#ff8a96}
-.o4-st{margin-top:6px;font:700 12px var(--font);color:#d9b8ff}
-.o4-br{right:10px;bottom:34px;display:flex;flex-direction:column;gap:4px;max-width:250px;font-size:11.5px;color:#cfe0f3}
-.o4-leg b{font:900 10.5px var(--font);letter-spacing:.14em;color:#7fe7ff}
-.o4-leg span{display:flex;align-items:center;gap:7px}.o4-leg i{flex:none;width:14px;height:10px;border-radius:3px}
-.o4-leg i.c{background:linear-gradient(90deg,#c08bff,#5aa9ff,#22d3ee)}.o4-leg i.g{background:linear-gradient(90deg,#ff5566,#ffb547)}.o4-leg i.r{background:#b46bff;box-shadow:0 0 8px #b46bff}
-.o4-leg i.t{background:linear-gradient(0deg,#1f3d66,#7fe7ff)}.o4-leg i.p{background:rgba(34,211,238,.35);border:1px solid #22d3ee}
-.o4-lab{padding:2px 8px;border-radius:8px;font:800 11px var(--font);white-space:nowrap;color:#04121f;background:#5ff0b4;border:1.5px solid #fff;box-shadow:0 0 14px rgba(95,240,180,.55);pointer-events:none}
-.o4-lab.i{background:#dff6ff;box-shadow:0 0 12px rgba(223,246,255,.5)}
-.o4-lab.c{background:#b46bff;color:#fff;box-shadow:0 0 18px rgba(180,107,255,.85)}
-.o4-lab.g.r{background:#ff5566;color:#fff;box-shadow:0 0 16px rgba(255,85,102,.8)}.o4-lab.g.a{background:#ffb547;box-shadow:0 0 14px rgba(255,181,71,.7)}
-.o4 .maplibregl-ctrl-group{background:rgba(6,17,32,.9);border:1px solid #1f4468}.o4 .maplibregl-ctrl-group button .maplibregl-ctrl-icon{filter:invert(1) brightness(1.4)}
-.o4 .maplibregl-ctrl-attrib{background:rgba(6,17,32,.8);color:#9fb6cf}.o4 .maplibregl-ctrl-attrib a{color:#9fd8ff}
-#lnOs.o4-on .os-which{display:none!important}
-@media(max-width:900px){.lnx .o4{height:520px}.o4-br{display:none}}
-@media(max-width:700px){.os-modes{flex:1 1 100%}.os-modes button{flex:1;height:44px}
-  .lnx .o4{height:520px}.o4-tl{max-width:calc(100% - 64px);padding:8px 10px;gap:5px}.o4-clock{font-size:24px}.o4-sub{font-size:11px}.o4-seg button{height:34px;font-size:10.5px;padding:0 6px}
-  .o4-bl{padding:8px 10px}.o4-g{grid-template-columns:70px minmax(0,1fr) 54px}}
-@media(max-width:900px){.os-sim{grid-template-columns:minmax(0,1fr)}.os-cell{display:none}.os-cell.show{display:block}.os-which{display:flex;flex:1 1 100%}.os-map{height:360px}}
-@media(max-width:700px){.os-flow{flex-direction:column;gap:10px}.os-flow li{max-width:none;flex-direction:row;align-items:baseline;justify-content:space-between;gap:10px;padding:5px 10px}.os-flow small{white-space:nowrap}
-  .os-flow li:not(:last-child):after{content:"\2193";right:auto;left:14px;top:auto;bottom:-13px;transform:none;font-size:11px}.os-chip{padding:5px 8px}.os-chip b{font-size:15px}
-  .os-jump{flex:1 1 100%;flex-wrap:nowrap;overflow-x:auto}.os-jump button{flex:none}.os-play{flex:1 1 100%;height:44px}.os-map{height:340px}}
+/* V16.28 step 3: off-service route - driver briefing */
+.br-wait{display:flex;flex-direction:column;gap:4px;padding:18px;border:1px dashed var(--line2);border-radius:12px;background:#0a1729}.br-wait b{color:#fff;font-size:14px}.br-wait span{color:var(--mut);font-size:12.5px}
+.br-sum{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px 14px;align-items:center;margin-bottom:10px}
+.br-who{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;font-size:16px;color:#fff;min-width:0}
+.br-who b{font-weight:900}.br-who i{font-style:normal;color:#7fe7ff;font-variant-numeric:tabular-nums;margin-left:4px}
+.br-tag{padding:3px 9px;border-radius:8px;background:#b46bff;color:#fff;font:900 12.5px var(--font);letter-spacing:.04em}
+.br-arr{color:#b46bff;font-weight:900;font-size:20px}
+.br-chips{grid-column:1;display:flex;flex-wrap:wrap;gap:6px}
+.br-chips span{display:inline-flex;align-items:baseline;gap:6px;padding:5px 10px;border-radius:9px;border:1px solid var(--line2);background:#0a1729;font-size:12px;color:var(--mut)}
+.br-chips b{font-size:16px;font-weight:900;color:#fff;font-variant-numeric:tabular-nums}.br-chips .x{border-color:#1f6f8a}.br-chips .x b{color:#7fe7ff}
+.br-send{grid-column:2;grid-row:1 / span 2;display:flex;flex-direction:column;gap:6px}
+.br-why{grid-column:1 / -1;margin:0;font-size:12.5px;color:#cfe0f3}.br-why b{color:#fff}
+.br-b{min-height:38px;padding:0 12px;border-radius:9px;border:1px solid #1f6f8a;background:#0b2a3c;color:#bff3ff;font:800 12px var(--font);letter-spacing:.04em;cursor:pointer;white-space:nowrap}
+.br-b:hover{background:#0f3850}.br-b:disabled{opacity:.6}.br-b[hidden]{display:none}
+.br-main{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(280px,1fr);gap:10px;align-items:stretch}
+.br-box{display:flex;flex-direction:column;min-width:0;border:1px solid #1f4468;border-radius:12px;overflow:hidden;background:#050d1a}
+.br-stage{position:relative;height:500px;flex:none}
+.br-box .br-map,.br-box .br-map.maplibregl-map{position:absolute;inset:0;width:auto;height:auto;background:#0a1424}
+.br-busy{position:absolute;inset:0;z-index:5;display:none;place-items:center;color:#bff3ff;font:800 13px var(--font);letter-spacing:.12em;background:rgba(4,12,26,.55)}
+.br-box.busy .br-busy{display:grid}
+.br-nav{position:absolute;z-index:4;top:10px;left:10px;right:230px;max-width:560px;display:flex;gap:12px;align-items:center;padding:10px 14px 10px 10px;border-radius:14px;
+  background:rgba(6,18,34,.82);border:1px solid rgba(180,107,255,.45);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);box-shadow:0 10px 30px rgba(0,6,20,.5);color:#fff;transition:border-color .2s,box-shadow .2s}
+.br-nav.near{border-color:#ffb547;box-shadow:0 0 0 2px rgba(255,181,71,.35),0 10px 30px rgba(0,6,20,.5)}
+.br-nav.end{border-color:#2ee59d}
+.br-ni{flex:none;width:58px;height:58px;border-radius:12px;display:grid;place-items:center;background:#b46bff;color:#fff}.br-ni svg{width:40px;height:40px}
+.br-nav.near .br-ni{background:#ffb547;color:#04121f}.br-nav.end .br-ni{background:#2ee59d;color:#04121f}
+.br-nt{display:flex;flex-direction:column;gap:2px;min-width:0}
+.br-nd{font:900 22px/1 var(--font);color:#fff;font-variant-numeric:tabular-nums}
+.br-nt b{font-size:15px;line-height:1.25;color:#fff}.br-nt em{font-style:normal;font-size:12.5px;color:#ffd38f;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.br-nt small{font-size:12px;color:#9fc6f0}.br-nt small b{font-size:12px;color:#dff6ff}
+.br-clk{position:absolute;z-index:4;top:10px;right:56px;padding:8px 12px;border-radius:12px;background:rgba(6,18,34,.82);border:1px solid rgba(34,211,238,.35);text-align:right;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+.br-clk b{display:block;font:900 28px/1 var(--font);color:#fff;font-variant-numeric:tabular-nums;text-shadow:0 0 14px rgba(34,211,238,.55)}.br-clk span{font-size:11.5px;color:#9fc6f0;white-space:nowrap}
+.br-lanes{display:inline-flex;gap:3px}.br-lanes i{font-style:normal;min-width:22px;height:24px;display:inline-grid;place-items:center;border-radius:5px;border:1px solid #3a4f78;color:#5f7690;font-weight:900;font-size:14px;background:#0a1729}
+.br-lanes i.ok{border-color:#fff;color:#04121f;background:#ffd38f}
+.br-rib{display:flex;align-items:stretch;gap:0;padding:8px 10px;background:#081527;border-top:1px solid #12344a;min-height:58px;overflow:hidden}
+.br-cap{flex:none;display:grid;place-items:center;width:30px}.br-cap b{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;background:#dff6ff;color:#04121f;font:900 13px var(--font)}.br-cap.b b{background:#2ee59d}
+.br-sg{min-width:0;display:flex;flex-direction:column;gap:3px;padding:0 4px}
+.br-sg .nm{font:800 12px var(--font);color:#cfe0f3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.br-sg .km{font-size:10.5px;color:#5f7690}
+.br-sg .bar{height:7px;border-radius:4px;background:rgba(180,107,255,.25);overflow:hidden}.br-sg .bar i{display:block;height:100%;width:calc(var(--p,0) * 100%);background:#efe0ff;border-radius:4px}
+.br-sg.xw .bar{background:rgba(34,211,238,.25)}.br-sg.xw .bar i{background:#7fe7ff}.br-sg.xw .nm{color:#bff3ff}
+.br-sg.on .nm{color:#fff}.br-sg.on .bar{box-shadow:0 0 10px rgba(180,107,255,.7)}.br-sg.done .nm{color:#8aa3bd}
+.br-jn{flex:none;width:24px;display:grid;place-items:center;color:#5f7690}.br-jn svg{width:18px;height:18px}.br-jn.passed{color:#b46bff}
+.br-ctl{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:8px 10px;background:#06121f;border-top:1px solid #12344a}
+.br-play{min-height:44px;padding:0 20px;border-radius:10px;border:1px solid #b46bff;background:linear-gradient(90deg,#8b5cf6,#b46bff);color:#fff;font:900 13px var(--font);letter-spacing:.06em;cursor:pointer;min-width:150px}
+.br-seg{display:flex;border:1px solid #1f4468;border-radius:9px;overflow:hidden}.br-seg button{min-height:36px;padding:0 10px;border:0;background:#0a1729;color:#9fc6f0;font:800 12px var(--font);cursor:pointer}
+.br-seg button+button{border-left:1px solid #1f4468}.br-seg button[aria-pressed="true"]{background:#12345a;color:#fff}
+.br-fs{margin-left:auto;border-color:#b46bff;color:#e9d8ff}
+.br-list{min-width:0;max-height:640px;overflow:auto;border:1px solid var(--line2);border-radius:12px;background:#0b1a2e;padding:6px}
+.br-list ol{list-style:none;margin:0;padding:0}
+.br-list li{display:grid;grid-template-columns:28px 34px minmax(0,1fr) auto;gap:8px;align-items:center;padding:8px 6px;border-radius:9px;cursor:pointer;border:1px solid transparent}
+.br-list li:hover{background:#0f2440}.br-list li.on{background:rgba(180,107,255,.16);border-color:#b46bff}.br-list li.past{opacity:.6}
+.br-list li.end{background:rgba(46,229,157,.08)}.br-list li.end.on{border-color:#2ee59d;background:rgba(46,229,157,.16)}
+.br-n{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;background:#1a2f52;color:#e9d8ff;font:900 12.5px var(--font)}.br-list li.end .br-n{background:#2ee59d;color:#04121f}
+.br-ic{width:34px;height:34px;border-radius:9px;display:grid;place-items:center;background:#12233f;color:#e9d8ff}.br-ic svg{width:24px;height:24px}.br-list li.xw .br-ic{color:#7fe7ff}
+.br-tx{display:flex;flex-direction:column;gap:2px;min-width:0}.br-tx b{font-size:13.5px;color:#fff;line-height:1.3}.br-tx em{font-style:normal;font-size:12px;color:#ffd38f;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.br-tx small{font-size:11.5px;color:var(--mut)}.br-tx small b{font-size:11.5px}
+.br-t{font:800 13px var(--font);color:#9fc6f0;font-variant-numeric:tabular-nums}
+.br-svc{margin:8px 6px 4px;font-size:12.5px;color:#cfe0f3;line-height:1.45}.br-svc b{color:#fff}
+.br-note{margin:8px 0 0;font-size:11.5px;color:var(--mut);line-height:1.45}
+.br-mk{transform:translate(-50%,-50%);display:inline-flex;align-items:center;gap:6px;white-space:nowrap;pointer-events:none}
+.br-mk.n b{width:24px;height:24px;border-radius:50%;display:grid;place-items:center;background:#0b1a2e;border:2px solid #e9d8ff;color:#e9d8ff;font:900 12px var(--font);box-shadow:0 0 10px rgba(180,107,255,.6)}
+.br-mk.a b,.br-mk.b b{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;border:2px solid #fff;font:900 14px var(--font);color:#04121f}
+.br-mk.a b{background:#dff6ff}.br-mk.b b{background:#2ee59d}
+.br-mk span{padding:3px 8px;border-radius:7px;background:rgba(6,18,34,.88);border:1px solid #1f4468;color:#fff;font:800 11.5px var(--font)}
+.maplibregl-marker .br-mk{transform:none}
+.br-bus{width:24px;height:40px;filter:drop-shadow(0 0 8px rgba(180,107,255,.9))}.br-bus svg{width:100%;height:100%;display:block}
+.br-bus2 .br-bus{position:absolute;left:0;top:0;transform:translate(-50%,-50%)}
+.br-box:fullscreen,.br-box.br-max{border-radius:0;border:0}
+.br-box.br-max{position:fixed;inset:0;z-index:20000}
+.br-box:fullscreen .br-stage,.br-box.br-max .br-stage{height:auto;flex:1}
+.br-box:fullscreen .br-nav,.br-box.br-max .br-nav{max-width:760px;padding:16px 20px 16px 16px}.br-box:fullscreen .br-ni,.br-box.br-max .br-ni{width:88px;height:88px}
+.br-box:fullscreen .br-ni svg,.br-box.br-max .br-ni svg{width:62px;height:62px}.br-box:fullscreen .br-nd,.br-box.br-max .br-nd{font-size:34px}
+.br-box:fullscreen .br-nt b,.br-box.br-max .br-nt b{font-size:24px}.br-box:fullscreen .br-nt em,.br-box.br-max .br-nt em{font-size:17px}
+.br-box:fullscreen .br-clk b,.br-box.br-max .br-clk b{font-size:42px}.br-box:fullscreen .br-sg .nm,.br-box.br-max .br-sg .nm{font-size:16px}
+@media(max-width:1000px){.br-main{grid-template-columns:minmax(0,1fr)}.br-list{max-height:none}}
+@media(max-width:700px){.br-sum{grid-template-columns:minmax(0,1fr)}.br-send{grid-column:1;grid-row:auto;flex-direction:row;flex-wrap:wrap}.br-send .br-b{flex:1;min-height:44px}
+  .br-who{font-size:14px}.br-stage{height:420px}
+  .br-nav{right:10px;top:auto;bottom:10px;padding:8px 10px 8px 8px;gap:10px}.br-ni{width:48px;height:48px}.br-ni svg{width:32px;height:32px}.br-nd{font-size:19px}.br-nt b{font-size:14px}
+  .br-clk{top:10px;right:52px;padding:6px 9px}.br-clk b{font-size:22px}
+  .br-rib .br-sg:not(.on) .nm{font-size:10.5px}.br-sg .nm[data-sh] .lg{display:none}.br-sg .nm[data-sh]::before{content:attr(data-sh)}.br-rib .br-sg{flex:1 1 0 !important}.br-rib .br-sg.on{flex-grow:2.4 !important}.br-sg .km{white-space:nowrap}.br-rib{padding:6px}.br-ctl .br-play{flex:1 1 100%;order:-1;min-height:48px}.br-ctl .br-b{flex:1;min-height:44px}.br-fs{margin-left:0}}
 .why{margin-top:14px;border:1px solid var(--line2);border-radius:12px;padding:12px 14px;background:#081527}
 .why-h{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 14px}
 .why-h h3{margin:0;font:800 13px/1.3 var(--font);letter-spacing:.06em;color:#7fe7ff;text-transform:uppercase}
@@ -587,7 +575,7 @@ tr.sel .radio{border-color:var(--ai);background:radial-gradient(circle,var(--ai)
 <body class="tab-setup">
 
 <header class="hdr top" id="hdr">
-  <div class="ttl brand"><div class="ic" aria-hidden="true">🚌</div><div style="min-width:0;flex:1"><h1>Halfway Planner</h1><button type="button" class="hsum" id="hsum" aria-expanded="false" aria-controls="hdr" hidden></button><p>1 Key settings &amp; buses &rarr; 2 Generate the halfway plan &rarr; 3 Route &amp; simulation &rarr; 4 ROI: EWT earned</p><div class="reqkey" id="reqkey"><span><i></i>Must be filled</span><span class="a"><i></i>Still needed</span><span class="nx" id="reqNext" aria-live="polite"></span></div></div></div>
+  <div class="ttl brand"><div class="ic" aria-hidden="true">🚌</div><div style="min-width:0;flex:1"><h1>Halfway Planner</h1><button type="button" class="hsum" id="hsum" aria-expanded="false" aria-controls="hdr" hidden></button><p>1 Key settings &amp; buses &rarr; 2 Generate the halfway plan &rarr; 3 Driver briefing &rarr; 4 ROI: EWT earned</p><div class="reqkey" id="reqkey"><span><i></i>Must be filled</span><span class="a"><i></i>Still needed</span><span class="nx" id="reqNext" aria-live="polite"></span></div></div></div>
   <div class="f f-op"><label for="op">Operator</label><select class="in w-op" id="op"><option value="">All operators</option><option value="SBST">SBS Transit</option><option value="SMRT">SMRT</option><option value="TTS">Tower Transit</option><option value="GAS">Go-Ahead</option></select></div>
   <div class="f"><label for="svc">Service</label><input class="in w-svc num" id="svc" list="svcList" maxlength="6" placeholder="e.g. 156" autocapitalize="characters" autocomplete="off"><datalist id="svcList"></datalist></div>
   <div class="f"><label for="aitp">AITP, every</label><div class="aitpw"><input class="in num" id="aitp" value="5" inputmode="numeric" maxlength="2" style="width:56px" title="Timing points on the route diagram: every N bus stops (and the first and last stop)"><span>BS</span></div></div>
@@ -636,8 +624,8 @@ tr.sel .radio{border-color:var(--ai);background:radial-gradient(circle,var(--ai)
     <div id="lnPlan"><div class="empty">Fill step 1, then press <b>Generate halfway plan</b>.</div></div>
   </section>
   <section class="card lnx" id="osCard" aria-labelledby="hO">
-    <div class="lnh"><span class="lnn">3</span><div class="lnt"><h2 id="hO">Off-service route &amp; simulation</h2><small>The simple way to the entry stop &ndash; expressways, few turns &ndash; and the buses played forward: no action against the plan.</small></div></div>
-    <div id="lnOs"><div class="empty">The off-service route and the simulation appear here after <b>Generate halfway plan</b>.</div></div>
+    <div class="lnh"><span class="lnn">3</span><div class="lnt"><h2 id="hO">Off-service route &ndash; driver briefing</h2><small>Play it to the bus captain: the way to go, turn by turn, with the time at each point. Show it full screen or send it to their phone.</small></div></div>
+    <div id="lnOs"><div class="empty">The off-service route and the driver briefing appear here after <b>Generate halfway plan</b>.</div></div>
   </section>
   <section class="card lnx" id="roiCard" aria-labelledby="hR">
     <div class="lnh"><span class="lnn">4</span><div class="lnt"><h2 id="hR">ROI &ndash; EWT earned</h2><small>No action against the plan, measured the same way at every AITP: average EWT and the average headway passengers wait for.</small></div></div>
@@ -1725,390 +1713,368 @@ function whyBind(){
   if(sv) sv.onclick = async () => { sv.disabled = true; sv.textContent = "Saving…"; try{ await whySave(); sv.textContent = "Saved"; }catch(e){ sv.textContent = "Could not save"; } setTimeout(() => { if($("whySave")){ $("whySave").disabled = false; $("whySave").textContent = "Save as picture"; } }, 1800); };
 }
 
-/* ================================================================ V16.28 off-service route + simulator (like the Diversion simulator)
-   The route: /api/hplan/route?prefer=simple - the simplest road way to the entry stop (expressways / highways, fewest turns), shown as
-   a flow of roads. The simulator plays the buses forward on two maps, NO ACTION and THE PLAN, from now to 30 min after the entry:
-   every D2 bus from its pass times (the same model as the plan), the halfway bus along D1, resting, off-service on the route and in
-   service from the entry stop; gaps longer than the headway + 2 are drawn on the route (amber, red from 2x the headway). */
-const OSIM = {maps:null, key:null, T:null, play:false, raf:0, last:0, w:"a", lock:false};
-const osHm = t => hm(t);
-function osStops(r, d){ const s = ST.snap; if(!s) return null; return s.direction === d ? s.stops : (s.opp && s.opp.direction === d ? s.opp.stops : null); }
-function osBuses(r, d){ const s = ST.snap; if(!s) return []; return s.direction === d ? (s.buses || []) : (s.opp && s.opp.direction === d ? (s.opp.buses || []) : []); }
-function osAt(stops, q){ const n = stops.length, k = Math.max(0, Math.min(n - 1, q)), i = Math.min(n - 2, Math.floor(k)), f = k - i, a = stops[i], b = stops[i + 1];
-  return [a.lat + f * (b.lat - a.lat), a.lon + f * (b.lon - a.lon)]; }
-function osAlong(line, f){                                                    // a point at fraction f of a polyline's length
-  if(!line || line.length < 2) return line && line[0];
-  const d = [0]; for(let i = 1; i < line.length; i++) d.push(d[i - 1] + Math.hypot(line[i][0] - line[i - 1][0], (line[i][1] - line[i - 1][1]) * Math.cos(line[i][0] * Math.PI / 180)));
-  const want = Math.max(0, Math.min(1, f)) * d[d.length - 1]; let i = d.findIndex(v => v >= want); if(i < 1) i = 1;
-  const g = (want - d[i - 1]) / Math.max(1e-12, d[i] - d[i - 1]); return [line[i - 1][0] + g * (line[i][0] - line[i - 1][0]), line[i - 1][1] + g * (line[i][1] - line[i - 1][1])];
+/* ================================================================ V16.28 step 3: the off-service route as a DRIVER BRIEFING
+   For the interchange staff to show the bus captain which way to drive off-service, like the Diversion TV: the whole route first,
+   then the bus drives it turn by turn while the camera follows (3D with the buildings, or 2D), a sat-nav card says the next turn,
+   how far, the lanes to use and where it goes; the clock shows the time at that point; the ribbon fills road by road; at the end:
+   which stop, which side, when to enter service and who is ahead / behind. Staff can step turn by turn, show it full screen to the
+   driver, and send it to the driver's phone (text or a route card picture). Data: /api/hplan/route?prefer=simple (the simplest road
+   route: expressways, fewest turns) - its line, turn-by-turn steps (lanes, exits, towards, clock minutes) and road stages. */
+const BR = {key:null, R:null, kind:null, P:null, d:0, play:false, raf:0, last:0, speed:1, phase:"idle", ph:0, hS:null, zS:null, want3d:true, navKey:"", busyMsg:""};
+const BRK = lat => [111320 * Math.cos(lat * Math.PI / 180), 110574];
+function brCum(l){ const c = [0]; for(let i = 1; i < l.length; i++){ const [kx, ky] = BRK(l[i][0]); c.push(c[i - 1] + Math.hypot((l[i][1] - l[i - 1][1]) * kx, (l[i][0] - l[i - 1][0]) * ky)); } return c; }
+function brAt(l, c, s){ const n = c.length - 1; if(s <= 0) return l[0]; if(s >= c[n]) return l[n];
+  let lo = 0, hi = n; while(hi - lo > 1){ const m = (lo + hi) >> 1; if(c[m] <= s) lo = m; else hi = m; }
+  const f = c[hi] === c[lo] ? 0 : (s - c[lo]) / (c[hi] - c[lo]); return [l[lo][0] + (l[hi][0] - l[lo][0]) * f, l[lo][1] + (l[hi][1] - l[lo][1]) * f]; }
+function brBrg(a, b){ const [kx, ky] = BRK(a[0]); return (Math.atan2((b[1] - a[1]) * kx, (b[0] - a[0]) * ky) * 180 / Math.PI + 360) % 360; }
+const brAd = (a, b) => ((a - b + 540) % 360) - 180;
+function brProj(p, l, c, lo){                                                // nearest position along the line at or after lo (m)
+  let best = {d:1e18, s:lo || 0}; const [kx, ky] = BRK(p[0]);
+  for(let i = 0; i < l.length - 1; i++){ if(c[i + 1] < (lo || 0) - 1) continue;
+    const ax = l[i][1] * kx, ay = l[i][0] * ky, bx = l[i + 1][1] * kx, by = l[i + 1][0] * ky, qx = p[1] * kx, qy = p[0] * ky, dx = bx - ax, dy = by - ay, L2 = dx * dx + dy * dy;
+    const t = L2 < 1e-9 ? 0 : Math.max(0, Math.min(1, ((qx - ax) * dx + (qy - ay) * dy) / L2)), d = Math.hypot(qx - (ax + t * dx), qy - (ay + t * dy));
+    if(d < best.d - 0.5) best = {d, s:Math.max(lo || 0, c[i] + t * (c[i + 1] - c[i]))}; }
+  return best;
 }
-function osSeg(stops, qb, qa){ const out = [osAt(stops, qb)]; for(let k = Math.ceil(qb); k <= Math.floor(qa); k++) out.push([stops[k].lat, stops[k].lon]); out.push(osAt(stops, qa)); return out; }
-/* everything the simulator needs, from the plan and the snapshot */
-function osModel(){
-  const r = ST.res, x = r ? cand(ST.sel) : null;
-  if(!r || !x || r.mode === "os" || !r.sim || !r.sim.units || r.now_min == null || x.entry_min == null) return null;
-  const S2 = osStops(r, r.next_dir), S1 = osStops(r, r.late_dir); if(!S2 || S2.length < 2) return null;
-  const SM = r.stop_min, now = r.now_min, A = x.use_adj ? (x.adj || {}) : {}, ins = r.sim.ins, j = x.j, n = S2.length, H = r.H;
-  const rt = ST.routes[x.code], ic = r.interchange, line = rt && rt.ok && rt.line && rt.line.length > 1 ? rt.line : [[ic.lat, ic.lon], [x.lat, x.lon]];
-  const b6 = osBuses(r, r.late_dir).find(b => +b.id === +r.late_bus);
-  let q1 = null; if(b6 && S1 && b6.km != null){ q1 = 0; for(let i = 0; i + 1 < S1.length; i++){ if(S1[i + 1].km >= b6.km){ q1 = i + (b6.km - S1[i].km) / Math.max(1e-9, S1[i + 1].km - S1[i].km); break; } q1 = S1.length - 1; } }
-  const arrive = Math.min(x.entry_min, x.leave_min + (x.os_min != null ? x.os_min : x.entry_min - x.leave_min));
-  const T0 = now, T1 = x.entry_min + 30;
-  return {r, x, S1, S2, SM, now, A, ins, j, n, H, rt, ic, line, q1, arrive, T0, T1, carr:r.c_arr_min, units:r.sim.units};
-}
-/* where a bus is at time T in one world ("b" no action, "a" the plan): {p:[lat,lon], q (D2 stop index) | null, st} or null */
-function osPos(M, u, T, w){
-  const {SM, now, A, ins, j, n, S1, S2, ic, line, q1, carr, x, arrive} = M;
-  if(u.uid === ins){
-    if(carr != null && T < carr){ if(q1 == null || !S1) return null; const q = q1 + (S1.length - 1 - q1) * Math.max(0, (T - now) / Math.max(1e-9, carr - now)); return {p:osAt(S1, q), q:null, st:"d1"}; }
-    if(w === "a"){
-      if(T < x.leave_min) return {p:[ic.lat, ic.lon], q:null, st:"rest"};
-      if(T < arrive) return {p:osAlong(line, (T - x.leave_min) / Math.max(1e-9, arrive - x.leave_min)), q:null, st:"off"};
-      if(T < x.entry_min) return {p:[x.lat, x.lon], q:null, st:"wait"};
-      const q = j + (T - x.entry_min) / SM; return q > n - 1 ? null : {p:osAt(S2, q), q, st:"svc"};
-    }
-    const q = (T - u.dep) / SM; if(q < 0) return {p:[ic.lat, ic.lon], q:null, st:"rest"}; return q > n - 1 ? null : {p:osAt(S2, q), q, st:"svc"};
-  }
-  const q = u.kind === "in_service" ? u.q + (T - now) / SM : (T - (u.dep + (w === "a" ? (A[u.uid] || 0) : 0))) / SM;
-  return q < 0 || q > n - 1 ? null : {p:osAt(S2, q), q, st:"svc"};
-}
-function osGaps(M, T, w){                                                    // the gaps between the buses on D2 at T, front first
-  const on = M.units.map(u => ({u, o:osPos(M, u, T, w)})).filter(z => z.o && z.o.q != null).sort((a, b) => b.o.q - a.o.q);
-  return on.slice(1).map((z, i) => ({a:on[i], b:z, g:M.SM * (on[i].o.q - z.o.q)}));
-}
-const osShort = u => String(u.label || "").replace(" (at interchange)", "").replace(/^D(\d) Bus /, "D$1 B");
-function osStatus(M, T, w){
-  const z = osPos(M, M.units.find(u => u.uid === M.ins) || {uid:M.ins}, T, w), W_ = whoC(M.r), r = M.r, x = M.x;
-  if(!z) return T < (M.carr || 0) ? `${W_}: on D${r.late_dir}` : `${W_}: trip finished`;
-  return `${W_}: ` + ({d1:`on D${r.late_dir} → interchange ${r.c_arr}`, rest:w === "a" ? `resting, leaves ${x.leave}` : `resting, departs ${r.c_full_dep}`,
-    off:`off-service → Stop ${x.no} (${x.entry_clock})`, wait:`at Stop ${x.no}, enters ${x.entry_clock}`, svc:`in service, Stop ${Math.floor(z.q) + 1}`})[z.st];
-}
-/* ---------------------------------------------------------------- the route as a flow of roads */
-function osRouteHtml(M){
-  const {r, x, rt, ic} = M, W_ = whoC(r);
-  const end = `<li class="os-end"><b>Stop ${x.no}</b><small>enter ${esc(x.entry_clock)}</small></li>`, start = `<li class="os-end s"><b>${esc(ic.name)}</b><small>leave ${esc(x.leave)}</small></li>`;
-  if(!rt || rt.loading) return `<div class="os-rt"><ol class="os-flow">${start}<li class="os-st wait"><b>Finding the simplest road route…</b><small>expressways, fewest turns</small></li>${end}</ol></div>`;
-  if(!rt.ok) return `<div class="os-rt"><ol class="os-flow">${start}<li class="os-st wait"><b>Road route unavailable</b><small>${esc(rt.error || "")} – the plan uses ${fkm(x.os_km)}, ${f0(x.os_min)} min</small></li>${end}</ol></div>`;
-  const sm = rt.simple || {}, st = rt.stages || [], xs = sm.xway_share != null ? Math.round(100 * sm.xway_share) : null;
-  const chip = (v, l, c) => `<span class="os-chip ${c || ""}"><b>${v}</b>${l}</span>`;
-  const alt = (rt.alternatives || []).filter(a => !a.chosen);
-  return `<div class="os-rt"><div class="os-chips">${chip(fkm(rt.km), "off-service")}${chip(`${f0(rt.time_min)} min`, `${esc(x.leave)} → ${esc(rt.arrive_clock || x.entry_clock)}`)}`
-    + (xs != null ? chip(`${xs}%`, "expressway / highway", xs >= 50 ? "x" : "") : "") + (sm.n_turns != null ? chip(String(sm.n_turns), sm.n_turns === 1 ? "turn" : "turns") : "")
-    + (st.length ? chip(String(st.length), st.length === 1 ? "road" : "roads") : "") + `</div>`
-    + `<ol class="os-flow">${start}${st.map(s_ => `<li class="os-st ${s_.xway ? "x" : ""}"><b>${s_.xway ? "🛣️ " : ""}${esc(s_.road)}</b><small>${fkm(s_.km)} · ${f0(s_.min)} min</small></li>`).join("")}${end}</ol>`
-    + `<p class="os-why">${rt.why && rt.why.length ? `<b>Why this route:</b> ${esc(rt.why[rt.why.length > 1 ? 1 : 0])}.` : esc(rt.time_src || "")}${alt.length ? ` <span>${alt.length} other route${alt.length === 1 ? "" : "s"} dashed grey on the plan map.</span>` : ""}</p></div>`;
-}
-/* ---------------------------------------------------------------- the simulator */
-function osStop(){ OSIM.play = false; cancelAnimationFrame(OSIM.raf); const b = $("osPlay"); if(b) b.textContent = "▶ PLAY"; }
-function osTeardown(){ osStop(); if(typeof os4Teardown === "function") os4Teardown(); if(OSIM.maps){ ["a", "b"].forEach(w => { const m = OSIM.maps[w].map; try{ m.stop(); m.off(); m.remove(); }catch(e){} }); OSIM.maps = null; } OSIM.key = null; OSIM.synced = false; }
-function osMap(id){
-  const m = L.map(id, {zoomControl:true, attributionControl:false, scrollWheelZoom:false, zoomSnap:0.25});
-  (window.SGBasemap ? SGBasemap.add(m, {style:"dark", switcher:false, minZoom:10, maxZoom:18}) : L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {maxZoom:19}).addTo(m));
-  return {map:m, base:L.layerGroup().addTo(m), gaps:L.layerGroup().addTo(m), trail:L.layerGroup().addTo(m), bus:L.layerGroup().addTo(m), mk:{}, tr:{}};
-}
-function renderOs(){
-  const el = $("lnOs"); if(!el) return;
-  const M = osModel();
-  if(!M){ osTeardown(); el.innerHTML = `<div class="empty">${ST.res && ST.res.mode === "os" ? "The OS bus route is in More detail." : "The off-service route and the simulation appear here after <b>Generate halfway plan</b>."}</div>`; return; }
-  const {r, x, T0, T1} = M, W_ = whoC(r);
-  if(!$("osSim")){
-    osTeardown();
-    el.innerHTML = `<div id="osRoute"></div><div class="os-ctl"><div class="os-modes" id="osModes" role="group" aria-label="Simulation view"><button type="button" data-m="2d" aria-pressed="true" title="Two flat maps side by side">2D</button><button type="button" data-m="3d" aria-pressed="false" title="3D city: light pillars, trails, gaps as walls, chase camera">3D</button><button type="button" data-m="4d" aria-pressed="false" title="4D space-time: height is time">4D</button></div><button type="button" class="os-play" id="osPlay">▶ PLAY</button><div class="os-jump" id="osJump"></div>`
-      + `<div class="os-time"><input type="range" id="osRange" step="0.1" aria-label="Simulation time"><span class="os-clock" id="osClock"></span></div>`
-      + `<div class="os-which" id="osWhich" role="group" aria-label="Map shown"><button type="button" data-w="a" aria-pressed="true">THE PLAN</button><button type="button" data-w="b" aria-pressed="false">NO ACTION</button></div></div>`
-      + `<div class="os-sim" id="osSim"><div class="os-cell" id="osCellB" data-w="b"><div class="os-map" id="osMapB"></div><span class="os-tag r">NO ACTION</span><div class="os-stat" id="osStatB"></div></div>`
-      + `<div class="os-cell show" id="osCellA" data-w="a"><div class="os-map" id="osMapA"></div><span class="os-tag g">THE PLAN</span><div class="os-stat" id="osStatA"></div></div></div>`
-      + `<div class="os-leg" aria-hidden="true"><span><i class="c"></i>${esc(W_)}</span><span><i class="o"></i>D${r.next_dir} bus</span><span><i class="n"></i>D${r.late_dir} bus on its D${r.next_dir} trip</span><span><i class="j"></i>re-timed (plan)</span><span><i class="ga"></i>gap +3 min or more</span><span><i class="gr"></i>gap 2× headway</span><span><i class="rt"></i>off-service route</span></div>`
-      + `<div class="o4" id="o4Box" hidden><div class="o4-map" id="o4Map"></div><div class="o4-busy" id="o4Busy" role="status"></div>`
-      + `<div class="o4-hud o4-tl"><div class="o4-mode" id="o4Mode"></div><div class="o4-clock" id="o4Clock"></div><div class="o4-sub" id="o4Sub"></div>`
-      + `<div class="o4-seg" id="o4World" role="group" aria-label="World"><button type="button" data-w="a" aria-pressed="true">THE PLAN</button><button type="button" data-w="b" aria-pressed="false">NO ACTION</button></div>`
-      + `<div class="o4-seg" id="o4Cam" role="group" aria-label="Camera"><button type="button" data-c="over" aria-pressed="true">OVERVIEW</button><button type="button" data-c="follow" aria-pressed="false">FOLLOW ${esc(osShort(r.sim.units.find(u => u.uid === r.sim.ins) || {label:W_}))}</button></div>`
-      + `<div class="o4-seg" id="o4Orbit" hidden><button type="button" aria-pressed="false">\u27f3 ORBIT</button></div></div>`
-      + `<div class="o4-hud o4-bl" id="o4Gap"></div><div class="o4-hud o4-br o4-leg" id="o4Leg"></div></div>`
-      + `<p class="os-note" id="osNote"></p>`;
-    $("osModes").querySelectorAll("button").forEach(b => b.onclick = () => os4Mode(b.dataset.m));
-    $("o4World").querySelectorAll("button").forEach(b => b.onclick = () => { OS4.world = b.dataset.w; $("o4World").querySelectorAll("button").forEach(z => z.setAttribute("aria-pressed", String(z === b))); os4Apply(false); });
-    $("o4Cam").querySelectorAll("button").forEach(b => b.onclick = () => { OS4.cam = b.dataset.c; $("o4Cam").querySelectorAll("button").forEach(z => z.setAttribute("aria-pressed", String(z === b)));
-      if(OS4.cam === "over"){ const M_ = osModel(); if(M_ && OS4.ml) os4Fit(M_, OS4.G || os4Geo(M_)); } os4Frame(true); });
-    $("o4Orbit").querySelector("button").onclick = function(){ OS4.orbit = !OS4.orbit; this.setAttribute("aria-pressed", String(OS4.orbit)); if(OS4.orbit) os4Spin(); };
-    $("osPlay").onclick = () => { if(OSIM.play){ osStop(); return; } const M_ = osModel(); if(!M_) return; if(OSIM.T >= M_.T1 - 0.01) OSIM.T = M_.T0; OSIM.play = true; $("osPlay").textContent = "❚❚ PAUSE"; OSIM.last = performance.now(); OSIM.raf = requestAnimationFrame(osTick); };
-    $("osRange").oninput = function(){ osStop(); OSIM.T = +this.value; osFrame(); };
-    $("osWhich").querySelectorAll("button").forEach(b => b.onclick = () => { OSIM.w = b.dataset.w; $("osWhich").querySelectorAll("button").forEach(z => z.setAttribute("aria-pressed", String(z === b)));
-      ["a", "b"].forEach(k => $(k === "a" ? "osCellA" : "osCellB").classList.toggle("show", k === OSIM.w)); if(OSIM.maps) OSIM.maps[OSIM.w].map.invalidateSize(); });
-  }
-  $("osRoute").innerHTML = osRouteHtml(M);
-  const jumps = [{t:T0, l:"now"}, {t:M.carr, l:`${W_} at interchange`}, {t:x.leave_min, l:"leaves off-service"}, {t:x.entry_min, l:`enters Stop ${x.no}`}, {t:T1, l:"+30 min"}]
-    .filter((z, i, a) => z.t != null && z.t >= T0 && a.findIndex(y => Math.abs(y.t - z.t) < 0.5) === i);
-  $("osJump").innerHTML = jumps.map(z => `<button type="button" data-t="${z.t}"><b>${osHm(z.t)}</b><small>${esc(z.l)}</small></button>`).join("");
-  $("osJump").querySelectorAll("button").forEach(b => b.onclick = () => { osStop(); OSIM.T = +b.dataset.t; osFrame(); });
-  const rg = $("osRange"); rg.min = T0; rg.max = T1;
-  const key = `${r.snap}|${x.code}|${x.entry_min}`;
-  const changed = OSIM.key !== key;
-  if(changed){ OSIM.key = key; OSIM.T = T0; osStop(); }
-  if(!OSIM.maps) OSIM.maps = {a:osMap("osMapA"), b:osMap("osMapB")};
-  const sync = (f, t) => f.map.on("move", () => { if(OSIM.lock) return; OSIM.lock = true; t.map.setView(f.map.getCenter(), f.map.getZoom(), {animate:false}); OSIM.lock = false; });
-  if(!OSIM.synced){ sync(OSIM.maps.a, OSIM.maps.b); sync(OSIM.maps.b, OSIM.maps.a); OSIM.synced = true; }
-  const S2line = M.S2.map(s_ => [s_.lat, s_.lon]), rtOk = M.rt && M.rt.ok;
-  ["a", "b"].forEach(w => { const Z = OSIM.maps[w]; Z.base.clearLayers(); Z.bus.clearLayers(); Z.mk = {};
-    if(M.S1) L.polyline(M.S1.map(s_ => [s_.lat, s_.lon]), {color:"#5f7690", weight:3, opacity:.35, dashArray:"4 6", interactive:false}).addTo(Z.base);
-    L.polyline(S2line, {color:"#2f8cff", weight:5, opacity:.5}).bindTooltip(`D${r.next_dir} service route`).addTo(Z.base);
-    arrowsAlong(Z.base, S2line, "#2f8cff", 6, 14);
-    if(w === "a"){
-      (rtOk ? (M.rt.alternatives || []).filter(a => !a.chosen && a.line && a.line.length > 1) : []).forEach(a => L.polyline(a.line, {color:"#8aa0b8", weight:3, opacity:.5, dashArray:"3 7"}).bindTooltip(`Other route: ${fkm(a.km)} · ${f0(a.time_min)} min`).addTo(Z.base));
-      L.polyline(M.line, {color:"#fff", weight:rtOk ? 9 : 4, opacity:rtOk ? .85 : .5}).addTo(Z.base);
-      L.polyline(M.line, {color:"#b46bff", weight:rtOk ? 5.5 : 2.5, dashArray:rtOk ? null : "5 7"}).bindTooltip(rtOk ? `Off-service: ${fkm(M.rt.km)} · ${f0(M.rt.time_min)} min` : "Road route not loaded – straight line").addTo(Z.base);
-      if(rtOk) arrowsAlong(Z.base, M.line, "#b46bff", 3, 18);
-    }
-    L.circleMarker([M.ic.lat, M.ic.lon], {radius:7, color:"#0b2545", weight:3, fillColor:"#fff", fillOpacity:1}).bindTooltip(M.ic.name).addTo(Z.base);
-    L.marker([x.lat, x.lon], {interactive:false, icon:L.divIcon({className:"", iconSize:[0, 0], html:`<div class="os-pin">Stop ${x.no}${w === "a" ? ` · ${esc(x.entry_clock)}` : ""}</div>`})}).addTo(Z.base);
-    L.circleMarker([x.lat, x.lon], {radius:8, color:"#fff", weight:3, fillColor:w === "a" ? "#2ee59d" : "#8aa0b8", fillOpacity:1}).addTo(Z.base);
-    Z.trail.clearLayers(); Z.tr = {};
-    M.units.forEach(u => { const c = u.uid === M.ins ? "c" : u.kind === "in_service" ? "o" : (w === "a" && M.A[u.uid] ? "j" : "n"), col = C4[c][0];
-      Z.tr[u.uid] = [L.polyline([], {color:col, weight:10, opacity:.22, interactive:false, lineCap:"round"}).addTo(Z.trail), L.polyline([], {color:col, weight:3, opacity:.85, interactive:false, lineCap:"round"}).addTo(Z.trail)];
-      Z.mk[u.uid] = L.marker(S2line[0], {interactive:false, keyboard:false, zIndexOffset:c === "c" ? 1000 : 0, icon:L.divIcon({className:"", iconSize:[0, 0], html:`<div class="os-bus ${c}" title="${esc(osShort(u))}">${c === "c" ? esc(osShort(u)) : esc(String(u.num))}</div>`})}).addTo(Z.bus); });
-    Z.map.invalidateSize();
-    const bb = L.latLngBounds(S2line.concat(M.line, [[M.ic.lat, M.ic.lon]])); if(bb.isValid()) Z.map.fitBounds(bb.pad(.04), {animate:false});
-  });
-  if(OS4.ml && OS4.ready) os4Apply(changed);
-  $("osNote").textContent = `Buses move by the plan's own timing (${f0(M.SM)} min stop to stop, the departures as planned). ${rtOk ? `The off-service run follows the simplest road route (${M.rt.time_src || "road routing"}).` : "The road route is not loaded: a straight line stands in for it."} Estimate only – the controller decides.`;
-  osFrame();
-}
-function osTick(t){
-  const M = osModel(); if(!M){ osStop(); return; }
-  const dt = (t - OSIM.last) / 1000; OSIM.last = t;
-  OSIM.T = Math.min(M.T1, OSIM.T + dt * (OS4.mode === "3d" && OS4.cam === "follow" ? 1 : 3));   // 3 simulated minutes a second (1 with the chase camera)
-  osFrame(); if(OSIM.T < M.T1 && OSIM.play) OSIM.raf = requestAnimationFrame(osTick); else osStop();
-}
-function osFrame(){
-  const M = osModel(); if(!M || !OSIM.maps) return;
-  const T = Math.max(M.T0, Math.min(M.T1, OSIM.T == null ? M.T0 : OSIM.T)); OSIM.T = T;
-  const rg = $("osRange"); if(rg) rg.value = T;
-  $("osClock").textContent = `${osHm(T)} · +${f0(T - M.T0)} min`;
-  $("osJump").querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", String(Math.abs(+b.dataset.t - T) < 0.05)));
-  ["a", "b"].forEach(w => { const Z = OSIM.maps[w];
-    M.units.forEach(u => { const mk = Z.mk[u.uid]; if(!mk) return; const z = osPos(M, u, T, w);
-      if(z){ mk.setLatLng(z.p); mk.setOpacity(1); const e = mk.getElement(); if(e) e.firstChild && e.firstChild.setAttribute("data-st", z.st); } else mk.setOpacity(0);
-      const tr = Z.tr[u.uid]; if(tr){ const pts = []; if(z) for(let t = Math.max(M.T0, T - 6); t <= T + 1e-9; t += 0.5){ const y = osPos(M, u, t, w); if(y) pts.push(y.p); else pts.length = 0; }
-        if(z) pts.push(z.p); tr[0].setLatLngs(pts.length > 1 ? pts : []); tr[1].setLatLngs(pts.length > 1 ? pts : []); } });
-    Z.gaps.clearLayers();
-    const G = osGaps(M, T, w); let big = null, nl = 0;
-    G.forEach(g => { if(!big || g.g > big.g) big = g;
-      if(g.g >= M.H + 3 - 1e-9){ const col = g.g >= 2 * M.H ? "#ff5566" : "#ffb547", seg = osSeg(M.S2, g.b.o.q, g.a.o.q);
-        L.polyline(seg, {color:col, weight:8, opacity:.85, interactive:false}).addTo(Z.gaps);
-        L.marker(osAt(M.S2, (g.a.o.q + g.b.o.q) / 2), {interactive:false, icon:L.divIcon({className:"", iconSize:[0, 0], html:`<div class="os-gap ${g.g >= 2 * M.H ? "r" : "a"}${nl++ % 2 ? " lo" : ""}">${f0(g.g)} min</div>`})}).addTo(Z.gaps); } });
-    const st = $(w === "a" ? "osStatA" : "osStatB");
-    st.innerHTML = `<b class="${big && big.g >= 2 * M.H ? "r" : big && big.g >= M.H + 3 ? "a" : "g"}">${big ? `${f0(big.g)} min` : "–"}</b><span>largest gap on D${M.r.next_dir}${big ? ` · ${esc(osShort(big.a.u))} → ${esc(osShort(big.b.u))}` : ""}</span><em>${esc(osStatus(M, T, w))}</em>`;
-  });
-  if(OS4.mode !== "2d") os4Frame(!OSIM.play);
-}
+function brCut(l, c, a, b){ const o = [brAt(l, c, a)]; for(let i = 0; i < l.length; i++) if(c[i] > a && c[i] < b) o.push(l[i]); o.push(brAt(l, c, b)); return o; }
+const BR_ABR = [[/\bAvenue\b/g, "Ave"], [/\bRoad\b/g, "Rd"], [/\bStreet\b/g, "St"], [/\bDrive\b/g, "Dr"], [/\bCrescent\b/g, "Cres"], [/\bExpressway\b/g, "Expwy"], [/\bBoulevard\b/g, "Blvd"],
+  [/\bCentral\b/g, "Ctrl"], [/\bPlace\b/g, "Pl"], [/\bLorong\b/g, "Lor"], [/\bJalan\b/g, "Jln"], [/\bBukit\b/g, "Bt"], [/\bUpper\b/g, "Upp"], [/\bNorth\b/g, "Nth"], [/\bSouth\b/g, "Sth"], [/\bInterchange\b/g, "Int"]];
+const brAbbr = r => { let t = String(r || "").trim(); if(t && t === t.toUpperCase() && /[A-Z]{4}/.test(t)) t = t.toLowerCase().replace(/\b([a-z])/g, m => m.toUpperCase()); BR_ABR.forEach(a => { t = t.replace(a[0], a[1]); }); return t; };
+const brDist = m => m < 950 ? `${Math.max(10, Math.round(m / 10) * 10)} m` : `${(m / 1000).toFixed(1)} km`;
+const BR_SVG = {l:'<path d="M15 20v-7a3 3 0 0 0-3-3H6m3-4L5 10l4 4"/>', r:'<path d="M9 20v-7a3 3 0 0 1 3-3h6m-3-4 4 4-4 4"/>', sl:'<path d="M14 20v-6L8 8m0 5V8h5"/>',
+  sr:'<path d="M10 20v-6l6-6m0 5V8h-5"/>', s:'<path d="M12 20V5m-4 4 4-4 4 4"/>', u:'<path d="M8 20V10a4 4 0 0 1 8 0v4m-3-3 3 3 3-3"/>',
+  ro:'<path d="M12 21v-6"/><circle cx="12" cy="10" r="4.5"/><path d="M15.5 4.5 17 8l-3.5.5"/>', ok:'<path d="M5 12.5l4.5 4.5L19 7.5"/>', go:'<circle cx="12" cy="12" r="4" fill="currentColor" stroke="none"/>'};
+const brSvg = k => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${BR_SVG[k] || BR_SVG.s}</svg>`;
+const BR_LANE = {left:"←", "slight left":"↖", "sharp left":"↰", straight:"↑", "slight right":"↗", right:"→", "sharp right":"↱", uturn:"↶", none:"↑"};
+const brLanes = ls => ls && ls.length > 1 && ls.some(l => !l.ok) ? `<span class="br-lanes" title="lanes: the bright ones are the ones to use">${ls.map(l => `<i class="${l.ok ? "ok" : ""}">${(l.ind && l.ind.length ? l.ind : ["straight"]).map(d => BR_LANE[d] || "↑").join("")}</i>`).join("")}</span>` : "";
+const BR_XW = /\b(EXPRESSWAY|EXPWY|HIGHWAY|HWY)\b|^(PIE|CTE|AYE|ECP|KPE|TPE|SLE|BKE|KJE|MCE|NSC)$/i;
+const BR_XC = [[/pan.?island/i, "PIE"], [/central exp/i, "CTE"], [/ayer rajah/i, "AYE"], [/east coast park/i, "ECP"], [/kallang.?paya lebar/i, "KPE"], [/tampines exp/i, "TPE"],
+  [/seletar exp/i, "SLE"], [/bukit timah exp/i, "BKE"], [/kranji exp/i, "KJE"], [/marina coastal/i, "MCE"], [/north.?south corridor/i, "NSC"]];
+const brCode = (road, ref) => { const r_ = String(ref || "").split(/[;,\s]+/).find(t => /^[A-Z]{2,4}$/.test(t)); if(r_) return r_; const h = BR_XC.find(z => z[0].test(road || "")); return h ? h[1] : ""; };   // PIE, CTE… for a narrow ribbon
 
-/* ================================================================ V16.28 simulator 3D / 4D (GPU, WebGL 2: MapLibre GL 4.7, loaded on demand)
-   3D  the city with its buildings; every bus a light pillar with a glowing trail of its last minutes; a gap of the headway + 3 min or
-       more stands up as a translucent wall as tall as it is long (12 m a minute: a 30-min gap is a 360 m wall); the off-service route
-       glows; FOLLOW BUS 6 is a chase camera behind the halfway bus.
-   4D  a space-time cube: the map is the floor, HEIGHT IS TIME. Every bus is a ribbon rising through time (waiting = a vertical
-       column); the now-plane slices the cube at the simulation time; at the entry stop the gap is a column between the two buses'
-       pass times - with the plan the halfway bus's ribbon cuts it in half.
-   Both use the same positions as the 2D maps (osPos), so the three views always agree. Without WebGL / the library: 2D only. */
-const OS4 = {mode:"2d", ml:null, ready:false, world:"a", cam:"over", orbit:false, key:null, ribKey:null, last:0, camH:null, mk:{}, gapMk:[], stat:{}, G:null};
-const C4 = {c:["#c08bff", "#4b2e70"], o:["#5aa9ff", "#1f3d66"], n:["#22d3ee", "#12505c"], j:["#ffb547", "#6a4c1d"]};
-const os4Cls = (M, u, w) => u.uid === M.ins ? "c" : u.kind === "in_service" ? "o" : (w === "a" && M.A[u.uid] ? "j" : "n");
-const os4K = lat => [111320 * Math.cos(lat * Math.PI / 180), 110574];
-function os4Sq(lat, lon, h){ const [kx, ky] = os4K(lat), dx = h / kx, dy = h / ky; return [[[lon - dx, lat - dy], [lon + dx, lat - dy], [lon + dx, lat + dy], [lon - dx, lat + dy], [lon - dx, lat - dy]]]; }
-function os4Quad(a, b, hw){                                                   // a strip a -> b ([lat, lon]), hw metres either side
-  const [kx, ky] = os4K(a[0]), dx = (b[1] - a[1]) * kx, dy = (b[0] - a[0]) * ky, d = Math.hypot(dx, dy); if(d < 0.5) return null;
-  const nx = -dy / d * hw / kx, ny = dx / d * hw / ky;
-  return [[[a[1] + nx, a[0] + ny], [b[1] + nx, b[0] + ny], [b[1] - nx, b[0] - ny], [a[1] - nx, a[0] - ny], [a[1] + nx, a[0] + ny]]];
+/* ---------------------------------------------------------------- the briefing data: route, turns along it, roads, times */
+function brPrep(){
+  const r = ST.res, x = r ? cand(ST.sel) : null, rt = x ? ST.routes[x.code] : null;
+  if(!r || !x || r.mode === "os" || !rt || !rt.ok || !rt.line || rt.line.length < 2) return null;
+  const line = rt.line.map(p => [+p[0], +p[1]]), c = brCum(line), total = Math.max(1, c[c.length - 1]);
+  const xw = new Set((rt.stages || []).filter(s_ => s_.xway).map(s_ => brAbbr(s_.road)));
+  const raw = (rt.steps || []).filter(s_ => s_.lat != null && s_.lon != null);
+  let lo = 0;
+  const man = raw.map((s_, i) => { const s = i === 0 ? 0 : (i === raw.length - 1 && s_.kind === "arrive") ? total : brProj([s_.lat, s_.lon], line, c, lo).s; lo = s;
+    return Object.assign({}, s_, {s, n:i + 1, name:brAbbr(s_.road), turn:s_.turn || "s", drive:s_.drive || s_.text, t:s_.t != null ? s_.t : null}); });
+  if(!man.length || man[man.length - 1].kind !== "arrive") man.push({kind:"arrive", turn:"ok", s:total, n:man.length + 1, name:`BS ${x.code}`, drive:`Arrive at BS ${x.code} ${x.name}`, t:rt.time_min, side:"", lat:x.lat, lon:x.lon});
+  const roads = man.slice(0, -1).map((m, i) => ({i, name:m.name || "Unnamed road", a:m.s, b:man[i + 1].s, turn:m.turn, xw:xw.has(m.name) || BR_XW.test(m.road || "") || BR_XW.test(m.ref || ""), code:brCode(m.road || m.name, m.ref)}));
+  const g = x.gap || {}, W_ = whoC(r);
+  return {r, x, rt, line, c, total, man, roads, W_, leave:x.leave_min, tt:rt.time_min, ahead:g.front, behind:g.rear, sp:g.split || [], start:r.interchange,
+    key:`${r.snap}|${x.code}|${x.leave_min}|${rt.km}|${rt.time_min}|${line.length}`};
 }
-const os4F = (g, p) => ({type:"Feature", geometry:{type:"Polygon", coordinates:g}, properties:p});
-const os4L = (c, p) => ({type:"Feature", geometry:{type:"LineString", coordinates:c.map(q => [q[1], q[0]])}, properties:p || {}});
-const os4FC = a => ({type:"FeatureCollection", features:a});
-function os4Geo(M){                                                         // the scene's extent, the time scale (metres a minute) and widths
-  const pts = M.S2.map(s_ => [s_.lat, s_.lon]).concat(M.line, [[M.ic.lat, M.ic.lon]]);
-  let s = 90, n = -90, w = 180, e = -180; pts.forEach(p => { s = Math.min(s, p[0]); n = Math.max(n, p[0]); w = Math.min(w, p[1]); e = Math.max(e, p[1]); });
-  const [kx, ky] = os4K((s + n) / 2), ext = Math.max((e - w) * kx, (n - s) * ky, 1000);
-  const k = Math.max(2000, Math.min(9000, ext * 0.34)) / Math.max(1, M.T1 - M.T0);
-  return {bb:[[w, s], [e, n]], ext, k, hw:Math.max(40, Math.min(160, ext * 0.004)), z0:30};
+function brClock(P, d){                                                     // clock minutes at distance d: between the turns' own times
+  const M = P.man.filter(m => m.t != null); let t = P.tt * d / P.total;
+  for(let i = 0; i + 1 < M.length; i++) if(d >= M[i].s && d <= M[i + 1].s){ const f = M[i + 1].s > M[i].s ? (d - M[i].s) / (M[i + 1].s - M[i].s) : 0; t = M[i].t + f * (M[i + 1].t - M[i].t); break; }
+  return P.leave + Math.min(P.tt, Math.max(0, t));
 }
-const os4Z = (G, M, t) => G.z0 + (t - M.T0) * G.k;
-function os4Heading(M, u, T, w){ const a = osPos(M, u, T, w), b = osPos(M, u, T + 0.3, w); if(!a || !b) return null;
-  const [kx, ky] = os4K(a.p[0]), dx = (b.p[1] - a.p[1]) * kx, dy = (b.p[0] - a.p[0]) * ky; return Math.hypot(dx, dy) < 1 ? null : Math.atan2(dx, dy) * 180 / Math.PI; }
+const brNext = (P, d) => P.man.find(m => m.s > d + 0.5) || P.man[P.man.length - 1];
+const brRoadAt = (P, d) => P.roads.find(q => d >= q.a && d < q.b) || P.roads[P.roads.length - 1];
 
-/* ---------------------------------------------------------------- engine start / stop */
-function os4Mode(m){
-  if(m === OS4.mode && (m === "2d" || OS4.ml)) return;
-  const box = $("o4Box"), sim = $("osSim"); if(!box) return;
-  document.querySelectorAll("#osModes button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.m === m)));
-  if(m === "2d"){ OS4.mode = "2d"; box.hidden = true; sim.hidden = false; $("lnOs").classList.remove("o4-on"); if(OSIM.maps) ["a", "b"].forEach(w => OSIM.maps[w].map.invalidateSize()); osFrame(); return; }
-  OS4.mode = m; box.hidden = false; sim.hidden = true; $("lnOs").classList.add("o4-on"); box.classList.toggle("m4", m === "4d");
-  $("o4Cam").hidden = m !== "3d"; $("o4Orbit").hidden = m !== "4d";
-  $("o4Leg").innerHTML = m === "4d" ? `<b>4D · SPACE-TIME</b><span><i class="t"></i>height = time (up = later)</span><span><i class="c"></i>each ribbon = one bus</span><span><i class="p"></i>now-plane</span><span><i class="g"></i>gap at Stop ${esc(String((cand(ST.sel) || {}).no || ""))}: column between two buses</span>`
-    : `<b>3D</b><span><i class="c"></i>light pillar = a bus, trail = its last minutes</span><span><i class="g"></i>wall = a gap, 12 m per minute</span><span><i class="r"></i>off-service route</span>`;
-  if(OS4.ml){ os4Apply(true); return; }
-  box.classList.add("busy"); $("o4Busy").textContent = "Starting the 3D engine…";
-  const fail = msg => { box.classList.remove("busy"); OS4.ml = null; OS4.ready = false; os4Mode("2d"); stat(msg, true); const n = $("osNote"); if(n) n.textContent = msg; };
-  if(!window.SG3D || !SG3D.load){ fail("3D / 4D needs the 3D map module, which is not available here. The 2D simulation still works."); return; }
-  SG3D.load().then(() => {
+/* ---------------------------------------------------------------- the two renderers (same calls): MapLibre 3D, Leaflet 2D */
+const brGrad = f => { const A = "#efe0ff", B = "rgba(180,107,255,.55)";
+  return f <= .001 ? ["interpolate", ["linear"], ["line-progress"], 0, B, 1, B] : f >= .999 ? ["interpolate", ["linear"], ["line-progress"], 0, A, 1, A]
+    : ["interpolate", ["linear"], ["line-progress"], 0, A, f, A, Math.min(.9999, f + .0008), B, 1, B]; };
+function brBusEl(){ const e = document.createElement("div"); e.className = "br-bus"; e.innerHTML = '<svg viewBox="0 0 24 40" aria-hidden="true"><rect x="3" y="2" width="18" height="36" rx="5" fill="#b46bff" stroke="#fff" stroke-width="2"/><rect x="6" y="5" width="12" height="7" rx="2" fill="#0b1a2e"/><rect x="6" y="30" width="12" height="4" rx="1.5" fill="#0b1a2e" opacity=".6"/></svg>'; return e; }
+function brMkEl(cls, html){ const e = document.createElement("div"); e.className = "br-mk " + cls; e.innerHTML = html; return e; }
+function BR3(host){
+  const R = {kind:"3d", ready:false, mk:[]}; let ml, bus, lastF = -1;
+  R.init = () => (window.SG3D && SG3D.load ? SG3D.load() : Promise.reject(new Error("no 3D module"))).then(() => new Promise((res, rej) => {
     try{
-      const M = osModel(); if(!M){ fail("Generate a plan first."); return; }
-      const G = OS4.G = os4Geo(M), c = [(G.bb[0][0] + G.bb[1][0]) / 2, (G.bb[0][1] + G.bb[1][1]) / 2];
-      const ml = OS4.ml = new maplibregl.Map({container:"o4Map", style:SG3D.style ? SG3D.style() : {version:8, sources:{}, layers:[{id:"bg", type:"background", paint:{"background-color":"#0a1830"}}]},
-        center:c, zoom:11, pitch:60, bearing:-20, maxPitch:75, antialias:true, attributionControl:false, fadeDuration:0});
+      ml = R.ml = new maplibregl.Map({container:host, style:SG3D.style ? SG3D.style() : {version:8, sources:{}, layers:[{id:"bg", type:"background", paint:{"background-color":"#0a1830"}}]},
+        center:[103.82, 1.35], zoom:12, pitch:50, bearing:0, maxPitch:72, antialias:true, attributionControl:false, fadeDuration:0, dragRotate:true});
       ml.addControl(new maplibregl.NavigationControl({visualizePitch:true}), "top-right");
       ml.addControl(new maplibregl.AttributionControl({compact:true, customAttribution:'<a href="https://openfreemap.org" target="_blank" rel="noopener">OpenFreeMap</a>'}), "bottom-right");
-      ml.on("error", e => { const sid = e && (e.sourceId || (e.source && e.source.id)); if(sid === "omt" && !OS4.noTiles){ OS4.noTiles = true; const n = $("osNote"); if(n) n.textContent = "3D buildings are not reachable on this network – the simulation runs on a plain floor."; } });
-      ml.once("style.load", () => { os4Layers(); OS4.ready = true; box.classList.remove("busy"); os4Apply(true); });
-    }catch(err){ fail("3D / 4D needs WebGL, which this browser or device does not provide. The 2D simulation still works."); }
-  }, () => fail("The 3D engine could not be loaded (no connection to the map library). The 2D simulation still works."));
+      ml.once("style.load", () => {
+        try{ ml.setSky({"sky-color":"#04101f", "horizon-color":"#0d2f55", "fog-color":"#081428", "sky-horizon-blend":0.6, "horizon-fog-blend":0.7, "fog-ground-blend":0.5, "atmosphere-blend":0.6}); }catch(e){}
+        ml.addSource("br-route", {type:"geojson", data:{type:"FeatureCollection", features:[]}, lineMetrics:true});
+        const below = ml.getLayer("road-label") ? "road-label" : undefined;
+        ml.addLayer({id:"br-glow", type:"line", source:"br-route", layout:{"line-cap":"round", "line-join":"round"}, paint:{"line-color":"#b46bff", "line-width":26, "line-blur":16, "line-opacity":.45}}, below);
+        ml.addLayer({id:"br-line", type:"line", source:"br-route", layout:{"line-cap":"round", "line-join":"round"}, paint:{"line-width":["interpolate", ["linear"], ["zoom"], 11, 5, 16, 11], "line-gradient":brGrad(0)}}, below);
+        R.ready = true; res();
+      });
+      ml.on("error", e => { const sid = e && (e.sourceId || (e.source && e.source.id)); if(sid === "omt" && !R.noTiles){ R.noTiles = true; const n = $("brNote"); if(n) n.textContent = "3D buildings are not reachable on this network – the route still plays."; } });
+      setTimeout(() => { if(!R.ready) rej(new Error("the 3D map did not start")); }, 25000);
+    }catch(e){ rej(e); }
+  }));
+  R.show = P => {
+    ml.getSource("br-route").setData({type:"Feature", properties:{}, geometry:{type:"LineString", coordinates:P.line.map(p => [p[1], p[0]])}});
+    R.mk.forEach(m => m.remove()); R.mk = []; lastF = -1; ml.setPaintProperty("br-line", "line-gradient", brGrad(0));
+    const add = (p, el, anchor) => R.mk.push(new maplibregl.Marker({element:el, anchor:anchor || "center"}).setLngLat([p[1], p[0]]).addTo(ml));
+    add(P.line[0], brMkEl("a", `<b>A</b><span>${esc(P.start.name)}</span>`), "bottom");
+    add(P.line[P.line.length - 1], brMkEl("b", `<b>B</b><span>Stop ${P.x.no} · BS ${esc(P.x.code)}</span>`), "bottom");
+    P.man.slice(1, -1).forEach(m => add([m.lat, m.lon], brMkEl("n", `<b>${m.n}</b>`)));
+    if(!bus){ bus = new maplibregl.Marker({element:brBusEl(), rotationAlignment:"map", pitchAlignment:"map"}); }
+    bus.setLngLat([P.line[0][1], P.line[0][0]]).addTo(ml);
+  };
+  R.overview = (P, ms) => { const b = new maplibregl.LngLatBounds(); P.line.forEach(p => b.extend([p[1], p[0]]));
+    const sm = host.clientWidth < 560, bear = (brBrg(P.line[0], P.line[P.line.length - 1]) + 270) % 360;
+    const cam = ml.cameraForBounds(b, {padding:sm ? {top:130, bottom:60, left:30, right:30} : {top:120, bottom:70, left:80, right:80}, bearing:bear});
+    if(cam) ml.flyTo({center:cam.center, zoom:Math.min(16.5, cam.zoom - .2), bearing:bear, pitch:48, duration:ms, essential:true}); };
+  R.approach = (p, h, ahead, ms, z) => { R.hS = h; R.zS = z; ml.flyTo({center:[ahead[1], ahead[0]], bearing:h, pitch:58, zoom:z, duration:ms, essential:true}); };
+  R.follow = (p, h, ahead, dt, z) => { if(R.hS == null) R.hS = h; if(R.zS == null) R.zS = z;
+    R.hS = (R.hS + brAd(h, R.hS) * (1 - Math.exp(-dt * 2.4)) + 360) % 360; R.zS += (z - R.zS) * (1 - Math.exp(-dt * 1.2));
+    ml.jumpTo({center:[ahead[1], ahead[0]], bearing:R.hS, pitch:58, zoom:R.zS}); };
+  R.bus = (p, h, f) => { bus.setLngLat([p[1], p[0]]).setRotation(h); const q = Math.round(f * 500) / 500; if(q !== lastF){ lastF = q; ml.setPaintProperty("br-line", "line-gradient", brGrad(q)); } };
+  R.state = () => ({kind:"3d", c:ml.getCenter().toArray(), zoom:+ml.getZoom().toFixed(2), pitch:+ml.getPitch().toFixed(1), bearing:+ml.getBearing().toFixed(1)});
+  R.remove = () => { try{ ml.remove(); }catch(e){} };
+  return R;
 }
-function os4Teardown(){ if(OS4.ml){ try{ OS4.ml.remove(); }catch(e){} } Object.values(OS4.mk).forEach(m => m.remove()); OS4.gapMk.forEach(m => m.remove());
-  Object.assign(OS4, {ml:null, ready:false, mode:"2d", key:null, ribKey:null, mk:{}, gapMk:[], camH:null, G:null}); }
-/* ---------------------------------------------------------------- layers (added once per map) */
-function os4Layers(){
-  const ml = OS4.ml, E = os4FC([]);
-  try{ ml.setSky({"sky-color":"#04101f", "horizon-color":"#0d2f55", "fog-color":"#081428", "sky-horizon-blend":0.6, "horizon-fog-blend":0.7, "fog-ground-blend":0.55, "atmosphere-blend":0.6}); }catch(e){}
-  try{ ml.setLight({anchor:"viewport", color:"#cfe9ff", intensity:0.38, position:[1.2, 200, 35]}); }catch(e){}
-  ["o4-route", "o4-d1", "o4-off", "o4-stops", "o4-beam", "o4-body", "o4-wall", "o4-wallg", "o4-rib", "o4-now", "o4-cube", "o4-col", "o4-ring", "o4-ruler", "o4-curtain"].forEach(s => ml.addSource(s, {type:"geojson", data:E}));
-  Object.keys(C4).forEach(c => ml.addSource("o4-trail-" + c, {type:"geojson", data:E, lineMetrics:true}));
-  const before = ml.getLayer("road-label") ? "road-label" : undefined, add = l => ml.addLayer(l, before);
-  add({id:"o4-route-glow", type:"line", source:"o4-route", layout:{"line-cap":"round", "line-join":"round"}, paint:{"line-color":"#2f8cff", "line-width":16, "line-blur":12, "line-opacity":.35}});
-  add({id:"o4-route", type:"line", source:"o4-route", layout:{"line-cap":"round", "line-join":"round"}, paint:{"line-color":"#5aa9ff", "line-width":3.2, "line-opacity":.9}});
-  add({id:"o4-d1", type:"line", source:"o4-d1", paint:{"line-color":"#5f7690", "line-width":2, "line-opacity":.4, "line-dasharray":[2, 2]}});
-  add({id:"o4-off-glow", type:"line", source:"o4-off", layout:{"line-cap":"round", "line-join":"round"}, paint:{"line-color":"#b46bff", "line-width":18, "line-blur":12, "line-opacity":.45}});
-  add({id:"o4-off", type:"line", source:"o4-off", layout:{"line-cap":"round", "line-join":"round"}, paint:{"line-color":"#e2c8ff", "line-width":3.6}});
-  add({id:"o4-stops", type:"circle", source:"o4-stops", paint:{"circle-radius":["get", "r"], "circle-color":["get", "c"], "circle-stroke-color":"#fff", "circle-stroke-width":["get", "s"], "circle-opacity":.95, "circle-pitch-alignment":"map"}});
-  add({id:"o4-wallg", type:"line", source:"o4-wallg", layout:{"line-cap":"round"}, paint:{"line-color":["get", "c"], "line-width":14, "line-blur":10, "line-opacity":.7}});
-  Object.keys(C4).forEach(c => {
-    const rgb = C4[c][0].match(/\w\w/g).map(h => parseInt(h, 16)).join(",");
-    add({id:"o4-trail-glow-" + c, type:"line", source:"o4-trail-" + c, layout:{"line-cap":"round", "line-join":"round"},
-      paint:{"line-width":14, "line-blur":9, "line-gradient":["interpolate", ["linear"], ["line-progress"], 0, `rgba(${rgb},0)`, 1, `rgba(${rgb},.55)`]}});
-    add({id:"o4-trail-" + c, type:"line", source:"o4-trail-" + c, layout:{"line-cap":"round", "line-join":"round"},
-      paint:{"line-width":4, "line-gradient":["interpolate", ["linear"], ["line-progress"], 0, `rgba(${rgb},0)`, 1, `rgba(${rgb},1)`]}});
-  });
-  const fx = (id, src, op, extra) => add(Object.assign({id, type:"fill-extrusion", source:src, paint:{"fill-extrusion-color":["get", "c"], "fill-extrusion-base":["get", "b"], "fill-extrusion-height":["get", "h"], "fill-extrusion-opacity":op, "fill-extrusion-vertical-gradient":true}}, extra || {}));
-  fx("o4-wall", "o4-wall", .42);
-  fx("o4-beam", "o4-beam", .5, {maxzoom:14.2, paint:{"fill-extrusion-color":["get", "c"], "fill-extrusion-base":0, "fill-extrusion-height":["interpolate", ["linear"], ["zoom"], 9, ["*", ["get", "m"], 1600], 12, ["*", ["get", "m"], 520], 14.2, ["*", ["get", "m"], 160]], "fill-extrusion-opacity":.5}});
-  fx("o4-body", "o4-body", .96, {minzoom:13.6});
-  fx("o4-curtain", "o4-curtain", .1);
-  fx("o4-rib", "o4-rib", .9);
-  fx("o4-col", "o4-col", .36);
-  fx("o4-ring", "o4-ring", .95);
-  fx("o4-ruler", "o4-ruler", .7);
-  fx("o4-cube", "o4-cube", 1);
-  fx("o4-now", "o4-now", .16);
+function BR2(host){
+  const R = {kind:"2d", ready:false}; let map, G, done, bus;
+  R.init = () => new Promise(res => {
+    map = R.map = L.map(host, {zoomControl:false, attributionControl:false, scrollWheelZoom:false, zoomSnap:0.25}).setView([1.35, 103.82], 12);
+    L.control.zoom({position:"bottomright"}).addTo(map);
+    (window.SGBasemap ? SGBasemap.add(map, {style:"dark", switcher:false, minZoom:10, maxZoom:19}) : L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {maxZoom:19}).addTo(map));
+    G = L.layerGroup().addTo(map); R.ready = true; res(); });
+  R.show = P => { G.clearLayers();
+    L.polyline(P.line, {color:"#b46bff", weight:20, opacity:.22, interactive:false}).addTo(G);
+    L.polyline(P.line, {color:"#b46bff", weight:7, opacity:.6, interactive:false}).addTo(G);
+    done = L.polyline([P.line[0], P.line[0]], {color:"#efe0ff", weight:7, interactive:false}).addTo(G);
+    const mk = (p, cls, html, z) => L.marker(p, {interactive:false, zIndexOffset:z || 0, icon:L.divIcon({className:"", iconSize:[0, 0], html:`<div class="br-mk ${cls}">${html}</div>`})}).addTo(G);
+    mk(P.line[0], "a", `<b>A</b><span>${esc(P.start.name)}</span>`, 500); mk(P.line[P.line.length - 1], "b", `<b>B</b><span>Stop ${P.x.no} · BS ${esc(P.x.code)}</span>`, 500);
+    P.man.slice(1, -1).forEach(m => mk([m.lat, m.lon], "n", `<b>${m.n}</b>`));
+    bus = L.marker(P.line[0], {interactive:false, zIndexOffset:1000, icon:L.divIcon({className:"", iconSize:[0, 0], html:'<div class="br-bus2"></div>'})}).addTo(G);
+    bus.on("add", () => { const e = bus.getElement(); if(e && !e.firstChild.firstChild) e.firstChild.appendChild(brBusEl()); }); const e = bus.getElement(); if(e && !e.firstChild.firstChild) e.firstChild.appendChild(brBusEl());
+    map.invalidateSize(); };
+  R.overview = (P, ms) => { map.invalidateSize(); if(ms < 50) map.fitBounds(P.line, {padding:[60, 60], animate:false}); else map.flyToBounds(P.line, {padding:[60, 60], duration:ms / 1000}); };
+  R.approach = (p, h, ahead, ms) => { if(ms < 50) map.setView(ahead, 17, {animate:false}); else map.flyTo(ahead, 17, {duration:ms / 1000}); };
+  R.follow = (p, h, ahead, dt, z) => map.setView(ahead, z >= 16 ? 17 : 16, {animate:false});
+  R.bus = (p, h, f, P) => { bus.setLatLng(p); const e = bus.getElement() && bus.getElement().querySelector(".br-bus"); if(e) e.style.transform = `translate(-50%,-50%) rotate(${Math.round(h)}deg)`;
+    if(done && P){ done.setLatLngs(brCut(P.line, P.c, 0, Math.max(.5, f * P.total))); } };
+  R.state = () => ({kind:"2d", c:[map.getCenter().lng, map.getCenter().lat], zoom:map.getZoom(), pitch:0, bearing:0});
+  R.remove = () => { try{ map.stop(); map.off(); map.remove(); }catch(e){} };
+  return R;
 }
-/* static per model / world: the lines, and in 4D the ribbons, columns and the ruler */
-function os4Apply(fit){
-  const ml = OS4.ml, M = osModel(); if(!ml || !OS4.ready || !M) return;
-  const G = OS4.G = os4Geo(M), w = OS4.world, four = OS4.mode === "4d";
-  ml.getSource("o4-route").setData(os4FC([os4L(M.S2.map(s_ => [s_.lat, s_.lon]))]));
-  ml.getSource("o4-d1").setData(os4FC(M.S1 && !four ? [os4L(M.S1.map(s_ => [s_.lat, s_.lon]))] : []));
-  ml.getSource("o4-off").setData(os4FC(w === "a" ? [os4L(M.line)] : []));
-  ml.getSource("o4-stops").setData(os4FC([{type:"Feature", geometry:{type:"Point", coordinates:[M.x.lon, M.x.lat]}, properties:{r:9, s:3, c:w === "a" ? "#2ee59d" : "#8aa0b8"}},
-    {type:"Feature", geometry:{type:"Point", coordinates:[M.ic.lon, M.ic.lat]}, properties:{r:7, s:3, c:"#ffffff"}}]));
-  const vis = (ids, on) => ids.forEach(id => { if(ml.getLayer(id)) ml.setLayoutProperty(id, "visibility", on ? "visible" : "none"); });
-  vis(["o4-rib", "o4-now", "o4-cube", "o4-col", "o4-ring", "o4-ruler", "o4-curtain"], four);
-  OS4.gapMk.forEach(m => m.getElement().style.display = four ? "none" : "");
-  vis(["o4-beam", "o4-body", "o4-wall", "o4-wallg"].concat(...Object.keys(C4).map(c => ["o4-trail-" + c, "o4-trail-glow-" + c])), !four);
-  vis(["building-3d"], !four); vis(["building-flat"], four);
-  const rk = `${OSIM.key}|${w}|${M.rt && M.rt.ok ? 1 : 0}`;
-  if(four && OS4.ribKey !== rk){ OS4.ribKey = rk; os4Static(M, G, w); }
-  if(!four) OS4.ribKey = null;
-  os4Labels(M, w);
-  if(fit) os4Fit(M, G);
-  os4Frame(true);
-}
-function os4Static(M, G, w){
-  const ml = OS4.ml, R = [], dt = 0.5;
-  M.units.forEach(u => { const c = os4Cls(M, u, w); let prev = null;
-    for(let t = M.T0; t <= M.T1 + 1e-9; t += dt){ const z = osPos(M, u, t, w);
-      if(z && prev){ const g = os4Quad(prev.p, z.p, G.hw) || os4Sq(z.p[0], z.p[1], G.hw);
-        R.push(os4F(g, {c:C4[c][0], f:C4[c][1], z0:os4Z(G, M, t - dt), b:os4Z(G, M, t - dt), h:os4Z(G, M, t) + G.k * 0.04, u:u.uid})); }
-      prev = z; } });
-  OS4.rib = R; ml.getSource("o4-rib").setData(os4FC(R));
-  const cur = [], S2 = M.S2.map(s_ => [s_.lat, s_.lon]);                       // the D2 route stood up through time: a time-distance chart over the map
-  for(let i = 1; i < S2.length; i++){ const q = os4Quad(S2[i - 1], S2[i], 6); if(q) cur.push(os4F(q, {c:"#2f8cff", b:os4Z(G, M, M.T0), h:os4Z(G, M, M.T1)})); }
-  ml.getSource("o4-curtain").setData(os4FC(cur));
-  const P = whyPasses(M.r, M.x), L_ = P.at(w === "a" ? P.tA : P.tB, M.j), cols = [], rings = [];
-  L_.forEach((o, i) => { if(o.t >= M.T0 && o.t <= M.T1) rings.push(os4F(os4Sq(M.x.lat, M.x.lon, G.hw * 3.2), {c:C4[os4Cls(M, o.u, w)][0], b:os4Z(G, M, o.t) - G.k * 0.12, h:os4Z(G, M, o.t) + G.k * 0.12}));
-    const n = L_[i + 1]; if(!n) return; const g = n.t - o.t, a = Math.max(o.t, M.T0), b = Math.min(n.t, M.T1);
-    if(g >= M.H + 3 - 1e-9 && b > a) cols.push(os4F(os4Sq(M.x.lat, M.x.lon, G.hw * 2.4), {c:g >= 2 * M.H ? "#ff5566" : "#ffb547", b:os4Z(G, M, a), h:os4Z(G, M, b), g, ta:o.t, tb:n.t})); });
-  OS4.cols = cols; ml.getSource("o4-col").setData(os4FC(cols)); ml.getSource("o4-ring").setData(os4FC(rings));
-  const sw = [G.bb[0][1], G.bb[0][0]], ru = [os4F(os4Sq(sw[0], sw[1], G.hw * 0.7), {c:"#8aa0b8", b:os4Z(G, M, M.T0), h:os4Z(G, M, M.T1)})];
-  for(let t = Math.ceil(M.T0 / 15) * 15; t <= M.T1; t += 15) ru.push(os4F(os4Sq(sw[0], sw[1], G.hw * 4), {c:t % 60 === 0 ? "#22d3ee" : "#5f7ea6", b:os4Z(G, M, t), h:os4Z(G, M, t) + G.k * 0.3}));
-  ml.getSource("o4-ruler").setData(os4FC(ru));
-  OS4.stat.rib = R.length; OS4.stat.cols = cols.map(c_ => [Math.round(c_.properties.ta), Math.round(c_.properties.tb), Math.round(c_.properties.g)]); OS4.stat.rings = rings.length;
-}
-function os4Fit(M, G){
-  const ml = OS4.ml, four = OS4.mode === "4d";
-  ml.jumpTo({pitch:four ? 56 : 58, bearing:four ? -28 : -18});
-  const sm = ml.getContainer().clientWidth < 560, pad = sm ? {top:190, bottom:130, left:24, right:24} : {top:70, bottom:four ? 40 : 70, left:50, right:50};
-  try{ ml.fitBounds(G.bb, {padding:pad, bearing:four ? -28 : -18, duration:0}); }catch(e){}
-  if(four) ml.jumpTo({zoom:ml.getZoom() - (sm ? 0.15 : 0.35)});
-  OS4.camH = null;
-}
-function os4Labels(M, w){
-  const ml = OS4.ml, mk = (k, ll, html, cls) => { if(OS4.mk[k]) OS4.mk[k].remove(); const e = document.createElement("div"); e.className = "o4-lab " + (cls || ""); e.innerHTML = html;
-    OS4.mk[k] = new maplibregl.Marker({element:e, anchor:"bottom", offset:[0, -12]}).setLngLat(ll).addTo(ml); };
-  mk("stop", [M.x.lon, M.x.lat], `Stop ${M.x.no}${w === "a" ? ` · ${esc(M.x.entry_clock)}` : ""}`, "s");
-  mk("ic", [M.ic.lon, M.ic.lat], esc(M.ic.name), "i");
-  if(!OS4.mk.bus){ const e = document.createElement("div"); e.className = "o4-lab c"; e.textContent = osShort(M.units.find(u => u.uid === M.ins) || {label:whoC(M.r)});
-    OS4.mk.bus = new maplibregl.Marker({element:e, anchor:"bottom", offset:[0, -18]}).setLngLat([M.ic.lon, M.ic.lat]).addTo(ml); }
-}
-/* per frame: buses, trails, walls (3D) or the now-plane and cubes (4D); camera; HUD */
-function os4Frame(force){
-  const ml = OS4.ml, M = osModel(); if(!ml || !OS4.ready || !M || OS4.mode === "2d") return;
-  const now = performance.now(); if(!force && now - OS4.last < 45) return; OS4.last = now;
-  const T = OSIM.T == null ? M.T0 : OSIM.T, w = OS4.world, G = OS4.G || os4Geo(M), four = OS4.mode === "4d";
-  const vis = M.units.map(u => ({u, z:osPos(M, u, T, w), c:os4Cls(M, u, w)})).filter(o => o.z);
-  if(four){
-    const zn = os4Z(G, M, T), b = G.bb, pad = 0.02;
-    const pw = (b[1][0] - b[0][0]) * pad, ph = (b[1][1] - b[0][1]) * pad;
-    ml.getSource("o4-now").setData(os4FC([os4F([[[b[0][0] - pw, b[0][1] - ph], [b[1][0] + pw, b[0][1] - ph], [b[1][0] + pw, b[1][1] + ph], [b[0][0] - pw, b[1][1] + ph], [b[0][0] - pw, b[0][1] - ph]]], {c:"#22d3ee", b:zn, h:zn + G.k * 0.12})]));
-    ml.getSource("o4-cube").setData(os4FC(vis.map(o => os4F(os4Sq(o.z.p[0], o.z.p[1], G.hw * (o.c === "c" ? 3 : 2.2)), {c:C4[o.c][0], b:zn - G.k * 0.5, h:zn + G.k * 0.5}))));
-    ml.setPaintProperty("o4-rib", "fill-extrusion-color", ["case", ["<=", ["get", "z0"], zn], ["get", "c"], ["get", "f"]]);
-    OS4.stat.now = Math.round(zn);
-    if(OS4.mk.bus) OS4.mk.bus.getElement().style.display = "none";
-  } else {
-    ml.getSource("o4-beam").setData(os4FC(vis.map(o => os4F(os4Sq(o.z.p[0], o.z.p[1], o.c === "c" ? 140 : 95), {c:C4[o.c][0], m:o.c === "c" ? 1.5 : 1}))));
-    ml.getSource("o4-body").setData(os4FC(vis.flatMap(o => { const h = os4Heading(M, o.u, T, w); const brg = (h == null ? 0 : h) * Math.PI / 180;
-      return [os4F(SG3D.box(o.z.p[0], o.z.p[1], brg, 12, 2.6), {c:C4[o.c][0], b:0.3, h:4.4}), os4F(os4Sq(o.z.p[0], o.z.p[1], o.c === "c" ? 4 : 2.5), {c:C4[o.c][0], b:4.4, h:o.c === "c" ? 90 : 45})]; })));
-    const tr = {c:[], o:[], n:[], j:[]};
-    vis.forEach(o => { const pts = []; for(let t = Math.max(M.T0, T - 8); t <= T + 1e-9; t += 0.25){ const z = osPos(M, o.u, t, w); if(z) pts.push(z.p); else pts.length = 0; }
-      pts.push(o.z.p); if(pts.length >= 2) tr[o.c].push(os4L(pts)); });
-    Object.keys(tr).forEach(c => ml.getSource("o4-trail-" + c).setData(os4FC(tr[c])));
-    const walls = [], glow = [], labs = [];
-    osGaps(M, T, w).forEach(g => { if(g.g < M.H + 3 - 1e-9) return; const col = g.g >= 2 * M.H ? "#ff5566" : "#ffb547", seg = osSeg(M.S2, g.b.o.q, g.a.o.q), h = g.g * 12;
-      for(let i = 1; i < seg.length; i++){ const q = os4Quad(seg[i - 1], seg[i], 16); if(q) walls.push(os4F(q, {c:col, b:0, h})); }
-      glow.push(os4L(seg, {c:col})); labs.push({p:osAt(M.S2, (g.a.o.q + g.b.o.q) / 2), g:g.g, r:g.g >= 2 * M.H}); });
-    ml.getSource("o4-wall").setData(os4FC(walls)); ml.getSource("o4-wallg").setData(os4FC(glow));
-    while(OS4.gapMk.length > labs.length) OS4.gapMk.pop().remove();
-    labs.forEach((l, i) => { let m = OS4.gapMk[i]; if(!m){ const e = document.createElement("div"); e.innerHTML = '<span class="o4-lab g"></span>'; m = OS4.gapMk[i] = new maplibregl.Marker({element:e, anchor:"bottom", offset:[0, -8]}).setLngLat([l.p[1], l.p[0]]).addTo(ml); }
-      const sp = m.getElement().firstChild; sp.className = "o4-lab g " + (l.r ? "r" : "a"); sp.textContent = `${f0(l.g)} min`; m.getElement().style.display = ""; m.setLngLat([l.p[1], l.p[0]]); });
-    const b6 = vis.find(o => o.u.uid === M.ins);
-    if(OS4.mk.bus){ OS4.mk.bus.getElement().style.display = b6 ? "" : "none"; if(b6) OS4.mk.bus.setLngLat([b6.z.p[1], b6.z.p[0]]); }
-    OS4.stat.walls = walls.length; OS4.stat.gaps = labs.map(l => Math.round(l.g));
-    if(OS4.cam === "follow" && b6){                                           // chase camera behind the halfway bus
-      const h = os4Heading(M, b6.u, T, w); if(h != null) OS4.camH = OS4.camH == null ? h : OS4.camH + ((((h - OS4.camH) % 360) + 540) % 360 - 180) * 0.18;
-      ml.jumpTo({center:[b6.z.p[1], b6.z.p[0]], zoom:15.6, pitch:64, bearing:OS4.camH == null ? ml.getBearing() : OS4.camH});
-    }
+
+/* ---------------------------------------------------------------- the card */
+function brTeardown(){ brStop(); if(BR.R) BR.R.remove(); BR.R = null; BR.kind = null; BR.key = null; BR.P = null; }
+function renderOs(){
+  const el = $("lnOs"); if(!el) return;
+  const r = ST.res, x = r ? cand(ST.sel) : null, rt = x ? ST.routes[x.code] : null;
+  if(!r || !x){ brTeardown(); el.innerHTML = `<div class="empty">${r && r.mode === "os" ? "The OS bus route is in More detail." : "The off-service route and the driver briefing appear here after <b>Generate halfway plan</b>."}</div>`; return; }
+  if(r.mode === "os"){ brTeardown(); el.innerHTML = `<div class="empty">The OS bus route is in More detail.</div>`; return; }
+  const P = brPrep();
+  if(!P){ brTeardown();
+    el.innerHTML = `<div class="br-wait">${!rt || rt.loading ? `<b>Finding the simplest road route…</b><span>expressways first, fewest turns – ${esc(whoC(r))} leaves ${esc(x.leave)}</span>` : `<b>Road route unavailable</b><span>${esc(rt.error || "")} – the plan uses ${fkm(x.os_km)}, ${f0(x.os_min)} min</span>`}</div>`; return; }
+  if(!$("brBox")){
+    el.innerHTML = `<div class="br-sum" id="brSum"></div>
+      <div class="br-main"><div class="br-box" id="brBox"><div class="br-stage"><div class="br-map" id="brMap"></div><div class="br-busy" id="brBusy" role="status"></div>
+        <div class="br-nav" id="brNav" aria-live="polite"></div><div class="br-clk" id="brClk"></div></div>
+        <div class="br-rib" id="brRib"></div>
+        <div class="br-ctl"><button type="button" class="br-b" id="brRe" title="From the start">⟲</button><button type="button" class="br-b" id="brPrev" title="Previous turn">◀ TURN</button>
+          <button type="button" class="br-play" id="brPlay">▶ PLAY ROUTE</button><button type="button" class="br-b" id="brNextT" title="Next turn">TURN ▶</button>
+          <div class="br-seg" id="brSpd" role="group" aria-label="Speed"><button type="button" data-v="1" aria-pressed="true">1×</button><button type="button" data-v="2" aria-pressed="false">2×</button><button type="button" data-v="4" aria-pressed="false">4×</button></div>
+          <div class="br-seg" id="brDim" role="group" aria-label="Map"><button type="button" data-v="3d" aria-pressed="true">3D</button><button type="button" data-v="2d" aria-pressed="false">2D</button></div>
+          <button type="button" class="br-b br-fs" id="brFs" title="Show the driver: full screen">⛶ SHOW DRIVER</button></div></div>
+        <aside class="br-list" id="brList" aria-label="Turn by turn"></aside></div>
+      <p class="br-note" id="brNote"></p>`;
+    $("brPlay").onclick = () => BR.play ? brStop() : brStart();
+    $("brRe").onclick = () => { brStop(); BR.d = 0; BR.phase = "idle"; brIntro(true); };
+    $("brPrev").onclick = () => brTurn(-1); $("brNextT").onclick = () => brTurn(1);
+    $("brSpd").querySelectorAll("button").forEach(b => b.onclick = () => { BR.speed = +b.dataset.v; $("brSpd").querySelectorAll("button").forEach(z => z.setAttribute("aria-pressed", String(z === b))); });
+    $("brDim").querySelectorAll("button").forEach(b => b.onclick = () => { BR.want3d = b.dataset.v === "3d"; brKind(); });
+    $("brFs").onclick = brFull;
+    BR.key = null; BR.R = null; BR.kind = null;
   }
-  OS4.stat.buses = vis.length; OS4.stat.T = T;
-  os4Hud(M, T);
+  const changed = BR.key !== P.key; BR.P = P;
+  $("brSum").innerHTML = brSumHtml(P); brWire();
+  $("brList").innerHTML = brListHtml(P);
+  $("brList").querySelectorAll("[data-k]").forEach(b => b.onclick = () => brJump(+b.dataset.k));
+  $("brRib").innerHTML = brRibHtml(P);
+  $("brNote").textContent = `Times from ${P.rt.time_src || "road routing"}; the stop at the end is where ${P.W_} enters service. Route check: ${P.rt.status_label || "–"} – check restrictions on the ground. Estimate only.`;
+  if(changed){ BR.key = P.key; brStop(); BR.d = 0; BR.phase = "idle"; }
+  if(!BR.R || (BR.R.kind === "3d") !== BR.want3d) brKind(); else if(changed && BR.R.ready){ BR.R.show(P); brIntro(true); } else brPaint(0);
 }
-function os4Hud(M, T){
-  const big = w => osGaps(M, T, w).reduce((a, g) => (!a || g.g > a.g) ? g : a, null), gp = big("a"), gn = big("b"), H = M.H, w = OS4.world;
-  $("o4Clock").textContent = osHm(T); $("o4Sub").textContent = `+${f0(T - M.T0)} min · ${OSIM.play ? `▶ ${OS4.mode === "3d" && OS4.cam === "follow" ? 1 : 3} min/s` : "paused"}`;
-  $("o4Mode").textContent = `${OS4.mode.toUpperCase()} · ${w === "a" ? "THE PLAN" : "NO ACTION"}`;
-  const bar = (lab, g, on) => { const v = g ? g.g : 0, p = Math.min(100, 100 * v / (3 * H)), c = v >= 2 * H ? "r" : v >= H + 3 ? "a" : "g";
-    return `<div class="o4-g ${on ? "on" : ""}"><span>${lab}</span><i><em class="${c}" style="width:${p.toFixed(1)}%"></em><u style="left:${(100 / 3).toFixed(1)}%"></u></i><b class="${c}">${g ? f0(v) : "–"}<small> min</small></b></div>`; };
-  $("o4Gap").innerHTML = `<div class="o4-gh">LARGEST GAP ON D${M.r.next_dir}</div>${bar("THE PLAN", gp, w === "a")}${bar("NO ACTION", gn, w === "b")}<div class="o4-st">${esc(osStatus(M, T, w))}</div>`;
+function brKind(){
+  const P = BR.P; if(!P || !$("brMap")) return;
+  brStop(); if(BR.R) BR.R.remove(); BR.R = null;
+  $("brMap").innerHTML = ""; const box = $("brBox"); box.classList.add("busy"); $("brBusy").textContent = BR.want3d ? "Starting the 3D map…" : "Starting the map…";
+  const want = BR.want3d; let R = want ? BR3($("brMap")) : BR2($("brMap")); BR.R = R;
+  $("brDim").querySelectorAll("button").forEach(z => z.setAttribute("aria-pressed", String(z.dataset.v === (want ? "3d" : "2d"))));
+  R.init().catch(err => {                                                    // no WebGL / the library is unreachable: 2D, and say so
+    if(R.kind !== "3d" || BR.R !== R) throw err;
+    R.remove(); $("brMap").innerHTML = ""; BR.want3d = false; R = BR.R = BR2($("brMap"));
+    $("brDim").querySelectorAll("button").forEach(z => z.setAttribute("aria-pressed", String(z.dataset.v === "2d")));
+    BR.note3d = "3D could not be loaded here (no WebGL or no connection to the map library) – showing the 2D map.";
+    return R.init();
+  }).then(() => { if(BR.R !== R) return; box.classList.remove("busy"); R.show(BR.P); brIntro(true); if(BR.note3d){ $("brNote").textContent = BR.note3d + " " + $("brNote").textContent; BR.note3d = ""; } })
+    .catch(() => { box.classList.remove("busy"); $("brBusy").textContent = "The map could not start."; });
 }
-function os4Spin(ts){                                                        // ORBIT: the 4D cube turns, 6 degrees a second
-  const ml = OS4.ml; if(!OS4.orbit || !ml || OS4.mode !== "4d"){ OS4.spinT = null; return; }
-  const now = ts || performance.now(), dt = OS4.spinT == null ? 0 : Math.min(0.25, (now - OS4.spinT) / 1000); OS4.spinT = now;
-  ml.jumpTo({bearing:(ml.getBearing() + 6 * dt) % 360});
-  requestAnimationFrame(os4Spin);
+function brSumHtml(P){
+  const sm = P.rt.simple || {}, xs = sm.xway_share != null ? Math.round(100 * sm.xway_share) : null, turns = P.man.filter(m => !["depart", "arrive", "continue"].includes(m.kind)).length;
+  return `<div class="br-who"><span class="br-tag">${esc(P.W_)}</span><b>${esc(P.start.name)} <i>${esc(P.x.leave)}</i></b><span class="br-arr">→</span><b>Stop ${P.x.no} · BS ${esc(P.x.code)} <i>${esc(P.x.entry_clock)}</i></b></div>`
+    + `<div class="br-chips"><span><b>${fkm(P.rt.km)}</b>off-service</span><span><b>${f0(P.rt.time_min)} min</b>drive</span>${xs != null ? `<span class="x"><b>${xs}%</b>expressway</span>` : ""}<span><b>${turns}</b>turns</span></div>`
+    + `<div class="br-send"><button type="button" class="br-b" id="brCopy">COPY FOR WHATSAPP</button><button type="button" class="br-b" id="brShare">SHARE…</button><button type="button" class="br-b" id="brCard">SAVE ROUTE CARD</button></div>`
+    + (P.rt.why && P.rt.why.length ? `<p class="br-why"><b>Why this way:</b> ${esc(P.rt.why[P.rt.why.length > 1 ? 1 : 0])}.</p>` : "");
+}
+function brWire(){
+  const c = $("brCopy"), sh = $("brShare"), cd = $("brCard"); if(!c) return;
+  c.onclick = async () => { try{ await navigator.clipboard.writeText(brText(BR.P)); c.textContent = "COPIED"; }catch(e){ c.textContent = "COPY NOT AVAILABLE"; } setTimeout(() => { if($("brCopy")) $("brCopy").textContent = "COPY FOR WHATSAPP"; }, 1800); };
+  sh.hidden = !navigator.share; sh.onclick = async () => { try{ await navigator.share({title:"Off-service route", text:brText(BR.P)}); }catch(e){} };
+  cd.onclick = async () => { cd.disabled = true; try{ await brCardPng(BR.P); cd.textContent = "SAVED"; }catch(e){ cd.textContent = "COULD NOT SAVE"; } setTimeout(() => { if($("brCard")){ $("brCard").disabled = false; $("brCard").textContent = "SAVE ROUTE CARD"; } }, 1800); };
+}
+function brListHtml(P){
+  return `<ol>${P.man.map((m, k) => { const ck = hm(P.leave + (m.t != null ? m.t : P.tt * m.s / P.total)), road = P.roads[k];
+    const meta = m.kind === "arrive" ? (m.side ? `stop on your <b>${esc(m.side)}</b>` : "") : road ? `${brDist(road.b - road.a)}${road.xw ? " · expressway" : ""}` : "";
+    return `<li class="${m.kind === "arrive" ? "end" : ""} ${road && road.xw ? "xw" : ""}" data-k="${k}" tabindex="0"><span class="br-n">${m.kind === "arrive" ? "B" : m.n}</span><span class="br-ic">${brSvg(m.kind === "depart" ? "go" : m.turn)}</span>`
+      + `<span class="br-tx"><b>${esc((m.drive || "").split(" — ")[0])}</b>${m.lane_hint ? `<em>${esc(m.lane_hint)} ${brLanes(m.lanes)}</em>` : ""}${meta ? `<small>${meta}</small>` : ""}</span><span class="br-t">${ck}</span></li>`; }).join("")}</ol>`
+    + (P.ahead && P.behind ? `<p class="br-svc">In service: <b>${esc(P.ahead)}</b> about ${f0(P.sp[0])} min ahead, <b>${esc(P.behind)}</b> about ${f0(P.sp[1])} min behind.</p>` : "");
+}
+function brRibHtml(P){
+  const tot = P.roads.reduce((a, q) => a + Math.sqrt(Math.max(60, q.b - q.a)), 0);
+  return `<div class="br-cap"><b>A</b></div>` + P.roads.map((q, k) => (k ? `<div class="br-jn" data-k="${k}">${brSvg(q.turn)}</div>` : "")
+    + `<div class="br-sg ${q.xw ? "xw" : ""}" data-k="${k}" style="flex-grow:${(100 * Math.sqrt(Math.max(60, q.b - q.a)) / tot).toFixed(2)}"><div class="nm"${q.code ? ` data-sh="${esc(q.code)}"` : ""}><span class="lg">${q.xw ? "🛣️ " : ""}${esc(q.name)}</span></div><div class="bar"><i></i></div><div class="km">${brDist(q.b - q.a)}</div></div>`).join("")
+    + `<div class="br-cap b"><b>B</b></div>`;
+}
+
+/* ---------------------------------------------------------------- playing it */
+function brIntro(now){ const P = BR.P, R = BR.R; if(!P || !R || !R.ready) return; BR.phase = "idle"; BR.d = 0; R.overview(P, now ? 0 : 1600); R.bus(P.line[0], brBrg(P.line[0], brAt(P.line, P.c, 25)), 0, P); brPaint(0); }
+function brStop(){ BR.play = false; cancelAnimationFrame(BR.raf); const b = $("brPlay"); if(b) b.textContent = BR.phase === "done" ? "▶ PLAY AGAIN" : BR.d > 0 ? "▶ CONTINUE" : "▶ PLAY ROUTE"; }
+function brStart(){
+  const P = BR.P, R = BR.R; if(!P || !R || !R.ready) return;
+  if(BR.phase === "done" || BR.d >= P.total - 1){ BR.d = 0; BR.phase = "idle"; }
+  BR.play = true; $("brPlay").textContent = "❚❚ PAUSE"; BR.last = 0;
+  if(BR.phase === "idle" && BR.d < 1){ BR.phase = "intro"; BR.ph = 0; R.overview(P, 1500); }
+  else if(BR.phase !== "drive"){ BR.phase = "drive"; R.hS = null; R.zS = null; }
+  BR.raf = requestAnimationFrame(brTick);
+}
+const brZoom = (P, d) => { const q = brRoadAt(P, d), m = brNext(P, d); return q && q.xw && m.s - d > 400 ? 15.4 : 16.6; };
+function brPlace(d, dt){
+  const P = BR.P, R = BR.R, p = brAt(P.line, P.c, d), h = brBrg(brAt(P.line, P.c, d - 6), brAt(P.line, P.c, d + 28)), ahead = brAt(P.line, P.c, d + 70);
+  R.bus(p, h, d / P.total, P); R.follow(p, h, ahead, dt, brZoom(P, d)); brPaint(d);
+}
+function brTick(ts){
+  if(!BR.play) return;
+  BR.raf = requestAnimationFrame(brTick);
+  const P = BR.P, R = BR.R; if(!P || !R || !R.ready) return;
+  const dt = BR.last ? Math.min(.25, (ts - BR.last) / 1000) : 0; BR.last = ts; BR.ph += dt;
+  if(BR.phase === "intro"){ if(BR.ph >= 2.2 / Math.sqrt(BR.speed)){ BR.phase = "approach"; BR.ph = 0; const h0 = brBrg(P.line[0], brAt(P.line, P.c, 28)); R.approach(P.line[0], h0, brAt(P.line, P.c, 70), 1500, brZoom(P, 0)); } return; }
+  if(BR.phase === "approach"){ if(BR.ph >= 1.6){ BR.phase = "drive"; BR.ph = 0; } return; }
+  if(BR.phase === "drive"){
+    const Db = Math.max(26, Math.min(70, 22 + P.total / 1000 * 2.2)), v0 = P.total / Db, m = brNext(P, BR.d), prev = P.man.filter(z => z.s <= BR.d).pop();
+    const nearTurn = (m.s - BR.d < 160 && m.kind !== "arrive") || (prev && prev.kind !== "depart" && BR.d - prev.s < 60), q = brRoadAt(P, BR.d);
+    const v = v0 * BR.speed * (nearTurn ? 0.33 : q && q.xw ? 1.4 : 1);
+    BR.d = Math.min(P.total, BR.d + v * dt); brPlace(BR.d, dt);
+    if(BR.d >= P.total){ BR.phase = "arrive"; BR.ph = 0; }
+    return;
+  }
+  if(BR.phase === "arrive"){ if(BR.ph >= 3){ BR.phase = "done"; R.overview(P, 1600); brStop(); } }
+}
+function brTurn(dir){                                                        // previous / next turn: the camera at that junction
+  const P = BR.P; if(!P) return;
+  const k = BR.kOn == null ? 0 : BR.kOn, at = P.man[k] && P.man[k].s - BR.d <= 100;          // "at" a turn: the camera is at its junction
+  brJump(Math.max(0, Math.min(P.man.length - 1, dir > 0 ? (at ? k + 1 : k) : k - 1)));
+}
+function brJump(k){
+  const P = BR.P, R = BR.R; if(!P || !R || !R.ready) return;
+  brStop(); const m = P.man[k]; BR.d = Math.max(0, Math.min(P.total, k === 0 ? 0 : m.s - (m.kind === "arrive" ? 40 : 90)));
+  BR.phase = m.kind === "arrive" ? "arrive" : "drive";
+  const p = brAt(P.line, P.c, BR.d), h = brBrg(brAt(P.line, P.c, BR.d - 6), brAt(P.line, P.c, BR.d + 28)), ahead = brAt(P.line, P.c, BR.d + 70);
+  R.bus(p, h, BR.d / P.total, P); R.approach(p, h, ahead, 900, 16.8); brPaint(BR.d, k); brStop();
+}
+function brPaint(d, kFocus){                                                 // sat-nav card, clock, ribbon, list
+  const P = BR.P; if(!P || !$("brNav")) return;
+  const m = brNext(P, d), q = brRoadAt(P, d), toGo = Math.max(0, m.s - d), arrived = d >= P.total - 1, near = toGo < 160 && !arrived;
+  let ic, top, act, sub = "";
+  if(d < 1 && P.man[0] && P.man[0].kind === "depart" && !BR.play){
+    ic = "go"; top = "START"; act = `Leave ${esc(P.start.name)} \u00b7 ${esc((P.man[0].drive || "").split(" \u2014 ")[0])}`; sub = `leave <b>${esc(P.x.leave)}</b> \u00b7 first turn in ${brDist(m.s)}`;
+  } else if(arrived || m.kind === "arrive"){
+    ic = "ok"; top = arrived ? "ARRIVED" : brDist(toGo);
+    act = `Stop ${P.x.no} · BS ${esc(P.x.code)} ${esc(P.x.name)}`; sub = `${m.side ? `on your <b>${esc(m.side)}</b> · ` : ""}enter service <b>${esc(P.x.entry_clock)}</b>`;
+  } else {
+    ic = m.turn; top = brDist(toGo); const parts = (m.drive || "").split(" — ");
+    act = esc(parts[0]); sub = m.lane_hint ? `${esc(m.lane_hint)} ${brLanes(m.lanes)}` : "";
+  }
+  const key = `${ic}|${act}|${sub}|${arrived}`;
+  if(BR.navKey !== key){ BR.navKey = key; $("brNav").innerHTML = `<div class="br-ni">${brSvg(ic)}</div><div class="br-nt"><span class="br-nd" id="brNd"></span><b>${act}</b>${sub ? `<em>${sub}</em>` : ""}<small id="brNow"></small></div>`; }
+  $("brNd").textContent = top; $("brNow").innerHTML = arrived ? (P.ahead ? `${esc(P.ahead)} ~${f0(P.sp[0])} min ahead · ${esc(P.behind)} ~${f0(P.sp[1])} min behind` : "") : `now on <b>${esc(q ? q.name : "")}</b>`;
+  $("brNav").classList.toggle("near", near); $("brNav").classList.toggle("end", arrived);
+  $("brClk").innerHTML = `<b>${hm(brClock(P, d))}</b><span>${arrived ? `arrived · enter ${esc(P.x.entry_clock)}` : `${brDist(Math.max(0, P.total - d))} to go · arrive ${hm(P.leave + P.tt)}`}</span>`;
+  $("brRib").querySelectorAll(".br-sg").forEach(e => { const r_ = P.roads[+e.dataset.k], f = d >= r_.b ? 1 : d <= r_.a ? 0 : (d - r_.a) / Math.max(1, r_.b - r_.a);
+    e.style.setProperty("--p", f.toFixed(3)); e.classList.toggle("on", d >= r_.a && d < r_.b && !arrived); e.classList.toggle("done", f >= 1); });
+  $("brRib").querySelectorAll(".br-jn").forEach(e => e.classList.toggle("passed", d >= P.roads[+e.dataset.k].a));
+  const kOn = BR.kOn = kFocus != null ? kFocus : arrived ? P.man.length - 1 : d < 1 && !BR.play ? 0 : Math.max(0, P.man.indexOf(m));
+  $("brList").querySelectorAll("li").forEach(li => { const on = +li.dataset.k === kOn; if(on && !li.classList.contains("on") && BR.play){ const L_ = $("brList"); L_.scrollTop = Math.max(0, li.offsetTop - L_.clientHeight / 3); } li.classList.toggle("on", on); li.classList.toggle("past", +li.dataset.k < kOn); });
+}
+function brResize(){ const R = BR.R; if(!R) return; if(R.ml) R.ml.resize(); if(R.map) R.map.invalidateSize(); }
+function brFull(){
+  const bx = $("brBox"); if(!bx) return;
+  if(document.fullscreenElement){ document.exitFullscreen().catch(() => {}); return; }
+  if(bx.classList.contains("br-max")){ bx.classList.remove("br-max"); setTimeout(brResize, 60); return; }
+  const fb = () => { bx.classList.add("br-max"); setTimeout(brResize, 60); };
+  if(bx.requestFullscreen) bx.requestFullscreen().catch(fb); else fb();
+}
+document.addEventListener("fullscreenchange", () => { const bx = $("brBox"); if(bx) bx.classList.toggle("br-full", document.fullscreenElement === bx); setTimeout(brResize, 80); });
+document.addEventListener("keydown", e => { const bx = $("brBox"); if(!bx || !(document.fullscreenElement === bx || bx.classList.contains("br-max"))) return;
+  if(e.key === "Escape" && bx.classList.contains("br-max")){ bx.classList.remove("br-max"); setTimeout(brResize, 60); }
+  else if(e.key === " "){ e.preventDefault(); BR.play ? brStop() : brStart(); } else if(e.key === "ArrowRight") brTurn(1); else if(e.key === "ArrowLeft") brTurn(-1); });
+
+/* ---------------------------------------------------------------- to the driver: text and a route card picture */
+function brText(P){
+  if(!P) return "";
+  const L_ = [`OFF-SERVICE ROUTE – ${P.W_} (Service ${ST.svc || ""})`, `Leave ${P.start.name} ${P.x.leave} → Stop ${P.x.no} BS ${P.x.code} ${P.x.name} by ${P.x.entry_clock}`,
+    `${fkm(P.rt.km)} · about ${f0(P.rt.time_min)} min`, ""];
+  P.man.forEach((m, k) => { const ck = hm(P.leave + (m.t != null ? m.t : P.tt * m.s / P.total)), road = P.roads[k];
+    L_.push(`${m.kind === "arrive" ? "B" : m.n}. ${ck}  ${m.drive || ""}${road && m.kind !== "arrive" ? ` (${brDist(road.b - road.a)})` : ""}`); });
+  L_.push("", `Enter service at ${P.x.entry_clock}.` + (P.ahead ? ` ${P.ahead} is about ${f0(P.sp[0])} min ahead, ${P.behind} about ${f0(P.sp[1])} min behind.` : ""));
+  return L_.join("\n");
+}
+async function brCardPng(P){
+  if(!P) return null;
+  const S = 2, W = 1080, PAD = 40, F = (w, s) => `${w} ${s}px system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif`;
+  const cv = document.createElement("canvas"), c = cv.getContext("2d");
+  const wrap = (t, w, font) => { c.font = font; const o = []; let ln = ""; String(t).split(/\s+/).forEach(wd => { const s = ln ? ln + " " + wd : wd; if(c.measureText(s).width > w && ln){ o.push(ln); ln = wd; } else ln = s; }); if(ln) o.push(ln); return o; };
+  const rows = P.man.map((m, k) => ({m, road:P.roads[k], ck:hm(P.leave + (m.t != null ? m.t : P.tt * m.s / P.total)), lines:wrap(m.drive || "", W - PAD * 2 - 200, F(700, 26))}));
+  let s = 90, n = -90, w = 180, e = -180; P.line.forEach(p => { s = Math.min(s, p[0]); n = Math.max(n, p[0]); w = Math.min(w, p[1]); e = Math.max(e, p[1]); });
+  const [kx, ky] = BRK((s + n) / 2), sx = (e - w) * kx, sy = (n - s) * ky, mw = W - PAD * 2;
+  const MH = Math.round(Math.max(380, Math.min(720, (mw - 140) * sy / Math.max(1e-9, sx) + 170))), rowsH = rows.reduce((a, r_) => a + Math.max(76, r_.lines.length * 34 + 30), 0), H = PAD + 150 + MH + 30 + rowsH + 120;
+  cv.width = W * S; cv.height = H * S; c.scale(S, S);
+  c.fillStyle = "#06101f"; c.fillRect(0, 0, W, H);
+  c.fillStyle = "#b46bff"; c.font = F(900, 22); c.fillText(`OFF-SERVICE ROUTE · ${P.W_.toUpperCase()}`, PAD, PAD + 22);
+  c.fillStyle = "#fff"; c.font = F(900, 34); c.fillText(`${P.start.name} ${P.x.leave}  →  Stop ${P.x.no} · BS ${P.x.code} ${P.x.entry_clock}`.slice(0, 64), PAD, PAD + 66);
+  c.fillStyle = "#9fc6f0"; c.font = F(700, 24); c.fillText(`${fkm(P.rt.km)} · about ${f0(P.rt.time_min)} min${P.rt.simple && P.rt.simple.xway_share != null ? ` · ${Math.round(100 * P.rt.simple.xway_share)}% expressway` : ""} · Service ${ST.svc || ""}`, PAD, PAD + 104);
+  // the route sketch (no map tiles: works offline and in a chat)
+  const mx = PAD, my = PAD + 140, mh = MH;
+  c.fillStyle = "#0b1a2e"; c.strokeStyle = "#1f4468"; c.lineWidth = 2; c.beginPath(); if(c.roundRect) c.roundRect(mx, my, mw, mh, 18); else c.rect(mx, my, mw, mh); c.fill(); c.stroke();
+  const sc = Math.min((mw - 140) / Math.max(1e-9, sx), (mh - 150) / Math.max(1e-9, sy));
+  const X = p => mx + mw / 2 + ((p[1] - (w + e) / 2) * kx) * sc, Y = p => my + mh / 2 - ((p[0] - (s + n) / 2) * ky) * sc;
+  c.lineJoin = "round"; c.lineCap = "round";
+  [[22, "rgba(180,107,255,.25)"], [9, "#b46bff"]].forEach(([lw, col]) => { c.strokeStyle = col; c.lineWidth = lw; c.beginPath(); P.line.forEach((p, i) => i ? c.lineTo(X(p), Y(p)) : c.moveTo(X(p), Y(p))); c.stroke(); });
+  const dot = (p, txt, bg, fg, r) => { c.fillStyle = bg; c.strokeStyle = "#fff"; c.lineWidth = 3; c.beginPath(); c.arc(X(p), Y(p), r, 0, Math.PI * 2); c.fill(); c.stroke(); c.fillStyle = fg; c.font = F(900, r * 1.1); c.textAlign = "center"; c.fillText(txt, X(p), Y(p) + r * 0.38); c.textAlign = "left"; };
+  P.man.slice(1, -1).forEach(m => dot([m.lat, m.lon], String(m.n), "#0b1a2e", "#e9d8ff", 17));
+  dot(P.line[0], "A", "#dff6ff", "#04121f", 22); dot(P.line[P.line.length - 1], "B", "#2ee59d", "#04121f", 22);
+  // A / B names: on the side away from the route, centred on the dot and kept inside the sketch
+  const lab = (p, q, txt) => { c.font = F(800, 20); const tw = c.measureText(txt).width, x0 = X(p), y0 = Y(p), up = Y(q) < y0;
+    const lx = Math.max(mx + 14, Math.min(mx + mw - 14 - tw, x0 - tw / 2)), ly = Math.max(my + 28, Math.min(my + mh - 14, up ? y0 + 50 : y0 - 34));
+    c.fillStyle = "rgba(6,16,31,.85)"; c.fillRect(lx - 8, ly - 21, tw + 16, 30); c.fillStyle = "#cfe0f3"; c.fillText(txt, lx, ly); };
+  lab(P.line[0], brAt(P.line, P.c, Math.min(P.total, 400)), `A  ${P.start.name}`);
+  lab(P.line[P.line.length - 1], brAt(P.line, P.c, Math.max(0, P.total - 400)), `B  Stop ${P.x.no} · BS ${P.x.code}`);
+  // the turns
+  let y = my + mh + 30;
+  rows.forEach(r_ => { const hgt = Math.max(76, r_.lines.length * 34 + 30), m = r_.m;
+    c.fillStyle = m.kind === "arrive" ? "rgba(46,229,157,.12)" : "rgba(255,255,255,.03)"; c.fillRect(PAD, y, W - PAD * 2, hgt - 8);
+    c.fillStyle = m.kind === "arrive" ? "#2ee59d" : "#b46bff"; c.beginPath(); c.arc(PAD + 30, y + 34, 22, 0, Math.PI * 2); c.fill();
+    c.fillStyle = "#04121f"; c.font = F(900, 22); c.textAlign = "center"; c.fillText(m.kind === "arrive" ? "B" : String(m.n), PAD + 30, y + 42); c.textAlign = "left";
+    c.save(); c.translate(PAD + 70, y + 12); c.scale(1.85, 1.85); c.strokeStyle = "#e9d8ff"; c.lineWidth = 2.6; c.lineCap = "round"; c.lineJoin = "round";
+    const svgP = (BR_SVG[m.kind === "depart" ? "go" : m.turn] || BR_SVG.s).match(/ d="([^"]+)"/g) || [];
+    svgP.forEach(dd => { try{ c.stroke(new Path2D(dd.slice(4, -1))); }catch(err){} });
+    if(m.kind === "depart"){ c.fillStyle = "#e9d8ff"; c.beginPath(); c.arc(12, 12, 4, 0, Math.PI * 2); c.fill(); } else if(m.turn === "ro"){ c.beginPath(); c.arc(12, 10, 4.5, 0, Math.PI * 2); c.stroke(); } c.restore();
+    c.fillStyle = "#fff"; c.font = F(700, 26); r_.lines.forEach((t, i) => c.fillText(t, PAD + 130, y + 36 + i * 34));
+    c.fillStyle = "#9fc6f0"; c.font = F(800, 26); c.textAlign = "right"; c.fillText(r_.ck, W - PAD - 14, y + 36); c.textAlign = "left";
+    if(r_.road && m.kind !== "arrive"){ c.fillStyle = "#8aa3bd"; c.font = F(600, 20); c.textAlign = "right"; c.fillText(brDist(r_.road.b - r_.road.a), W - PAD - 14, y + 62); c.textAlign = "left"; }
+    y += hgt; });
+  c.fillStyle = "#dff6ff"; c.font = F(800, 24);
+  wrap(`Enter service at ${P.x.entry_clock}.` + (P.ahead ? ` ${P.ahead} about ${f0(P.sp[0])} min ahead, ${P.behind} about ${f0(P.sp[1])} min behind.` : ""), W - PAD * 2, F(800, 24)).forEach((t, i) => c.fillText(t, PAD, y + 30 + i * 32));
+  c.fillStyle = "#5f7690"; c.font = F(600, 18); c.fillText("SG Transport Pulse · Halfway Planner · estimate – follow road signs and check restrictions on site", PAD, H - 24);
+  const blob = await new Promise(ok => cv.toBlob(ok, "image/png"));
+  if(blob){ const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `offservice_${ST.svc || "svc"}_stop${P.x.no}.png`; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 5000); }
+  return {w:cv.width, h:cv.height, bytes:blob ? blob.size : 0};
 }
 
 function planText(){

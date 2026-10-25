@@ -1,31 +1,43 @@
 # SG Transport Pulse V16.19 — Operational Intelligence & Service Recovery Platform
 
-## Halfway Planner: simulator in 2D / 3D / 4D (V16.28)
-The simulator in step 3 now has three views. A switch sits next to PLAY: **2D · 3D · 4D**. All three use the same bus positions (`osPos`), so they always agree. 3D and 4D run on the GPU (WebGL 2) with **MapLibre GL 4.7.1**, the same library as the platform's 3D maps. It is loaded only when 3D or 4D is first opened, and the buildings come from OpenFreeMap with no key.
+## Halfway Planner: step 3 is now the driver briefing (V16.28)
+Step 3 exists for one job: the interchange staff **show the bus captain which way to drive off service**, from the interchange to the stop where the bus enters service. It replaces the earlier 2D / 3D / 4D network simulator in step 3. The page now reads: 1 Key settings & buses → 2 Generate the halfway plan → **3 Driver briefing** → 4 ROI: EWT earned.
 
-* **2D:** the two maps, NO ACTION | THE PLAN. Every bus now draws a glowing trail of its last 6 minutes.
-* **3D:** the city with buildings in 3D, tilted, with sky and fog.
-  * Every bus is a **light pillar** (a real-size 3D bus close up) with a glowing gradient **trail** of its last 8 minutes.
-  * A gap of the headway + 3 min or more stands up as a translucent **wall as tall as it is long** (12 m a minute, so a 30-min gap is a 360 m red wall). Walls are labelled with their minutes.
-  * The off-service route glows.
-  * **FOLLOW** the halfway bus: a chase camera rides behind it, pitch 64°, at 1 simulated minute a second. It takes the bus along the expressway to the entry stop.
-  * The HUD (glass panels) shows the clock, THE PLAN / NO ACTION, overview / follow, and the **largest gap in both worlds as gauges** (e.g. plan 15 min against no action 30 min), plus what Bus 6 is doing.
-* **4D, a space-time cube:** the map is the floor and **height is time**.
-  * Every bus is a ribbon rising through time; waiting is a vertical column.
-  * The D2 route is stood up as a curtain, which turns it into a time-distance chart standing over the city.
-  * A **now-plane** slices the cube at the simulation time. Ribbons are bright below it (the past) and dim above it (the future).
-  * At the entry stop the gap is a column between two buses' pass times, and each passing bus is a ring.
-    * With **no action**: one red 30-min column (17:27 → 17:57).
-    * With **the plan**: D1 Bus 6's ribbon cuts it into **15 + 15**.
-  * A time ruler (a plate every 15 min) gives the scale, and **ORBIT** turns the cube.
-* **No WebGL, or the library unreachable:** the page says so and stays in 2D.
+**At the top: the trip in one line.** For example, "D1 Bus 6 · D2 Stop 0 17:18 → Stop 44 · BS 20043 17:42", with chips for km off service, drive minutes, % expressway and number of turns. Below it is one line on why this route was chosen, e.g. "simpler than the fastest route (22% expressway, 11 turns, 9 roads) for +2 min".
 
-`map3d.js` now also exports `SG3D.style()`, an additive change. Test: `r3d/t_halfway_4d.js` (28 checks, desktop and phone, real MapLibre on an offline synthetic city). `t_halfway_sim.js` adds the 2D trails and the offline fallback, for 59 checks in total.
+**The briefing map (3D, with 2D as a fallback):**
+* **The route.** The route glows purple. **A** marks the interchange, **B** marks the entry stop, and each turn is numbered (2, 3, 4…) on the map.
+* **PLAY.** The camera first shows the whole route, then drops behind the bus and follows it like a sat-nav (3D: pitch 58°, it pulls back on expressways). The bus slows to a third of its speed near each turn so the junction can be explained, and the route fills in as it is driven. A drive takes roughly half a minute to a minute at 1×; the speed buttons give **1× / 2× / 4×**.
+* **◀ TURN / TURN ▶.** The camera flies to the previous or next junction (zoom 16.8, looking the way the bus drives) and stops there, so the staff can point at it.
+* **The sat-nav card.** It shows the distance to the next turn and the instruction, for example "90 m · Take the ramp onto Pan-Island Expressway (PIE) towards Changi". It adds the lanes to use with lane arrows ("use the right 2 lanes") and the road the bus is on now.
+* **The clock.** The clock shows the time at that point of the drive (e.g. 17:20) with km to go and the arrival time.
+* **The road ribbon.** Along the bottom, each road is a segment (Toa Payoh Lor 6 → Pan-Island Expwy → Ctrl Expwy → Ang Mo Kio Ave 3). It fills as the bus drives, and expressways carry a badge. On a phone the expressways show their code (PIE, CTE) and the road the bus is on gets the most room.
+* **SHOW DRIVER.** The map goes full screen so it can be turned round to the driver. In full screen, space plays or pauses, ← → step through the turns, and Esc leaves (where the browser has no full-screen API, a full-window view is used).
+* **3D or 2D.** 3D uses MapLibre GL 4.7.1 with OpenFreeMap buildings, loaded only when step 3 opens. Without WebGL, or if the library cannot be reached, the same briefing plays on the flat Leaflet map and the page says so.
 
-## Halfway Planner: off-service route & simulation (V16.28)
-A new step 3 sits between the plan and the ROI. The page now reads: 1 Key settings & buses → 2 Generate the halfway plan → **3 Route & simulation** → 4 ROI: EWT earned.
+**The turn-by-turn list** (beside the map; under it on a phone). Each row is one instruction with its icon, lane hint, distance on that road, and clock time. Clicking a row jumps the camera to that turn. The last row is "Arrive at BS 20043 … – the stop is on your left". Under the list: which buses are ahead and behind once Bus 6 is in service ("D2 Bus 4 about 15 min ahead, D2 Bus 3 about 15 min behind").
 
-**Off-service route – the simple way.** `/api/hplan/route` takes a new `prefer=simple`, and the Halfway Planner always sends it. From the routing alternatives it picks the simplest suitable route:
+**To the driver's phone:**
+* **COPY FOR WHATSAPP** (and **SHARE** where the phone offers it). The text lists the trip, then one numbered line per turn with its clock time and distance, then the bus ahead and behind.
+* **SAVE ROUTE CARD.** This saves a PNG picture (2160 px wide), `offservice_{service}_stop{no}.png`. It has a sketch of the route with A, B and the numbered turns, the instructions with icons and lanes, and the times.
+
+**Turn-by-turn data (API, additive).** `/api/hplan/route` steps carry more fields; existing fields are unchanged.
+* `hplan.instructions(steps, stop_code, stop_name, scale=None)`. Each step now also has:
+  * `kind`, `turn` (icon key) and `drive` (the plain-English instruction);
+  * `t` (minutes from leaving, routing time × `scale`; the page passes `time_min / osrm_min`, so the clock matches the planned arrival);
+  * `towards`, `exit`, `lanes`, `lane_hint` and `ref`;
+  * `side` on the arrival step.
+* `offservice.parse_osrm` keeps, for each step: `loc` (the junction point), `lanes` (indications and valid), `dest` (OSRM destinations), `exits` and `rexit` (roundabout exit number).
+
+Code: `hwjs` is not shipped. The briefing is inside `halfway_planner.html`. The old step-3 simulator code (`osSim`, 2D / 3D / 4D) is no longer on the page.
+
+Tests:
+* `r3d/t_halfway_sim.js`: the briefing in 2D, on desktop and phone (63 checks).
+* `r3d/t_halfway_brief3d.js`: the briefing on real MapLibre with an offline synthetic city, on desktop and phone (16 checks). It checks the A / B / numbered markers, the camera at a junction, the chase camera, the pull-back on the expressway, full screen and 2D.
+* `dvtest/t_os_simple.py` (22 checks), including the instruction texts and lane hints.
+
+## Halfway Planner: off-service route – the simple way (V16.28)
+`/api/hplan/route` takes a new `prefer=simple`, and the Halfway Planner always sends it. From the routing alternatives it picks the simplest suitable route:
 * **Simplicity score:**
   * Counts against a route: turns; road changes (×0.5); sharp turns or U-turns (×2).
   * Counts for a route: the share driven on expressways or highways (−4 × share).
@@ -39,28 +51,7 @@ A new step 3 sits between the plan and the ROI. The page now reads: 1 Key settin
   * `alternatives`: each with its line, expressway share, turns and `chosen`
 * **No change elsewhere:** without `prefer`, the recommendation and the response are exactly as before, so the Recovery Decision Engine and the other callers are unchanged.
 
-Code: `offservice.parse_osrm` now keeps the road class of each step, and `group_roads` adds expressway km per road. The new functions are `offservice.is_xway`, `simplicity` and `pick_simple`, with parameters `simple_*` in `PARAMS`.
-
-On the page, the route is shown as:
-* **Chips:** km, minutes (leave → arrive), % expressway, turns, roads.
-* **A flow of roads:** interchange → Toa Payoh Lorong 6 → **Pan-Island Expressway** → **Central Expressway** → Ang Mo Kio Ave 3 → Stop 44. Expressways are highlighted.
-* **One "why this route" line.**
-
-**Simulator (like the Diversion simulator).** Two maps sit side by side, **NO ACTION** and **THE PLAN** (on a phone, one at a time with a toggle):
-* **Controls:**
-  * PLAY / PAUSE, at 3 simulated minutes a second.
-  * Jump buttons: now · Bus 6 at the interchange · leaves off-service · enters the stop · +30 min.
-  * A time slider.
-* **Buses:** every D2 bus moves on its pass times, using the same model as the plan.
-  * D1 buses on their D2 trip appear in cyan. Departures re-timed by the plan appear in amber.
-  * The halfway bus (purple) runs D1, rests at the interchange, drives the off-service road route and enters at the stop.
-  * In NO ACTION, the halfway bus rests and then runs its full trip.
-* **Gaps:** gaps of the headway + 3 min or more are drawn on the route with their minutes (amber; red from 2× the headway).
-* **Each map shows:** the largest gap on D2 and what Bus 6 is doing.
-* **Example, at 17:42:** NO ACTION shows 30 min with Bus 6 at Stop 11; THE PLAN shows 15 min with Bus 6 at Stop 44.
-* Other routes appear dashed grey on the plan map.
-
-Tests: `dvtest/t_os_simple.py` (13 checks). `r3d/t_halfway_sim.js` adds the route and simulator checks, for 56 in total.
+Code: `offservice.parse_osrm` keeps the road class of each step, and `group_roads` adds expressway km per road. The new functions are `offservice.is_xway`, `simplicity` and `pick_simple`, with parameters `simple_*` in `PARAMS`. `map3d.js` exports `SG3D.style()` (additive), which the 3D briefing uses.
 
 ## Halfway Planner: lean flow, 1 key settings → 2 generate → 3 ROI (V16.28)
 The page is now three steps. Everything else is folded under **More detail**, which is closed by default.
@@ -114,7 +105,7 @@ The section numbers and the Recovery Decision Engine headers are gone. The mobil
 * **Step 3:** smaller figures. Space is kept for the bottom navigation bar.
 * **More detail:** at most 8 stop cards.
 
-**Why this plan: Lean Six Sigma, DMAIC, in pictures (step 3, under the ROI).** This is a storyboard for selling the plan to a manager. Each DMAIC step is one illustration plus 3–4 pointers (a big number and a few words), with no paragraphs. A ribbon at the top (D M A I C) jumps to each step. Everything is drawn from the plan's own pass times, using the same model as the simulation.
+**Why this plan: Lean Six Sigma, DMAIC, in pictures (step 3, under the ROI).** This is a storyboard for selling the plan to a manager. Each DMAIC step is one illustration plus 3–4 pointers (a big number and a few words), with no paragraphs. A ribbon at the top (D M A I C) jumps to each step. Everything is drawn from the plan's own pass times, using the same model as the plan.
 
 The promise is the headway (a bus every 10 min). Red always means waiting beyond it.
 

@@ -569,44 +569,88 @@ def _bearing(a, b):
     return (math.degrees(math.atan2(y, x)) + 360) % 360
 
 
-def instructions(steps, stop_code, stop_name):
-    """OSRM steps [{road, km, min, man, mod, line}] -> [{icon, verb, road, text, km, lat, lon}] for the navigation view."""
+_ORD = {1: "1st", 2: "2nd", 3: "3rd"}
+_TURN = {"left": "l", "sharp left": "l", "slight left": "sl", "right": "r", "sharp right": "r", "slight right": "sr", "straight": "s", "uturn": "u", "": "s"}
+
+
+def _towards(dest):
+    """OSRM 'destinations' ('PIE: Changi, Tuas' / 'Ang Mo Kio') -> 'towards Changi, Tuas'."""
+    d = (dest or "").strip()
+    if not d:
+        return ""
+    d = d.split(":", 1)[1].strip() if ":" in d else d
+    return f" towards {d}" if d else ""
+
+
+def _lanes(lanes):
+    """[{ind, ok}] -> a short hint ('use the right 2 lanes') when only some lanes are valid, else ''."""
+    if not lanes or all(l["ok"] for l in lanes) or not any(l["ok"] for l in lanes):
+        return ""
+    n, ok = len(lanes), [i for i, l in enumerate(lanes) if l["ok"]]
+    k = len(ok)
+    side = "left" if ok[-1] < n / 2 else "right" if ok[0] >= n / 2 else "middle"
+    return f"use the {side} lane" if k == 1 and side != "middle" else f"use the {side} {k} lanes" if side != "middle" else f"use the middle lane{'s' if k > 1 else ''}"
+
+
+def instructions(steps, stop_code, stop_name, scale=None):
+    """OSRM steps [{road, km, min, man, mod, line}] -> [{icon, verb, road, text, km, lat, lon}] for the navigation view.
+    V16.28 driver briefing, added per step: kind, turn (l r sl sr s u ro ok), t (minutes from departure, OSRM time x scale), towards,
+    exit, lanes [{ind, ok}], lane_hint, side (of the stop on arrival: left / right)."""
+    t_run = 0.0
+    sc = scale if scale and scale > 0 else 1.0
     icon = {"left": "\u2190", "slight left": "\u2196", "sharp left": "\u21b0", "right": "\u2192", "slight right": "\u2197", "sharp right": "\u21b1",
             "straight": "\u2191", "uturn": "\u21b6", "": "\u2191"}
     out = []
     for i, st in enumerate(steps):
         man, mod, road = st.get("man") or "", st.get("mod") or "", st.get("road") or "unnamed road"
-        pt = st["line"][0] if st.get("line") else None
+        pt = st.get("loc") or (st["line"][0] if st.get("line") else None)
+        t_at, t_run = t_run, t_run + (st.get("min") or 0.0) * sc
+        tw, ex, lh = _towards(st.get("dest")), (st.get("exits") or "").split(";")[0].strip(), _lanes(st.get("lanes"))
+        extra = {"t": round(t_at, 1), "towards": tw.replace(" towards ", "", 1), "exit": ex, "lanes": st.get("lanes") or [], "lane_hint": lh, "ref": st.get("ref") or ""}
         if man == "arrive":
+            side = mod if mod in ("left", "right") else ""
             out.append({"icon": "\u25cf", "verb": "ARRIVE", "road": f"BS {stop_code}", "text": f"Arrive BS {stop_code} {stop_name} \u2014 enter service", "km": 0.0,
-                        "lat": pt[0] if pt else None, "lon": pt[1] if pt else None})
+                        "lat": pt[0] if pt else None, "lon": pt[1] if pt else None, "kind": "arrive", "turn": "ok", "side": side,
+                        "drive": f"Arrive at BS {stop_code} {stop_name}" + (f" \u2014 the stop is on your {side}" if side else ""), **extra})
             continue
+        rd = f"{road} ({st['ref']})" if st.get("ref") and st["ref"] not in road else road
+        kind, turn = "turn", _TURN.get(mod, "s")
         if man == "depart":
             ln = st.get("line") or []
             head = _COMPASS[int((_bearing(ln[0], ln[min(len(ln) - 1, 3)]) + 22.5) // 45) % 8] if len(ln) >= 2 else ""
             verb, text = "HEAD " + head.upper() if head else "START", f"Head {head} on {road}" if head else f"Start on {road}"
+            kind, turn, drive = "depart", "s", f"Head {head} on {rd}" if head else f"Start on {rd}"
         elif man in ("turn", "end of road"):
             verb, text = ("TURN " + mod.upper()) if mod else "TURN", f"Turn {mod} onto {road}" if mod else f"Turn onto {road}"
+            drive = (f"At the end of the road turn {mod} onto {rd}" if man == "end of road" else f"Turn {mod} onto {rd}") if mod else f"Turn onto {rd}"
         elif man in ("roundabout", "rotary"):
             verb, text = "ROUNDABOUT", f"At the roundabout, take the exit onto {road}"
+            n_ = st.get("rexit")
+            kind, turn, drive = "roundabout", "ro", f"At the roundabout take the {_ORD.get(n_, f'{n_}th') if n_ else ''} exit onto {rd}".replace("the  exit", "the exit")
         elif man in ("on ramp",):
             verb, text = "TAKE RAMP", f"Take the ramp {mod} onto {road}".replace("  ", " ")
+            kind, drive = "ramp_on", f"Take the ramp onto {rd}{tw}"
         elif man in ("off ramp",):
             verb, text = "EXIT", f"Exit {mod} towards {road}".replace("  ", " ")
+            kind, drive = "ramp_off", (f"Take exit {ex}" if ex else "Take the exit") + (tw or f" towards {road}")
         elif man == "fork":
             verb, text = "KEEP " + (mod.replace("slight ", "").upper() or "AHEAD"), f"Keep {mod.replace('slight ', '') or 'ahead'} onto {road}"
+            kind, turn, drive = "fork", ("sl" if "left" in mod else "sr" if "right" in mod else "s"), f"Keep {mod.replace('slight ', '') or 'ahead'} onto {rd}{tw}"
         elif man == "merge":
             verb, text = "MERGE", f"Merge onto {road}"
+            kind, drive = "merge", f"Merge onto {rd}"
         else:                                                              # new name / continue / notification
             if out and out[-1]["road"] == road:
                 out[-1]["km"] += st.get("km") or 0.0
                 continue
             verb, text = "CONTINUE", f"Continue on {road}"
+            kind, turn, drive = "continue", "s", f"Continue onto {rd}"
         if out and out[-1]["road"] == road and man not in ("turn", "end of road", "roundabout", "rotary", "fork", "off ramp", "on ramp", "depart"):
             out[-1]["km"] += st.get("km") or 0.0
             continue
         out.append({"icon": icon.get(mod, "\u2191") if man not in ("roundabout", "rotary") else "\u21bb", "verb": verb, "road": road, "text": text,
-                    "km": st.get("km") or 0.0, "lat": pt[0] if pt else None, "lon": pt[1] if pt else None})
+                    "km": st.get("km") or 0.0, "lat": pt[0] if pt else None, "lon": pt[1] if pt else None, "kind": kind, "turn": turn,
+                    "drive": drive + (f" \u2014 {lh}" if lh else ""), **extra})
     for x in out:
         x["km"] = round(x["km"], 2)
     return out
