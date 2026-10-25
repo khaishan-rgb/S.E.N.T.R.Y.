@@ -1,5 +1,45 @@
 # SG Transport Pulse V16.19 — Operational Intelligence & Service Recovery Platform
 
+## Halfway Planner: off-service route & simulation (V16.28)
+A new step 3 sits between the plan and the ROI. The page now reads: 1 Key settings & buses → 2 Generate the halfway plan → **3 Route & simulation** → 4 ROI: EWT earned.
+
+**Off-service route – the simple way.** `/api/hplan/route` takes a new `prefer=simple`, and the Halfway Planner always sends it. From the routing alternatives it picks the simplest suitable route:
+* **Simplicity score:**
+  * Counts against a route: turns; road changes (×0.5); sharp turns or U-turns (×2).
+  * Counts for a route: the share driven on expressways or highways (−4 × share).
+* **What counts as an expressway or highway:** OSRM's `motorway` road class, an expressway or highway name, or a Singapore expressway code (PIE, CTE, AYE, ECP, KPE, TPE, SLE, BKE, KJE, MCE, NSC).
+* **Time limit:** it only considers routes at most **max(5 min, 20 % of the fastest)** slower than the fastest.
+* **New response fields:**
+  * `pick`
+  * `why`: e.g. "simpler than the fastest route (22% expressway, 11 turns, 9 roads) for +2 min"
+  * `simple`: expressway km and share, turns, roads
+  * `stages`: one entry per road, with km, minutes, and whether it is an expressway
+  * `alternatives`: each with its line, expressway share, turns and `chosen`
+* **No change elsewhere:** without `prefer`, the recommendation and the response are exactly as before, so the Recovery Decision Engine and the other callers are unchanged.
+
+Code: `offservice.parse_osrm` now keeps the road class of each step, and `group_roads` adds expressway km per road. The new functions are `offservice.is_xway`, `simplicity` and `pick_simple`, with parameters `simple_*` in `PARAMS`.
+
+On the page, the route is shown as:
+* **Chips:** km, minutes (leave → arrive), % expressway, turns, roads.
+* **A flow of roads:** interchange → Toa Payoh Lorong 6 → **Pan-Island Expressway** → **Central Expressway** → Ang Mo Kio Ave 3 → Stop 44. Expressways are highlighted.
+* **One "why this route" line.**
+
+**Simulator (like the Diversion simulator).** Two maps sit side by side, **NO ACTION** and **THE PLAN** (on a phone, one at a time with a toggle):
+* **Controls:**
+  * PLAY / PAUSE, at 3 simulated minutes a second.
+  * Jump buttons: now · Bus 6 at the interchange · leaves off-service · enters the stop · +30 min.
+  * A time slider.
+* **Buses:** every D2 bus moves on its pass times, using the same model as the plan.
+  * D1 buses on their D2 trip appear in cyan. Departures re-timed by the plan appear in amber.
+  * The halfway bus (purple) runs D1, rests at the interchange, drives the off-service road route and enters at the stop.
+  * In NO ACTION, the halfway bus rests and then runs its full trip.
+* **Gaps:** gaps of the headway + 3 min or more are drawn on the route with their minutes (amber; red from 2× the headway).
+* **Each map shows:** the largest gap on D2 and what Bus 6 is doing.
+* **Example, at 17:42:** NO ACTION shows 30 min with Bus 6 at Stop 11; THE PLAN shows 15 min with Bus 6 at Stop 44.
+* Other routes appear dashed grey on the plan map.
+
+Tests: `dvtest/t_os_simple.py` (13 checks). `r3d/t_halfway_sim.js` adds the route and simulator checks, for 56 in total.
+
 ## Halfway Planner: lean flow, 1 key settings → 2 generate → 3 ROI (V16.28)
 The page is now three steps. Everything else is folded under **More detail**, which is closed by default.
 

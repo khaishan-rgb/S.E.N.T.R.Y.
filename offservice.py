@@ -23,6 +23,8 @@ PARAMS = {
     "near_m": 50.0,               # road works / incidents within this distance are "on the route"
     "service_overlap_m": 30.0,    # off-service points within this distance of the service's own route count as "on the service route"
     "w_review": 3.0, "w_unsuitable": 1000.0, "w_congested_km": 1.5, "w_turn": 0.25, "w_sharp": 1.5, "w_overlap": 3.0, "w_roadworks": 2.0,
+    # V16.28 simplest off-service route (Halfway Planner): expressways and few turns, if it costs at most max(slack_min, slack_pct x fastest) extra minutes
+    "simple_slack_min": 5.0, "simple_slack_pct": 0.20, "simple_w_road": 0.5, "simple_w_sharp": 2.0, "simple_w_xway": 4.0,
 }
 BUS_TYPES = {"sd": "Single deck", "dd": "Double deck", "art": "Articulated"}
 STATUS_TXT = {"verified": "VERIFIED", "review": "REQUIRES REVIEW", "unsuitable": "UNSUITABLE"}
@@ -93,11 +95,24 @@ def parse_osrm(j):
                 g = [(c[1], c[0]) for c in (st.get("geometry") or {}).get("coordinates") or []]
                 man = st.get("maneuver") or {}
                 road = (st.get("name") or "").strip() or (st.get("ref") or "").strip()
+                cls = {c for it in (st.get("intersections") or []) for c in (it.get("classes") or [])}
                 steps.append({"road": road, "ref": (st.get("ref") or "").strip(), "km": (st.get("distance") or 0) / 1000.0, "min": (st.get("duration") or 0) / 60.0,
-                              "man": man.get("type") or "", "mod": man.get("modifier") or "", "line": g})
+                              "man": man.get("type") or "", "mod": man.get("modifier") or "", "line": g, "motorway": "motorway" in cls})
         if len(line) >= 2:
             out.append({"line": line, "km": (r.get("distance") or 0) / 1000.0 or line_km(line), "osrm_min": (r.get("duration") or 0) / 60.0, "steps": steps})
     return out
+
+
+XWAY_REFS = {"PIE", "CTE", "AYE", "ECP", "KPE", "TPE", "SLE", "BKE", "KJE", "MCE", "NSC"}
+XWAY_RE = re.compile(r"\b(EXPRESSWAY|EXPWY|HIGHWAY|HWY)\b")
+
+
+def is_xway(st):
+    """V16.28: an expressway / highway step - OSRM's motorway road class, an expressway or highway name, or a Singapore expressway code."""
+    if st.get("motorway"):
+        return True
+    name, ref = (st.get("road") or "").upper(), (st.get("ref") or "").upper()
+    return bool(XWAY_RE.search(name) or XWAY_RE.search(ref) or ref.replace(" ", "") in XWAY_REFS or name.strip() in XWAY_REFS)
 
 
 def group_roads(steps, min_km=0.08):
@@ -113,16 +128,17 @@ def group_roads(steps, min_km=0.08):
             g["line"] += st["line"][1:] if g["line"] else st["line"]
             g["turns"] += 1 if st["man"] in ("turn", "end of road", "fork", "roundabout", "rotary", "on ramp", "off ramp") else 0
             g["sharp"] += 1 if st["mod"] in ("sharp left", "sharp right", "uturn") else 0
+            g["xkm"] += st["km"] if is_xway(st) else 0.0
         else:
             groups.append({"road": name, "km": st["km"], "min": st["min"], "line": list(st["line"]), "man": st["man"], "mod": st["mod"],
                            "turns": 1 if st["man"] in ("turn", "end of road", "fork", "roundabout", "rotary", "on ramp", "off ramp") else 0,
-                           "sharp": 1 if st["mod"] in ("sharp left", "sharp right", "uturn") else 0})
+                           "sharp": 1 if st["mod"] in ("sharp left", "sharp right", "uturn") else 0, "xkm": st["km"] if is_xway(st) else 0.0})
     # fold tiny groups (< min_km) into the previous one so the timeline stays readable
     out = []
     for g in groups:
         if out and g["km"] < min_km:
             p = out[-1]
-            p["km"] += g["km"]; p["min"] += g["min"]; p["line"] += g["line"][1:]; p["turns"] += g["turns"]; p["sharp"] += g["sharp"]
+            p["km"] += g["km"]; p["min"] += g["min"]; p["line"] += g["line"][1:]; p["turns"] += g["turns"]; p["sharp"] += g["sharp"]; p["xkm"] += g.get("xkm", 0.0)
         else:
             out.append(g)
     return out
@@ -265,6 +281,41 @@ def build_options(routes, ctx, P):
     for o in opts:
         o["tags"] = [x for x, y in (("A", fastest), ("B", shortest), ("C", pref)) if o is y]
     return opts, pref["idx"], fastest["idx"], shortest["idx"]
+
+
+def simplicity(o, P):
+    """V16.28: how hard a route is to drive off-service - turns, road changes and sharp turns count up, the share on expressways counts down.
+    Lower is simpler. o: an option from build_options (groups carry turns / sharp / xkm)."""
+    gs = o.get("groups") or []
+    xkm = sum(g.get("xkm", 0.0) for g in gs)
+    share = xkm / max(o.get("km") or 0.0, 0.01)
+    n_roads = len(gs)
+    score = o.get("n_turns", 0) + P["simple_w_road"] * max(0, n_roads - 1) + P["simple_w_sharp"] * o.get("n_sharp", 0) - P["simple_w_xway"] * min(1.0, share)
+    return {"score": round(score, 2), "xway_km": round(xkm, 2), "xway_share": round(min(1.0, share), 2), "n_roads": n_roads, "n_turns": o.get("n_turns", 0), "n_sharp": o.get("n_sharp", 0)}
+
+
+def pick_simple(opts, P):
+    """V16.28: the simplest suitable route (most expressway, fewest turns) among those at most max(slack_min, slack_pct x fastest) minutes
+    slower than the fastest. Returns (index, reasons [str])."""
+    if not opts:
+        return None, []
+    for o in opts:
+        o["simple"] = simplicity(o, P)
+    ok = [o for o in opts if o.get("status") != "unsuitable"] or opts
+    fast = min(ok, key=lambda o: (o["time_min"], o["km"]))
+    slack = max(P["simple_slack_min"], P["simple_slack_pct"] * fast["time_min"])
+    near = [o for o in ok if o["time_min"] <= fast["time_min"] + slack + 1e-9]
+    best = min(near, key=lambda o: (o["simple"]["score"], o["time_min"]))
+    b, f = best["simple"], fast["simple"]
+    why = [f"{b['xway_share'] * 100:.0f}% on expressways / highways, {b['n_turns']} turns, {b['n_roads']} roads"]
+    if best is not fast:
+        why.append(f"simpler than the fastest route ({f['xway_share'] * 100:.0f}% expressway, {f['n_turns']} turns, {f['n_roads']} roads) for {best['time_min'] - fast['time_min']:+.0f} min")
+    elif len(opts) > 1:
+        why.append("also the fastest")
+    others = [o for o in near if o is not best]
+    if others and best is fast:
+        why.append(f"{len(opts)} routes compared")
+    return best["idx"], why
 
 
 # ============================================================================ headway maths at the halfway stop

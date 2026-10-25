@@ -4144,7 +4144,9 @@ async def os_routes(origin, dest, svc, d, stop_code, bus, dims, service_line, le
         r["status"], r["status_text"] = offservice.suitability(r["findings"], bus, r["verified"])
         r["osm_ok"] = bool(osm and osm.get("ok"))
     opts, rec, fastest, shortest = offservice.build_options(routes, {"leave": leave, "planned_start": planned_start}, P)
-    return {"options": opts, "recommended": rec, "fastest": fastest, "shortest": shortest, "roadworks": rw, "incidents": inc, "P": P}, None
+    simplest, why_simple = offservice.pick_simple(opts, P)               # V16.28: expressways, fewer turns (the Halfway Planner asks for it)
+    return {"options": opts, "recommended": rec, "fastest": fastest, "shortest": shortest, "simplest": simplest, "why_simple": why_simple,
+            "roadworks": rw, "incidents": inc, "P": P}, None
 
 
 @app.get("/api/planner/setup")
@@ -4869,8 +4871,10 @@ async def api_hp_plan(snap: str = "", bus: str = "", delay: str = "20", brk: str
 
 
 @app.get("/api/hplan/route")
-async def api_hp_route(snap: str = "", stop: str = "", mode: str = "late", bus: str = "", os_from: str = "", leave: str = "", from_pt: str = "", from_label: str = "", on: str = ""):
-    """Off-service deployment route from the bus / OS location to the entry stop, with turn-by-turn guidance, traffic, incidents and road works."""
+async def api_hp_route(snap: str = "", stop: str = "", mode: str = "late", bus: str = "", os_from: str = "", leave: str = "", from_pt: str = "", from_label: str = "", on: str = "",
+                       prefer: str = ""):
+    """Off-service deployment route from the bus / OS location to the entry stop, with turn-by-turn guidance, traffic, incidents and road works.
+    V16.28: prefer=simple picks the simplest route (most expressway / highway, fewest turns) within a few minutes of the fastest."""
     S = HP_SNAP.get(snap)
     if not S:
         return {"ok": False, "error": "The live snapshot has expired. Refresh and run the simulation again.", "expired": True}
@@ -4894,8 +4898,11 @@ async def api_hp_route(snap: str = "", stop: str = "", mode: str = "late", bus: 
     R, rerr = await os_routes(origin, (stops[j]["lat"], stops[j]["lon"]), S["svc"], rdir, stops[j]["code"], "dd", {}, g["line"], lv, planned_start=None, prep=prep)
     if R is None:
         return {"ok": False, "error": f"No road route could be calculated ({rerr})."}
-    x = next(o for o in R["options"] if o["idx"] == R["recommended"])
+    simple = prefer.strip().lower() == "simple" and R.get("simplest") is not None
+    pick = R["simplest"] if simple else R["recommended"]
+    x = next(o for o in R["options"] if o["idx"] == pick)
     near = lambda p: offservice.dist_to_line_m((p["lat"], p["lon"]), x["line"]) <= 300
+    tot_g = sum(q_["min"] for q_ in x["groups"]) or 1.0
     return {"ok": True, "origin": {"label": origin_label, "lat": origin[0], "lon": origin[1]},
             "stop": {"code": stops[j]["code"], "name": stops[j]["name"], "lat": stops[j]["lat"], "lon": stops[j]["lon"], "km_from_start": round(ss[j], 2)},
             "km": round(x["km"], 2), "time_min": round(x["time_min"], 1), "time_src": x["time_src"], "leave_clock": hplan.hhmm(lv),
@@ -4903,7 +4910,12 @@ async def api_hp_route(snap: str = "", stop: str = "", mode: str = "late", bus: 
             "status": x["status"], "status_label": offservice.STATUS_TXT[x["status"]], "status_text": x["status_text"], "findings": x["findings"][:8],
             "line": offservice.simplify(x["line"], 300), "traffic": x["traffic"], "roads": [q_["road"] for q_ in x["groups"]],
             "steps": hplan.instructions(x.get("steps") or [], stops[j]["code"], stops[j]["name"]),
-            "alternatives": [{"label": o["label"], "km": round(o["km"], 2), "time_min": round(o["time_min"], 1), "status": o["status"], "tags": o["tags"]} for o in R["options"]],
+            "alternatives": [{"label": o["label"], "km": round(o["km"], 2), "time_min": round(o["time_min"], 1), "status": o["status"], "tags": o["tags"],
+                              "chosen": o["idx"] == pick, "xway_share": (o.get("simple") or {}).get("xway_share"), "n_turns": o.get("n_turns"), "n_roads": len(o.get("groups") or []),
+                              "line": offservice.simplify(o["line"], 80)} for o in R["options"]],
+            "pick": "simple" if simple else "recommended", "why": R.get("why_simple") if simple else [], "simple": x.get("simple"),
+            "stages": [{"road": q_["road"], "km": round(q_["km"], 2), "min": round(q_["min"] * x["time_min"] / tot_g, 1), "xway": q_.get("xkm", 0.0) >= 0.5 * max(q_["km"], 0.01),
+                        "turns": q_["turns"]} for q_ in x["groups"]],
             "service_after": ho_simplify(ho_cut(g["line"], cum, ss[j], cum[-1]), 250),
             "incidents": [p for p in R["incidents"] if p.get("lat") is not None and near(p)][:10],
             "roadworks": [p for p in R["roadworks"] if p.get("lat") is not None and near(p)][:10],
