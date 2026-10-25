@@ -52,21 +52,24 @@ The section numbers and the Recovery Decision Engine headers are gone. The mobil
 * **Step 3:** smaller figures. Space is kept for the bottom navigation bar.
 * **More detail:** at most 8 stop cards.
 
-**Why the plan works, in four pictures (step 3, under the ROI).** These pictures are for briefing a manager. Each one is drawn from the plan's own pass times, using the same model as the simulation.
+**Why this plan: Lean Six Sigma, DMAIC (step 3, under the ROI).** This is a storyboard for selling the plan to a manager. Each DMAIC step is a band with plain-language rows on the left and a chart on the right. A ribbon at the top (D M A I C) jumps to each step. Everything is drawn from the plan's own pass times, using the same model as the simulation.
 
-The idea behind all four: the waiting at a stop is a saw-tooth. Each gap is a triangle, and its area is the waiting it causes, so the waiting grows with the **square** of the gap. That is what EWT counts.
+EWT is explained as **average wait − promised wait**, where the promised wait is half the headway. With one passenger a minute, a gap of *g* minutes makes *g* × (*g* − H) ÷ 2 extra passenger-minutes. EWT is the extra passenger-minutes ÷ passengers, which is the same sum the engine does.
 
-1. **The problem.** The gap at the entry stop with no action. *Example:* a 30-min gap on a 10-min service is 3× as long as the headway, so 3× as many people arrive in it and each waits 3× as long. That makes **9× the waiting** (triangle 450 against 50).
-2. **The fix.** The halfway bus lands mid-gap. *Example:* 30 becomes 15 + 15, two small triangles instead of one big one, so there is 50% less waiting in that gap. The split holds at every stop after the entry.
-3. **The price.** The halfway bus's empty slot at the interchange, no action against the plan (marked "empty slot"). *Example:* the moved departures keep the biggest headway to 12 min instead of a 20-min hole. The halfway alone, without the re-spacing, would leave D2 worse (2.074 vs 1.881).
-4. **The net.** EWT at every AITP, no action against the plan: green where the plan waits less, red where it waits more. Below it, **Add it up** sums the EWT minutes over the AITPs. *Example:* the 4 after the entry earn 4.17, the 9 before it give back 3.27, and the net is 0.90 ÷ 13 = **0.070 min per passenger**, the same figure as the headline.
+| Step | What it says | Chart |
+|---|---|---|
+| **D Define** | The problem (who is how far apart, what the timetable promises), the customer, the Lean waste (waiting), the measure (EWT), the goal and the scope. | EWT in one bar: average wait = promised (green) + EWT (red). |
+| **M Measure** | The baseline. *Example:* 30 passengers in the 30-min gap wait 15 min on average, 10 more than promised, making 300 extra passenger-minutes; a 10-min gap makes 0. Route EWT 1.881. | One bar per passenger at the entry stop; its height is their wait. |
+| **A Analyze** | A Pareto of extra passenger-minutes by gap. *Example:* one gap makes 98% of it, and one 30-min gap makes 300 while two 15-min gaps make 75. | Pareto bars. |
+| **I Improve** | The action (complete, rest, off-service, enter mid-gap), the effect (300 → 75, −75% at the entry stop and after it), the side effect at the interchange and the re-spacing, the options tested, and the result. The result is honest about what the stops before the entry give back. | The same passengers with the plan; average wait = promised + EWT, no action against the plan, before the entry, from the entry on, and all of the route. |
+| **C Control** | The control plan with times: Bus C leaves; the moved departures (±1 min); Bus C passes the entry stop; the headways to monitor at the AITPs after it; the Recovery Decision Engine gate (worth deploying / marginal / not better). | – |
 
-Under the pictures:
-* **The pitch:** one paragraph with the gain, the price and the net. The verdict stays honest: a marginal plan says so.
+Under the storyboard:
+* **The pitch:** one line per DMAIC step.
 * **Copy pitch.**
-* **Save as picture:** one PNG of the four pictures and the pitch, for a slide or a chat.
+* **Save as picture:** one PNG of the whole storyboard, for a slide or a chat.
 
-On a phone the pictures sit one under the other and are drawn narrower, so the labels stay readable.
+On a phone the steps stack and the charts are drawn narrower, so the labels stay readable.
 
 ## Halfway Planner: the ticked bus covers a gap on the next direction, before vs after simulation (V16.28)
 **Example.** D1 Bus 6 is ticked, and D2 Bus 3 runs 30 min behind D2 Bus 4. The plan for Bus 6:

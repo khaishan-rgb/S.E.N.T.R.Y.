@@ -263,28 +263,39 @@ details.ln-more .row{margin-top:12px}
 .why{margin-top:14px;border:1px solid var(--line2);border-radius:12px;padding:12px 14px;background:#081527}
 .why-h{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 14px}
 .why-h h3{margin:0;font:800 13px/1.3 var(--font);letter-spacing:.06em;color:#7fe7ff;text-transform:uppercase}
-.why-h>span{font-size:12.5px;color:var(--mut);line-height:1.45;flex:1 1 380px}.why-h>span b{color:#cfe0f3}
-.why-lg{flex:1 1 100%;display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;font-size:11.5px;color:var(--mut)}
-.why-lg i{display:inline-block;width:14px;height:10px;border-radius:2px;margin-left:6px;vertical-align:-1px}
-.why-lg i:first-child{margin-left:0}.why-lg i.r{background:rgba(255,85,102,.5);border:1px solid #ff6b7d}.why-lg i.o{background:rgba(255,181,71,.45);border:1px solid #ffb547}.why-lg i.g{background:rgba(46,229,157,.35);border:1px solid #2ee59d}.why-lg i.p{width:4px;background:#b46bff}
-.why-g{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:10px}
-.why-c{margin:0;border:1px solid var(--line2);border-radius:10px;padding:9px 10px 10px;background:#0b1a2e;min-width:0}
-body.ds-app .why-c.bad{border-color:#7a2433!important}body.ds-app .why-c.good{border-color:#1c6a4c!important}body.ds-app .why-c.warn{border-color:#7a5a1c!important}
-.why-c figcaption{display:flex;align-items:center;gap:8px;font-size:13.5px;color:#fff}
-.wn{display:inline-grid;place-items:center;width:21px;height:21px;border-radius:50%;background:#12345a;color:#7fe7ff;font:800 11.5px var(--font);flex:none}
-.why-c.bad .wn{background:#5a1a26;color:#ffb0b9}.why-c.good .wn{background:#124a36;color:#8ff5c9}.why-c.warn .wn{background:#4f3a12;color:#ffd38f}
-.why-svg{display:block;width:100%;height:auto;margin-top:6px;font-family:var(--font)}
-.why-2 small{display:block;margin-top:6px;font-size:11px;font-weight:700;color:var(--mut);letter-spacing:.04em}.why-2 .why-svg{margin-top:2px}
-.why-c p{margin:6px 0 0;font-size:12.5px;color:#cfe0f3;line-height:1.5}.why-c p b{color:#fff}
-.why-c p .g{color:#5ff0b4;font-weight:700}.why-c p .r{color:#ff8f9c;font-weight:700}
+.why-h>span{font-size:13px;color:#cfe0f3;line-height:1.45;flex:1 1 380px}.why-h>span b{color:#fff}
+.why-rb{list-style:none;margin:10px 0 0;padding:0;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:3px}
+.why-rb a{display:flex;align-items:center;gap:9px;min-height:46px;padding:4px 16px 4px 20px;background:#0d2440;color:#cfe0f3;text-decoration:none;font-size:12.5px;font-weight:800;line-height:1.2;clip-path:polygon(0 0,calc(100% - 12px) 0,100% 50%,calc(100% - 12px) 100%,0 100%,12px 50%)}
+.why-rb li:first-child a{padding-left:12px;clip-path:polygon(0 0,calc(100% - 12px) 0,100% 50%,calc(100% - 12px) 100%,0 100%)}
+.why-rb a:hover{background:#12345a}.why-rb b{font:900 19px var(--font);color:#7fe7ff}
+.why-rb small{display:block;font-size:11px;font-weight:600;color:var(--mut);margin-top:1px}
+.why-g{display:grid;gap:10px;margin-top:10px}
+.why-c{display:grid;grid-template-columns:132px minmax(0,1fr) minmax(0,1fr);gap:10px 16px;border:1px solid var(--line2);border-radius:10px;padding:12px 14px;background:#0b1a2e;min-width:0;scroll-margin-top:96px}
+.why-c.why-nov{grid-template-columns:132px minmax(0,1fr)}
+body.ds-app .why-c.why-imp{border-color:#1c6a4c!important}
+.why-c header{display:flex;flex-direction:column;align-items:flex-start;gap:6px}
+.why-c header b{font:900 14px/1.2 var(--font);letter-spacing:.08em;color:#fff}
+.why-c header em{font-style:normal;font-size:12.5px;color:var(--mut);line-height:1.35}
+.why-wn{display:inline-grid;place-items:center;width:34px;height:34px;border-radius:50%;background:#12345a;color:#7fe7ff;font:900 18px var(--font);flex:none}
+.why-c.why-imp .why-wn{background:#124a36;color:#8ff5c9}
+.why-t{display:flex;flex-direction:column;gap:8px;min-width:0}
+.why-r{display:grid;grid-template-columns:96px minmax(0,1fr);gap:8px}
+.why-r .why-l{font:800 10.5px/1.75 var(--font);letter-spacing:.06em;color:var(--mut);text-transform:uppercase}
+.why-r p{margin:0;font-size:13px;color:#cfe0f3;line-height:1.5}.why-r p b{color:#fff}
+.why-vs{display:flex;flex-direction:column;gap:12px;min-width:0}
+.why-v small{display:block;font-size:11.5px;color:var(--mut);line-height:1.4;margin-bottom:4px}.why-v small b{color:#cfe0f3}
+.why-svg{display:block;width:100%;height:auto;font-family:var(--font)}
 .why-pitch{margin-top:10px;display:flex;gap:12px;align-items:flex-start;border:1px dashed #1f6f8a;border-radius:10px;padding:10px 12px;background:#061d2a}
-.why-pitch .k{font:800 11px/1.6 var(--font);letter-spacing:.1em;color:#7fe7ff;flex:none}
-.why-pitch p{margin:0;flex:1;font-size:13.5px;color:#e6f6ff;line-height:1.55;min-width:0}
+.why-pitch .why-k{font:800 11px/1.6 var(--font);letter-spacing:.1em;color:#7fe7ff;flex:none}
+.why-pitch ol{margin:0;padding:0;list-style:none;flex:1;min-width:0;display:flex;flex-direction:column;gap:4px}
+.why-pitch li{display:grid;grid-template-columns:18px minmax(0,1fr);gap:8px;font-size:13.5px;color:#e6f6ff;line-height:1.5}.why-pitch li b{color:#7fe7ff;font-weight:900}
 .why-btns{display:flex;flex-direction:column;gap:6px;flex:none}
 .wbtn{min-height:36px;padding:0 14px;border-radius:9px;border:1px solid #1f6f8a;background:#0b2a3c;color:#bff3ff;font-weight:800;font-size:12.5px;cursor:pointer;white-space:nowrap}
 .wbtn:hover{background:#0f3850}.wbtn:disabled{opacity:.6;cursor:default}
-@media(max-width:900px){.why-g{grid-template-columns:minmax(0,1fr)}}
-@media(max-width:700px){.why{padding:10px}.why-pitch{flex-direction:column}.why-btns{flex-direction:row;width:100%}.wbtn{flex:1;min-height:44px}.why-c p{font-size:12.5px}}
+@media(max-width:1100px){.why-c,.why-c.why-nov{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.why-c header{grid-column:1/-1;flex-direction:row;align-items:center;flex-wrap:wrap;gap:4px 10px}.why-c.why-nov .why-t{grid-column:1/-1}}
+@media(max-width:900px){.why-c,.why-c.why-nov{grid-template-columns:minmax(0,1fr)}.why-rb small{display:none}}
+@media(max-width:700px){.why{padding:10px}.why-c{padding:10px}.why-rb{gap:2px}.why-rb a{flex-direction:column;justify-content:center;gap:0;padding:4px 10px 4px 14px;font-size:10.5px;min-height:48px}.why-rb li:first-child a{padding-left:6px}.why-rb b{font-size:17px}
+  .why-r{grid-template-columns:minmax(0,1fr);gap:1px}.why-pitch{flex-direction:column}.why-btns{flex-direction:row;width:100%}.wbtn{flex:1;min-height:44px}}
 @media(max-width:900px){.sm-hero{grid-template-columns:1fr}.sm-row{grid-template-columns:minmax(0,1fr) 108px}.sm-row .bar_{grid-column:1/-1;grid-row:2}}
 
 /* ---------- page grid ---------- */
@@ -1398,10 +1409,12 @@ function renderRoi(){
   whyBind();
   const lm = $("lnMore"); if(lm) lm.onclick = e => { e.preventDefault(); const d = $("more"); d.open = true; setTimeout(() => $("simCard").scrollIntoView({behavior:"smooth", block:"start"}), 80); };
 }
-/* ================================================================ V16.28 why the plan works - four pictures for the briefing
-   The waiting a passenger feels at a stop is a saw-tooth: arrive just after a bus and you wait the whole gap, arrive just before the
-   next and you wait nothing. Each gap is a triangle; its area is the waiting it causes, so it grows with the SQUARE of the gap
-   (that is what EWT counts). The pictures use the plan's own pass times (the same model as the simulation). */
+/* ================================================================ V16.28 why this plan - Lean Six Sigma storyboard (DMAIC)
+   D Define the problem and the measure (EWT) - M Measure the baseline - A Analyze where the extra waiting comes from (Pareto)
+   - I Improve: the halfway bus, its side effect and the result - C Control: what OCC checks, and the RDE gate.
+   EWT in plain words: the average wait minus the promised wait (half the headway). With one passenger a minute, a gap of g minutes
+   makes g x (g - H) / 2 extra passenger-minutes, and EWT = extra passenger-minutes / passengers - the same sum the engine does.
+   Everything is drawn from the plan's own pass times (the same model as the simulation). */
 function whyPasses(r, x){
   const S = r.sim, SM = r.stop_min, now = r.now_min, A = x.use_adj ? (x.adj || {}) : {}, ins = S.ins, j = x.j;
   const tB = (u, k) => u.kind === "in_service" ? now + SM * (k - u.q) : u.dep + SM * k;
@@ -1409,156 +1422,223 @@ function whyPasses(r, x){
   const at = (f, k) => S.units.map(u => ({u, t:f(u, k)})).filter(o => o.t != null).sort((a, b) => a.t - b.t);
   return {tB, tA, at, ins};
 }
-const awt = L => { let s = 0, q = 0; for(let i = 1; i < L.length; i++){ const g = L[i].t - L[i - 1].t; s += g; q += g * g; } return s > 0 ? q / (2 * s) : null; };
 const gmaxL = (L, H) => Math.max(H || 0, ...L.slice(1).map((o, i) => o.t - L[i].t));
+const gapsL = L => L.slice(1).map((o, i) => ({g:o.t - L[i].t, a:L[i].u, b:o.u}));
 const WHY_FONT = "system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif";
 let whyNarrow = null; const whyW = () => (whyNarrow = innerWidth < 700) ? 360 : 520;
 addEventListener("resize", () => { if(whyNarrow != null && (innerWidth < 700) !== whyNarrow && $("why") && ST.res) renderRoi(); });
-function sawtooth(L, t0, t1, wmax, H, aria, ins, ghost){
-  const W = whyW(), HT = 176, L0 = 30, R0 = 8, T0 = 20, B0 = 40;
-  const X = t => L0 + (Math.max(t0, Math.min(t1, t)) - t0) / (t1 - t0) * (W - L0 - R0), Y = w => T0 + (1 - w / wmax) * (HT - T0 - B0), y0 = Y(0);
-  let s = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${HT}" width="${W}" height="${HT}" class="why-svg" font-family="${WHY_FONT}" role="img" aria-label="${esc(aria)}">`;
-  for(let w = 0; w <= wmax + 1e-9; w += 10) s += `<line x1="${L0}" x2="${W - R0}" y1="${Y(w).toFixed(1)}" y2="${Y(w).toFixed(1)}" stroke="${w ? "#14294a" : "#5f7ea6"}" stroke-width="${w ? 1 : 1.4}"/><text x="${L0 - 5}" y="${(Y(w) + 3.5).toFixed(1)}" fill="#5f7690" font-size="10" text-anchor="end">${w}</text>`;
-  s += `<text x="${L0 - 26}" y="${T0 - 9}" fill="#8aa3bd" font-size="9.5">wait, min</text>`;
-  (ghost || []).forEach(g => { const gx = X(g.t).toFixed(1); s += `<line x1="${gx}" x2="${gx}" y1="${T0 + 12}" y2="${y0.toFixed(1)}" stroke="#b46bff" stroke-width="1.4" stroke-dasharray="3 3"/><text x="${gx}" y="${T0 + 9}" fill="#d9b8ff" font-size="10" font-weight="800" text-anchor="middle">${esc(g.label)}</text>`; });
-  for(let i = 0; i + 1 < L.length; i++){
-    const a = L[i].t, b = L[i + 1].t, g = b - a; if(b <= t0 || a >= t1) continue;
-    const c = g >= 2 * H ? ["rgba(255,85,102,.34)", "#ff6b7d"] : g > H + 2 ? ["rgba(255,181,71,.30)", "#ffb547"] : ["rgba(46,229,157,.22)", "#2ee59d"];
-    const ya = Y(g - Math.max(0, t0 - a));
-    s += `<polygon points="${X(a).toFixed(1)},${y0.toFixed(1)} ${X(a).toFixed(1)},${ya.toFixed(1)} ${X(b).toFixed(1)},${y0.toFixed(1)}" fill="${c[0]}" stroke="${c[1]}" stroke-width="1.4" stroke-linejoin="round"/>`;
-    if(X(b) - X(a) > 24) s += `<text x="${(X(a) + (X(b) - X(a)) * 0.32).toFixed(1)}" y="${(y0 - (y0 - ya) * 0.28).toFixed(1)}" fill="#fff" font-size="${g >= 2 * H ? 13 : 11}" font-weight="800" text-anchor="middle">${f0(g)}</text>`;
-  }
+const md = s => esc(s).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>");                          // **bold** in the storyboard text
+const mdSeg = s => String(s).split("**").map((t, i) => ({t, b:i % 2 === 1})).filter(o => o.t);
+const shortBus = u => String((u && u.label) || "").replace(" (at interchange)", "").replace(/^D(\d) Bus /, "D$1 B");
+const svgOpen = (W, HT, aria) => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${HT}" width="${W}" height="${HT}" class="why-svg" font-family="${WHY_FONT}" role="img" aria-label="${esc(aria)}">`;
+const gapCol = (g, H) => g >= 2 * H ? ["rgba(255,85,102,.78)", "#ff8a96"] : g > H + 2 ? ["rgba(255,181,71,.75)", "#ffc56b"] : ["rgba(46,229,157,.6)", "#5ff0b4"];
+const fx = v => v == null ? "\u2013" : Math.abs(v - Math.round(v)) < 0.05 ? f0(v) : f1(v);     // 15 not 15.0, 3 not 3.0
+const xpm = (g, H) => g * (g - H) / 2;                                                    // extra passenger-minutes of one gap (1 passenger a minute)
+const halo = 'paint-order="stroke" stroke="#0b1a2e" stroke-width="3" stroke-linejoin="round"';
+
+/* one bar per passenger (1 a minute), as tall as that passenger's wait; the dashed line is the promised average wait */
+function paxBars(L, H, wmax, ins, aria){
+  const W = whyW(), HT = 188, L0 = 30, R0 = 10, T0 = 26, B0 = 40, t0 = L[0].t - 1, t1 = L[L.length - 1].t + 1;
+  const X = t => L0 + (t - t0) / (t1 - t0) * (W - L0 - R0), Y = w => T0 + (1 - w / wmax) * (HT - T0 - B0), y0 = Y(0), bw = Math.max(1.6, (X(1) - X(0)) * 0.7);
+  let s = svgOpen(W, HT, aria);
+  for(let w = 0; w <= wmax + 1e-9; w += 10) s += `<line x1="${L0}" x2="${W - R0}" y1="${Y(w).toFixed(1)}" y2="${Y(w).toFixed(1)}" stroke="${w ? "#14294a" : "#5f7ea6"}"/><text x="${L0 - 5}" y="${(Y(w) + 3.5).toFixed(1)}" fill="#5f7690" font-size="10" text-anchor="end">${w}</text>`;
+  s += `<text x="2" y="10" fill="#8aa3bd" font-size="10">wait, min</text>`;
+  gapsL(L).forEach(({g, a}, i) => {
+    const ta = L[i].t, tb = L[i + 1].t, c = gapCol(g, H);
+    for(let m = Math.floor(ta); m < tb; m++){ const arr = m + 0.5; if(arr <= ta || arr >= tb) continue; const w = tb - arr;
+      s += `<rect x="${(X(arr) - bw / 2).toFixed(1)}" y="${Y(w).toFixed(1)}" width="${bw.toFixed(1)}" height="${(y0 - Y(w)).toFixed(1)}" fill="${c[0]}"/>`; }
+    if(X(tb) - X(ta) > 28) s += `<text x="${((X(ta) + X(tb)) / 2).toFixed(1)}" y="${(Y(g) - 6).toFixed(1)}" fill="${c[1]}" font-size="${g >= 2 * H ? 13 : 11.5}" font-weight="900" text-anchor="middle">${f0(g)} min</text>`;
+  });
+  const yp = Y(H / 2).toFixed(1);
+  s += `<line x1="${L0}" x2="${W - R0}" y1="${yp}" y2="${yp}" stroke="#7fe7ff" stroke-width="1.6" stroke-dasharray="6 4"/><text x="${W - R0}" y="${(Y(H / 2) - 5).toFixed(1)}" fill="#bff3ff" font-size="10.5" font-weight="800" text-anchor="end" ${halo}>promised average ${fx(H / 2)} min</text>`;
   let lastX = -1e9, lvl = 0;
-  L.filter(o => o.t >= t0 - 0.01 && o.t <= t1 + 0.01).forEach(o => {
-    const x_ = X(o.t), hw = o.u.uid === ins, lab = String(o.u.label || "").replace(" (at interchange)", "").replace(/^D(\d) Bus /, "D$1 B");
-    lvl = x_ - lastX < 46 ? 1 - lvl : 0; lastX = x_;
+  L.forEach(o => {
+    const x_ = X(o.t), hw = o.u.uid === ins; lvl = x_ - lastX < 46 ? 1 - lvl : 0; lastX = x_;
     s += `<line x1="${x_.toFixed(1)}" x2="${x_.toFixed(1)}" y1="${(y0 - 4).toFixed(1)}" y2="${(y0 + 5).toFixed(1)}" stroke="${hw ? "#b46bff" : "#cfe0f3"}" stroke-width="${hw ? 3 : 1.6}"/>`
-      + `<text x="${x_.toFixed(1)}" y="${(y0 + 17 + lvl * 12).toFixed(1)}" fill="${hw ? "#d9b8ff" : "#9fc6f0"}" font-size="10.5" font-weight="${hw ? 900 : 700}" text-anchor="middle">${esc(lab)}</text>`;
+      + `<text x="${x_.toFixed(1)}" y="${(y0 + 17 + lvl * 12).toFixed(1)}" fill="${hw ? "#d9b8ff" : "#9fc6f0"}" font-size="10.5" font-weight="${hw ? 900 : 700}" text-anchor="middle">${esc(shortBus(o.u))}</text>`;
+  });
+  return s + `</svg>`;
+}
+/* EWT as a picture: the average wait = the promised part (green) + EWT (red) */
+function ewtBar(H, ewt){
+  const W = whyW(), HT = 74, pr = H / 2, e = Math.max(0, ewt), tot = pr + e, mx = Math.ceil(tot + 0.6), X = v => 2 + v / mx * (W - 12), y = 22, bh = 26;
+  let s = svgOpen(W, HT, "Average wait today: the promised part and the EWT");
+  s += `<text x="2" y="13" fill="#fff" font-size="12.5" font-weight="800">Average wait today: ${f1(tot)} min</text>`;
+  s += `<rect x="${X(0)}" y="${y}" width="${(X(pr) - X(0)).toFixed(1)}" height="${bh}" fill="rgba(46,229,157,.45)" stroke="#2ee59d"/><text x="${((X(0) + X(pr)) / 2).toFixed(1)}" y="${y + 17}" fill="#fff" font-size="12" font-weight="800" text-anchor="middle">promised ${fx(pr)}</text>`;
+  const ew = X(tot) - X(pr);
+  s += `<rect x="${X(pr).toFixed(1)}" y="${y}" width="${Math.max(0, ew).toFixed(1)}" height="${bh}" fill="rgba(255,85,102,.6)" stroke="#ff6b7d"/>`
+    + `<text x="${(ew > 74 ? (X(pr) + X(tot)) / 2 : X(tot) + 6).toFixed(1)}" y="${y + 17}" fill="${ew > 74 ? "#fff" : "#ffb0b9"}" font-size="12" font-weight="900" text-anchor="${ew > 74 ? "middle" : "start"}">EWT ${f2(ewt)}</text>`;
+  const st = mx > 12 ? 2 : 1;
+  for(let v = 0; v <= mx; v += st) s += `<text x="${X(v).toFixed(1)}" y="${y + bh + 14}" fill="#5f7690" font-size="10" text-anchor="${v ? "middle" : "start"}">${v}</text>`;
+  return s + `</svg>`;
+}
+/* Pareto: extra passenger-minutes by gap, largest first */
+function pareto(items, H){
+  const W = whyW(), LW = W < 400 ? 136 : 168, VW = W < 400 ? 70 : 84, BW = W - LW - VW, RH = 28, HT = items.length * RH + 4, mx = Math.max(1, ...items.map(o => o.v));
+  let s = svgOpen(W, HT, "Extra passenger-minutes by gap, largest first");
+  items.forEach((o, i) => { const y = i * RH, w = Math.max(2, BW * o.v / mx), c = o.g != null ? gapCol(o.g, H) : ["rgba(138,160,184,.45)", "#8aa0b8"];
+    s += `<text x="0" y="${y + 17}" fill="#cfe0f3" font-size="11.5" font-weight="700">${esc(o.lab)}</text><rect x="${LW}" y="${y + 6}" width="${w.toFixed(1)}" height="16" rx="3" fill="${c[0]}"/>`
+      + `<text x="${(LW + w + 6).toFixed(1)}" y="${y + 18}" fill="${c[1]}" font-size="11.5" font-weight="900">${f0(o.v)} · ${o.p}%</text>`; });
+  return s + `</svg>`;
+}
+/* the result: average wait = promised (green) + EWT (red), no action vs the plan, by part of the route */
+function resultBars(H, G){
+  const W = whyW(), LW = W < 400 ? 60 : 68, VW = W < 400 ? 96 : 120, BW = W - LW - VW, pr = H / 2;
+  const mx = Math.ceil(pr + Math.max(0, ...G.flatMap(g => [g.b, g.a])) + 0.5), X = v => LW + v / mx * BW, GH = 64, HT = G.length * GH;
+  let s = svgOpen(W, HT, "Average wait with no action and with the plan");
+  G.forEach((g, i) => { const y = i * GH, d = g.b - g.a;
+    s += `<text x="0" y="${y + 13}" fill="#fff" font-size="12" font-weight="800">${esc(g.lab)} <tspan fill="#8aa3bd" font-weight="600" font-size="10.5">${esc(g.sub)}</tspan></text>`
+      + `<text x="${W - 2}" y="${y + 13}" fill="${d > 0.005 ? "#5ff0b4" : d < -0.005 ? "#ff8a96" : "#8aa3bd"}" font-size="12" font-weight="900" text-anchor="end">${d > 0.005 ? "−" : d < -0.005 ? "+" : "±"}${f2(Math.abs(d))} min</text>`;
+    [["No action", g.b, 0], ["Plan", g.a, 1]].forEach(([nm, e, k]) => { const yy = y + 20 + k * 20, e_ = Math.max(0, e);
+      s += `<text x="0" y="${yy + 12}" fill="${k ? "#fff" : "#8aa3bd"}" font-size="11" font-weight="${k ? 800 : 600}">${nm}</text>`
+        + `<rect x="${X(0).toFixed(1)}" y="${yy + 1}" width="${(X(pr) - X(0)).toFixed(1)}" height="15" fill="rgba(46,229,157,${k ? ".55" : ".25"})"/>`
+        + `<rect x="${X(pr).toFixed(1)}" y="${yy + 1}" width="${(X(pr + e_) - X(pr)).toFixed(1)}" height="15" fill="rgba(255,85,102,${k ? ".75" : ".38"})"/>`
+        + `<text x="${(X(pr + e_) + 6).toFixed(1)}" y="${yy + 12.5}" fill="${k ? "#fff" : "#8aa3bd"}" font-size="11" font-weight="${k ? 800 : 600}">${f1(pr + e)} · EWT ${f2(e)}</text>`; });
   });
   return s + `</svg>`;
 }
 function whyData(r, x){
   if(!r || !x || !r.sim || !r.sim.units || !x.variants || r.now_min == null || x.entry_min == null || !x.gap || !x.front || !x.rear) return null;
   const {tB, tA, at, ins} = whyPasses(r, x), H = r.H, j = x.j;
-  // (1)(2) at the entry stop: the gap with two more buses either side - no action vs the plan
   const B1 = at(tB, j), iF = B1.findIndex(o => o.u.uid === x.front.uid), iR = B1.findIndex(o => o.u.uid === x.rear.uid);
   if(iF < 0 || iR < 0) return null;
-  const keep1 = new Set(B1.slice(Math.max(0, Math.min(iF, iR) - 2), Math.max(iF, iR) + 3).map(o => o.u.uid));
+  const keep1 = new Set(B1.slice(Math.max(0, Math.min(iF, iR) - 1), Math.max(iF, iR) + 2).map(o => o.u.uid));
   const b1 = B1.filter(o => keep1.has(o.u.uid)), a1 = at(tA, j).filter(o => keep1.has(o.u.uid) || o.u.uid === ins);
-  // (3) at the first stop: Bus C's slot and the buses moved round it, one unmoved bus either side - no action vs the plan
   const B0 = at(tB, 0), A_ = x.use_adj ? (x.adj || {}) : {}, iC = B0.findIndex(o => o.u.uid === ins);
   if(iC < 0) return null;
   const mv = B0.map((o, i) => (o.u.uid === ins || A_[o.u.uid]) ? i : -1).filter(i => i >= 0);
   const keep0 = new Set(B0.slice(Math.max(0, Math.min(...mv) - 1), Math.max(...mv) + 2).map(o => o.u.uid));
   const b0 = B0.filter(o => keep0.has(o.u.uid)), a0 = at(tA, 0).filter(o => keep0.has(o.u.uid) && o.u.uid !== ins);
-  const hole = gmaxL(b0.filter(o => o.u.uid !== ins), H);
   const {L: OPTS, pick} = simOpts(r, x), base = OPTS[0], ch = OPTS.find(o => o.k === pick), only = OPTS.find(o => o.k === "only");
   const ei = Math.max(0, r.points.findIndex(p => p.j >= j)), n = r.points.length;
-  return {tB, ins, H, b1, a1, b0, a0, hole, slot:tB(B0[iC].u, 0), base, ch, only, ei, n,
+  return {B1, b1, a1, b0, a0, hole:gmaxL(b0.filter(o => o.u.uid !== ins), H), base, ch, only, ei, n, pick,
     dn0:avgP(base.pts, ei), dn1:avgP(ch.pts, ei), up0:ei ? avgP(base.pts, 0, ei) : null, up1:ei ? avgP(ch.pts, 0, ei) : null,
     moved:(r.dep_adj || []).filter(a => a.adj && x.use_adj && pick === "adj")};
 }
-function whyPitch(r, x, D){
-  const W_ = whoC(r), nd = `D${r.next_dir}`, g = x.gap, gain = D.base.ewt - D.ch.ewt, pct = D.base.ewt > 0.005 ? Math.round(100 * gain / D.base.ewt) : 0;
-  let s = `${W_} turns the ${f0(g.minutes)}-min gap (${g.front} → ${g.rear}) into ${f0(g.split[0])} + ${f0(g.split[1])} min from Stop ${x.no} on (${x.pct}% along ${nd}): EWT there ${f2(D.dn0)} → ${f2(D.dn1)} min at ${D.n - D.ei} AITP${D.n - D.ei === 1 ? "" : "s"}.`;
-  if(D.up0 != null) s += D.moved.length ? ` Re-spacing ${D.moved.length} departure${D.moved.length === 1 ? "" : "s"} at ${r.interchange.name} keeps the cost before Stop ${x.no} to +${f2(D.up1 - D.up0)} min at ${D.ei} AITPs${D.only ? ` (the halfway alone, without it: ${f3(D.only.ewt)} – worse than no action ${f3(D.base.ewt)})` : ""}.` : ` Before Stop ${x.no} EWT goes up ${f2(D.up1 - D.up0)} min at ${D.ei} AITPs.`;
-  s += gain > 0.005 ? ` Net across ${nd}: ${f3(D.base.ewt)} → ${f3(D.ch.ewt)} min per passenger (−${f3(gain)}, ${pct}%) with no extra bus.` : ` Net across ${nd}: ${f3(D.base.ewt)} → ${f3(D.ch.ewt)} min – not better than no action.`;
-  return s;
+/* the storyboard as data, so the page and the saved picture say the same thing */
+function whyModel(r, x){
+  const D = whyData(r, x); if(!D) return null;
+  const {base, ch, only, ei, n, dn0, dn1, up0, up1, moved, b1, a1, b0, a0} = D, H = r.H, pr = H / 2, W_ = whoC(r), nd = `D${r.next_dir}`, g = x.gap, g0 = g.minutes, sp = g.split;
+  const gain = base.ewt - ch.ewt, pct = base.ewt > 0.005 ? Math.round(100 * gain / base.ewt) : 0, k = g0 / H;
+  const cls = gain >= 0.1 && pct >= 5 ? "good" : gain > 0.005 ? "marg" : "bad", verdict = cls === "good" ? "WORTH DEPLOYING" : cls === "marg" ? "MARGINAL – OCC's call" : "NOT BETTER THAN NO ACTION";
+  const ex0 = xpm(g0, H), ex1 = xpm(sp[0], H) + xpm(sp[1], H), cut = ex0 > 0 ? Math.round(100 * (1 - ex1 / ex0)) : 0;
+  const all = gapsL(D.B1).map(o => ({lab:`${shortBus(o.a)} → ${shortBus(o.b).replace(shortBus(o.a).split(" ")[0] + " ", "")} · ${f0(o.g)} min`, g:o.g, v:Math.max(0, xpm(o.g, H))})).sort((a, b) => b.v - a.v);
+  const tot = all.reduce((s_, o) => s_ + o.v, 0) || 1, top = all.slice(0, 2), rest = all.slice(2), P = o => Math.round(100 * o.v / tot);
+  const items = top.map(o => Object.assign(o, {p:P(o)})); if(rest.length){ const v = rest.reduce((s_, o) => s_ + o.v, 0); items.push({lab:`the other ${rest.length} gaps`, g:null, v, p:Math.round(100 * v / tot)}); }
+  const pp = items[0] ? items[0].p : 0;
+  const gl = L => gapsL(L).map(o => f0(o.g)).join(" · "), wmax = Math.ceil(Math.max(gmaxL(b1, H), gmaxL(a1, H)) / 10) * 10;
+  const brk = r.break_min != null ? f0(r.break_min) : "", after = r.points.slice(ei).map(p => `Stop ${p.no}`).join(", ");
+  const slot = moved.map(a => `${a.label} ${a.adj > 0 ? "+" : "−"}${f0(Math.abs(a.adj))}`).join(", ");
+  const G = []; if(ei) G.push({lab:`Before Stop ${x.no}`, sub:`${ei} AITP${ei === 1 ? "" : "s"}`, b:up0, a:up1});
+  G.push({lab:`From Stop ${x.no} on`, sub:`${n - ei} AITP${n - ei === 1 ? "" : "s"}`, b:dn0, a:dn1}, {lab:`All of ${nd}`, sub:`${n} AITPs`, b:base.ewt, a:ch.ewt});
+  const cards = [
+    {k:"D", name:"DEFINE", q:"What is the problem?", rows:[
+      ["Problem", `**${g.front}** and **${g.rear}** are **${f0(g0)} min** apart on ${nd}. The timetable promises a bus every **${f0(H)} min**.`],
+      ["Customer", `Someone who reaches a ${nd} stop in that gap waits up to ${f0(g0)} min – ${fx(g0 / 2)} on average instead of ${fx(pr)}.`],
+      ["Lean waste", "Waiting – one of Lean's 8 wastes."],
+      ["Measure (CTQ)", `**EWT – Excess Wait Time** = the average wait − the promised wait. Promised wait = half the headway = **${fx(pr)} min**.`],
+      ["Goal", `Cut EWT on ${nd} with the buses we have. ${nd} keeps running.`],
+      ["Scope", `The ${n} timing points (AITPs) on ${nd}, every trip that passes them.`]],
+      vis:[{sub:`EWT in one picture – ${nd} today, no action. Green = what the timetable promises, **red = EWT**.`, svg:ewtBar(H, base.ewt)}]},
+    {k:"M", name:"MEASURE", q:"How bad is it today?", rows:[
+      ["In the gap", `**${f0(g0)} passengers** arrive in the ${f0(g0)}-min gap. They wait **${fx(g0 / 2)} min** on average – ${fx((g0 - H) / 2)} more than promised = **${f0(ex0)} extra passenger-minutes**.`],
+      ["Normal gap", `In a ${f0(H)}-min gap, ${f0(H)} passengers wait ${fx(pr)} min on average = **0 extra**.`],
+      ["Baseline", `On all ${n} AITPs of ${nd}, passengers wait **${f1(pr + base.ewt)} min** on average against ${fx(pr)} promised: **EWT ${f3(base.ewt)} min**.`],
+      ["On target", `${f0(base.on_pct)}% of headways are within ${f0(H)} ± 2 min.`]],
+      vis:[{sub:`Stop ${x.no}, no action. **Each bar is one passenger** (1 a minute); its height is how long they wait.`, svg:paxBars(b1, H, wmax, r.sim.ins, `Stop ${x.no} with no action: one bar per passenger`)}]},
+    {k:"A", name:"ANALYZE", q:"Where does the extra waiting come from?", rows:[
+      ["Finding", `**One gap – ${g.front} → ${g.rear} – makes ${pp}% of the extra waiting** at Stop ${x.no}.`],
+      ["Why", `A ${f0(g0)}-min gap catches ${fx(k)}× the passengers of a ${f0(H)}-min one, and each of them waits longer. So the waiting grows much faster than the gap: one ${f0(g0)}-min gap makes ${f0(ex0)}; two ${f0(sp[0])}-min gaps make ${f0(ex1)} together.`],
+      ["So", "Fill that one gap and most of the problem is gone."]],
+      vis:[{sub:`Pareto – extra passenger-minutes at Stop ${x.no}, by gap (1 passenger a minute, all ${all.length} gaps).`, svg:pareto(items, H)}]},
+    {k:"I", name:"IMPROVE", q:"The fix and what it does", rows:[
+      ["Action", `**${W_}** finishes D${r.late_dir} at ${r.c_arr}, rests ${brk} min, leaves at ${x.leave} off-service and **enters ${nd} at Stop ${x.no} at ${x.entry_clock}** – the middle of the gap.`],
+      ["Effect", `${f0(g0)} min → **${f0(sp[0])} + ${f0(sp[1])} min**. Extra waiting at Stop ${x.no}: ${f0(ex0)} → **${f0(ex1)} passenger-minutes (−${cut}%)**, and the same at every stop after it.`],
+      ["Side effect", moved.length ? `${W_}'s own departure at ${r.interchange.name} is lost. Re-spacing ${slot} min turns the gaps there from ${gl(b0)} into ${gl(a0)} – biggest **${f0(gmaxL(a0, H))} min**, not a ${f0(D.hole)}-min hole.` : `${W_}'s own departure at ${r.interchange.name} is lost: a ${f0(D.hole)}-min hole there.`],
+      ["Options tested", `No action ${f3(base.ewt)} · ${only ? `halfway only ${f3(only.ewt)}${only.ewt > base.ewt + 0.0005 ? " (worse)" : ""} · ` : ""}**${D.pick === "adj" ? "halfway + re-spacing" : "halfway"} ${f3(ch.ewt)} (the plan)**.`],
+      ["Result", gain > 0.005 ? `${nd} EWT **${f3(base.ewt)} → ${f3(ch.ewt)} min (−${pct}%)** with no extra bus.${ei ? ` Passengers from Stop ${x.no} on wait ${f2(dn0 - dn1)} min less; before it, ${f2(Math.abs(up1 - up0))} min ${up1 > up0 ? "more" : "less"}.` : ""}` : `${nd} EWT ${f3(base.ewt)} → ${f3(ch.ewt)} min – not better than no action.`]],
+      vis:[{sub:`Stop ${x.no} with the plan – same scale. ${W_} in purple.`, svg:paxBars(a1, H, wmax, r.sim.ins, `Stop ${x.no} with the plan: one bar per passenger`)},
+           {sub:`Average wait, min: green = promised (${fx(pr)}), **red = EWT**. Faint = no action, bright = the plan.`, svg:resultBars(H, G)}]},
+    {k:"C", name:"CONTROL", q:"Keep it on track", rows:[
+      [x.leave, `${W_} leaves off-service after its ${brk}-min break. More than 2 min late? Press GENERATE AGAIN – a later stop is picked.`],
+      ...(moved.length ? [["Departures", `${moved.map(a => `${a.label} ${a.dep_new} (${a.adj > 0 ? "+" : "−"}${f0(Math.abs(a.adj))})`).join(", ")} – each leaves on its new time (± 1 min).`]] : []),
+      [x.entry_clock, `${W_} passes Stop ${x.no}: ${g.front} about ${f0(sp[0])} min ahead, ${g.rear} about ${f0(sp[1])} min behind.`],
+      ["Monitor", `Headways at ${after} stay about ${f0(sp[0])} min (± 2). If not, re-plan.`],
+      ["Gate", `The Recovery Decision Engine rule: EWT down ≥ 0.10 min (${f3(gain)}) and ≥ 5% (${pct}%) → **${verdict}**.`]], vis:[]}];
+  const pitch = [["D", `${g.front} and ${g.rear} are ${f0(g0)} min apart on ${nd}; the promise is a bus every ${f0(H)} min.`],
+    ["M", `Passengers on ${nd} wait ${f1(pr + base.ewt)} min on average against ${fx(pr)} promised: EWT ${f3(base.ewt)} min.`],
+    ["A", `That one gap makes ${pp}% of the extra waiting at Stop ${x.no}.`],
+    ["I", `${W_} enters Stop ${x.no} at ${x.entry_clock}: ${f0(g0)} → ${f0(sp[0])} + ${f0(sp[1])} min, extra waiting there −${cut}%. ${nd} EWT ${f3(base.ewt)} → ${f3(ch.ewt)} (${gain > 0.005 ? `−${pct}%` : "no gain"}), no extra bus.`],
+    ["C", `${moved.length ? `${moved.length} departures re-spaced; check ` : "Check "}${W_} leaves at ${x.leave} and passes Stop ${x.no} at ${x.entry_clock}. RDE gate: ${verdict}.`]];
+  return {cards, pitch, cls, title:`Service ${ST.svc || ""}, ${W_} halfway at Stop ${x.no} (${x.pct}% along ${nd})`};
 }
 function whyPics(r, x){
-  const D = whyData(r, x); if(!D) return "";
-  const {b1, a1, b0, a0, H, ins, base, ch, ei, n, dn0, dn1, up0, up1, moved} = D, W_ = whoC(r), nd = `D${r.next_dir}`, P = r.points, g = x.gap, g0 = g.minutes, sp = g.split;
-  const area = v => Math.round(v * v / 2), times = (a, b) => b > 0 ? a / b : 0;
-  const t0 = Math.min(b1[0].t, a1[0].t) - 1, t1 = Math.max(b1[b1.length - 1].t, a1[a1.length - 1].t) + 1, wmax = Math.ceil(Math.max(gmaxL(b1, H), gmaxL(a1, H)) / 10) * 10;
-  const s0 = Math.min(b0[0].t, a0[0].t) - 1, s1 = Math.max(b0[b0.length - 1].t, a0[a0.length - 1].t) + 1, wmax0 = Math.ceil(Math.max(gmaxL(b0, H), gmaxL(a0, H), D.hole) / 10) * 10;
-  const w1b = awt(b1), w1a = awt(a1), w0b = awt(b0), w0a = awt(a0), cut = Math.round(100 * (1 - (area(sp[0]) + area(sp[1])) / Math.max(1, area(g0))));
-  // (4) EWT at every AITP: no action vs the plan, green where the plan is lower, red where it is higher
-  const W = whyW(), HT = 168, L0 = 34, R0 = 10, T0 = 16, B0_ = 34;
-  const ys = [...base.pts, ...ch.pts].filter(p => p && p.ewt != null).map(p => p.ewt), ymax = Math.max(0.5, Math.ceil(Math.max(...ys) * 2) / 2);
-  const X4 = pct => L0 + pct / 100 * (W - L0 - R0), Y4 = v => T0 + (1 - v / ymax) * (HT - T0 - B0_);
-  let c4 = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${HT}" width="${W}" height="${HT}" class="why-svg" font-family="${WHY_FONT}" role="img" aria-label="EWT at every AITP, no action against the plan">`;
-  for(let v = 0; v <= ymax + 1e-9; v += 0.5) c4 += `<line x1="${L0}" x2="${W - R0}" y1="${Y4(v).toFixed(1)}" y2="${Y4(v).toFixed(1)}" stroke="${v ? "#14294a" : "#5f7ea6"}"/><text x="${L0 - 5}" y="${(Y4(v) + 3.5).toFixed(1)}" fill="#5f7690" font-size="10" text-anchor="end">${v.toFixed(1)}</text>`;
-  for(let i = 0; i + 1 < P.length; i++){
-    const a = base.pts[i], b = base.pts[i + 1], c = ch.pts[i], d = ch.pts[i + 1]; if(!a || !b || !c || !d) continue;
-    const up = (c.ewt + d.ewt) / 2 > (a.ewt + b.ewt) / 2 + 1e-9;
-    c4 += `<polygon class="${up ? "wup" : "wdn"}" points="${X4(P[i].pct).toFixed(1)},${Y4(a.ewt).toFixed(1)} ${X4(P[i + 1].pct).toFixed(1)},${Y4(b.ewt).toFixed(1)} ${X4(P[i + 1].pct).toFixed(1)},${Y4(d.ewt).toFixed(1)} ${X4(P[i].pct).toFixed(1)},${Y4(c.ewt).toFixed(1)}" fill="${up ? "rgba(255,85,102,.30)" : "rgba(46,229,157,.30)"}"/>`;
-  }
-  const line = (L, col, dash) => `<polyline points="${L.map((p, i) => p ? `${X4(P[i].pct).toFixed(1)},${Y4(p.ewt).toFixed(1)}` : "").filter(Boolean).join(" ")}" fill="none" stroke="${col}" stroke-width="2.4"${dash ? ' stroke-dasharray="5 4"' : ""}/>`;
-  c4 += line(base.pts, "#8aa0b8", true) + line(ch.pts, "#22d3ee", false);
-  const ex = X4(x.pct);
-  c4 += `<line x1="${ex.toFixed(1)}" x2="${ex.toFixed(1)}" y1="${T0 - 4}" y2="${Y4(0).toFixed(1)}" stroke="#b46bff" stroke-width="1.6" stroke-dasharray="3 3"/><text x="${(ex + (ex > W / 2 ? -5 : 5)).toFixed(1)}" y="${T0 + 4}" fill="#d9b8ff" font-size="10.5" font-weight="800" text-anchor="${ex > W / 2 ? "end" : "start"}">${esc(W_)} enters (Stop ${x.no})</text>`;
-  c4 += `<line x1="${W - R0 - 128}" x2="${W - R0 - 112}" y1="${HT - 26}" y2="${HT - 26}" stroke="#8aa0b8" stroke-width="2.4" stroke-dasharray="5 4"/><text x="${W - R0 - 108}" y="${HT - 22.5}" fill="#8aa3bd" font-size="10">no action</text><line x1="${W - R0 - 56}" x2="${W - R0 - 40}" y1="${HT - 26}" y2="${HT - 26}" stroke="#22d3ee" stroke-width="2.4"/><text x="${W - R0 - 36}" y="${HT - 22.5}" fill="#8aa3bd" font-size="10">plan</text>`;
-  [0, 25, 50, 75, 100].forEach(p => { c4 += `<text x="${X4(p).toFixed(1)}" y="${HT - 6}" fill="#5f7690" font-size="10" text-anchor="middle">${p}%</text>`; });
-  c4 += `<text x="${L0}" y="${T0 - 6}" fill="#8aa3bd" font-size="9.5">EWT, min</text></svg>`;
-  const gain = base.ewt - ch.ewt, pct = base.ewt > 0.005 ? Math.round(100 * gain / base.ewt) : 0;
-  const dsum = (a, b) => { let s_ = 0; for(let i = a; i < b; i++) if(base.pts[i] && ch.pts[i]) s_ += base.pts[i].ewt - ch.pts[i].ewt; return s_; };
-  const sUp = dsum(0, ei), sDn = dsum(ei, n), sNet = sUp + sDn;
-  const rowsB = [ei ? {lab:`Before Stop ${x.no}`, sub:`${ei} AITP${ei === 1 ? "" : "s"}`, v:sUp} : null, {lab:`From Stop ${x.no} on`, sub:`${n - ei} AITP${n - ei === 1 ? "" : "s"}`, v:sDn}, {lab:"Net", sub:`÷ ${n} AITPs = ${sNet >= 0 ? "−" : "+"}${f3(Math.abs(sNet / n))} min per passenger`, v:sNet, net:1}].filter(Boolean);
-  const bmx = Math.max(0.01, ...rowsB.map(o => Math.abs(o.v))), BX = W < 400 ? 112 : 150, BW = W < 400 ? 160 : 220, BH = 30, BHT = rowsB.length * BH + 36;
-  let c5 = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${BHT}" width="${W}" height="${BHT}" class="why-svg why-bal" font-family="${WHY_FONT}" role="img" aria-label="EWT minutes earned and given back, summed over the AITPs">`
-    + `<text x="0" y="11" fill="#8aa3bd" font-size="10">Add it up – EWT minutes summed over the AITPs</text>`;
-  rowsB.forEach((o, i) => { const y = 18 + i * BH, w_ = Math.max(2, BW * Math.abs(o.v) / bmx), col = o.v >= 0 ? ["rgba(46,229,157,.55)", "#2ee59d", "#8ff5c9"] : ["rgba(255,85,102,.5)", "#ff6b7d", "#ffb0b9"];
-    c5 += `<text x="0" y="${y + (o.net ? 14 : 10)}" fill="${o.net ? "#fff" : "#cfe0f3"}" font-size="11.5" font-weight="${o.net ? 900 : 700}">${esc(o.lab)}</text>${o.net ? "" : `<text x="0" y="${y + 22}" fill="#8aa3bd" font-size="10">${esc(o.sub)}</text>`}`
-      + `<rect x="${BX}" y="${y + 3}" width="${w_.toFixed(1)}" height="15" rx="3" fill="${col[0]}" stroke="${col[1]}"${o.net ? ' stroke-width="1.6"' : ""}/>`
-      + `<text x="${(BX + w_ + 6).toFixed(1)}" y="${y + 14.5}" fill="${col[2]}" font-size="11.5" font-weight="800">${o.v >= 0 ? "−" : "+"}${f2(Math.abs(o.v))}</text>${o.net ? `<text x="${BX}" y="${y + 34}" fill="#cfe0f3" font-size="11.5" font-weight="700">${esc(o.sub)}</text>` : ""}`; });
-  c5 += `</svg>`;
-  const card = (n_, t, svg, cap, cls) => `<figure class="why-c ${cls || ""}" data-n="${n_}"><figcaption><span class="wn">${n_}</span><b>${t}</b></figcaption>${svg}<p>${cap}</p></figure>`;
-  const k = times(g0, H), slotTxt = moved.length ? moved.map(a => `${esc(a.label)} ${a.adj > 0 ? "+" : "−"}${f0(Math.abs(a.adj))}`).join(", ") : "";
-  return `<div class="why" id="why"><div class="why-h"><h3>Why the plan works – in four pictures</h3><span>Each triangle is the waiting caused by one gap: arrive just after a bus and you wait the whole gap, just before the next and you wait nothing. The area is the waiting, so it grows with the <b>square</b> of the gap – that is what EWT counts.</span>
-      <div class="why-lg"><i class="r"></i>long gap (≥ ${f0(2 * H)} min) <i class="o"></i>stretched (${f0(H + 3)}–${f0(2 * H - 1)}) <i class="g"></i>on headway (${f0(H)} ± 2) <i class="p"></i>${esc(W_)}</div></div>
-    <div class="why-g">
-    ${card("1", `The problem – Stop ${x.no} with no action`, sawtooth(b1, t0, t1, wmax, H, "Waiting at the entry stop with no action", ins),
-      `${esc(g.front)} passes at ${esc(g.t_front)}, ${esc(g.rear)} at ${esc(g.t_rear)}: a <b>${f0(g0)}-min gap</b>. It is ${f1(k)}× as long as a ${f0(H)}-min headway, so ${f1(k)}× as many people arrive in it, and each waits ${f1(k)}× as long – <b>${f0(k * k)}× the waiting</b> (triangle ${area(g0)} against ${area(H)}). Average wait of the passengers in this picture: <b>${f1(w1b)} min</b>.`, "bad")}
-    ${card("2", `The fix – ${esc(W_)} lands mid-gap`, sawtooth(a1, t0, t1, wmax, H, "Waiting at the entry stop with the plan", ins),
-      `${esc(W_)} passes Stop ${x.no} at <b>${esc(x.entry_clock)}</b>, so the same ${f0(g0)} min become <b>${f0(sp[0])} + ${f0(sp[1])}</b>. Two small triangles (${area(sp[0])} + ${area(sp[1])}) instead of one big one (${area(g0)}): <b>${cut}% less waiting</b> in that gap, no extra bus. Their average wait ${f1(w1b)} → <b>${f1(w1a)} min</b> – at Stop ${x.no} and every stop after it.`, "good")}
-    ${card("3", `The price – ${esc(W_)}'s slot at ${esc(r.interchange.name)}`, `<div class="why-2"><small>No action</small>${sawtooth(b0, s0, s1, wmax0, H, "Departures round the slot, no action", ins)}<small>The plan</small>${sawtooth(a0, s0, s1, wmax0, H, "Departures round the slot, with the plan", ins, [{t:D.slot, label:"empty slot"}])}</div>`,
-      `${esc(W_)} no longer departs in its slot. ${moved.length ? `${slotTxt} min share the gap, so the biggest headway is <b>${f0(gmaxL(a0, H))} min</b> instead of a <b>${f0(D.hole)}-min hole</b>.` : `Nothing round it moves, so it leaves a <b>${f0(D.hole)}-min hole</b>.`} Passengers before Stop ${x.no} wait a little longer: average ${f1(w0b)} → <b>${f1(w0a)} min</b>.${D.only && moved.length ? ` Without the re-spacing the halfway would make ${nd} worse (EWT ${f3(D.only.ewt)} vs ${f3(base.ewt)}).` : ""}`, "warn")}
-    ${card("4", `The net – EWT at all ${n} AITPs of ${nd}`, c4 + c5,
-      `<span class="g">Green</span> = less waiting than no action, <span class="r">red</span> = more. From Stop ${x.no} on: <b>−${f2(dn0 - dn1)} min</b> per passenger at ${n - ei} AITP${n - ei === 1 ? "" : "s"}${up0 != null ? `; before it: +${f2(up1 - up0)} min at ${ei}` : ""}. ${ei ? `Added up, the ${n - ei} after it earn ${f2(sDn)} and the ${ei} before it ${sUp < 0 ? `give back ${f2(-sUp)}` : `earn ${f2(sUp)}`}: ` : ""}overall <b>${gain >= 0 ? "−" : "+"}${f3(Math.abs(gain))} min per passenger (${pct}%)</b>. The gain is made where the gap was.`, gain > 0.005 ? "good" : "bad")}
-    </div>
-    <div class="why-pitch"><div class="k">THE PITCH</div><p id="whyTxt">${esc(whyPitch(r, x, D))}</p><div class="why-btns"><button type="button" class="wbtn" id="whyCopy">Copy pitch</button><button type="button" class="wbtn" id="whySave">Save as picture</button></div></div></div>`;
+  const M = whyModel(r, x); if(!M) return "";
+  const rib = M.cards.map(c => `<li><a href="#why-${c.k}" data-k="${c.k}"><b>${c.k}</b><span>${c.name.charAt(0) + c.name.slice(1).toLowerCase()}<small>${esc(c.q)}</small></span></a></li>`).join("");
+  const card = c => `<section class="why-c ${c.vis.length ? "" : "why-nov"} ${c.k === "I" ? "why-imp" : ""}" id="why-${c.k}" data-k="${c.k}"><header><span class="why-wn">${c.k}</span><b>${c.name}</b><em>${esc(c.q)}</em></header>`
+    + `<div class="why-t">${c.rows.map(([l, t]) => `<div class="why-r"><span class="why-l">${esc(l)}</span><p>${md(t)}</p></div>`).join("")}</div>`
+    + (c.vis.length ? `<div class="why-vs">${c.vis.map(v => `<div class="why-v"><small>${md(v.sub)}</small>${v.svg}</div>`).join("")}</div>` : "") + `</section>`;
+  return `<div class="why" id="why"><div class="why-h"><h3>Why this plan – Lean Six Sigma (DMAIC)</h3><span>Waiting is waste. We measure it as <b>EWT</b>: how many minutes longer passengers wait than the timetable promises.</span></div>
+    <ol class="why-rb">${rib}</ol><div class="why-g">${M.cards.map(card).join("")}</div>
+    <div class="why-pitch"><div class="why-k">THE PITCH</div><ol id="whyTxt">${M.pitch.map(([k, t]) => `<li><b>${k}</b><span>${esc(t)}</span></li>`).join("")}</ol><div class="why-btns"><button type="button" class="wbtn" id="whyCopy">Copy pitch</button><button type="button" class="wbtn" id="whySave">Save as picture</button></div></div></div>`;
 }
-/* One PNG of the four pictures and the pitch, for a slide or a chat. */
+const whyPitchText = () => { const r = ST.res, x = r ? cand(ST.sel) : null, M = whyModel(r, x); return M ? `Why this plan (DMAIC) – ${M.title}\n` + M.pitch.map(([k, t]) => `${k}: ${t}`).join("\n") : ""; };
+/* One PNG of the storyboard and the pitch, for a slide or a chat (drawn from the same model as the page). */
 async function whySave(){
-  const box = document.getElementById("why"), r = ST.res, x = r ? cand(ST.sel) : null; if(!box || !x) return null;
-  const figs = [...box.querySelectorAll("figure.why-c")], S = 2, CW = 520, PAD = 18, GAP = 14, IP = 12, COLW = CW + 2 * IP;
+  const r = ST.res, x = r ? cand(ST.sel) : null, M = whyModel(r, x), box = $("why"); if(!M || !box) return null;
+  const S = 2, PAD = 20, G = 16, HC = 132, TC = 440, VC = 520, IP = 14, LB = 96, Wd = PAD * 2 + IP * 2 + HC + TC + VC + G * 2;
   const cv = document.createElement("canvas"), c = cv.getContext("2d"), F = (w, s) => `${w} ${s}px ${WHY_FONT}`;
-  const wrap = (t, w, font) => { c.font = font; const out = []; let ln = ""; String(t).split(/\s+/).forEach(wd => { const s = ln ? ln + " " + wd : wd; if(c.measureText(s).width > w && ln){ out.push(ln); ln = wd; } else ln = s; }); if(ln) out.push(ln); return out; };
+  const wrap = (s, w, size, wt) => { const toks = []; let sp = false;
+    mdSeg(s).forEach(sg => sg.t.split(/(\s+)/).forEach(p => { if(!p) return; if(/^\s+$/.test(p)){ sp = true; return; } toks.push({t:p, b:sg.b, sp}); sp = false; }));
+    const lines = []; let ln = [], lw = 0;
+    toks.forEach(tk => { c.font = F(tk.b ? 800 : (wt || 400), size); const tw = c.measureText(tk.t).width, sw = c.measureText(" ").width; let gp = ln.length && tk.sp ? sw : 0;
+      if(ln.length && lw + gp + tw > w){ lines.push(ln); ln = []; lw = 0; gp = 0; } ln.push({t:tk.t, b:tk.b, x:lw + gp}); lw += gp + tw; });
+    if(ln.length) lines.push(ln); return lines; };
+  const draw = (lines, x0, y0, size, lh, col, bcol, wt) => { lines.forEach((ln, i) => ln.forEach(tk => { c.font = F(tk.b ? 800 : (wt || 400), size); c.fillStyle = tk.b ? bcol : col; c.fillText(tk.t, x0 + tk.x, y0 + i * lh); })); return lines.length * lh; };
   const load = el => new Promise((ok, no) => { const im = new Image(); im.onload = () => ok(im); im.onerror = no; im.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(new XMLSerializer().serializeToString(el)); });
-  const cells = [];
-  for(const f of figs){
-    const svgs = [...f.querySelectorAll("svg")], ims = await Promise.all(svgs.map(load)), subs = [...f.querySelectorAll(".why-2 small")].map(e => e.textContent);
-    const cap = wrap(f.querySelector("p").textContent, CW, F(400, 13));
-    const hs = svgs.map(e => CW * (+e.getAttribute("height") || 168) / (+e.getAttribute("width") || CW));
-    cells.push({f, ims, hs, subs, cap, h: IP + 22 + hs.reduce((a, b) => a + b + 6, 0) + subs.length * 16 + 8 + cap.length * 18 + IP});
+  const secs = [...box.querySelectorAll("section.why-c")];
+  const bands = [];
+  for(const card of M.cards){
+    const sec = secs.find(e => e.dataset.k === card.k), svgs = sec ? [...sec.querySelectorAll(".why-v svg")] : [], ims = await Promise.all(svgs.map(load));
+    const tw = card.vis.length ? TC : TC + G + VC;
+    const rows = card.rows.map(([l, t]) => ({l, lines:wrap(t, tw - LB, 13)}));
+    const vis = card.vis.map((v, i) => ({sub:wrap(v.sub, VC, 11.5), im:ims[i], h:ims[i] ? VC * (+svgs[i].getAttribute("height")) / (+svgs[i].getAttribute("width")) : 0}));
+    const hq = wrap(card.q, HC, 12.5);
+    const hT = rows.reduce((s_, o) => s_ + o.lines.length * 18 + 8, 0), hV = vis.reduce((s_, o) => s_ + o.sub.length * 16 + 4 + o.h + 12, 0), hH = 44 + 22 + hq.length * 17;
+    bands.push({card, rows, vis, hq, tw, h:Math.max(hT, hV, hH) + IP * 2});
   }
-  const pitch = wrap(document.getElementById("whyTxt").textContent, 2 * COLW + GAP - 2 * IP, F(600, 14));
-  const title = `Why the plan works – Service ${ST.svc || ""}, ${whoC(r)} halfway at Stop ${x.no} (${x.pct}% along D${r.next_dir})`;
-  const rows = [Math.max(cells[0].h, cells[1] ? cells[1].h : 0), cells[2] ? Math.max(cells[2].h, cells[3] ? cells[3].h : 0) : 0];
-  const Wd = PAD * 2 + COLW * 2 + GAP, Ht = PAD + 30 + rows[0] + GAP + rows[1] + GAP + IP * 2 + 20 + pitch.length * 20 + PAD;
+  const pw = Wd - PAD * 2 - IP * 2 - 26, pl = M.pitch.map(([k, t]) => ({k, lines:wrap(t, pw, 14, 600)})), hp = IP * 2 + 22 + pl.reduce((s_, o) => s_ + o.lines.length * 20 + 4, 0);
+  const sub = wrap("Waiting is waste. We measure it as **EWT**: how many minutes longer passengers wait than the timetable promises.", Wd - PAD * 2, 13.5);
+  const Ht = PAD + 26 + sub.length * 19 + 10 + bands.reduce((s_, b) => s_ + b.h + 12, 0) + hp + PAD;
   cv.width = Wd * S; cv.height = Ht * S; c.scale(S, S);
   c.fillStyle = "#06101f"; c.fillRect(0, 0, Wd, Ht);
-  c.fillStyle = "#7fe7ff"; c.font = F(800, 17); c.fillText(title, PAD, PAD + 18);
-  const edge = {bad: "#7a2433", good: "#1c6a4c", warn: "#7a5a1c"};
-  const box_ = (x_, y_, w, h, col) => { c.fillStyle = "#0b1a2e"; c.strokeStyle = col; c.lineWidth = 1.2; c.beginPath(); if(c.roundRect) c.roundRect(x_, y_, w, h, 10); else c.rect(x_, y_, w, h); c.fill(); c.stroke(); };
-  cells.forEach((cl, i) => {
-    const x0 = PAD + (i % 2) * (COLW + GAP), y0 = PAD + 30 + (i < 2 ? 0 : rows[0] + GAP), cls = ["bad", "good", "warn"].find(k => cl.f.classList.contains(k));
-    box_(x0, y0, COLW, rows[i < 2 ? 0 : 1], edge[cls] || "#1d3a5f");
-    let y = y0 + IP + 15; c.fillStyle = "#fff"; c.font = F(800, 14.5); c.fillText(`${cl.f.dataset.n}. ${cl.f.querySelector("figcaption b").textContent}`, x0 + IP, y); y += 9;
-    cl.ims.forEach((im, k) => { if(cl.subs[k]){ c.fillStyle = "#8aa3bd"; c.font = F(700, 11); c.fillText(cl.subs[k], x0 + IP, y + 11); y += 16; } c.drawImage(im, x0 + IP, y, CW, cl.hs[k]); y += cl.hs[k] + 6; });
-    y += 8; c.fillStyle = "#cfe0f3"; c.font = F(400, 13); cl.cap.forEach(t => { y += 18; c.fillText(t, x0 + IP, y - 4); });
+  c.fillStyle = "#7fe7ff"; c.font = F(800, 18); c.fillText(`Why this plan – Lean Six Sigma (DMAIC) · ${M.title}`, PAD, PAD + 18);
+  let y = PAD + 26 + 14; y += draw(sub, PAD, y, 13.5, 19, "#cfe0f3", "#fff") + 4;
+  const rr = (x_, y_, w, h, col) => { c.fillStyle = "#0b1a2e"; c.strokeStyle = col; c.lineWidth = 1.2; c.beginPath(); if(c.roundRect) c.roundRect(x_, y_, w, h, 10); else c.rect(x_, y_, w, h); c.fill(); c.stroke(); };
+  bands.forEach(b => {
+    rr(PAD, y, Wd - PAD * 2, b.h, b.card.k === "I" ? "#1c6a4c" : "#1d3a5f");
+    const x0 = PAD + IP, y0 = y + IP;
+    c.fillStyle = "#12345a"; c.beginPath(); c.arc(x0 + 17, y0 + 17, 17, 0, Math.PI * 2); c.fill();
+    c.fillStyle = "#7fe7ff"; c.font = F(900, 18); c.textAlign = "center"; c.fillText(b.card.k, x0 + 17, y0 + 23.5); c.textAlign = "left";
+    c.fillStyle = "#fff"; c.font = F(900, 14); c.fillText(b.card.name, x0, y0 + 58);
+    draw(b.hq, x0, y0 + 78, 12.5, 17, "#8aa3bd", "#fff");
+    let ty = y0 + 13; const tx = x0 + HC + G;
+    b.rows.forEach(o => { c.fillStyle = "#8aa3bd"; c.font = F(800, 10.5); c.fillText(String(o.l).toUpperCase(), tx, ty); ty += draw(o.lines, tx + LB, ty, 13, 18, "#cfe0f3", "#fff") + 8; });
+    let vy = y0 + 11; const vx = tx + TC + G;
+    b.vis.forEach(v => { vy += draw(v.sub, vx, vy, 11.5, 16, "#8aa3bd", "#cfe0f3") + 4; if(v.im){ c.drawImage(v.im, vx, vy - 10, VC, v.h); vy += v.h + 12; } });
+    y += b.h + 12;
   });
-  const py = PAD + 30 + rows[0] + GAP + rows[1] + GAP;
-  box_(PAD, py, 2 * COLW + GAP, IP * 2 + 20 + pitch.length * 20, "#1f6f8a");
-  c.fillStyle = "#7fe7ff"; c.font = F(800, 11.5); c.fillText("THE PITCH", PAD + IP, py + IP + 12);
-  c.fillStyle = "#e6f6ff"; c.font = F(600, 14); pitch.forEach((t, k) => c.fillText(t, PAD + IP, py + IP + 36 + k * 20));
+  rr(PAD, y, Wd - PAD * 2, hp, "#1f6f8a");
+  c.fillStyle = "#7fe7ff"; c.font = F(800, 11.5); c.fillText("THE PITCH", PAD + IP, y + IP + 12);
+  let py = y + IP + 36; pl.forEach(o => { c.fillStyle = "#7fe7ff"; c.font = F(900, 14); c.fillText(o.k, PAD + IP, py); py += draw(o.lines, PAD + IP + 26, py, 14, 20, "#e6f6ff", "#fff", 600) + 4; });
   const blob = await new Promise(ok => cv.toBlob(ok, "image/png"));
-  if(blob){ const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `halfway_why_${ST.svc || "svc"}_stop${x.no}.png`; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 5000); }
-  return {w: cv.width, h: cv.height, bytes: blob ? blob.size : 0};
+  if(blob){ const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `halfway_dmaic_${ST.svc || "svc"}_stop${x.no}.png`; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 5000); }
+  return {w:cv.width, h:cv.height, bytes:blob ? blob.size : 0};
 }
 function whyBind(){
   const cp = $("whyCopy"), sv = $("whySave");
-  if(cp) cp.onclick = async () => { try{ await navigator.clipboard.writeText($("whyTxt").textContent); cp.textContent = "Copied"; }catch(e){ cp.textContent = "Copy not available here"; } setTimeout(() => { if($("whyCopy")) $("whyCopy").textContent = "Copy pitch"; }, 1800); };
+  document.querySelectorAll("#why .why-rb a").forEach(a => a.onclick = e => { e.preventDefault(); const t = $("why-" + a.dataset.k); if(t) t.scrollIntoView({behavior:"smooth", block:"start"}); });
+  if(cp) cp.onclick = async () => { try{ await navigator.clipboard.writeText(whyPitchText()); cp.textContent = "Copied"; }catch(e){ cp.textContent = "Copy not available here"; } setTimeout(() => { if($("whyCopy")) $("whyCopy").textContent = "Copy pitch"; }, 1800); };
   if(sv) sv.onclick = async () => { sv.disabled = true; sv.textContent = "Saving…"; try{ await whySave(); sv.textContent = "Saved"; }catch(e){ sv.textContent = "Could not save"; } setTimeout(() => { if($("whySave")){ $("whySave").disabled = false; $("whySave").textContent = "Save as picture"; } }, 1800); };
 }
 
