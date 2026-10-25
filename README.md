@@ -1,5 +1,27 @@
 # SG Transport Pulse V16.19 — Operational Intelligence & Service Recovery Platform
 
+## Halfway Planner: simulator in 2D / 3D / 4D (V16.28)
+The simulator in step 3 now has three views. A switch sits next to PLAY: **2D · 3D · 4D**. All three use the same bus positions (`osPos`), so they always agree. 3D and 4D run on the GPU (WebGL 2) with **MapLibre GL 4.7.1**, the same library as the platform's 3D maps. It is loaded only when 3D or 4D is first opened, and the buildings come from OpenFreeMap with no key.
+
+* **2D:** the two maps, NO ACTION | THE PLAN. Every bus now draws a glowing trail of its last 6 minutes.
+* **3D:** the city with buildings in 3D, tilted, with sky and fog.
+  * Every bus is a **light pillar** (a real-size 3D bus close up) with a glowing gradient **trail** of its last 8 minutes.
+  * A gap of the headway + 3 min or more stands up as a translucent **wall as tall as it is long** (12 m a minute, so a 30-min gap is a 360 m red wall). Walls are labelled with their minutes.
+  * The off-service route glows.
+  * **FOLLOW** the halfway bus: a chase camera rides behind it, pitch 64°, at 1 simulated minute a second. It takes the bus along the expressway to the entry stop.
+  * The HUD (glass panels) shows the clock, THE PLAN / NO ACTION, overview / follow, and the **largest gap in both worlds as gauges** (e.g. plan 15 min against no action 30 min), plus what Bus 6 is doing.
+* **4D, a space-time cube:** the map is the floor and **height is time**.
+  * Every bus is a ribbon rising through time; waiting is a vertical column.
+  * The D2 route is stood up as a curtain, which turns it into a time-distance chart standing over the city.
+  * A **now-plane** slices the cube at the simulation time. Ribbons are bright below it (the past) and dim above it (the future).
+  * At the entry stop the gap is a column between two buses' pass times, and each passing bus is a ring.
+    * With **no action**: one red 30-min column (17:27 → 17:57).
+    * With **the plan**: D1 Bus 6's ribbon cuts it into **15 + 15**.
+  * A time ruler (a plate every 15 min) gives the scale, and **ORBIT** turns the cube.
+* **No WebGL, or the library unreachable:** the page says so and stays in 2D.
+
+`map3d.js` now also exports `SG3D.style()`, an additive change. Test: `r3d/t_halfway_4d.js` (28 checks, desktop and phone, real MapLibre on an offline synthetic city). `t_halfway_sim.js` adds the 2D trails and the offline fallback, for 59 checks in total.
+
 ## Halfway Planner: off-service route & simulation (V16.28)
 A new step 3 sits between the plan and the ROI. The page now reads: 1 Key settings & buses → 2 Generate the halfway plan → **3 Route & simulation** → 4 ROI: EWT earned.
 

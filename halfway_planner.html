@@ -299,6 +299,55 @@ details.ln-more .row{margin-top:12px}
 .os-leg i{display:inline-block;width:14px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px}
 .os-leg i.c{background:#b46bff}.os-leg i.o{background:#9fc6f0}.os-leg i.n{background:#22d3ee}.os-leg i.j{background:#ffb547}.os-leg i.ga{background:#ffb547;height:4px;vertical-align:2px}.os-leg i.gr{background:#ff5566;height:4px;vertical-align:2px}.os-leg i.rt{background:#b46bff;height:4px;vertical-align:2px}
 .os-note{margin:6px 0 0;font-size:11.5px;color:var(--mut);line-height:1.45}
+/* V16.28 simulator 2D / 3D / 4D */
+.os-modes{display:flex;gap:0;border:1px solid #1f6f8a;border-radius:10px;overflow:hidden;background:#06121f;box-shadow:0 0 18px rgba(34,211,238,.12) inset}
+.os-modes button{height:40px;min-width:48px;padding:0 12px;border:0;border-right:1px solid #12344a;background:transparent;color:#8fb3d4;font:900 13px var(--font);letter-spacing:.08em;cursor:pointer}
+.os-modes button:last-child{border-right:0}
+.os-modes button[aria-pressed="true"]{color:#04121f;background:linear-gradient(135deg,#7fe7ff,#22d3ee);text-shadow:none;box-shadow:0 0 16px rgba(34,211,238,.55)}
+.os-modes button[data-m="4d"]:not([aria-pressed="true"]){color:#d9b8ff}
+.lnx .o4{position:relative;height:540px;border-radius:12px;overflow:hidden;border:1px solid #1f4468;background:radial-gradient(120% 80% at 50% 0%,#0d2547 0%,#050d1a 70%);box-shadow:0 0 0 1px rgba(34,211,238,.08),0 18px 40px rgba(0,8,24,.5)}
+.o4[hidden]{display:none!important}
+.o4 .o4-map,.o4 .o4-map.maplibregl-map{position:absolute;inset:0;width:auto;height:auto}
+.o4-busy{position:absolute;inset:0;z-index:5;display:none;place-items:center;color:#bff3ff;font:800 13px var(--font);letter-spacing:.14em;background:rgba(4,12,26,.6)}
+.o4.busy .o4-busy{display:grid}
+.o4-hud{position:absolute;z-index:4;padding:10px 12px;border-radius:12px;background:rgba(6,18,34,.58);border:1px solid rgba(34,211,238,.28);backdrop-filter:blur(10px) saturate(1.3);-webkit-backdrop-filter:blur(10px) saturate(1.3);box-shadow:0 10px 30px rgba(0,6,20,.45);color:#dff6ff}
+.o4-tl{top:10px;left:10px;display:flex;flex-direction:column;gap:6px;max-width:300px}
+.o4-mode{font:900 11px var(--font);letter-spacing:.16em;color:#7fe7ff}
+.o4-clock{font:900 34px/1 var(--font);font-variant-numeric:tabular-nums;color:#fff;text-shadow:0 0 18px rgba(34,211,238,.65)}
+.o4-sub{font:700 12px var(--font);color:#8fb3d4;font-variant-numeric:tabular-nums}
+.o4-seg{display:flex;border:1px solid #1f4468;border-radius:9px;overflow:hidden}
+.o4-seg[hidden]{display:none}
+.o4-seg button{flex:1;height:32px;padding:0 10px;border:0;background:rgba(4,14,28,.6);color:#9fc6f0;font:800 11px var(--font);letter-spacing:.06em;cursor:pointer;white-space:nowrap}
+.o4-seg button+button{border-left:1px solid #1f4468}
+.o4-seg button[aria-pressed="true"]{background:rgba(34,211,238,.22);color:#fff;box-shadow:0 0 12px rgba(34,211,238,.35) inset}
+.o4-bl{left:10px;bottom:10px;width:min(330px,calc(100% - 20px))}
+.o4-gh{font:900 10.5px var(--font);letter-spacing:.14em;color:#8fb3d4;margin-bottom:6px}
+.o4-g{display:grid;grid-template-columns:78px minmax(0,1fr) 62px;align-items:center;gap:8px;margin:3px 0;opacity:.62}
+.o4-g.on{opacity:1}
+.o4-g span{font:800 10.5px var(--font);letter-spacing:.06em;color:#cfe0f3}
+.o4-g i{position:relative;height:8px;border-radius:5px;background:rgba(95,126,166,.25);overflow:hidden}
+.o4-g i em{position:absolute;left:0;top:0;bottom:0;border-radius:5px;background:#2ee59d;box-shadow:0 0 10px #2ee59d}
+.o4-g i em.a{background:#ffb547;box-shadow:0 0 10px #ffb547}.o4-g i em.r{background:#ff5566;box-shadow:0 0 12px #ff5566}
+.o4-g i u{position:absolute;top:-2px;bottom:-2px;width:2px;background:#7fe7ff;opacity:.8}
+.o4-g b{font:900 18px var(--font);font-variant-numeric:tabular-nums;text-align:right;color:#5ff0b4}.o4-g b small{font-size:10px;color:#8fb3d4}
+.o4-g b.a{color:#ffc56b}.o4-g b.r{color:#ff8a96}
+.o4-st{margin-top:6px;font:700 12px var(--font);color:#d9b8ff}
+.o4-br{right:10px;bottom:34px;display:flex;flex-direction:column;gap:4px;max-width:250px;font-size:11.5px;color:#cfe0f3}
+.o4-leg b{font:900 10.5px var(--font);letter-spacing:.14em;color:#7fe7ff}
+.o4-leg span{display:flex;align-items:center;gap:7px}.o4-leg i{flex:none;width:14px;height:10px;border-radius:3px}
+.o4-leg i.c{background:linear-gradient(90deg,#c08bff,#5aa9ff,#22d3ee)}.o4-leg i.g{background:linear-gradient(90deg,#ff5566,#ffb547)}.o4-leg i.r{background:#b46bff;box-shadow:0 0 8px #b46bff}
+.o4-leg i.t{background:linear-gradient(0deg,#1f3d66,#7fe7ff)}.o4-leg i.p{background:rgba(34,211,238,.35);border:1px solid #22d3ee}
+.o4-lab{padding:2px 8px;border-radius:8px;font:800 11px var(--font);white-space:nowrap;color:#04121f;background:#5ff0b4;border:1.5px solid #fff;box-shadow:0 0 14px rgba(95,240,180,.55);pointer-events:none}
+.o4-lab.i{background:#dff6ff;box-shadow:0 0 12px rgba(223,246,255,.5)}
+.o4-lab.c{background:#b46bff;color:#fff;box-shadow:0 0 18px rgba(180,107,255,.85)}
+.o4-lab.g.r{background:#ff5566;color:#fff;box-shadow:0 0 16px rgba(255,85,102,.8)}.o4-lab.g.a{background:#ffb547;box-shadow:0 0 14px rgba(255,181,71,.7)}
+.o4 .maplibregl-ctrl-group{background:rgba(6,17,32,.9);border:1px solid #1f4468}.o4 .maplibregl-ctrl-group button .maplibregl-ctrl-icon{filter:invert(1) brightness(1.4)}
+.o4 .maplibregl-ctrl-attrib{background:rgba(6,17,32,.8);color:#9fb6cf}.o4 .maplibregl-ctrl-attrib a{color:#9fd8ff}
+#lnOs.o4-on .os-which{display:none!important}
+@media(max-width:900px){.lnx .o4{height:520px}.o4-br{display:none}}
+@media(max-width:700px){.os-modes{flex:1 1 100%}.os-modes button{flex:1;height:44px}
+  .lnx .o4{height:520px}.o4-tl{max-width:calc(100% - 64px);padding:8px 10px;gap:5px}.o4-clock{font-size:24px}.o4-sub{font-size:11px}.o4-seg button{height:34px;font-size:10.5px;padding:0 6px}
+  .o4-bl{padding:8px 10px}.o4-g{grid-template-columns:70px minmax(0,1fr) 54px}}
 @media(max-width:900px){.os-sim{grid-template-columns:minmax(0,1fr)}.os-cell{display:none}.os-cell.show{display:block}.os-which{display:flex;flex:1 1 100%}.os-map{height:360px}}
 @media(max-width:700px){.os-flow{flex-direction:column;gap:10px}.os-flow li{max-width:none;flex-direction:row;align-items:baseline;justify-content:space-between;gap:10px;padding:5px 10px}.os-flow small{white-space:nowrap}
   .os-flow li:not(:last-child):after{content:"\2193";right:auto;left:14px;top:auto;bottom:-13px;transform:none;font-size:11px}.os-chip{padding:5px 8px}.os-chip b{font-size:15px}
@@ -1751,11 +1800,11 @@ function osRouteHtml(M){
 }
 /* ---------------------------------------------------------------- the simulator */
 function osStop(){ OSIM.play = false; cancelAnimationFrame(OSIM.raf); const b = $("osPlay"); if(b) b.textContent = "▶ PLAY"; }
-function osTeardown(){ osStop(); if(OSIM.maps){ OSIM.maps.a.map.remove(); OSIM.maps.b.map.remove(); OSIM.maps = null; } OSIM.key = null; OSIM.synced = false; }
+function osTeardown(){ osStop(); if(typeof os4Teardown === "function") os4Teardown(); if(OSIM.maps){ ["a", "b"].forEach(w => { const m = OSIM.maps[w].map; try{ m.stop(); m.off(); m.remove(); }catch(e){} }); OSIM.maps = null; } OSIM.key = null; OSIM.synced = false; }
 function osMap(id){
   const m = L.map(id, {zoomControl:true, attributionControl:false, scrollWheelZoom:false, zoomSnap:0.25});
   (window.SGBasemap ? SGBasemap.add(m, {style:"dark", switcher:false, minZoom:10, maxZoom:18}) : L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {maxZoom:19}).addTo(m));
-  return {map:m, base:L.layerGroup().addTo(m), gaps:L.layerGroup().addTo(m), bus:L.layerGroup().addTo(m), mk:{}};
+  return {map:m, base:L.layerGroup().addTo(m), gaps:L.layerGroup().addTo(m), trail:L.layerGroup().addTo(m), bus:L.layerGroup().addTo(m), mk:{}, tr:{}};
 }
 function renderOs(){
   const el = $("lnOs"); if(!el) return;
@@ -1764,13 +1813,24 @@ function renderOs(){
   const {r, x, T0, T1} = M, W_ = whoC(r);
   if(!$("osSim")){
     osTeardown();
-    el.innerHTML = `<div id="osRoute"></div><div class="os-ctl"><button type="button" class="os-play" id="osPlay">▶ PLAY</button><div class="os-jump" id="osJump"></div>`
+    el.innerHTML = `<div id="osRoute"></div><div class="os-ctl"><div class="os-modes" id="osModes" role="group" aria-label="Simulation view"><button type="button" data-m="2d" aria-pressed="true" title="Two flat maps side by side">2D</button><button type="button" data-m="3d" aria-pressed="false" title="3D city: light pillars, trails, gaps as walls, chase camera">3D</button><button type="button" data-m="4d" aria-pressed="false" title="4D space-time: height is time">4D</button></div><button type="button" class="os-play" id="osPlay">▶ PLAY</button><div class="os-jump" id="osJump"></div>`
       + `<div class="os-time"><input type="range" id="osRange" step="0.1" aria-label="Simulation time"><span class="os-clock" id="osClock"></span></div>`
       + `<div class="os-which" id="osWhich" role="group" aria-label="Map shown"><button type="button" data-w="a" aria-pressed="true">THE PLAN</button><button type="button" data-w="b" aria-pressed="false">NO ACTION</button></div></div>`
       + `<div class="os-sim" id="osSim"><div class="os-cell" id="osCellB" data-w="b"><div class="os-map" id="osMapB"></div><span class="os-tag r">NO ACTION</span><div class="os-stat" id="osStatB"></div></div>`
       + `<div class="os-cell show" id="osCellA" data-w="a"><div class="os-map" id="osMapA"></div><span class="os-tag g">THE PLAN</span><div class="os-stat" id="osStatA"></div></div></div>`
       + `<div class="os-leg" aria-hidden="true"><span><i class="c"></i>${esc(W_)}</span><span><i class="o"></i>D${r.next_dir} bus</span><span><i class="n"></i>D${r.late_dir} bus on its D${r.next_dir} trip</span><span><i class="j"></i>re-timed (plan)</span><span><i class="ga"></i>gap +3 min or more</span><span><i class="gr"></i>gap 2× headway</span><span><i class="rt"></i>off-service route</span></div>`
+      + `<div class="o4" id="o4Box" hidden><div class="o4-map" id="o4Map"></div><div class="o4-busy" id="o4Busy" role="status"></div>`
+      + `<div class="o4-hud o4-tl"><div class="o4-mode" id="o4Mode"></div><div class="o4-clock" id="o4Clock"></div><div class="o4-sub" id="o4Sub"></div>`
+      + `<div class="o4-seg" id="o4World" role="group" aria-label="World"><button type="button" data-w="a" aria-pressed="true">THE PLAN</button><button type="button" data-w="b" aria-pressed="false">NO ACTION</button></div>`
+      + `<div class="o4-seg" id="o4Cam" role="group" aria-label="Camera"><button type="button" data-c="over" aria-pressed="true">OVERVIEW</button><button type="button" data-c="follow" aria-pressed="false">FOLLOW ${esc(osShort(r.sim.units.find(u => u.uid === r.sim.ins) || {label:W_}))}</button></div>`
+      + `<div class="o4-seg" id="o4Orbit" hidden><button type="button" aria-pressed="false">\u27f3 ORBIT</button></div></div>`
+      + `<div class="o4-hud o4-bl" id="o4Gap"></div><div class="o4-hud o4-br o4-leg" id="o4Leg"></div></div>`
       + `<p class="os-note" id="osNote"></p>`;
+    $("osModes").querySelectorAll("button").forEach(b => b.onclick = () => os4Mode(b.dataset.m));
+    $("o4World").querySelectorAll("button").forEach(b => b.onclick = () => { OS4.world = b.dataset.w; $("o4World").querySelectorAll("button").forEach(z => z.setAttribute("aria-pressed", String(z === b))); os4Apply(false); });
+    $("o4Cam").querySelectorAll("button").forEach(b => b.onclick = () => { OS4.cam = b.dataset.c; $("o4Cam").querySelectorAll("button").forEach(z => z.setAttribute("aria-pressed", String(z === b)));
+      if(OS4.cam === "over"){ const M_ = osModel(); if(M_ && OS4.ml) os4Fit(M_, OS4.G || os4Geo(M_)); } os4Frame(true); });
+    $("o4Orbit").querySelector("button").onclick = function(){ OS4.orbit = !OS4.orbit; this.setAttribute("aria-pressed", String(OS4.orbit)); if(OS4.orbit) os4Spin(); };
     $("osPlay").onclick = () => { if(OSIM.play){ osStop(); return; } const M_ = osModel(); if(!M_) return; if(OSIM.T >= M_.T1 - 0.01) OSIM.T = M_.T0; OSIM.play = true; $("osPlay").textContent = "❚❚ PAUSE"; OSIM.last = performance.now(); OSIM.raf = requestAnimationFrame(osTick); };
     $("osRange").oninput = function(){ osStop(); OSIM.T = +this.value; osFrame(); };
     $("osWhich").querySelectorAll("button").forEach(b => b.onclick = () => { OSIM.w = b.dataset.w; $("osWhich").querySelectorAll("button").forEach(z => z.setAttribute("aria-pressed", String(z === b)));
@@ -1783,7 +1843,8 @@ function renderOs(){
   $("osJump").querySelectorAll("button").forEach(b => b.onclick = () => { osStop(); OSIM.T = +b.dataset.t; osFrame(); });
   const rg = $("osRange"); rg.min = T0; rg.max = T1;
   const key = `${r.snap}|${x.code}|${x.entry_min}`;
-  if(OSIM.key !== key){ OSIM.key = key; OSIM.T = T0; osStop(); }
+  const changed = OSIM.key !== key;
+  if(changed){ OSIM.key = key; OSIM.T = T0; osStop(); }
   if(!OSIM.maps) OSIM.maps = {a:osMap("osMapA"), b:osMap("osMapB")};
   const sync = (f, t) => f.map.on("move", () => { if(OSIM.lock) return; OSIM.lock = true; t.map.setView(f.map.getCenter(), f.map.getZoom(), {animate:false}); OSIM.lock = false; });
   if(!OSIM.synced){ sync(OSIM.maps.a, OSIM.maps.b); sync(OSIM.maps.b, OSIM.maps.a); OSIM.synced = true; }
@@ -1801,18 +1862,21 @@ function renderOs(){
     L.circleMarker([M.ic.lat, M.ic.lon], {radius:7, color:"#0b2545", weight:3, fillColor:"#fff", fillOpacity:1}).bindTooltip(M.ic.name).addTo(Z.base);
     L.marker([x.lat, x.lon], {interactive:false, icon:L.divIcon({className:"", iconSize:[0, 0], html:`<div class="os-pin">Stop ${x.no}${w === "a" ? ` · ${esc(x.entry_clock)}` : ""}</div>`})}).addTo(Z.base);
     L.circleMarker([x.lat, x.lon], {radius:8, color:"#fff", weight:3, fillColor:w === "a" ? "#2ee59d" : "#8aa0b8", fillOpacity:1}).addTo(Z.base);
-    M.units.forEach(u => { const c = u.uid === M.ins ? "c" : u.kind === "in_service" ? "o" : (w === "a" && M.A[u.uid] ? "j" : "n");
+    Z.trail.clearLayers(); Z.tr = {};
+    M.units.forEach(u => { const c = u.uid === M.ins ? "c" : u.kind === "in_service" ? "o" : (w === "a" && M.A[u.uid] ? "j" : "n"), col = C4[c][0];
+      Z.tr[u.uid] = [L.polyline([], {color:col, weight:10, opacity:.22, interactive:false, lineCap:"round"}).addTo(Z.trail), L.polyline([], {color:col, weight:3, opacity:.85, interactive:false, lineCap:"round"}).addTo(Z.trail)];
       Z.mk[u.uid] = L.marker(S2line[0], {interactive:false, keyboard:false, zIndexOffset:c === "c" ? 1000 : 0, icon:L.divIcon({className:"", iconSize:[0, 0], html:`<div class="os-bus ${c}" title="${esc(osShort(u))}">${c === "c" ? esc(osShort(u)) : esc(String(u.num))}</div>`})}).addTo(Z.bus); });
     Z.map.invalidateSize();
-    const bb = L.latLngBounds(S2line.concat(M.line, [[M.ic.lat, M.ic.lon]])); if(bb.isValid()) Z.map.fitBounds(bb.pad(.04));
+    const bb = L.latLngBounds(S2line.concat(M.line, [[M.ic.lat, M.ic.lon]])); if(bb.isValid()) Z.map.fitBounds(bb.pad(.04), {animate:false});
   });
+  if(OS4.ml && OS4.ready) os4Apply(changed);
   $("osNote").textContent = `Buses move by the plan's own timing (${f0(M.SM)} min stop to stop, the departures as planned). ${rtOk ? `The off-service run follows the simplest road route (${M.rt.time_src || "road routing"}).` : "The road route is not loaded: a straight line stands in for it."} Estimate only – the controller decides.`;
   osFrame();
 }
 function osTick(t){
   const M = osModel(); if(!M){ osStop(); return; }
   const dt = (t - OSIM.last) / 1000; OSIM.last = t;
-  OSIM.T = Math.min(M.T1, OSIM.T + dt * 3);                                 // 3 simulated minutes per second
+  OSIM.T = Math.min(M.T1, OSIM.T + dt * (OS4.mode === "3d" && OS4.cam === "follow" ? 1 : 3));   // 3 simulated minutes a second (1 with the chase camera)
   osFrame(); if(OSIM.T < M.T1 && OSIM.play) OSIM.raf = requestAnimationFrame(osTick); else osStop();
 }
 function osFrame(){
@@ -1823,7 +1887,9 @@ function osFrame(){
   $("osJump").querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", String(Math.abs(+b.dataset.t - T) < 0.05)));
   ["a", "b"].forEach(w => { const Z = OSIM.maps[w];
     M.units.forEach(u => { const mk = Z.mk[u.uid]; if(!mk) return; const z = osPos(M, u, T, w);
-      if(z){ mk.setLatLng(z.p); mk.setOpacity(1); const e = mk.getElement(); if(e) e.firstChild && e.firstChild.setAttribute("data-st", z.st); } else mk.setOpacity(0); });
+      if(z){ mk.setLatLng(z.p); mk.setOpacity(1); const e = mk.getElement(); if(e) e.firstChild && e.firstChild.setAttribute("data-st", z.st); } else mk.setOpacity(0);
+      const tr = Z.tr[u.uid]; if(tr){ const pts = []; if(z) for(let t = Math.max(M.T0, T - 6); t <= T + 1e-9; t += 0.5){ const y = osPos(M, u, t, w); if(y) pts.push(y.p); else pts.length = 0; }
+        if(z) pts.push(z.p); tr[0].setLatLngs(pts.length > 1 ? pts : []); tr[1].setLatLngs(pts.length > 1 ? pts : []); } });
     Z.gaps.clearLayers();
     const G = osGaps(M, T, w); let big = null, nl = 0;
     G.forEach(g => { if(!big || g.g > big.g) big = g;
@@ -1833,6 +1899,216 @@ function osFrame(){
     const st = $(w === "a" ? "osStatA" : "osStatB");
     st.innerHTML = `<b class="${big && big.g >= 2 * M.H ? "r" : big && big.g >= M.H + 3 ? "a" : "g"}">${big ? `${f0(big.g)} min` : "–"}</b><span>largest gap on D${M.r.next_dir}${big ? ` · ${esc(osShort(big.a.u))} → ${esc(osShort(big.b.u))}` : ""}</span><em>${esc(osStatus(M, T, w))}</em>`;
   });
+  if(OS4.mode !== "2d") os4Frame(!OSIM.play);
+}
+
+/* ================================================================ V16.28 simulator 3D / 4D (GPU, WebGL 2: MapLibre GL 4.7, loaded on demand)
+   3D  the city with its buildings; every bus a light pillar with a glowing trail of its last minutes; a gap of the headway + 3 min or
+       more stands up as a translucent wall as tall as it is long (12 m a minute: a 30-min gap is a 360 m wall); the off-service route
+       glows; FOLLOW BUS 6 is a chase camera behind the halfway bus.
+   4D  a space-time cube: the map is the floor, HEIGHT IS TIME. Every bus is a ribbon rising through time (waiting = a vertical
+       column); the now-plane slices the cube at the simulation time; at the entry stop the gap is a column between the two buses'
+       pass times - with the plan the halfway bus's ribbon cuts it in half.
+   Both use the same positions as the 2D maps (osPos), so the three views always agree. Without WebGL / the library: 2D only. */
+const OS4 = {mode:"2d", ml:null, ready:false, world:"a", cam:"over", orbit:false, key:null, ribKey:null, last:0, camH:null, mk:{}, gapMk:[], stat:{}, G:null};
+const C4 = {c:["#c08bff", "#4b2e70"], o:["#5aa9ff", "#1f3d66"], n:["#22d3ee", "#12505c"], j:["#ffb547", "#6a4c1d"]};
+const os4Cls = (M, u, w) => u.uid === M.ins ? "c" : u.kind === "in_service" ? "o" : (w === "a" && M.A[u.uid] ? "j" : "n");
+const os4K = lat => [111320 * Math.cos(lat * Math.PI / 180), 110574];
+function os4Sq(lat, lon, h){ const [kx, ky] = os4K(lat), dx = h / kx, dy = h / ky; return [[[lon - dx, lat - dy], [lon + dx, lat - dy], [lon + dx, lat + dy], [lon - dx, lat + dy], [lon - dx, lat - dy]]]; }
+function os4Quad(a, b, hw){                                                   // a strip a -> b ([lat, lon]), hw metres either side
+  const [kx, ky] = os4K(a[0]), dx = (b[1] - a[1]) * kx, dy = (b[0] - a[0]) * ky, d = Math.hypot(dx, dy); if(d < 0.5) return null;
+  const nx = -dy / d * hw / kx, ny = dx / d * hw / ky;
+  return [[[a[1] + nx, a[0] + ny], [b[1] + nx, b[0] + ny], [b[1] - nx, b[0] - ny], [a[1] - nx, a[0] - ny], [a[1] + nx, a[0] + ny]]];
+}
+const os4F = (g, p) => ({type:"Feature", geometry:{type:"Polygon", coordinates:g}, properties:p});
+const os4L = (c, p) => ({type:"Feature", geometry:{type:"LineString", coordinates:c.map(q => [q[1], q[0]])}, properties:p || {}});
+const os4FC = a => ({type:"FeatureCollection", features:a});
+function os4Geo(M){                                                         // the scene's extent, the time scale (metres a minute) and widths
+  const pts = M.S2.map(s_ => [s_.lat, s_.lon]).concat(M.line, [[M.ic.lat, M.ic.lon]]);
+  let s = 90, n = -90, w = 180, e = -180; pts.forEach(p => { s = Math.min(s, p[0]); n = Math.max(n, p[0]); w = Math.min(w, p[1]); e = Math.max(e, p[1]); });
+  const [kx, ky] = os4K((s + n) / 2), ext = Math.max((e - w) * kx, (n - s) * ky, 1000);
+  const k = Math.max(2000, Math.min(9000, ext * 0.34)) / Math.max(1, M.T1 - M.T0);
+  return {bb:[[w, s], [e, n]], ext, k, hw:Math.max(40, Math.min(160, ext * 0.004)), z0:30};
+}
+const os4Z = (G, M, t) => G.z0 + (t - M.T0) * G.k;
+function os4Heading(M, u, T, w){ const a = osPos(M, u, T, w), b = osPos(M, u, T + 0.3, w); if(!a || !b) return null;
+  const [kx, ky] = os4K(a.p[0]), dx = (b.p[1] - a.p[1]) * kx, dy = (b.p[0] - a.p[0]) * ky; return Math.hypot(dx, dy) < 1 ? null : Math.atan2(dx, dy) * 180 / Math.PI; }
+
+/* ---------------------------------------------------------------- engine start / stop */
+function os4Mode(m){
+  if(m === OS4.mode && (m === "2d" || OS4.ml)) return;
+  const box = $("o4Box"), sim = $("osSim"); if(!box) return;
+  document.querySelectorAll("#osModes button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.m === m)));
+  if(m === "2d"){ OS4.mode = "2d"; box.hidden = true; sim.hidden = false; $("lnOs").classList.remove("o4-on"); if(OSIM.maps) ["a", "b"].forEach(w => OSIM.maps[w].map.invalidateSize()); osFrame(); return; }
+  OS4.mode = m; box.hidden = false; sim.hidden = true; $("lnOs").classList.add("o4-on"); box.classList.toggle("m4", m === "4d");
+  $("o4Cam").hidden = m !== "3d"; $("o4Orbit").hidden = m !== "4d";
+  $("o4Leg").innerHTML = m === "4d" ? `<b>4D · SPACE-TIME</b><span><i class="t"></i>height = time (up = later)</span><span><i class="c"></i>each ribbon = one bus</span><span><i class="p"></i>now-plane</span><span><i class="g"></i>gap at Stop ${esc(String((cand(ST.sel) || {}).no || ""))}: column between two buses</span>`
+    : `<b>3D</b><span><i class="c"></i>light pillar = a bus, trail = its last minutes</span><span><i class="g"></i>wall = a gap, 12 m per minute</span><span><i class="r"></i>off-service route</span>`;
+  if(OS4.ml){ os4Apply(true); return; }
+  box.classList.add("busy"); $("o4Busy").textContent = "Starting the 3D engine…";
+  const fail = msg => { box.classList.remove("busy"); OS4.ml = null; OS4.ready = false; os4Mode("2d"); stat(msg, true); const n = $("osNote"); if(n) n.textContent = msg; };
+  if(!window.SG3D || !SG3D.load){ fail("3D / 4D needs the 3D map module, which is not available here. The 2D simulation still works."); return; }
+  SG3D.load().then(() => {
+    try{
+      const M = osModel(); if(!M){ fail("Generate a plan first."); return; }
+      const G = OS4.G = os4Geo(M), c = [(G.bb[0][0] + G.bb[1][0]) / 2, (G.bb[0][1] + G.bb[1][1]) / 2];
+      const ml = OS4.ml = new maplibregl.Map({container:"o4Map", style:SG3D.style ? SG3D.style() : {version:8, sources:{}, layers:[{id:"bg", type:"background", paint:{"background-color":"#0a1830"}}]},
+        center:c, zoom:11, pitch:60, bearing:-20, maxPitch:75, antialias:true, attributionControl:false, fadeDuration:0});
+      ml.addControl(new maplibregl.NavigationControl({visualizePitch:true}), "top-right");
+      ml.addControl(new maplibregl.AttributionControl({compact:true, customAttribution:'<a href="https://openfreemap.org" target="_blank" rel="noopener">OpenFreeMap</a>'}), "bottom-right");
+      ml.on("error", e => { const sid = e && (e.sourceId || (e.source && e.source.id)); if(sid === "omt" && !OS4.noTiles){ OS4.noTiles = true; const n = $("osNote"); if(n) n.textContent = "3D buildings are not reachable on this network – the simulation runs on a plain floor."; } });
+      ml.once("style.load", () => { os4Layers(); OS4.ready = true; box.classList.remove("busy"); os4Apply(true); });
+    }catch(err){ fail("3D / 4D needs WebGL, which this browser or device does not provide. The 2D simulation still works."); }
+  }, () => fail("The 3D engine could not be loaded (no connection to the map library). The 2D simulation still works."));
+}
+function os4Teardown(){ if(OS4.ml){ try{ OS4.ml.remove(); }catch(e){} } Object.values(OS4.mk).forEach(m => m.remove()); OS4.gapMk.forEach(m => m.remove());
+  Object.assign(OS4, {ml:null, ready:false, mode:"2d", key:null, ribKey:null, mk:{}, gapMk:[], camH:null, G:null}); }
+/* ---------------------------------------------------------------- layers (added once per map) */
+function os4Layers(){
+  const ml = OS4.ml, E = os4FC([]);
+  try{ ml.setSky({"sky-color":"#04101f", "horizon-color":"#0d2f55", "fog-color":"#081428", "sky-horizon-blend":0.6, "horizon-fog-blend":0.7, "fog-ground-blend":0.55, "atmosphere-blend":0.6}); }catch(e){}
+  try{ ml.setLight({anchor:"viewport", color:"#cfe9ff", intensity:0.38, position:[1.2, 200, 35]}); }catch(e){}
+  ["o4-route", "o4-d1", "o4-off", "o4-stops", "o4-beam", "o4-body", "o4-wall", "o4-wallg", "o4-rib", "o4-now", "o4-cube", "o4-col", "o4-ring", "o4-ruler", "o4-curtain"].forEach(s => ml.addSource(s, {type:"geojson", data:E}));
+  Object.keys(C4).forEach(c => ml.addSource("o4-trail-" + c, {type:"geojson", data:E, lineMetrics:true}));
+  const before = ml.getLayer("road-label") ? "road-label" : undefined, add = l => ml.addLayer(l, before);
+  add({id:"o4-route-glow", type:"line", source:"o4-route", layout:{"line-cap":"round", "line-join":"round"}, paint:{"line-color":"#2f8cff", "line-width":16, "line-blur":12, "line-opacity":.35}});
+  add({id:"o4-route", type:"line", source:"o4-route", layout:{"line-cap":"round", "line-join":"round"}, paint:{"line-color":"#5aa9ff", "line-width":3.2, "line-opacity":.9}});
+  add({id:"o4-d1", type:"line", source:"o4-d1", paint:{"line-color":"#5f7690", "line-width":2, "line-opacity":.4, "line-dasharray":[2, 2]}});
+  add({id:"o4-off-glow", type:"line", source:"o4-off", layout:{"line-cap":"round", "line-join":"round"}, paint:{"line-color":"#b46bff", "line-width":18, "line-blur":12, "line-opacity":.45}});
+  add({id:"o4-off", type:"line", source:"o4-off", layout:{"line-cap":"round", "line-join":"round"}, paint:{"line-color":"#e2c8ff", "line-width":3.6}});
+  add({id:"o4-stops", type:"circle", source:"o4-stops", paint:{"circle-radius":["get", "r"], "circle-color":["get", "c"], "circle-stroke-color":"#fff", "circle-stroke-width":["get", "s"], "circle-opacity":.95, "circle-pitch-alignment":"map"}});
+  add({id:"o4-wallg", type:"line", source:"o4-wallg", layout:{"line-cap":"round"}, paint:{"line-color":["get", "c"], "line-width":14, "line-blur":10, "line-opacity":.7}});
+  Object.keys(C4).forEach(c => {
+    const rgb = C4[c][0].match(/\w\w/g).map(h => parseInt(h, 16)).join(",");
+    add({id:"o4-trail-glow-" + c, type:"line", source:"o4-trail-" + c, layout:{"line-cap":"round", "line-join":"round"},
+      paint:{"line-width":14, "line-blur":9, "line-gradient":["interpolate", ["linear"], ["line-progress"], 0, `rgba(${rgb},0)`, 1, `rgba(${rgb},.55)`]}});
+    add({id:"o4-trail-" + c, type:"line", source:"o4-trail-" + c, layout:{"line-cap":"round", "line-join":"round"},
+      paint:{"line-width":4, "line-gradient":["interpolate", ["linear"], ["line-progress"], 0, `rgba(${rgb},0)`, 1, `rgba(${rgb},1)`]}});
+  });
+  const fx = (id, src, op, extra) => add(Object.assign({id, type:"fill-extrusion", source:src, paint:{"fill-extrusion-color":["get", "c"], "fill-extrusion-base":["get", "b"], "fill-extrusion-height":["get", "h"], "fill-extrusion-opacity":op, "fill-extrusion-vertical-gradient":true}}, extra || {}));
+  fx("o4-wall", "o4-wall", .42);
+  fx("o4-beam", "o4-beam", .5, {maxzoom:14.2, paint:{"fill-extrusion-color":["get", "c"], "fill-extrusion-base":0, "fill-extrusion-height":["interpolate", ["linear"], ["zoom"], 9, ["*", ["get", "m"], 1600], 12, ["*", ["get", "m"], 520], 14.2, ["*", ["get", "m"], 160]], "fill-extrusion-opacity":.5}});
+  fx("o4-body", "o4-body", .96, {minzoom:13.6});
+  fx("o4-curtain", "o4-curtain", .1);
+  fx("o4-rib", "o4-rib", .9);
+  fx("o4-col", "o4-col", .36);
+  fx("o4-ring", "o4-ring", .95);
+  fx("o4-ruler", "o4-ruler", .7);
+  fx("o4-cube", "o4-cube", 1);
+  fx("o4-now", "o4-now", .16);
+}
+/* static per model / world: the lines, and in 4D the ribbons, columns and the ruler */
+function os4Apply(fit){
+  const ml = OS4.ml, M = osModel(); if(!ml || !OS4.ready || !M) return;
+  const G = OS4.G = os4Geo(M), w = OS4.world, four = OS4.mode === "4d";
+  ml.getSource("o4-route").setData(os4FC([os4L(M.S2.map(s_ => [s_.lat, s_.lon]))]));
+  ml.getSource("o4-d1").setData(os4FC(M.S1 && !four ? [os4L(M.S1.map(s_ => [s_.lat, s_.lon]))] : []));
+  ml.getSource("o4-off").setData(os4FC(w === "a" ? [os4L(M.line)] : []));
+  ml.getSource("o4-stops").setData(os4FC([{type:"Feature", geometry:{type:"Point", coordinates:[M.x.lon, M.x.lat]}, properties:{r:9, s:3, c:w === "a" ? "#2ee59d" : "#8aa0b8"}},
+    {type:"Feature", geometry:{type:"Point", coordinates:[M.ic.lon, M.ic.lat]}, properties:{r:7, s:3, c:"#ffffff"}}]));
+  const vis = (ids, on) => ids.forEach(id => { if(ml.getLayer(id)) ml.setLayoutProperty(id, "visibility", on ? "visible" : "none"); });
+  vis(["o4-rib", "o4-now", "o4-cube", "o4-col", "o4-ring", "o4-ruler", "o4-curtain"], four);
+  OS4.gapMk.forEach(m => m.getElement().style.display = four ? "none" : "");
+  vis(["o4-beam", "o4-body", "o4-wall", "o4-wallg"].concat(...Object.keys(C4).map(c => ["o4-trail-" + c, "o4-trail-glow-" + c])), !four);
+  vis(["building-3d"], !four); vis(["building-flat"], four);
+  const rk = `${OSIM.key}|${w}|${M.rt && M.rt.ok ? 1 : 0}`;
+  if(four && OS4.ribKey !== rk){ OS4.ribKey = rk; os4Static(M, G, w); }
+  if(!four) OS4.ribKey = null;
+  os4Labels(M, w);
+  if(fit) os4Fit(M, G);
+  os4Frame(true);
+}
+function os4Static(M, G, w){
+  const ml = OS4.ml, R = [], dt = 0.5;
+  M.units.forEach(u => { const c = os4Cls(M, u, w); let prev = null;
+    for(let t = M.T0; t <= M.T1 + 1e-9; t += dt){ const z = osPos(M, u, t, w);
+      if(z && prev){ const g = os4Quad(prev.p, z.p, G.hw) || os4Sq(z.p[0], z.p[1], G.hw);
+        R.push(os4F(g, {c:C4[c][0], f:C4[c][1], z0:os4Z(G, M, t - dt), b:os4Z(G, M, t - dt), h:os4Z(G, M, t) + G.k * 0.04, u:u.uid})); }
+      prev = z; } });
+  OS4.rib = R; ml.getSource("o4-rib").setData(os4FC(R));
+  const cur = [], S2 = M.S2.map(s_ => [s_.lat, s_.lon]);                       // the D2 route stood up through time: a time-distance chart over the map
+  for(let i = 1; i < S2.length; i++){ const q = os4Quad(S2[i - 1], S2[i], 6); if(q) cur.push(os4F(q, {c:"#2f8cff", b:os4Z(G, M, M.T0), h:os4Z(G, M, M.T1)})); }
+  ml.getSource("o4-curtain").setData(os4FC(cur));
+  const P = whyPasses(M.r, M.x), L_ = P.at(w === "a" ? P.tA : P.tB, M.j), cols = [], rings = [];
+  L_.forEach((o, i) => { if(o.t >= M.T0 && o.t <= M.T1) rings.push(os4F(os4Sq(M.x.lat, M.x.lon, G.hw * 3.2), {c:C4[os4Cls(M, o.u, w)][0], b:os4Z(G, M, o.t) - G.k * 0.12, h:os4Z(G, M, o.t) + G.k * 0.12}));
+    const n = L_[i + 1]; if(!n) return; const g = n.t - o.t, a = Math.max(o.t, M.T0), b = Math.min(n.t, M.T1);
+    if(g >= M.H + 3 - 1e-9 && b > a) cols.push(os4F(os4Sq(M.x.lat, M.x.lon, G.hw * 2.4), {c:g >= 2 * M.H ? "#ff5566" : "#ffb547", b:os4Z(G, M, a), h:os4Z(G, M, b), g, ta:o.t, tb:n.t})); });
+  OS4.cols = cols; ml.getSource("o4-col").setData(os4FC(cols)); ml.getSource("o4-ring").setData(os4FC(rings));
+  const sw = [G.bb[0][1], G.bb[0][0]], ru = [os4F(os4Sq(sw[0], sw[1], G.hw * 0.7), {c:"#8aa0b8", b:os4Z(G, M, M.T0), h:os4Z(G, M, M.T1)})];
+  for(let t = Math.ceil(M.T0 / 15) * 15; t <= M.T1; t += 15) ru.push(os4F(os4Sq(sw[0], sw[1], G.hw * 4), {c:t % 60 === 0 ? "#22d3ee" : "#5f7ea6", b:os4Z(G, M, t), h:os4Z(G, M, t) + G.k * 0.3}));
+  ml.getSource("o4-ruler").setData(os4FC(ru));
+  OS4.stat.rib = R.length; OS4.stat.cols = cols.map(c_ => [Math.round(c_.properties.ta), Math.round(c_.properties.tb), Math.round(c_.properties.g)]); OS4.stat.rings = rings.length;
+}
+function os4Fit(M, G){
+  const ml = OS4.ml, four = OS4.mode === "4d";
+  ml.jumpTo({pitch:four ? 56 : 58, bearing:four ? -28 : -18});
+  const sm = ml.getContainer().clientWidth < 560, pad = sm ? {top:190, bottom:130, left:24, right:24} : {top:70, bottom:four ? 40 : 70, left:50, right:50};
+  try{ ml.fitBounds(G.bb, {padding:pad, bearing:four ? -28 : -18, duration:0}); }catch(e){}
+  if(four) ml.jumpTo({zoom:ml.getZoom() - (sm ? 0.15 : 0.35)});
+  OS4.camH = null;
+}
+function os4Labels(M, w){
+  const ml = OS4.ml, mk = (k, ll, html, cls) => { if(OS4.mk[k]) OS4.mk[k].remove(); const e = document.createElement("div"); e.className = "o4-lab " + (cls || ""); e.innerHTML = html;
+    OS4.mk[k] = new maplibregl.Marker({element:e, anchor:"bottom", offset:[0, -12]}).setLngLat(ll).addTo(ml); };
+  mk("stop", [M.x.lon, M.x.lat], `Stop ${M.x.no}${w === "a" ? ` · ${esc(M.x.entry_clock)}` : ""}`, "s");
+  mk("ic", [M.ic.lon, M.ic.lat], esc(M.ic.name), "i");
+  if(!OS4.mk.bus){ const e = document.createElement("div"); e.className = "o4-lab c"; e.textContent = osShort(M.units.find(u => u.uid === M.ins) || {label:whoC(M.r)});
+    OS4.mk.bus = new maplibregl.Marker({element:e, anchor:"bottom", offset:[0, -18]}).setLngLat([M.ic.lon, M.ic.lat]).addTo(ml); }
+}
+/* per frame: buses, trails, walls (3D) or the now-plane and cubes (4D); camera; HUD */
+function os4Frame(force){
+  const ml = OS4.ml, M = osModel(); if(!ml || !OS4.ready || !M || OS4.mode === "2d") return;
+  const now = performance.now(); if(!force && now - OS4.last < 45) return; OS4.last = now;
+  const T = OSIM.T == null ? M.T0 : OSIM.T, w = OS4.world, G = OS4.G || os4Geo(M), four = OS4.mode === "4d";
+  const vis = M.units.map(u => ({u, z:osPos(M, u, T, w), c:os4Cls(M, u, w)})).filter(o => o.z);
+  if(four){
+    const zn = os4Z(G, M, T), b = G.bb, pad = 0.02;
+    const pw = (b[1][0] - b[0][0]) * pad, ph = (b[1][1] - b[0][1]) * pad;
+    ml.getSource("o4-now").setData(os4FC([os4F([[[b[0][0] - pw, b[0][1] - ph], [b[1][0] + pw, b[0][1] - ph], [b[1][0] + pw, b[1][1] + ph], [b[0][0] - pw, b[1][1] + ph], [b[0][0] - pw, b[0][1] - ph]]], {c:"#22d3ee", b:zn, h:zn + G.k * 0.12})]));
+    ml.getSource("o4-cube").setData(os4FC(vis.map(o => os4F(os4Sq(o.z.p[0], o.z.p[1], G.hw * (o.c === "c" ? 3 : 2.2)), {c:C4[o.c][0], b:zn - G.k * 0.5, h:zn + G.k * 0.5}))));
+    ml.setPaintProperty("o4-rib", "fill-extrusion-color", ["case", ["<=", ["get", "z0"], zn], ["get", "c"], ["get", "f"]]);
+    OS4.stat.now = Math.round(zn);
+    if(OS4.mk.bus) OS4.mk.bus.getElement().style.display = "none";
+  } else {
+    ml.getSource("o4-beam").setData(os4FC(vis.map(o => os4F(os4Sq(o.z.p[0], o.z.p[1], o.c === "c" ? 140 : 95), {c:C4[o.c][0], m:o.c === "c" ? 1.5 : 1}))));
+    ml.getSource("o4-body").setData(os4FC(vis.flatMap(o => { const h = os4Heading(M, o.u, T, w); const brg = (h == null ? 0 : h) * Math.PI / 180;
+      return [os4F(SG3D.box(o.z.p[0], o.z.p[1], brg, 12, 2.6), {c:C4[o.c][0], b:0.3, h:4.4}), os4F(os4Sq(o.z.p[0], o.z.p[1], o.c === "c" ? 4 : 2.5), {c:C4[o.c][0], b:4.4, h:o.c === "c" ? 90 : 45})]; })));
+    const tr = {c:[], o:[], n:[], j:[]};
+    vis.forEach(o => { const pts = []; for(let t = Math.max(M.T0, T - 8); t <= T + 1e-9; t += 0.25){ const z = osPos(M, o.u, t, w); if(z) pts.push(z.p); else pts.length = 0; }
+      pts.push(o.z.p); if(pts.length >= 2) tr[o.c].push(os4L(pts)); });
+    Object.keys(tr).forEach(c => ml.getSource("o4-trail-" + c).setData(os4FC(tr[c])));
+    const walls = [], glow = [], labs = [];
+    osGaps(M, T, w).forEach(g => { if(g.g < M.H + 3 - 1e-9) return; const col = g.g >= 2 * M.H ? "#ff5566" : "#ffb547", seg = osSeg(M.S2, g.b.o.q, g.a.o.q), h = g.g * 12;
+      for(let i = 1; i < seg.length; i++){ const q = os4Quad(seg[i - 1], seg[i], 16); if(q) walls.push(os4F(q, {c:col, b:0, h})); }
+      glow.push(os4L(seg, {c:col})); labs.push({p:osAt(M.S2, (g.a.o.q + g.b.o.q) / 2), g:g.g, r:g.g >= 2 * M.H}); });
+    ml.getSource("o4-wall").setData(os4FC(walls)); ml.getSource("o4-wallg").setData(os4FC(glow));
+    while(OS4.gapMk.length > labs.length) OS4.gapMk.pop().remove();
+    labs.forEach((l, i) => { let m = OS4.gapMk[i]; if(!m){ const e = document.createElement("div"); e.innerHTML = '<span class="o4-lab g"></span>'; m = OS4.gapMk[i] = new maplibregl.Marker({element:e, anchor:"bottom", offset:[0, -8]}).setLngLat([l.p[1], l.p[0]]).addTo(ml); }
+      const sp = m.getElement().firstChild; sp.className = "o4-lab g " + (l.r ? "r" : "a"); sp.textContent = `${f0(l.g)} min`; m.getElement().style.display = ""; m.setLngLat([l.p[1], l.p[0]]); });
+    const b6 = vis.find(o => o.u.uid === M.ins);
+    if(OS4.mk.bus){ OS4.mk.bus.getElement().style.display = b6 ? "" : "none"; if(b6) OS4.mk.bus.setLngLat([b6.z.p[1], b6.z.p[0]]); }
+    OS4.stat.walls = walls.length; OS4.stat.gaps = labs.map(l => Math.round(l.g));
+    if(OS4.cam === "follow" && b6){                                           // chase camera behind the halfway bus
+      const h = os4Heading(M, b6.u, T, w); if(h != null) OS4.camH = OS4.camH == null ? h : OS4.camH + ((((h - OS4.camH) % 360) + 540) % 360 - 180) * 0.18;
+      ml.jumpTo({center:[b6.z.p[1], b6.z.p[0]], zoom:15.6, pitch:64, bearing:OS4.camH == null ? ml.getBearing() : OS4.camH});
+    }
+  }
+  OS4.stat.buses = vis.length; OS4.stat.T = T;
+  os4Hud(M, T);
+}
+function os4Hud(M, T){
+  const big = w => osGaps(M, T, w).reduce((a, g) => (!a || g.g > a.g) ? g : a, null), gp = big("a"), gn = big("b"), H = M.H, w = OS4.world;
+  $("o4Clock").textContent = osHm(T); $("o4Sub").textContent = `+${f0(T - M.T0)} min · ${OSIM.play ? `▶ ${OS4.mode === "3d" && OS4.cam === "follow" ? 1 : 3} min/s` : "paused"}`;
+  $("o4Mode").textContent = `${OS4.mode.toUpperCase()} · ${w === "a" ? "THE PLAN" : "NO ACTION"}`;
+  const bar = (lab, g, on) => { const v = g ? g.g : 0, p = Math.min(100, 100 * v / (3 * H)), c = v >= 2 * H ? "r" : v >= H + 3 ? "a" : "g";
+    return `<div class="o4-g ${on ? "on" : ""}"><span>${lab}</span><i><em class="${c}" style="width:${p.toFixed(1)}%"></em><u style="left:${(100 / 3).toFixed(1)}%"></u></i><b class="${c}">${g ? f0(v) : "–"}<small> min</small></b></div>`; };
+  $("o4Gap").innerHTML = `<div class="o4-gh">LARGEST GAP ON D${M.r.next_dir}</div>${bar("THE PLAN", gp, w === "a")}${bar("NO ACTION", gn, w === "b")}<div class="o4-st">${esc(osStatus(M, T, w))}</div>`;
+}
+function os4Spin(ts){                                                        // ORBIT: the 4D cube turns, 6 degrees a second
+  const ml = OS4.ml; if(!OS4.orbit || !ml || OS4.mode !== "4d"){ OS4.spinT = null; return; }
+  const now = ts || performance.now(), dt = OS4.spinT == null ? 0 : Math.min(0.25, (now - OS4.spinT) / 1000); OS4.spinT = now;
+  ml.jumpTo({bearing:(ml.getBearing() + 6 * dt) % 360});
+  requestAnimationFrame(os4Spin);
 }
 
 function planText(){

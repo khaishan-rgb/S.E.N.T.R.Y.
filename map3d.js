@@ -540,5 +540,5 @@
     var m = this, c = m.getContainer && m.getContainer(), o = c && c.id && CFG[c.id];
     if(o) setTimeout(function(){ if(!m._sg3d) attach(m, o); }, 0);
   });
-  var SG3D = window.SG3D = {attach:attach, auto:auto, load:load, box:box, list:[]};
+  var SG3D = window.SG3D = {attach:attach, auto:auto, load:load, box:box, list:[], style:style};   // V16.28: style() also for the Halfway 3D / 4D simulator
 })();
