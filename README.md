@@ -1,4 +1,29 @@
-# SG Transport Pulse V16.19 — Operational Intelligence & Service Recovery Platform
+# SG Transport Pulse V17.0 (S.E.N.T.R.Y. 3.0) — Operational Intelligence & Service Recovery Platform
+
+## Forecast Centre: the new home page (V17.0)
+The Command Centre is now the **Forecast Centre** (`/command`, also `/forecast`). The previous page is still at `/command/classic`. Full documentation is in **FORECAST_CENTRE.md**: architecture, matching rules, forecasts, alerts, database, providers, configuration, API, tests and the completion report.
+
+* **What it shows:**
+  * which services will be hit in the next **15 / 30 / 60 min**, from **verified** evidence only;
+  * 8 KPIs computed from the feeds (Unavailable when a feed is missing, marked stale when old);
+  * a MapLibre map of Singapore with a horizon scrubber;
+  * a smart alert centre;
+  * service intelligence, with the reason every nearby event was accepted or rejected;
+  * a forecast comparison;
+  * a data-integrity panel.
+* **Strict route matching:** an event counts only when its own line runs along the route, in the same direction, for at least 40 m, while it is in force. Parallel roads, the opposite carriageway, flyovers and nearby roads are rejected with the reason. LTA point reports stay **UNVERIFIED**.
+* **Forecasts:** explainable rules, labelled as rules. Accuracy is shown only once it has been measured. LTA speed bands are not used.
+* **Showcase:** Demo → Play / Present runs a fictional, offline, seven-step scenario through the real engine, with DEMO indicators everywhere.
+* **Fix:** the planned-timetable store was overwritten by the TomTom state (`TT` defined twice). It is renamed `PTT` and works again.
+* **TomTom cost:** TomTom's free tier is now monthly per API (Incident Details 2,500 a month). The new optional `TOMTOM_INCIDENTS_EVERY_SEC` (e.g. 1800) keeps the shared incident call inside it.
+* **New files:** `forecast.py` (engine), `forecast.html` (page), `FORECAST_CENTRE.md`, `.env.example`, `Dockerfile`, `docker-compose.yml`, `.dockerignore`.
+* **Changed files:**
+  * `app.py`: V17 block at the end, `/command` route, TomTom raw incidents kept, `PTT`, the lifespan task, forecast alerts in the bell;
+  * `app_shell.js`: menu name;
+  * `render.yaml`: new optional variables;
+  * `README.md`.
+* **Tests:** `tests/t_forecast.py` (79 checks, run: `python3 tests/t_forecast.py . tests/stubs`) and `r3d/t_forecast_page.js` (53 checks, 5 screen sizes + 2D fallback).
+
 
 ## Halfway Planner: the driver briefing, step 4 (V16.28)
 The driver briefing exists for one job: the interchange staff **show the bus captain which way to drive off service**, from the interchange to the stop where the bus enters service. It replaces the earlier 2D / 3D / 4D network simulator. It sits after the ROI, just above More detail. The page now reads: 1 Key settings & buses → 2 Generate the halfway plan → 3 ROI: EWT earned → **4 Driver briefing**.

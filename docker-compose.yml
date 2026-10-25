@@ -1,0 +1,15 @@
+# Local / self-hosted run:  cp .env.example .env  (fill in keys)  then  docker compose up -d --build
+# Put an HTTPS reverse proxy (Caddy, nginx, Traefik) in front for production; the app trusts X-Forwarded-* headers.
+services:
+  sentry:
+    build: .
+    env_file: .env
+    environment:
+      BUNCHING_DB: /data/bunching.db
+    ports:
+      - "8000:8000"
+    volumes:
+      - sentry-data:/data          # history, alerts and audit survive restarts
+    restart: unless-stopped
+volumes:
+  sentry-data:

@@ -1,0 +1,937 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#040a14">
+<title>Forecast Centre · S.E.N.T.R.Y.</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="/design-system.css">
+<script src="/app-shell.js" data-module="command"></script>
+<style>
+/* ===================================================================== S.E.N.T.R.Y. 3.0 Forecast Centre */
+:root{--fc-glass:rgba(11,24,43,.72);--fc-glass-2:rgba(9,20,37,.86);--fc-edge:rgba(126,178,230,.16);--fc-glow:rgba(56,214,255,.30);
+  --fc-cyan:#38d6ff;--fc-ice:#bfefff;--fc-watch:#ffb547;--fc-high:#ff8a3d;--fc-crit:#ff5566;--fc-ok:#2ee59d;--fc-unv:#8aa2bd;--fc-rain:#7cc8ff;--fc-demo:#a07bff;
+  --fc-gap:12px;--fc-r:12px;--fc-mapH:clamp(460px,calc(100vh - 360px),1100px)}
+body.ds-app{background:radial-gradient(1200px 600px at 60% -10%,rgba(47,140,255,.10),transparent 60%),var(--ds-void)}
+.fc{padding-top:14px}
+.fc-num{font-family:var(--ds-display);font-variant-numeric:tabular-nums}
+.fc-glass{position:relative;background:linear-gradient(180deg,var(--fc-glass),var(--fc-glass-2));border:1px solid var(--fc-edge);border-radius:var(--fc-r);
+  box-shadow:0 1px 0 rgba(255,255,255,.035) inset,0 18px 40px -28px rgba(0,0,0,.9);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);min-width:0}
+.fc-glass.lit:before{content:"";position:absolute;left:16px;right:16px;top:-1px;height:1px;background:linear-gradient(90deg,transparent,var(--fc-cyan),transparent);opacity:.7}
+.fc-h{display:flex;align-items:center;gap:10px;padding:12px 14px 10px;border-bottom:1px solid var(--fc-edge)}
+.fc-h h2{margin:0;font:600 15px/1.2 var(--ds-display);color:#fff;letter-spacing:.01em}
+.fc-h small{color:var(--ds-mut);font-size:12px}
+.fc-h .sp{flex:1}
+.fc-b{padding:12px 14px}
+.fc-muted{color:var(--ds-mut)}
+.fc-tag{display:inline-flex;align-items:center;gap:5px;height:20px;padding:0 7px;border-radius:6px;font:600 11px/1 var(--ds-font);border:1px solid var(--ds-line-2);color:var(--ds-text-2);white-space:nowrap;background:rgba(8,20,38,.6)}
+.fc-tag.crit{color:#ffd5da;border-color:rgba(255,85,102,.55);background:rgba(255,85,102,.14)}
+.fc-tag.high{color:#ffe0c7;border-color:rgba(255,138,61,.55);background:rgba(255,138,61,.13)}
+.fc-tag.watch{color:#ffe9c2;border-color:rgba(255,181,71,.5);background:rgba(255,181,71,.11)}
+.fc-tag.info{color:var(--ds-text-2)}
+.fc-tag.ver{color:#cff6ff;border-color:rgba(56,214,255,.5);background:rgba(56,214,255,.10)}
+.fc-tag.unv{color:#d5dfea;border-style:dashed;border-color:rgba(138,162,189,.7);background:transparent}
+.fc-tag.rej{color:#9fb2c7;border-color:rgba(138,162,189,.35)}
+.fc-tag.est{color:#d6efff;border-color:rgba(124,200,255,.5);border-style:dashed}
+.fc-tag.demo{color:#e9e0ff;border-color:rgba(160,123,255,.7);background:rgba(160,123,255,.18)}
+.fc-tag.stale{color:#ffe9c2;border-color:rgba(255,181,71,.6);border-style:dashed}
+.fc-tag.ok{color:#c9ffe9;border-color:rgba(46,229,157,.5);background:rgba(46,229,157,.10)}
+.fc-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--fc-unv);flex:none}
+.fc-dot.live{background:var(--fc-ok);box-shadow:0 0 0 3px rgba(46,229,157,.15)} .fc-dot.stale{background:var(--fc-watch)} .fc-dot.unavailable{background:var(--fc-crit)} .fc-dot.off,.fc-dot.idle{background:#53667c}
+
+/* ---------- command bar */
+.fc-bar{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px 18px;align-items:center;padding:12px 16px;margin-bottom:var(--fc-gap)}
+.fc-id{display:flex;align-items:center;gap:14px;min-width:0}
+.fc-mark{width:38px;height:38px;flex:none;border-radius:10px;display:grid;place-items:center;background:radial-gradient(circle at 50% 40%,rgba(56,214,255,.35),rgba(56,214,255,.04));border:1px solid rgba(56,214,255,.45)}
+.fc-mark svg{width:22px;height:22px}
+.fc-id h1{margin:0;font:600 24px/1.05 var(--ds-display);color:#fff;letter-spacing:.01em}
+.fc-id p{margin:3px 0 0;font-size:12.5px;color:var(--ds-mut)}
+.fc-meta{display:flex;align-items:center;gap:10px 14px;flex-wrap:wrap;justify-content:flex-end}
+.fc-clock{display:flex;flex-direction:column;align-items:flex-end;line-height:1}
+.fc-clock b{font:600 26px/1 var(--ds-display);font-variant-numeric:tabular-nums;color:#fff;letter-spacing:.02em}
+.fc-clock small{margin-top:4px;font-size:11.5px;color:var(--ds-mut)}
+.fc-pill{display:inline-flex;align-items:center;gap:7px;height:30px;padding:0 11px;border-radius:999px;border:1px solid var(--ds-line-2);background:rgba(8,20,38,.7);font:600 12px var(--ds-font);color:#fff;white-space:nowrap}
+.fc-pill.live{border-color:rgba(46,229,157,.5)} .fc-pill.demo{border-color:rgba(160,123,255,.7);background:rgba(160,123,255,.16)} .fc-pill.warn{border-color:rgba(255,181,71,.6)} .fc-pill.bad{border-color:rgba(255,85,102,.6)}
+.fc-pill .fc-dot{width:7px;height:7px}
+.fc-feeds{display:flex;align-items:center;gap:4px;height:30px;padding:0 10px;border-radius:999px;border:1px solid var(--ds-line-2);background:rgba(8,20,38,.7);cursor:pointer;color:var(--ds-text-2);font:600 12px var(--ds-font)}
+.fc-feeds .fc-dot{width:7px;height:7px}
+.fc-feeds span{margin-left:6px}
+.fc-crit{display:inline-flex;align-items:center;gap:7px;height:30px;padding:0 11px;border-radius:999px;border:1px solid rgba(255,85,102,.5);background:rgba(255,85,102,.12);color:#ffd5da;font:600 12px var(--ds-font);cursor:pointer}
+.fc-crit.zero{border-color:var(--ds-line-2);background:rgba(8,20,38,.7);color:var(--ds-text-2)}
+.fc-wx{display:inline-flex;align-items:center;gap:7px;height:30px;padding:0 11px;border-radius:999px;border:1px solid var(--ds-line-2);background:rgba(8,20,38,.7);font:500 12px var(--ds-font);color:var(--ds-text-2);max-width:280px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fc-wx svg{width:16px;height:16px;flex:none}
+.fc-upd{font-size:12px;color:var(--ds-mut);white-space:nowrap}
+.fc-feedpop{position:absolute;right:16px;top:calc(100% + 6px);z-index:60;width:min(440px,calc(100vw - 32px));padding:10px 12px;display:none}
+.fc-feedpop.on{display:block}
+.fc-feedpop table{width:100%;border-collapse:collapse;font-size:12.5px}
+.fc-feedpop td{padding:5px 4px;border-bottom:1px solid var(--fc-edge);vertical-align:top;color:var(--ds-text-2)}
+.fc-feedpop td:first-child{white-space:nowrap;color:#fff}
+
+/* ---------- KPI ribbon */
+.fc-kpis{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:var(--fc-gap);margin-bottom:var(--fc-gap)}
+.fc-kpi{position:relative;padding:11px 12px 10px 14px;min-height:96px;display:flex;flex-direction:column;overflow:hidden}
+.fc-kpi:after{content:"";position:absolute;left:0;top:12px;bottom:12px;width:2px;border-radius:0 2px 2px 0;background:var(--k,rgba(56,214,255,.6))}
+.fc-kpi[data-lv="critical"]{--k:var(--fc-crit)} .fc-kpi[data-lv="high"]{--k:var(--fc-high)} .fc-kpi[data-lv="watch"]{--k:var(--fc-watch)} .fc-kpi[data-lv="off"]{--k:#3b4c60}
+.fc-kpi .l{font:500 12px/1.25 var(--ds-font);color:var(--ds-text-2);display:flex;gap:6px;align-items:flex-start}
+.fc-kpi .l b{font-weight:500;flex:1}
+.fc-kpi .v{margin-top:6px;display:flex;align-items:baseline;gap:6px;font:600 32px/1 var(--ds-display);color:#fff;font-variant-numeric:tabular-nums}
+.fc-kpi .v small{font:500 13px var(--ds-font);color:var(--ds-mut)}
+.fc-kpi .v.na{font:600 15px/1.2 var(--ds-font);color:var(--ds-mut);margin-top:12px}
+.fc-kpi .s{margin-top:auto;padding-top:6px;font-size:11.5px;line-height:1.3;color:var(--ds-mut);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.fc-kpi svg.spark{position:absolute;right:8px;top:30px;width:64px;height:22px;opacity:.85}
+.fc-kpi[data-lv="critical"] .v{color:#ffd5da}
+
+/* ---------- main grid */
+.fc-grid{display:grid;grid-template-columns:minmax(300px,330px) minmax(0,1fr) minmax(330px,370px);gap:var(--fc-gap);align-items:start}
+.fc-side{display:flex;flex-direction:column;height:var(--fc-mapH);min-height:0}
+.fc-side .fc-scroll{flex:1;min-height:0;overflow:auto}
+.fc-mapwrap{position:relative;height:var(--fc-mapH);overflow:hidden;padding:0}
+#fcMap{position:absolute;inset:0;background:#07111f;border-radius:var(--fc-r)}
+#fcMap .maplibregl-canvas{outline:none}
+.fc-layers{position:absolute;left:10px;top:10px;z-index:5;display:flex;flex-wrap:wrap;gap:4px;max-width:calc(100% - 90px)}
+.fc-layers button{height:26px;padding:0 9px;border-radius:7px;border:1px solid var(--ds-line-2);background:rgba(5,11,21,.84);color:var(--ds-mut);font:600 11.5px var(--ds-font);cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+.fc-layers button i{width:9px;height:9px;border-radius:2px;display:inline-block;background:currentColor;opacity:.9}
+.fc-layers button[aria-pressed="true"]{color:#fff;border-color:rgba(56,214,255,.45);background:rgba(16,40,66,.9)}
+.fc-layers button[disabled]{opacity:.4;cursor:not-allowed}
+.fc-legend{position:absolute;left:10px;bottom:72px;z-index:5;padding:8px 10px;border-radius:9px;background:rgba(5,11,21,.86);border:1px solid var(--ds-line);font-size:11.5px;color:var(--ds-text-2);display:grid;gap:4px;max-width:260px}
+.fc-legend i{display:inline-block;width:18px;height:4px;border-radius:2px;margin-right:6px;vertical-align:middle}
+.fc-legend i.ring{width:10px;height:10px;border-radius:50%;background:transparent!important;border:2px dashed var(--fc-unv)}
+.fc-legend i.dot{width:10px;height:10px;border-radius:50%}
+/* the horizon scrubber: the page's one memorable element */
+.fc-hz{position:absolute;left:50%;transform:translateX(-50%);bottom:12px;z-index:6;display:grid;grid-template-columns:repeat(4,minmax(86px,1fr));gap:0;padding:4px;border-radius:14px;
+  background:rgba(4,12,24,.9);border:1px solid rgba(56,214,255,.32);box-shadow:0 12px 30px -12px rgba(0,0,0,.9),0 0 0 1px rgba(56,214,255,.06) inset;width:min(560px,calc(100% - 24px))}
+.fc-hz:before{content:"";position:absolute;left:12%;right:12%;top:50%;height:1px;background:linear-gradient(90deg,rgba(56,214,255,.0),rgba(56,214,255,.35),rgba(255,138,61,.35),rgba(255,85,102,0));pointer-events:none}
+.fc-hz button{position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:7px 6px 6px;border:0;border-radius:10px;background:transparent;color:var(--ds-mut);cursor:pointer;font:600 12px var(--ds-font)}
+.fc-hz button b{font:600 17px/1 var(--ds-display);color:var(--ds-text-2)}
+.fc-hz button small{font:500 10.5px/1.1 var(--ds-font);color:var(--ds-mut);white-space:nowrap}
+.fc-hz button[aria-pressed="true"]{background:linear-gradient(180deg,rgba(56,214,255,.20),rgba(56,214,255,.06));box-shadow:inset 0 0 0 1px rgba(56,214,255,.5)}
+.fc-hz button[aria-pressed="true"] b{color:#fff}
+.fc-hz button .ln{width:24px;height:3px;border-radius:2px;background:var(--c,#3b4c60)}
+.fc-mapnote{position:absolute;right:10px;top:10px;z-index:5;max-width:min(320px,48%);padding:7px 10px;border-radius:9px;background:rgba(5,11,21,.86);border:1px solid var(--ds-line);font-size:11.5px;color:var(--ds-text-2)}
+.fc-mapnote:empty{display:none}
+.fc-wm{position:absolute;inset:0;z-index:4;pointer-events:none;display:none;align-items:center;justify-content:center;overflow:hidden}
+.fc-wm span{transform:rotate(-18deg);font:700 clamp(40px,7vw,110px)/1 var(--ds-display);letter-spacing:.2em;color:rgba(160,123,255,.10);white-space:nowrap}
+body.fc-demo .fc-wm{display:flex}
+.fc-ribbon{position:absolute;right:52px;top:10px;z-index:7;background:#7c5be6;color:#fff;font:700 11px/1 var(--ds-font);letter-spacing:.16em;padding:8px 11px;border-radius:7px;display:none;box-shadow:0 4px 14px -4px rgba(0,0,0,.7)}
+body.fc-demo .fc-layers{max-width:calc(100% - 170px)}
+body.fc-demo .fc-mapwrap{box-shadow:inset 0 0 0 2px rgba(160,123,255,.55)}
+body.fc-demo .fc-ribbon{display:block}
+.maplibregl-popup-content,.leaflet-popup-content-wrapper{background:#0a1628!important;color:var(--ds-text)!important;border:1px solid rgba(56,214,255,.3);border-radius:10px!important;box-shadow:0 14px 34px -14px rgba(0,0,0,.95)!important;padding:10px 12px!important;font:13px/1.4 var(--ds-font);max-width:320px}
+.maplibregl-popup-tip{border-top-color:#0a1628!important;border-bottom-color:#0a1628!important}
+.leaflet-popup-tip{background:#0a1628!important}
+.maplibregl-popup-close-button{color:#9fb6d8;font-size:16px;padding:2px 6px}
+.fc-pop h4{margin:0 0 4px;font:600 14px/1.25 var(--ds-display);color:#fff}
+.fc-pop p{margin:4px 0;color:var(--ds-text-2);font-size:12.5px}
+.fc-pop .row{display:flex;gap:5px;flex-wrap:wrap;margin-top:6px}
+.fc-pop button{height:24px;padding:0 8px;border-radius:6px;border:1px solid rgba(56,214,255,.4);background:rgba(56,214,255,.08);color:#dff8ff;font:600 11.5px var(--ds-font);cursor:pointer}
+.fc-zone{width:18px;height:18px;border-radius:50%;background:radial-gradient(circle,var(--zc,#ff8a3d) 0 34%,transparent 36%);position:relative;cursor:pointer}
+.fc-zone:after{content:"";position:absolute;inset:-9px;border-radius:50%;border:2px solid var(--zc,#ff8a3d);opacity:.6}
+@media (prefers-reduced-motion:no-preference){.fc-zone.pulse:after{animation:fcp 1.8s ease-out infinite}}
+@keyframes fcp{0%{transform:scale(.5);opacity:.9}100%{transform:scale(1.6);opacity:0}}
+html.ds-reduce-motion .fc-zone:after{animation:none!important}
+
+/* ---------- service intelligence */
+.fc-search{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px;padding:12px 14px 10px;border-bottom:1px solid var(--fc-edge)}
+.fc-search .ds-segm button{height:30px;padding:0 10px}
+.fc-svc-h{display:flex;align-items:flex-start;gap:12px;margin-bottom:10px}
+.fc-svcno{min-width:64px;padding:7px 8px 6px;border-radius:9px;text-align:center;background:#081426;border:1px solid var(--ds-line-2)}
+.fc-svcno b{display:block;font:600 24px/1 var(--ds-display);color:#fff}
+.fc-svcno small{display:block;margin-top:3px;font-size:11px;color:var(--ds-mut)}
+.fc-svc-t{min-width:0;flex:1}
+.fc-svc-t p{margin:2px 0 0;font-size:12.5px;color:var(--ds-text-2)}
+.fc-sec{margin-top:14px}
+.fc-sec h3{margin:0 0 7px;font:600 12.5px/1.2 var(--ds-font);color:var(--ds-text-2);display:flex;align-items:center;gap:8px}
+.fc-sec h3 .sp{flex:1}
+.fc-ev{padding:8px 9px;border-radius:9px;border:1px solid var(--fc-edge);background:rgba(8,18,33,.55);margin-bottom:6px;font-size:12.5px;color:var(--ds-text-2)}
+.fc-ev b{color:#fff;font-weight:600}
+.fc-ev.rej{opacity:.82}
+.fc-ev details summary{cursor:pointer;color:var(--ds-mut);font-size:12px;margin-top:4px;list-style:none}
+.fc-ev details summary::-webkit-details-marker{display:none}
+.fc-ev details summary:before{content:"+ ";color:var(--fc-cyan)}
+.fc-ev details[open] summary:before{content:"– "}
+.fc-ev .why{margin-top:5px;color:var(--ds-text-2);line-height:1.4}
+.fc-links{display:flex;flex-wrap:wrap;gap:6px}
+.fc-links a{display:inline-flex;align-items:center;height:28px;padding:0 10px;border-radius:7px;border:1px solid var(--ds-line-2);background:rgba(16,34,58,.7);color:var(--ds-text);font:600 12px var(--ds-font);text-decoration:none}
+.fc-links a:hover{border-color:rgba(56,214,255,.5)}
+.fc-rec{width:100%;border-collapse:collapse;font-size:12px}
+.fc-rec td{padding:6px 4px;border-top:1px solid var(--fc-edge);vertical-align:top;color:var(--ds-text-2)}
+.fc-rec td b{color:#fff}
+.fc-rec .chk{display:block;color:var(--ds-mut)} .fc-rec .chk.y:before{content:"✓ ";color:var(--fc-ok)} .fc-rec .chk.n:before{content:"✗ ";color:var(--fc-crit)} .fc-rec .chk.q:before{content:"• ";color:var(--fc-watch)}
+.fc-rec tr.best td{background:rgba(56,214,255,.06)}
+.fc-bar2{height:8px;border-radius:5px;background:rgba(124,200,255,.12);overflow:hidden}
+.fc-bar2 i{display:block;height:100%;background:linear-gradient(90deg,#4aa8ff,#9be7ff)}
+.fc-empty{padding:16px 6px;color:var(--ds-mut);font-size:13px;line-height:1.5}
+.fc-empty b{color:#fff}
+
+/* ---------- alert centre */
+.fc-tabs{display:flex;gap:2px;padding:8px 10px;border-bottom:1px solid var(--fc-edge)}
+.fc-tabs button{flex:1;height:30px;border:0;border-radius:7px;background:transparent;color:var(--ds-mut);font:600 12px var(--ds-font);cursor:pointer}
+.fc-tabs button[aria-pressed="true"]{background:rgba(56,214,255,.12);color:#fff;box-shadow:inset 0 0 0 1px rgba(56,214,255,.35)}
+.fc-alerts{display:grid;gap:8px;padding:10px}
+.fc-al{position:relative;padding:10px 11px 10px 14px;border-radius:10px;border:1px solid var(--fc-edge);background:rgba(8,18,33,.78);transition:opacity .25s}
+.fc-al:before{content:"";position:absolute;left:0;top:9px;bottom:9px;width:3px;border-radius:0 3px 3px 0;background:var(--c,var(--fc-unv))}
+.fc-al.critical{--c:var(--fc-crit);border-color:rgba(255,85,102,.35)} .fc-al.high{--c:var(--fc-high)} .fc-al.watch{--c:var(--fc-watch)} .fc-al.info{--c:#4b6a8a}
+.fc-al.faded{opacity:.55} .fc-al.faded:hover{opacity:.9}
+.fc-al.unv{border-style:dashed}
+.fc-al.focus{box-shadow:0 0 0 2px rgba(56,214,255,.6)}
+.fc-al .t1{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.fc-al h4{margin:5px 0 2px;font:600 14px/1.25 var(--ds-display);color:#fff}
+.fc-al .loc{font-size:12px;color:var(--ds-text-2)}
+.fc-al .svcs{display:flex;gap:4px;flex-wrap:wrap;margin-top:6px}
+.fc-al .svcs button{height:22px;padding:0 7px;border-radius:6px;border:1px solid rgba(56,214,255,.35);background:rgba(56,214,255,.07);color:#dff8ff;font:600 11.5px var(--ds-font);cursor:pointer}
+.fc-al .svcs button.unv{border-style:dashed;border-color:rgba(138,162,189,.6);background:transparent;color:#d5dfea}
+.fc-al .dl{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;margin-top:7px}
+.fc-al .dl div{padding:5px 6px;border-radius:7px;background:rgba(4,12,24,.6);border:1px solid var(--fc-edge);text-align:center}
+.fc-al .dl div.on{border-color:rgba(56,214,255,.45)}
+.fc-al .dl b{display:block;font:600 15px/1 var(--ds-display);color:#fff}
+.fc-al .dl small{font-size:10.5px;color:var(--ds-mut)}
+.fc-al .meta{margin-top:7px;font-size:11.5px;color:var(--ds-mut);line-height:1.45}
+.fc-al .act{margin-top:7px;font-size:12px;color:#d9eaff;line-height:1.4;padding:6px 8px;border-radius:7px;background:rgba(56,214,255,.05);border:1px solid rgba(56,214,255,.14)}
+.fc-al .foot{display:flex;align-items:center;gap:6px;margin-top:8px;flex-wrap:wrap}
+.fc-al .foot .sp{flex:1}
+.fc-al details{margin-top:6px;font-size:12px;color:var(--ds-text-2)}
+.fc-al details summary{cursor:pointer;color:var(--ds-mut)}
+.fc-al details li{margin:4px 0}
+.fc-audit{padding:10px;font-size:12px;color:var(--ds-text-2)}
+.fc-audit div{padding:6px 0;border-bottom:1px solid var(--fc-edge)}
+.fc-audit b{color:#fff;font-weight:600}
+
+/* ---------- lower row */
+.fc-low{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr) minmax(0,.95fr);gap:var(--fc-gap);margin-top:var(--fc-gap)}
+.fc-cmp{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.fc-cmp>div{padding:10px;border-radius:10px;border:1px solid var(--fc-edge);background:rgba(4,12,24,.5);cursor:pointer}
+.fc-cmp>div.on{border-color:rgba(56,214,255,.5);background:rgba(56,214,255,.06)}
+.fc-cmp h3{margin:0;font:600 18px/1 var(--ds-display);color:#fff}
+.fc-cmp .row{display:flex;gap:5px;flex-wrap:wrap;margin:8px 0}
+.fc-cmp .tot{font:600 22px/1 var(--ds-display);color:#fff}
+.fc-cmp .tot small{font:500 11.5px var(--ds-font);color:var(--ds-mut)}
+.fc-cmp ul{margin:6px 0 0;padding:0;list-style:none;font-size:12px;color:var(--ds-text-2)}
+.fc-cmp li{padding:2px 0}
+.fc-cmp .note{margin-top:6px;font-size:11.5px;color:var(--ds-mut)}
+.fc-tbl{width:100%;border-collapse:collapse;font-size:12.5px}
+.fc-tbl th{text-align:left;font:600 11.5px var(--ds-font);color:var(--ds-mut);padding:6px 6px;border-bottom:1px solid var(--fc-edge)}
+.fc-tbl td{padding:7px 6px;border-bottom:1px solid var(--fc-edge);color:var(--ds-text-2);vertical-align:middle}
+.fc-tbl td b{color:#fff}
+.fc-tbl tr{cursor:pointer} .fc-tbl tr:hover td{background:rgba(56,214,255,.04)}
+.fc-int{font-size:12.5px;color:var(--ds-text-2)}
+.fc-int .src{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:4px 8px;align-items:center;padding:5px 0;border-bottom:1px solid var(--fc-edge)}
+.fc-int .src b{color:#fff;font-weight:500}
+.fc-int .src small{grid-column:2/4;color:var(--ds-mut);font-size:11.5px}
+.fc-int p{margin:8px 0 0;line-height:1.45}
+
+/* ---------- demo bar / presentation */
+.fc-demobar{position:sticky;bottom:10px;z-index:30;margin-top:var(--fc-gap);display:none;grid-template-columns:auto minmax(0,1fr) auto;gap:14px;align-items:center;padding:10px 12px;
+  border-color:rgba(160,123,255,.55)!important;background:linear-gradient(180deg,rgba(28,18,58,.92),rgba(14,12,36,.95))!important}
+body.fc-demo .fc-demobar{display:grid}
+.fc-steps{display:flex;gap:4px;min-width:0;overflow-x:auto}
+.fc-steps button{flex:1;min-width:92px;display:flex;flex-direction:column;align-items:flex-start;gap:2px;padding:6px 8px;border-radius:8px;border:1px solid rgba(160,123,255,.25);background:rgba(160,123,255,.06);color:#cfc2ff;cursor:pointer;text-align:left}
+.fc-steps button small{font:600 10.5px var(--ds-font);color:#a998e6}
+.fc-steps button span{font:600 12px/1.2 var(--ds-font);white-space:nowrap}
+.fc-steps button.done{background:rgba(160,123,255,.14)}
+.fc-steps button[aria-current="step"]{background:rgba(160,123,255,.32);border-color:rgba(200,180,255,.8);color:#fff}
+.fc-say{grid-column:1/-1;font-size:13.5px;line-height:1.45;color:#ece6ff;min-height:20px}
+.fc-say b{color:#fff}
+.fc-dctl{display:flex;gap:6px}
+.fc-dctl .ds-btn{height:32px}
+body.fc-present{padding:0!important}
+body.fc-present .ds-side,body.fc-present .ds-cmd,body.fc-present .ds-bnav,body.fc-present .ds-scrim{display:none!important}
+body.fc-present .fc{max-width:none;padding:10px 12px 0}
+body.fc-present{--fc-mapH:calc(100vh - 300px)}
+body.fc-present.fc-demo{--fc-mapH:calc(100vh - 380px)}
+body.fc-present .fc-low{display:none}
+.fc-exit{display:none}
+body.fc-present .fc-exit{display:inline-flex}
+body.fc-present .fc-enter{display:none}
+.fc-summary{display:none}
+body.fc-present .fc-summary{display:block}
+.fc-summary .big{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;padding:12px 14px}
+.fc-summary .big div{padding:10px;border-radius:10px;background:rgba(4,12,24,.6);border:1px solid var(--fc-edge)}
+.fc-summary .big b{display:block;font:600 34px/1 var(--ds-display);color:#fff}
+.fc-summary .big small{font-size:12px;color:var(--ds-mut)}
+body.fc-present .fc-svcpanel .fc-search{display:none}
+body.fc-present .fc-svcpanel .fc-svch{display:none}
+body.fc-demo{--fc-mapH:clamp(420px,calc(100vh - 470px),1100px)}
+.fc-legend.off{display:none}
+
+/* ---------- responsive: 2K / 4K control-room screens, laptop, phone */
+@media (min-width:2200px){:root{--fc-gap:16px} .fc-grid{grid-template-columns:minmax(360px,420px) minmax(0,1fr) minmax(400px,460px)} .fc-kpi .v{font-size:40px} .fc-kpi{min-height:112px} .fc-id h1{font-size:30px}}
+@media (min-width:2600px){.fc.ds-page{max-width:none}}
+@media (min-width:3200px){:root{--fc-gap:20px} .fc-grid{grid-template-columns:minmax(520px,600px) minmax(0,1fr) minmax(560px,640px)} .fc-kpi{min-height:150px;padding:16px 18px} .fc-kpi .v{font-size:56px} .fc-kpi .l{font-size:17px} .fc-kpi .s{font-size:15px}
+  .fc-id h1{font-size:40px} .fc-id p{font-size:16px} .fc-clock b{font-size:38px} .fc-clock small{font-size:15px} .fc-h h2{font-size:21px} .fc-h small{font-size:15px} .fc-al h4{font-size:19px}
+  .fc-al,.fc-ev,.fc-tbl,.fc-int,.fc-svc-t p,.fc-sec p{font-size:15.5px} .fc-al .loc,.fc-al .meta{font-size:14.5px} .fc-al .act{font-size:15px} .fc-tag{font-size:13px;height:25px;padding:0 9px}
+  .fc-pill,.fc-feeds,.fc-crit,.fc-wx{height:40px;font-size:16px;padding:0 14px} .fc-wx{max-width:440px} .fc-upd{font-size:15px} .ds-segm button{height:36px;font-size:15px;padding:0 16px} .fc-sec h3{font-size:15.5px}
+  .fc-tbl th{font-size:14px} .fc-cmp h3{font-size:24px} .fc-cmp .tot{font-size:28px} .fc-cmp li,.fc-cmp .note{font-size:15px} .fc-legend{font-size:14px;max-width:340px} .fc-tabs button{height:38px;font-size:15px}
+  .fc-hz{width:min(820px,calc(100% - 24px))} .fc-hz button b{font-size:24px} .fc-hz button small{font-size:13px} .fc-layers button{height:34px;font-size:14px} .fc-al .dl b{font-size:20px} .fc-al .svcs button{height:28px;font-size:14px}
+  :root{--fc-mapH:calc(100vh - 560px)} .fc-say{font-size:17px} .fc-steps button span{font-size:15px} .fc-summary .big b{font-size:46px} .fc-summary .big small{font-size:15px}}
+@media (max-width:1600px){.fc-kpis{grid-template-columns:repeat(4,minmax(0,1fr))} .fc-bar{grid-template-columns:minmax(0,1fr)} .fc-meta{justify-content:flex-start;min-width:0} .fc-clock{margin-left:auto}}
+@media (max-width:1799px){.fc-grid{grid-template-columns:minmax(0,1fr) minmax(320px,350px)} .fc-svcpanel{grid-column:1/-1;order:3;height:auto!important} .fc-svcpanel .fc-scroll{max-height:none}}
+@media (max-width:1360px){.fc-low{grid-template-columns:minmax(0,1fr) minmax(0,1fr)} .fc-low>:first-child{grid-column:1/-1}}
+@media (max-width:999px){:root{--fc-mapH:58vh} body.fc-demo{--fc-mapH:52vh} .fc-bar{grid-template-columns:minmax(0,1fr)} .fc-meta{justify-content:flex-start;min-width:0} .fc-wx{min-width:0;max-width:100%;flex:1 1 220px}
+  .fc-grid{grid-template-columns:minmax(0,1fr)} .fc-alertpanel{height:auto!important;max-height:none} .fc-alertpanel .fc-scroll{max-height:70vh}
+  .fc-low{grid-template-columns:minmax(0,1fr)} .fc-demobar{grid-template-columns:minmax(0,1fr)} .fc-dctl{justify-content:flex-start}}
+@media (max-width:640px){.fc-kpis{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px} .fc-kpi{min-height:0;padding:9px 10px 8px 12px} .fc-kpi .v{font-size:24px;margin-top:4px} .fc-kpi .v.na{font-size:13px;margin-top:6px} .fc-kpi .s{-webkit-line-clamp:1;font-size:11px} .fc-kpi .l{font-size:11.5px} .fc-kpi svg.spark{display:none}
+  .fc-feeds .fc-dot{display:none} .fc-feeds .fc-dot.live:first-child{display:inline-block} .fc-meta{gap:8px} .fc-bar{padding:12px}
+  .fc-id h1{font-size:20px} .fc-clock b{font-size:20px} .fc-cmp{grid-template-columns:minmax(0,1fr)} .fc-wx{max-width:100%}
+  .fc-hz{grid-template-columns:repeat(4,minmax(0,1fr));bottom:8px} .fc-hz button small{display:none} .fc-legend{display:none} .fc-mapnote{max-width:60%}}
+</style>
+</head>
+<body>
+<main class="ds-page fc" id="main">
+  <header class="fc-glass lit fc-bar" id="fcBar" style="position:relative">
+    <div class="fc-id">
+      <div class="fc-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="#38d6ff" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="8.5" opacity=".45"/><circle cx="12" cy="12" r="4.5" opacity=".75"/><path d="M12 12l6-6"/><circle cx="12" cy="12" r="1.4" fill="#38d6ff"/></svg></div>
+      <div><h1>Forecast Centre</h1><p id="fcSub">S.E.N.T.R.Y. predictive operations – verified route impact, forecast 15 / 30 / 60 min ahead</p></div>
+    </div>
+    <div class="fc-meta">
+      <div class="ds-segm" role="group" aria-label="Data mode"><button type="button" data-mode="live" aria-pressed="true">Live</button><button type="button" data-mode="demo" aria-pressed="false">Demo</button></div>
+      <span class="fc-pill" id="fcMode"><i class="fc-dot"></i><span>Checking</span></span>
+      <button type="button" class="fc-feeds" id="fcFeeds" aria-expanded="false" aria-controls="fcFeedPop" title="Data sources"></button>
+      <button type="button" class="fc-crit zero" id="fcCrit" title="Critical unacknowledged warnings">0 critical</button>
+      <span class="fc-wx" id="fcWx" title="NEA 2-hour forecast">Weather –</span>
+      <span class="fc-upd" id="fcUpd">–</span>
+      <div class="fc-clock"><b id="fcClock">--:--:--</b><small id="fcDate">Singapore time</small></div>
+      <button type="button" class="ds-btn sm fc-enter" id="fcPresent" title="Full-screen presentation">Present</button>
+      <button type="button" class="ds-btn sm fc-exit" id="fcExit">Exit presentation</button>
+    </div>
+    <div class="fc-glass fc-feedpop" id="fcFeedPop" role="dialog" aria-label="Data sources"></div>
+  </header>
+
+  <section class="fc-kpis" id="fcKpis" aria-label="Executive KPIs"></section>
+
+  <div class="fc-grid">
+    <aside class="fc-glass fc-side fc-svcpanel" aria-label="Service intelligence">
+      <div class="fc-summary" id="fcSummary"></div>
+      <div class="fc-h fc-svch"><h2>Service intelligence</h2><span class="sp"></span><small id="fcSvcMode"></small></div>
+      <div class="fc-search">
+        <input class="ds-input" id="fcSvcIn" list="fcSvcList" placeholder="Service, e.g. 12" autocomplete="off" aria-label="Bus service">
+        <div class="ds-segm" id="fcDir" role="group" aria-label="Direction"><button type="button" data-d="1" aria-pressed="true">Dir 1</button><button type="button" data-d="2" aria-pressed="false">Dir 2</button></div>
+        <datalist id="fcSvcList"></datalist>
+      </div>
+      <div class="fc-scroll"><div class="fc-b" id="fcSvc"><div class="fc-empty">Pick a service to see its route, the events that really touch it (and the ones rejected, with the reason), the predicted extra running time and recovery options.</div></div></div>
+    </aside>
+
+    <section class="fc-glass fc-mapwrap" aria-label="Singapore forecast map">
+      <div id="fcMap" role="region" aria-label="Map"></div>
+      <div class="fc-wm" aria-hidden="true"><span>DEMO</span></div>
+      <div class="fc-ribbon" aria-hidden="true">DEMO</div>
+      <div class="fc-layers" id="fcLayers" role="group" aria-label="Map layers"></div>
+      <div class="fc-mapnote" id="fcMapNote" role="status"></div>
+      <div class="fc-legend" id="fcLegend"></div>
+      <div class="fc-hz" id="fcHz" role="group" aria-label="Forecast horizon"></div>
+    </section>
+
+    <aside class="fc-glass fc-side fc-alertpanel" aria-label="Predictive alert centre">
+      <div class="fc-h"><h2>Alert centre</h2><span class="sp"></span><small id="fcAlCount"></small></div>
+      <div class="fc-tabs" role="group" aria-label="Alert view">
+        <button type="button" data-tab="active" aria-pressed="true">Active</button><button type="button" data-tab="acked" aria-pressed="false">Acknowledged</button>
+        <button type="button" data-tab="history" aria-pressed="false">Cleared</button><button type="button" data-tab="audit" aria-pressed="false">Audit</button>
+      </div>
+      <div class="fc-scroll"><div id="fcAlerts" class="fc-alerts"></div></div>
+    </aside>
+  </div>
+
+  <div class="fc-low">
+    <section class="fc-glass" aria-label="Forecast comparison">
+      <div class="fc-h"><h2>Forecast comparison</h2><span class="sp"></span><small id="fcMethodS">rule-based estimate</small></div>
+      <div class="fc-b"><div class="fc-cmp" id="fcCmp"></div></div>
+    </section>
+    <section class="fc-glass" aria-label="Services at risk">
+      <div class="fc-h"><h2>Services at risk</h2><span class="sp"></span><small>verified evidence only</small></div>
+      <div class="fc-b" style="overflow:auto;max-height:340px"><table class="fc-tbl" id="fcTop"></table></div>
+    </section>
+    <section class="fc-glass" aria-label="Data integrity">
+      <div class="fc-h"><h2>Data integrity</h2><span class="sp"></span><small id="fcIntS"></small></div>
+      <div class="fc-b fc-int" id="fcInt"></div>
+    </section>
+  </div>
+
+  <section class="fc-glass fc-demobar" id="fcDemo" aria-label="Showcase scenario">
+    <span class="fc-tag demo">DEMO · fictional</span>
+    <div class="fc-steps" id="fcSteps" role="group" aria-label="Scenario steps"></div>
+    <div class="fc-dctl"><button type="button" class="ds-btn sm" id="fcPrev" aria-label="Previous step">◀</button><button type="button" class="ds-btn sm ai" id="fcPlay">Play</button><button type="button" class="ds-btn sm" id="fcNext" aria-label="Next step">▶</button></div>
+    <div class="fc-say" id="fcSay" role="status" aria-live="polite"></div>
+  </section>
+</main>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="/basemap.js"></script>
+<script src="/map3d.js"></script>
+<script>
+/* S.E.N.T.R.Y. 3.0 Forecast Centre - page script. Data: /api/forecast/* (live) or the fictional demo (mode=demo). Nothing here invents
+   a value: a KPI without data says Unavailable; demo data is always shown with DEMO indicators and never mixed into live. */
+(function(){
+"use strict";
+var $ = function(id){ return document.getElementById(id); };
+var esc = function(s){ return String(s == null ? "" : s).replace(/[&<>"']/g, function(c){ return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]; }); };
+var api = function(u, o){
+  if(window.DS && DS.api) return DS.api(u, o);
+  return fetch(u, Object.assign({credentials:"same-origin"}, o || {})).then(function(r){ return r.json(); }).catch(function(e){ return {error:String(e)}; });
+};
+var LV = {critical:3, high:2, watch:1, info:0};
+var LVN = {critical:"Critical", high:"High", watch:"Watch", info:"Info"};
+var COL = {critical:"#ff5566", high:"#ff8a3d", watch:"#ffb547", info:"#6f93b8", ver:"#38d6ff", unv:"#8aa2bd", rain:"#7cc8ff", ok:"#2ee59d", demo:"#a07bff", works:"#e7b85c"};
+var HZ = [0, 15, 30, 60];
+var SRC = [["tomtom_incidents", "TomTom incidents & jams"], ["tomtom_flow", "Traffic flow probes"], ["lta_incidents", "LTA incidents"], ["lta_roadworks", "LTA road works"],
+           ["nea_rain", "NEA rainfall"], ["nea_forecast", "NEA 2-h forecast"], ["route_index", "Route geometry"]];
+var KPI_ORDER = ["verified_incidents", "services_affected", "congestion_zones", "predicted_disruptions", "rain_exposure", "roadworks", "model_confidence", "critical_unacked"];
+var REASON = {opposite_direction:"Opposite carriageway / direction", parallel_road:"Parallel road", crossing:"Only crosses the route", nearby:"Nearby, not on the route",
+              not_in_force:"Not in force", too_short:"Too little overlap", point_on_line:"Point only"};
+var KIND = {jam:"Jam", accident:"Accident", breakdown:"Broken-down vehicle", road_closed:"Road closed", lane_closed:"Lane closed", roadworks:"Road works",
+            flooding:"Flooding", hazard:"Hazard", other:"Incident", speed:"Abnormal slowdown", rain:"Heavy rain"};
+var qs = new URLSearchParams(location.search);
+var S = {mode:qs.get("demo") === "1" ? "demo" : "live", step:Math.max(0, Math.min(6, +(qs.get("step") || 0) || 0)), h:0, st:null, svc:null, dir:1, view:null,
+         tab:"active", hist:{}, timer:null, play:false, playT:null, hzT:null, present:false, svcs:[], demoAck:{}, busy:false, lastT:null, first:true,
+         lay:{flow:true, heat:false, events:true, unverified:true, works:true, rain:true, probes:true, zones:true, route:true, legend:window.innerWidth >= 1600}};
+function store(k, v){ try{ if(v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); }catch(e){ return null; } }
+try{ var sl = JSON.parse(store("fc.layers") || "null"); if(sl) Object.keys(S.lay).forEach(function(k){ if(typeof sl[k] === "boolean") S.lay[k] = sl[k]; }); }catch(e){}
+var hm = function(ts){ if(!ts) return "–"; var d = new Date(ts * 1000); return new Intl.DateTimeFormat("en-GB", {timeZone:"Asia/Singapore", hour:"2-digit", minute:"2-digit", hour12:false}).format(d); };
+var f1 = function(x){ return x == null || isNaN(x) ? "–" : (Math.round(x * 10) / 10).toFixed(Math.abs(x) >= 10 ? 0 : 1); };
+var lvTag = function(lv){ return '<span class="fc-tag ' + esc(lv) + '">' + esc(LVN[lv] || lv) + '</span>'; };
+var isDemo = function(){ return S.mode === "demo"; };
+
+/* ------------------------------------------------------------------ clock (Singapore time; the demo shows its own fictional clock) */
+function tick(){
+  var d = new Date(), o = {timeZone:"Asia/Singapore"};
+  if(isDemo() && S.st && S.st.demo){ $("fcClock").textContent = S.st.demo.clock; $("fcDate").textContent = "Fictional demo time"; return; }
+  $("fcClock").textContent = new Intl.DateTimeFormat("en-GB", Object.assign({hour:"2-digit", minute:"2-digit", second:"2-digit", hour12:false}, o)).format(d);
+  $("fcDate").textContent = new Intl.DateTimeFormat("en-GB", Object.assign({weekday:"short", day:"numeric", month:"short", year:"numeric"}, o)).format(d) + " SGT";
+}
+setInterval(tick, 1000); tick();
+
+/* ------------------------------------------------------------------ small SVG charts */
+function spark(vals){
+  if(!vals || vals.length < 2) return "";
+  var mx = Math.max.apply(null, vals), mn = Math.min.apply(null, vals), w = 64, h = 22, n = vals.length;
+  var pts = vals.map(function(v, i){ return (i * (w - 2) / (n - 1) + 1).toFixed(1) + "," + (h - 2 - (mx === mn ? .5 : (v - mn) / (mx - mn)) * (h - 4)).toFixed(1); }).join(" ");
+  return '<svg class="spark" viewBox="0 0 64 22" aria-hidden="true"><polyline points="' + pts + '" fill="none" stroke="#38d6ff" stroke-width="1.5" stroke-linejoin="round" opacity=".8"/></svg>';
+}
+function rangeChart(extra, hw){
+  var H = [15, 30, 60], mx = 4, w = 280, rowH = 30, top = 8, left = 44, right = 50;
+  H.forEach(function(h){ var e = extra[h] || extra[String(h)] || {}; mx = Math.max(mx, (e.hi || 0) * 1.1, (e.mid || 0) * 1.2); });
+  var hwv = hw || 10, th = [["watch", 2], ["high", Math.max(5, .5 * hwv)], ["critical", Math.max(10, .8 * hwv)]];
+  mx = Math.max(mx, th[1][1] * 1.05);
+  var X = function(v){ return left + Math.min(1, v / mx) * (w - left - right); }, H_ = top + H.length * rowH + 14;
+  var s = '<svg viewBox="0 0 ' + w + ' ' + H_ + '" width="100%" role="img" aria-label="Predicted extra running time by horizon">';
+  var lastX = -99;
+  th.forEach(function(t){ if(t[1] <= mx){ var x = X(t[1]); s += '<line x1="' + x + '" x2="' + x + '" y1="' + (top - 4) + '" y2="' + (top + H.length * rowH) + '" stroke="' + COL[t[0]] + '" stroke-dasharray="2 3" opacity=".7"/>';
+    if(x - lastX >= 38){ s += '<text x="' + x + '" y="' + (H_ - 2) + '" fill="' + COL[t[0]] + '" font-size="9.5" text-anchor="middle">' + t[0] + '</text>'; lastX = x; } } });
+  H.forEach(function(h, i){
+    var e = extra[h] || extra[String(h)] || {mid:0, lo:0, hi:0}, y = top + i * rowH + rowH / 2;
+    var c = e.mid >= th[2][1] ? COL.critical : e.mid >= th[1][1] ? COL.high : e.mid >= 2 ? COL.watch : COL.ver;
+    s += '<text x="0" y="' + (y + 4) + '" fill="#b6c8dd" font-size="12">+' + h + ' min</text>'
+      + '<line x1="' + left + '" x2="' + (w - right) + '" y1="' + y + '" y2="' + y + '" stroke="rgba(126,178,230,.18)"/>'
+      + '<rect x="' + X(e.lo || 0) + '" y="' + (y - 5) + '" width="' + Math.max(2, X(e.hi || 0) - X(e.lo || 0)) + '" height="10" rx="5" fill="' + c + '" opacity=".28"/>'
+      + '<rect x="' + (X(e.mid || 0) - 1.5) + '" y="' + (y - 8) + '" width="3" height="16" rx="1.5" fill="' + c + '"/>'
+      + '<text x="' + (w - 2) + '" y="' + (y + 4) + '" fill="#fff" font-size="13" font-weight="600" text-anchor="end">+' + f1(e.mid) + ' min</text>';
+  });
+  return s + '</svg>';
+}
+
+/* ------------------------------------------------------------------ map: MapLibre GL (WebGL) with a Leaflet fallback, one interface */
+var MV = {kind:null, ready:false, ml:null, lf:null, pop:null, zm:[], groups:{}, fitDone:false};
+function webgl(){ try{ var c = document.createElement("canvas"); return !!(c.getContext("webgl2") || c.getContext("webgl")); }catch(e){ return false; } }
+function geoCircle(lat, lon, m){ var out = [], kx = 111320 * Math.cos(lat * Math.PI / 180), ky = 110574; for(var i = 0; i <= 40; i++){ var a = i / 40 * 2 * Math.PI; out.push([lon + m * Math.cos(a) / kx, lat + m * Math.sin(a) / ky]); } return out; }
+function arrowImg(){ var c = document.createElement("canvas"); c.width = c.height = 24; var x = c.getContext("2d"); x.fillStyle = "#fff"; x.beginPath(); x.moveTo(6, 5); x.lineTo(19, 12); x.lineTo(6, 19); x.lineTo(9, 12); x.closePath(); x.fill(); return x.getImageData(0, 0, 24, 24); }
+function kindImg(ch, bg, fg, dashed){
+  var c = document.createElement("canvas"); c.width = c.height = 30; var x = c.getContext("2d");
+  x.beginPath(); x.arc(15, 15, 11.5, 0, Math.PI * 2); x.fillStyle = bg; x.fill(); x.lineWidth = 2; x.strokeStyle = fg; if(dashed) x.setLineDash([3, 2.5]); x.stroke(); x.setLineDash([]);
+  x.fillStyle = fg; x.font = "bold 13px system-ui,sans-serif"; x.textAlign = "center"; x.textBaseline = "middle"; x.fillText(ch, 15, 15.5); return x.getImageData(0, 0, 30, 30);
+}
+var ICON = {accident:"!", breakdown:"B", road_closed:"×", lane_closed:"⇥", roadworks:"W", flooding:"≈", hazard:"!", other:"i", jam:"J"};
+MV.init = function(){
+  if(MV.kind) return Promise.resolve();
+  var useML = webgl() && window.SG3D && SG3D.load && qs.get("map") !== "2d";
+  var p = useML ? SG3D.load().then(function(){ return new Promise(function(res, rej){
+    try{
+      var m = MV.ml = new maplibregl.Map({container:"fcMap", style:SG3D.style(), center:[103.82, 1.352], zoom:10.6, minZoom:9.2, maxZoom:18.5, attributionControl:false,
+                                          pitch:0, dragRotate:false, pitchWithRotate:false, fadeDuration:0});
+      m.addControl(new maplibregl.NavigationControl({showCompass:false}), "top-right");
+      m.addControl(new maplibregl.AttributionControl({compact:true, customAttribution:'<a href="https://openfreemap.org" target="_blank" rel="noopener">OpenFreeMap</a> · TomTom · LTA · NEA'}), "bottom-right");
+      var t = setTimeout(function(){ rej(new Error("map did not start")); }, 20000);
+      m.once("style.load", function(){ clearTimeout(t); try{ mlLayers(m); }catch(e){ return rej(e); } MV.kind = "ml"; MV.ready = true;
+        var at = document.querySelector("#fcMap .maplibregl-ctrl-attrib"); if(at) at.classList.remove("maplibregl-compact-show"); res(); });
+      m.on("error", function(e){ var sid = e && (e.sourceId || (e.source && e.source.id)); if(sid === "omt" && !MV.noTiles){ MV.noTiles = true; note("Basemap tiles not reachable – the forecast layers still draw."); } if(sid === "tt" && !MV.noTT){ MV.noTT = true; note("TomTom flow tiles unavailable."); } });
+    }catch(e){ rej(e); }
+  }); }) : Promise.reject(new Error("no WebGL"));
+  return p.catch(function(err){
+    if(MV.ml){ try{ MV.ml.remove(); }catch(e){} MV.ml = null; }
+    $("fcMap").innerHTML = "";
+    if(!window.L){ note("The map library could not be loaded. Everything else on the page works."); return; }
+    var m = MV.lf = L.map("fcMap", {zoomControl:true, attributionControl:false, preferCanvas:true}).setView([1.352, 103.82], 11);
+    if(window.SGBasemap) SGBasemap.add(m, {style:"dark", switcher:false}); else L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {maxZoom:19}).addTo(m);
+    ["flow", "rainarea", "heat", "events", "unverified", "works", "rain", "probes", "route", "zones"].forEach(function(k){ MV.groups[k] = L.layerGroup().addTo(m); });
+    MV.kind = "lf"; MV.ready = true;
+    note("2D map (" + (err && err.message === "no WebGL" ? "WebGL not available" : "the 3D map library could not start") + ").");
+  });
+};
+function mlLayers(m){
+  ["building-3d"].forEach(function(id){ if(m.getLayer(id)) m.setLayoutProperty(id, "visibility", "none"); });
+  m.addImage("fc-arr", arrowImg(), {sdf:true});
+  Object.keys(ICON).forEach(function(k){
+    m.addImage("fc-k-" + k, kindImg(ICON[k], "#0a1628", k === "roadworks" ? COL.works : k === "road_closed" ? COL.critical : "#ff8a3d", false));
+    m.addImage("fc-u-" + k, kindImg("?", "rgba(10,22,40,.85)", COL.unv, true));
+  });
+  var below = m.getLayer("road-label") ? "road-label" : undefined;
+  m.addSource("tt", {type:"raster", tiles:["/api/tomtom/tile/{z}/{x}/{y}.png"], tileSize:256, maxzoom:18});
+  m.addLayer({id:"tt-flow", type:"raster", source:"tt", paint:{"raster-opacity":.72}, layout:{visibility:"none"}}, below);
+  ["rainarea", "heat", "ev", "evp", "rain", "probe", "route", "rsec", "rcrit", "rrain", "rver", "stops"].forEach(function(id){ m.addSource(id, {type:"geojson", data:{type:"FeatureCollection", features:[]}}); });
+  m.addLayer({id:"rainarea", type:"fill", source:"rainarea", paint:{"fill-color":COL.rain, "fill-opacity":.07}});
+  m.addLayer({id:"rainarea-l", type:"line", source:"rainarea", paint:{"line-color":COL.rain, "line-opacity":.35, "line-width":1, "line-dasharray":[2, 2]}});
+  m.addLayer({id:"heat", type:"heatmap", source:"heat", layout:{visibility:"none"}, paint:{"heatmap-weight":["get", "w"], "heatmap-radius":["interpolate", ["linear"], ["zoom"], 9, 18, 14, 60],
+    "heatmap-intensity":1.1, "heatmap-opacity":.72, "heatmap-color":["interpolate", ["linear"], ["heatmap-density"], 0, "rgba(0,0,0,0)", .2, "rgba(255,181,71,.35)", .5, "rgba(255,138,61,.6)", .85, "rgba(255,85,102,.85)"]}});
+  m.addLayer({id:"route-casing", type:"line", source:"route", layout:{"line-cap":"round", "line-join":"round"}, paint:{"line-color":"#02070f", "line-width":["interpolate", ["linear"], ["zoom"], 10, 6, 16, 14], "line-opacity":.9}});
+  m.addLayer({id:"route-line", type:"line", source:"route", layout:{"line-cap":"round", "line-join":"round"}, paint:{"line-color":"#9be7ff", "line-width":["interpolate", ["linear"], ["zoom"], 10, 2.5, 16, 7], "line-opacity":.85}});
+  m.addLayer({id:"rsec", type:"line", source:"rsec", layout:{"line-cap":"round"}, paint:{"line-color":["get", "c"], "line-width":["interpolate", ["linear"], ["zoom"], 10, 3, 16, 8]}});
+  m.addLayer({id:"rrain", type:"line", source:"rrain", paint:{"line-color":COL.rain, "line-width":["interpolate", ["linear"], ["zoom"], 10, 7, 16, 18], "line-opacity":.35, "line-dasharray":[1, 1.2]}});
+  m.addLayer({id:"rcrit", type:"line", source:"rcrit", layout:{"line-cap":"round"}, paint:{"line-color":["get", "c"], "line-width":["interpolate", ["linear"], ["zoom"], 10, 9, 16, 22], "line-opacity":.35, "line-blur":4}});
+  m.addLayer({id:"route-arrow", type:"symbol", source:"route", layout:{"symbol-placement":"line", "symbol-spacing":90, "icon-image":"fc-arr", "icon-size":["interpolate", ["linear"], ["zoom"], 10, .45, 16, .8], "icon-rotation-alignment":"map", "icon-allow-overlap":true}, paint:{"icon-color":"#e8fbff", "icon-opacity":.9}});
+  m.addLayer({id:"ev-glow", type:"line", source:"ev", layout:{"line-cap":"round", "line-join":"round"}, paint:{"line-color":["get", "c"], "line-width":["*", ["get", "w"], 2.6], "line-opacity":["*", ["get", "o"], .28], "line-blur":5}});
+  m.addLayer({id:"ev-line", type:"line", source:"ev", layout:{"line-cap":"round", "line-join":"round"}, paint:{"line-color":["get", "c"], "line-width":["get", "w"], "line-opacity":["get", "o"]}});
+  m.addLayer({id:"ev-arrow", type:"symbol", source:"ev", minzoom:11.5, layout:{"symbol-placement":"line", "symbol-spacing":70, "icon-image":"fc-arr", "icon-size":.55, "icon-rotation-alignment":"map", "icon-allow-overlap":true}, paint:{"icon-color":["get", "c"], "icon-opacity":["get", "o"]}});
+  m.addLayer({id:"stops", type:"circle", source:"stops", minzoom:12, paint:{"circle-radius":3.2, "circle-color":"#07111f", "circle-stroke-color":"#9be7ff", "circle-stroke-width":1.4}});
+  m.addLayer({id:"probe", type:"circle", source:"probe", paint:{"circle-radius":["interpolate", ["linear"], ["zoom"], 10, 4, 15, 7], "circle-color":["get", "c"], "circle-stroke-color":"#02070f", "circle-stroke-width":1.5}});
+  m.addLayer({id:"rain", type:"circle", source:"rain", paint:{"circle-radius":["interpolate", ["linear"], ["get", "mmh"], 0, 2.5, 2.5, 5, 10, 9, 50, 15], "circle-color":["interpolate", ["linear"], ["get", "mmh"], 0, "#2a4a6a", .1, "#4aa8ff", 10, "#7cc8ff", 50, "#d8f3ff"],
+    "circle-opacity":["case", [">", ["get", "mmh"], 0], .85, .35], "circle-stroke-color":"#bfefff", "circle-stroke-width":["case", [">=", ["get", "mmh"], 10], 1.5, 0]}});
+  m.addLayer({id:"evp", type:"symbol", source:"evp", layout:{"icon-image":["get", "icon"], "icon-size":["interpolate", ["linear"], ["zoom"], 10, .7, 15, 1], "icon-allow-overlap":true}});
+  var hov = ["ev-line", "evp", "probe", "rain", "rsec", "stops"];
+  hov.forEach(function(id){ m.on("mouseenter", id, function(){ m.getCanvas().style.cursor = "pointer"; }); m.on("mouseleave", id, function(){ m.getCanvas().style.cursor = ""; }); });
+  m.on("click", function(e){
+    var f = m.queryRenderedFeatures(e.point, {layers:hov.filter(function(id){ return m.getLayer(id); })})[0];
+    if(!f) return;
+    var html = popHtml(f.layer.id === "ev-line" || f.layer.id === "evp" ? "event" : f.layer.id, f.properties);
+    if(html){ if(MV.pop) MV.pop.remove(); MV.pop = new maplibregl.Popup({maxWidth:"320px", closeButton:true}).setLngLat(e.lngLat).setHTML(html).addTo(m); }
+  });
+}
+function note(t){ $("fcMapNote").textContent = t || ""; }
+
+function evColour(e, h){
+  if(e.kind === "jam"){
+    var d = h ? ((e.fc || {})[h] || {}).mid : e.delay_s, mn = (d || 0) / 60;
+    return mn >= 5 ? COL.critical : mn >= 2 ? COL.high : mn >= .5 ? COL.watch : "#c7d6e6";
+  }
+  if(e.kind === "road_closed") return COL.critical;
+  if(e.kind === "roadworks") return COL.works;
+  if(e.status === "unverified") return COL.unv;
+  return LV[e.level] >= 2 ? COL[e.level] : (e.status === "confirmed" ? COL.ver : "#7f95ad");
+}
+function ratioColour(r){ return r == null ? "#6f8399" : r < .5 ? COL.critical : r < .7 ? COL.high : r < .85 ? COL.watch : COL.ok; }
+function probeRatio(p, h){ var v = h ? ((p.fc || {})[h] || [])[0] : p.cur, ref = p.base || p.ff; return v != null && ref ? v / ref : null; }
+function layerOn(k){ return !!S.lay[k]; }
+
+MV.update = function(){
+  if(!MV.ready) return;
+  var st = S.st || {}, h = S.h, ev = st.events || [], L_ = [], P_ = [], heat = [];
+  ev.forEach(function(e){
+    var isW = e.kind === "roadworks", unv = e.status === "unverified";
+    if(isW && !layerOn("works")) return;
+    if(!isW && unv && !layerOn("unverified")) return;
+    if(!isW && !unv && !layerOn("events")) return;
+    var props = {id:e.id, kind:e.kind, status:e.status, level:e.level, c:evColour(e, h), w:e.kind === "jam" ? (e.status === "confirmed" ? 5 : 3) : 4,
+                 o:e.status === "no_route_impact" ? .45 : 1, icon:(unv || e.status === "no_route_impact" && !e.line ? "fc-u-" : "fc-k-") + (ICON[e.kind] ? e.kind : "other")};
+    if(e.line && e.line.length > 1) L_.push({type:"Feature", properties:props, geometry:{type:"LineString", coordinates:e.line}});
+    if(e.pt && (!e.line || e.kind !== "jam")) P_.push({type:"Feature", properties:props, geometry:{type:"Point", coordinates:e.pt}});
+    if(e.kind === "jam" && e.line) { var mid = e.line[Math.floor(e.line.length / 2)]; heat.push({type:"Feature", properties:{w:Math.min(1, ((((e.fc || {})[h] || {}).mid || e.delay_s || 0) / 600))}, geometry:{type:"Point", coordinates:mid}}); }
+  });
+  var probes = layerOn("probes") ? (st.probes || []).map(function(p){ return {type:"Feature", properties:{key:p.key, c:ratioColour(probeRatio(p, h))}, geometry:{type:"Point", coordinates:[p.lon, p.lat]}}; }) : [];
+  var rain = layerOn("rain") ? ((st.rain || {}).stations || []).map(function(s){ return {type:"Feature", properties:{id:s.id, name:s.name, mmh:s.mmh, cls:s.cls}, geometry:{type:"Point", coordinates:[s.lon, s.lat]}}; }) : [];
+  var areas = layerOn("rain") ? ((st.rain || {}).areas || []).filter(function(a){ return a.rain; }).map(function(a){ return {type:"Feature", properties:{name:a.name, text:a.text}, geometry:{type:"Polygon", coordinates:[geoCircle(a.lat, a.lon, 2500)]}}; }) : [];
+  var v = S.view && !S.view.error && layerOn("route") ? S.view : null, route = [], sec = [], crit = [], rrain = [], stops = [];
+  if(v){
+    route.push({type:"Feature", properties:{}, geometry:{type:"LineString", coordinates:v.line}});
+    (v.sections || []).forEach(function(s){ if(s.line && s.line.length > 1) sec.push({type:"Feature", properties:{key:s.key, c:ratioColour(probeRatio(s, h))}, geometry:{type:"LineString", coordinates:s.line}}); });
+    (v.critical || []).forEach(function(c){ if(c.line && c.line.length > 1) crit.push({type:"Feature", properties:{c:c.kind === "road_closed" ? COL.critical : COL.high}, geometry:{type:"LineString", coordinates:c.line}}); });
+    ((v.rain || {}).segments || []).forEach(function(r){ if(r.line && r.line.length > 1) rrain.push({type:"Feature", properties:{}, geometry:{type:"LineString", coordinates:r.line}}); });
+    (v.stops || []).forEach(function(s, i){ stops.push({type:"Feature", properties:{name:s.name, code:s.code, km:s.km, i:i}, geometry:{type:"Point", coordinates:[s.lon, s.lat]}}); });
+  }
+  var FCo = function(f){ return {type:"FeatureCollection", features:f}; };
+  if(MV.kind === "ml"){
+    var m = MV.ml, set = function(id, f){ var s = m.getSource(id); if(s) s.setData(FCo(f)); };
+    set("ev", L_); set("evp", P_); set("heat", heat); set("probe", probes); set("rain", rain); set("rainarea", areas); set("route", route); set("rsec", sec); set("rcrit", crit); set("rrain", rrain); set("stops", stops);
+    var flowOk = !isDemo() && st.config && st.config.tomtom_key && layerOn("flow");
+    m.setLayoutProperty("tt-flow", "visibility", flowOk ? "visible" : "none");
+    m.setLayoutProperty("heat", "visibility", layerOn("heat") ? "visible" : "none");
+  } else if(MV.kind === "lf"){
+    var G = MV.groups; Object.keys(G).forEach(function(k){ G[k].clearLayers(); });
+    var ll = function(c){ return [c[1], c[0]]; };
+    if(!isDemo() && st.config && st.config.tomtom_key && layerOn("flow")) L.tileLayer("/api/tomtom/tile/{z}/{x}/{y}.png", {opacity:.7, maxZoom:18}).addTo(G.flow);
+    areas.forEach(function(a){ L.polygon(a.geometry.coordinates[0].map(ll), {color:COL.rain, weight:1, dashArray:"4 4", fillOpacity:.07}).addTo(G.rainarea); });
+    route.forEach(function(r){ L.polyline(r.geometry.coordinates.map(ll), {color:"#02070f", weight:9, opacity:.9}).addTo(G.route); L.polyline(r.geometry.coordinates.map(ll), {color:"#9be7ff", weight:4}).addTo(G.route); });
+    sec.forEach(function(s){ L.polyline(s.geometry.coordinates.map(ll), {color:s.properties.c, weight:6}).addTo(G.route); });
+    crit.forEach(function(s){ L.polyline(s.geometry.coordinates.map(ll), {color:s.properties.c, weight:16, opacity:.3}).addTo(G.route); });
+    rrain.forEach(function(s){ L.polyline(s.geometry.coordinates.map(ll), {color:COL.rain, weight:12, opacity:.3, dashArray:"3 4"}).addTo(G.route); });
+    stops.forEach(function(s){ L.circleMarker(ll(s.geometry.coordinates), {radius:3, color:"#9be7ff", weight:1.3, fillColor:"#07111f", fillOpacity:1}).bindPopup(popHtml("stops", s.properties)).addTo(G.route); });
+    L_.forEach(function(f){ var p = f.properties; L.polyline(f.geometry.coordinates.map(ll), {color:p.c, weight:p.w, opacity:p.o}).bindPopup(function(){ return popHtml("event", p); }).addTo(p.status === "unverified" ? G.unverified : p.kind === "roadworks" ? G.works : G.events); });
+    P_.forEach(function(f){ var p = f.properties, u = p.status !== "confirmed"; L.circleMarker(ll(f.geometry.coordinates), {radius:7, color:u ? COL.unv : p.c, weight:2, dashArray:u ? "3 3" : null, fillColor:"#0a1628", fillOpacity:.9}).bindPopup(function(){ return popHtml("event", p); }).addTo(u ? G.unverified : G.events); });
+    probes.forEach(function(f){ L.circleMarker(ll(f.geometry.coordinates), {radius:5, color:"#02070f", weight:1.5, fillColor:f.properties.c, fillOpacity:1}).bindPopup(function(){ return popHtml("probe", f.properties); }).addTo(G.probes); });
+    rain.forEach(function(f){ var r = f.properties.mmh; L.circleMarker(ll(f.geometry.coordinates), {radius:r > 0 ? 4 + Math.min(10, r / 4) : 2.5, color:"#bfefff", weight:r >= 10 ? 1.5 : 0, fillColor:r > 0 ? COL.rain : "#2a4a6a", fillOpacity:r > 0 ? .85 : .35}).bindPopup(function(){ return popHtml("rain", f.properties); }).addTo(G.rain); });
+  }
+  zones();
+};
+function zones(){
+  MV.zm.forEach(function(z){ z.remove(); }); MV.zm = [];
+  if(!layerOn("zones") || !MV.ready) return;
+  ((S.st || {}).zones || []).forEach(function(z){
+    var el = document.createElement("button"); el.type = "button"; el.className = "fc-zone" + (z.abnormal || z.max_mag >= 3 ? " pulse" : "");
+    el.style.setProperty("--zc", z.max_mag >= 3 || z.abnormal ? COL.critical : COL.high); el.setAttribute("aria-label", "Congestion zone " + (z.roads || []).join(", "));
+    var html = '<div class="fc-pop"><h4>Congestion risk zone</h4><p>' + esc((z.roads || []).join(", ") || "Road") + '</p><p>' + z.n + ' jam(s), ' + f1(z.km) + ' km, worst delay ' + f1(z.delay_min) + ' min</p><p>'
+      + (z.abnormal ? "<b>Abnormal</b> for this time of day" : z.recurring ? "Recurring at this time of day" : "Recurrence history still building") + '</p><p>' + z.services + ' verified service-direction(s)</p></div>';
+    if(MV.kind === "ml"){ var mk = new maplibregl.Marker({element:el}).setLngLat([z.lon, z.lat]).setPopup(new maplibregl.Popup({maxWidth:"300px"}).setHTML(html)).addTo(MV.ml); MV.zm.push(mk); }
+    else if(MV.kind === "lf"){ var mk2 = L.marker([z.lat, z.lon], {icon:L.divIcon({className:"", html:el.outerHTML, iconSize:[18, 18], iconAnchor:[9, 9]})}).bindPopup(html).addTo(MV.lf); MV.zm.push(mk2); }
+  });
+}
+function evById(id){ return ((S.st || {}).events || []).filter(function(e){ return e.id === id; })[0]; }
+function popHtml(kind, p){
+  if(kind === "event"){
+    var e = evById(p.id); if(!e) return "";
+    var st = e.status === "confirmed" ? '<span class="fc-tag ver">Verified on ' + e.services.length + ' service-direction' + (e.services.length === 1 ? "" : "s") + '</span>'
+      : e.status === "unverified" ? '<span class="fc-tag unv">Unverified</span>' : '<span class="fc-tag rej">No bus route affected</span>';
+    var d = e.delay_s != null ? '<p>Delay now ' + f1(e.delay_s / 60) + ' min' + (S.h && e.fc && e.fc[S.h] ? ', at +' + S.h + ' min ' + f1(e.fc[S.h].mid / 60) + ' min (' + esc(e.fc[S.h].trend) + ')' : "") + '</p>' : "";
+    var sv = e.services.map(function(s){ return '<button type="button" data-svc="' + esc(s.svc) + '" data-dir="' + s.dir + '">' + esc(s.svc) + ' d' + s.dir + (s.extra && s.extra[30] ? ' +' + f1(s.extra[30]) : '') + '</button>'; }).join("")
+      + (e.unverified_services || []).map(function(s){ return '<button type="button" data-svc="' + esc(s.svc) + '" data-dir="' + s.dir + '" style="border-style:dashed">' + esc(s.svc) + ' d' + s.dir + ' ?</button>'; }).join("");
+    return '<div class="fc-pop"><h4>' + esc(KIND[e.kind] || e.label) + (e.road ? ' – ' + esc(e.road) : '') + '</h4>' + (e.from || e.to ? '<p>' + esc(e.from || "") + (e.to ? ' → ' + esc(e.to) : '') + '</p>' : '')
+      + '<p>' + st + ' ' + (isDemo() ? '<span class="fc-tag demo">DEMO</span>' : '') + '</p>' + d + (e.pass_text ? '<p>' + esc(e.pass_text) + '</p>' : '')
+      + '<p class="fc-muted">' + esc(e.validity || "") + ' · ' + esc((e.sources || []).join(" + ")) + (e.recur_detail ? '<br>' + esc(e.recur_detail) : '') + '</p>'
+      + (e.n_rejected ? '<p class="fc-muted">' + e.n_rejected + ' nearby service line(s) checked and rejected.</p>' : '') + (sv ? '<div class="row">' + sv + '</div>' : '') + '</div>';
+  }
+  if(kind === "probe"){
+    var pr = ((S.st || {}).probes || []).filter(function(x){ return x.key === p.key; })[0] || ((S.view || {}).sections || []).filter(function(x){ return x.key === p.key; })[0]; if(!pr) return "";
+    return '<div class="fc-pop"><h4>Traffic speed – ' + esc(pr.road || "probe") + '</h4><p>Now <b>' + f1(pr.cur) + ' km/h</b> · ' + (pr.base ? 'usual ' + f1(pr.base) + ' km/h (' + pr.base_days + ' days of history)' : 'free-flow ' + f1(pr.ff) + ' km/h (no history yet)') + '</p>'
+      + '<p>Forecast: ' + [15, 30, 60].map(function(h){ var f = (pr.fc || {})[h]; return f ? '+' + h + ' ' + f1(f[0]) + ' (' + f1(f[1]) + '–' + f1(f[2]) + ')' : ''; }).join(" · ") + ' km/h</p>'
+      + '<p>' + esc(String((pr.state || {}).state || "").replace(/_/g, " ")) + ', ' + esc(pr.trend) + (pr.persist_min ? ', for ' + pr.persist_min + ' min' : '') + '</p><p class="fc-muted">' + esc(pr.dir_ok ? "Direction verified against the route." : pr.dir_txt || "") + '</p></div>';
+  }
+  if(kind === "rain") return '<div class="fc-pop"><h4>' + esc(p.name || "Rain gauge") + '</h4><p><b>' + f1(p.mmh) + ' mm/h</b> (' + esc(p.cls) + ') – observed at the gauge.</p><p class="fc-muted">Route exposure between gauges is estimated.</p></div>';
+  if(kind === "rsec") return popHtml("probe", p);
+  if(kind === "stops") return '<div class="fc-pop"><h4>' + esc(p.name) + '</h4><p>Stop ' + esc(p.code) + ' · route km ' + f1(p.km) + '</p></div>';
+  return "";
+}
+MV.fit = function(bounds, pad){
+  if(!MV.ready || !bounds) return;
+  if(MV.kind === "ml") MV.ml.fitBounds(bounds, {padding:pad || {top:60, bottom:110, left:40, right:60}, duration:S.first ? 0 : 900, maxZoom:15});
+  else if(MV.kind === "lf") MV.lf.fitBounds([[bounds[0][1], bounds[0][0]], [bounds[1][1], bounds[1][0]]], {padding:[40, 40], maxZoom:15});
+};
+function boundsOf(coords){
+  var b = null; coords.forEach(function(c){ if(!c) return; if(!b) b = [[c[0], c[1]], [c[0], c[1]]]; b[0][0] = Math.min(b[0][0], c[0]); b[0][1] = Math.min(b[0][1], c[1]); b[1][0] = Math.max(b[1][0], c[0]); b[1][1] = Math.max(b[1][1], c[1]); });
+  return b;
+}
+function fitScene(){
+  var st = S.st || {}, cs = [];
+  if(S.view && S.view.line && !S.view.error){ MV.fit(boundsOf(S.view.line)); return; }
+  if(isDemo()){
+    (st.events || []).forEach(function(e){ (e.line || []).forEach(function(c){ cs.push(c); }); if(e.pt) cs.push(e.pt); });
+    var wet = ((st.rain || {}).stations || []).filter(function(s){ return s.mmh > 0; }); wet.forEach(function(s){ cs.push([s.lon, s.lat]); });
+    if(S.step >= 1 && S.step <= 5){ cs = []; (st.events || []).forEach(function(e){ if(e.kind === "jam" || e.kind === "accident") (e.line || []).forEach(function(c){ cs.push(c); }); if(e.kind === "accident" && e.pt) cs.push(e.pt); }); }
+    var b = boundsOf(cs); if(b){ b[0][0] -= .01; b[1][0] += .01; b[0][1] -= .006; b[1][1] += .006; } MV.fit(b);
+  } else MV.fit([[103.61, 1.24], [104.03, 1.46]], {top:40, bottom:90, left:20, right:20});
+}
+
+/* ------------------------------------------------------------------ rendering */
+function renderBar(){
+  var st = S.st || {}, src = st.sources || {}, mode = $("fcMode"), live = 0, n = 0;
+  document.querySelectorAll('[data-mode]').forEach(function(b){ b.setAttribute("aria-pressed", String(b.getAttribute("data-mode") === S.mode)); });
+  var dots = SRC.map(function(s){ var x = src[s[0]] || {status:st.error ? "unavailable" : "idle"}; n++; if(x.status === "live") live++; return '<i class="fc-dot ' + esc(x.status) + '" title="' + esc(s[1] + ": " + x.status) + '"></i>'; }).join("");
+  $("fcFeeds").innerHTML = dots + '<span>' + live + '/' + n + ' feeds</span>';
+  var core = ["tomtom_incidents", "route_index"].map(function(k){ return (src[k] || {}).status; });
+  if(isDemo()){ mode.className = "fc-pill demo"; mode.innerHTML = '<i class="fc-dot" style="background:#a07bff"></i><span>DEMO · fictional data</span>'; }
+  else if(st.error && !st.kpis.length){ mode.className = "fc-pill warn"; mode.innerHTML = '<i class="fc-dot stale"></i><span>Starting</span>'; }
+  else if(core.indexOf("unavailable") >= 0 || core.indexOf("off") >= 0){ mode.className = "fc-pill warn"; mode.innerHTML = '<i class="fc-dot stale"></i><span>LIVE · degraded</span>'; }
+  else if(Object.keys(src).some(function(k){ return src[k].status === "stale"; })){ mode.className = "fc-pill warn"; mode.innerHTML = '<i class="fc-dot stale"></i><span>LIVE · some data stale</span>'; }
+  else { mode.className = "fc-pill live"; mode.innerHTML = '<i class="fc-dot live"></i><span>LIVE</span>'; }
+  var cc = (st.alert_counts || {}).critical_unacked || 0, cr = $("fcCrit");
+  cr.className = "fc-crit" + (cc ? "" : " zero"); cr.textContent = cc + " critical" + ((st.alert_counts || {}).escalated ? " · " + st.alert_counts.escalated + " escalated" : "");
+  var areas = (st.rain || {}).areas || [], cnt = {};
+  areas.forEach(function(a){ cnt[a.text] = (cnt[a.text] || 0) + 1; });
+  var topW = Object.keys(cnt).sort(function(a, b){ return cnt[b] - cnt[a]; })[0], wetA = areas.filter(function(a){ return a.rain; }).length, wetG = (st.rain || {}).wet;
+  $("fcWx").innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="#7cc8ff" stroke-width="1.8" stroke-linecap="round"><path d="M7 17a4 4 0 0 1-.6-7.96A5.5 5.5 0 0 1 17 8.5a3.5 3.5 0 0 1 .5 6.96"/>' + (wetA ? '<path d="M9 19l-1 2M13 19l-1 2M17 19l-1 2"/>' : '') + '</svg><span>'
+    + (topW ? esc(topW) + (wetA ? ' · rain in ' + wetA + '/' + areas.length + ' areas' : '') : 'Forecast unavailable') + (wetG != null ? ' · ' + wetG + ' gauges wet' : '') + '</span>';
+  $("fcUpd").textContent = isDemo() ? "Demo step " + (S.step + 1) + " of 7" : st.time ? "Updated " + hm(st.now) + (st.age_s != null ? " · " + st.age_s + " s ago" : "") : (st.error || "–");
+  var rows = SRC.map(function(s){ var x = src[s[0]] || {}; return '<tr><td><i class="fc-dot ' + esc(x.status || "idle") + '"></i> ' + esc(s[1]) + '</td><td>' + esc(x.status || "–") + (x.age_s != null ? ', ' + Math.round(x.age_s / 60) + ' min old' : '') + '<br><small>' + esc(x.detail || "") + '</small></td></tr>'; }).join("");
+  $("fcFeedPop").innerHTML = '<table>' + rows + '</table><p class="fc-muted" style="margin:8px 0 0;font-size:12px">LTA Traffic Speed Bands are not used for forecasting. Stale data is kept on screen and marked stale; nothing is filled in.</p>';
+  document.body.classList.toggle("fc-demo", isDemo());
+}
+function renderKpis(){
+  var st = S.st || {}, by = {};
+  (st.kpis || []).forEach(function(k){ by[k.id] = k; });
+  if(!isDemo() && st.now && S.lastT !== st.now){ S.lastT = st.now; KPI_ORDER.forEach(function(id){ var k = by[id]; if(k && k.value != null){ var a = S.hist[id] = S.hist[id] || []; a.push(k.value); if(a.length > 30) a.shift(); } }); }
+  $("fcKpis").innerHTML = KPI_ORDER.map(function(id){
+    var k = by[id] || {label:id, available:false, sub:"No data yet"};
+    var lv = k.level || (id === "predicted_disruptions" && k.value ? "high" : id === "rain_exposure" && k.value ? "watch" : id === "critical_unacked" && k.value ? "critical" : null);
+    var val = k.value != null ? '<div class="v fc-num"><span data-v="' + k.value + '">' + esc(k.value) + '</span>' + (k.unit ? '<small>' + esc(k.unit) + '</small>' : '') + '</div>'
+      : '<div class="v na">' + esc(k.text || (k.available === false ? "Unavailable" : "–")) + '</div>';
+    var tags = (k.stale ? '<span class="fc-tag stale">Stale</span>' : '') + (isDemo() ? '<span class="fc-tag demo">DEMO</span>' : '');
+    return '<div class="fc-glass fc-kpi" data-lv="' + (k.available === false ? "off" : lv || "") + '" title="' + esc(k.basis || "") + '"><div class="l"><b>' + esc(k.label) + '</b>' + tags + '</div>'
+      + val + '<div class="s">' + esc(k.available === false ? (k.sub || "Source unavailable") : k.sub || "") + '</div>' + (isDemo() ? "" : spark(S.hist[id])) + '</div>';
+  }).join("");
+}
+function renderLayers(){
+  var st = S.st || {}, flowAvail = !isDemo() && st.config && st.config.tomtom_key;
+  var defs = [["events", "Incidents & jams", COL.high], ["unverified", "Unverified", COL.unv], ["works", "Road works", COL.works], ["flow", "Traffic flow", COL.ok],
+              ["heat", "Congestion heat", COL.critical], ["rain", "Rain", COL.rain], ["probes", "Speed probes", COL.ver], ["zones", "Risk zones", COL.critical], ["route", "Selected route", "#9be7ff"], ["legend", "Key", "#b6c8dd"]];
+  $("fcLayers").innerHTML = defs.map(function(d){ var dis = d[0] === "flow" && !flowAvail;
+    return '<button type="button" data-layer="' + d[0] + '" aria-pressed="' + (S.lay[d[0]] && !dis) + '"' + (dis ? ' disabled title="Needs a TomTom key (live mode)"' : '') + '><i style="color:' + d[2] + '"></i>' + d[1] + '</button>'; }).join("");
+  $("fcLegend").classList.toggle("off", !S.lay.legend);
+  $("fcLegend").innerHTML = '<div><i style="background:' + COL.critical + '"></i>Jam: 5+ min delay at the horizon</div><div><i style="background:' + COL.high + '"></i>2–5 min</div><div><i style="background:' + COL.watch + '"></i>under 2 min</div>'
+    + '<div><i class="ring"></i>Unverified (no line / direction)</div><div><i class="dot" style="background:' + COL.rain + '"></i>Rain gauge (observed), dashed = estimated exposure</div><div><i style="background:#9be7ff"></i>Selected route, arrows = direction</div>';
+}
+function renderHz(){
+  var cmp = {}; ((S.st || {}).comparison || []).forEach(function(c){ cmp[c.h] = c; });
+  var nowN = ((S.st || {}).events || []).filter(function(e){ return e.status === "confirmed"; }).length;
+  $("fcHz").innerHTML = HZ.map(function(h){
+    var c = cmp[h], lv = c ? (c.critical ? "critical" : c.high ? "high" : c.watch ? "watch" : "") : "", sub = h ? (c ? (c.critical + c.high) + " at risk · +" + f1(c.extra_total) + " bus-min" : "–") : nowN + " verified events";
+    return '<button type="button" data-h="' + h + '" aria-pressed="' + (S.h === h) + '" style="--c:' + (lv ? COL[lv] : "#3b4c60") + '"><b>' + (h ? "+" + h + " min" : "Now") + '</b><span class="ln"></span><small>' + esc(sub) + '</small></button>';
+  }).join("");
+}
+function alertCard(a){
+  var demo = isDemo(), acked = a.acked || S.demoAck[a.id], d = a.delay || {}, hasD = [15, 30, 60].some(function(h){ return d[h] != null || d[String(h)] != null; });
+  var svcs = (a.services || []).slice(0, 12).map(function(s){ var x = s.extra30 != null ? ' +' + f1(s.extra30) : s.share != null ? ' ' + Math.round(s.share * 100) + '%' : '';
+    return '<button type="button" class="' + (a.verified === false && a.kind !== "rain" ? "unv" : "") + '" data-svc="' + esc(s.svc) + '" data-dir="' + s.dir + '">' + esc(s.svc) + ' d' + s.dir + x + '</button>'; }).join("");
+  var tags = lvTag(a.level) + (a.kind === "rain" ? '<span class="fc-tag est">Estimated</span>' : a.verified === false ? '<span class="fc-tag unv">Unverified</span>' : '<span class="fc-tag ver">Verified</span>')
+    + (a.escalated && !acked ? '<span class="fc-tag crit">Escalated</span>' : '') + (a.realerts ? '<span class="fc-tag watch">Worsened</span>' : '') + (a.stale ? '<span class="fc-tag stale">Source stale</span>' : '')
+    + (a.status === "resolved" ? '<span class="fc-tag ok">Cleared ' + hm(a.resolved_at) + '</span>' : '') + (demo ? '<span class="fc-tag demo">DEMO</span>' : '');
+  var dl = hasD ? '<div class="dl">' + [15, 30, 60].map(function(h){ var v = d[h] != null ? d[h] : d[String(h)]; return '<div class="' + (a.horizon === h ? "on" : "") + '"><b>' + (v == null ? "–" : "+" + f1(v)) + '</b><small>+' + h + ' min</small></div>'; }).join("") + '</div>' : '';
+  var links = (a.links || []).slice(0, 3).map(function(l){ return '<a href="' + esc(l.href) + '">' + esc(l.label) + '</a>'; }).join("");
+  var ack = a.status === "resolved" ? '' : acked ? '<small class="fc-muted">Acknowledged by ' + esc((acked.by || "DEMO")) + ' ' + hm(acked.ts) + '</small>' : '<button type="button" class="ds-btn sm pri" data-ack="' + esc(a.id) + '">Acknowledge</button>';
+  return '<article class="fc-al ' + esc(a.level) + (acked ? " faded" : "") + (a.verified === false ? " unv" : "") + (S.focusAlert === a.id ? " focus" : "") + '" data-al="' + esc(a.id) + '">'
+    + '<div class="t1">' + tags + '<span style="flex:1"></span><small class="fc-muted">' + (a.age_min != null ? a.age_min + ' min' : '') + '</small></div>'
+    + '<h4>' + esc(a.title) + '</h4><div class="loc">' + esc(a.location || "") + (a.segment ? ' – ' + esc(a.segment) : '') + '</div>'
+    + (svcs ? '<div class="svcs">' + svcs + '</div>' : '') + (hasD ? '<div class="meta" style="margin-top:6px">Predicted extra delay (min)</div>' + dl : '')
+    + '<div class="meta">' + esc(a.observed || "") + '<br>Direction: ' + esc(a.direction || "–") + '<br>Confidence: ' + esc(a.confidence || "–") + '<br>Source ' + esc(a.source || "–") + ', first ' + hm(a.first) + ', updated ' + hm(a.last) + '</div>'
+    + '<div class="act">' + esc(a.recommended || "") + '</div>'
+    + ((a.explain || []).length ? '<details><summary>Why these services (route matching)</summary><ul>' + a.explain.map(function(x){ return '<li>' + esc(x) + '</li>'; }).join("") + '</ul></details>' : '')
+    + '<div class="foot"><div class="fc-links">' + links + '</div><span class="sp"></span>' + ack + '</div></article>';
+}
+function renderAlerts(){
+  var st = S.st || {}, all = st.alerts || [], el = $("fcAlerts");
+  document.querySelectorAll("[data-tab]").forEach(function(b){ b.setAttribute("aria-pressed", String(b.getAttribute("data-tab") === S.tab)); });
+  var c = st.alert_counts || {};
+  $("fcAlCount").textContent = (c.unacked || 0) + " unacknowledged · " + (c.active || 0) + " active";
+  if(S.tab === "audit"){
+    var au = st.audit || [];
+    el.className = "fc-audit"; el.innerHTML = au.length ? au.map(function(x){ return '<div><b>' + hm(x.ts) + ' ' + esc(x.action) + '</b> ' + esc(x.title || x.alert_id) + '<br><small class="fc-muted">' + esc(x.by || "system") + (x.detail ? ' – ' + esc(x.detail) : '') + '</small></div>'; }).join("") : '<div class="fc-empty">No audit entries yet.</div>';
+    return;
+  }
+  el.className = "fc-alerts";
+  var list = all.filter(function(a){ var ak = a.acked || S.demoAck[a.id];
+    return S.tab === "active" ? a.status === "active" : S.tab === "acked" ? a.status === "active" && ak : a.status === "resolved"; });
+  if(S.tab === "active") list.sort(function(a, b){ var x = !!(a.acked || S.demoAck[a.id]), y = !!(b.acked || S.demoAck[b.id]); return x === y ? 0 : x ? 1 : -1; });
+  el.innerHTML = list.length ? list.map(alertCard).join("") : '<div class="fc-empty">' + (S.tab === "active" ? (st.error && !isDemo() ? esc(st.error) : "No active warnings. Every event the feeds report has been checked against the bus routes; none needs attention.") : S.tab === "acked" ? "Nothing acknowledged." : "Nothing cleared in the last 24 hours.") + '</div>';
+}
+function renderCmp(){
+  var st = S.st || {};
+  $("fcMethodS").textContent = isDemo() ? "DEMO – fictional" : "rule-based estimate, not ML";
+  $("fcCmp").innerHTML = (st.comparison || []).map(function(c){
+    var worst = (c.worst || []).map(function(w){ return '<li><b style="color:#fff">' + esc(w.svc) + ' d' + w.dir + '</b> +' + f1(w.extra.mid) + ' min <span class="fc-muted">(' + f1(w.extra.lo) + '–' + f1(w.extra.hi) + ')</span></li>'; }).join("");
+    return '<div class="' + (S.h === c.h ? "on" : "") + '" data-h="' + c.h + '" role="button" tabindex="0"><h3>+' + c.h + ' min</h3><div class="row">' + (c.critical ? lvTag("critical").replace(">Critical<", ">" + c.critical + " critical<") : "")
+      + (c.high ? lvTag("high").replace(">High<", ">" + c.high + " high<") : "") + (c.watch ? lvTag("watch").replace(">Watch<", ">" + c.watch + " watch<") : "") + (!c.critical && !c.high && !c.watch ? '<span class="fc-tag ok">No service at risk</span>' : '') + '</div>'
+      + '<div class="tot">+' + f1(c.extra_total) + ' <small>bus-minutes predicted on the services checked</small></div><ul>' + (worst || '<li class="fc-muted">No predicted extra delay.</li>') + '</ul>'
+      + '<div class="note">' + (c.jams_building ? c.jams_building + ' jam(s) still building. ' : '') + esc(c.rain_note || "") + '</div></div>';
+  }).join("") || '<div class="fc-empty">' + esc(st.error || "No forecast yet.") + '</div>';
+}
+function renderTop(){
+  var rows = ((S.st || {}).services || []).filter(function(s){ return LV[s.level] >= 1 || s.extra[15].mid > 0 || s.extra[30].mid > 0; }).slice(0, 14);
+  $("fcTop").innerHTML = rows.length ? '<thead><tr><th>Service</th><th>Risk</th><th>+15</th><th>+30</th><th>+60</th><th>Cause</th><th>Recovery</th></tr></thead><tbody>' + rows.map(function(s){
+    return '<tr data-svc="' + esc(s.svc) + '" data-dir="' + s.dir + '"><td><b>' + esc(s.svc) + '</b> d' + s.dir + '</td><td>' + lvTag(s.level) + (s.blocked ? ' <span class="fc-tag crit">Blocked</span>' : '') + '</td>'
+      + [15, 30, 60].map(function(h){ var e = s.extra[h] || s.extra[String(h)]; return '<td class="fc-num"><b>+' + f1(e.mid) + '</b></td>'; }).join("")
+      + '<td>' + esc((s.causes || []).join(", ") || (s.heavy_share ? "Heavy rain (est.)" : "–")) + '</td><td>' + (s.building ? "still building" : s.recovery_min != null ? "~" + s.recovery_min + " min" : "–") + '</td></tr>'; }).join("") + '</tbody>'
+    : '<tbody><tr><td class="fc-empty">No service at risk from verified evidence.</td></tr></tbody>';
+}
+function renderInt(){
+  var st = S.st || {}, src = st.sources || {}, cfg = st.config || {}, cal = st.calibration || {};
+  $("fcIntS").textContent = isDemo() ? "DEMO sources" : (cfg.provider ? "provider: " + cfg.provider : "");
+  var h = SRC.map(function(s){ var x = src[s[0]] || {};
+    return '<div class="src"><i class="fc-dot ' + esc(x.status || "idle") + '"></i><b>' + esc(s[1]) + '</b><span class="fc-muted">' + esc(x.status || "–") + (x.age_s != null ? ' · ' + (x.age_s < 120 ? x.age_s + ' s' : Math.round(x.age_s / 60) + ' min') : '') + '</span><small>' + esc(x.detail || "") + '</small></div>'; }).join("");
+  h += '<p><b style="color:#fff">Method.</b> ' + esc(st.method || "") + '</p>';
+  h += '<p><b style="color:#fff">Accuracy.</b> ' + (cal.n >= 30 ? 'Measured on ' + cal.n + ' later observations: ' + Math.round(cal.coverage * 100) + ' % inside the 80 % band, mean error ' + f1(cal.mae) + ' km/h.' : (isDemo() ? 'Demo – not a measured accuracy.' : 'Not measured yet (' + (cal.n || 0) + ' of 30 checks). No accuracy is claimed until then.')) + '</p>';
+  if(!isDemo() && cfg.probe_cap) h += '<p><b style="color:#fff">Budget.</b> ' + cfg.probe_used + ' of ' + cfg.probe_cap + ' forecast probe calls today; TomTom shared ' + ((cfg.tomtom_shared || {}).used || 0) + '/' + ((cfg.tomtom_shared || {}).cap || 0) + ' (reserve ' + cfg.tomtom_reserve + ' kept for other modules). History: ' + ((cfg.store || {}).history_days || 0) + ' day(s).</p>';
+  h += '<p class="fc-muted">LTA Traffic Speed Bands are not used. A service counts as affected only when an event\'s own line runs along its route in the same direction; point reports stay unverified.</p>';
+  $("fcInt").innerHTML = h;
+}
+function renderSummary(){
+  var st = S.st || {}, by = {}; (st.kpis || []).forEach(function(k){ by[k.id] = k; });
+  var worst = (st.services || [])[0], top = (st.alerts || []).filter(function(a){ return a.status === "active"; })[0];
+  var cell = function(id, lbl){ var k = by[id] || {}; return '<div><b class="fc-num">' + (k.value != null ? esc(k.value) : "–") + '</b><small>' + esc(lbl) + '</small></div>'; };
+  $("fcSummary").innerHTML = '<div class="fc-h"><h2>Executive summary</h2>' + (isDemo() ? '<span class="sp"></span><span class="fc-tag demo">DEMO</span>' : '') + '</div><div class="big">'
+    + cell("predicted_disruptions", "services at high / critical risk") + cell("critical_unacked", "critical, unacknowledged") + cell("verified_incidents", "verified route incidents")
+    + '<div><b class="fc-num">' + (worst ? "+" + f1(worst.extra[30].mid) : "–") + '</b><small>' + (worst ? 'min at +30 on ' + esc(worst.svc) + ' d' + worst.dir : 'worst predicted delay') + '</small></div></div>'
+    + (top ? '<p class="fc-muted" style="margin:0;padding:0 14px 12px;font-size:12.5px">Top alert: <b style="color:#fff">' + esc(top.title) + '</b></p>' : '');
+}
+function renderDemo(){
+  var d = (S.st || {}).demo; if(!isDemo() || !d) return;
+  $("fcSteps").innerHTML = d.steps.map(function(s, i){ return '<button type="button" data-step="' + i + '" class="' + (i < S.step ? "done" : "") + '"' + (i === S.step ? ' aria-current="step"' : '') + '><small>' + (i + 1) + '</small><span>' + esc(s.title) + '</span></button>'; }).join("");
+  $("fcSay").innerHTML = '<b>' + esc(d.title) + '.</b> ' + esc(d.say) + ' <span class="fc-muted">' + esc(d.label) + '</span>';
+  $("fcPlay").textContent = S.play ? "Pause" : "Play";
+}
+function render(){
+  renderBar(); renderKpis(); renderLayers(); renderHz(); renderAlerts(); renderCmp(); renderTop(); renderInt(); renderSummary(); renderDemo();
+  $("fcSvcMode").textContent = isDemo() ? "DEMO" : "";
+  MV.update();
+}
+
+/* ------------------------------------------------------------------ service intelligence */
+function renderSvc(){
+  var v = S.view, el = $("fcSvc");
+  if(!v){ return; }
+  if(v.error){ el.innerHTML = '<div class="fc-empty">' + esc(v.error) + '</div>'; return; }
+  document.querySelectorAll("#fcDir button").forEach(function(b){ var d = +b.getAttribute("data-d"); b.setAttribute("aria-pressed", String(d === S.dir)); b.disabled = !!(v.directions && v.directions.length && v.directions.indexOf(d) < 0); });
+  var h = '<div class="fc-svc-h"><div class="fc-svcno"><b>' + esc(v.svc) + '</b><small>Dir ' + v.dir + '</small></div><div class="fc-svc-t"><div style="display:flex;gap:5px;flex-wrap:wrap">' + lvTag(v.level)
+    + (v.blocked ? '<span class="fc-tag crit">Route blocked</span>' : v.maybe_blocked ? '<span class="fc-tag high">May be blocked</span>' : '') + (isDemo() ? '<span class="fc-tag demo">DEMO</span>' : '') + '</div>'
+    + '<p>' + esc(v.from || "") + (v.toward ? ' → <b style="color:#fff">' + esc(v.toward) + '</b>' : '') + '</p><p class="fc-muted">' + f1(v.length_km) + ' km · headway ' + (v.hw ? f1(v.hw) + ' min (' + esc(v.hw_src || "") + ')' : "–") + '</p></div></div>';
+  h += '<div class="fc-sec"><h3>Predicted extra running time<span class="sp"></span><span class="fc-tag">80 % band</span></h3>' + rangeChart(v.extra, v.hw) + '</div>';
+  h += '<div class="fc-sec"><h3>Running time</h3>' + (v.hist_rt ? '<p style="margin:0;font-size:13px">Usual for this time: <b style="color:#fff">' + f1(v.hist_rt) + ' min</b> (measured). Predicted: '
+       + [15, 30, 60].map(function(x){ return '+' + x + ' <b style="color:#fff">' + f1((v.pred_rt || {})[x] || (v.pred_rt || {})[String(x)]) + '</b>'; }).join(" · ") + ' min.</p>' : '<p class="fc-muted" style="margin:0;font-size:12.5px">' + esc(v.rt_note || "Unavailable") + '</p>')
+       + (v.recovery_min != null ? '<p style="margin:6px 0 0;font-size:12.5px">Expected recovery: about ' + v.recovery_min + ' min.</p>' : v.building ? '<p style="margin:6px 0 0;font-size:12.5px;color:#ffe0c7">Congestion still building – no recovery estimate yet.</p>' : '') + '</div>';
+  if((v.critical || []).length) h += '<div class="fc-sec"><h3>Critical stretches</h3>' + v.critical.map(function(c){ return '<div class="fc-ev"><b>' + esc(KIND[c.kind] || c.label) + '</b> ' + esc(c.road || "") + ', route km ' + f1((c.a_m || 0) / 1000) + '–' + f1((c.b_m || 0) / 1000)
+       + '<br>+' + f1((c.per || {})[30] || (c.per || {})["30"]) + ' min at +30' + (c.recovery_min != null ? ', recovers in ~' + c.recovery_min + ' min' : c.trend === "building" ? ', building' : '') + '<br><span class="fc-muted">' + esc(c.basis) + '</span></div>'; }).join("") + '</div>';
+  var evItem = function(e, cls, tag){ return '<div class="fc-ev ' + cls + '">' + tag + ' <b>' + esc(KIND[e.kind] || e.label) + '</b> ' + esc(e.road || "") + (e.from || e.to ? ' <span class="fc-muted">(' + esc(e.from || "") + (e.to ? ' → ' + esc(e.to) : '') + ')</span>' : '')
+       + '<details><summary>' + (cls === "rej" ? esc(REASON[e.reason] || e.reason || "Rejected") : "Why") + '</summary><div class="why">' + esc(e.explain) + '</div><div class="fc-muted" style="margin-top:4px">' + esc((e.sources || []).join(" + ")) + (e.validity ? ' · ' + esc(e.validity) : '') + '</div></details></div>'; };
+  h += '<div class="fc-sec"><h3>Evidence on this route<span class="sp"></span><small class="fc-muted">' + (v.verified || []).length + ' verified · ' + (v.unverified || []).length + ' unverified · ' + (v.rejected || []).length + ' rejected</small></h3>'
+    + ((v.verified || []).map(function(e){ return evItem(e, "", '<span class="fc-tag ver">Verified</span>'); }).join("") + (v.unverified || []).map(function(e){ return evItem(e, "", '<span class="fc-tag unv">Unverified</span>'); }).join("")
+       + (v.rejected || []).map(function(e){ return evItem(e, "rej", '<span class="fc-tag rej">Rejected</span>'); }).join("") || '<p class="fc-muted" style="margin:0;font-size:12.5px">No incident, jam or road works on or near this route right now.</p>') + '</div>';
+  if((v.sections || []).length) h += '<div class="fc-sec"><h3>Traffic along the route</h3>' + v.sections.map(function(s){ var r = probeRatio(s, S.h);
+       return '<div class="fc-ev"><i class="fc-dot" style="background:' + ratioColour(r) + '"></i> <b>' + esc(s.road || "Route km " + f1(s.a_m / 1000)) + '</b>: ' + f1(s.cur) + ' km/h now, ' + (s.base ? 'usual ' + f1(s.base) : 'free-flow ' + f1(s.ff)) + (S.h && s.fc && s.fc[S.h] ? ', +' + S.h + ': ' + f1(s.fc[S.h][0]) : '')
+         + '<br><span class="fc-muted">' + esc(String((s.state || {}).state || "").replace(/_/g, " ")) + ' · ' + esc(s.trend) + ' · ' + (s.dir_ok ? "direction verified" : s.dir_ok === false ? "other direction – not used" : "direction not verified – not used") + '</span></div>'; }).join("") + '</div>';
+  else h += '<div class="fc-sec"><h3>Traffic along the route</h3><p class="fc-muted" style="margin:0;font-size:12.5px">' + (isDemo() ? 'No probe on this route in the demo.' : 'No speed probe yet: probes are taken on demand when a service is selected, within the daily budget.') + '</p></div>';
+  var r = v.rain;
+  if(r) h += '<div class="fc-sec"><h3>Rainfall exposure<span class="sp"></span><span class="fc-tag est">Estimated</span></h3><div class="fc-bar2" title="share of the route in moderate+ rain"><i style="width:' + Math.round((r.share_wet || 0) * 100) + '%"></i></div>'
+       + '<p style="margin:6px 0 0;font-size:12.5px">' + Math.round((r.share_wet || 0) * 100) + ' % of the route in moderate+ rain, ' + Math.round((r.share_heavy || 0) * 100) + ' % heavy' + (r.max_mmh != null ? ', up to ' + f1(r.max_mmh) + ' mm/h' : '') + '. Confidence ' + esc(r.confidence) + ', trend ' + esc(r.trend) + '.</p><p class="fc-muted" style="margin:4px 0 0;font-size:11.5px">' + esc(r.label) + '</p></div>';
+  var rc = v.recovery;
+  if(rc) h += '<div class="fc-sec" id="fcRecovery"><h3>Recovery options<span class="sp"></span><span class="fc-tag">Advisory</span></h3><table class="fc-rec">' + rc.options.map(function(o){
+       return '<tr class="' + (o.id === rc.suggested ? "best" : "") + '"><td><b>' + esc(o.name) + '</b>' + (o.id === rc.suggested ? ' <span class="fc-tag ver">suggested</span>' : '') + '<br>' + esc(o.note) + '<br>Largest gap ~' + f1(o.gap_max) + ' min' + (o.gap_min != null ? ', smallest ~' + f1(o.gap_min) + ' min' : '')
+         + o.checks.map(function(c){ return '<span class="chk ' + (c.ok === true ? "y" : c.ok === false ? "n" : "q") + '">' + esc(c.rule) + (c.note ? ' (' + esc(c.note) + ')' : '') + '</span>'; }).join("") + (o.href ? '<a href="' + esc(o.href) + '" style="color:#9be7ff;font-size:12px">Open</a>' : '') + '</td></tr>'; }).join("")
+       + '</table><p class="fc-muted" style="margin:6px 0 0;font-size:11.5px">' + esc(rc.basis) + ' <a href="' + esc(rc.engine.href) + '" style="color:#9be7ff">' + esc(rc.engine.label) + '</a></p></div>';
+  h += '<div class="fc-sec"><h3>Open with this service</h3><div class="fc-links">' + (v.links || []).map(function(l){ return '<a href="' + esc(l.href) + '">' + esc(l.label) + '</a>'; }).join("") + '</div></div>';
+  el.innerHTML = h;
+}
+function selectSvc(svc, dir, opts){
+  if(!svc) return;
+  S.svc = String(svc).toUpperCase(); S.dir = +dir || 1; $("fcSvcIn").value = S.svc;
+  var u = "/api/forecast/service?svc=" + encodeURIComponent(S.svc) + "&dir=" + S.dir + (isDemo() ? "&mode=demo&step=" + S.step : "");
+  $("fcSvc").innerHTML = '<div class="fc-empty">Checking service ' + esc(S.svc) + ' direction ' + S.dir + ' against every event' + (isDemo() ? '' : ' and sampling traffic along it') + '…</div>';
+  return api(u, {timeout:60000}).then(function(v){
+    if(S.svc !== String(svc).toUpperCase()) return;
+    S.view = v; renderSvc(); MV.update(); if(!(opts && opts.nofit)) fitScene();
+    if(opts && opts.scroll && $("fcRecovery")) $("fcRecovery").scrollIntoView({block:"nearest", behavior:"smooth"});
+  });
+}
+
+/* ------------------------------------------------------------------ data */
+function load(){
+  if(S.busy) return Promise.resolve();
+  S.busy = true;
+  var u = isDemo() ? "/api/forecast/state?mode=demo&step=" + S.step : "/api/forecast/state";
+  return api(u, {timeout:90000}).then(function(st){
+    if(!st || (st.error && !st.kpis)) st = Object.assign({kpis:[], alerts:[], events:[], comparison:[], services:[]}, st || {});
+    S.st = st; render(); tick();
+    if(S.first){ fitScene(); S.first = false; }
+  }).finally(function(){ S.busy = false; });
+}
+function schedule(){ clearInterval(S.timer); if(!isDemo()) S.timer = setInterval(function(){ if(!document.hidden) load().then(function(){ if(S.svc) selectSvc(S.svc, S.dir, {nofit:true}); }); }, 60000); }
+function setMode(m){
+  if(m === S.mode) return;
+  S.mode = m; S.view = null; S.svc = null; S.first = true; S.demoAck = {}; stopPlay();
+  $("fcSvc").innerHTML = '<div class="fc-empty">Pick a service to see its route and the evidence for it.</div>'; $("fcSvcIn").value = "";
+  var u = new URL(location.href); if(m === "demo"){ u.searchParams.set("demo", "1"); u.searchParams.set("step", S.step); } else { u.searchParams.delete("demo"); u.searchParams.delete("step"); }
+  history.replaceState(null, "", u.toString());
+  loadSvcList(); load().then(function(){ if(isDemo()) choreo(); }); schedule();
+}
+function loadSvcList(){
+  api("/api/forecast/services" + (isDemo() ? "?mode=demo" : "")).then(function(j){
+    S.svcs = (j && j.services) || [];
+    $("fcSvcList").innerHTML = S.svcs.slice(0, 900).map(function(s){ return '<option value="' + esc(s.svc) + '">'; }).join("");
+  });
+}
+
+/* ------------------------------------------------------------------ demo choreography (the presenter's story) */
+function goStep(k){
+  S.step = Math.max(0, Math.min(6, k));
+  var u = new URL(location.href); u.searchParams.set("step", S.step); history.replaceState(null, "", u.toString());
+  return load().then(choreo);
+}
+function choreo(){
+  if(!isDemo()) return;
+  clearInterval(S.hzT); S.focusAlert = null;
+  var k = S.step;
+  S.h = k === 4 ? 15 : k >= 5 ? 30 : 0;
+  if(k <= 2){ S.view = null; S.svc = null; $("fcSvcIn").value = ""; $("fcSvc").innerHTML = '<div class="fc-empty">Pick a service to see its route and the evidence for it.</div>'; render(); fitScene(); }
+  if(k >= 3) selectSvc("X101", 1, {scroll:k === 6}).then(function(){ render(); });
+  if(k === 4 && S.play){ var hs = [15, 30, 60], i = 0; S.hzT = setInterval(function(){ i = (i + 1) % 3; S.h = hs[i]; renderHz(); renderCmp(); MV.update(); if(S.view) renderSvc(); }, 2600); }
+  if(k === 5){ S.tab = "active"; var a = ((S.st || {}).alerts || []).filter(function(x){ return x.status === "active"; })[0]; if(a){ S.focusAlert = a.id; renderAlerts(); var el = document.querySelector('[data-al="' + a.id + '"]'); if(el) el.scrollIntoView({block:"nearest", behavior:"smooth"}); } }
+  renderHz();
+}
+function stopPlay(){ S.play = false; clearTimeout(S.playT); clearInterval(S.hzT); if($("fcPlay")) $("fcPlay").textContent = "Play"; }
+function playLoop(){
+  if(!S.play) return;
+  S.playT = setTimeout(function(){ if(!S.play) return; if(S.step >= 6){ stopPlay(); return; } goStep(S.step + 1).then(playLoop); }, S.step === 4 ? 9000 : 7500);
+}
+
+/* ------------------------------------------------------------------ presentation (full screen showcase) */
+function present(on){
+  S.present = on; document.body.classList.toggle("fc-present", on);
+  if(on){ var d = document.documentElement; if(d.requestFullscreen && !document.fullscreenElement) d.requestFullscreen().catch(function(){}); }
+  else if(document.fullscreenElement) document.exitFullscreen().catch(function(){});
+  setTimeout(function(){ if(MV.ml) MV.ml.resize(); if(MV.lf) MV.lf.invalidateSize(); fitScene(); }, 120);
+  var u = new URL(location.href); if(on) u.searchParams.set("present", "1"); else u.searchParams.delete("present"); history.replaceState(null, "", u.toString());
+}
+document.addEventListener("fullscreenchange", function(){ if(!document.fullscreenElement && S.present) present(false); });
+
+/* ------------------------------------------------------------------ events */
+document.addEventListener("click", function(e){
+  var t = e.target.closest("button,[data-h],tr[data-svc],[data-al]"); if(!t) return;
+  if(t.hasAttribute("data-mode")){ setMode(t.getAttribute("data-mode")); return; }
+  if(t.hasAttribute("data-ack")){ ackAlert(t.getAttribute("data-ack"), t); return; }
+  if(t.hasAttribute("data-svc")){ selectSvc(t.getAttribute("data-svc"), t.getAttribute("data-dir")); if(window.innerWidth < 1360){ var p = document.querySelector(".fc-svcpanel"); if(p) p.scrollIntoView({behavior:"smooth", block:"start"}); } return; }
+  if(t.hasAttribute("data-layer")){ var k = t.getAttribute("data-layer"); S.lay[k] = !S.lay[k]; store("fc.layers", JSON.stringify(S.lay)); renderLayers(); if(k !== "legend") MV.update(); return; }
+  if(t.hasAttribute("data-h")){ S.h = +t.getAttribute("data-h"); clearInterval(S.hzT); renderHz(); renderCmp(); MV.update(); if(S.view) renderSvc(); return; }
+  if(t.hasAttribute("data-tab")){ S.tab = t.getAttribute("data-tab"); renderAlerts(); return; }
+  if(t.hasAttribute("data-step")){ stopPlay(); goStep(+t.getAttribute("data-step")); return; }
+  if(t.hasAttribute("data-d")){ if(S.svc) selectSvc(S.svc, +t.getAttribute("data-d")); else S.dir = +t.getAttribute("data-d"); return; }
+  if(t.hasAttribute("data-al") && !e.target.closest("a,button,summary")){
+    var a = ((S.st || {}).alerts || []).filter(function(x){ return x.id === t.getAttribute("data-al"); })[0];
+    if(a && a.lat != null && MV.ready){ S.focusAlert = a.id; renderAlerts(); if(MV.kind === "ml") MV.ml.flyTo({center:[a.lon, a.lat], zoom:Math.max(MV.ml.getZoom(), 13.2), duration:900}); else MV.lf.setView([a.lat, a.lon], 14); }
+  }
+});
+document.addEventListener("keydown", function(e){
+  if(e.target.closest && e.target.closest("input,textarea,select")) return;
+  if(e.key === "Escape" && S.present){ present(false); return; }
+  if(!isDemo()) return;
+  if(e.key === "ArrowRight"){ stopPlay(); goStep(S.step + 1); } else if(e.key === "ArrowLeft"){ stopPlay(); goStep(S.step - 1); }
+  else if(e.key === " " && S.present){ e.preventDefault(); $("fcPlay").click(); }
+});
+$("fcCmp").addEventListener("keydown", function(e){ var t = e.target.closest("[data-h]"); if(t && (e.key === "Enter" || e.key === " ")){ e.preventDefault(); t.click(); } });
+$("fcFeeds").onclick = function(){ var p = $("fcFeedPop"), on = !p.classList.contains("on"); p.classList.toggle("on", on); this.setAttribute("aria-expanded", String(on)); };
+document.addEventListener("click", function(e){ if(!e.target.closest("#fcFeeds,#fcFeedPop")){ $("fcFeedPop").classList.remove("on"); $("fcFeeds").setAttribute("aria-expanded", "false"); } });
+$("fcCrit").onclick = function(){ S.tab = "active"; renderAlerts(); var p = document.querySelector(".fc-alertpanel"); if(p) p.scrollIntoView({behavior:"smooth", block:"start"}); };
+$("fcPresent").onclick = function(){ present(true); };
+$("fcExit").onclick = function(){ present(false); };
+$("fcPrev").onclick = function(){ stopPlay(); goStep(S.step - 1); };
+$("fcNext").onclick = function(){ stopPlay(); goStep(S.step + 1); };
+$("fcPlay").onclick = function(){ if(S.play){ stopPlay(); return; } S.play = true; this.textContent = "Pause"; if(S.step >= 6) goStep(0).then(playLoop); else { choreo(); playLoop(); } };
+$("fcSvcIn").addEventListener("change", function(){ var v = this.value.trim().toUpperCase(); if(!v) return; var s = S.svcs.filter(function(x){ return x.svc === v; })[0]; selectSvc(v, s && s.dirs && s.dirs.indexOf(S.dir) < 0 ? s.dirs[0] : S.dir); });
+$("fcSvcIn").addEventListener("keydown", function(e){ if(e.key === "Enter"){ e.preventDefault(); this.dispatchEvent(new Event("change")); } });
+function ackAlert(id, btn){
+  var by = (window.DS && DS.prefs && (DS.prefs().displayName || DS.prefs().staffId)) || "";
+  if(isDemo()){ S.demoAck[id] = {by:"you (demo)", ts:((S.st || {}).now || Date.now() / 1000)}; renderAlerts(); renderSummary(); return; }
+  btn.disabled = true; btn.textContent = "Acknowledging…";
+  api("/api/forecast/alerts/" + encodeURIComponent(id) + "/ack", {method:"POST", headers:{"content-type":"application/json"}, body:JSON.stringify({by:by})}).then(function(r){
+    if(r && r.ok){ (S.st.alerts || []).forEach(function(a){ if(a.id === id) a.acked = r.alert.acked; }); if(r.counts) S.st.alert_counts = r.counts; renderAlerts(); renderBar(); renderSummary(); load(); }
+    else { btn.disabled = false; btn.textContent = "Acknowledge"; note((r && r.error) || "Could not acknowledge."); }
+  });
+}
+window.addEventListener("resize", function(){ if(MV.ml) MV.ml.resize(); });
+
+/* ------------------------------------------------------------------ start */
+renderLayers(); renderHz();
+MV.init().then(function(){ MV.update(); fitScene(); });
+loadSvcList();
+load().then(function(){
+  if(isDemo()) choreo();
+  if(qs.get("svc")) selectSvc(qs.get("svc"), qs.get("dir") || 1);
+  if(qs.get("present") === "1") present(true);
+  if(isDemo() && qs.get("play") === "1"){ S.play = true; playLoop(); }
+});
+schedule();
+window.FCX = {S:S, MV:MV, load:load, selectSvc:selectSvc, goStep:goStep, present:present, setMode:setMode};
+})();
+
+</script>
+</body>
+</html>

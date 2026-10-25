@@ -22,7 +22,7 @@ import headway
 import routegeom
 import traffic
 
-VERSION = "V16.19"
+VERSION = "V17.0"
 # V16.8: pages hidden for everyone (see Settings > Pages). Defined here because bb_init() reads the saved value while the module loads.
 SITE_PAGE_IDS = ("command", "route", "headway", "bunching", "recovery", "halfplan", "trafficaware", "running", "ewt", "cameras", "diversion")     # "settings" can never be hidden
 SITE = {"hidden": [x.strip() for x in os.getenv("HIDDEN_PAGES", "").split(",") if x.strip() in SITE_PAGE_IDS], "block": True}
@@ -576,7 +576,9 @@ async def lifespan(app):
         trvtask = asyncio.create_task(tr_verify_loop())      # V16.3: second-source check of congestion (our buses + Waze)
         if DV_AUTO:
             asyncio.create_task(dv_auto_loop())              # V16.14: potential road blockages for Diversion Maps (suggestions only)
+    fctask = asyncio.create_task(fc_loop())                  # V17: Forecast Centre collector (idle unless the page is open or FORECAST_ALWAYS_ON=1)
     yield
+    fctask.cancel()
     if task is not None:
         task.cancel()
     if trtask is not None:
@@ -908,7 +910,7 @@ def held_minutes(key, conds, ts):
 
 # --------------------------------------------------------------------------- planned timetable (optional, uploaded by the operator)
 TT_FILE = HERE / "timetable.json"
-TT = {"trips": {}, "updated": None, "rows": 0}     # {(svc, dir): [trip, ...]}
+PTT = {"trips": {}, "updated": None, "rows": 0}     # {(svc, dir): [trip, ...]}  (V17: renamed from TT - the TomTom state below re-used the name and wiped it)
 TT_TOKEN = os.getenv("TIMETABLE_TOKEN", "")         # if set, uploads/clears need header x-admin-token
 TT_MAX_BYTES = 8 * 1024 * 1024
 ALL_CAP = int(os.getenv("CONTROL_ALL_CAP", "160"))   # service+direction pairs scanned in All-services mode
@@ -916,7 +918,7 @@ ALL_CAP = int(os.getenv("CONTROL_ALL_CAP", "160"))   # service+direction pairs s
 
 def tt_save():
     try:
-        TT_FILE.write_text(json.dumps({"updated": TT["updated"], "rows": TT["rows"], "trips": {f"{k[0]}|{k[1]}": v for k, v in TT["trips"].items()}}), encoding="utf-8")
+        TT_FILE.write_text(json.dumps({"updated": PTT["updated"], "rows": PTT["rows"], "trips": {f"{k[0]}|{k[1]}": v for k, v in PTT["trips"].items()}}), encoding="utf-8")
     except OSError:
         pass          # read-only or ephemeral disk: the timetable then lives in memory only
 
@@ -924,15 +926,15 @@ def tt_save():
 def tt_load():
     try:
         j = json.loads(TT_FILE.read_text(encoding="utf-8"))
-        TT["trips"] = {(k.split("|")[0], int(k.split("|")[1])): v for k, v in j.get("trips", {}).items()}
-        TT["updated"], TT["rows"] = j.get("updated"), j.get("rows", 0)
+        PTT["trips"] = {(k.split("|")[0], int(k.split("|")[1])): v for k, v in j.get("trips", {}).items()}
+        PTT["updated"], PTT["rows"] = j.get("updated"), j.get("rows", 0)
     except (OSError, ValueError, IndexError):
         pass
 
 
 def tt_summary():
-    pairs = {f"{k[0]}:{k[1]}": len(v) for k, v in TT["trips"].items()}
-    return {"loaded": bool(pairs), "pairs": pairs, "services": len({k[0] for k in TT["trips"]}), "trips": sum(pairs.values()), "updated": TT["updated"], "tokenRequired": bool(TT_TOKEN)}
+    pairs = {f"{k[0]}:{k[1]}": len(v) for k, v in PTT["trips"].items()}
+    return {"loaded": bool(pairs), "pairs": pairs, "services": len({k[0] for k in PTT["trips"]}), "trips": sum(pairs.values()), "updated": PTT["updated"], "tokenRequired": bool(TT_TOKEN)}
 
 
 tt_load()
@@ -954,7 +956,7 @@ async def api_timetable_upload(request: Request):
     trips, info = headway.parse_timetable(raw.decode("utf-8-sig", "replace"))
     if not trips:
         return JSONResponse({"error": "; ".join(info["errors"][:3]) or "No usable rows found.", **info}, status_code=400)
-    TT.update(trips=trips, updated=now_sgt().isoformat(timespec="seconds"), rows=info["rows"])
+    PTT.update(trips=trips, updated=now_sgt().isoformat(timespec="seconds"), rows=info["rows"])
     tt_save()
     return {"ok": True, "rows": info["rows"], "errors": info["errors"], **tt_summary()}
 
@@ -963,7 +965,7 @@ async def api_timetable_upload(request: Request):
 async def api_timetable_clear(request: Request):
     if TT_TOKEN and request.headers.get("x-admin-token", "") != TT_TOKEN:
         return JSONResponse({"error": "Upload token missing or wrong."}, status_code=401)
-    TT.update(trips={}, updated=None, rows=0)
+    PTT.update(trips={}, updated=None, rows=0)
     tt_save()
     return {"ok": True, **tt_summary()}
 
@@ -1027,7 +1029,7 @@ async def api_control(services: str = "", direction: int = 0, adj: str = "", pla
                "origin_etas": [o["eta"] for o in b.get("origin", [])],
                "sched": headway.sched_hw(fq["freqs"].get((svc, d)), now), "adj_hw": adj_m.get((svc, d)), "plan_override": plan_m.get((svc, d)),
                "layover": lay_m.get((svc, d)), "next_dir": (2 if d == 1 else 1) if len(st["dirs"].get(svc, [])) > 1 else d}
-        tt = TT["trips"].get((svc, d))
+        tt = PTT["trips"].get((svc, d))
         if tt:
             nowm = now.hour * 60 + now.minute + now.second / 60
             codes, arrs = [x["code"] for x in stops], []
@@ -5620,7 +5622,8 @@ def waze_live():
 TT_FIRST = bool(os.getenv("TOMTOM_API_KEY", "").strip()) and os.getenv("CONGESTION_FIRST", "tomtom").strip().lower() != "lta"
 TT = {"jams": [], "referer": os.getenv("TOMTOM_REFERER", "").strip(), "key": os.getenv("TOMTOM_API_KEY", "").strip(), "cap": int(os.getenv("TOMTOM_DAILY_CAP", "2000") or 2000), "day": "", "n": 0,
       "inc_at": 0.0, "inc_ok_at": 0.0, "alerts": [], "error": None, "flow": {}, "flow_error": None, "flow_ok_at": 0.0}
-TT_INC_TTL = 120 if TT_FIRST else 300   # one call for the whole island: every 2 min when TomTom finds jams first, else every 5 min
+TT_INC_TTL = int(os.getenv("TOMTOM_INCIDENTS_EVERY_SEC", "0") or 0) or (120 if TT_FIRST else 300)   # one call for the whole island: every 2 min when TomTom finds jams first, else every 5 min
+# V17: TomTom's free tier is MONTHLY per API (Incident Details 2,500 a month = ~83 a day). TOMTOM_INCIDENTS_EVERY_SEC (e.g. 1800) slows this call down to stay inside it.
 TT_FLOW_TTL = 600                   # flow: one reading per stretch point per 10 minutes
 TT_FLOW_MAX_EVENTS = 10             # at most this many congestion stretches are checked per cycle
 TT_SLOW_RATIO = 0.5                 # current speed / free-flow speed at or below this = jam
@@ -5699,9 +5702,10 @@ async def tomtom_incidents():
     try:
         r = await client().get("https://api.tomtom.com/traffic/services/5/incidentDetails", timeout=20, headers=tt_headers(), params={
             "key": TT["key"], "bbox": TT_BBOX, "language": "en-GB", "timeValidityFilter": "present",
-            "fields": "{incidents{type,geometry{type,coordinates},properties{id,iconCategory,magnitudeOfDelay,events{description,code,iconCategory},from,to,roadNumbers,length,delay}}}"})
+            "fields": "{incidents{type,geometry{type,coordinates},properties{id,iconCategory,magnitudeOfDelay,events{description,code,iconCategory},from,to,roadNumbers,length,delay,startTime,endTime}}}"})
         r.raise_for_status()
         out, jams = [], []
+        TT["raw"], TT["raw_at"] = (r.json().get("incidents") or []), now          # V17 Forecast Centre: full geometry, re-parsed by forecast.py (no extra call)
         for inc in (r.json().get("incidents") or []):
             pr = inc.get("properties") or {}
             cat = pr.get("iconCategory")
@@ -6373,7 +6377,18 @@ async def login_page():
 
 @app.get("/command", response_class=HTMLResponse)
 async def command_page():
+    """V17: the Command Centre is now the Forecast Centre (the home page). The previous page stays at /command/classic."""
+    return _page("forecast.html")
+
+
+@app.get("/command/classic", response_class=HTMLResponse)
+async def command_classic_page():
     return _page("command.html")
+
+
+@app.get("/forecast", response_class=HTMLResponse)
+async def forecast_page():
+    return _page("forecast.html")
 
 
 @app.get("/settings", response_class=HTMLResponse)
@@ -6590,6 +6605,14 @@ async def api_system_notifications():
         for x in dv_queue_items():                                                    # V16.14: Diversion Maps
             out.append({"id": x["id"], "kind": "diversion", "severity": "critical" if x["severity"] == "critical" else "warning", "title": x["title"],
                         "detail": x["detail"], "acked": x["status"] == "acknowledged", "ts": x["last"], "href": x["href"]})
+    except Exception:
+        pass
+    try:                                                                              # V17: Forecast Centre alerts (verified, high / critical)
+        if FC.get("book") is not None:
+            for a in FC["book"].view(time.time()):
+                if a["level"] in ("critical", "high"):
+                    out.append({"id": "fc:" + a["id"], "kind": "forecast", "severity": "critical" if a["level"] == "critical" else "warning",
+                                "title": a["title"], "detail": (a.get("observed") or "")[:120], "acked": bool(a.get("acked")), "ts": a.get("last"), "href": "/command"})
     except Exception:
         pass
     out.sort(key=lambda x: (x["acked"], 0 if x["severity"] == "critical" else 1, -(x["ts"] or 0)))
@@ -11209,3 +11232,569 @@ async def api_dv_ai_route_plan(request: Request):
                flagged=("The AI's choice is large and complex for a Bus Captain \u2014 controller review required." if not chosen.get("sensible", True) else
                         "The AI's choice has LOW overall confidence (weak bus-road evidence) \u2014 controller review required." if chosen.get("confidence") == "LOW" else ""))
     return out
+
+
+# =========================================================================== V17 S.E.N.T.R.Y. 3.0 - Forecast Centre (the home page)
+# Data: TomTom incidents & jams (the call the traffic engine already makes - full geometry kept), TomTom Flow probes along watched / selected
+# service routes (own daily budget, keeps a reserve of TomTom's shared cap), LTA incidents and road works, NEA rain gauges and the NEA
+# 2-hour forecast, the real-road service lines (TR_LINES), running-time history (rt_trip). NO LTA speed bands. The engine is forecast.py
+# (pure); this block only collects, stores (SQLite) and serves. Demo mode is a separate, fictional world and is never mixed into live data.
+import forecast  # noqa: E402
+import statistics  # noqa: E402
+
+FC_DB = os.getenv("FORECAST_DB", "").strip() or BB_DB                     # default: the platform's existing SQLite file
+FC_EVERY = max(60, int(os.getenv("FORECAST_REFRESH_SEC", "120") or 120))  # evaluation cycle (s)
+FC_PROBE_MIN = max(5, int(os.getenv("FORECAST_PROBE_EVERY_MIN", "15") or 15))
+FC_PROBES_PER_ROUTE = max(1, min(12, int(os.getenv("FORECAST_PROBES_PER_ROUTE", "6") or 6)))
+FC_PROBE_CAP = int(os.getenv("FORECAST_PROBE_CAP", "200") or 200)          # flow calls a day for forecast probes (200/day = ~6,000 of the 20,000 free Flow Segment Data calls a month)
+FC_RESERVE = int(os.getenv("FORECAST_TOMTOM_RESERVE", "800") or 800)       # never take TomTom's shared daily cap below this
+FC_ALWAYS = os.getenv("FORECAST_ALWAYS_ON", "").strip().lower() in ("1", "true", "yes")
+FC_KEEP_DAYS = int(os.getenv("FORECAST_KEEP_DAYS", "35") or 35)
+FC_PROVIDER = (os.getenv("FORECAST_TRAFFIC_PROVIDER", "tomtom") or "tomtom").strip().lower()   # tomtom | here
+HERE_KEY = os.getenv("HERE_API_KEY", "").strip()                           # optional second provider (server side only)
+FC_SERVICES = [s.strip().upper() for s in (os.getenv("FORECAST_SERVICES") or os.getenv("BUNCHING_SERVICES") or "").split(",") if s.strip()][:8]
+FC = {"store": None, "book": None, "jt": forecast.JamTracker(), "index": None, "index_at": None, "state": None, "world": None, "last": 0.0,
+      "last_req": 0.0, "lock": None, "probes": {}, "selected": {}, "budget": {"day": "", "n": 0}, "rain_prev": None, "rain_seen": None,
+      "nea2h": None, "nea2h_at": 0.0, "nea2h_err": None, "lta_inc_at": 0.0, "recur": {}, "jam_slot": None, "purged": "", "demo": {},
+      "err": None, "cycle_ms": None, "probe_err": None, "provider_ok_at": 0.0}
+
+
+def fc_store():
+    if FC["store"] is None:
+        FC["store"] = forecast.Store(FC_DB)
+        FC["book"] = forecast.AlertBook(store=FC["store"])
+    return FC["store"]
+
+
+def fc_lock():
+    if FC["lock"] is None:
+        FC["lock"] = asyncio.Lock()
+    return FC["lock"]
+
+
+def fc_budget_ok():
+    day = now_sgt().strftime("%Y-%m-%d")
+    if FC["budget"]["day"] != day:
+        FC["budget"] = {"day": day, "n": 0}
+    left_shared = TT["cap"] - (TT["n"] if TT["day"] == day else 0)
+    return FC["budget"]["n"] < FC_PROBE_CAP and left_shared > FC_RESERVE
+
+
+class FcProvider:
+    """Traffic provider abstraction: flow(lat, lon) -> one road segment (speeds km/h + its geometry) or None."""
+    name = "none"
+
+    def configured(self):
+        return False
+
+    async def flow(self, lat, lon, brg=None):
+        return None
+
+
+class FcTomTom(FcProvider):
+    name = "tomtom"
+
+    def configured(self):
+        return bool(TT["key"])
+
+    async def flow(self, lat, lon, brg=None):
+        if not tt_spend():
+            raise RuntimeError("TomTom daily cap reached")
+        r = await fc_get("https://api.tomtom.com/traffic/services/4/flowSegmentData/absolute/10/json",
+                         {"key": TT["key"], "point": f"{lat:.5f},{lon:.5f}", "unit": "KMPH"}, tt_headers())
+        return forecast.parse_tomtom_flow(r)
+
+
+class FcHere(FcProvider):
+    name = "here"
+
+    def configured(self):
+        return bool(HERE_KEY)
+
+    async def flow(self, lat, lon, brg=None):
+        r = await fc_get("https://data.traffic.hereapi.com/v7/flow", {"in": f"circle:{lat:.5f},{lon:.5f};r=60", "locationReferencing": "shape", "apiKey": HERE_KEY})
+        segs = forecast.parse_here_flow(r)
+        best, bd = None, 1e9
+        for s_ in segs:                                                    # the segment nearest the point (and, given a bearing, aligned with it)
+            L = forecast.Line(s_["line"])
+            if not L.ok:
+                continue
+            d, _, b = L.locate(forecast.to_xy(lat, lon))
+            pen = 0 if brg is None else (0 if forecast.angdiff(float(b[0]), brg) <= 35 else 1000)
+            if d[0] + pen < bd:
+                best, bd = s_, d[0] + pen
+        return best
+
+
+def fc_provider():
+    p = FcHere() if FC_PROVIDER == "here" else FcTomTom()
+    return p if p.configured() else (FcTomTom() if FcTomTom().configured() else (FcHere() if FcHere().configured() else FcProvider()))
+
+
+async def fc_get(url, params, headers=None, tries=3):
+    """GET JSON with retry + exponential backoff on 429 / 5xx / network errors."""
+    last = None
+    for k in range(tries):
+        try:
+            r = await client().get(url, params=params, headers=headers or {}, timeout=15)
+            if r.status_code in (429, 500, 502, 503, 504) and k + 1 < tries:
+                await asyncio.sleep(0.5 * (2 ** k))
+                continue
+            r.raise_for_status()
+            return r.json()
+        except Exception as e:
+            last = e
+            if k + 1 < tries and not (isinstance(e, httpx.HTTPStatusError) and e.response.status_code in (400, 401, 403, 404)):
+                await asyncio.sleep(0.5 * (2 ** k))
+                continue
+            break
+    raise last if last else RuntimeError("request failed")
+
+
+def fc_src(status, age=None, detail="", label=""):
+    return {"status": status, "age_s": None if age is None else int(age), "detail": detail, "label": label}
+
+
+async def fc_nea2h():
+    now = time.time()
+    if FC["nea2h"] is not None and now - FC["nea2h_at"] < 600:
+        return FC["nea2h"]
+    for u in ("https://api-open.data.gov.sg/v2/real-time/api/two-hr-weather-forecast", "https://api.data.gov.sg/v1/environment/2-hour-weather-forecast"):
+        try:
+            j = await fc_get(u, None, {"x-api-key": DATAGOV_KEY} if DATAGOV_KEY else None, tries=2)
+            p = forecast.parse_nea_2h(j)
+            if p["areas"]:
+                FC.update(nea2h=p, nea2h_at=now, nea2h_err=None)
+                return p
+            FC["nea2h_err"] = "no areas in response"
+        except Exception as e:
+            FC["nea2h_err"] = f"{type(e).__name__}"
+    return FC["nea2h"]
+
+
+async def fc_lta_incidents():
+    async def factory():                                   # the same cache entry as /api/incidents: one LTA call serves both
+        d = await get_lta(EP_INCIDENTS)
+        return d, TTL_INCIDENTS, not d.get("_error")
+    return await cached("incidents", factory)
+
+
+async def fc_index():
+    """The island-wide route index from the real-road service lines (rebuilt when TR_LINES changes)."""
+    try:
+        st = await static()
+        if st.get("routes"):
+            tr_lines_kick(st)
+    except Exception:
+        pass
+    if TR_LINES["n"] and FC["index_at"] != TR_LINES["at"]:
+        lines = {k: v["line"] for k, v in TR_LINES["lines"].items()}
+        FC["index"] = await asyncio.to_thread(forecast.RouteIndex, lines)
+        FC["index_at"] = TR_LINES["at"]
+    return FC["index"]
+
+
+async def fc_route(svc, d):
+    """(Line, stops) for one service-direction: the index line when there is one, else the platform's route geometry."""
+    st = await static()
+    stops = route_stops(st, svc, d) if st.get("stops") else []
+    idx = FC["index"]
+    if idx is not None and (svc, d) in idx.lines:
+        return idx.lines[(svc, d)], stops
+    if len(stops) >= 2:
+        g = await route_geometry(svc, d, stops)
+        L = forecast.Line(g["line"])
+        return (L if L.ok else None), stops
+    return None, stops
+
+
+def fc_probe_points(L, n):
+    """n points spread along the route, away from the ends (terminals are not representative)."""
+    if L is None or not L.ok or L.length < 600:
+        return []
+    k = max(1, min(n, int(L.length // 2000) or 1))
+    out = []
+    for i in range(k):
+        s_ = L.length * (i + 0.5) / k
+        la, lo = L.point_at(s_)
+        _, _, b = L.locate(forecast.to_xy(la, lo))
+        out.append((round(la, 5), round(lo, 5), float(b[0])))
+    return out
+
+
+async def fc_probe_service(svc, d, now, force=False):
+    """Sample the provider along one service route (within the daily budget); stores the readings and the forecasts it issues."""
+    prov = fc_provider()
+    if prov.name == "none":
+        return 0
+    L, _ = await fc_route(svc, d)
+    n = 0
+    for la, lo, brg in fc_probe_points(L, FC_PROBES_PER_ROUTE):
+        key = f"{la:.4f},{lo:.4f},{int(((brg + 22.5) % 360) // 45)}"
+        last = FC["probes"].get(key)
+        if last and now - last["ts"] < FC_PROBE_MIN * 60 and not (force and now - last["ts"] > 300):
+            if (svc, d) not in last["svcs"]:
+                last["svcs"].append((svc, d))
+            continue
+        if not fc_budget_ok():
+            FC["probe_err"] = "daily probe budget reached (FORECAST_PROBE_CAP / FORECAST_TOMTOM_RESERVE)"
+            break
+        FC["budget"]["n"] += 1
+        try:
+            res = await prov.flow(la, lo, brg)
+        except Exception as e:
+            FC["probe_err"] = f"{prov.name}: " + (tt_err(e) if prov.name == "tomtom" else f"{type(e).__name__}")
+            continue
+        if not res:
+            continue
+        FC["provider_ok_at"] = now
+        FC["probe_err"] = None
+        rec = dict(res, key=key, lat=la, lon=lo, brg=brg, ts=now, svcs=[(svc, d)], road=res.get("road") or "")
+        FC["probes"][key] = rec
+        stv = fc_store()
+        stv.settle(key, now, res["cur"])
+        stv.add_probes([(key, now, svc, d, la, lo, res["cur"], res["ff"], res.get("conf"), 1 if res.get("closure") else 0, prov.name)])
+        hist = stv.probe_hist(key, now - FC_KEEP_DAYS * 86400, now - 1800)
+        series = stv.probe_hist(key, now - 1800)
+        b0 = forecast.baseline(hist, now)
+        slope, _ = forecast.trend(series, now)
+        rows = []
+        for h in forecast.PARAMS["horizons"]:
+            bh = forecast.baseline(hist, now + h * 60)["kmh"]
+            mid, lo_, hi_ = forecast.forecast_speed(res["cur"], res["ff"], b0["kmh"], bh, slope, h, b0.get("sigma"))
+            rows.append((now, key, h, now + h * 60, mid, lo_, hi_))
+        stv.add_forecasts(rows)
+        n += 1
+    for k in [k for k, v in FC["probes"].items() if now - v["ts"] > 3 * 3600]:
+        FC["probes"].pop(k, None)
+    return n
+
+
+def fc_hist_rt(svc, d, now):
+    """Median measured running time (min) for this service-direction at this time of day (same day type, last 60 days)."""
+    dt = now_sgt()
+    dtype = bb_day_type(dt)
+    m0 = dt.hour * 60 + dt.minute
+    rows = bb_sql("SELECT start_ts, rt_min FROM rt_trip WHERE service=? AND direction=? AND day_type=? AND start_ts>=? AND cover>=0.8",
+                  (svc, d, dtype, now - 60 * 86400), fetch=True) or []
+    vals = []
+    for r in rows:
+        t = datetime.fromtimestamp(r["start_ts"], SGT)
+        if abs(t.hour * 60 + t.minute - m0) <= 45 and r["rt_min"]:
+            vals.append(float(r["rt_min"]))
+    return round(statistics.median(vals), 1) if len(vals) >= 5 else None
+
+
+async def fc_world(now):
+    """Collect everything the engine needs (live). Each source is marked live / stale / unavailable / off: nothing is ever filled in."""
+    stv = fc_store()
+    src = {}
+    idx = await fc_index()
+    src["route_index"] = fc_src("live" if idx is not None and len(idx) else "unavailable", (now - TR_LINES["at"]) if TR_LINES["at"] else None,
+                                f"{len(idx)} service-direction lines (busrouter.sg, fitted to LTA stops)" if idx is not None else (TR_LINES.get("info") or "not built yet"),
+                                "Route geometry")
+    events = []
+    # TomTom incidents & jams (shared call with the traffic engine)
+    if TT["key"]:
+        try:
+            await tomtom_incidents()
+        except Exception:
+            pass
+        raw, at = TT.get("raw"), TT.get("raw_at") or 0
+        if raw is not None:
+            events += forecast.parse_tomtom_incidents({"incidents": raw}, now)
+            age = now - at
+            src["tomtom_incidents"] = fc_src("live" if age <= 2 * TT_INC_TTL + 120 else "stale", age, TT.get("error") or f"{len(raw)} incidents incl. jams", "TomTom incidents & jams")
+        else:
+            src["tomtom_incidents"] = fc_src("unavailable", None, TT.get("error") or "no response yet", "TomTom incidents & jams")
+    else:
+        src["tomtom_incidents"] = fc_src("off", None, "TOMTOM_API_KEY not set", "TomTom incidents & jams")
+    # LTA incidents
+    if KEY:
+        raw = await fc_lta_incidents()
+        age = cache_age("incidents")
+        if raw.get("value") or not raw.get("_error"):
+            events += forecast.parse_lta_incidents(raw.get("value") or [], now)
+            src["lta_incidents"] = fc_src("live" if (age or 0) <= 2 * TTL_INCIDENTS + 60 else "stale", age, raw.get("_error") or f"{len(raw.get('value') or [])} incidents (point only)", "LTA incidents")
+        else:
+            src["lta_incidents"] = fc_src("unavailable", age, raw.get("_error"), "LTA incidents")
+        items, err = await tr_roadworks(now)
+        age = cache_age("roadworks")
+        events += forecast.normalise_roadworks(items, now)
+        src["lta_roadworks"] = fc_src("unavailable" if err and not items else ("live" if (age or 0) <= 2 * TTL_ROADWORKS + 60 else "stale"), age,
+                                      err or f"{len(items)} in force or starting within 2 h", "LTA road works")
+    else:
+        src["lta_incidents"] = fc_src("off", None, "LTA_ACCOUNT_KEY not set", "LTA incidents")
+        src["lta_roadworks"] = fc_src("off", None, "LTA_ACCOUNT_KEY not set", "LTA road works")
+    # NEA rainfall (all gauges, zero readings included) + the previous reading set for the trend
+    await api_rain()
+    hit = CACHE.get("rain")
+    stations = (hit[2].get("stations") if hit else None) or []
+    if hit and stations:
+        if FC["rain_seen"] != hit[1]:
+            FC["rain_prev"], FC["rain_seen"] = FC.get("rain_cur"), hit[1]
+            FC["rain_cur"] = stations
+        age = now - hit[1]
+        src["nea_rain"] = fc_src("live" if age <= 2 * TTL_RAIN + 120 else "stale", age, f"{len(stations)} gauges, {sum(1 for s_ in stations if s_['mm'] > 0)} wet", "NEA rainfall")
+    else:
+        src["nea_rain"] = fc_src("unavailable", None, (hit[2].get("error") if hit else None) or "no gauges", "NEA rainfall")
+    nea = await fc_nea2h()
+    src["nea_forecast"] = fc_src("live" if nea and now - FC["nea2h_at"] < 1800 else ("stale" if nea else "unavailable"), (now - FC["nea2h_at"]) if nea else None,
+                                 FC["nea2h_err"] or (f"{len(nea['areas'])} areas" if nea else ""), "NEA 2-h forecast")
+    # probes on the watched + recently selected services
+    sel = [k for k, t in FC["selected"].items() if now - t < 900][:3]
+    want = []
+    if FC_SERVICES:
+        st = await static()
+        for svc in FC_SERVICES:
+            for d in st.get("dirs", {}).get(svc, []):
+                want.append((svc, d))
+    for k in sel:
+        if k not in want:
+            want.append(k)
+    prov = fc_provider()
+    for svc, d in want[:12]:
+        try:
+            await fc_probe_service(svc, d, now)
+        except Exception as e:
+            FC["probe_err"] = f"{type(e).__name__}"
+    probes = []
+    for key, p in FC["probes"].items():
+        for (svc, d) in p["svcs"]:
+            probes.append({"key": key, "svc": svc, "dir": d, "lat": p["lat"], "lon": p["lon"], "road": p.get("road") or "", "cur": p["cur"], "ff": p["ff"],
+                           "conf": p.get("conf"), "closure": p.get("closure"), "line": p.get("line"), "ts": p["ts"], "provider": p.get("provider"),
+                           "series": stv.probe_hist(key, now - 1800), "hist": stv.probe_hist(key, now - FC_KEEP_DAYS * 86400, now - 1800)})
+    pa = (now - FC["provider_ok_at"]) if FC["provider_ok_at"] else None
+    src["tomtom_flow"] = fc_src("off" if prov.name == "none" else ("live" if pa is not None and pa <= FC_PROBE_MIN * 120 else ("stale" if pa is not None else ("unavailable" if FC["probe_err"] else "idle"))),
+                                pa, FC["probe_err"] or (f"{prov.name}: {len(FC['probes'])} probe points, {FC['budget']['n']}/{FC_PROBE_CAP} calls today" if prov.name != "none" else "no traffic provider key"),
+                                f"{'HERE' if prov.name == 'here' else 'TomTom'} flow probes")
+    # jams: build-up rate, recurrence for the time of day, snapshots every 10 min for future recurrence statistics
+    FC["jt"].update(events, now)
+    stv.cover(now)
+    slot = int(now // 600)
+    jrows, info = [], {}
+    hol = set()
+    for ev in events:
+        if ev.get("delay_s") is None and ev["kind"] != "jam":
+            continue
+        rate, _ = FC["jt"].rate(ev["id"])
+        cell = forecast.jam_cell(ev) if ev["kind"] == "jam" else None
+        rec = None
+        if cell:
+            ck = (cell, forecast.slot15(now))
+            hit_ = FC["recur"].get(ck)
+            if not hit_ or now - hit_[0] > 600:
+                hit_ = (now, stv.jam_recurrence(cell, now, hol))
+                FC["recur"][ck] = hit_
+            rec = hit_[1]
+            if FC["jam_slot"] != slot:
+                jrows.append((now, ev["id"], cell, ev.get("mag"), ev.get("delay_s"), ev.get("length_m"), ev.get("road") or ""))
+        info[ev["id"]] = {"rate": rate, "recurring": rec["recurring"] if rec else None, "typical_s": rec["typical_s"] if rec else None,
+                          "detail": rec["detail"] if rec else None, "first_seen": FC["jt"].first_seen(ev["id"])}
+    if jrows:
+        stv.add_jams(jrows)
+    FC["jam_slot"] = slot
+    if len(FC["recur"]) > 3000:
+        FC["recur"].clear()
+    # headways and running-time history for the services that matter
+    fq = await freq_table()
+    keys = set(want)
+    world = {"demo": False, "now": now, "index": idx, "routes": {}, "events": events, "probes": probes,
+             "rain": {"stations": stations, "prev": FC.get("rain_prev"), "ts": hit[1] if hit else None}, "nea_2h": nea or {}, "sources": src,
+             "headways": {}, "hist_rt": {}, "stops": {}, "focus": list(keys), "holidays": (), "jam_info": info,
+             "calibration": stv.calibration(now)}
+    return world, fq
+
+
+async def fc_cycle(force=False):
+    """One evaluation: collect, evaluate (in a thread), update the alert book. Never runs twice at once."""
+    now = time.time()
+    if not force and FC["state"] is not None and now - FC["last"] < FC_EVERY - 5:
+        return FC["state"]
+    async with fc_lock():
+        if not force and FC["state"] is not None and time.time() - FC["last"] < FC_EVERY - 5:
+            return FC["state"]
+        t0 = time.time()
+        try:
+            world, fq = await fc_world(now)
+            state = await asyncio.to_thread(forecast.evaluate, world)
+            keys = set(state["impacts"].keys())
+            dtn = now_sgt()
+            for k in keys:                                                   # headways + running-time history, then re-evaluate those services
+                try:
+                    hw_, _ = bb_resolve_hw(k[0], k[1], dtn, fq)
+                except Exception:
+                    hw_ = None
+                if hw_:
+                    world["headways"][k] = hw_
+                rt_ = await asyncio.to_thread(fc_hist_rt, k[0], k[1], now)
+                if rt_:
+                    world["hist_rt"][k] = rt_
+            if world["headways"] or world["hist_rt"]:
+                state = await asyncio.to_thread(forecast.evaluate, world)
+            fresh = {n: v["status"] == "live" for n, v in world["sources"].items()}
+            fc_store()
+            FC["book"].update(state["cands"], now, fresh)
+            state["kpis"].append(forecast.critical_kpi(FC["book"]))
+            FC.update(state=state, world=world, last=now, err=None, cycle_ms=round((time.time() - t0) * 1000))
+            if FC["purged"] != now_sgt().strftime("%Y-%m-%d"):
+                FC["purged"] = now_sgt().strftime("%Y-%m-%d")
+                await asyncio.to_thread(FC["store"].purge, now, FC_KEEP_DAYS)
+        except Exception as e:
+            FC["err"] = f"{type(e).__name__}: {str(e)[:200]}"
+        return FC["state"]
+
+
+async def fc_loop():
+    await asyncio.sleep(20)
+    while True:
+        try:
+            if FC_ALWAYS or time.time() - FC["last_req"] < 600:
+                await fc_cycle()
+        except Exception as e:
+            FC["err"] = f"{type(e).__name__}: {str(e)[:200]}"
+        await asyncio.sleep(FC_EVERY)
+
+
+def fc_demo(step):
+    step = max(0, min(len(forecast.DEMO_STEPS) - 1, int(step or 0)))
+    if step not in FC["demo"]:
+        FC["demo"][step] = forecast.demo_state(step)
+    return FC["demo"][step]
+
+
+def fc_payload(state, book_view, counts, audit, extra=None):
+    out = forecast.public_state(state)
+    out.update(alerts=book_view, alert_counts=counts, audit=audit)
+    if extra:
+        out.update(extra)
+    return out
+
+
+def fc_config():
+    prov = fc_provider()
+    return {"provider": prov.name, "tomtom_key": bool(TT["key"]), "here_key": bool(HERE_KEY), "lta_key": bool(KEY), "probe_cap": FC_PROBE_CAP,
+            "probe_used": FC["budget"]["n"] if FC["budget"]["day"] == now_sgt().strftime("%Y-%m-%d") else 0, "tomtom_reserve": FC_RESERVE,
+            "tomtom_shared": {"used": TT["n"] if TT["day"] == now_sgt().strftime("%Y-%m-%d") else 0, "cap": TT["cap"]},
+            "watched": FC_SERVICES, "refresh_s": FC_EVERY, "always_on": FC_ALWAYS, "store": {"ok": FC["store"].ok if FC["store"] else None,
+            "schema": FC["store"].version if FC["store"] else None, "err": FC["store"].err if FC["store"] else None,
+            "history_days": FC["store"].history_days() if FC["store"] else 0}, "speed_bands_used": False}
+
+
+@app.get("/api/forecast/state")
+async def api_forecast_state(mode: str = "live", step: int = 0):
+    if mode == "demo":
+        state, world = fc_demo(step)
+        return fc_payload(state, state["alerts"], state["alert_counts"], state["audit"],
+                          {"demo": state["demo"], "recovery": state.get("recovery"), "config": {"provider": "demo", "speed_bands_used": False}})
+    FC["last_req"] = time.time()
+    state = await fc_cycle()
+    fc_store()
+    if state is None:
+        return {"mode": "live", "error": FC["err"] or "The Forecast Centre is starting: no evaluation yet.", "kpis": [], "alerts": [], "events": [],
+                "config": fc_config(), "time": now_sgt().isoformat(timespec="seconds")}
+    now = time.time()
+    return fc_payload(state, FC["book"].view(now, history=True), FC["book"].counts(), FC["store"].audit_list(40),
+                      {"config": fc_config(), "age_s": round(now - FC["last"]), "cycle_ms": FC["cycle_ms"], "error": FC["err"]})
+
+
+@app.get("/api/forecast/service")
+async def api_forecast_service(svc: str = "", dir: int = 1, mode: str = "live", step: int = 0):
+    svc = svc.strip().upper()
+    if not svc:
+        return JSONResponse({"error": "Pick a service."}, status_code=400)
+    key = (svc, int(dir))
+    if mode == "demo":
+        state, world = fc_demo(step)
+        v = forecast.service_view(state, world, key)
+        if state.get("recovery") and state["recovery"]["svc"] == svc and state["recovery"]["dir"] == int(dir):
+            v["recovery"] = state["recovery"]
+        return v
+    FC["last_req"] = time.time()
+    FC["selected"][key] = time.time()
+    state = await fc_cycle()
+    if state is None:
+        return JSONResponse({"error": FC["err"] or "No evaluation yet."}, status_code=503)
+    world = FC["world"]
+    L, stops = await fc_route(svc, key[1])
+    if L is None:
+        return {"svc": svc, "dir": key[1], "error": f"No route geometry for service {svc} direction {key[1]}."}
+    if world["index"] is None or key not in world["index"].lines:
+        world["routes"][key] = L.pts
+    world["stops"][key] = stops
+    n = await fc_probe_service(svc, key[1], time.time(), force=True)          # on demand, within the budget
+    if n:
+        p = FC["probes"]
+        world["probes"] = [x for x in world["probes"] if (x["svc"], x["dir"]) != key] + [
+            {"key": k, "svc": svc, "dir": key[1], "lat": v["lat"], "lon": v["lon"], "road": v.get("road") or "", "cur": v["cur"], "ff": v["ff"], "conf": v.get("conf"),
+             "closure": v.get("closure"), "line": v.get("line"), "ts": v["ts"], "provider": v.get("provider"), "series": FC["store"].probe_hist(k, time.time() - 1800),
+             "hist": FC["store"].probe_hist(k, time.time() - FC_KEEP_DAYS * 86400, time.time() - 1800)} for k, v in p.items() if key in v["svcs"]]
+    try:
+        hw_, _ = bb_resolve_hw(svc, key[1], now_sgt(), await freq_table())
+        if hw_:
+            world["headways"][key] = hw_
+    except Exception:
+        pass
+    rt_ = await asyncio.to_thread(fc_hist_rt, svc, key[1], time.time())
+    if rt_:
+        world["hist_rt"][key] = rt_
+    await asyncio.to_thread(forecast.recompute_service, state, world, key)
+    v = await asyncio.to_thread(forecast.service_view, state, world, key)
+    im = state["impacts"].get(key)
+    if im and im["extra"][30]["mid"] >= 2:
+        v["recovery"] = forecast.recovery_options(svc, key[1], im["extra"][30]["mid"], im["hw"])
+    st = await static()
+    v["directions"] = st.get("dirs", {}).get(svc, [])
+    return v
+
+
+@app.get("/api/forecast/services")
+async def api_forecast_services(mode: str = "live"):
+    if mode == "demo":
+        return {"services": [{"svc": s, "dirs": [1, 2] if s == "X101" else [1]} for s in ("X101", "X102", "X201", "X305", "X410")], "demo": True}
+    st = await static()
+    dirs = st.get("dirs") or {}
+
+    def keyf(s_):
+        m = re.match(r"(\d+)(.*)", s_)
+        return (0, int(m.group(1)), m.group(2)) if m else (1, 0, s_)
+    return {"services": [{"svc": s_, "dirs": dirs[s_]} for s_ in sorted(dirs, key=keyf)], "error": st.get("error")}
+
+
+@app.post("/api/forecast/alerts/{aid}/ack")
+async def api_forecast_ack(aid: str, request: Request):
+    try:
+        body = json.loads((await request.body()).decode("utf-8") or "{}")
+    except ValueError:
+        body = {}
+    if body.get("mode") == "demo":
+        return {"ok": True, "demo": True, "note": "Demo acknowledgement: shown on this screen only, not stored."}
+    fc_store()
+    s_ = auth.read(request.cookies.get(auth.COOKIE, "")) if hasattr(auth, "read") else None
+    u_ = s_.get("u") if s_ else None
+    who = ((u_.get("name") or u_.get("id")) if isinstance(u_, dict) else (str(u_) if u_ else None)) or str(body.get("by") or "").strip()[:60] or "controller"
+    a = FC["book"].ack(aid, who, time.time(), str(body.get("note") or ""))
+    if a is None:
+        return JSONResponse({"error": "Unknown alert."}, status_code=404)
+    return {"ok": True, "alert": a, "counts": FC["book"].counts()}
+
+
+@app.get("/api/forecast/audit")
+async def api_forecast_audit(alert: str = "", limit: int = 200):
+    fc_store()
+    return {"audit": FC["store"].audit_list(max(1, min(1000, limit)), alert or None)}
+
+
+@app.get("/api/forecast/recovery")
+async def api_forecast_recovery(svc: str = "", dir: int = 1, extra: float = 0.0, hw: float = 0.0, layover: float = -1):
+    return forecast.recovery_options(svc.strip().upper(), int(dir), extra, hw or None, None if layover < 0 else layover)
+
+
+@app.get("/api/forecast/health")
+async def api_forecast_health():
+    fc_store()
+    w = FC.get("world") or {}
+    return {"engine": forecast.ENGINE, "method": forecast.METHOD, "params": forecast.PARAMS, "sources": w.get("sources") or {},
+            "last": datetime.fromtimestamp(FC["last"], SGT).isoformat(timespec="seconds") if FC["last"] else None, "error": FC["err"],
+            "cycle_ms": FC["cycle_ms"], "config": fc_config(), "calibration": FC["store"].calibration(time.time()),
+            "index": len(FC["index"]) if FC["index"] is not None else 0, "probes": len(FC["probes"])}

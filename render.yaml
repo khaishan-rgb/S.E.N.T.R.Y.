@@ -71,3 +71,21 @@ services:
         sync: false
       - key: DIVERSION_BLOCK_END_MARGIN_M # optional: Diversion Planner — usable junction margin at each end of a blockage in metres (default 10)
         sync: false
+      - key: TOMTOM_INCIDENTS_EVERY_SEC # optional (V17): seconds between TomTom incident calls; 1800 stays inside TomTom's free 2,500 a month (default 120 / 300)
+        sync: false
+      - key: FORECAST_SERVICES    # optional (V17 Forecast Centre): services probed continuously, e.g. 12,174 (default BUNCHING_SERVICES)
+        sync: false
+      - key: FORECAST_PROBE_CAP   # optional: TomTom flow calls a day for forecast probes (default 200, ~6,000 of the free 20,000 a month)
+        sync: false
+      - key: FORECAST_TOMTOM_RESERVE # optional: never take TomTom's shared daily counter below this (default 800)
+        sync: false
+      - key: FORECAST_ALWAYS_ON   # optional: 1 = collect forecast history even when nobody has the page open
+        sync: false
+      - key: FORECAST_KEEP_DAYS   # optional: days of forecast history kept (default 35)
+        sync: false
+      - key: FORECAST_DB          # optional: separate SQLite file for the Forecast Centre (default BUNCHING_DB)
+        sync: false
+      - key: FORECAST_TRAFFIC_PROVIDER # optional: tomtom (default) | here
+        sync: false
+      - key: HERE_API_KEY         # optional: HERE Traffic API v7 key (second provider) - set it here, never in the code
+        sync: false

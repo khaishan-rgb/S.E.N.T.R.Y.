@@ -18,8 +18,8 @@
   var MODULES = [
     {id:"occlive",  name:"OCC Live",                  short:"OCC Live", icon:"bell",    route:"/occ-live",     group:"COMMAND",   permission:"view", shortcut:true,  mobile:"more",     enabled:true,
      desc:"Combined live alert queue and OCC Connect \u2014 the always-on Service Controller workspace."},
-    {id:"command",  name:"Command Centre",           short:"Home",     icon:"home",    route:"/command",      group:"COMMAND",   permission:"view", shortcut:false, mobile:"home",     enabled:true,
-     desc:"Network exceptions, attention queue and AI insights"},
+    {id:"command",  name:"Forecast Centre",          short:"Home",     icon:"home",    route:"/command",      group:"COMMAND",   permission:"view", shortcut:false, mobile:"home",     enabled:true,
+     aliases:["/forecast"], desc:"Predictive OCC home: verified route impact, 15 / 30 / 60-min forecasts, smart alerts"},
     {id:"route",    name:"Route Traffic",            short:"Traffic",  icon:"route",   route:"/",             group:"COMMAND",   permission:"view", shortcut:true,  mobile:"traffic",  enabled:true,
      desc:"Live route map: speed, incidents, road works, cameras"},
     {id:"headway",  name:"Headway Control",          short:"Control",  icon:"headway", route:"/control",      group:"COMMAND",   permission:"view", shortcut:true,  mobile:"control",  enabled:true,
@@ -116,7 +116,7 @@
     return '<a class="' + cls + (m.id === ACTIVE ? " active" : "") + '" href="' + m.route + '"' + (m.id === ACTIVE ? ' aria-current="page"' : "") + ' title="' + esc(m.name) + '">' + icon(m.icon) + '<span>' + esc(m.name) + '</span></a>';
   }
   function sidebarHTML(){
-    var h = '<a class="ds-brand" href="/command" aria-label="SG Transport Pulse \u2014 Command Centre"><span class="ds-logo">' + icon("logo", ' stroke-width="2"') + '</span>'
+    var h = '<a class="ds-brand" href="/command" aria-label="SG Transport Pulse \u2014 Forecast Centre"><span class="ds-logo">' + icon("logo", ' stroke-width="2"') + '</span>'
       + '<span class="ds-brand-t"><b>SG TRANSPORT PULSE</b><small>Operational Intelligence Platform</small></span></a><nav class="ds-nav" aria-label="Primary">';
     GROUPS.forEach(function(g){
       var items = MODULES.filter(function(m){ return m.group === g && !hid(m); }); if(!items.length) return;
@@ -197,7 +197,7 @@
     var cmd = document.createElement("header"); cmd.className = "ds-cmd"; cmd.id = "dsCmd"; cmd.setAttribute("role", "banner"); cmd.innerHTML = cmdHTML();
     b.insertBefore(cmd, b.firstChild); b.insertBefore(scrim, b.firstChild); b.insertBefore(side, b.firstChild);
 
-    var pops = [["dsLaunch", launcherHTML()], ["dsNotes", '<h4>NOTIFICATIONS <a href="/command">Command Centre</a></h4><div id="dsNoteList"><div class="ds-note-empty">Loading\u2026</div></div>'], ["dsProfile", profileHTML(null)]];
+    var pops = [["dsLaunch", launcherHTML()], ["dsNotes", '<h4>NOTIFICATIONS <a href="/command">Forecast Centre</a></h4><div id="dsNoteList"><div class="ds-note-empty">Loading\u2026</div></div>'], ["dsProfile", profileHTML(null)]];
     pops.forEach(function(x){ var d = document.createElement("div"); d.className = "ds-pop"; d.id = x[0]; d.setAttribute("role", "dialog"); d.innerHTML = x[1]; b.appendChild(d); });
     var bn = document.createElement("nav"); bn.className = "ds-bnav"; bn.setAttribute("aria-label", "Mobile navigation"); bn.innerHTML = bottomHTML(); b.appendChild(bn);
     var sh = document.createElement("div"); sh.className = "ds-sheet"; sh.id = "dsSheet"; sh.innerHTML = sheetHTML(); b.appendChild(sh);
