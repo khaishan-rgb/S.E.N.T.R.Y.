@@ -52,22 +52,22 @@ The section numbers and the Recovery Decision Engine headers are gone. The mobil
 * **Step 3:** smaller figures. Space is kept for the bottom navigation bar.
 * **More detail:** at most 8 stop cards.
 
-**Why this plan: Lean Six Sigma, DMAIC (step 3, under the ROI).** This is a storyboard for selling the plan to a manager. Each DMAIC step is a band with plain-language rows on the left and a chart on the right. A ribbon at the top (D M A I C) jumps to each step. Everything is drawn from the plan's own pass times, using the same model as the simulation.
+**Why this plan: Lean Six Sigma, DMAIC, in pictures (step 3, under the ROI).** This is a storyboard for selling the plan to a manager. Each DMAIC step is one illustration plus 3–4 pointers (a big number and a few words), with no paragraphs. A ribbon at the top (D M A I C) jumps to each step. Everything is drawn from the plan's own pass times, using the same model as the simulation.
 
-EWT is explained as **average wait − promised wait**, where the promised wait is half the headway. With one passenger a minute, a gap of *g* minutes makes *g* × (*g* − H) ÷ 2 extra passenger-minutes. EWT is the extra passenger-minutes ÷ passengers, which is the same sum the engine does.
-
-| Step | What it says | Chart |
+| Step | Illustration | Pointers (D1 Bus 6 example) |
 |---|---|---|
-| **D Define** | The problem (who is how far apart, what the timetable promises), the customer, the Lean waste (waiting), the measure (EWT), the goal and the scope. | EWT in one bar: average wait = promised (green) + EWT (red). |
-| **M Measure** | The baseline. *Example:* 30 passengers in the 30-min gap wait 15 min on average, 10 more than promised, making 300 extra passenger-minutes; a 10-min gap makes 0. Route EWT 1.881. | One bar per passenger at the entry stop; its height is their wait. |
-| **A Analyze** | A Pareto of extra passenger-minutes by gap. *Example:* one gap makes 98% of it, and one 30-min gap makes 300 while two 15-min gaps make 75. | Pareto bars. |
-| **I Improve** | The action (complete, rest, off-service, enter mid-gap), the effect (300 → 75, −75% at the entry stop and after it), the side effect at the interchange and the re-spacing, the options tested, and the result. The result is honest about what the stops before the entry give back. | The same passengers with the plan; average wait = promised + EWT, no action against the plan, before the entry, from the entry on, and all of the route. |
-| **C Control** | The control plan with times: Bus C leaves; the moved departures (±1 min); Bus C passes the entry stop; the headways to monitor at the AITPs after it; the Recovery Decision Engine gate (worth deploying / marginal / not better). | – |
+| **D Define** – the problem | The buses passing the entry stop on a time line, each gap bracketed (10 / **30** / 10 min) | 10 min promised · 30 min gap · waiting (the Lean waste) |
+| **M Measure** – EWT today | One bar: average wait = promised (green) + EWT (red) | 5 min promised · 6.9 min actual · 1.88 EWT |
+| **A Analyze** – the cause | One bar per passenger (1 a minute), as tall as their wait; each gap tagged with its extra passenger-minutes | 98% of the extra wait is one gap · 9× the waiting of a 10-min gap · +300 |
+| **I Improve** – the fix | The same passengers with the halfway bus (15 + 15, +38 each); the interchange departures before and after (empty slot, gaps of 12) | 17:42 enters · 15 + 15 · −75% · 12 min max gap |
+| **C Control** – check & result | Average wait, no action against the plan: before the entry, from the entry on, and all of the route | 17:18 leaves · 17:42 at the stop · 15 ± 2 to watch · the RDE gate (MARGINAL) |
+
+With one passenger a minute, a gap of *g* minutes makes *g* × (*g* − H) ÷ 2 extra passenger-minutes, and EWT is the extra ÷ passengers.
 
 Under the storyboard:
-* **The pitch:** one line per DMAIC step.
+* **The pitch:** five short lines, D M A I C.
 * **Copy pitch.**
-* **Save as picture:** one PNG of the whole storyboard, for a slide or a chat.
+* **Save as picture:** one PNG of the whole storyboard.
 
 On a phone the steps stack and the charts are drawn narrower, so the labels stay readable.
 
