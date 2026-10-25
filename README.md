@@ -54,15 +54,19 @@ The section numbers and the Recovery Decision Engine headers are gone. The mobil
 
 **Why this plan: Lean Six Sigma, DMAIC, in pictures (step 3, under the ROI).** This is a storyboard for selling the plan to a manager. Each DMAIC step is one illustration plus 3–4 pointers (a big number and a few words), with no paragraphs. A ribbon at the top (D M A I C) jumps to each step. Everything is drawn from the plan's own pass times, using the same model as the simulation.
 
+The promise is the headway (a bus every 10 min). Red always means waiting beyond it.
+
 | Step | Illustration | Pointers (D1 Bus 6 example) |
 |---|---|---|
-| **D Define** – the problem | The buses passing the entry stop on a time line, each gap bracketed (10 / **30** / 10 min) | 10 min promised · 30 min gap · waiting (the Lean waste) |
-| **M Measure** – EWT today | One bar: average wait = promised (green) + EWT (red) | 5 min promised · 6.9 min actual · 1.88 EWT |
-| **A Analyze** – the cause | One bar per passenger (1 a minute), as tall as their wait; each gap tagged with its extra passenger-minutes | 98% of the extra wait is one gap · 9× the waiting of a 10-min gap · +300 |
-| **I Improve** – the fix | The same passengers with the halfway bus (15 + 15, +38 each); the interchange departures before and after (empty slot, gaps of 12) | 17:42 enters · 15 + 15 · −75% · 12 min max gap |
-| **C Control** – check & result | Average wait, no action against the plan: before the entry, from the entry on, and all of the route | 17:18 leaves · 17:42 at the stop · 15 ± 2 to watch · the RDE gate (MARGINAL) |
+| **D Define** – the problem | The buses passing the entry stop on a time line, each gap bracketed (10 / **30** / 10 min) | 10 min promised headway · 30 min gap · waiting (the Lean waste) |
+| **M Measure** – today | One bar: the headway passengers feel (Σh² ÷ Σh) = promised 10 (green) + 3.8 over (red) | 13.8 min felt · +3.8 over the promise · EWT 1.88 = (13.8 − 10) ÷ 2 |
+| **A Analyze** – the cause | One bar per passenger (1 a minute), as tall as their wait, with a promise line at 10 min. The part over the line is red; each gap is tagged with its minutes over | >99% of the waiting over 10 min is this gap · 20 of 30 wait over 10 · +200 min over |
+| **I Improve** – the fix | The same passengers with the halfway bus (15 + 15, 12.5 min over each); the interchange departures before and after (empty slot, gaps of 12) | 17:42 enters · 15 + 15 · −88% minutes over 10 · 10 of 30 wait over 10 (was 20) · 12 min max gap |
+| **C Control** – check & result | The headway passengers feel against the promised 10, no action against the plan: before the entry, from the entry on, and all of the route; EWT beside each | 17:18 leaves · 17:42 at the stop · 15 ± 2 to watch · the RDE gate (MARGINAL) |
 
-With one passenger a minute, a gap of *g* minutes makes *g* × (*g* − H) ÷ 2 extra passenger-minutes, and EWT is the extra ÷ passengers.
+With one passenger a minute, a gap of *g* minutes makes (*g* − H)² ÷ 2 minutes waited beyond the promise.
+
+EWT itself is unchanged: it is still the RDE's measure, and the headway passengers feel = H + 2 × EWT.
 
 Under the storyboard:
 * **The pitch:** five short lines, D M A I C.
