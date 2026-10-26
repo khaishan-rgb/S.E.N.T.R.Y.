@@ -397,8 +397,9 @@ body.ds-app .ds-cmd{background:rgba(5,22,58,.82)!important}
   <section class="fc-glass" style="padding:12px;margin-bottom:12px" aria-label="Forecast filters">
     <label>Service <input class="ds-input" id="fcFilterSvc" list="fcSvcList" placeholder="All services" autocomplete="off"></label>
     <label>Operator <select class="ds-input" id="fcFilterOp"><option value="">All operators</option></select></label>
+    <label>Minimum extra delay (min) <input class="ds-input" id="fcFilterMin" type="number" min="0" step="0.5" value="0" style="width:100px"></label>
     <button type="button" class="ds-btn sm" id="fcFilterReset">Clear filters</button>
-    <small id="fcFilterNote">Filters apply to alerts, forecast comparison and services at risk. Map and executive totals cover the network.</small>
+    <small id="fcFilterNote">Filters apply to map route impacts, alerts, forecasts and risk rows. Minimum delay uses the largest prediction at 15 / 30 / 60 min. Only verified affected services are shown. Executive totals and weather cover the network; background traffic flow is hidden while filtering.</small>
   </section>
   <div class="fc-grid">
     <aside class="fc-glass fc-side fc-svcpanel" aria-label="Service intelligence">
@@ -658,7 +659,7 @@ function layerOn(k){ return !!S.lay[k]; }
 
 MV.update = function(){
   if(!MV.ready) return;
-  var st = S.st || {}, h = S.h, ev = st.events || [], L_ = [], P_ = [], heat = [];
+  var st = S.st || {}, h = S.h, ev = (st.events || []).filter(visibleEvent), L_ = [], P_ = [], heat = [];
   ev.forEach(function(e){
     var isW = e.kind === "roadworks", unv = e.status === "unverified";
     if(isW && !layerOn("works")) return;
@@ -670,10 +671,10 @@ MV.update = function(){
     if(e.pt && (!e.line || e.kind !== "jam")) P_.push({type:"Feature", properties:props, geometry:{type:"Point", coordinates:e.pt}});
     if(e.kind === "jam" && e.line) { var mid = e.line[Math.floor(e.line.length / 2)]; heat.push({type:"Feature", properties:{w:Math.min(1, ((((e.fc || {})[h] || {}).mid || e.delay_s || 0) / 600))}, geometry:{type:"Point", coordinates:mid}}); }
   });
-  var probes = layerOn("probes") ? (st.probes || []).map(function(p){ return {type:"Feature", properties:{key:p.key, c:ratioColour(probeRatio(p, h))}, geometry:{type:"Point", coordinates:[p.lon, p.lat]}}; }) : [];
+  var probes = layerOn("probes") ? (st.probes || []).filter(matchesService).map(function(p){ return {type:"Feature", properties:{key:p.key, c:ratioColour(probeRatio(p, h))}, geometry:{type:"Point", coordinates:[p.lon, p.lat]}}; }) : [];
   var rain = layerOn("rain") ? ((st.rain || {}).stations || []).filter(function(s){ return s.mmh > 0; }).map(function(s){ return {type:"Feature", properties:{id:s.id, name:s.name, mmh:s.mmh, cls:s.cls}, geometry:{type:"Point", coordinates:[s.lon, s.lat]}}; }) : [];
   var areas = [];                                                         // NEA area forecasts stay in the weather pill: no circles on the map
-  var v = S.view && !S.view.error && layerOn("route") ? S.view : null, route = [], sec = [], crit = [], rrain = [], stops = [];
+  var v = S.view && matchesService(S.view) && !S.view.error && layerOn("route") ? S.view : null, route = [], sec = [], crit = [], rrain = [], stops = [];
   if(v){
     route.push({type:"Feature", properties:{}, geometry:{type:"LineString", coordinates:v.line}});
     (v.sections || []).forEach(function(s){ if(s.line && s.line.length > 1) sec.push({type:"Feature", properties:{key:s.key, c:ratioColour(probeRatio(s, h))}, geometry:{type:"LineString", coordinates:s.line}}); });
@@ -685,13 +686,13 @@ MV.update = function(){
   if(MV.kind === "ml"){
     var m = MV.ml, set = function(id, f){ var s = m.getSource(id); if(s) s.setData(FCo(f)); };
     set("ev", L_); set("evp", P_); set("heat", heat); set("probe", probes); set("rain", rain); set("route", route); set("rsec", sec); set("rcrit", crit); set("rrain", rrain); set("stops", stops);
-    var flowOk = !isDemo() && st.config && st.config.tomtom_key && layerOn("flow");
+    var flowOk = !isDemo() && st.config && st.config.tomtom_key && layerOn("flow") && !filterActive();
     ["tt-glow", "tt-flow", "tt-closed"].forEach(function(id){ if(m.getLayer(id)) m.setLayoutProperty(id, "visibility", flowOk ? "visible" : "none"); });
     m.setLayoutProperty("heat", "visibility", layerOn("heat") ? "visible" : "none");
   } else if(MV.kind === "lf"){
     var G = MV.groups; Object.keys(G).forEach(function(k){ G[k].clearLayers(); });
     var ll = function(c){ return [c[1], c[0]]; };
-    if(!isDemo() && st.config && st.config.tomtom_key && layerOn("flow")) L.tileLayer("/api/tomtom/tile/{z}/{x}/{y}.png", {opacity:.7, maxZoom:18}).addTo(G.flow);
+    if(!isDemo() && st.config && st.config.tomtom_key && layerOn("flow") && !filterActive()) L.tileLayer("/api/tomtom/tile/{z}/{x}/{y}.png", {opacity:.7, maxZoom:18}).addTo(G.flow);
     areas.forEach(function(a){ L.polygon(a.geometry.coordinates[0].map(ll), {color:COL.rain, weight:1, dashArray:"4 4", fillOpacity:.07}).addTo(G.rainarea); });
     route.forEach(function(r){ L.polyline(r.geometry.coordinates.map(ll), {color:"#02070f", weight:9, opacity:.9}).addTo(G.route); L.polyline(r.geometry.coordinates.map(ll), {color:"#9be7ff", weight:4}).addTo(G.route); });
     sec.forEach(function(s){ L.polyline(s.geometry.coordinates.map(ll), {color:s.properties.c, weight:6}).addTo(G.route); });
@@ -709,7 +710,7 @@ MV.update = function(){
 function zones(){
   MV.zm.forEach(function(z){ z.remove(); }); MV.zm = [];
   if(!layerOn("zones") || !MV.ready) return;
-  ((S.st || {}).zones || []).forEach(function(z){
+  ((S.st || {}).zones || []).filter(function(z){ return z.services > 0 && (!filterActive() || (z.event_ids || []).some(function(id){ var e = evById(id); return e && visibleEvent(e); })); }).forEach(function(z){
     var el = document.createElement("button"); el.type = "button"; el.className = "fc-zone" + (z.abnormal || z.max_mag >= 3 ? " pulse" : ""); el.innerHTML = "<b>!</b>";
     el.style.setProperty("--zc", z.max_mag >= 3 || z.abnormal ? COL.critical : COL.high); el.setAttribute("aria-label", "Congestion zone " + (z.roads || []).join(", "));
     var html = '<div class="fc-pop"><h4>Congestion risk zone</h4><p>' + esc((z.roads || []).join(", ") || "Road") + '</p><p>' + z.n + ' jam(s), ' + f1(z.km) + ' km, worst delay ' + f1(z.delay_min) + ' min</p><p>'
@@ -721,11 +722,12 @@ function zones(){
 function evById(id){ return ((S.st || {}).events || []).filter(function(e){ return e.id === id; })[0]; }
 function popHtml(kind, p){
   if(kind === "event"){
-    var e = evById(p.id); if(!e) return "";
+    var e = evById(p.id); if(!e || !visibleEvent(e)) return "";
+    e = Object.assign({}, e, {services:(e.services || []).filter(matchesService), unverified_services:[]});
     var st = e.status === "confirmed" ? '<span class="fc-tag ver">Verified on ' + e.services.length + ' service-direction' + (e.services.length === 1 ? "" : "s") + '</span>'
       : e.status === "unverified" ? '<span class="fc-tag unv">Unverified – not counted</span>' : '<span class="fc-tag rej">No bus route affected</span>';
     var d = e.delay_s != null ? '<p>Delay now ' + f1(e.delay_s / 60) + ' min' + (S.h && e.fc && e.fc[S.h] ? ', at +' + S.h + ' min ' + f1(e.fc[S.h].mid / 60) + ' min (' + esc(e.fc[S.h].trend) + ')' : "") + '</p>' : "";
-    var sv = e.services.map(function(s){ return '<button type="button" data-svc="' + esc(s.svc) + '" data-dir="' + s.dir + '">' + esc(s.svc) + ' d' + s.dir + (s.extra && s.extra[30] ? ' +' + f1(s.extra[30]) : '') + '</button>'; }).join("")
+    var sv = e.services.map(function(s){ return '<button type="button" data-svc="' + esc(s.svc) + '" data-dir="' + s.dir + '">' + esc(s.svc) + ' d' + s.dir + (s.extra && s.extra[30] ? ' +' + f1(s.extra[30]) + ' min extra at +30 min' : '') + '</button>'; }).join("")
       + (e.unverified_services || []).map(function(s){ return '<button type="button" data-svc="' + esc(s.svc) + '" data-dir="' + s.dir + '" style="border-style:dashed">' + esc(s.svc) + ' d' + s.dir + ' ?</button>'; }).join("");
     return '<div class="fc-pop"><h4>' + esc(KIND[e.kind] || e.label) + (e.road ? ' – ' + esc(e.road) : '') + '</h4>' + (e.from || e.to ? '<p>' + esc(e.from || "") + (e.to ? ' → ' + esc(e.to) : '') + '</p>' : '')
       + '<p>' + st + ' ' + (isDemo() ? '<span class="fc-tag demo">DEMO</span>' : '') + '</p>' + d + (e.pass_text ? '<p>' + esc(e.pass_text) + '</p>' : '')
@@ -844,15 +846,21 @@ function renderLayers(){
 }
 function renderHz(){
   var cmp = {}; ((S.st || {}).comparison || []).forEach(function(c){ cmp[c.h] = c; });
-  var nowN = ((S.st || {}).events || []).filter(function(e){ return e.status === "confirmed"; }).length;
+  var nowN = ((S.st || {}).events || []).filter(visibleEvent).length;
   $("fcHz").innerHTML = HZ.map(function(h){
-    var c = cmp[h], lv = c ? (c.critical ? "critical" : c.high ? "high" : c.watch ? "watch" : "") : "", sub = h ? (c ? (c.critical + c.high) + " at risk · +" + f1(c.extra_total) + " bus-min" : "–") : nowN + " verified events";
+    var c = cmp[h];
+    if(c && filterActive()){
+      var selected = ((S.st || {}).services || []).filter(matchesService), counts = {critical:0,high:0,watch:0};
+      selected.forEach(function(s){ var lv = (s.levels || {})[h]; if(counts[lv] != null) counts[lv]++; });
+      c = Object.assign({}, c, counts, {extra_total:selected.reduce(function(n,s){ return n + s.extra[h].mid; },0)});
+    }
+    var lv = c ? (c.critical ? "critical" : c.high ? "high" : c.watch ? "watch" : "") : "", sub = h ? (c ? (c.critical + c.high) + " at risk · +" + f1(c.extra_total) + " extra min total" : "–") : nowN + " verified events";
     return '<button type="button" data-h="' + h + '" aria-pressed="' + (S.h === h) + '" style="--c:' + (lv ? COL[lv] : "#3b4c60") + '"><b>' + (h ? "+" + h + " min" : "Now") + '</b><span class="ln"></span><small>' + esc(sub) + '</small></button>';
   }).join("");
 }
 function alertCard(a){
   var demo = isDemo(), acked = a.acked || S.demoAck[a.id], d = a.delay || {}, hasD = [15, 30, 60].some(function(h){ return d[h] != null || d[String(h)] != null; });
-  var svcs = (a.services || []).slice(0, 12).map(function(s){ var x = s.extra30 != null ? ' +' + f1(s.extra30) + ' min' : s.share != null ? ' ' + Math.round(s.share * 100) + '%' : '';
+  var svcs = (a.services || []).filter(matchesService).slice(0, 12).map(function(s){ var x = s.extra30 != null ? ' +' + f1(s.extra30) + ' min' : s.share != null ? ' ' + Math.round(s.share * 100) + '%' : '';
     return '<button type="button" class="' + (a.verified === false && a.kind !== "rain" ? "unv" : "") + '" data-svc="' + esc(s.svc) + '" data-dir="' + s.dir + '">' + esc(s.svc) + ' d' + s.dir + x + '</button>'; }).join("");
   var tags = lvTag(a.level) + (a.kind === "rain" ? '<span class="fc-tag est">Estimated</span>' : a.verified === false ? '<span class="fc-tag unv">Unverified</span>' : '<span class="fc-tag ver">Verified</span>')
     + (a.escalated && !acked ? '<span class="fc-tag crit">Escalated</span>' : '') + (a.realerts ? '<span class="fc-tag watch">Worsened</span>' : '') + (a.stale ? '<span class="fc-tag stale">Source stale</span>' : '')
@@ -869,18 +877,29 @@ function alertCard(a){
     + ((a.explain || []).length ? '<details><summary>Why these services (route matching)</summary><ul>' + a.explain.map(function(x){ return '<li>' + esc(x) + '</li>'; }).join("") + '</ul></details>' : '')
     + '<div class="foot"><div class="fc-links">' + links + '</div><span class="sp"></span>' + ack + '</div></article>';
 }
-function filterActive(){ return !!($("fcFilterSvc").value.trim() || $("fcFilterOp").value); }
+function filterActive(){ return !!($("fcFilterSvc").value.trim() || $("fcFilterOp").value || minDelay()); }
+function minDelay(){ return Math.max(0, Number($("fcFilterMin").value) || 0); }
+function predictedDelay(s){
+  var extra = s.extra || {}, values = [15,30,60].map(function(h){ var v = extra[h]; return Number(v && typeof v === "object" ? v.mid : v) || 0; });
+  return Math.max.apply(null, values);
+}
+function visibleEvent(e){ return e.status === "confirmed" && (e.services || []).some(matchesService); }
 function matchesService(s){
   var svc = $("fcFilterSvc").value.trim().toUpperCase(), op = $("fcFilterOp").value;
   var meta = (S.svcs || []).find(function(x){ return x.svc === s.svc; });
-  return (!svc || s.svc === svc) && (!op || meta && meta.operator === op);
+  var row = ((S.st || {}).services || []).find(function(x){return x.svc === s.svc && x.dir === s.dir;}) || s;
+  return (!svc || s.svc === svc) && (!op || meta && meta.operator === op) && (!minDelay() || predictedDelay(row) >= minDelay());
 }
-function renderFiltered(){ renderAlerts(); renderCmp(); renderTop(); }
+function renderFiltered(){
+  if(MV.pop){ MV.pop.remove(); MV.pop = null; }
+  if(MV.lf) MV.lf.closePopup();
+  renderAlerts(); renderCmp(); renderTop(); renderHz(); MV.update();
+}
 function renderAlerts(){
-  var st = S.st || {}, all = (st.alerts || []).filter(function(a){ return !filterActive() || (a.services || []).some(matchesService); }), el = $("fcAlerts");
+  var st = S.st || {}, all = (st.alerts || []).filter(function(a){ return (a.services || []).some(matchesService); }), el = $("fcAlerts");
   document.querySelectorAll("[data-tab]").forEach(function(b){ b.setAttribute("aria-pressed", String(b.getAttribute("data-tab") === S.tab)); });
   var c = st.alert_counts || {};
-  if(filterActive()) c = {active:all.filter(function(a){return a.status === "active";}).length, unacked:all.filter(function(a){return a.status === "active" && !a.acked && !S.demoAck[a.id];}).length};
+  c = {active:all.filter(function(a){return a.status === "active";}).length, unacked:all.filter(function(a){return a.status === "active" && !a.acked && !S.demoAck[a.id];}).length};
   $("fcAlCount").textContent = (c.unacked || 0) + " unacknowledged · " + (c.active || 0) + " active";
   if(S.tab === "audit"){
     var au = (st.audit || []).filter(function(x){ return !filterActive() || all.some(function(a){ return a.id === x.alert_id; }); });
@@ -891,7 +910,7 @@ function renderAlerts(){
   var list = all.filter(function(a){ var ak = a.acked || S.demoAck[a.id];
     return S.tab === "active" ? a.status === "active" : S.tab === "acked" ? a.status === "active" && ak : a.status === "resolved"; });
   if(S.tab === "active") list.sort(function(a, b){ var x = !!(a.acked || S.demoAck[a.id]), y = !!(b.acked || S.demoAck[b.id]); return x === y ? 0 : x ? 1 : -1; });
-  el.innerHTML = list.length ? list.map(alertCard).join("") : '<div class="fc-empty">' + (S.tab === "active" ? (st.error && !isDemo() ? esc(st.error) : "No active warnings match this view. Every event the feeds report has been checked against the bus routes; none needs attention.") : S.tab === "acked" ? "Nothing acknowledged." : "Nothing cleared in the last 24 hours.") + '</div>';
+  el.innerHTML = list.length ? list.map(alertCard).join("") : '<div class="fc-empty">' + (S.tab === "active" ? (st.error && !isDemo() ? esc(st.error) : "No alerts match the selected service, operator and minimum delay.") : S.tab === "acked" ? "Nothing acknowledged." : "Nothing cleared in the last 24 hours.") + '</div>';
 }
 function renderCmp(){
   var st = S.st || {};
@@ -915,7 +934,7 @@ function renderTop(){
     return '<tr data-svc="' + esc(s.svc) + '" data-dir="' + s.dir + '"><td><b>' + esc(s.svc) + '</b> d' + s.dir + '</td><td>' + lvTag(s.level) + (s.blocked ? ' <span class="fc-tag crit">Blocked</span>' : '') + '</td>'
       + [15, 30, 60].map(function(h){ var e = s.extra[h] || s.extra[String(h)]; return '<td class="fc-num"><b>+' + f1(e.mid) + ' min</b></td>'; }).join("")
       + '<td>' + esc((s.causes || []).join(", ") || (s.heavy_share ? "Heavy rain (est.)" : "–")) + '</td><td>' + (s.building ? "still building" : s.recovery_min != null ? "~" + s.recovery_min + " min" : "–") + '</td></tr>'; }).join("") + '</tbody>'
-    : '<tbody><tr><td class="fc-empty">No service at risk from verified evidence.</td></tr></tbody>';
+    : '<tbody><tr><td class="fc-empty">No services at risk match the selected filters.</td></tr></tbody>';
 }
 function renderInt(){
   var st = S.st || {}, src = st.sources || {}, cfg = st.config || {}, cal = st.calibration || {};
@@ -1019,7 +1038,8 @@ function setMode(m){
 }
 $("fcFilterSvc").addEventListener("input", renderFiltered);
 $("fcFilterOp").addEventListener("change", renderFiltered);
-$("fcFilterReset").addEventListener("click", function(){ $("fcFilterSvc").value = ""; $("fcFilterOp").value = ""; renderFiltered(); });
+$("fcFilterMin").addEventListener("input", renderFiltered);
+$("fcFilterReset").addEventListener("click", function(){ $("fcFilterSvc").value = ""; $("fcFilterOp").value = ""; $("fcFilterMin").value = "0"; renderFiltered(); });
 function loadSvcList(){
   api("/api/forecast/services" + (isDemo() ? "?mode=demo" : "")).then(function(j){
     S.svcs = (j && j.services) || [];

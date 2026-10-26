@@ -1239,6 +1239,7 @@ def evaluate(world, P=None):
                          "km": round(sum((m.get("length_m") or 0) for m in mm) / 1000, 1), "max_mag": max(mags), "delay_min": round(max((m.get("delay_s") or 0) for m in mm) / 60, 1),
                          "roads": sorted({m.get("road") or m.get("from") or "" for m in mm} - {""})[:3],
                          "services": len({(s["svc"], s["dir"]) for x in evv for s in x["services"]}),
+                         "event_ids": [x["id"] for x in evv],
                          "abnormal": any(x["recurring"] is False for x in evv), "recurring": all(x["recurring"] for x in evv) if evv else None})
 
     # ---- 7. services ranked

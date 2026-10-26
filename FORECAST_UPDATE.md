@@ -1,8 +1,6 @@
-Forecast Centre update
+Forecast filter update
 
-- Forecast comparison explains the 15 / 30 / 60 minute horizons and aggregate delay units.
-- Services at risk shows explicit minute values and full horizon headings.
-- Service and operator filters apply together to alerts, comparison and risk rows; map and executive totals remain network-wide, as labelled. Operator choices use the existing timetable operator mapping.
-- Missing incident names use Traffic disruption and the matched service/direction. Missing road names are explicitly attributed to the source; no road name is invented.
-
-Validation: Python compilation, JavaScript syntax and focused filter intersection/aggregate rendering checks passed. The existing t_forecast.py suite did not finish and was stopped; full integration/browser validation remains outstanding.
+Upload app.py, forecast.py and forecast.html, replacing existing files.
+Map events, popup service buttons, probes, selected route, alerts, risk rows and forecast cards now respect service/operator/minimum delay. Events without verified affected services are hidden. Broad traffic-flow tiles are hidden while filters are active. Weather and executive totals remain network-wide, as labelled.
+Minimum delay is the largest predicted extra running time at 15, 30 or 60 minutes, not timetable lateness.
+Validation: Python compilation, JavaScript syntax, and map data-source tests for operator/service intersection, minimum delay, unaffected/unverified removal, probe filtering and background flow suppression passed. Full browser/live-data validation has not been run.
