@@ -399,6 +399,8 @@ body.ds-app .ds-cmd{background:rgba(5,22,58,.82)!important}
     <label>Operator <select class="ds-input" id="fcFilterOp"><option value="">All operators</option></select></label>
     <label>Minimum extra delay (min) <input class="ds-input" id="fcFilterMin" type="number" min="0" step="0.5" value="0" style="width:100px"></label>
     <button type="button" class="ds-btn sm" id="fcFilterReset">Clear filters</button>
+    <label><input type="checkbox" id="fcLiveBuses" checked> Live buses</label>
+    <small id="fcBusStatus" role="status">Waiting for live bus positions…</small>
     <small id="fcFilterNote">Filters apply to map route impacts, alerts, forecasts and risk rows. Minimum delay uses the largest prediction at 15 / 30 / 60 min. Only verified affected services are shown. Executive totals and weather cover the network; background traffic flow is hidden while filtering.</small>
   </section>
   <div class="fc-grid">
@@ -706,7 +708,60 @@ MV.update = function(){
     rain.forEach(function(f){ var r = f.properties.mmh; L.circleMarker(ll(f.geometry.coordinates), {radius:r > 0 ? 4 + Math.min(10, r / 4) : 2.5, color:"#bfefff", weight:r >= 10 ? 1.5 : 0, fillColor:r > 0 ? COL.rain : "#2a4a6a", fillOpacity:r > 0 ? .85 : .35}).bindPopup(function(){ return popHtml("rain", f.properties); }).addTo(G.rain); });
   }
   zones();
+  drawLiveBuses();
 };
+// Bus positions use the existing sampled LTA arrival feed, never fictional demo data.
+var liveBuses = [], busMarkers = [], busGeneration = 0, busDebounce;
+function busTargets(){
+  var rows = [], svc = $("fcFilterSvc").value.trim().toUpperCase();
+  if(svc){
+    var meta = (S.svcs || []).find(function(s){return s.svc === svc;});
+    (meta && meta.dirs || []).forEach(function(d){rows.push({svc:svc,dir:d});});
+  } else if(S.svc) rows = [{svc:S.svc,dir:S.dir}];
+  else rows = ((S.st || {}).services || []).filter(function(s){return predictedDelay(s) > 0 || s.blocked;});
+  var seen = {};
+  return rows.filter(function(s){var key=s.svc+":"+s.dir; if(seen[key] || !matchesService(s)) return false; seen[key]=true; return true;});
+}
+function drawLiveBuses(){
+  busMarkers.forEach(function(m){m.remove();}); busMarkers = [];
+  if(!MV.ready || isDemo() || !$("fcLiveBuses").checked) return;
+  liveBuses.filter(matchesService).forEach(function(b){
+    var label = b.svc + " · D" + b.dir;
+    var html = '<div class="fc-pop"><h4>Live bus · ' + esc(label) + '</h4><p>Nearest reported stop: ' + esc((b.near || {}).name || "Unavailable")
+      + '<br>Road: ' + esc((b.near || {}).road || "Not supplied") + '</p><p>Source: LTA sampled bus arrivals<br>Feed updated: ' + esc(b.updated || "Unavailable") + '</p><small>Positions are sampled; this is not a complete fleet count. Road is the nearest stop’s road, not a confirmed incident road.</small></div>';
+    var marker, el = document.createElement("span");
+    el.textContent = "▣ " + label; el.style.cssText = "background:#073e34;color:#bcffe3;border:1px solid #2ee59d;border-radius:5px;padding:3px 5px;font:bold 11px sans-serif;white-space:nowrap";
+    if(MV.kind === "ml") marker = new maplibregl.Marker({element:el}).setLngLat([b.lon,b.lat]).setPopup(new maplibregl.Popup({maxWidth:"320px"}).setHTML(html)).addTo(MV.ml);
+    else if(MV.kind === "lf") marker = L.marker([b.lat,b.lon],{icon:L.divIcon({className:"",html:el.outerHTML,iconSize:[80,22],iconAnchor:[40,11]})}).bindPopup(html).addTo(MV.lf);
+    if(marker) busMarkers.push(marker);
+  });
+}
+function queueLiveBuses(){
+  clearTimeout(busDebounce); busGeneration++; liveBuses = []; drawLiveBuses();
+  busDebounce = setTimeout(refreshLiveBuses,350);
+}
+async function refreshLiveBuses(){
+  var generation = ++busGeneration, status = $("fcBusStatus");
+  liveBuses = []; drawLiveBuses();
+  if(isDemo()){status.textContent="Live buses unavailable in demo mode.";return;}
+  if(!$("fcLiveBuses").checked){status.textContent="Live buses hidden.";return;}
+  var targets = busTargets(), index = 0, failed = 0, result = [];
+  if(!targets.length){status.textContent="No matching services for live buses.";return;}
+  status.textContent="Loading live buses for " + targets.length + " service-direction(s)…";
+  async function worker(){
+    while(index < targets.length && generation === busGeneration){
+      var t = targets[index++], j;
+      try { j = await api("/api/buses?service=" + encodeURIComponent(t.svc) + "&direction=" + t.dir,{timeout:30000}); } catch(e){ j = {error:String(e)}; }
+      if(generation !== busGeneration) return;
+      if(!j || j.error){failed++;continue;}
+      (j.buses || []).forEach(function(b){if(typeof b.lat === "number" && typeof b.lon === "number" && Number.isFinite(b.lat) && Number.isFinite(b.lon) && b.lat > 0 && b.lon > 0) result.push(Object.assign({},b,{svc:t.svc,dir:t.dir,updated:j.updated}));});
+    }
+  }
+  await Promise.all([worker(),worker(),worker()]);
+  if(generation !== busGeneration) return;
+  liveBuses = result; drawLiveBuses();
+  status.textContent = result.length + " sampled live bus position(s) · refresh every 60 s" + (failed ? " · " + failed + " service-direction feed(s) unavailable" : "");
+}
 function zones(){
   MV.zm.forEach(function(z){ z.remove(); }); MV.zm = [];
   if(!layerOn("zones") || !MV.ready) return;
@@ -893,7 +948,7 @@ function matchesService(s){
 function renderFiltered(){
   if(MV.pop){ MV.pop.remove(); MV.pop = null; }
   if(MV.lf) MV.lf.closePopup();
-  renderAlerts(); renderCmp(); renderTop(); renderHz(); MV.update();
+  renderAlerts(); renderCmp(); renderTop(); renderHz(); MV.update(); queueLiveBuses();
 }
 function renderAlerts(){
   var st = S.st || {}, all = (st.alerts || []).filter(function(a){ return (a.services || []).some(matchesService); }), el = $("fcAlerts");
@@ -1011,7 +1066,7 @@ function selectSvc(svc, dir, opts){
   $("fcSvc").innerHTML = '<div class="fc-empty">Checking service ' + esc(S.svc) + ' direction ' + S.dir + ' against every event' + (isDemo() ? '' : ' and sampling traffic along it') + '…</div>';
   return api(u, {timeout:60000}).then(function(v){
     if(S.svc !== String(svc).toUpperCase()) return;
-    S.view = v; renderSvc(); MV.update(); if(!(opts && opts.nofit)) fitScene();
+    S.view = v; renderSvc(); MV.update(); queueLiveBuses(); if(!(opts && opts.nofit)) fitScene();
     if(opts && opts.scroll && $("fcRecovery")) $("fcRecovery").scrollIntoView({block:"nearest", behavior:"smooth"});
   });
 }
@@ -1023,7 +1078,7 @@ function load(){
   var u = isDemo() ? "/api/forecast/state?mode=demo&step=" + S.step : "/api/forecast/state";
   return api(u, {timeout:90000}).then(function(st){
     if(!st || (st.error && !st.kpis)) st = Object.assign({kpis:[], alerts:[], events:[], comparison:[], services:[]}, st || {});
-    S.st = st; render(); tick();
+    S.st = st; render(); tick(); queueLiveBuses();
     if(S.first){ fitScene(); S.first = false; }
   }).finally(function(){ S.busy = false; });
 }
@@ -1039,6 +1094,7 @@ function setMode(m){
 $("fcFilterSvc").addEventListener("input", renderFiltered);
 $("fcFilterOp").addEventListener("change", renderFiltered);
 $("fcFilterMin").addEventListener("input", renderFiltered);
+$("fcLiveBuses").addEventListener("change", queueLiveBuses);
 $("fcFilterReset").addEventListener("click", function(){ $("fcFilterSvc").value = ""; $("fcFilterOp").value = ""; $("fcFilterMin").value = "0"; renderFiltered(); });
 function loadSvcList(){
   api("/api/forecast/services" + (isDemo() ? "?mode=demo" : "")).then(function(j){
