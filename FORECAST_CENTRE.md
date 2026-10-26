@@ -66,7 +66,7 @@ Everything else is rejected with a written reason, which is shown in the service
 | Too little overlap | touches the route for less than the minimum |
 | Not in force | ended, or starts after the 60-min horizon |
 
-**Point-only reports** (LTA incidents, LTA road works) are **UNVERIFIED** when they lie within 12 m of a route line. They are drawn as dashed rings and get their own "UNVERIFIED" alert (Watch level at most). They are **never** counted in "Verified route incidents" or "Bus services potentially affected".
+**Point-only reports** (LTA incidents, LTA road works) have no line and no direction. When they lie within 12 m of a route line they are shown as **"Unverified – not counted"**: a dashed ring on the map, and a line in the service's evidence list. They raise **no alert**, do **not** change any service's risk level, and are **never** counted in "Verified route incidents" or "Bus services potentially affected" (`PARAMS["alert_unverified"] = False`). Anything further than 12 m from the route line is simply "nearby" and ignored.
 
 Tests prove that **300 random parallel or nearby roads 21–330 m from a route never confirm**, and that 200 random stretches on the route (with ±9 m geometry noise) always do.
 
@@ -75,7 +75,8 @@ Tests prove that **300 random parallel or nearby roads 21–330 m from a route n
 * **Interpolation:** NEA gauge 5-min totals (× 12 = mm/h) are interpolated by inverse distance (power 2) onto points every 200 m of each route. No estimate is made further than 5 km from every gauge.
 * **Confidence:** set by the nearest gauge: high ≤ 2 km, medium ≤ 3.5 km, low ≤ 5 km.
 * **Intensity classes (WMO):** light < 2.5 mm/h, moderate < 10, heavy < 50, violent ≥ 50.
-* **Severe exposure:** at least 20 % of a route in heavy rain, at medium or better confidence.
+* **Counted only at the route:** a stretch of route counts as raining heavily only when a gauge **within 2 km of that stretch itself reports heavy rain** (`rain_count_km`). An estimate that is heavy only because of a gauge further away is shown, but **not counted**.
+* **Severe exposure:** at least 20 % of a route in counted heavy rain.
 * **Trend:** compares the previous reading set with the current one.
 * **+30 and +60 min:** use the NEA 2-hour area forecast.
 * **Labelling:** everything is labelled *ESTIMATED from NEA rain gauges – not observed at road level*.
@@ -99,7 +100,7 @@ Tests prove that **300 random parallel or nearby roads 21–330 m from a route n
   |---|---|
   | Critical | road closed on the route, or extra ≥ max(10 min, 0.8 × headway) |
   | High | extra ≥ max(5 min, 0.5 × headway) |
-  | Watch | extra ≥ 2 min, or ≥ 20 % heavy rain, or an unverified closure/accident on the route |
+  | Watch | extra ≥ 2 min, or ≥ 20 % of the route in counted heavy rain (unverified reports never raise a level) |
 * **Accuracy is measured, never claimed.** Every probe forecast is stored (`fc_fc`) and settled against the next observation at its target time. The "Forecast model confidence" KPI shows the measured band coverage and mean error only after 30 checks; until then it says **Not measured yet**.
 * **Machine learning** (LightGBM etc.) is not used. The snapshots it needs (`fc_probe`, `fc_jam`, `fc_cover`) are being collected. Train only once there are several weeks of data, using a time-based split (no future leakage), and compare against this baseline on the same `fc_fc` checks.
 
@@ -220,7 +221,7 @@ See `.env.example`. The settings for the Forecast Centre are:
 
 | Test | What |
 |---|---|
-| `tests/t_forecast.py` (79 checks) | parsing (TomTom, HERE, LTA, NEA samples in the documented formats); route intersection; direction; parallel / nearby / crossing rejection (incl. 300 random cases); road-work windows; rainfall classes and exposure; forecast maths; alert de-duplication, re-alert, acknowledge, clearance with fresh vs stale data, escalation, reopen, audit; store and calibration; demo determinism and separation; the live cycle on a fake HTTP client (budget, stale data, API failure → Unavailable); no API key in payloads; no LTA speed bands; JSON safety; the timetable fix |
+| `tests/t_forecast.py` (82 checks) | parsing (TomTom, HERE, LTA, NEA samples in the documented formats); route intersection; direction; parallel / nearby / crossing rejection (incl. 300 random cases); road-work windows; rainfall classes and exposure; forecast maths; alert de-duplication, re-alert, acknowledge, clearance with fresh vs stale data, escalation, reopen, audit; store and calibration; demo determinism and separation; the live cycle on a fake HTTP client (budget, stale data, API failure → Unavailable); no API key in payloads; no LTA speed bands; JSON safety; the timetable fix |
 | `r3d/t_forecast_page.js` (53 checks) | real MapLibre on an offline city: 1920×1080, 2560×1440, 3840×2160, 1366×768 and phone layouts; KPIs; layers; horizon scrubber; alert acknowledgement and audit; service evidence; demo story; presentation mode; Leaflet fallback; no page errors |
 
 Run the engine tests from the project folder (no network, no keys, no extra packages beyond numpy):
@@ -255,6 +256,17 @@ python3 tests/t_forecast.py . tests/stubs
 | SQLite schema + migrations, retention | **Done** |
 | PostgreSQL / PostGIS, React / TypeScript / Vite rewrite | **Not done, deliberately**: see sections 1 and 7 |
 | Dockerfile + docker-compose | **Added, not built here** (no Docker daemon in the build environment) |
+
+## 13b. V17.1 changes (strict counting, control-room look)
+
+* **Strict counting:**
+  * Unverified point reports no longer create alerts or affect risk.
+  * Rain is counted only where a gauge within 2 km of the route reports heavy rain.
+* **Look:** the page has the control-room style of an OCC forecast wall:
+  * electric-blue grid backdrop;
+  * an angled, glowing title plate;
+  * corner-bracket panels and angled panel tabs;
+  * a ring gauge on every KPI. Each ring is a real share, for example verified out of all reports near routes, or wet gauges out of all gauges. Its meaning is in the tooltip.
 
 ## 14. Remaining limitations and next priorities
 

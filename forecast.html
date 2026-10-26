@@ -274,25 +274,109 @@ body.fc-demo{--fc-mapH:clamp(420px,calc(100vh - 470px),1100px)}
   .fc-feeds .fc-dot{display:none} .fc-feeds .fc-dot.live:first-child{display:inline-block} .fc-meta{gap:8px} .fc-bar{padding:12px}
   .fc-id h1{font-size:20px} .fc-clock b{font-size:20px} .fc-cmp{grid-template-columns:minmax(0,1fr)} .fc-wx{max-width:100%}
   .fc-hz{grid-template-columns:repeat(4,minmax(0,1fr));bottom:8px} .fc-hz button small{display:none} .fc-legend{display:none} .fc-mapnote{max-width:60%}}
+
+/* ===================================================================== HUD control-room theme (V17.1: the look of an OCC forecast wall) */
+:root{--fc-br:rgba(127,231,255,.95);--fc-edge:rgba(90,190,255,.26)}
+body.ds-app{background:radial-gradient(1400px 720px at 55% -10%,rgba(36,120,255,.42),transparent 62%),radial-gradient(900px 640px at 100% 100%,rgba(0,170,255,.12),transparent 60%),
+  linear-gradient(rgba(80,170,255,.05) 1px,transparent 1px) 0 0/44px 44px,linear-gradient(90deg,rgba(80,170,255,.05) 1px,transparent 1px) 0 0/44px 44px,
+  linear-gradient(180deg,#06183f,#04102c 55%,#030a1f)!important;background-attachment:fixed!important}
+body.ds-app .ds-side{background:linear-gradient(180deg,rgba(6,26,68,.97),rgba(3,12,34,.98))!important;border-right-color:rgba(90,190,255,.22)!important}
+body.ds-app .ds-cmd{background:rgba(5,22,58,.82)!important}
+.fc-glass,.fc-mapwrap:after{border-radius:6px;
+  background:linear-gradient(var(--fc-br),var(--fc-br)) 0 0/18px 2px no-repeat,linear-gradient(var(--fc-br),var(--fc-br)) 0 0/2px 18px no-repeat,
+    linear-gradient(var(--fc-br),var(--fc-br)) 100% 0/18px 2px no-repeat,linear-gradient(var(--fc-br),var(--fc-br)) 100% 0/2px 18px no-repeat,
+    linear-gradient(var(--fc-br),var(--fc-br)) 0 100%/18px 2px no-repeat,linear-gradient(var(--fc-br),var(--fc-br)) 0 100%/2px 18px no-repeat,
+    linear-gradient(var(--fc-br),var(--fc-br)) 100% 100%/18px 2px no-repeat,linear-gradient(var(--fc-br),var(--fc-br)) 100% 100%/2px 18px no-repeat,
+    linear-gradient(180deg,rgba(10,44,108,.60),rgba(5,24,66,.84))}
+.fc-glass{border-color:var(--fc-edge);box-shadow:0 0 0 1px rgba(56,214,255,.05) inset,0 0 28px -14px rgba(56,214,255,.45),0 18px 40px -28px rgba(0,0,0,.9)}
+.fc-mapwrap{background:#07111f}
+.fc-mapwrap:after{content:"";position:absolute;inset:0;z-index:8;pointer-events:none;border:1px solid var(--fc-edge);
+  background-color:transparent;background-image:linear-gradient(var(--fc-br),var(--fc-br)),linear-gradient(var(--fc-br),var(--fc-br)),linear-gradient(var(--fc-br),var(--fc-br)),linear-gradient(var(--fc-br),var(--fc-br)),
+    linear-gradient(var(--fc-br),var(--fc-br)),linear-gradient(var(--fc-br),var(--fc-br)),linear-gradient(var(--fc-br),var(--fc-br)),linear-gradient(var(--fc-br),var(--fc-br)),linear-gradient(transparent,transparent)}
+.fc-h{border-bottom:0;position:relative;padding:12px 14px 11px}
+.fc-h:after{content:"";position:absolute;left:14px;right:14px;bottom:0;height:1px;background:linear-gradient(90deg,rgba(127,231,255,.75),rgba(56,214,255,.12) 65%,transparent)}
+.fc-h h2{display:inline-flex;align-items:center;gap:9px;padding:5px 24px 5px 10px;margin-left:-4px;font-size:15.5px;letter-spacing:.03em;
+  background:linear-gradient(90deg,rgba(56,214,255,.24),rgba(56,214,255,.04));clip-path:polygon(0 0,calc(100% - 13px) 0,100% 100%,0 100%)}
+.fc-h h2:before{content:"";width:7px;height:7px;flex:none;background:#7fe7ff;transform:rotate(45deg);box-shadow:0 0 8px #38d6ff}
+.fc-tabs button[aria-pressed="true"],.ds-segm button[aria-pressed="true"]{background:linear-gradient(180deg,rgba(56,214,255,.28),rgba(56,214,255,.08));box-shadow:inset 0 0 0 1px rgba(127,231,255,.55),0 0 14px -4px rgba(56,214,255,.6)}
+.fc-al{background:linear-gradient(180deg,rgba(8,34,86,.85),rgba(6,24,62,.88));border-color:rgba(90,190,255,.2)}
+.fc-al .dl div,.fc-cmp>div,.fc-ev{background:rgba(4,20,56,.62)}
+
+/* header: the title plate */
+.fc-hud{position:relative;display:grid;grid-template-columns:minmax(0,1fr) minmax(320px,34%) minmax(0,1fr);align-items:start;margin:0 0 12px;padding:0 6px;min-height:104px}
+.fc-hud-frame{position:absolute;left:0;right:0;top:0;width:100%;height:62px;pointer-events:none;filter:drop-shadow(0 0 6px rgba(56,214,255,.45))}
+.fc-hud-l{display:flex;align-items:center;gap:10px;padding-top:10px;min-width:0;flex-wrap:wrap}
+.fc-hud-r{display:flex;align-items:center;justify-content:flex-end;gap:12px;padding-top:6px}
+.fc-hud-c{position:relative;z-index:1;display:block;text-align:center;padding-top:6px;min-width:0}
+.fc-hud-c h1{white-space:nowrap}
+.fc-hud-c h1{margin:0;font:600 30px/1.05 var(--ds-display);letter-spacing:.08em;color:#fff;text-shadow:0 0 18px rgba(56,214,255,.75),0 0 2px rgba(255,255,255,.6)}
+.fc-hud-c p{margin:4px 0 0;font-size:12px;color:#a9d8ff;letter-spacing:.04em}
+.fc-hud-s{grid-column:1/-1;display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap;margin-top:10px}
+.fc-brand{display:flex;flex-direction:column;line-height:1.1;margin-right:4px}
+.fc-brand b{font:600 14px/1 var(--ds-display);letter-spacing:.16em;color:#dff8ff}
+.fc-brand small{font-size:11px;color:#8fc6ef;margin-top:3px}
+.fc-clock{padding:6px 14px;position:relative;
+  background:linear-gradient(var(--fc-br),var(--fc-br)) 0 0/10px 2px no-repeat,linear-gradient(var(--fc-br),var(--fc-br)) 0 0/2px 10px no-repeat,
+    linear-gradient(var(--fc-br),var(--fc-br)) 100% 100%/10px 2px no-repeat,linear-gradient(var(--fc-br),var(--fc-br)) 100% 100%/2px 10px no-repeat,rgba(8,36,92,.5)}
+.fc-clock b{text-shadow:0 0 12px rgba(56,214,255,.6)}
+.fc-pill,.fc-feeds,.fc-crit.zero,.fc-wx{background:rgba(6,30,78,.72);border-color:rgba(90,190,255,.32)}
+.fc-feedpop{top:calc(100% + 4px);left:50%;right:auto;transform:translateX(-50%)}
+
+/* KPI: ring gauge + figure (a ring is a real share; its meaning is in the tooltip) */
+.fc-kpi{display:grid;grid-template-columns:50px minmax(0,1fr);grid-template-areas:"l l" "r v" "s s";gap:6px 12px;align-items:center;min-height:118px;padding:11px 13px 10px 13px}
+.fc-kpi .txt{display:contents} .fc-kpi .l{grid-area:l} .fc-ring{grid-area:r} .fc-kpi .v{grid-area:v;margin-top:0} .fc-kpi .s{grid-area:s;margin-top:0}
+.fc-kpi:after{display:none}
+.fc-ring{position:relative;width:50px;height:50px;align-self:center}
+.fc-ring svg{width:100%;height:100%;transform:rotate(-90deg);overflow:visible}
+.fc-ring .bg{fill:none;stroke:rgba(90,190,255,.16);stroke-width:5}
+.fc-ring .fg{fill:none;stroke:var(--k,#38d6ff);stroke-width:5;stroke-linecap:round;filter:drop-shadow(0 0 4px var(--k,#38d6ff))}
+.fc-ring .tk{fill:none;stroke:rgba(127,231,255,.35);stroke-width:1;stroke-dasharray:1 4.2}
+.fc-ring span{position:absolute;inset:0;display:grid;place-items:center;font:600 11.5px/1 var(--ds-display);color:#dff8ff}
+.fc-kpi[data-lv="critical"]{--k:var(--fc-crit)} .fc-kpi[data-lv="high"]{--k:var(--fc-high)} .fc-kpi[data-lv="watch"]{--k:var(--fc-watch)} .fc-kpi[data-lv="off"]{--k:#4b5d74}
+.fc-kpi[data-lv="off"] .fc-ring .fg{stroke-dasharray:3 4!important;filter:none}
+.fc-kpi .txt{min-width:0}
+.fc-kpi .v{font-size:32px;text-shadow:0 0 14px rgba(56,214,255,.35)}
+.fc-kpi .v.na{margin-top:0;font-size:14px}
+.fc-kpi .s{padding-top:4px}
+.fc-kpi svg.spark{top:auto;bottom:8px;right:8px;opacity:.6}
+@media (max-width:999px){.fc-hud{grid-template-columns:minmax(0,1fr);min-height:0;padding:10px 0 0} .fc-hud-frame{display:none}
+  .fc-hud-c{order:-1;padding:12px 10px;border:1px solid rgba(127,231,255,.45);border-radius:6px;background:linear-gradient(180deg,rgba(42,140,255,.30),rgba(11,58,140,.12));clip-path:polygon(0 0,100% 0,calc(100% - 16px) 100%,16px 100%)}
+  .fc-hud-r{justify-content:space-between} .fc-hud-s{justify-content:flex-start}}
+@media (max-width:640px){.fc-hud-c h1{font-size:22px;white-space:normal} .fc-kpi{grid-template-columns:38px minmax(0,1fr);gap:4px 9px;min-height:0} .fc-ring{width:38px;height:38px} .fc-ring span{font-size:9px} .fc-kpi .v{font-size:22px}}
+@media (min-width:3200px){.fc-hud{min-height:150px} .fc-hud-frame{height:88px} .fc-hud-c h1{font-size:46px} .fc-hud-c p{font-size:17px} .fc-brand b{font-size:19px} .fc-brand small{font-size:15px}
+  .fc-kpi{grid-template-columns:78px minmax(0,1fr);min-height:170px} .fc-ring{width:78px;height:78px} .fc-ring span{font-size:16px}}
 </style>
 </head>
 <body>
 <main class="ds-page fc" id="main">
-  <header class="fc-glass lit fc-bar" id="fcBar" style="position:relative">
-    <div class="fc-id">
+  <header class="fc-hud" id="fcBar">
+    <svg class="fc-hud-frame" viewBox="0 0 1000 100" preserveAspectRatio="none" aria-hidden="true">
+      <defs>
+        <linearGradient id="fcHg" x1="0" x2="1"><stop offset="0" stop-color="#38d6ff" stop-opacity="0"/><stop offset=".22" stop-color="#38d6ff" stop-opacity=".55"/><stop offset=".5" stop-color="#7fe7ff" stop-opacity="1"/><stop offset=".78" stop-color="#38d6ff" stop-opacity=".55"/><stop offset="1" stop-color="#38d6ff" stop-opacity="0"/></linearGradient>
+        <linearGradient id="fcHf" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2a8cff" stop-opacity=".55"/><stop offset="1" stop-color="#0b3a8c" stop-opacity=".12"/></linearGradient>
+      </defs>
+      <path d="M330 1 H670 L645 58 H355 Z" fill="url(#fcHf)"/>
+      <path d="M0 1 H330 L355 58 H645 L670 1 H1000" fill="none" stroke="url(#fcHg)" stroke-width="1.6" vector-effect="non-scaling-stroke"/>
+      <path d="M300 1 L322 1 M678 1 L700 1" stroke="#7fe7ff" stroke-width="4" vector-effect="non-scaling-stroke"/>
+      <path d="M370 58 H630" stroke="#7fe7ff" stroke-width="2.4" vector-effect="non-scaling-stroke" opacity=".9"/>
+    </svg>
+    <div class="fc-hud-l">
       <div class="fc-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="#38d6ff" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="8.5" opacity=".45"/><circle cx="12" cy="12" r="4.5" opacity=".75"/><path d="M12 12l6-6"/><circle cx="12" cy="12" r="1.4" fill="#38d6ff"/></svg></div>
-      <div><h1>Forecast Centre</h1><p id="fcSub">S.E.N.T.R.Y. predictive operations – verified route impact, forecast 15 / 30 / 60 min ahead</p></div>
-    </div>
-    <div class="fc-meta">
+      <div class="fc-brand"><b>S.E.N.T.R.Y.</b><small>Predictive OCC</small></div>
       <div class="ds-segm" role="group" aria-label="Data mode"><button type="button" data-mode="live" aria-pressed="true">Live</button><button type="button" data-mode="demo" aria-pressed="false">Demo</button></div>
       <span class="fc-pill" id="fcMode"><i class="fc-dot"></i><span>Checking</span></span>
+    </div>
+    <div class="fc-hud-c fc-id"><h1>Forecast Centre</h1><p id="fcSub">verified route impact, forecast 15 / 30 / 60 min ahead</p></div>
+    <div class="fc-hud-r">
+      <div class="fc-clock"><b id="fcClock">--:--:--</b><small id="fcDate">Singapore time</small></div>
+      <button type="button" class="ds-btn sm fc-enter" id="fcPresent" title="Full-screen presentation">Present</button>
+      <button type="button" class="ds-btn sm fc-exit" id="fcExit">Exit presentation</button>
+    </div>
+    <div class="fc-hud-s fc-meta">
       <button type="button" class="fc-feeds" id="fcFeeds" aria-expanded="false" aria-controls="fcFeedPop" title="Data sources"></button>
       <button type="button" class="fc-crit zero" id="fcCrit" title="Critical unacknowledged warnings">0 critical</button>
       <span class="fc-wx" id="fcWx" title="NEA 2-hour forecast">Weather –</span>
       <span class="fc-upd" id="fcUpd">–</span>
-      <div class="fc-clock"><b id="fcClock">--:--:--</b><small id="fcDate">Singapore time</small></div>
-      <button type="button" class="ds-btn sm fc-enter" id="fcPresent" title="Full-screen presentation">Present</button>
-      <button type="button" class="ds-btn sm fc-exit" id="fcExit">Exit presentation</button>
     </div>
     <div class="fc-glass fc-feedpop" id="fcFeedPop" role="dialog" aria-label="Data sources"></div>
   </header>
@@ -584,7 +668,7 @@ function popHtml(kind, p){
   if(kind === "event"){
     var e = evById(p.id); if(!e) return "";
     var st = e.status === "confirmed" ? '<span class="fc-tag ver">Verified on ' + e.services.length + ' service-direction' + (e.services.length === 1 ? "" : "s") + '</span>'
-      : e.status === "unverified" ? '<span class="fc-tag unv">Unverified</span>' : '<span class="fc-tag rej">No bus route affected</span>';
+      : e.status === "unverified" ? '<span class="fc-tag unv">Unverified – not counted</span>' : '<span class="fc-tag rej">No bus route affected</span>';
     var d = e.delay_s != null ? '<p>Delay now ' + f1(e.delay_s / 60) + ' min' + (S.h && e.fc && e.fc[S.h] ? ', at +' + S.h + ' min ' + f1(e.fc[S.h].mid / 60) + ' min (' + esc(e.fc[S.h].trend) + ')' : "") + '</p>' : "";
     var sv = e.services.map(function(s){ return '<button type="button" data-svc="' + esc(s.svc) + '" data-dir="' + s.dir + '">' + esc(s.svc) + ' d' + s.dir + (s.extra && s.extra[30] ? ' +' + f1(s.extra[30]) : '') + '</button>'; }).join("")
       + (e.unverified_services || []).map(function(s){ return '<button type="button" data-svc="' + esc(s.svc) + '" data-dir="' + s.dir + '" style="border-style:dashed">' + esc(s.svc) + ' d' + s.dir + ' ?</button>'; }).join("");
@@ -648,6 +732,25 @@ function renderBar(){
   $("fcFeedPop").innerHTML = '<table>' + rows + '</table><p class="fc-muted" style="margin:8px 0 0;font-size:12px">LTA Traffic Speed Bands are not used for forecasting. Stale data is kept on screen and marked stale; nothing is filled in.</p>';
   document.body.classList.toggle("fc-demo", isDemo());
 }
+function ringOf(id, k, st){
+  var n = st.network || {}, c = st.alert_counts || {}, cal = st.calibration || {}, v = k.value || 0, r = null, cap = "";
+  if(id === "verified_incidents"){ var u = n.unverified_reports || 0; r = v + u ? v / (v + u) : 1; cap = "of reports near routes are verified (the rest are not counted)"; }
+  else if(id === "services_affected"){ r = (n.affected_dirs || 0) / Math.max(1, n.service_dirs || 0); cap = "of all service-directions on the network"; }
+  else if(id === "congestion_zones"){ r = v ? (n.zones_abnormal || 0) / v : 0; cap = "of zones are abnormal for the time of day"; }
+  else if(id === "predicted_disruptions"){ r = v / Math.max(1, n.affected_dirs || 0); cap = "of affected service-directions are at high / critical risk"; }
+  else if(id === "rain_exposure"){ var g = (st.rain || {}).stations || []; r = g.length ? ((st.rain || {}).wet || 0) / g.length : 0; cap = "of NEA gauges report rain"; }
+  else if(id === "roadworks"){ r = v ? (n.roadworks_verified || 0) / v : 0; cap = "of road works are verified on a route line"; }
+  else if(id === "model_confidence"){ if(k.value != null){ r = k.value / 100; cap = "of later observations inside the forecast band"; } else { r = Math.min(1, (cal.n || 0) / 30); cap = "of the 30 checks needed before accuracy is shown"; } }
+  else if(id === "critical_unacked"){ r = v / Math.max(1, c.active || 0); cap = "of active alerts are critical and unacknowledged"; }
+  if(k.available === false || r == null) return {r:0, txt:"–", cap:"No data"};
+  r = Math.max(0, Math.min(1, r));
+  return {r:r, txt:(r > 0 && r < .01 ? "<1" : Math.round(r * 100)) + "%", cap:cap};
+}
+function ringSvg(g){
+  var C = 2 * Math.PI * 20;
+  return '<div class="fc-ring" title="' + esc(g.txt + " " + g.cap) + '" aria-label="' + esc(g.txt + " " + g.cap) + '"><svg viewBox="0 0 48 48" aria-hidden="true"><circle class="tk" cx="24" cy="24" r="23.2"/><circle class="bg" cx="24" cy="24" r="20"/>'
+    + '<circle class="fg" cx="24" cy="24" r="20" stroke-dasharray="' + (g.r * C).toFixed(1) + ' ' + C.toFixed(1) + '"/></svg><span>' + esc(g.txt) + '</span></div>';
+}
 function renderKpis(){
   var st = S.st || {}, by = {};
   (st.kpis || []).forEach(function(k){ by[k.id] = k; });
@@ -658,8 +761,9 @@ function renderKpis(){
     var val = k.value != null ? '<div class="v fc-num"><span data-v="' + k.value + '">' + esc(k.value) + '</span>' + (k.unit ? '<small>' + esc(k.unit) + '</small>' : '') + '</div>'
       : '<div class="v na">' + esc(k.text || (k.available === false ? "Unavailable" : "–")) + '</div>';
     var tags = (k.stale ? '<span class="fc-tag stale">Stale</span>' : '') + (isDemo() ? '<span class="fc-tag demo">DEMO</span>' : '');
-    return '<div class="fc-glass fc-kpi" data-lv="' + (k.available === false ? "off" : lv || "") + '" title="' + esc(k.basis || "") + '"><div class="l"><b>' + esc(k.label) + '</b>' + tags + '</div>'
-      + val + '<div class="s">' + esc(k.available === false ? (k.sub || "Source unavailable") : k.sub || "") + '</div>' + (isDemo() ? "" : spark(S.hist[id])) + '</div>';
+    return '<div class="fc-glass fc-kpi" data-lv="' + (k.available === false ? "off" : lv || "") + '" title="' + esc(k.basis || "") + '">' + ringSvg(ringOf(id, k, st))
+      + '<div class="txt"><div class="l"><b>' + esc(k.label) + '</b>' + tags + '</div>' + val + '<div class="s">' + esc(k.available === false ? (k.sub || "Source unavailable") : k.sub || "") + '</div></div>'
+      + (isDemo() ? "" : spark(S.hist[id])) + '</div>';
   }).join("");
 }
 function renderLayers(){
@@ -670,7 +774,7 @@ function renderLayers(){
     return '<button type="button" data-layer="' + d[0] + '" aria-pressed="' + (S.lay[d[0]] && !dis) + '"' + (dis ? ' disabled title="Needs a TomTom key (live mode)"' : '') + '><i style="color:' + d[2] + '"></i>' + d[1] + '</button>'; }).join("");
   $("fcLegend").classList.toggle("off", !S.lay.legend);
   $("fcLegend").innerHTML = '<div><i style="background:' + COL.critical + '"></i>Jam: 5+ min delay at the horizon</div><div><i style="background:' + COL.high + '"></i>2–5 min</div><div><i style="background:' + COL.watch + '"></i>under 2 min</div>'
-    + '<div><i class="ring"></i>Unverified (no line / direction)</div><div><i class="dot" style="background:' + COL.rain + '"></i>Rain gauge (observed), dashed = estimated exposure</div><div><i style="background:#9be7ff"></i>Selected route, arrows = direction</div>';
+    + '<div><i class="ring"></i>Unverified report (no line / direction) – not counted</div><div><i class="dot" style="background:' + COL.rain + '"></i>Rain gauge (observed), dashed = estimated exposure</div><div><i style="background:#9be7ff"></i>Selected route, arrows = direction</div>';
 }
 function renderHz(){
   var cmp = {}; ((S.st || {}).comparison || []).forEach(function(c){ cmp[c.h] = c; });
@@ -784,7 +888,7 @@ function renderSvc(){
   var evItem = function(e, cls, tag){ return '<div class="fc-ev ' + cls + '">' + tag + ' <b>' + esc(KIND[e.kind] || e.label) + '</b> ' + esc(e.road || "") + (e.from || e.to ? ' <span class="fc-muted">(' + esc(e.from || "") + (e.to ? ' → ' + esc(e.to) : '') + ')</span>' : '')
        + '<details><summary>' + (cls === "rej" ? esc(REASON[e.reason] || e.reason || "Rejected") : "Why") + '</summary><div class="why">' + esc(e.explain) + '</div><div class="fc-muted" style="margin-top:4px">' + esc((e.sources || []).join(" + ")) + (e.validity ? ' · ' + esc(e.validity) : '') + '</div></details></div>'; };
   h += '<div class="fc-sec"><h3>Evidence on this route<span class="sp"></span><small class="fc-muted">' + (v.verified || []).length + ' verified · ' + (v.unverified || []).length + ' unverified · ' + (v.rejected || []).length + ' rejected</small></h3>'
-    + ((v.verified || []).map(function(e){ return evItem(e, "", '<span class="fc-tag ver">Verified</span>'); }).join("") + (v.unverified || []).map(function(e){ return evItem(e, "", '<span class="fc-tag unv">Unverified</span>'); }).join("")
+    + ((v.verified || []).map(function(e){ return evItem(e, "", '<span class="fc-tag ver">Verified</span>'); }).join("") + (v.unverified || []).map(function(e){ return evItem(e, "", '<span class="fc-tag unv">Unverified – not counted</span>'); }).join("")
        + (v.rejected || []).map(function(e){ return evItem(e, "rej", '<span class="fc-tag rej">Rejected</span>'); }).join("") || '<p class="fc-muted" style="margin:0;font-size:12.5px">No incident, jam or road works on or near this route right now.</p>') + '</div>';
   if((v.sections || []).length) h += '<div class="fc-sec"><h3>Traffic along the route</h3>' + v.sections.map(function(s){ var r = probeRatio(s, S.h);
        return '<div class="fc-ev"><i class="fc-dot" style="background:' + ratioColour(r) + '"></i> <b>' + esc(s.road || "Route km " + f1(s.a_m / 1000)) + '</b>: ' + f1(s.cur) + ' km/h now, ' + (s.base ? 'usual ' + f1(s.base) : 'free-flow ' + f1(s.ff)) + (S.h && s.fc && s.fc[S.h] ? ', +' + S.h + ': ' + f1(s.fc[S.h][0]) : '')

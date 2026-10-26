@@ -22,7 +22,10 @@ The Command Centre is now the **Forecast Centre** (`/command`, also `/forecast`)
   * `app_shell.js`: menu name;
   * `render.yaml`: new optional variables;
   * `README.md`.
-* **Tests:** `tests/t_forecast.py` (79 checks, run: `python3 tests/t_forecast.py . tests/stubs`) and `r3d/t_forecast_page.js` (53 checks, 5 screen sizes + 2D fallback).
+* **V17.1:**
+  * Strict counting: unverified point reports raise no alerts and no risk; rain is counted only within 2 km of a gauge that reports it.
+  * Control-room restyle: title plate, corner-bracket panels, ring-gauge KPIs.
+* **Tests:** `tests/t_forecast.py` (82 checks, run: `python3 tests/t_forecast.py . tests/stubs`) and `r3d/t_forecast_page.js` (53 checks, 5 screen sizes + 2D fallback).
 
 
 ## Halfway Planner: the driver briefing, step 4 (V16.28)

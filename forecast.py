@@ -56,7 +56,9 @@ PARAMS = {
     "rain_hi_conf_km": 2.0,     # nearest gauge within 2 km = high confidence, within 3.5 km = medium, else low
     "rain_med_conf_km": 3.5,
     "rain_light_mmh": 0.1, "rain_mod_mmh": 2.5, "rain_heavy_mmh": 10.0, "rain_violent_mmh": 50.0,   # WMO intensity classes
-    "rain_severe_share": 0.20,  # a service is "severely exposed" with >= 20 % of its route in heavy rain (estimated, >= medium confidence)
+    "rain_severe_share": 0.20,  # a service is "severely exposed" with >= 20 % of its route in COUNTED heavy rain
+    "rain_count_km": 2.0,       # rain is COUNTED only on route stretches within 2 km of a gauge that itself reports heavy rain (nothing further)
+    "alert_unverified": False,  # point-only reports (LTA) never raise alerts or service risk: map + evidence list only, "not counted"
     # ---- forecasting
     "horizons": [15, 30, 60],
     "tau_min": 30.0,            # e-folding time of a speed anomaly (mean reversion)
@@ -657,14 +659,14 @@ def rain_class(mmh):
     return "violent"
 
 
-def idw(X, stations, P=None):
+def idw(X, stations, P=None, with_near=False):
     """Inverse-distance (power 2) rainfall estimate at points X (N x 2 m) from gauges within rain_max_km.
-    -> (mm/h array, nearest-gauge km array, confidence labels)"""
+    -> (mm/h array, nearest-gauge km array, confidence labels[, highest reading (mm/h) of the gauges within rain_count_km])"""
     P = P or PARAMS
     st = [s for s in stations or [] if s.get("mm") is not None and in_sg(s.get("lat"), s.get("lon"))]
     n = len(X)
     if not st or not n:
-        return np.full(n, np.nan), np.full(n, np.inf), ["none"] * n
+        return (np.full(n, np.nan), np.full(n, np.inf), ["none"] * n) + ((np.zeros(n),) if with_near else ())
     G = np.array([[s["lon"] * KX, s["lat"] * KY] for s in st])
     v = np.array([s["mm"] * 12.0 for s in st])               # 5-min total -> mm/h
     D = np.hypot(X[:, None, 0] - G[None, :, 0], X[:, None, 1] - G[None, :, 1]) / 1000.0
@@ -673,6 +675,9 @@ def idw(X, stations, P=None):
     ws = W.sum(1)
     est = np.where(ws > 0, (W * v[None, :]).sum(1) / np.where(ws > 0, ws, 1.0), np.nan)
     conf = ["high" if k <= P["rain_hi_conf_km"] else "medium" if k <= P["rain_med_conf_km"] else "low" if k <= P["rain_max_km"] else "none" for k in near]
+    if with_near:
+        nmax = np.where(D <= P["rain_count_km"], v[None, :], -1.0).max(1)
+        return est, near, conf, nmax
     return est, near, conf
 
 
@@ -682,15 +687,16 @@ def rain_exposure(route, stations, prev_stations=None, P=None):
     if not route.ok:
         return None
     S, _, w = route.sample(P["rain_step_m"])
-    est, near, conf = idw(S, stations, P)
+    est, near, conf, nmax = idw(S, stations, P, with_near=True)
     cls = [rain_class(None if np.isnan(e) else float(e)) for e in est]
     known = ~np.isnan(est)
     good = np.array([c in ("high", "medium") for c in conf])
+    counted = (nmax >= P["rain_heavy_mmh"]) & np.nan_to_num(est >= P["rain_heavy_mmh"], nan=False)     # a gauge within 2 km itself reads heavy
     wet = np.array([c in ("moderate", "heavy", "violent") for c in cls])
     heavy = np.array([c in ("heavy", "violent") for c in cls])
     tot = float(w.sum()) or 1.0
     km_wet, km_heavy = float(w[wet].sum()) / 1000, float(w[heavy].sum()) / 1000
-    km_heavy_good = float(w[heavy & good].sum()) / 1000
+    km_heavy_good = float(w[heavy & counted].sum()) / 1000
     cover = float(w[known].sum()) / tot
     mean_wet = float(np.nanmean(est[wet])) if wet.any() else 0.0
     trend = "unknown"
@@ -718,7 +724,8 @@ def rain_exposure(route, stations, prev_stations=None, P=None):
             "share_heavy_good": round(km_heavy_good * 1000 / tot, 3), "mean_mmh": round(mean_wet, 1),
             "max_mmh": round(float(np.nanmax(est)), 1) if known.any() else None, "coverage": round(cover, 2), "confidence": lvl_conf,
             "nearest_gauge_km": round(float(np.min(near)), 1) if len(near) else None, "trend": trend, "segments": segs,
-            "label": "ESTIMATED from NEA rain gauges (inverse-distance interpolation) - not observed at road level"}
+            "km_counted": round(km_heavy_good, 2),
+            "label": f"ESTIMATED from NEA rain gauges (inverse-distance interpolation), not observed at road level. COUNTED only where a gauge within {P['rain_count_km']:.0f} km of the route reports heavy rain."}
 
 
 # =========================================================================== traffic: baselines, trend, forecast (explainable)
@@ -843,7 +850,7 @@ def risk_level(extra_min, hw, blocked=False, heavy_share=0.0, unverified=0, P=No
         return "critical"
     if extra_min >= max(P["high_min"], P["high_hw"] * hw):
         return "high"
-    if extra_min >= P["watch_min"] or heavy_share >= PARAMS["rain_severe_share"] or unverified:
+    if extra_min >= P["watch_min"] or heavy_share >= PARAMS["rain_severe_share"] or (unverified and P.get("alert_unverified")):
         return "watch"
     return "info"
 
@@ -925,7 +932,8 @@ def service_impact(key, route, confirmed, unverified, probes, rain, hw, jam_info
         extra[h] = {"mid": round(mid, 1), "lo": round(min(lo, mid), 1), "hi": round(max(hi, mid), 1)}
     heavy = (rain or {}).get("share_heavy_good", 0.0) or 0.0
     unv = sum(1 for ev, m in unverified if ev["kind"] in ("road_closed", "accident", "flooding", "breakdown", "lane_closed"))
-    levels = {h: risk_level(extra[h]["mid"], hw, blocked, heavy, unv, P) for h in horizons}
+    unv_risk = unv if P.get("alert_unverified") else 0
+    levels = {h: risk_level(extra[h]["mid"], hw, blocked, heavy, unv_risk, P) for h in horizons}
     lvl = max(levels.values(), key=lambda k: RANK[k])
     h30 = 30 if 30 in extra else horizons[0]
     crit = sorted([c for c in contrib if max((v[0] for v in c["per"].values()), default=0) >= 0.5 or c["kind"] in ("road_closed", "flooding")],
@@ -934,7 +942,7 @@ def service_impact(key, route, confirmed, unverified, probes, rain, hw, jam_info
     building = any(c["trend"] == "building" for c in contrib)
     pred_rt = {h: round(hist_rt + extra[h]["mid"], 1) for h in horizons} if hist_rt else None
     return {"svc": key[0], "dir": key[1], "level": lvl, "levels": levels, "extra": extra, "blocked": blocked, "maybe_blocked": maybe_blocked,
-            "score": risk_score(extra[h30]["mid"], extra[horizons[-1]]["mid"], blocked, heavy, unv, lvl), "hw": hw,
+            "score": risk_score(extra[h30]["mid"], extra[horizons[-1]]["mid"], blocked, heavy, unv_risk, lvl), "hw": hw,
             "rain": rain, "heavy_share": heavy, "unverified": unv, "contrib": contrib, "critical_segments": crit,
             "recovery_min": None if building else (max(recs) if recs else None), "building": building,
             "hist_rt": hist_rt, "pred_rt": pred_rt, "length_m": round(route.length) if route is not None and route.ok else None}
@@ -1124,7 +1132,9 @@ def evaluate(world, P=None):
 
     # ---- 4. service impact for every service with verified evidence, probes, focus or rain exposure
     focus = set(tuple(x) for x in world.get("focus") or [])
-    keys = set(conf_by) | set(probes_by) | {k for k in focus if k in routes} | {k for k, r in rain_by.items() if r and r["share_heavy_good"] >= P["rain_severe_share"]} | set(unv_by)
+    keys = set(conf_by) | set(probes_by) | {k for k in focus if k in routes} | {k for k, r in rain_by.items() if r and r["share_heavy_good"] >= P["rain_severe_share"]}
+    if P.get("alert_unverified"):
+        keys |= set(unv_by)
     impacts = {}
     for k in keys:
         R = routes.get(k)
@@ -1174,7 +1184,7 @@ def evaluate(world, P=None):
                         related.append(f"{other.get('label')} ({' + '.join(other.get('sources') or [other['source']])})")
                         break
         status = "confirmed" if per_svc else ("unverified" if res["unverified"] else "no_route_impact")
-        if status == "unverified" and ev["kind"] in ("road_closed", "accident", "flooding", "breakdown", "lane_closed"):
+        if status == "unverified" and P.get("alert_unverified") and ev["kind"] in ("road_closed", "accident", "flooding", "breakdown", "lane_closed"):
             lvl = "watch"
         rej = [{"svc": k[0], "dir": k[1], "reason": m["reason"], "explain": m["explain"]} for k, m in res["rejected"]
                if m["reason"] in ("opposite_direction", "parallel_road", "crossing", "too_short", "not_in_force")][:12]
@@ -1237,7 +1247,7 @@ def evaluate(world, P=None):
     ver_inc = [e for e in ev_view if e["status"] == "confirmed" and e["kind"] not in ("jam", "roadworks")]
     kpis = [
         kpi("verified_incidents", "Verified route incidents", len(ver_inc),
-            f"{lta_unv} unverified (no line/direction)" if lta_unv else "geometry + direction checked", tt_inc and have_idx,
+            f"{lta_unv} unverified report(s) near routes - not counted" if lta_unv else "only events whose own line runs along a route", tt_inc and have_idx,
             _src_stale(src, "tomtom_incidents"), "Incidents whose own line runs along a bus route in the same direction (TomTom geometry)",
             level="critical" if any(e["kind"] == "road_closed" for e in ver_inc) else ("high" if ver_inc else None)),
         kpi("services_affected", "Bus services potentially affected", len({s["svc"] for s in affected}),
@@ -1253,7 +1263,7 @@ def evaluate(world, P=None):
         kpi("rain_exposure", "Severe rainfall exposure", sum(1 for k, r in rain_by.items() if r and r["share_heavy_good"] >= P["rain_severe_share"]),
             (f"est. - {sum(1 for s in stations if (s.get('mm') or 0) > 0)} of {len(stations)} gauges wet, max {max_mmh:.0f} mm/h" if stations else ""),
             _src_ok(src, "nea_rain") and have_idx, _src_stale(src, "nea_rain"),
-            f"ESTIMATED: service-directions with >= {int(P['rain_severe_share'] * 100)} % of the route in heavy rain (>= {P['rain_heavy_mmh']:.0f} mm/h)"),
+            f"ESTIMATED: service-directions with >= {int(P['rain_severe_share'] * 100)} % of the route in heavy rain (>= {P['rain_heavy_mmh']:.0f} mm/h), counted only within {P['rain_count_km']:.0f} km of a gauge reporting it"),
         kpi("roadworks", "Roadwork restrictions", sum(1 for e in ev_view if e["kind"] == "roadworks"),
             f"{sum(1 for e in ev_view if e['kind'] == 'roadworks' and e['status'] == 'confirmed')} verified on routes, "
             f"{sum(1 for e in ev_view if e['kind'] == 'roadworks' and e['status'] == 'unverified')} unverified",
@@ -1303,7 +1313,7 @@ def evaluate(world, P=None):
                           "links": links_for(top["svc"], top["dir"], e["kind"]) if top else links_for(None, None, e["kind"]),
                           "explain": [s["explain"] for s in e["services"][:3]] + [r["explain"] for r in e["rejected"][:3]],
                           "lat": e["pt"][1] if e.get("pt") else None, "lon": e["pt"][0] if e.get("pt") else None, "score": max((s["extra"].get(30, 0) for s in e["services"]), default=0)})
-        elif e["status"] == "unverified" and e["kind"] in ("road_closed", "accident", "flooding", "breakdown", "lane_closed"):
+        elif e["status"] == "unverified" and P.get("alert_unverified") and e["kind"] in ("road_closed", "accident", "flooding", "breakdown", "lane_closed"):
             cands.append({"key": "uv:" + e["id"], "kind": e["kind"], "level": "watch", "verified": False,
                           "title": f"UNVERIFIED {e['label']} - {e['road'] or 'near a bus route'}" + (f" towards {e['towards']}" if e.get("towards") else ""),
                           "location": e.get("desc") or "", "segment": "", "services": [{"svc": s["svc"], "dir": s["dir"], "extra30": None} for s in e["unverified_services"]],
@@ -1350,7 +1360,10 @@ def evaluate(world, P=None):
                                    "cls": rain_class((s.get("mm") or 0) * 12)} for s in stations],
                      "max_mmh": round(max_mmh, 1), "wet": sum(1 for s in stations if (s.get("mm") or 0) > 0), "areas": fc2h.get("areas", []),
                      "label": "Gauge readings (observed at the gauge). Route exposure is ESTIMATED."},
-            "sources": src, "calibration": cal, "_ev": ev_out}
+            "sources": src, "calibration": cal, "_ev": ev_out,
+            "network": {"service_dirs": len(idx) if idx is not None else 0, "gauges": len(stations), "affected_dirs": len(affected),
+                        "unverified_reports": lta_unv, "roadworks_verified": sum(1 for e in ev_view if e["kind"] == "roadworks" and e["status"] == "confirmed"),
+                        "zones_abnormal": sum(1 for z in zone_out if z["abnormal"])}}
 
 
 def _svc_brief(s):
@@ -1762,7 +1775,7 @@ DEMO_BASE = datetime(2026, 1, 6, 7, 40, tzinfo=SGT).timestamp()      # a Tuesday
 DEMO_STEPS = [
     {"t": 0, "title": "Normal operations", "say": "Traffic is normal for a weekday morning. Every KPI is computed from the (fictional) feeds."},
     {"t": 10, "title": "Traffic builds up", "say": "Speeds on the expressway eastbound start to drop; TomTom reports a small jam."},
-    {"t": 20, "title": "Deterioration detected", "say": "Speed is 50 % below the usual for 08:00 on a weekday - abnormal, not the normal peak. An LTA accident report arrives (point only: UNVERIFIED)."},
+    {"t": 20, "title": "Deterioration detected", "say": "Speed is 50 % below the usual for 08:00 on a weekday - abnormal, not the normal peak. An LTA accident report arrives: a point only, so it is shown as UNVERIFIED on the map and NOT counted."},
     {"t": 25, "title": "Route impact verified", "say": "TomTom's jam and accident lines run along X101 eastbound and X305: CONFIRMED. X101 westbound (opposite carriageway), X102 (parallel road) and X201 (flyover) are REJECTED."},
     {"t": 30, "title": "Prediction generated", "say": "+15 / +30 / +60 min forecasts with uncertainty bands; the jam is still building, recovery not before the jam stops growing."},
     {"t": 41, "title": "OCC alerted", "say": "The critical alert has been unacknowledged for 15 min: it is ESCALATED. Duplicates are grouped, unchanged conditions do not re-alert."},
