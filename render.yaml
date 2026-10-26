@@ -89,3 +89,11 @@ services:
         sync: false
       - key: HERE_API_KEY         # optional: HERE Traffic API v7 key (second provider) - set it here, never in the code
         sync: false
+      - key: FORECAST_TILE_MODE   # optional (V17.3): backup (default) = TomTom incident TILES when Incident Details fails | always | off
+        sync: false
+      - key: FORECAST_TILE_ZOOM   # optional: 11-15 (default 13, about 88 tiles a sweep)
+        sync: false
+      - key: FORECAST_TILE_EVERY_MIN # optional: minutes between backup tile sweeps (default 15)
+        sync: false
+      - key: FORECAST_TILE_CAP    # optional: most incident tiles a day for the backup (default 3000)
+        sync: false

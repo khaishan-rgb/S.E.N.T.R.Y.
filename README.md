@@ -1,4 +1,4 @@
-# SG Transport Pulse V17.0 (S.E.N.T.R.Y. 3.0) — Operational Intelligence & Service Recovery Platform
+# SG Transport Pulse V17.3 (S.E.N.T.R.Y. 3.0) — Operational Intelligence & Service Recovery Platform
 
 ## Forecast Centre: the new home page (V17.0)
 The Command Centre is now the **Forecast Centre** (`/command`, also `/forecast`). The previous page is still at `/command/classic`. Full documentation is in **FORECAST_CENTRE.md**: architecture, matching rules, forecasts, alerts, database, providers, configuration, API, tests and the completion report.
@@ -25,7 +25,13 @@ The Command Centre is now the **Forecast Centre** (`/command`, also `/forecast`)
 * **V17.1:**
   * Strict counting: unverified point reports raise no alerts and no risk; rain is counted only within 2 km of a gauge that reports it.
   * Control-room restyle: title plate, corner-bracket panels, ring-gauge KPIs.
-* **Tests:** `tests/t_forecast.py` (82 checks, run: `python3 tests/t_forecast.py . tests/stubs`) and `r3d/t_forecast_page.js` (53 checks, 5 screen sizes + 2D fallback).
+* **V17.2 (deployment safety):** the test stand-ins are now in-memory (`tests/fakes.py`). No file in the project is named like a real library. The app checks at start-up that `httpx` is the real library and shows **DEPLOY PROBLEM** if a stray `httpx.py` is next to `app.py`.
+* **V17.3 (backup traffic source, clearer map):**
+  * **Backup when TomTom Incident Details fails** (403 / quota / error): the Forecast Centre automatically reads TomTom's **vector incident tiles** instead. They come from the much larger map-tile allowance and carry the same jam and incident lines (with delay, magnitude and the start marker that gives the direction). Lines without a start marker stay UNVERIFIED. Settings: `FORECAST_TILE_MODE` (backup | always | off), `FORECAST_TILE_ZOOM` (13), `FORECAST_TILE_EVERY_MIN` (15), `FORECAST_TILE_CAP` (3000 a day).
+  * **Waze for Cities** jams and alerts are used too when `WAZE_FEED_URL` is set (same strict matching). OpenStreetMap has no live traffic; HERE needs its own key.
+  * **Road works KPI** counts only works verified on a route (LTA gives points, so they are listed as "near routes, not counted"), no longer every approved work island-wide.
+  * **Map:** pictogram icons for accident, breakdown, road works, road closed, lane closed, flooding and hazard (grey dashed = unverified); NEA area forecasts no longer drawn as circles (they stay in the weather pill); congestion risk zones are a "!" diamond; traffic flow drawn from TomTom vector tiles in our own teal → amber → red colours; a compact map key with the real icons.
+* **Tests:** `tests/t_forecast.py` (97 checks, run: `python3 tests/t_forecast.py`) and `r3d/t_forecast_page.js` (57 checks, 5 screen sizes + 2D fallback).
 
 
 ## Halfway Planner: the driver briefing, step 4 (V16.28)

@@ -345,7 +345,7 @@ def parse_tomtom_incidents(j, now=None):
         passable, ptxt = BUS_PASS.get(kind, BUS_PASS["other"])
         st, en = _ts(pr.get("startTime")), _ts(pr.get("endTime"))
         out.append({
-            "id": "tomtom:" + str(pr.get("id") or stable_id(cat, line[:1] or pt)), "source": "TomTom", "provider": "tomtom",
+            "id": "tomtom:" + str(pr.get("id") or stable_id(cat, line[:1] or pt)), "source": "TomTom", "provider": "tomtom", "src_key": "tomtom_incidents",
             "kind": kind, "label": TT_ICON.get(cat, "Incident"), "desc": desc, "road": " / ".join(roads),
             "from": (pr.get("from") or "").strip(), "to": (pr.get("to") or "").strip(),
             "line": line, "pt": pt if not line else line[len(line) // 2], "geom": "line" if line else "point",
@@ -391,7 +391,7 @@ def parse_lta_incidents(rows, now=None):
         if r:
             road, towards = r.group(1).strip(), (r.group(2) or "").strip()
         passable, ptxt = BUS_PASS.get(kind, BUS_PASS["other"])
-        out.append({"id": "lta:" + stable_id(typ, round(lat, 5), round(lon, 5), msg[:60]), "source": "LTA", "provider": "lta", "kind": kind,
+        out.append({"id": "lta:" + stable_id(typ, round(lat, 5), round(lon, 5), msg[:60]), "source": "LTA", "provider": "lta", "src_key": "lta_incidents", "kind": kind,
                     "label": typ, "desc": body or typ, "road": road, "towards": towards, "from": "", "to": "", "line": [], "pt": (lat, lon),
                     "geom": "point", "delay_s": None, "length_m": None, "magnitude": "unknown", "mag": None, "start": None, "end": None, "reported": rep,
                     "passable": passable, "pass_text": ptxt, "observed": now, "validity": "current (LTA live list)"})
@@ -405,7 +405,7 @@ def normalise_roadworks(items, now=None):
     for x in items or []:
         lat, lon = num(x.get("lat")), num(x.get("lon"))
         pt = (lat, lon) if in_sg(lat, lon) else None
-        out.append({"id": "ltarw:" + str(x.get("key") or stable_id(x.get("road"), x.get("start_epoch"))), "source": "LTA", "provider": "lta",
+        out.append({"id": "ltarw:" + str(x.get("key") or stable_id(x.get("road"), x.get("start_epoch"))), "source": "LTA", "provider": "lta", "src_key": "lta_roadworks",
                     "kind": "roadworks", "label": "Road works", "desc": (x.get("other") or "Approved road works")[:160], "road": x.get("road") or "",
                     "from": "", "to": "", "line": [], "pt": pt, "geom": "point" if pt else "road_name", "delay_s": None, "length_m": None,
                     "magnitude": "unknown", "mag": None, "start": x.get("start_epoch"), "end": x.get("end_epoch"),
@@ -576,6 +576,10 @@ def match_event(route, ev, now=None, horizon_min=60, P=None):
     now = now or time.time()
     if ev.get("line") and len(ev["line"]) >= 2:
         m = match_line(route, ev.get("_L") or Line(ev["line"]), P)
+        if ev.get("dir_known") is False and (m["status"] == "confirmed" or m.get("reason") == "opposite_direction"):
+            m = dict(m, status="unverified", reason="direction_unknown",
+                     explain=f"UNVERIFIED: the line runs along the route ({m.get('overlap_m') or m.get('event_m')} m) but its direction of travel is not known "
+                             f"(no TomTom start marker), so it is not counted.")
     elif ev.get("pt"):
         m = match_point(route, ev["pt"], P)
     else:
@@ -1198,9 +1202,13 @@ def evaluate(world, P=None):
             "magnitude": ev.get("magnitude"), "fc": fc, "passable": ev.get("passable"), "pass_text": ev.get("pass_text"),
             "validity": ev.get("validity_txt"), "start": ev.get("start"), "end": ev.get("end"),
             "recurring": (jt.get(ev["id"]) or {}).get("recurring"), "recur_detail": (jt.get(ev["id"]) or {}).get("detail"),
-            "first_seen": (jt.get(ev["id"]) or {}).get("first_seen"), "growth": round(rate, 1) if rate else 0.0,
+            "first_seen": (jt.get(ev["id"]) or {}).get("first_seen"), "growth": round(rate, 1) if rate else 0.0, "src_key": ev.get("src_key") or "tomtom_incidents",
             "recovery_min": jam_recovery_min(ev.get("delay_s"), rate, P) if ev.get("delay_s") else None, "related": sorted(set(related)),
         })
+    rw_total = sum(1 for e in ev_out if e["kind"] == "roadworks")
+    rw_near = sum(1 for e in ev_view if e["kind"] == "roadworks" and e["status"] == "unverified")
+    rw_ver = sum(1 for e in ev_view if e["kind"] == "roadworks" and e["status"] == "confirmed")
+    ev_view = [e for e in ev_view if not (e["kind"] == "roadworks" and e["status"] == "no_route_impact")]     # far from every route: counted, not sent
     for ev in ev_out:
         ev.pop("_res", None)
     ev_view.sort(key=lambda e: (-RANK[e["level"]], e["status"] != "confirmed", -(e["delay_s"] or 0)))
@@ -1241,14 +1249,14 @@ def evaluate(world, P=None):
     def kpi(id_, label, value, sub, ok, stale=False, basis="", unit="", level=None):
         return {"id": id_, "label": label, "value": value if ok else None, "sub": sub if ok else (sub or "Source unavailable"),
                 "available": bool(ok), "stale": bool(stale and ok), "basis": basis, "unit": unit, "level": level}
-    tt_inc = _src_ok(src, "tomtom_incidents")
+    tt_inc = _src_ok(src, "tomtom_incidents", "tomtom_tiles", "waze")
     have_idx = idx is not None and len(idx) > 0
     lta_unv = sum(1 for e in ev_view if e["status"] == "unverified" and e["kind"] not in ("jam", "roadworks"))
     ver_inc = [e for e in ev_view if e["status"] == "confirmed" and e["kind"] not in ("jam", "roadworks")]
     kpis = [
         kpi("verified_incidents", "Verified route incidents", len(ver_inc),
             f"{lta_unv} unverified report(s) near routes - not counted" if lta_unv else "only events whose own line runs along a route", tt_inc and have_idx,
-            _src_stale(src, "tomtom_incidents"), "Incidents whose own line runs along a bus route in the same direction (TomTom geometry)",
+            _src_stale(src, "tomtom_incidents", "tomtom_tiles"), "Incidents whose own line runs along a bus route in the same direction (TomTom / Waze geometry)",
             level="critical" if any(e["kind"] == "road_closed" for e in ver_inc) else ("high" if ver_inc else None)),
         kpi("services_affected", "Bus services potentially affected", len({s["svc"] for s in affected}),
             f"{len(affected)} service-directions, verified matches only", (tt_inc or _src_ok(src, "tomtom_flow")) and have_idx,
@@ -1256,7 +1264,7 @@ def evaluate(world, P=None):
         kpi("congestion_zones", "Congestion risk zones", len(zone_out),
             f"{sum(1 for z in zone_out if z['abnormal'])} abnormal for the time of day" if any(z["abnormal"] for z in zone_out) else
             ("recurrence history building" if zone_out and all(z["recurring"] is None for z in zone_out) else f"{len(jams)} jams island-wide"),
-            tt_inc, _src_stale(src, "tomtom_incidents"), "TomTom jams of moderate+ magnitude (or abnormal for the time), grouped where they touch"),
+            tt_inc, _src_stale(src, "tomtom_incidents", "tomtom_tiles"), "Jams of moderate+ magnitude (or abnormal for the time), grouped where they touch (TomTom / Waze)"),
         kpi("predicted_disruptions", "Predicted service disruptions", sum(1 for s in svc_list if RANK[s["level"]] >= RANK["high"]),
             f"{sum(1 for s in svc_list if s['level'] == 'critical')} critical within 60 min", (tt_inc or _src_ok(src, "tomtom_flow")) and have_idx,
             _src_stale(src, "tomtom_incidents", "tomtom_flow"), "Service-directions at HIGH or CRITICAL risk at +15/+30/+60 min (rule-based)"),
@@ -1264,10 +1272,10 @@ def evaluate(world, P=None):
             (f"est. - {sum(1 for s in stations if (s.get('mm') or 0) > 0)} of {len(stations)} gauges wet, max {max_mmh:.0f} mm/h" if stations else ""),
             _src_ok(src, "nea_rain") and have_idx, _src_stale(src, "nea_rain"),
             f"ESTIMATED: service-directions with >= {int(P['rain_severe_share'] * 100)} % of the route in heavy rain (>= {P['rain_heavy_mmh']:.0f} mm/h), counted only within {P['rain_count_km']:.0f} km of a gauge reporting it"),
-        kpi("roadworks", "Roadwork restrictions", sum(1 for e in ev_view if e["kind"] == "roadworks"),
-            f"{sum(1 for e in ev_view if e['kind'] == 'roadworks' and e['status'] == 'confirmed')} verified on routes, "
-            f"{sum(1 for e in ev_view if e['kind'] == 'roadworks' and e['status'] == 'unverified')} unverified",
-            _src_ok(src, "lta_roadworks", "tomtom_incidents"), _src_stale(src, "lta_roadworks"), "Road works in force now or within 60 min"),
+        kpi("roadworks", "Roadwork restrictions", rw_ver,
+            f"{rw_near} near routes (LTA points, not counted) - {rw_total:,} in force island-wide",
+            _src_ok(src, "lta_roadworks", "tomtom_incidents", "tomtom_tiles"), _src_stale(src, "lta_roadworks"),
+            "Road works whose own line runs along a bus route (TomTom). LTA approved works give no road line, so they are listed, not counted."),
     ]
     cal = world.get("calibration") or {}
     if cal.get("n", 0) >= 30:
@@ -1309,7 +1317,7 @@ def evaluate(world, P=None):
                                       + (f"; includes {', '.join(e['related'])}" if e.get("related") else ""),
                           "predicted": {h: e["fc"].get(h) for h in H} if e["fc"] else None,
                           "confidence": "Verified route match (line geometry + direction)" + ("; recurring for this time" if e["recurring"] else "; abnormal for this time" if e["recurring"] is False else "; recurrence not known yet"),
-                          "source": " + ".join(e["sources"]), "deps": ["tomtom_incidents"], "recommended": REC.get(e["kind"], REC["accident"]),
+                          "source": " + ".join(e["sources"]), "deps": [e.get("src_key") or "tomtom_incidents"], "recommended": REC.get(e["kind"], REC["accident"]),
                           "links": links_for(top["svc"], top["dir"], e["kind"]) if top else links_for(None, None, e["kind"]),
                           "explain": [s["explain"] for s in e["services"][:3]] + [r["explain"] for r in e["rejected"][:3]],
                           "lat": e["pt"][1] if e.get("pt") else None, "lon": e["pt"][0] if e.get("pt") else None, "score": max((s["extra"].get(30, 0) for s in e["services"]), default=0)})
@@ -1362,7 +1370,7 @@ def evaluate(world, P=None):
                      "label": "Gauge readings (observed at the gauge). Route exposure is ESTIMATED."},
             "sources": src, "calibration": cal, "_ev": ev_out,
             "network": {"service_dirs": len(idx) if idx is not None else 0, "gauges": len(stations), "affected_dirs": len(affected),
-                        "unverified_reports": lta_unv, "roadworks_verified": sum(1 for e in ev_view if e["kind"] == "roadworks" and e["status"] == "confirmed"),
+                        "unverified_reports": lta_unv, "roadworks_verified": rw_ver, "roadworks_near": rw_near, "roadworks_total": rw_total,
                         "zones_abnormal": sum(1 for z in zone_out if z["abnormal"])}}
 
 
@@ -1972,3 +1980,296 @@ def recompute_service(state, world, key, P=None):
     im["hw_src"] = "scheduled" if (world.get("headways") or {}).get(key) else "assumed 10 min (no headway on record)"
     state["impacts"][key] = im
     return im
+
+
+# =========================================================================== backup sources (V17.3)
+# 1) TomTom VECTOR INCIDENT TILES: the same incidents and jams as Incident Details, as road lines, from the tile allowance
+#    (Traffic Flow & Incidents vector tiles, 200,000 a month) instead of Incident Details (2,500 a month).
+#    Direction: each incident has a "start_poi" marker at its beginning; the line is oriented to start there. A line with no start
+#    marker cannot be oriented -> UNVERIFIED (shown, not counted).
+# 2) Waze for Cities jams (lines in the direction of traffic) and alerts (points), when WAZE_FEED_URL is set.
+import gzip
+import struct
+
+
+def _varint(b, i):
+    r = s = 0
+    while True:
+        c = b[i]
+        i += 1
+        r |= (c & 0x7F) << s
+        if c < 0x80:
+            return r, i
+        s += 7
+
+
+def _pb_fields(b):
+    """Protocol-buffer fields of a message -> (field number, wire type, int | bytes)."""
+    i, n = 0, len(b)
+    while i < n:
+        key, i = _varint(b, i)
+        f, wt = key >> 3, key & 7
+        if wt == 0:
+            v, i = _varint(b, i)
+        elif wt == 1:
+            v, i = b[i:i + 8], i + 8
+        elif wt == 2:
+            ln, i = _varint(b, i)
+            v, i = b[i:i + ln], i + ln
+        elif wt == 5:
+            v, i = b[i:i + 4], i + 4
+        else:
+            raise ValueError(f"unsupported wire type {wt}")
+        yield f, wt, v
+
+
+def _packed(b):
+    out, i = [], 0
+    while i < len(b):
+        v, i = _varint(b, i)
+        out.append(v)
+    return out
+
+
+def _zz(n):
+    return (n >> 1) ^ -(n & 1)
+
+
+def _mvt_value(b):
+    for f, wt, v in _pb_fields(b):
+        if f == 1:
+            return bytes(v).decode("utf-8", "replace")
+        if f == 2:
+            return struct.unpack("<f", bytes(v))[0]
+        if f == 3:
+            return struct.unpack("<d", bytes(v))[0]
+        if f == 4:
+            return v - (1 << 64) if v >= 1 << 63 else v
+        if f == 5:
+            return v
+        if f == 6:
+            return _zz(v)
+        if f == 7:
+            return bool(v)
+    return None
+
+
+def _mvt_geom(cmds):
+    """Geometry commands -> list of parts, each a list of (x, y) tile units."""
+    parts, cur, x, y, i = [], None, 0, 0, 0
+    while i < len(cmds):
+        c = cmds[i]
+        i += 1
+        cid, cnt = c & 7, c >> 3
+        if cid == 7:                                   # ClosePath
+            if cur:
+                cur.append(cur[0])
+            continue
+        for _ in range(cnt):
+            x += _zz(cmds[i])
+            y += _zz(cmds[i + 1])
+            i += 2
+            if cid == 1:                               # MoveTo starts a new part
+                cur = [(x, y)]
+                parts.append(cur)
+            elif cur is not None:
+                cur.append((x, y))
+    return parts
+
+
+def decode_mvt(data):
+    """A Mapbox Vector Tile (gzip or not) -> {layer name: {"extent", "features": [{"type", "props", "parts"}]}}."""
+    if data[:2] == b"\x1f\x8b":
+        data = gzip.decompress(data)
+    out = {}
+    for f, wt, lb in _pb_fields(memoryview(data)):
+        if f != 3 or wt != 2:
+            continue
+        name, extent, keys, vals, raw = "", 4096, [], [], []
+        for lf, lwt, lv in _pb_fields(lb):
+            if lf == 1:
+                name = bytes(lv).decode("utf-8", "replace")
+            elif lf == 2:
+                raw.append(lv)
+            elif lf == 3:
+                keys.append(bytes(lv).decode("utf-8", "replace"))
+            elif lf == 4:
+                vals.append(_mvt_value(lv))
+            elif lf == 5:
+                extent = lv
+        feats = []
+        for fb in raw:
+            tags, gtype, geom = [], 0, []
+            for ff, fwt, fv in _pb_fields(fb):
+                if ff == 2:
+                    tags = _packed(fv) if fwt == 2 else tags + [fv]
+                elif ff == 3:
+                    gtype = fv
+                elif ff == 4:
+                    geom = _packed(fv) if fwt == 2 else geom + [fv]
+            props = {keys[tags[k]]: vals[tags[k + 1]] for k in range(0, len(tags) - 1, 2) if tags[k] < len(keys) and tags[k + 1] < len(vals)}
+            feats.append({"type": gtype, "props": props, "parts": _mvt_geom(geom)})
+        out[name] = {"extent": extent, "features": feats}
+    return out
+
+
+def tile_ll(z, tx, ty, px, py, extent=4096):
+    n = 2.0 ** z
+    lon = (tx + px / extent) / n * 360.0 - 180.0
+    lat = math.degrees(math.atan(math.sinh(math.pi * (1 - 2 * (ty + py / extent) / n))))
+    return lat, lon
+
+
+def tiles_for_bbox(z, south, west, north, east):
+    n = 2 ** z
+    x0, x1 = int((west + 180) / 360 * n), int((east + 180) / 360 * n)
+    yy = lambda lat: int((1 - math.log(math.tan(math.radians(lat)) + 1 / math.cos(math.radians(lat))) / math.pi) / 2 * n)
+    return [(z, x, y) for x in range(x0, x1 + 1) for y in range(yy(north), yy(south) + 1)]
+
+
+def _endpoint_m(a, b):
+    return hav_m(a[0], a[1], b[0], b[1])
+
+
+def join_pieces(lines, tol=6.0):
+    """Pieces of one line cut by tile borders -> whole lines. Tiles carry a margin, so neighbouring pieces usually OVERLAP for a stretch
+    (sometimes they only touch); either way they are joined once, in any stored orientation. A piece lying wholly on another is dropped."""
+    lines = [list(l) for l in lines if len(l) >= 2]
+    on = lambda L, p: float(L.locate(to_xy(*p))[0][0]) <= tol
+    changed = True
+    while changed:
+        changed = False
+        for i in range(len(lines)):
+            La = Line(lines[i])
+            if not La.ok:
+                continue
+            for j in range(len(lines)):
+                if i == j:
+                    continue
+                Lb0 = Line(lines[j])
+                if not Lb0.ok:
+                    continue
+                if on(La, lines[j][0]) and on(La, lines[j][-1]):             # j lies on i: a duplicate piece
+                    del lines[j]
+                    changed = True
+                    break
+                for b in (lines[j], lines[j][::-1]):
+                    a = lines[i]
+                    if _endpoint_m(a[-1], b[0]) <= tol:
+                        new = a + b[1:]
+                    else:
+                        Lb = Line(b)
+                        if not (on(La, b[0]) and on(Lb, a[-1])):
+                            continue
+                        s0 = float(La.locate(to_xy(*b[0]))[1][0])
+                        head = La.cut(0.0, s0) if s0 > 0.5 else [a[0]]
+                        new = head[:-1] + b if len(head) >= 2 else b
+                    lines[i] = new
+                    del lines[j]
+                    changed = True
+                    break
+                if changed:
+                    break
+            if changed:
+                break
+    return lines
+
+
+def parse_tomtom_incident_tiles(tiles, now=None, P=None):
+    """[(z, x, y, pbf bytes)] -> incident events. Pieces of one incident cut by tile borders are joined; each joined line is oriented from
+    its TomTom start marker (start_poi). Without a start marker the direction is unknown: dir_known False (never confirmed)."""
+    P = P or PARAMS
+    now = now or time.time()
+    segs, pois = [], []
+    for z, tx, ty, data in tiles:
+        try:
+            L = decode_mvt(bytes(data))
+        except Exception:
+            continue
+        fl = L.get("Traffic incidents flow") or L.get("Traffic incident flow") or {}
+        po = L.get("Traffic incidents POI") or L.get("Traffic incident POI") or {}
+        ext = fl.get("extent", 4096)
+        for ft in fl.get("features", []):
+            pr = ft["props"]
+            try:
+                cat = int(pr.get("icon_category", 0))
+            except (TypeError, ValueError):
+                cat = 0
+            if cat == 13:                                        # a cluster of mixed incidents (low zoom): not usable
+                continue
+            for part in ft["parts"]:
+                pts = [tile_ll(z, tx, ty, px, py, ext) for px, py in part]
+                pts = [p for p in pts if in_sg(*p)]
+                if len(pts) >= 2:
+                    segs.append({"cat": cat, "mag": pr.get("magnitude"), "delay": pr.get("delay"), "desc": pr.get("description") or "",
+                                 "road_type": pr.get("road_type") or "", "pts": pts})
+        pext = po.get("extent", 4096)
+        for ft in po.get("features", []):
+            pr = ft["props"]
+            if (pr.get("poi_type") or "start_poi") != "start_poi":
+                continue
+            for part in ft["parts"]:
+                for px, py in part:
+                    try:
+                        cat = int(pr.get("icon_category", 0))
+                    except (TypeError, ValueError):
+                        cat = 0
+                    pois.append((tile_ll(z, tx, ty, px, py, pext), cat))
+    groups = {}
+    for s_ in segs:
+        groups.setdefault((s_["cat"], s_["mag"], s_["delay"], s_["desc"]), []).append(s_["pts"])
+    events = []
+    for (cat, mag, delay, desc), lines in groups.items():
+        lines = join_pieces(lines)
+        for ln in lines:
+            if Line(ln).length < 20:
+                continue
+            ds, de = min([_endpoint_m(p, ln[0]) for p, c in pois if c == cat] or [1e9]), min([_endpoint_m(p, ln[-1]) for p, c in pois if c == cat] or [1e9])
+            dir_known = min(ds, de) <= 40.0
+            if dir_known and de < ds:
+                ln = ln[::-1]
+            kind = TT_KIND.get(cat, "other")
+            passable, ptxt = BUS_PASS.get(kind, BUS_PASS["other"])
+            mid = ln[len(ln) // 2]
+            try:
+                mg = int(mag) if mag is not None else None
+            except (TypeError, ValueError):
+                mg = None
+            events.append({"id": "tomtom-tile:" + stable_id(cat, round(ln[0][0], 4), round(ln[0][1], 4), round(ln[-1][0], 4), round(ln[-1][1], 4)),
+                           "source": "TomTom tiles", "provider": "tomtom", "src_key": "tomtom_tiles", "kind": kind, "label": TT_ICON.get(cat, "Incident"),
+                           "desc": desc or TT_ICON.get(cat, "Incident"), "road": "", "from": "", "to": "", "line": ln, "pt": mid, "geom": "line",
+                           "dir_known": dir_known, "delay_s": num(delay), "length_m": round(Line(ln).length), "magnitude": TT_MAG.get(mg, "unknown"), "mag": mg,
+                           "start": None, "end": None, "passable": passable, "pass_text": ptxt, "observed": now,
+                           "validity": "present (TomTom incident tiles)" + ("" if dir_known else "; direction unknown (no start marker)")})
+    return events
+
+
+WAZE_MAG = {0: 0, 1: 1, 2: 1, 3: 2, 4: 3, 5: 4}
+
+
+def waze_events(jams, alerts, now=None):
+    """Waze for Cities feed (already parsed by traffic.parse_waze) -> events. Jam lines follow the direction of traffic."""
+    now = now or time.time()
+    out = []
+    for j in jams or []:
+        ln = [(float(a), float(b)) for a, b in j.get("line") or [] if in_sg(num(a), num(b))]
+        if len(ln) < 2:
+            continue
+        lv = int(j.get("level") or 0)
+        out.append({"id": "waze:" + stable_id(round(ln[0][0], 4), round(ln[0][1], 4), round(ln[-1][0], 4), round(ln[-1][1], 4)), "source": "Waze", "provider": "waze",
+                    "src_key": "waze", "kind": "road_closed" if lv >= 5 else "jam", "label": "Road closed" if lv >= 5 else "Jam", "desc": f"Waze jam level {lv}",
+                    "road": j.get("street") or "", "from": "", "to": "", "line": ln, "pt": ln[len(ln) // 2], "geom": "line", "dir_known": True,
+                    "delay_s": num(j.get("delay_s")), "length_m": round(Line(ln).length), "magnitude": TT_MAG.get(WAZE_MAG.get(lv, 0), "unknown"),
+                    "mag": WAZE_MAG.get(lv, 0), "start": None, "end": None, "passable": lv < 5, "pass_text": BUS_PASS["road_closed" if lv >= 5 else "jam"][1],
+                    "observed": now, "validity": "present (Waze)"})
+    for a in alerts or []:
+        la, lo = num(a.get("lat")), num(a.get("lon"))
+        if not in_sg(la, lo):
+            continue
+        t = str(a.get("type") or "").lower()
+        kind = "accident" if "accident" in t else "road_closed" if "closed" in t else "hazard"
+        out.append({"id": "waze:" + str(a.get("key") or stable_id(la, lo, t)), "source": "Waze", "provider": "waze", "src_key": "waze", "kind": kind,
+                    "label": str(a.get("type") or "Waze report").replace("Waze: ", ""), "desc": a.get("message") or "", "road": a.get("road") or "", "from": "", "to": "",
+                    "line": [], "pt": (la, lo), "geom": "point", "delay_s": None, "length_m": None, "magnitude": "unknown", "mag": None, "start": None, "end": None,
+                    "passable": kind != "road_closed", "pass_text": BUS_PASS[kind][1], "observed": now, "validity": "present (Waze user report)"})
+    return out

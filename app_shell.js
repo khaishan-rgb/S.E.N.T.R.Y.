@@ -246,6 +246,7 @@
   }
   function summarise(s){
     if(!s || s.error || !s.feeds) return {cls:"bad", txt:"OFFLINE", title:"The server status could not be read" + (s && s.error ? " (" + s.error + ")" : "")};
+    if(s.config && s.config.httpx_ok === false) return {cls:"bad", txt:"DEPLOY PROBLEM", title:s.config.problem || "A stray httpx.py next to app.py blocks every live feed: delete it and redeploy."};
     if(s.config && !s.config.lta_key) return {cls:"bad", txt:"NO LTA KEY", title:"LTA_ACCOUNT_KEY is not set on the server: live bus and traffic feeds cannot load."};
     var all = s.feeds.concat(s.engines || []), ok = all.filter(function(f){ return f.status === "ok"; }).length, bad = all.filter(function(f){ return f.status === "error"; }).length, stale = all.filter(function(f){ return f.status === "stale"; }).length;
     if(bad) return {cls:"warn", txt:"DEGRADED", title:bad + " feed(s) returning errors \u2014 see Settings \u203a Data & Refresh"};

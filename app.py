@@ -15,6 +15,12 @@ from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
 import httpx
+# V17.2 self-check: a stray file named httpx.py next to app.py (e.g. a test stand-in) replaces the real library and cuts every live feed.
+HTTPX_STUB = not hasattr(httpx, "__version__")
+HTTPX_PROBLEM = ("Deployment problem: the web library 'httpx' is not the real one (" + str(getattr(httpx, "__file__", "?")) + "). "
+                 "Delete the stray httpx.py next to app.py in the repository and redeploy: until then no live feed can be reached.") if HTTPX_STUB else None
+if HTTPX_STUB:
+    print("ERROR " + HTTPX_PROBLEM, flush=True)
 from fastapi import FastAPI, Query, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 
@@ -22,7 +28,7 @@ import headway
 import routegeom
 import traffic
 
-VERSION = "V17.0"
+VERSION = "V17.3"
 # V16.8: pages hidden for everyone (see Settings > Pages). Defined here because bb_init() reads the saved value while the module loads.
 SITE_PAGE_IDS = ("command", "route", "headway", "bunching", "recovery", "halfplan", "trafficaware", "running", "ewt", "cameras", "diversion")     # "settings" can never be hidden
 SITE = {"hidden": [x.strip() for x in os.getenv("HIDDEN_PAGES", "").split(",") if x.strip() in SITE_PAGE_IDS], "block": True}
@@ -609,7 +615,8 @@ async def page_occ_live():
 
 @app.get("/api/health")
 async def health():
-    return {"online": True, "lta": bool(KEY), "version": VERSION, "time": now_sgt().isoformat(timespec="seconds"), "speedEndpoint": GOOD_SPEED_PATH, "tomtom": bool(TT["key"])}
+    return {"online": True, "lta": bool(KEY), "version": VERSION, "time": now_sgt().isoformat(timespec="seconds"), "speedEndpoint": GOOD_SPEED_PATH, "tomtom": bool(TT["key"]),
+            "httpx_ok": not HTTPX_STUB, "problem": HTTPX_PROBLEM if HTTPX_STUB else None}
 
 
 @app.get("/api/traffic-test")
@@ -5674,7 +5681,8 @@ def tt_err(e):
     try:
         if isinstance(e, httpx.HTTPStatusError):
             code = e.response.status_code
-            hint = {401: "key rejected", 403: "key is not enabled for this TomTom product", 429: "too many calls"}.get(code, "")
+            hint = {401: "key rejected", 403: "key not enabled for this TomTom API, or its free monthly allowance is used up (see the TomTom dashboard)",
+                    429: "too many calls / quota"}.get(code, "")
             body = " ".join((e.response.text or "").split())[:100]
             if "InvalidReferer" in body:
                 hint = "key is limited to certain websites: in TomTom set Allowed Referers to *, or set TOMTOM_REFERER on the server"
@@ -6575,7 +6583,7 @@ async def api_system_status():
          "last": datetime.fromtimestamp(TR["last"], SGT).isoformat(timespec="seconds") if TR["last"] else None,
          "age_s": int(now - TR["last"]) if TR["last"] else None, "refresh_s": TR["params"]["refresh_s"], "feeds": TR["feeds"]},
     ]
-    config = {"lta_key": bool(KEY), "datagov_key": bool(DATAGOV_KEY), "onemap_routing": bool(routegeom.ONEMAP_EMAIL and routegeom.ONEMAP_PASSWORD),
+    config = {"httpx_ok": not HTTPX_STUB, "problem": HTTPX_PROBLEM, "lta_key": bool(KEY), "datagov_key": bool(DATAGOV_KEY), "onemap_routing": bool(routegeom.ONEMAP_EMAIL and routegeom.ONEMAP_PASSWORD),
               "osrm": OSRM, "carto_key": bool(CARTO_API_KEY), "waze_feed": bool(WAZE["url"]), "tomtom_key": bool(TT["key"])}
     newest = max([f["last"] for f in feeds + engines if f.get("last") and f["status"] in ("ok", "stale")] or [None], key=lambda x: x or "")
     return {"version": VERSION, "platform": "V16.0", "time": now_sgt().isoformat(timespec="seconds"), "feeds": feeds, "engines": engines,
@@ -11240,6 +11248,7 @@ async def api_dv_ai_route_plan(request: Request):
 # 2-hour forecast, the real-road service lines (TR_LINES), running-time history (rt_trip). NO LTA speed bands. The engine is forecast.py
 # (pure); this block only collects, stores (SQLite) and serves. Demo mode is a separate, fictional world and is never mixed into live data.
 import forecast  # noqa: E402
+import numpy as np  # noqa: E402
 import statistics  # noqa: E402
 
 FC_DB = os.getenv("FORECAST_DB", "").strip() or BB_DB                     # default: the platform's existing SQLite file
@@ -11253,10 +11262,15 @@ FC_KEEP_DAYS = int(os.getenv("FORECAST_KEEP_DAYS", "35") or 35)
 FC_PROVIDER = (os.getenv("FORECAST_TRAFFIC_PROVIDER", "tomtom") or "tomtom").strip().lower()   # tomtom | here
 HERE_KEY = os.getenv("HERE_API_KEY", "").strip()                           # optional second provider (server side only)
 FC_SERVICES = [s.strip().upper() for s in (os.getenv("FORECAST_SERVICES") or os.getenv("BUNCHING_SERVICES") or "").split(",") if s.strip()][:8]
+FC_TILE_ZOOM = max(11, min(15, int(os.getenv("FORECAST_TILE_ZOOM", "13") or 13)))          # TomTom incident tiles (backup when Incident Details fails)
+FC_TILE_EVERY = max(5, int(os.getenv("FORECAST_TILE_EVERY_MIN", "15") or 15))
+FC_TILE_CAP = int(os.getenv("FORECAST_TILE_CAP", "3000") or 3000)                         # tile calls a day for the backup (~88 tiles a sweep at zoom 13)
+FC_TILE_MODE = (os.getenv("FORECAST_TILE_MODE", "backup") or "backup").strip().lower()      # backup = only when Incident Details fails | always | off
 FC = {"store": None, "book": None, "jt": forecast.JamTracker(), "index": None, "index_at": None, "state": None, "world": None, "last": 0.0,
       "last_req": 0.0, "lock": None, "probes": {}, "selected": {}, "budget": {"day": "", "n": 0}, "rain_prev": None, "rain_seen": None,
       "nea2h": None, "nea2h_at": 0.0, "nea2h_err": None, "lta_inc_at": 0.0, "recur": {}, "jam_slot": None, "purged": "", "demo": {},
-      "err": None, "cycle_ms": None, "probe_err": None, "provider_ok_at": 0.0}
+      "err": None, "cycle_ms": None, "probe_err": None, "provider_ok_at": 0.0,
+      "tiles": {"at": 0.0, "ok_at": 0.0, "events": [], "error": None, "day": "", "n": 0, "last_n": 0, "why": ""}}
 
 
 def fc_store():
@@ -11485,6 +11499,54 @@ def fc_hist_rt(svc, d, now):
     return round(statistics.median(vals), 1) if len(vals) >= 5 else None
 
 
+async def fc_incident_tiles(now, why):
+    """TomTom vector incident tiles over the bus network (tile allowance), every FORECAST_TILE_EVERY_MIN, within FORECAST_TILE_CAP a day."""
+    T = FC["tiles"]
+    if not TT["key"] or FC_TILE_MODE == "off":
+        return T
+    if now - T["at"] < FC_TILE_EVERY * 60:
+        return T
+    day = now_sgt().strftime("%Y-%m-%d")
+    if T["day"] != day:
+        T["day"], T["n"] = day, 0
+    idx = FC["index"]
+    if idx is not None and len(idx):
+        lo = np.min([L.lo for L in idx.lines.values()], 0)
+        hi = np.max([L.hi for L in idx.lines.values()], 0)
+        south, west, north, east = lo[1] / forecast.KY, lo[0] / forecast.KX, hi[1] / forecast.KY, hi[0] / forecast.KX
+    else:
+        south, west, north, east = 1.22, 103.6, 1.47, 104.05
+    want = [t for t in forecast.tiles_for_bbox(FC_TILE_ZOOM, south - .005, west - .005, north + .005, east + .005) if _tile_over_sg(*t)]
+    if T["n"] + len(want) > FC_TILE_CAP:
+        T["error"] = f"daily tile budget reached ({FC_TILE_CAP}, FORECAST_TILE_CAP)"
+        return T
+    T["at"], T["why"] = now, why
+    sem_ = asyncio.Semaphore(6)
+    got, errs = [], []
+
+    async def one(t):
+        z, x, y = t
+        async with sem_:
+            try:
+                TT_TILE["n"] = TT_TILE.get("n", 0) + 1
+                T["n"] += 1
+                r = await client().get(f"https://api.tomtom.com/traffic/map/4/tile/incidents/{z}/{x}/{y}.pbf", timeout=15, headers=tt_headers(),
+                                       params={"key": TT["key"], "t": "-1"})
+                if r.status_code == 204:
+                    return
+                r.raise_for_status()
+                if r.content:
+                    got.append((z, x, y, r.content))
+            except Exception as e:
+                errs.append(tt_err(e))
+    await asyncio.gather(*[one(t) for t in want])
+    if got or not errs:
+        T.update(events=await asyncio.to_thread(forecast.parse_tomtom_incident_tiles, got, now), ok_at=now, error=None, last_n=len(want))
+    else:
+        T["error"] = "incident tiles: " + errs[0]
+    return T
+
+
 async def fc_world(now):
     """Collect everything the engine needs (live). Each source is marked live / stale / unavailable / off: nothing is ever filled in."""
     stv = fc_store()
@@ -11501,14 +11563,39 @@ async def fc_world(now):
         except Exception:
             pass
         raw, at = TT.get("raw"), TT.get("raw_at") or 0
+        fresh_raw = raw is not None and now - at <= 2 * TT_INC_TTL + 120
         if raw is not None:
-            events += forecast.parse_tomtom_incidents({"incidents": raw}, now)
             age = now - at
-            src["tomtom_incidents"] = fc_src("live" if age <= 2 * TT_INC_TTL + 120 else "stale", age, TT.get("error") or f"{len(raw)} incidents incl. jams", "TomTom incidents & jams")
+            src["tomtom_incidents"] = fc_src("live" if fresh_raw else "stale", age, TT.get("error") or f"{len(raw)} incidents incl. jams", "TomTom incidents & jams")
         else:
             src["tomtom_incidents"] = fc_src("unavailable", None, TT.get("error") or "no response yet", "TomTom incidents & jams")
+        use_tiles = FC_TILE_MODE == "always" or (FC_TILE_MODE == "backup" and not fresh_raw)
+        if use_tiles:
+            T = await fc_incident_tiles(now, "always on" if FC_TILE_MODE == "always" else "Incident Details unavailable")
+            ta = (now - T["ok_at"]) if T["ok_at"] else None
+            src["tomtom_tiles"] = fc_src("live" if ta is not None and ta <= FC_TILE_EVERY * 120 else ("stale" if ta is not None else "unavailable"), ta,
+                                         T["error"] or f"backup in use ({T['why']}): {len(T['events'])} incidents incl. jams from {T['last_n']} tiles; {T['n']}/{FC_TILE_CAP} tiles today",
+                                         "TomTom incident tiles (backup)")
+        else:
+            src["tomtom_tiles"] = fc_src("idle", None, "standby: used automatically when TomTom Incident Details fails", "TomTom incident tiles (backup)")
+        if fresh_raw:
+            events += forecast.parse_tomtom_incidents({"incidents": raw}, now)
+        elif use_tiles and FC["tiles"]["ok_at"]:
+            events += list(FC["tiles"]["events"])                               # the backup: same incidents and jams, from the tiles
+        elif raw is not None:
+            events += forecast.parse_tomtom_incidents({"incidents": raw}, now)  # last known, marked stale
     else:
         src["tomtom_incidents"] = fc_src("off", None, "TOMTOM_API_KEY not set", "TomTom incidents & jams")
+        src["tomtom_tiles"] = fc_src("off", None, "TOMTOM_API_KEY not set", "TomTom incident tiles (backup)")
+    if WAZE["url"]:
+        try:
+            await waze_state()
+        except Exception:
+            pass
+        wa = (now - WAZE["ok_at"]) if WAZE["ok_at"] else None
+        src["waze"] = fc_src("live" if waze_live() else ("stale" if wa is not None else "unavailable"), wa, WAZE["error"] or f"{len(WAZE['jams'])} jams, {len(WAZE['alerts'])} reports", "Waze for Cities")
+        if WAZE["jams"] or WAZE["alerts"]:
+            events += forecast.waze_events(WAZE["jams"], WAZE["alerts"], now)
     # LTA incidents
     if KEY:
         raw = await fc_lta_incidents()
@@ -11678,7 +11765,52 @@ def fc_config():
             "tomtom_shared": {"used": TT["n"] if TT["day"] == now_sgt().strftime("%Y-%m-%d") else 0, "cap": TT["cap"]},
             "watched": FC_SERVICES, "refresh_s": FC_EVERY, "always_on": FC_ALWAYS, "store": {"ok": FC["store"].ok if FC["store"] else None,
             "schema": FC["store"].version if FC["store"] else None, "err": FC["store"].err if FC["store"] else None,
-            "history_days": FC["store"].history_days() if FC["store"] else 0}, "speed_bands_used": False}
+            "history_days": FC["store"].history_days() if FC["store"] else 0}, "speed_bands_used": False,
+            "httpx_stub": HTTPX_STUB, "problem": HTTPX_PROBLEM if HTTPX_STUB else None,
+            "tiles": {"mode": FC_TILE_MODE, "zoom": FC_TILE_ZOOM, "every_min": FC_TILE_EVERY, "cap": FC_TILE_CAP, "used": FC["tiles"]["n"] if FC["tiles"]["day"] == now_sgt().strftime("%Y-%m-%d") else 0},
+            "waze": bool(WAZE["url"])}
+
+
+FC_VT = {"cache": {}}
+
+
+@app.get("/api/tomtom/vflow/{z}/{x}/{y}.pbf")
+async def api_tomtom_vflow(z: int, x: int, y: int):
+    """TomTom Traffic Flow VECTOR tiles (relative speed 0-1 per road line), proxied so the key stays on the server; the Forecast Centre
+    colours them itself. Same daily tile counter as the raster flow tiles."""
+    from fastapi.responses import Response
+    empty = Response(b"", media_type="application/x-protobuf", headers={"Cache-Control": "public, max-age=60"})
+    if not TT["key"] or z < 9 or z > 18 or not (0 <= x < 2 ** z and 0 <= y < 2 ** z) or not _tile_over_sg(z, x, y):
+        return empty
+    now = time.time()
+    hit = FC_VT["cache"].get((z, x, y))
+    if hit and now - hit[0] < TT_TILE_TTL:
+        return Response(hit[1], media_type="application/x-protobuf", headers={"Cache-Control": "public, max-age=60"})
+    day = now_sgt().strftime("%Y-%m-%d")
+    if TT_TILE["day"] != day:
+        TT_TILE["day"], TT_TILE["n"] = day, 0
+    if TT_TILE["n"] >= TT_TILE["cap"]:
+        TT_TILE["error"] = "daily tile cap reached"
+        return empty
+    TT_TILE["n"] += 1
+    try:
+        r = await client().get(f"https://api.tomtom.com/traffic/map/4/tile/flow/relative/{z}/{x}/{y}.pbf", timeout=15, headers=tt_headers(), params={"key": TT["key"]})
+        if r.status_code == 204:
+            return empty
+        r.raise_for_status()
+        body = r.content
+        if body[:2] == b"\x1f\x8b":
+            import gzip as _gz
+            body = _gz.decompress(body)
+        FC_VT["cache"][(z, x, y)] = (now, body)
+        if len(FC_VT["cache"]) > 600:
+            for k in sorted(FC_VT["cache"], key=lambda k: FC_VT["cache"][k][0])[:200]:
+                FC_VT["cache"].pop(k, None)
+        TT_TILE.update(ok_at=now, error=None)
+        return Response(body, media_type="application/x-protobuf", headers={"Cache-Control": "public, max-age=60"})
+    except Exception as e:
+        TT_TILE["error"] = "vector flow tiles: " + tt_err(e)
+        return empty
 
 
 @app.get("/api/forecast/state")

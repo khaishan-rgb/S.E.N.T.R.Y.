@@ -162,10 +162,14 @@ It uses the same file as the rest of the platform (`BUNCHING_DB`) unless `FORECA
 
 | | TomTom (primary, implemented) | HERE Traffic v7 (secondary, implemented, not validated live) | Google Routes (not implemented) |
 |---|---|---|---|
-| Use here | incidents & jams (lines in travel direction), Flow Segment Data probes (segment geometry), raster flow tiles | flow by shape (`/v7/flow`, `locationReferencing=shape`) | travel-time validation of selected routes only |
+| Use here | incidents & jams (lines in travel direction), Flow Segment Data probes (segment geometry), vector flow tiles for the map, vector incident tiles as the backup | flow by shape (`/v7/flow`, `locationReferencing=shape`) | travel-time validation of selected routes only |
 | Direction | yes (incident line order; flow segment geometry) | yes (shape order) | per requested route |
 | Free tier | monthly per API: Incidents 2,500, Flow Segment 20,000, tiles 200,000 ([pricing](https://docs.tomtom.com/pricing)) | see [HERE pricing](https://www.here.com/developer) | billed per request; check Google Maps Platform pricing |
 | Switch | `FORECAST_TRAFFIC_PROVIDER=tomtom` | `FORECAST_TRAFFIC_PROVIDER=here` + `HERE_API_KEY` | – |
+
+**Backup sources (V17.3).** When TomTom **Incident Details** fails (403 = key not enabled for that API or monthly allowance used up, 429, timeout), the cycle switches to TomTom **vector incident tiles** (`/traffic/map/4/tile/incidents/{z}/{x}/{y}.pbf`, layers "Traffic incidents flow" and "Traffic incidents POI"). They come from the tile allowance, not the incident allowance, and carry the same line, delay, magnitude, category and description. The pieces that a tile border cuts are joined again, and each line is oriented from its start marker (the POI where the event begins in the direction of travel). A line with no start marker within 40 m has an unknown direction: it is shown, but stays **UNVERIFIED** and is never counted. Mode `FORECAST_TILE_MODE`: `backup` (default, only while Incident Details fails), `always`, `off`. Zoom 13 covers the bus network in about 88 tiles a sweep; every 15 minutes that is about 8,400 a day, so `FORECAST_TILE_CAP` (3,000 a day, about 90,000 a month of the 200,000 tile allowance) stops it first and the sweep resumes the next day.
+
+**Waze for Cities** (`WAZE_FEED_URL`, free for partners) jams have their own lines in the travel direction and go through the same strict matching; Waze point alerts stay unverified. **OpenStreetMap** has road geometry but no live traffic, so it cannot be a traffic source. **HERE** needs its own key (`HERE_API_KEY`); without one it stays off.
 
 Before relying on HERE, compare it on a week of probes: run both on the same points and compare the `fc_fc` errors. Google Routes is worth adding only for a handful of route travel-time checks, because of cost and licensing.
 
@@ -188,6 +192,11 @@ See `.env.example`. The settings for the Forecast Centre are:
 | `FORECAST_DB` | `BUNCHING_DB` | Separate SQLite file if wanted. |
 | `FORECAST_TRAFFIC_PROVIDER` | tomtom | `tomtom` or `here`. |
 | `HERE_API_KEY` | – | Optional HERE key. |
+| `FORECAST_TILE_MODE` | backup | TomTom incident tiles: `backup` (only when Incident Details fails), `always`, `off`. |
+| `FORECAST_TILE_ZOOM` | 13 | 11–15. Higher = finer but more tiles a sweep. |
+| `FORECAST_TILE_EVERY_MIN` | 15 | Minutes between backup tile sweeps. |
+| `FORECAST_TILE_CAP` | 3000 | Most incident tiles a day for the backup. |
+| `WAZE_FEED_URL` | – | Optional Waze for Cities JSON feed (jams + alerts). |
 
 ## 10. API
 
@@ -221,16 +230,16 @@ See `.env.example`. The settings for the Forecast Centre are:
 
 | Test | What |
 |---|---|
-| `tests/t_forecast.py` (82 checks) | parsing (TomTom, HERE, LTA, NEA samples in the documented formats); route intersection; direction; parallel / nearby / crossing rejection (incl. 300 random cases); road-work windows; rainfall classes and exposure; forecast maths; alert de-duplication, re-alert, acknowledge, clearance with fresh vs stale data, escalation, reopen, audit; store and calibration; demo determinism and separation; the live cycle on a fake HTTP client (budget, stale data, API failure → Unavailable); no API key in payloads; no LTA speed bands; JSON safety; the timetable fix |
-| `r3d/t_forecast_page.js` (53 checks) | real MapLibre on an offline city: 1920×1080, 2560×1440, 3840×2160, 1366×768 and phone layouts; KPIs; layers; horizon scrubber; alert acknowledgement and audit; service evidence; demo story; presentation mode; Leaflet fallback; no page errors |
+| `tests/t_forecast.py` (97 checks) | parsing (TomTom, HERE, LTA, NEA samples in the documented formats); route intersection; direction; parallel / nearby / crossing rejection (incl. 300 random cases); road-work windows; rainfall classes and exposure; forecast maths; alert de-duplication, re-alert, acknowledge, clearance with fresh vs stale data, escalation, reopen, audit; store and calibration; demo determinism and separation; the live cycle on a fake HTTP client (budget, stale data, API failure → Unavailable); no API key in payloads; no LTA speed bands; JSON safety; the timetable fix; the backup sources (vector incident tiles decoded, pieces joined, direction from the start marker, unknown direction never counted; the live cycle falls back to tiles on a 403; Waze) |
+| `r3d/t_forecast_page.js` (57 checks) | real MapLibre on an offline city: 1920×1080, 2560×1440, 3840×2160, 1366×768 and phone layouts; KPIs; layers; horizon scrubber; alert acknowledgement and audit; service evidence; demo story; presentation mode; Leaflet fallback; vector flow colours, pictogram icons and the map key; deployment self-check banner; no page errors |
 
 Run the engine tests from the project folder (no network, no keys, no extra packages beyond numpy):
 
 ```
-python3 tests/t_forecast.py . tests/stubs
+python3 tests/t_forecast.py
 ```
 
-`tests/stubs` holds tiny stand-ins for FastAPI and httpx, so the test runs without a server. The browser test runs in the development harness (Playwright + offline MapLibre).
+`tests/fakes.py` provides in-memory stand-ins for FastAPI and httpx, so the test runs without a server. There is deliberately **no file named `httpx.py` or a `fastapi/` folder** anywhere in the project: such a file next to `app.py` would replace the real library and cut every live feed. Since V17.2 the app checks this at start-up. If it ever happens, every page's status shows **DEPLOY PROBLEM**, the Forecast Centre names the stray file, and `/api/health` returns `httpx_ok: false`. The browser test runs in the development harness (Playwright + offline MapLibre).
 
 ## 13. Feature completion report
 
@@ -267,6 +276,17 @@ python3 tests/t_forecast.py . tests/stubs
   * an angled, glowing title plate;
   * corner-bracket panels and angled panel tabs;
   * a ring gauge on every KPI. Each ring is a real share, for example verified out of all reports near routes, or wet gauges out of all gauges. Its meaning is in the tooltip.
+
+## 13c. V17.3 changes (backup source, clearer map)
+
+* **Backup traffic source:** TomTom vector incident tiles take over automatically when Incident Details fails (section 8). The Data integrity panel shows "TomTom incident tiles (backup)" with its own status line. Waze is used when configured.
+* **Road works KPI:** counts only works verified on a route. LTA road works are points, so they are listed as "near routes (LTA points, not counted)" with the island-wide total for context.
+* **Map:**
+  * pictogram icons (accident, breakdown, road works, road closed, lane closed, flooding, hazard); unverified reports use the same icon in grey with a dashed ring;
+  * NEA 2-hour area forecasts are no longer drawn as circles on the map (they stay in the weather pill); only gauges that report rain now are drawn;
+  * congestion risk zones are a "!" diamond;
+  * traffic flow comes from TomTom **vector** flow tiles (proxied by `/api/tomtom/vflow/{z}/{x}/{y}.pbf`, the key stays on the server) and is coloured by the page: teal (free) → green → amber → orange → red (jammed), with a soft glow on jammed roads only;
+  * a compact map key with the real icons.
 
 ## 14. Remaining limitations and next priorities
 

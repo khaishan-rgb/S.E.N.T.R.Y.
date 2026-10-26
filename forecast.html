@@ -94,10 +94,19 @@ body.ds-app{background:radial-gradient(1200px 600px at 60% -10%,rgba(47,140,255,
 .fc-layers button i{width:9px;height:9px;border-radius:2px;display:inline-block;background:currentColor;opacity:.9}
 .fc-layers button[aria-pressed="true"]{color:#fff;border-color:rgba(56,214,255,.45);background:rgba(16,40,66,.9)}
 .fc-layers button[disabled]{opacity:.4;cursor:not-allowed}
-.fc-legend{position:absolute;left:10px;bottom:72px;z-index:5;padding:8px 10px;border-radius:9px;background:rgba(5,11,21,.86);border:1px solid var(--ds-line);font-size:11.5px;color:var(--ds-text-2);display:grid;gap:4px;max-width:260px}
+.fc-legend{position:absolute;left:10px;bottom:72px;z-index:5;padding:8px 10px;border-radius:9px;background:rgba(5,11,21,.86);border:1px solid var(--ds-line);font-size:11.5px;color:var(--ds-text-2);display:grid;gap:5px;max-width:330px}
 .fc-legend i{display:inline-block;width:18px;height:4px;border-radius:2px;margin-right:6px;vertical-align:middle}
 .fc-legend i.ring{width:10px;height:10px;border-radius:50%;background:transparent!important;border:2px dashed var(--fc-unv)}
 .fc-legend i.dot{width:10px;height:10px;border-radius:50%}
+.fc-legend i.dia{width:10px;height:10px;border-radius:2px;transform:rotate(45deg);background:#0a1628;border:2px solid var(--ds-crit,#ff5566);margin:0 9px 0 4px}
+.fc-legend .fc-lg-row{display:flex;align-items:center;gap:0;white-space:nowrap}
+.fc-legend .fc-lg-row i.sw{width:12px;margin:0 4px 0 9px}
+.fc-legend .fc-lg-row.sub{font-size:10.5px;color:var(--ds-text-3,#8aa0b8);white-space:normal}
+.fc-lg-icons{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:3px 10px}
+.fc-lg-icons span{display:flex;align-items:center;gap:5px;white-space:nowrap;min-width:0}
+.fc-lg-icons img{width:20px;height:20px;flex:none}
+.fc-lg-icons i{margin:0 5px 0 5px!important;flex:none}
+.fc-lg-icons i.ln{width:14px;margin:0 3px!important}
 /* the horizon scrubber: the page's one memorable element */
 .fc-hz{position:absolute;left:50%;transform:translateX(-50%);bottom:12px;z-index:6;display:grid;grid-template-columns:repeat(4,minmax(86px,1fr));gap:0;padding:4px;border-radius:14px;
   background:rgba(4,12,24,.9);border:1px solid rgba(56,214,255,.32);box-shadow:0 12px 30px -12px rgba(0,0,0,.9),0 0 0 1px rgba(56,214,255,.06) inset;width:min(560px,calc(100% - 24px))}
@@ -125,10 +134,12 @@ body.fc-demo .fc-ribbon{display:block}
 .fc-pop p{margin:4px 0;color:var(--ds-text-2);font-size:12.5px}
 .fc-pop .row{display:flex;gap:5px;flex-wrap:wrap;margin-top:6px}
 .fc-pop button{height:24px;padding:0 8px;border-radius:6px;border:1px solid rgba(56,214,255,.4);background:rgba(56,214,255,.08);color:#dff8ff;font:600 11.5px var(--ds-font);cursor:pointer}
-.fc-zone{width:18px;height:18px;border-radius:50%;background:radial-gradient(circle,var(--zc,#ff8a3d) 0 34%,transparent 36%);position:relative;cursor:pointer}
-.fc-zone:after{content:"";position:absolute;inset:-9px;border-radius:50%;border:2px solid var(--zc,#ff8a3d);opacity:.6}
+.fc-zone{width:24px;height:24px;position:relative;cursor:pointer;background:none;border:0;padding:0;display:grid;place-items:center}
+.fc-zone:before{content:"";position:absolute;inset:4px;transform:rotate(45deg);border-radius:3px;background:#0a1628;border:2px solid var(--zc,#ff8a3d);box-shadow:0 0 10px var(--zc,#ff8a3d)}
+.fc-zone b{position:relative;color:var(--zc,#ff8a3d);font:800 12px/1 var(--ds-font,system-ui)}
+.fc-zone:after{content:"";position:absolute;inset:2px;transform:rotate(45deg);border-radius:4px;border:2px solid var(--zc,#ff8a3d);opacity:0}
 @media (prefers-reduced-motion:no-preference){.fc-zone.pulse:after{animation:fcp 1.8s ease-out infinite}}
-@keyframes fcp{0%{transform:scale(.5);opacity:.9}100%{transform:scale(1.6);opacity:0}}
+@keyframes fcp{0%{transform:rotate(45deg) scale(.8);opacity:.9}100%{transform:rotate(45deg) scale(1.7);opacity:0}}
 html.ds-reduce-motion .fc-zone:after{animation:none!important}
 
 /* ---------- service intelligence */
@@ -261,7 +272,7 @@ body.fc-demo{--fc-mapH:clamp(420px,calc(100vh - 470px),1100px)}
   .fc-id h1{font-size:40px} .fc-id p{font-size:16px} .fc-clock b{font-size:38px} .fc-clock small{font-size:15px} .fc-h h2{font-size:21px} .fc-h small{font-size:15px} .fc-al h4{font-size:19px}
   .fc-al,.fc-ev,.fc-tbl,.fc-int,.fc-svc-t p,.fc-sec p{font-size:15.5px} .fc-al .loc,.fc-al .meta{font-size:14.5px} .fc-al .act{font-size:15px} .fc-tag{font-size:13px;height:25px;padding:0 9px}
   .fc-pill,.fc-feeds,.fc-crit,.fc-wx{height:40px;font-size:16px;padding:0 14px} .fc-wx{max-width:440px} .fc-upd{font-size:15px} .ds-segm button{height:36px;font-size:15px;padding:0 16px} .fc-sec h3{font-size:15.5px}
-  .fc-tbl th{font-size:14px} .fc-cmp h3{font-size:24px} .fc-cmp .tot{font-size:28px} .fc-cmp li,.fc-cmp .note{font-size:15px} .fc-legend{font-size:14px;max-width:340px} .fc-tabs button{height:38px;font-size:15px}
+  .fc-tbl th{font-size:14px} .fc-cmp h3{font-size:24px} .fc-cmp .tot{font-size:28px} .fc-cmp li,.fc-cmp .note{font-size:15px} .fc-legend{font-size:14px;max-width:420px} .fc-tabs button{height:38px;font-size:15px}
   .fc-hz{width:min(820px,calc(100% - 24px))} .fc-hz button b{font-size:24px} .fc-hz button small{font-size:13px} .fc-layers button{height:34px;font-size:14px} .fc-al .dl b{font-size:20px} .fc-al .svcs button{height:28px;font-size:14px}
   :root{--fc-mapH:calc(100vh - 560px)} .fc-say{font-size:17px} .fc-steps button span{font-size:15px} .fc-summary .big b{font-size:46px} .fc-summary .big small{font-size:15px}}
 @media (max-width:1600px){.fc-kpis{grid-template-columns:repeat(4,minmax(0,1fr))} .fc-bar{grid-template-columns:minmax(0,1fr)} .fc-meta{justify-content:flex-start;min-width:0} .fc-clock{margin-left:auto}}
@@ -455,8 +466,9 @@ var LV = {critical:3, high:2, watch:1, info:0};
 var LVN = {critical:"Critical", high:"High", watch:"Watch", info:"Info"};
 var COL = {critical:"#ff5566", high:"#ff8a3d", watch:"#ffb547", info:"#6f93b8", ver:"#38d6ff", unv:"#8aa2bd", rain:"#7cc8ff", ok:"#2ee59d", demo:"#a07bff", works:"#e7b85c"};
 var HZ = [0, 15, 30, 60];
-var SRC = [["tomtom_incidents", "TomTom incidents & jams"], ["tomtom_flow", "Traffic flow probes"], ["lta_incidents", "LTA incidents"], ["lta_roadworks", "LTA road works"],
+var SRC = [["tomtom_incidents", "TomTom incidents & jams"], ["tomtom_tiles", "TomTom incident tiles (backup)"], ["tomtom_flow", "Traffic flow probes"], ["lta_incidents", "LTA incidents"], ["lta_roadworks", "LTA road works"],
            ["nea_rain", "NEA rainfall"], ["nea_forecast", "NEA 2-h forecast"], ["route_index", "Route geometry"]];
+function srcList(src){ return SRC.concat(src && src.waze ? [["waze", "Waze for Cities"]] : []); }
 var KPI_ORDER = ["verified_incidents", "services_affected", "congestion_zones", "predicted_disruptions", "rain_exposure", "roadworks", "model_confidence", "critical_unacked"];
 var REASON = {opposite_direction:"Opposite carriageway / direction", parallel_road:"Parallel road", crossing:"Only crosses the route", nearby:"Nearby, not on the route",
               not_in_force:"Not in force", too_short:"Too little overlap", point_on_line:"Point only"};
@@ -512,16 +524,44 @@ function rangeChart(extra, hw){
 }
 
 /* ------------------------------------------------------------------ map: MapLibre GL (WebGL) with a Leaflet fallback, one interface */
+/* traffic flow: a calm cyan-green when free, through amber and orange to a glowing red when jammed */
+var FLOW_STOPS = [[0, "#ff2e63"], [.25, "#ff4d4d"], [.45, "#ff8a3d"], [.62, "#ffc93c"], [.8, "#7be08a"], [1, "#2ee6c5"]];
+function FLOW_RAMP(lvl){ var e = ["interpolate", ["linear"], lvl]; FLOW_STOPS.forEach(function(st){ e.push(st[0], st[1]); }); return e; }
 var MV = {kind:null, ready:false, ml:null, lf:null, pop:null, zm:[], groups:{}, fitDone:false};
 function webgl(){ try{ var c = document.createElement("canvas"); return !!(c.getContext("webgl2") || c.getContext("webgl")); }catch(e){ return false; } }
 function geoCircle(lat, lon, m){ var out = [], kx = 111320 * Math.cos(lat * Math.PI / 180), ky = 110574; for(var i = 0; i <= 40; i++){ var a = i / 40 * 2 * Math.PI; out.push([lon + m * Math.cos(a) / kx, lat + m * Math.sin(a) / ky]); } return out; }
 function arrowImg(){ var c = document.createElement("canvas"); c.width = c.height = 24; var x = c.getContext("2d"); x.fillStyle = "#fff"; x.beginPath(); x.moveTo(6, 5); x.lineTo(19, 12); x.lineTo(6, 19); x.lineTo(9, 12); x.closePath(); x.fill(); return x.getImageData(0, 0, 24, 24); }
-function kindImg(ch, bg, fg, dashed){
-  var c = document.createElement("canvas"); c.width = c.height = 30; var x = c.getContext("2d");
-  x.beginPath(); x.arc(15, 15, 11.5, 0, Math.PI * 2); x.fillStyle = bg; x.fill(); x.lineWidth = 2; x.strokeStyle = fg; if(dashed) x.setLineDash([3, 2.5]); x.stroke(); x.setLineDash([]);
-  x.fillStyle = fg; x.font = "bold 13px system-ui,sans-serif"; x.textAlign = "center"; x.textBaseline = "middle"; x.fillText(ch, 15, 15.5); return x.getImageData(0, 0, 30, 30);
+var KCOL = {accident:"#ff5566", breakdown:"#ff8a3d", road_closed:"#ff2e63", lane_closed:"#ffb547", roadworks:"#ffb547", flooding:"#7cc8ff", hazard:"#ffd23f", jam:"#ff8a3d", other:"#9be7ff"};
+function pictogram(x, k, c){                                   // drawn in a 24 x 24 box centred on (0, 0)
+  x.strokeStyle = c; x.fillStyle = c; x.lineWidth = 1.8; x.lineCap = "round"; x.lineJoin = "round";
+  var P = function(pts, fill){ x.beginPath(); pts.forEach(function(p, i){ i ? x.lineTo(p[0], p[1]) : x.moveTo(p[0], p[1]); }); x.closePath(); fill ? x.fill() : x.stroke(); };
+  if(k === "accident"){ var pts = []; for(var i = 0; i < 16; i++){ var a = i / 16 * Math.PI * 2, r = i % 2 ? 3.6 : 8.2; pts.push([Math.cos(a) * r, Math.sin(a) * r]); } P(pts, true); x.fillStyle = "#0a1628"; x.fillRect(-.9, -4.2, 1.8, 4.6); x.fillRect(-.9, 1.6, 1.8, 1.8); }
+  else if(k === "breakdown" || k === "jam"){
+    var car = function(dx, dy, s){ x.beginPath(); x.moveTo(dx - 6 * s, dy + 2 * s); x.lineTo(dx - 6 * s, dy - 1 * s); x.lineTo(dx - 3.5 * s, dy - 4 * s); x.lineTo(dx + 3.5 * s, dy - 4 * s); x.lineTo(dx + 6 * s, dy - 1 * s); x.lineTo(dx + 6 * s, dy + 2 * s); x.closePath(); x.fill();
+      x.fillStyle = "#0a1628"; x.beginPath(); x.arc(dx - 3.4 * s, dy + 2.3 * s, 1.6 * s, 0, 7); x.arc(dx + 3.4 * s, dy + 2.3 * s, 1.6 * s, 0, 7); x.fill(); x.fillStyle = c; };
+    if(k === "jam"){ car(-4.5, 3.2, .62); car(4.5, 3.2, .62); car(0, -3.6, .62); } else { car(0, 2.5, .95); x.beginPath(); x.moveTo(0, -9.5); x.lineTo(3.6, -4.2); x.lineTo(-3.6, -4.2); x.closePath(); x.fill(); }
+  }
+  else if(k === "roadworks"){ P([[-2.6, -8.5], [2.6, -8.5], [6.2, 6], [-6.2, 6]], true); x.fillStyle = "#0a1628"; x.fillRect(-4.1, -2.4, 8.2, 2); x.fillRect(-5.3, 2.2, 10.6, 1.8); x.fillStyle = c; x.fillRect(-8.5, 6, 17, 2.4); }
+  else if(k === "road_closed"){ x.beginPath(); x.arc(0, 0, 8.6, 0, 7); x.fill(); x.fillStyle = "#fff"; x.fillRect(-5.6, -1.6, 11.2, 3.2); }
+  else if(k === "lane_closed"){ x.fillRect(-8.5, -2.5, 17, 5); x.fillStyle = "#0a1628"; for(var j = -8; j < 9; j += 4.2){ x.beginPath(); x.moveTo(j, 2.5); x.lineTo(j + 2.2, -2.5); x.lineTo(j + 3.6, -2.5); x.lineTo(j + 1.4, 2.5); x.closePath(); x.fill(); } x.fillStyle = c; x.fillRect(-7, 2.5, 1.6, 5.5); x.fillRect(5.4, 2.5, 1.6, 5.5); }
+  else if(k === "flooding"){ for(var w = -4.5; w <= 5; w += 4.5){ x.beginPath(); x.moveTo(-8, w); x.bezierCurveTo(-5, w - 3, -3, w + 3, 0, w); x.bezierCurveTo(3, w - 3, 5, w + 3, 8, w); x.stroke(); } }
+  else if(k === "hazard"){ P([[0, -8.8], [8.8, 7], [-8.8, 7]], true); x.fillStyle = "#0a1628"; x.fillRect(-.95, -3.2, 1.9, 5.6); x.fillRect(-.95, 3.6, 1.9, 1.9); }
+  else { x.beginPath(); x.arc(0, 0, 7.5, 0, 7); x.stroke(); x.fillRect(-.95, -1, 1.9, 5); x.fillRect(-.95, -4.4, 1.9, 1.9); }
 }
-var ICON = {accident:"!", breakdown:"B", road_closed:"×", lane_closed:"⇥", roadworks:"W", flooding:"≈", hazard:"!", other:"i", jam:"J"};
+function kindCanvas(k, unv){
+  var c = document.createElement("canvas"), S2 = 2, R = 15; c.width = c.height = 34 * S2; var x = c.getContext("2d"); x.scale(S2, S2); x.translate(17, 17);
+  var col = unv ? "#9fb2c7" : (KCOL[k] || KCOL.other);
+  x.beginPath(); x.arc(0, 0, R, 0, 7); x.fillStyle = unv ? "rgba(8,20,40,.78)" : "#08162e"; x.fill();
+  if(!unv){ x.shadowColor = col; x.shadowBlur = 6; }
+  x.lineWidth = 2; x.strokeStyle = col; if(unv) x.setLineDash([3.2, 2.6]); x.stroke(); x.setLineDash([]); x.shadowBlur = 0;
+  x.save(); x.scale(.82, .82); pictogram(x, k, col); x.restore();
+  return c;
+}
+function kindImg(k, unv){ var c = kindCanvas(k, unv); return c.getContext("2d").getImageData(0, 0, c.width, c.height); }
+var ICON = {accident:1, breakdown:1, road_closed:1, lane_closed:1, roadworks:1, flooding:1, hazard:1, other:1, jam:1};
+var ICON_URL = {};
+function iconUrl(k, unv){ var key = (unv ? "u-" : "k-") + k; if(!ICON_URL[key]) ICON_URL[key] = kindCanvas(k, unv).toDataURL(); return ICON_URL[key]; }
+var KNAME = {accident:"Accident", breakdown:"Breakdown", roadworks:"Road works", road_closed:"Road closed", lane_closed:"Lane closed", flooding:"Flooding", hazard:"Hazard", jam:"Jam", other:"Other"};
 MV.init = function(){
   if(MV.kind) return Promise.resolve();
   var useML = webgl() && window.SG3D && SG3D.load && qs.get("map") !== "2d";
@@ -552,15 +592,23 @@ function mlLayers(m){
   ["building-3d"].forEach(function(id){ if(m.getLayer(id)) m.setLayoutProperty(id, "visibility", "none"); });
   m.addImage("fc-arr", arrowImg(), {sdf:true});
   Object.keys(ICON).forEach(function(k){
-    m.addImage("fc-k-" + k, kindImg(ICON[k], "#0a1628", k === "roadworks" ? COL.works : k === "road_closed" ? COL.critical : "#ff8a3d", false));
-    m.addImage("fc-u-" + k, kindImg("?", "rgba(10,22,40,.85)", COL.unv, true));
+    m.addImage("fc-k-" + k, kindImg(k, false), {pixelRatio:2});
+    m.addImage("fc-u-" + k, kindImg(k, true), {pixelRatio:2});
   });
   var below = m.getLayer("road-label") ? "road-label" : undefined;
-  m.addSource("tt", {type:"raster", tiles:["/api/tomtom/tile/{z}/{x}/{y}.png"], tileSize:256, maxzoom:18});
-  m.addLayer({id:"tt-flow", type:"raster", source:"tt", paint:{"raster-opacity":.72}, layout:{visibility:"none"}}, below);
+  m.addSource("ttv", {type:"vector", tiles:[location.origin + "/api/tomtom/vflow/{z}/{x}/{y}.pbf"], minzoom:10, maxzoom:18});
+  var lvl = ["to-number", ["coalesce", ["get", "traffic_level"], 1]];
+  var major = ["match", ["get", "road_type"], ["Motorway", "International road", "Major road", "Secondary road", "Connecting road"], true, false];
+  var side = ["case", ["==", ["get", "traffic_road_coverage"], "one_side"], ["case", ["to-boolean", ["get", "left_hand_traffic"]], -1, 1], 0];
+  var ff = {"source":"ttv", "source-layer":"Traffic flow", layout:{"line-cap":"round", "line-join":"round", visibility:"none"}, filter:["any", [">=", ["zoom"], 13], major]};
+  m.addLayer(Object.assign({id:"tt-glow", type:"line", paint:{"line-color":FLOW_RAMP(lvl), "line-blur":4, "line-opacity":["interpolate", ["linear"], lvl, .35, .55, .6, 0],
+    "line-width":["interpolate", ["linear"], ["zoom"], 10, 5, 16, 14], "line-offset":["interpolate", ["linear"], ["zoom"], 10, ["*", side, 1.2], 16, ["*", side, 4]]}}, ff), below);
+  m.addLayer(Object.assign({id:"tt-flow", type:"line", paint:{"line-color":FLOW_RAMP(lvl), "line-opacity":["interpolate", ["linear"], lvl, 0, 1, .6, .95, .85, .7, 1, .5],
+    "line-width":["interpolate", ["linear"], ["zoom"], 10, ["case", major, 1.6, .8], 16, ["case", major, 4.2, 2.4]],
+    "line-offset":["interpolate", ["linear"], ["zoom"], 10, ["*", side, 1.2], 16, ["*", side, 4]]}}, ff), below);
+  m.addLayer(Object.assign({id:"tt-closed", type:"line", paint:{"line-color":"#ff2e63", "line-width":["interpolate", ["linear"], ["zoom"], 10, 2, 16, 5], "line-dasharray":[1, 1.2]}},
+    ff, {filter:["all", ["has", "road_closure"], ff.filter]}), below);
   ["rainarea", "heat", "ev", "evp", "rain", "probe", "route", "rsec", "rcrit", "rrain", "rver", "stops"].forEach(function(id){ m.addSource(id, {type:"geojson", data:{type:"FeatureCollection", features:[]}}); });
-  m.addLayer({id:"rainarea", type:"fill", source:"rainarea", paint:{"fill-color":COL.rain, "fill-opacity":.07}});
-  m.addLayer({id:"rainarea-l", type:"line", source:"rainarea", paint:{"line-color":COL.rain, "line-opacity":.35, "line-width":1, "line-dasharray":[2, 2]}});
   m.addLayer({id:"heat", type:"heatmap", source:"heat", layout:{visibility:"none"}, paint:{"heatmap-weight":["get", "w"], "heatmap-radius":["interpolate", ["linear"], ["zoom"], 9, 18, 14, 60],
     "heatmap-intensity":1.1, "heatmap-opacity":.72, "heatmap-color":["interpolate", ["linear"], ["heatmap-density"], 0, "rgba(0,0,0,0)", .2, "rgba(255,181,71,.35)", .5, "rgba(255,138,61,.6)", .85, "rgba(255,85,102,.85)"]}});
   m.addLayer({id:"route-casing", type:"line", source:"route", layout:{"line-cap":"round", "line-join":"round"}, paint:{"line-color":"#02070f", "line-width":["interpolate", ["linear"], ["zoom"], 10, 6, 16, 14], "line-opacity":.9}});
@@ -617,8 +665,8 @@ MV.update = function(){
     if(e.kind === "jam" && e.line) { var mid = e.line[Math.floor(e.line.length / 2)]; heat.push({type:"Feature", properties:{w:Math.min(1, ((((e.fc || {})[h] || {}).mid || e.delay_s || 0) / 600))}, geometry:{type:"Point", coordinates:mid}}); }
   });
   var probes = layerOn("probes") ? (st.probes || []).map(function(p){ return {type:"Feature", properties:{key:p.key, c:ratioColour(probeRatio(p, h))}, geometry:{type:"Point", coordinates:[p.lon, p.lat]}}; }) : [];
-  var rain = layerOn("rain") ? ((st.rain || {}).stations || []).map(function(s){ return {type:"Feature", properties:{id:s.id, name:s.name, mmh:s.mmh, cls:s.cls}, geometry:{type:"Point", coordinates:[s.lon, s.lat]}}; }) : [];
-  var areas = layerOn("rain") ? ((st.rain || {}).areas || []).filter(function(a){ return a.rain; }).map(function(a){ return {type:"Feature", properties:{name:a.name, text:a.text}, geometry:{type:"Polygon", coordinates:[geoCircle(a.lat, a.lon, 2500)]}}; }) : [];
+  var rain = layerOn("rain") ? ((st.rain || {}).stations || []).filter(function(s){ return s.mmh > 0; }).map(function(s){ return {type:"Feature", properties:{id:s.id, name:s.name, mmh:s.mmh, cls:s.cls}, geometry:{type:"Point", coordinates:[s.lon, s.lat]}}; }) : [];
+  var areas = [];                                                         // NEA area forecasts stay in the weather pill: no circles on the map
   var v = S.view && !S.view.error && layerOn("route") ? S.view : null, route = [], sec = [], crit = [], rrain = [], stops = [];
   if(v){
     route.push({type:"Feature", properties:{}, geometry:{type:"LineString", coordinates:v.line}});
@@ -630,9 +678,9 @@ MV.update = function(){
   var FCo = function(f){ return {type:"FeatureCollection", features:f}; };
   if(MV.kind === "ml"){
     var m = MV.ml, set = function(id, f){ var s = m.getSource(id); if(s) s.setData(FCo(f)); };
-    set("ev", L_); set("evp", P_); set("heat", heat); set("probe", probes); set("rain", rain); set("rainarea", areas); set("route", route); set("rsec", sec); set("rcrit", crit); set("rrain", rrain); set("stops", stops);
+    set("ev", L_); set("evp", P_); set("heat", heat); set("probe", probes); set("rain", rain); set("route", route); set("rsec", sec); set("rcrit", crit); set("rrain", rrain); set("stops", stops);
     var flowOk = !isDemo() && st.config && st.config.tomtom_key && layerOn("flow");
-    m.setLayoutProperty("tt-flow", "visibility", flowOk ? "visible" : "none");
+    ["tt-glow", "tt-flow", "tt-closed"].forEach(function(id){ if(m.getLayer(id)) m.setLayoutProperty(id, "visibility", flowOk ? "visible" : "none"); });
     m.setLayoutProperty("heat", "visibility", layerOn("heat") ? "visible" : "none");
   } else if(MV.kind === "lf"){
     var G = MV.groups; Object.keys(G).forEach(function(k){ G[k].clearLayers(); });
@@ -645,7 +693,8 @@ MV.update = function(){
     rrain.forEach(function(s){ L.polyline(s.geometry.coordinates.map(ll), {color:COL.rain, weight:12, opacity:.3, dashArray:"3 4"}).addTo(G.route); });
     stops.forEach(function(s){ L.circleMarker(ll(s.geometry.coordinates), {radius:3, color:"#9be7ff", weight:1.3, fillColor:"#07111f", fillOpacity:1}).bindPopup(popHtml("stops", s.properties)).addTo(G.route); });
     L_.forEach(function(f){ var p = f.properties; L.polyline(f.geometry.coordinates.map(ll), {color:p.c, weight:p.w, opacity:p.o}).bindPopup(function(){ return popHtml("event", p); }).addTo(p.status === "unverified" ? G.unverified : p.kind === "roadworks" ? G.works : G.events); });
-    P_.forEach(function(f){ var p = f.properties, u = p.status !== "confirmed"; L.circleMarker(ll(f.geometry.coordinates), {radius:7, color:u ? COL.unv : p.c, weight:2, dashArray:u ? "3 3" : null, fillColor:"#0a1628", fillOpacity:.9}).bindPopup(function(){ return popHtml("event", p); }).addTo(u ? G.unverified : G.events); });
+    P_.forEach(function(f){ var p = f.properties, u = p.status !== "confirmed", k = ICON[p.kind] ? p.kind : "other", key = k + (u ? "u" : "k");
+      L.marker(ll(f.geometry.coordinates), {icon:L.icon({iconUrl:iconUrl(k, u), iconSize:[30, 30], iconAnchor:[15, 15]})}).bindPopup(function(){ return popHtml("event", p); }).addTo(u ? G.unverified : G.events); });
     probes.forEach(function(f){ L.circleMarker(ll(f.geometry.coordinates), {radius:5, color:"#02070f", weight:1.5, fillColor:f.properties.c, fillOpacity:1}).bindPopup(function(){ return popHtml("probe", f.properties); }).addTo(G.probes); });
     rain.forEach(function(f){ var r = f.properties.mmh; L.circleMarker(ll(f.geometry.coordinates), {radius:r > 0 ? 4 + Math.min(10, r / 4) : 2.5, color:"#bfefff", weight:r >= 10 ? 1.5 : 0, fillColor:r > 0 ? COL.rain : "#2a4a6a", fillOpacity:r > 0 ? .85 : .35}).bindPopup(function(){ return popHtml("rain", f.properties); }).addTo(G.rain); });
   }
@@ -655,12 +704,12 @@ function zones(){
   MV.zm.forEach(function(z){ z.remove(); }); MV.zm = [];
   if(!layerOn("zones") || !MV.ready) return;
   ((S.st || {}).zones || []).forEach(function(z){
-    var el = document.createElement("button"); el.type = "button"; el.className = "fc-zone" + (z.abnormal || z.max_mag >= 3 ? " pulse" : "");
+    var el = document.createElement("button"); el.type = "button"; el.className = "fc-zone" + (z.abnormal || z.max_mag >= 3 ? " pulse" : ""); el.innerHTML = "<b>!</b>";
     el.style.setProperty("--zc", z.max_mag >= 3 || z.abnormal ? COL.critical : COL.high); el.setAttribute("aria-label", "Congestion zone " + (z.roads || []).join(", "));
     var html = '<div class="fc-pop"><h4>Congestion risk zone</h4><p>' + esc((z.roads || []).join(", ") || "Road") + '</p><p>' + z.n + ' jam(s), ' + f1(z.km) + ' km, worst delay ' + f1(z.delay_min) + ' min</p><p>'
       + (z.abnormal ? "<b>Abnormal</b> for this time of day" : z.recurring ? "Recurring at this time of day" : "Recurrence history still building") + '</p><p>' + z.services + ' verified service-direction(s)</p></div>';
     if(MV.kind === "ml"){ var mk = new maplibregl.Marker({element:el}).setLngLat([z.lon, z.lat]).setPopup(new maplibregl.Popup({maxWidth:"300px"}).setHTML(html)).addTo(MV.ml); MV.zm.push(mk); }
-    else if(MV.kind === "lf"){ var mk2 = L.marker([z.lat, z.lon], {icon:L.divIcon({className:"", html:el.outerHTML, iconSize:[18, 18], iconAnchor:[9, 9]})}).bindPopup(html).addTo(MV.lf); MV.zm.push(mk2); }
+    else if(MV.kind === "lf"){ var mk2 = L.marker([z.lat, z.lon], {icon:L.divIcon({className:"", html:el.outerHTML, iconSize:[24, 24], iconAnchor:[12, 12]})}).bindPopup(html).addTo(MV.lf); MV.zm.push(mk2); }
   });
 }
 function evById(id){ return ((S.st || {}).events || []).filter(function(e){ return e.id === id; })[0]; }
@@ -712,10 +761,14 @@ function fitScene(){
 function renderBar(){
   var st = S.st || {}, src = st.sources || {}, mode = $("fcMode"), live = 0, n = 0;
   document.querySelectorAll('[data-mode]').forEach(function(b){ b.setAttribute("aria-pressed", String(b.getAttribute("data-mode") === S.mode)); });
-  var dots = SRC.map(function(s){ var x = src[s[0]] || {status:st.error ? "unavailable" : "idle"}; n++; if(x.status === "live") live++; return '<i class="fc-dot ' + esc(x.status) + '" title="' + esc(s[1] + ": " + x.status) + '"></i>'; }).join("");
-  $("fcFeeds").innerHTML = dots + '<span>' + live + '/' + n + ' feeds</span>';
+  var dots = srcList(src).map(function(s){ var x = src[s[0]] || {status:st.error ? "unavailable" : "idle"}; if(x.status !== "idle" && x.status !== "off"){ n++; if(x.status === "live") live++; }
+    return '<i class="fc-dot ' + esc(x.status) + '" title="' + esc(s[1] + ": " + x.status) + '"></i>'; }).join("");
+  $("fcFeeds").innerHTML = dots + '<span>' + live + '/' + n + ' feeds live</span>';
   var core = ["tomtom_incidents", "route_index"].map(function(k){ return (src[k] || {}).status; });
-  if(isDemo()){ mode.className = "fc-pill demo"; mode.innerHTML = '<i class="fc-dot" style="background:#a07bff"></i><span>DEMO · fictional data</span>'; }
+  var prob = !isDemo() && st.config && st.config.problem;
+  if(prob) note(prob);
+  if(prob){ mode.className = "fc-pill bad"; mode.innerHTML = '<i class="fc-dot unavailable"></i><span>DEPLOYMENT PROBLEM</span>'; }
+  else if(isDemo()){ mode.className = "fc-pill demo"; mode.innerHTML = '<i class="fc-dot" style="background:#a07bff"></i><span>DEMO · fictional data</span>'; }
   else if(st.error && !st.kpis.length){ mode.className = "fc-pill warn"; mode.innerHTML = '<i class="fc-dot stale"></i><span>Starting</span>'; }
   else if(core.indexOf("unavailable") >= 0 || core.indexOf("off") >= 0){ mode.className = "fc-pill warn"; mode.innerHTML = '<i class="fc-dot stale"></i><span>LIVE · degraded</span>'; }
   else if(Object.keys(src).some(function(k){ return src[k].status === "stale"; })){ mode.className = "fc-pill warn"; mode.innerHTML = '<i class="fc-dot stale"></i><span>LIVE · some data stale</span>'; }
@@ -728,7 +781,7 @@ function renderBar(){
   $("fcWx").innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="#7cc8ff" stroke-width="1.8" stroke-linecap="round"><path d="M7 17a4 4 0 0 1-.6-7.96A5.5 5.5 0 0 1 17 8.5a3.5 3.5 0 0 1 .5 6.96"/>' + (wetA ? '<path d="M9 19l-1 2M13 19l-1 2M17 19l-1 2"/>' : '') + '</svg><span>'
     + (topW ? esc(topW) + (wetA ? ' · rain in ' + wetA + '/' + areas.length + ' areas' : '') : 'Forecast unavailable') + (wetG != null ? ' · ' + wetG + ' gauges wet' : '') + '</span>';
   $("fcUpd").textContent = isDemo() ? "Demo step " + (S.step + 1) + " of 7" : st.time ? "Updated " + hm(st.now) + (st.age_s != null ? " · " + st.age_s + " s ago" : "") : (st.error || "–");
-  var rows = SRC.map(function(s){ var x = src[s[0]] || {}; return '<tr><td><i class="fc-dot ' + esc(x.status || "idle") + '"></i> ' + esc(s[1]) + '</td><td>' + esc(x.status || "–") + (x.age_s != null ? ', ' + Math.round(x.age_s / 60) + ' min old' : '') + '<br><small>' + esc(x.detail || "") + '</small></td></tr>'; }).join("");
+  var rows = srcList(src).map(function(s){ var x = src[s[0]] || {}; return '<tr><td><i class="fc-dot ' + esc(x.status || "idle") + '"></i> ' + esc(s[1]) + '</td><td>' + esc(x.status || "–") + (x.age_s != null ? ', ' + Math.round(x.age_s / 60) + ' min old' : '') + '<br><small>' + esc(x.detail || "") + '</small></td></tr>'; }).join("");
   $("fcFeedPop").innerHTML = '<table>' + rows + '</table><p class="fc-muted" style="margin:8px 0 0;font-size:12px">LTA Traffic Speed Bands are not used for forecasting. Stale data is kept on screen and marked stale; nothing is filled in.</p>';
   document.body.classList.toggle("fc-demo", isDemo());
 }
@@ -773,8 +826,15 @@ function renderLayers(){
   $("fcLayers").innerHTML = defs.map(function(d){ var dis = d[0] === "flow" && !flowAvail;
     return '<button type="button" data-layer="' + d[0] + '" aria-pressed="' + (S.lay[d[0]] && !dis) + '"' + (dis ? ' disabled title="Needs a TomTom key (live mode)"' : '') + '><i style="color:' + d[2] + '"></i>' + d[1] + '</button>'; }).join("");
   $("fcLegend").classList.toggle("off", !S.lay.legend);
-  $("fcLegend").innerHTML = '<div><i style="background:' + COL.critical + '"></i>Jam: 5+ min delay at the horizon</div><div><i style="background:' + COL.high + '"></i>2–5 min</div><div><i style="background:' + COL.watch + '"></i>under 2 min</div>'
-    + '<div><i class="ring"></i>Unverified report (no line / direction) – not counted</div><div><i class="dot" style="background:' + COL.rain + '"></i>Rain gauge (observed), dashed = estimated exposure</div><div><i style="background:#9be7ff"></i>Selected route, arrows = direction</div>';
+  var it = function(icon, label, tip){ return '<span' + (tip ? ' title="' + tip + '"' : '') + '>' + icon + label + '</span>'; }, img = function(k, u){ return '<img alt="" src="' + iconUrl(k, u) + '">'; };
+  $("fcLegend").innerHTML = (flowAvail && S.lay.flow ? '<div class="fc-lg-row"><i style="width:54px;background:linear-gradient(90deg,' + FLOW_STOPS.slice().reverse().map(function(x){ return x[1]; }).join(",") + ')"></i>Traffic flow: free → jammed (TomTom)</div>' : '')
+    + '<div class="fc-lg-row">Jam delay <i class="sw" style="background:' + COL.critical + '"></i>5+ min <i class="sw" style="background:' + COL.high + '"></i>2–5 <i class="sw" style="background:' + COL.watch + '"></i>&lt;2</div>'
+    + '<div class="fc-lg-icons">' + ["accident", "breakdown", "roadworks", "road_closed", "lane_closed", "flooding", "hazard"].map(function(k){ return it(img(k, false), KNAME[k]); }).join("")
+    + it(img("accident", true), "Unverified", "Grey dashed icon = unverified report (no road line or direction): not counted")
+    + it('<i class="dia"></i>', "Risk zone", "Congestion risk zone: several jams together")
+    + it('<i class="dot" style="background:' + COL.rain + '"></i>', "Raining now", "Rain gauge reporting rain now; dashed on a route = estimated exposure")
+    + it('<i class="ln" style="background:#9be7ff"></i>', "Your route", "Selected route, arrows = direction") + '</div>'
+    + '<div class="fc-lg-row sub">Grey dashed = not verified on the route, not counted</div>';
 }
 function renderHz(){
   var cmp = {}; ((S.st || {}).comparison || []).forEach(function(c){ cmp[c.h] = c; });
@@ -841,7 +901,8 @@ function renderTop(){
 function renderInt(){
   var st = S.st || {}, src = st.sources || {}, cfg = st.config || {}, cal = st.calibration || {};
   $("fcIntS").textContent = isDemo() ? "DEMO sources" : (cfg.provider ? "provider: " + cfg.provider : "");
-  var h = SRC.map(function(s){ var x = src[s[0]] || {};
+  var h = (!isDemo() && cfg.problem ? '<p style="margin:0 0 8px;padding:8px 10px;border-radius:8px;border:1px solid rgba(255,85,102,.6);background:rgba(255,85,102,.14);color:#ffd5da"><b>Fix needed.</b> ' + esc(cfg.problem) + '</p>' : '')
+    + srcList(src).map(function(s){ var x = src[s[0]] || {};
     return '<div class="src"><i class="fc-dot ' + esc(x.status || "idle") + '"></i><b>' + esc(s[1]) + '</b><span class="fc-muted">' + esc(x.status || "–") + (x.age_s != null ? ' · ' + (x.age_s < 120 ? x.age_s + ' s' : Math.round(x.age_s / 60) + ' min') : '') + '</span><small>' + esc(x.detail || "") + '</small></div>'; }).join("");
   h += '<p><b style="color:#fff">Method.</b> ' + esc(st.method || "") + '</p>';
   h += '<p><b style="color:#fff">Accuracy.</b> ' + (cal.n >= 30 ? 'Measured on ' + cal.n + ' later observations: ' + Math.round(cal.coverage * 100) + ' % inside the 80 % band, mean error ' + f1(cal.mae) + ' km/h.' : (isDemo() ? 'Demo – not a measured accuracy.' : 'Not measured yet (' + (cal.n || 0) + ' of 30 checks). No accuracy is claimed until then.')) + '</p>';
