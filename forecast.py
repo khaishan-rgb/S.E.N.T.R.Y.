@@ -901,7 +901,7 @@ def service_impact(key, route, confirmed, unverified, probes, rain, hw, jam_info
                       max(0.0, hi - (typical if ji.get("recurring") else 0)) * share / 60.0)
             if inside:
                 per[h] = (0.0, 0.0, 0.0)
-        contrib.append({"kind": ev["kind"], "id": ev["id"], "label": ev.get("label"), "road": ev.get("road") or ev.get("from"), "a_m": m.get("a_m"), "b_m": m.get("b_m"),
+        contrib.append({"kind": ev["kind"], "id": ev["id"], "label": ev.get("label"), "road": ev.get("road") or ev.get("from") or m.get("road_context"), "a_m": m.get("a_m"), "b_m": m.get("b_m"),
                         "share": round(share, 2), "per": per, "trend": tr if ev.get("delay_s") is not None else "unknown",
                         "recurring": ji.get("recurring"), "recovery_min": jam_recovery_min(ev.get("delay_s"), rate, P) if ev.get("delay_s") else None,
                         "basis": "inside a verified jam: its delay is already counted in the jam" if inside else "TomTom delay on the overlapping stretch" + (" minus the usual delay for this time (recurring)" if ji.get("recurring") else
@@ -1035,6 +1035,23 @@ def _src_stale(src, *names):
     return any((src.get(n) or {}).get("status") == "stale" for n in names)
 
 
+def segment_road_context(route, match, stops):
+    """Nearby route-stop road as context, never a claimed incident road."""
+    if route is None or match.get("a_m") is None or match.get("b_m") is None:
+        return ""
+    candidates = []
+    a, b = sorted((match["a_m"], match["b_m"]))
+    for stop in stops:
+        if not stop.get("road") or stop.get("lat") is None or stop.get("lon") is None:
+            continue
+        distance, along, _ = route.locate(to_xy(stop["lat"], stop["lon"]))
+        d, pos = float(distance[0]), float(along[0])
+        gap = max(a - pos, pos - b, 0)
+        if d <= 80 and gap <= 200:
+            candidates.append((gap, abs(pos - (a + b) / 2), stop["road"]))
+    return "Near " + min(candidates)[2] + " (route stop)" if candidates else ""
+
+
 # =========================================================================== the evaluation pipeline (live and demo share it)
 def prepare_probes(world, routes, P=None):
     """Verify each probe's direction against its service route, give it a stretch of the route, its baseline and its forecasts."""
@@ -1111,6 +1128,7 @@ def evaluate(world, P=None):
         res = idx.match(ev, now, H[-1], P) if idx is not None and len(idx) else {"confirmed": [], "unverified": [], "rejected": []}
         ev["_res"] = res
         for k, m in res["confirmed"]:
+            m["road_context"] = segment_road_context(routes.get(k), m, (world.get("stops") or {}).get(k, [])) if not (ev.get("road") or ev.get("from")) else ""
             conf_by.setdefault(k, []).append((ev, m))
         for k, m in res["unverified"]:
             unv_by.setdefault(k, []).append((ev, m))
@@ -1161,7 +1179,7 @@ def evaluate(world, P=None):
         for k, m in res["confirmed"]:
             im = impacts.get(k)
             c = next((c for c in (im or {}).get("contrib", []) if c["id"] == ev["id"]), None)
-            per_svc.append({"svc": k[0], "dir": k[1], "a_m": m.get("a_m"), "b_m": m.get("b_m"), "overlap_m": m.get("overlap_m"),
+            per_svc.append({"svc": k[0], "dir": k[1], "road": ev.get("road") or ev.get("from") or m.get("road_context") or "", "a_m": m.get("a_m"), "b_m": m.get("b_m"), "overlap_m": m.get("overlap_m"),
                             "explain": m["explain"], "extra": {h: round(c["per"].get(h, (0, 0, 0))[0], 1) for h in H} if c else {h: 0.0 for h in H},
                             "hw": hw.get(k)})
         per_svc.sort(key=lambda x: -x["extra"].get(30, 0))
@@ -1312,7 +1330,7 @@ def evaluate(world, P=None):
                           "road": e.get("road") or e.get("from") or "",
                           "location": " - ".join(x for x in (e.get("from"), e.get("to")) if x) or (e.get("road") or "Road name not supplied by source"),
                           "segment": f"route km {top['a_m'] / 1000:.1f}-{top['b_m'] / 1000:.1f} of {top['svc']} dir {top['dir']}" if top and top.get("a_m") is not None else "",
-                          "services": [{"svc": s["svc"], "dir": s["dir"], "extra30": s["extra"].get(30, 0)} for s in e["services"]],
+                          "services": [{"svc": s["svc"], "dir": s["dir"], "extra30": s["extra"].get(30, 0), "road": s.get("road") or ""} for s in e["services"]],
                           "direction": f"towards {e['towards']}" if e.get("towards") else "direction of the TomTom line",
                           "delay": d, "horizon": hz,
                           "observed": (f"{e['label']}: TomTom delay {round((e['delay_s'] or 0) / 60)} min over {round((e['length_m'] or 0) / 100) / 10} km now" if e.get("delay_s") is not None else f"{e['label']} reported by {' + '.join(e['sources'])}")
@@ -2178,6 +2196,33 @@ def join_pieces(lines, tol=6.0):
     return lines
 
 
+def _tile_incident_type(props):
+    """Read TomTom flat and indexed tags; larger indexed priorities take precedence.
+
+    https://docs.tomtom.com/traffic-api/documentation/tomtom-maps/v1/traffic-incidents/vector-incident-tiles
+    Keep one type per feature so its traffic delay is not counted multiple times.
+    """
+    indexed = []
+    for key, value in props.items():
+        match = re.fullmatch(r"icon_category_(\d+)", key)
+        if not match:
+            continue
+        try:
+            category = int(value)
+        except (TypeError, ValueError):
+            continue
+        if category in TT_ICON and category != 0:
+            indexed.append((int(match.group(1)), category))
+    if indexed:
+        priority, category = max(indexed)
+        return category, props.get(f"description_{priority}") or props.get("description") or ""
+    try:
+        category = int(props.get("icon_category", 0))
+    except (TypeError, ValueError):
+        category = 0
+    return category, props.get("description") or ""
+
+
 def parse_tomtom_incident_tiles(tiles, now=None, P=None):
     """[(z, x, y, pbf bytes)] -> incident events. Pieces of one incident cut by tile borders are joined; each joined line is oriented from
     its TomTom start marker (start_poi). Without a start marker the direction is unknown: dir_known False (never confirmed)."""
@@ -2194,17 +2239,14 @@ def parse_tomtom_incident_tiles(tiles, now=None, P=None):
         ext = fl.get("extent", 4096)
         for ft in fl.get("features", []):
             pr = ft["props"]
-            try:
-                cat = int(pr.get("icon_category", 0))
-            except (TypeError, ValueError):
-                cat = 0
+            cat, desc = _tile_incident_type(pr)
             if cat == 13:                                        # a cluster of mixed incidents (low zoom): not usable
                 continue
             for part in ft["parts"]:
                 pts = [tile_ll(z, tx, ty, px, py, ext) for px, py in part]
                 pts = [p for p in pts if in_sg(*p)]
                 if len(pts) >= 2:
-                    segs.append({"cat": cat, "mag": pr.get("magnitude"), "delay": pr.get("delay"), "desc": pr.get("description") or "",
+                    segs.append({"cat": cat, "mag": pr.get("magnitude"), "delay": pr.get("delay"), "desc": desc,
                                  "road_type": pr.get("road_type") or "", "pts": pts})
         pext = po.get("extent", 4096)
         for ft in po.get("features", []):
@@ -2213,10 +2255,7 @@ def parse_tomtom_incident_tiles(tiles, now=None, P=None):
                 continue
             for part in ft["parts"]:
                 for px, py in part:
-                    try:
-                        cat = int(pr.get("icon_category", 0))
-                    except (TypeError, ValueError):
-                        cat = 0
+                    cat, _ = _tile_incident_type(pr)
                     pois.append((tile_ll(z, tx, ty, px, py, pext), cat))
     groups = {}
     for s_ in segs:
