@@ -1307,8 +1307,8 @@ def evaluate(world, P=None):
             d = {h: max((s["extra"][h] for s in e["services"]), default=0.0) for h in H}
             hz = next((h for h in H if risk_level(d[h], top and top["hw"], e["kind"] == "road_closed", 0, 0, P) == e["level"]), H[0])
             cands.append({"key": "ev:" + e["id"], "kind": e["kind"], "level": e["level"], "verified": True,
-                          "title": f"{e['label']} - {e['road'] or e['from'] or 'road'}" + (f" towards {e['towards']}" if e.get("towards") else ""),
-                          "location": " - ".join(x for x in (e.get("from"), e.get("to")) if x) or (e.get("road") or ""),
+                          "title": f"{e['label'] if e.get('label') and e['label'] != 'Unknown' else 'Traffic disruption'} - {e['road'] or e['from'] or ('service ' + str(top['svc']) + ' dir ' + str(top['dir']) if top else 'matched route segment')}" + (f" towards {e['towards']}" if e.get("towards") else ""),
+                          "location": " - ".join(x for x in (e.get("from"), e.get("to")) if x) or (e.get("road") or "Road name not supplied by source"),
                           "segment": f"route km {top['a_m'] / 1000:.1f}-{top['b_m'] / 1000:.1f} of {top['svc']} dir {top['dir']}" if top and top.get("a_m") is not None else "",
                           "services": [{"svc": s["svc"], "dir": s["dir"], "extra30": s["extra"].get(30, 0)} for s in e["services"]],
                           "direction": f"towards {e['towards']}" if e.get("towards") else "direction of the TomTom line",

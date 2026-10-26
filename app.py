@@ -11890,7 +11890,8 @@ async def api_forecast_services(mode: str = "live"):
     def keyf(s_):
         m = re.match(r"(\d+)(.*)", s_)
         return (0, int(m.group(1)), m.group(2)) if m else (1, 0, s_)
-    return {"services": [{"svc": s_, "dirs": dirs[s_]} for s_ in sorted(dirs, key=keyf)], "error": st.get("error")}
+    opmap = await occ_operator_map()
+    return {"services": [{"svc": s_, "dirs": dirs[s_], "operator": opmap.get(s_, "")} for s_ in sorted(dirs, key=keyf)], "error": st.get("error")}
 
 
 @app.post("/api/forecast/alerts/{aid}/ack")

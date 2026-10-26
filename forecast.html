@@ -394,6 +394,12 @@ body.ds-app .ds-cmd{background:rgba(5,22,58,.82)!important}
 
   <section class="fc-kpis" id="fcKpis" aria-label="Executive KPIs"></section>
 
+  <section class="fc-glass" style="padding:12px;margin-bottom:12px" aria-label="Forecast filters">
+    <label>Service <input class="ds-input" id="fcFilterSvc" list="fcSvcList" placeholder="All services" autocomplete="off"></label>
+    <label>Operator <select class="ds-input" id="fcFilterOp"><option value="">All operators</option></select></label>
+    <button type="button" class="ds-btn sm" id="fcFilterReset">Clear filters</button>
+    <small id="fcFilterNote">Filters apply to alerts, forecast comparison and services at risk. Map and executive totals cover the network.</small>
+  </section>
   <div class="fc-grid">
     <aside class="fc-glass fc-side fc-svcpanel" aria-label="Service intelligence">
       <div class="fc-summary" id="fcSummary"></div>
@@ -428,8 +434,8 @@ body.ds-app .ds-cmd{background:rgba(5,22,58,.82)!important}
 
   <div class="fc-low">
     <section class="fc-glass" aria-label="Forecast comparison">
-      <div class="fc-h"><h2>Forecast comparison</h2><span class="sp"></span><small id="fcMethodS">rule-based estimate</small></div>
-      <div class="fc-b"><div class="fc-cmp" id="fcCmp"></div></div>
+      <div class="fc-h"><h2>Predicted delay by forecast horizon</h2><span class="sp"></span><small id="fcMethodS">rule-based estimate</small></div>
+      <div class="fc-b"><p class="fc-muted">Compare expected extra running time 15, 30 and 60 minutes from now. Values are additional minutes per service-direction; ranges show uncertainty. Totals sum these minutes across service-directions, not individual buses.</p><div class="fc-cmp" id="fcCmp"></div></div>
     </section>
     <section class="fc-glass" aria-label="Services at risk">
       <div class="fc-h"><h2>Services at risk</h2><span class="sp"></span><small>verified evidence only</small></div>
@@ -846,7 +852,7 @@ function renderHz(){
 }
 function alertCard(a){
   var demo = isDemo(), acked = a.acked || S.demoAck[a.id], d = a.delay || {}, hasD = [15, 30, 60].some(function(h){ return d[h] != null || d[String(h)] != null; });
-  var svcs = (a.services || []).slice(0, 12).map(function(s){ var x = s.extra30 != null ? ' +' + f1(s.extra30) : s.share != null ? ' ' + Math.round(s.share * 100) + '%' : '';
+  var svcs = (a.services || []).slice(0, 12).map(function(s){ var x = s.extra30 != null ? ' +' + f1(s.extra30) + ' min' : s.share != null ? ' ' + Math.round(s.share * 100) + '%' : '';
     return '<button type="button" class="' + (a.verified === false && a.kind !== "rain" ? "unv" : "") + '" data-svc="' + esc(s.svc) + '" data-dir="' + s.dir + '">' + esc(s.svc) + ' d' + s.dir + x + '</button>'; }).join("");
   var tags = lvTag(a.level) + (a.kind === "rain" ? '<span class="fc-tag est">Estimated</span>' : a.verified === false ? '<span class="fc-tag unv">Unverified</span>' : '<span class="fc-tag ver">Verified</span>')
     + (a.escalated && !acked ? '<span class="fc-tag crit">Escalated</span>' : '') + (a.realerts ? '<span class="fc-tag watch">Worsened</span>' : '') + (a.stale ? '<span class="fc-tag stale">Source stale</span>' : '')
@@ -863,13 +869,21 @@ function alertCard(a){
     + ((a.explain || []).length ? '<details><summary>Why these services (route matching)</summary><ul>' + a.explain.map(function(x){ return '<li>' + esc(x) + '</li>'; }).join("") + '</ul></details>' : '')
     + '<div class="foot"><div class="fc-links">' + links + '</div><span class="sp"></span>' + ack + '</div></article>';
 }
+function filterActive(){ return !!($("fcFilterSvc").value.trim() || $("fcFilterOp").value); }
+function matchesService(s){
+  var svc = $("fcFilterSvc").value.trim().toUpperCase(), op = $("fcFilterOp").value;
+  var meta = (S.svcs || []).find(function(x){ return x.svc === s.svc; });
+  return (!svc || s.svc === svc) && (!op || meta && meta.operator === op);
+}
+function renderFiltered(){ renderAlerts(); renderCmp(); renderTop(); }
 function renderAlerts(){
-  var st = S.st || {}, all = st.alerts || [], el = $("fcAlerts");
+  var st = S.st || {}, all = (st.alerts || []).filter(function(a){ return !filterActive() || (a.services || []).some(matchesService); }), el = $("fcAlerts");
   document.querySelectorAll("[data-tab]").forEach(function(b){ b.setAttribute("aria-pressed", String(b.getAttribute("data-tab") === S.tab)); });
   var c = st.alert_counts || {};
+  if(filterActive()) c = {active:all.filter(function(a){return a.status === "active";}).length, unacked:all.filter(function(a){return a.status === "active" && !a.acked && !S.demoAck[a.id];}).length};
   $("fcAlCount").textContent = (c.unacked || 0) + " unacknowledged · " + (c.active || 0) + " active";
   if(S.tab === "audit"){
-    var au = st.audit || [];
+    var au = (st.audit || []).filter(function(x){ return !filterActive() || all.some(function(a){ return a.id === x.alert_id; }); });
     el.className = "fc-audit"; el.innerHTML = au.length ? au.map(function(x){ return '<div><b>' + hm(x.ts) + ' ' + esc(x.action) + '</b> ' + esc(x.title || x.alert_id) + '<br><small class="fc-muted">' + esc(x.by || "system") + (x.detail ? ' – ' + esc(x.detail) : '') + '</small></div>'; }).join("") : '<div class="fc-empty">No audit entries yet.</div>';
     return;
   }
@@ -877,24 +891,29 @@ function renderAlerts(){
   var list = all.filter(function(a){ var ak = a.acked || S.demoAck[a.id];
     return S.tab === "active" ? a.status === "active" : S.tab === "acked" ? a.status === "active" && ak : a.status === "resolved"; });
   if(S.tab === "active") list.sort(function(a, b){ var x = !!(a.acked || S.demoAck[a.id]), y = !!(b.acked || S.demoAck[b.id]); return x === y ? 0 : x ? 1 : -1; });
-  el.innerHTML = list.length ? list.map(alertCard).join("") : '<div class="fc-empty">' + (S.tab === "active" ? (st.error && !isDemo() ? esc(st.error) : "No active warnings. Every event the feeds report has been checked against the bus routes; none needs attention.") : S.tab === "acked" ? "Nothing acknowledged." : "Nothing cleared in the last 24 hours.") + '</div>';
+  el.innerHTML = list.length ? list.map(alertCard).join("") : '<div class="fc-empty">' + (S.tab === "active" ? (st.error && !isDemo() ? esc(st.error) : "No active warnings match this view. Every event the feeds report has been checked against the bus routes; none needs attention.") : S.tab === "acked" ? "Nothing acknowledged." : "Nothing cleared in the last 24 hours.") + '</div>';
 }
 function renderCmp(){
   var st = S.st || {};
   $("fcMethodS").textContent = isDemo() ? "DEMO – fictional" : "rule-based estimate, not ML";
   $("fcCmp").innerHTML = (st.comparison || []).map(function(c){
+    if(filterActive()){
+      var rows = (st.services || []).filter(matchesService), counts = {critical:0,high:0,watch:0};
+      rows.forEach(function(s){ var lv = (s.levels || {})[c.h]; if(counts[lv] != null) counts[lv]++; });
+      c = Object.assign({}, c, counts, {extra_total:rows.reduce(function(n,s){return n + s.extra[c.h].mid;},0), worst:rows.slice().sort(function(a,b){return b.extra[c.h].mid-a.extra[c.h].mid;}).slice(0,3).filter(function(s){return s.extra[c.h].mid>0;}).map(function(s){return {svc:s.svc,dir:s.dir,extra:s.extra[c.h]};}), jams_building:0});
+    }
     var worst = (c.worst || []).map(function(w){ return '<li><b style="color:#fff">' + esc(w.svc) + ' d' + w.dir + '</b> +' + f1(w.extra.mid) + ' min <span class="fc-muted">(' + f1(w.extra.lo) + '–' + f1(w.extra.hi) + ')</span></li>'; }).join("");
     return '<div class="' + (S.h === c.h ? "on" : "") + '" data-h="' + c.h + '" role="button" tabindex="0"><h3>+' + c.h + ' min</h3><div class="row">' + (c.critical ? lvTag("critical").replace(">Critical<", ">" + c.critical + " critical<") : "")
       + (c.high ? lvTag("high").replace(">High<", ">" + c.high + " high<") : "") + (c.watch ? lvTag("watch").replace(">Watch<", ">" + c.watch + " watch<") : "") + (!c.critical && !c.high && !c.watch ? '<span class="fc-tag ok">No service at risk</span>' : '') + '</div>'
-      + '<div class="tot">+' + f1(c.extra_total) + ' <small>bus-minutes predicted on the services checked</small></div><ul>' + (worst || '<li class="fc-muted">No predicted extra delay.</li>') + '</ul>'
+      + '<div class="tot">+' + f1(c.extra_total) + ' <small>extra minutes summed across service-directions</small></div><ul>' + (worst || '<li class="fc-muted">No predicted extra delay.</li>') + '</ul>'
       + '<div class="note">' + (c.jams_building ? c.jams_building + ' jam(s) still building. ' : '') + esc(c.rain_note || "") + '</div></div>';
   }).join("") || '<div class="fc-empty">' + esc(st.error || "No forecast yet.") + '</div>';
 }
 function renderTop(){
-  var rows = ((S.st || {}).services || []).filter(function(s){ return LV[s.level] >= 1 || s.extra[15].mid > 0 || s.extra[30].mid > 0; }).slice(0, 14);
-  $("fcTop").innerHTML = rows.length ? '<thead><tr><th>Service</th><th>Risk</th><th>+15</th><th>+30</th><th>+60</th><th>Cause</th><th>Recovery</th></tr></thead><tbody>' + rows.map(function(s){
+  var rows = ((S.st || {}).services || []).filter(function(s){ return matchesService(s) && (LV[s.level] >= 1 || s.extra[15].mid > 0 || s.extra[30].mid > 0 || s.extra[60].mid > 0); }).slice(0, 14);
+  $("fcTop").innerHTML = rows.length ? '<thead><tr><th>Service</th><th>Risk</th><th>In 15 min</th><th>In 30 min</th><th>In 60 min</th><th>Cause</th><th>Recovery</th></tr></thead><tbody>' + rows.map(function(s){
     return '<tr data-svc="' + esc(s.svc) + '" data-dir="' + s.dir + '"><td><b>' + esc(s.svc) + '</b> d' + s.dir + '</td><td>' + lvTag(s.level) + (s.blocked ? ' <span class="fc-tag crit">Blocked</span>' : '') + '</td>'
-      + [15, 30, 60].map(function(h){ var e = s.extra[h] || s.extra[String(h)]; return '<td class="fc-num"><b>+' + f1(e.mid) + '</b></td>'; }).join("")
+      + [15, 30, 60].map(function(h){ var e = s.extra[h] || s.extra[String(h)]; return '<td class="fc-num"><b>+' + f1(e.mid) + ' min</b></td>'; }).join("")
       + '<td>' + esc((s.causes || []).join(", ") || (s.heavy_share ? "Heavy rain (est.)" : "–")) + '</td><td>' + (s.building ? "still building" : s.recovery_min != null ? "~" + s.recovery_min + " min" : "–") + '</td></tr>'; }).join("") + '</tbody>'
     : '<tbody><tr><td class="fc-empty">No service at risk from verified evidence.</td></tr></tbody>';
 }
@@ -998,9 +1017,17 @@ function setMode(m){
   history.replaceState(null, "", u.toString());
   loadSvcList(); load().then(function(){ if(isDemo()) choreo(); }); schedule();
 }
+$("fcFilterSvc").addEventListener("input", renderFiltered);
+$("fcFilterOp").addEventListener("change", renderFiltered);
+$("fcFilterReset").addEventListener("click", function(){ $("fcFilterSvc").value = ""; $("fcFilterOp").value = ""; renderFiltered(); });
 function loadSvcList(){
   api("/api/forecast/services" + (isDemo() ? "?mode=demo" : "")).then(function(j){
     S.svcs = (j && j.services) || [];
+    var selectedOp = $("fcFilterOp").value;
+    var ops = Array.from(new Set(S.svcs.map(function(s){return s.operator;}).filter(Boolean))).sort();
+    $("fcFilterOp").innerHTML = '<option value="">All operators</option>' + ops.map(function(op){return '<option value="' + esc(op) + '">' + esc(op) + '</option>';}).join("");
+    $("fcFilterOp").value = ops.indexOf(selectedOp) >= 0 ? selectedOp : "";
+    renderFiltered();
     $("fcSvcList").innerHTML = S.svcs.slice(0, 900).map(function(s){ return '<option value="' + esc(s.svc) + '">'; }).join("");
   });
 }
