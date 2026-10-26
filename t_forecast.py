@@ -145,6 +145,11 @@ stns = [{"id": "W", "lat": 1.3345, "lon": 103.8800, "mm": 2.5}, {"id": "D", "lat
 rx = F.rain_exposure(EAST, stns)
 check("a heavy gauge (30 mm/h) next to the route: part of the route heavily exposed, with confidence and an ESTIMATED label",
       rx["km_heavy"] > 0 and 0 < rx["share_heavy"] < 1 and rx["confidence"] in ("high", "medium") and "ESTIMATED" in rx["label"] and rx["segments"])
+rx3 = F.rain_exposure(EAST, [{"id": "N", "lat": 1.3335 + 0.027, "lon": 103.8800, "mm": 5.0}])
+check("STRICT rain: a 60 mm/h gauge 3 km away makes the estimate heavy, but nothing is COUNTED (no reporting gauge within 2 km)",
+      rx3["km_heavy"] > 0 and rx3["share_heavy_good"] == 0 and rx3["km_counted"] == 0 and "COUNTED only" in rx3["label"])
+rx4 = F.rain_exposure(EAST, [{"id": "C", "lat": 1.3345, "lon": 103.8800, "mm": 5.0}])
+check("STRICT rain: the same gauge 110 m from the route -> the stretches within 2 km are counted", rx4["share_heavy_good"] > 0 and rx4["km_counted"] > 0)
 rx = F.rain_exposure(F.Line([(1.44, 104.05), (1.44, 104.06)]), stns)
 check("no gauge within 5 km: no estimate at all (coverage 0, nothing exposed)", rx["coverage"] == 0 and rx["km_wet"] == 0 and rx["max_mmh"] is None)
 rx2 = F.rain_exposure(EAST, stns, prev_stations=[dict(s, mm=0.2) for s in stns])
@@ -310,7 +315,9 @@ uv = next(e for e in s0["events"] if e["id"].startswith("lta:"))
 check("LTA point on the route: UNVERIFIED, listed separately, not a confirmed service", uv["status"] == "unverified" and not uv["services"] and uv["unverified_services"])
 check("probes sampled along the watched service, direction verified, within the budget", len(s0["probes"]) >= 1 and all(p["dir_ok"] for p in s0["probes"])
       and s0["config"]["probe_used"] >= 1 and s0["config"]["speed_bands_used"] is False)
-check("alerts raised for the verified jam and the unverified accident (kept apart)", any(a["key"].startswith("ev:") for a in s0["alerts"]) and any(a["key"].startswith("uv:") for a in s0["alerts"]))
+check("an alert for the verified jam; the unverified LTA point raises NO alert (nearby / unverified is not counted)",
+      any(a["key"].startswith("ev:") for a in s0["alerts"]) and not any(a["key"].startswith("uv:") for a in s0["alerts"]))
+check("the unverified point does not change any service's risk level", all(s["unverified"] == 0 or s["level"] == "info" or s["extra"][15]["mid"] > 0 or s["heavy_share"] > 0 for s in s0["services"]))
 check("no API key anywhere in the payload", "SECRET-TT-KEY-123" not in json.dumps(s0, default=str))
 check("live state never contains demo data", s0["mode"] == "live" and "DEMO" not in json.dumps(s0["events"], default=str) and "demo" not in s0)
 sv = run(app.api_forecast_service(svc="51", dir=1))
