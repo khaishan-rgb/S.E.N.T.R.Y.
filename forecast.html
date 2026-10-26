@@ -730,9 +730,11 @@ function drawLiveBuses(){
     var html = '<div class="fc-pop"><h4>Live bus · ' + esc(label) + '</h4><p>Nearest reported stop: ' + esc((b.near || {}).name || "Unavailable")
       + '<br>Road: ' + esc((b.near || {}).road || "Not supplied") + '</p><p>Source: LTA sampled bus arrivals<br>Feed updated: ' + esc(b.updated || "Unavailable") + '</p><small>Positions are sampled; this is not a complete fleet count. Road is the nearest stop’s road, not a confirmed incident road.</small></div>';
     var marker, el = document.createElement("span");
-    el.textContent = "▣ " + label; el.style.cssText = "background:#073e34;color:#bcffe3;border:1px solid #2ee59d;border-radius:5px;padding:3px 5px;font:bold 11px sans-serif;white-space:nowrap";
+    el.setAttribute("role", "img"); el.setAttribute("aria-label", "Live bus " + label); el.title = "Live bus " + label;
+    el.innerHTML = '<svg width="16" height="18" viewBox="0 0 24 28" aria-hidden="true"><rect x="3" y="2" width="18" height="22" rx="4" fill="#bcffe3"/><rect x="6" y="6" width="12" height="9" rx="1.5" fill="#073e34"/><path d="M12 6v9" stroke="#bcffe3" stroke-width="1.5"/><circle cx="7.5" cy="19.5" r="1.5" fill="#073e34"/><circle cx="16.5" cy="19.5" r="1.5" fill="#073e34"/><path d="M6 24v2m12-2v2" stroke="#bcffe3" stroke-width="3" stroke-linecap="round"/></svg>';
+    el.style.cssText = "display:flex;align-items:center;justify-content:center;box-sizing:border-box;width:26px;height:26px;background:#073e34;border:1px solid #2ee59d;border-radius:50%;cursor:pointer";
     if(MV.kind === "ml") marker = new maplibregl.Marker({element:el}).setLngLat([b.lon,b.lat]).setPopup(new maplibregl.Popup({maxWidth:"320px"}).setHTML(html)).addTo(MV.ml);
-    else if(MV.kind === "lf") marker = L.marker([b.lat,b.lon],{icon:L.divIcon({className:"",html:el.outerHTML,iconSize:[80,22],iconAnchor:[40,11]})}).bindPopup(html).addTo(MV.lf);
+    else if(MV.kind === "lf") marker = L.marker([b.lat,b.lon],{icon:L.divIcon({className:"",html:el.outerHTML,iconSize:[26,26],iconAnchor:[13,13]})}).bindPopup(html).addTo(MV.lf);
     if(marker) busMarkers.push(marker);
   });
 }
@@ -913,24 +915,18 @@ function renderHz(){
     return '<button type="button" data-h="' + h + '" aria-pressed="' + (S.h === h) + '" style="--c:' + (lv ? COL[lv] : "#3b4c60") + '"><b>' + (h ? "+" + h + " min" : "Now") + '</b><span class="ln"></span><small>' + esc(sub) + '</small></button>';
   }).join("");
 }
+function simpleReason(kind){
+  return {jam:"Traffic",speed:"Traffic",rain:"Rain",roadworks:"Road works",road_closed:"Road closed",lane_closed:"Lane closed",accident:"Accident",breakdown:"Breakdown",flooding:"Flooding",hazard:"Road hazard",other:"Traffic disruption"}[kind] || "Traffic disruption";
+}
 function alertCard(a){
-  var demo = isDemo(), acked = a.acked || S.demoAck[a.id], d = a.delay || {}, hasD = [15, 30, 60].some(function(h){ return d[h] != null || d[String(h)] != null; });
-  var svcs = (a.services || []).filter(matchesService).slice(0, 12).map(function(s){ var x = s.extra30 != null ? ' +' + f1(s.extra30) + ' min' : s.share != null ? ' ' + Math.round(s.share * 100) + '%' : '';
-    return '<button type="button" class="' + (a.verified === false && a.kind !== "rain" ? "unv" : "") + '" data-svc="' + esc(s.svc) + '" data-dir="' + s.dir + '">' + esc(s.svc) + ' d' + s.dir + x + '</button>'; }).join("");
-  var tags = lvTag(a.level) + (a.kind === "rain" ? '<span class="fc-tag est">Estimated</span>' : a.verified === false ? '<span class="fc-tag unv">Unverified</span>' : '<span class="fc-tag ver">Verified</span>')
-    + (a.escalated && !acked ? '<span class="fc-tag crit">Escalated</span>' : '') + (a.realerts ? '<span class="fc-tag watch">Worsened</span>' : '') + (a.stale ? '<span class="fc-tag stale">Source stale</span>' : '')
-    + (a.status === "resolved" ? '<span class="fc-tag ok">Cleared ' + hm(a.resolved_at) + '</span>' : '') + (demo ? '<span class="fc-tag demo">DEMO</span>' : '');
-  var dl = hasD ? '<div class="dl">' + [15, 30, 60].map(function(h){ var v = d[h] != null ? d[h] : d[String(h)]; return '<div class="' + (a.horizon === h ? "on" : "") + '"><b>' + (v == null ? "–" : "+" + f1(v)) + '</b><small>+' + h + ' min</small></div>'; }).join("") + '</div>' : '';
-  var links = (a.links || []).slice(0, 3).map(function(l){ return '<a href="' + esc(l.href) + '">' + esc(l.label) + '</a>'; }).join("");
-  var ack = a.status === "resolved" ? '' : acked ? '<small class="fc-muted">Acknowledged by ' + esc((acked.by || "DEMO")) + ' ' + hm(acked.ts) + '</small>' : '<button type="button" class="ds-btn sm pri" data-ack="' + esc(a.id) + '">Acknowledge</button>';
-  return '<article class="fc-al ' + esc(a.level) + (acked ? " faded" : "") + (a.verified === false ? " unv" : "") + (S.focusAlert === a.id ? " focus" : "") + '" data-al="' + esc(a.id) + '">'
-    + '<div class="t1">' + tags + '<span style="flex:1"></span><small class="fc-muted">' + (a.age_min != null ? a.age_min + ' min' : '') + '</small></div>'
-    + '<h4>' + esc(a.title) + '</h4><div class="loc">' + esc(a.location || "") + (a.segment ? ' – ' + esc(a.segment) : '') + '</div>'
-    + (svcs ? '<div class="svcs">' + svcs + '</div>' : '') + (hasD ? '<div class="meta" style="margin-top:6px">Predicted extra delay (min)</div>' + dl : '')
-    + '<div class="meta">' + esc(a.observed || "") + '<br>Direction: ' + esc(a.direction || "–") + '<br>Confidence: ' + esc(a.confidence || "–") + '<br>Source ' + esc(a.source || "–") + ', first ' + hm(a.first) + ', updated ' + hm(a.last) + '</div>'
-    + '<div class="act">' + esc(a.recommended || "") + '</div>'
-    + ((a.explain || []).length ? '<details><summary>Why these services (route matching)</summary><ul>' + a.explain.map(function(x){ return '<li>' + esc(x) + '</li>'; }).join("") + '</ul></details>' : '')
-    + '<div class="foot"><div class="fc-links">' + links + '</div><span class="sp"></span>' + ack + '</div></article>';
+  var acked = a.acked || S.demoAck[a.id], services = (a.services || []).filter(matchesService);
+  var road = a.road || (a.location && a.location.indexOf("Road name not supplied") < 0 ? a.location : "") || "Road name unavailable";
+  var rows = services.map(function(s){
+    var delay = s.extra30;
+    return '<tr><td>' + esc(road) + '</td><td><button type="button" class="ds-btn sm" data-svc="' + esc(s.svc) + '" data-dir="' + s.dir + '">' + esc(s.svc) + ' · D' + s.dir + '</button></td><td>' + esc(simpleReason(a.kind)) + '</td><td>' + (delay == null ? 'Unavailable' : '+' + f1(delay) + ' min') + '</td></tr>';
+  }).join("");
+  var ack = a.status === "resolved" ? 'Cleared' : acked ? 'Acknowledged' : '<button type="button" class="ds-btn sm pri" data-ack="' + esc(a.id) + '">Acknowledge</button>';
+  return '<article class="fc-al ' + esc(a.level) + '" data-al="' + esc(a.id) + '"><div style="overflow:auto"><table class="fc-tbl"><thead><tr><th>Road</th><th>Service</th><th>Reason</th><th>Extra min</th></tr></thead><tbody>' + rows + '</tbody></table></div><div class="foot"><small class="fc-muted">Extra running time predicted in 30 min' + (isDemo() ? ' · DEMO' : '') + '</small><span class="sp"></span>' + ack + '</div></article>';
 }
 function filterActive(){ return !!($("fcFilterSvc").value.trim() || $("fcFilterOp").value || minDelay()); }
 function minDelay(){ return Math.max(0, Number($("fcFilterMin").value) || 0); }
@@ -984,12 +980,12 @@ function renderCmp(){
   }).join("") || '<div class="fc-empty">' + esc(st.error || "No forecast yet.") + '</div>';
 }
 function renderTop(){
-  var rows = ((S.st || {}).services || []).filter(function(s){ return matchesService(s) && (LV[s.level] >= 1 || s.extra[15].mid > 0 || s.extra[30].mid > 0 || s.extra[60].mid > 0); }).slice(0, 14);
-  $("fcTop").innerHTML = rows.length ? '<thead><tr><th>Service</th><th>Risk</th><th>In 15 min</th><th>In 30 min</th><th>In 60 min</th><th>Cause</th><th>Recovery</th></tr></thead><tbody>' + rows.map(function(s){
-    return '<tr data-svc="' + esc(s.svc) + '" data-dir="' + s.dir + '"><td><b>' + esc(s.svc) + '</b> d' + s.dir + '</td><td>' + lvTag(s.level) + (s.blocked ? ' <span class="fc-tag crit">Blocked</span>' : '') + '</td>'
-      + [15, 30, 60].map(function(h){ var e = s.extra[h] || s.extra[String(h)]; return '<td class="fc-num"><b>+' + f1(e.mid) + ' min</b></td>'; }).join("")
-      + '<td>' + esc((s.causes || []).join(", ") || (s.heavy_share ? "Heavy rain (est.)" : "–")) + '</td><td>' + (s.building ? "still building" : s.recovery_min != null ? "~" + s.recovery_min + " min" : "–") + '</td></tr>'; }).join("") + '</tbody>'
-    : '<tbody><tr><td class="fc-empty">No services at risk match the selected filters.</td></tr></tbody>';
+  var rows = ((S.st || {}).services || []).filter(function(s){return matchesService(s) && (LV[s.level] >= 1 || predictedDelay(s) > 0);});
+  $("fcTop").innerHTML = '<caption style="text-align:left;padding:0 0 8px;color:#b6c8dd">Extra running time predicted in 30 min</caption><thead><tr><th>Road</th><th>Service</th><th>Reason</th><th>Extra min</th></tr></thead><tbody>' + (rows.map(function(s){
+    var reasons = (s.causes || []).map(function(c){return /^(unknown|jam|speed|other)$/i.test(c) ? 'Traffic' : c;});
+    var delay = (s.extra || {})[30];
+    return '<tr data-svc="' + esc(s.svc) + '" data-dir="' + s.dir + '"><td>' + esc((s.roads || []).join(', ') || 'Road name unavailable') + '</td><td><b>' + esc(s.svc) + '</b> · D' + s.dir + '</td><td>' + esc(Array.from(new Set(reasons)).join(', ') || (s.heavy_share ? 'Rain' : 'Traffic disruption')) + '</td><td>' + (delay && delay.mid != null ? '+' + f1(delay.mid) + ' min' : 'Unavailable') + '</td></tr>';
+  }).join('') || '<tr><td colspan="4" class="fc-empty">No affected services match the filters.</td></tr>') + '</tbody>';
 }
 function renderInt(){
   var st = S.st || {}, src = st.sources || {}, cfg = st.config || {}, cal = st.calibration || {};

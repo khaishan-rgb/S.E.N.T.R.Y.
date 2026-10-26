@@ -1309,6 +1309,7 @@ def evaluate(world, P=None):
             hz = next((h for h in H if risk_level(d[h], top and top["hw"], e["kind"] == "road_closed", 0, 0, P) == e["level"]), H[0])
             cands.append({"key": "ev:" + e["id"], "kind": e["kind"], "level": e["level"], "verified": True,
                           "title": f"{e['label'] if e.get('label') and e['label'] != 'Unknown' else 'Traffic disruption'} - {e['road'] or e['from'] or ('service ' + str(top['svc']) + ' dir ' + str(top['dir']) if top else 'matched route segment')}" + (f" towards {e['towards']}" if e.get("towards") else ""),
+                          "road": e.get("road") or e.get("from") or "",
                           "location": " - ".join(x for x in (e.get("from"), e.get("to")) if x) or (e.get("road") or "Road name not supplied by source"),
                           "segment": f"route km {top['a_m'] / 1000:.1f}-{top['b_m'] / 1000:.1f} of {top['svc']} dir {top['dir']}" if top and top.get("a_m") is not None else "",
                           "services": [{"svc": s["svc"], "dir": s["dir"], "extra30": s["extra"].get(30, 0)} for s in e["services"]],
@@ -1379,6 +1380,7 @@ def _svc_brief(s):
     return {"svc": s["svc"], "dir": s["dir"], "level": s["level"], "levels": s["levels"], "score": s["score"], "extra": s["extra"], "blocked": s["blocked"],
             "maybe_blocked": s["maybe_blocked"], "heavy_share": s["heavy_share"], "unverified": s["unverified"], "recovery_min": s["recovery_min"],
             "building": s["building"], "hw": s["hw"], "hw_src": s.get("hw_src"), "hist_rt": s["hist_rt"], "pred_rt": s["pred_rt"],
+            "roads": sorted({c.get("road") for c in s["contrib"] if c.get("road")}),
             "causes": sorted({c["label"] or c["kind"] for c in s["contrib"]})[:4]}
 
 
@@ -1481,7 +1483,7 @@ class AlertBook:
             aid = stable_id(c["key"])
             seen.add(aid)
             a = self.alerts.get(aid)
-            snap = {k: c.get(k) for k in ("kind", "title", "location", "segment", "services", "direction", "delay", "horizon", "observed", "predicted",
+            snap = {k: c.get(k) for k in ("kind", "title", "road", "location", "segment", "services", "direction", "delay", "horizon", "observed", "predicted",
                                            "confidence", "source", "recommended", "links", "explain", "lat", "lon", "verified", "score", "deps")}
             if a is None or (a["status"] == "resolved" and now - (a.get("resolved_at") or 0) > P["reopen_min"] * 60):
                 a = dict(snap, id=aid, key=c["key"], level=c["level"], peak=c["level"], status="active", first=now, last=now, missed=0, stale=False,
