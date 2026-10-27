@@ -448,6 +448,44 @@ body.fc-present #fcTop th:first-child{width:28%}body.fc-present #fcTop th:nth-ch
 body.fc-present .fc-cmp ul{padding-left:16px;margin:6px 0}body.fc-present .fc-cmp .row{gap:4px}
 body.fc-present .fc-kpis{position:relative}body.fc-present .fc-kpis:before{content:'Network totals';position:absolute;top:-12px;left:2px;color:#9ab5d4;font-size:10px}
 .fc-horizon-lead{font-size:11px;color:#a9c7e8;white-space:nowrap}body.fc-present .fc-horizon-lead{font-size:clamp(12px,.8vw,23px)}
+/* TV correction: fixed baselines, no overlapping HUD row, one wide service table. */
+.fc-event-marker{display:grid;place-items:center;width:34px;height:34px;padding:0;border:0;background:transparent;cursor:pointer;z-index:2}
+.fc-event-marker img{width:34px;height:34px;filter:drop-shadow(0 2px 3px #030a16)}
+.fc-load{color:#b4eddf;font-weight:600}.fc-load.heavy{color:#ffc779}
+#fcTop caption{text-align:left;padding:0 0 9px;color:#aac3df;font-size:12px}
+body.fc-present .fc{grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);grid-template-rows:68px 104px minmax(0,1fr) 230px;gap:12px;padding:12px}
+body.fc-present .fc-hud{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;padding:0 2px;min-height:0}
+body.fc-present .fc-hud-frame,body.fc-present .fc-hud-l,body.fc-present .fc-hud-s{display:none}
+body.fc-present .fc-hud-c{grid-column:1;grid-row:1;text-align:left;padding:0;order:0;border:0;background:none;clip-path:none}
+body.fc-present .fc-hud-c h1{font-size:clamp(24px,1.65vw,46px);letter-spacing:.03em;text-shadow:none;white-space:nowrap}
+body.fc-present .fc-hud-c p{font-size:clamp(11px,.8vw,22px);margin-top:5px}
+body.fc-present .fc-hud-r{grid-column:2;grid-row:1;padding:0;justify-content:flex-end}
+body.fc-present .fc-kpis{grid-template-columns:repeat(8,minmax(0,1fr));gap:8px;margin:0;align-items:stretch}
+body.fc-present .fc-kpis:before{display:none}
+body.fc-present .fc-kpi{display:flex;flex-direction:column;align-items:flex-start;justify-content:flex-start;gap:6px;padding:10px 12px;min-height:0;overflow:hidden;border-radius:9px;background:#0c203b}
+body.fc-present .fc-kpi .txt{display:contents}
+body.fc-present .fc-kpi .l{display:flex;align-items:flex-start;min-height:30px;height:30px;width:100%;font-size:12px;line-height:15px;margin:0}
+body.fc-present .fc-kpi .l>b{font-weight:600}
+body.fc-present .fc-kpi .v{margin:0;font-size:28px;line-height:32px;min-height:32px;color:#f0f6ff;text-shadow:none}
+body.fc-present .fc-kpi .v.na{font-size:15px;line-height:18px;white-space:normal}
+body.fc-present .fc-kpi .s,body.fc-present .fc-kpi .fc-ring,body.fc-present .fc-kpi svg.spark{display:none}
+body.fc-present .fc-low>section:first-child{display:none}
+body.fc-present .fc-low>section:nth-child(2){grid-column:1/-1;grid-row:4}
+body.fc-present .fc-low>section:nth-child(2) .fc-h{padding:9px 14px 8px;min-height:0}
+body.fc-present .fc-low>section:nth-child(2) .fc-h h2{font-size:19px;line-height:24px;white-space:nowrap}
+body.fc-present .fc-low>section:nth-child(2) .fc-h small{font-size:12px;white-space:nowrap}
+body.fc-present #fcTop{font-size:17px;line-height:21px}
+body.fc-present #fcTop td,body.fc-present #fcTop th{padding:5px 8px;vertical-align:middle}
+body.fc-present #fcTop th{font-size:12px;line-height:16px;white-space:nowrap}
+body.fc-present #fcTop caption{font-size:11px;line-height:14px;padding:0 0 5px}
+body.fc-present #fcTop th:first-child{width:11%}body.fc-present #fcTop th:nth-child(2){width:27%}body.fc-present #fcTop th:nth-child(3){width:24%}body.fc-present #fcTop th:nth-child(4){width:10%}body.fc-present #fcTop th:nth-child(5){width:11%}body.fc-present #fcTop th:nth-child(6){width:17%}
+body.fc-present #fcTop .fc-reason-icon{width:22px;height:22px}
+body.fc-present .fc-alertpanel .fc-h h2{font-size:20px}body.fc-present .fc-alertpanel .fc-h small{font-size:12px}
+body.fc-present .fc-tv-alerts .fc-tbl{font-size:16px}
+body.fc-present .fc-hz{bottom:10px}.fc-present .fc-hz button small{line-height:1.3;white-space:normal}
+body.fc-present .fc-event-marker,body.fc-present .fc-event-marker img{width:32px;height:32px}
+@media(min-width:2600px){body.fc-present .fc{grid-template-rows:120px 160px minmax(0,1fr) 380px;gap:20px;padding:20px}body.fc-present .fc-kpi{padding:18px}body.fc-present .fc-kpi .l{font-size:21px;line-height:26px;height:52px;min-height:52px}body.fc-present .fc-kpi .v{font-size:45px;line-height:54px}body.fc-present .fc-kpi .v.na{font-size:26px;line-height:30px}body.fc-present #fcTop{font-size:28px;line-height:34px}body.fc-present #fcTop td,body.fc-present #fcTop th{padding:9px 12px}body.fc-present #fcTop th{font-size:22px;line-height:27px}body.fc-present #fcTop caption{font-size:18px;line-height:24px}body.fc-present .fc-low>section:nth-child(2) .fc-h h2{font-size:29px;line-height:36px}body.fc-present .fc-low>section:nth-child(2) .fc-h small{font-size:22px}body.fc-present .fc-tv-alerts .fc-tbl{font-size:27px}body.fc-present .fc-event-marker,body.fc-present .fc-event-marker img{width:44px;height:44px}}
+@media(max-height:760px){body.fc-present .fc{grid-template-rows:60px 98px minmax(0,1fr) 220px;gap:8px;padding:8px}}
 </style>
 </head>
 <body>
@@ -525,7 +563,7 @@ body.fc-present .fc-kpis{position:relative}body.fc-present .fc-kpis:before{conte
       <div class="fc-b"><p class="fc-muted">Compare expected extra running time 15, 30 and 60 minutes from now. Values are additional minutes per service-direction; ranges show uncertainty. The headline shows average extra minutes per affected service-direction, not a network sum.</p><div class="fc-cmp" id="fcCmp"></div></div>
     </section>
     <section class="fc-glass" aria-label="Services at risk">
-      <div class="fc-h"><h2>Service watch</h2><span class="sp"></span><small id="fcWatchPage">route impacts · three-bus groups</small></div>
+      <div class="fc-h"><h2>Services to watch</h2><span class="sp"></span><small id="fcWatchPage">route impacts · three-bus groups</small></div>
       <div class="fc-b" style="overflow:auto;max-height:340px"><table class="fc-tbl" id="fcTop"></table></div>
     </section>
     <section class="fc-glass" aria-label="Data integrity">
@@ -620,7 +658,7 @@ function rangeChart(extra, hw){
 /* traffic flow: a calm cyan-green when free, through amber and orange to a glowing red when jammed */
 var FLOW_STOPS = [[0, "#ff2e63"], [.25, "#ff4d4d"], [.45, "#ff8a3d"], [.62, "#ffc93c"], [.8, "#7be08a"], [1, "#2ee6c5"]];
 function FLOW_RAMP(lvl){ var e = ["interpolate", ["linear"], lvl]; FLOW_STOPS.forEach(function(st){ e.push(st[0], st[1]); }); return e; }
-var MV = {kind:null, ready:false, ml:null, lf:null, pop:null, zm:[], groups:{}, fitDone:false};
+var MV = {kind:null, ready:false, ml:null, lf:null, pop:null, zm:[], groups:{}, fitDone:false, eventMarkers:[]};
 function forecastMapStyle(){
   var style = SG3D.style();
   var palette = {bg:["background-color","#111c2c"],water:["fill-color","#091426"],park:["fill-color","#18362f"],wood:["fill-color","#17312d"],
@@ -743,7 +781,7 @@ function mlLayers(m){
   m.addLayer({id:"probe", type:"circle", source:"probe", paint:{"circle-radius":["interpolate", ["linear"], ["zoom"], 10, 4, 15, 7], "circle-color":["get", "c"], "circle-stroke-color":"#02070f", "circle-stroke-width":1.5}});
   m.addLayer({id:"rain", type:"circle", source:"rain", paint:{"circle-radius":["interpolate", ["linear"], ["get", "mmh"], 0, 2.5, 2.5, 5, 10, 9, 50, 15], "circle-color":["interpolate", ["linear"], ["get", "mmh"], 0, "#2a4a6a", .1, "#4aa8ff", 10, "#7cc8ff", 50, "#d8f3ff"],
     "circle-opacity":["case", [">", ["get", "mmh"], 0], .85, .35], "circle-stroke-color":"#bfefff", "circle-stroke-width":["case", [">=", ["get", "mmh"], 10], 1.5, 0]}});
-  m.addLayer({id:"evp", type:"symbol", source:"evp", layout:{"icon-sort-key":["get","priority"], "icon-image":["get", "icon"], "icon-size":["interpolate", ["linear"], ["zoom"], 10, .8, 15, 1], "icon-allow-overlap":true, "icon-ignore-placement":true, "icon-padding":3}});
+  m.addLayer({id:"evp", type:"symbol", source:"evp", layout:{visibility:"none","icon-sort-key":["get","priority"], "icon-image":["get", "icon"], "icon-size":["interpolate", ["linear"], ["zoom"], 10, .8, 15, 1], "icon-allow-overlap":true, "icon-ignore-placement":true, "icon-padding":3}});
   var hov = ["ev-line", "evp", "probe", "rain", "rsec", "stops"];
   hov.forEach(function(id){ m.on("mouseenter", id, function(){ m.getCanvas().style.cursor = "pointer"; }); m.on("mouseleave", id, function(){ m.getCanvas().style.cursor = ""; }); });
   m.on("click", function(e){
@@ -838,7 +876,21 @@ MV.update = function(){
   zones();
   drawLiveBuses();
   renderMapContext();
+  drawEventMarkers(ev);
 };
+function drawEventMarkers(events){
+  (MV.eventMarkers || []).forEach(function(m){m.remove();});MV.eventMarkers=[];
+  if(!MV.ready || MV.kind!=="ml") return;
+  events.forEach(function(e){
+    var point=eventPoint(e);if(!point) return;
+    var kind=ICON[e.kind] ? e.kind : 'other',button=document.createElement('button');
+    button.type='button';button.className='fc-event-marker';button.title=(KNAME[kind] || 'Incident') + (e.road ? ' · ' + e.road : '');
+    button.setAttribute('aria-label',button.title);
+    var img=document.createElement('img');img.alt='';img.src=iconUrl(kind,false);button.appendChild(img);
+    var marker=new maplibregl.Marker({element:button}).setLngLat(point).setPopup(new maplibregl.Popup({maxWidth:'340px'}).setHTML(popHtml('event',{id:e.id}))).addTo(MV.ml);
+    MV.eventMarkers.push(marker);
+  });
+}
 // Bus positions use the existing sampled LTA arrival feed, never fictional demo data.
 var liveBuses = [], busMarkers = [], busGeneration = 0, busDebounce;
 function busTargets(){
@@ -1071,11 +1123,26 @@ function toggleMap3D(){
  if(MV.ml.getLayer('building-3d')) MV.ml.setLayoutProperty('building-3d','visibility',S.map3d ? 'visible' : 'none');
  renderLayers();
 }
+function loadingCell(s){
+ var b=bunchingRow(s);
+ if(!b || !b.available || !b.load_level) return '<span class="fc-muted">Unavailable</span>';
+ var label={SEA:'Seats available',SDA:'Standing',LSD:'Heavy load'}[b.load_level] || 'Unavailable';
+ var counts=b.load_counts || {},known=b.load_sampled || 0;
+ return '<span class="fc-load ' + (b.load_level==='LSD' ? 'heavy' : '') + '">' + label + (known ? ' · ' + (counts[b.load_level] || 0) + '/' + known : '') + '</span>';
+}
+function watchRows(){
+ var rows=forecastRows().slice();
+ (S.bunching || []).forEach(function(b){if(b.available && (b.groups3>0 || b.load_level==='LSD') && matchesService(b) && !rows.some(function(s){return s.svc===b.svc && s.dir===b.dir;})) rows.push(Object.assign({roads:[],causes:b.groups3>0 ? ['Bunching'] : ['Heavy passenger load'],extra:{}},b));});
+ rows.sort(function(a,b){var ab=bunchingRow(a)||{},bb=bunchingRow(b)||{};var score=function(s,o){return (s.blocked ? 100 : 0)+(o.groups3||0)*20+(o.load_level==='LSD' ? 10 : 0)+predictedDelay(s);};return score(b,bb)-score(a,ab);});
+ return rows;
+}
 function bunchingRow(s){return (S.bunching || []).find(function(b){return b.svc===s.svc && b.dir===s.dir;});}
 function bunchingCell(s){var b=bunchingRow(s);return b && b.available ? '<span class="fc-bunch-count' + (b.groups3 ? ' active' : '') + '">' + b.groups3 + '</span>' : '<span class="fc-muted" title="No fresh bunching observations">Unavailable</span>';}
 async function loadBunching(){
  if(isDemo()){S.bunching=[];renderTop();return;}
- var j;try{j=await api('/api/forecast/bunching');}catch(e){j={};}if(isDemo()) return;S.bunching=(j && j.rows) || [];renderTop();
+ var selected=selectedServices(), targets=selected.length ? selected.filter(function(svc){return [1,2].some(function(dir){return matchesService({svc:svc,dir:dir});});}) : forecastRows().map(function(s){return s.svc;});
+ var query=Array.from(new Set(targets)).join(',');
+ var j;try{j=await api('/api/forecast/bunching?services=' + encodeURIComponent(query));}catch(e){j={};}if(isDemo()) return;S.bunching=(j && j.rows) || [];renderTop();
 }
 function tvSlice(rows,size){var pages=Math.max(1,Math.ceil(rows.length/size));return {rows:S.present ? rows.slice((S.tvPage%pages)*size,(S.tvPage%pages+1)*size) : rows,page:S.tvPage%pages+1,pages:pages};}
 setInterval(function(){if(S.present && !document.hidden){S.tvPage++;renderTop();renderAlerts();}},12000);
@@ -1138,7 +1205,7 @@ function alertCard(a){
   var road = a.road || (a.location && a.location.indexOf("Road name not supplied") < 0 ? a.location : "") || "Road name unavailable";
   var rows = services.map(function(s){
     var delay = s.extra30;
-    return '<tr><td>' + esc(s.road || road) + '</td><td><button type="button" class="ds-btn sm" data-svc="' + esc(s.svc) + '" data-dir="' + s.dir + '">' + esc(s.svc) + ' · D' + s.dir + '</button></td><td>' + '<img class="fc-reason-icon" alt="" src="' + iconUrl(ICON[a.kind] ? a.kind : 'other',false) + '">' + esc(simpleReason(a.kind)) + '</td><td>' + (delay == null ? 'Unavailable' : '+' + f1(delay) + ' min') + '</td></tr>';
+    return '<tr><td>' + esc(s.road || road) + '</td><td><button type="button" class="ds-btn sm" data-svc="' + esc(s.svc) + '" data-dir="' + s.dir + '">' + esc(s.svc) + ' · D' + s.dir + '</button></td><td>' + '<img class="fc-reason-icon" alt="" src="' + iconUrl(ICON[a.kind] ? a.kind : 'other',false) + '">' + esc(simpleReason(a.kind)) + '</td><td>' + (a.kind === 'road_closed' ? 'Blocked' : delay == null ? 'Unavailable' : '+' + f1(delay) + ' min') + '</td></tr>';
   }).join("");
   var ack = a.status === "resolved" ? 'Cleared' : acked ? 'Acknowledged' : '<button type="button" class="ds-btn sm pri" data-ack="' + esc(a.id) + '">Acknowledge</button>';
   return '<article class="fc-al ' + esc(a.level) + '" data-al="' + esc(a.id) + '"><div style="overflow:auto"><table class="fc-tbl"><thead><tr><th>Road</th><th>Service</th><th>Reason</th><th>Extra min</th></tr></thead><tbody>' + rows + '</tbody></table></div><div class="foot"><small class="fc-muted">Extra running time predicted in 30 min' + (isDemo() ? ' · DEMO' : '') + '</small><span class="sp"></span>' + ack + '</div></article>';
@@ -1179,7 +1246,7 @@ function renderAlerts(){
   if(S.present){
     var compact=[];list.forEach(function(a){(a.services || []).filter(matchesService).forEach(function(service){compact.push({alert:a,service:service});});});
     var page=tvSlice(compact,6);
-    el.innerHTML='<div class="fc-tv-alerts"><table class="fc-tbl"><thead><tr><th>Road</th><th>Service</th><th>Reason</th><th>Extra min</th></tr></thead><tbody>' + page.rows.map(function(row){var a=row.alert,service=row.service;return '<tr data-al="' + esc(a.id) + '"><td>' + esc(service.road || a.road || 'Road name unavailable') + '</td><td><b>' + esc(service.svc) + '</b> · D' + service.dir + '</td><td><img class="fc-reason-icon" alt="" src="' + iconUrl(ICON[a.kind] ? a.kind : 'other',false) + '">' + esc(simpleReason(a.kind)) + '</td><td>' + (service.extra30==null ? 'Unavailable' : '+' + f1(service.extra30) + ' min') + '</td></tr>';}).join('') + '</tbody></table><small>Page ' + page.page + '/' + page.pages + ' · rotates every 12 s · ' + horizonLead(30) + '</small></div>';
+    el.innerHTML='<div class="fc-tv-alerts"><table class="fc-tbl"><thead><tr><th>Road</th><th>Service</th><th>Reason</th><th>Extra min</th></tr></thead><tbody>' + page.rows.map(function(row){var a=row.alert,service=row.service;return '<tr data-al="' + esc(a.id) + '"><td>' + esc(service.road || a.road || 'Road name unavailable') + '</td><td><b>' + esc(service.svc) + '</b> · D' + service.dir + '</td><td><img class="fc-reason-icon" alt="" src="' + iconUrl(ICON[a.kind] ? a.kind : 'other',false) + '">' + esc(simpleReason(a.kind)) + '</td><td>' + (a.kind === 'road_closed' ? 'Blocked' : service.extra30==null ? 'Unavailable' : '+' + f1(service.extra30) + ' min') + '</td></tr>';}).join('') + '</tbody></table><small>Page ' + page.page + '/' + page.pages + ' · rotates every 12 s · ' + horizonLead(30) + '</small></div>';
     if(!compact.length) el.innerHTML='<div class="fc-empty">No alerts match these filters.</div>';
     return;
   }
@@ -1202,14 +1269,17 @@ function renderCmp(){
   }).join("") || '<div class="fc-empty">' + esc(st.error || "No forecast yet.") + '</div>';
 }
 function renderTop(){
-  var rows = ((S.st || {}).services || []).filter(function(s){return matchesService(s) && (LV[s.level] >= 1 || predictedDelay(s) > 0);});
-  (S.bunching || []).forEach(function(b){if(b.available && b.groups3>0 && matchesService(b) && !rows.some(function(s){return s.svc===b.svc && s.dir===b.dir;})) rows.push(Object.assign({roads:[],causes:['Bunching'],extra:{}},b));});
-  var page=tvSlice(rows,4);rows=page.rows;$("fcWatchPage").textContent='three-bus groups' + (S.present ? ' · page ' + page.page + '/' + page.pages : '');
-  $("fcTop").innerHTML = '<caption style="text-align:left;padding:0 0 8px;color:#b6c8dd">Extra running time predicted in 30 min</caption><thead><tr><th>Road</th><th>Service</th><th>Reason</th><th>Extra min</th><th>3-bus bunching</th></tr></thead><tbody>' + (rows.map(function(s){
-    var reasons = (s.causes || []).map(function(c){return /^(unknown|jam|speed|other)$/i.test(c) ? 'Traffic' : c;});
-    var delay = (s.extra || {})[30];
-    return '<tr data-risk-service="true" tabindex="0" role="button" aria-label="Show service ' + esc(s.svc) + ' on map" data-svc="' + esc(s.svc) + '" data-dir="' + s.dir + '"><td>' + esc((s.roads || []).join(', ') || 'Road name unavailable') + '</td><td><b>' + esc(s.svc) + '</b> · D' + s.dir + '</td><td>' + '<img class="fc-reason-icon" alt="" src="' + iconUrl((s.causes || []).some(function(c){return /road.?works/i.test(c);}) ? 'roadworks' : (s.causes || []).some(function(c){return /accident/i.test(c);}) ? 'accident' : (s.causes || []).some(function(c){return /jam|traffic|speed/i.test(c);}) ? 'jam' : 'other',false) + '">' + esc(Array.from(new Set(reasons)).join(', ') || (s.heavy_share ? 'Rain' : 'Traffic disruption')) + '</td><td>' + (delay && delay.mid != null ? '+' + f1(delay.mid) + ' min' : 'Unavailable') + '</td><td>' + bunchingCell(s) + '</td></tr>';
-  }).join('') || '<tr><td colspan="5" class="fc-empty">No affected services match the filters.</td></tr>') + '</tbody>';
+  var all=watchRows(),page=tvSlice(all,4),rows=page.rows;
+  var traffic=all.filter(function(s){return predictedDelay(s)>0 || s.blocked;}).length;
+  var bunch=all.filter(function(s){var b=bunchingRow(s);return b && b.available && b.groups3>0;}).length;
+  var heavy=all.filter(function(s){var b=bunchingRow(s);return b && b.available && b.load_level==='LSD';}).length;
+  $("fcWatchPage").textContent=traffic + ' traffic · ' + bunch + ' bunching · ' + heavy + ' heavy load' + (S.present ? ' · ' + page.page + '/' + page.pages : '');
+  $("fcTop").innerHTML='<caption>Delay: 30-minute forecast · passenger load: current sampled observations · bunching: groups of exactly three</caption><thead><tr><th>Service</th><th>Road / location</th><th>Watch reason</th><th>Extra time</th><th>3-bus groups</th><th>Passenger load</th></tr></thead><tbody>' + (rows.map(function(s){
+    var causes=(s.causes || []),reasons=causes.map(function(c){return /^(unknown|jam|speed|other)$/i.test(c) ? 'Traffic' : c;}),delay=(s.extra || {})[30];
+    var kind=causes.some(function(c){return /road.?works/i.test(c);}) ? 'roadworks' : causes.some(function(c){return /road closed/i.test(c);}) ? 'road_closed' : causes.some(function(c){return /accident/i.test(c);}) ? 'accident' : causes.some(function(c){return /traffic|jam|speed/i.test(c);}) ? 'jam' : 'other';
+    var road=(s.roads || []).join(', ') || 'Not supplied';
+    return '<tr data-risk-service="true" tabindex="0" role="button" aria-label="Show service ' + esc(s.svc) + ' on map" data-svc="' + esc(s.svc) + '" data-dir="' + s.dir + '"><td><b>' + esc(s.svc) + '</b> · D' + s.dir + '</td><td title="' + esc(road) + '">' + esc(road) + '</td><td><img class="fc-reason-icon" alt="" src="' + iconUrl(kind,false) + '">' + esc(Array.from(new Set(reasons)).join(', ') || 'Traffic disruption') + '</td><td>' + (s.blocked ? 'Blocked' : delay && delay.mid!=null ? '+' + f1(delay.mid) + ' min' : 'Unavailable') + '</td><td>' + bunchingCell(s) + '</td><td>' + loadingCell(s) + '</td></tr>';
+  }).join('') || '<tr><td colspan="6" class="fc-empty">No matching services need watching.</td></tr>') + '</tbody>';
 }
 function renderInt(){
   var st = S.st || {}, src = st.sources || {}, cfg = st.config || {}, cal = st.calibration || {};
@@ -1355,7 +1425,7 @@ function playLoop(){
 
 /* ------------------------------------------------------------------ presentation (full screen showcase) */
 function present(on){
-  S.present = on;S.tvPage=0; document.body.classList.toggle("fc-present", on);renderTop();renderAlerts();renderCmp();
+  S.present = on;S.tvPage=0;if(on){S.lay.events=true;S.lay.works=true;S.lay.traffic=true;} document.body.classList.toggle("fc-present", on);renderKpis();renderTop();renderAlerts();renderCmp();renderLayers();MV.update();
   if(on){ var d = document.documentElement; if(d.requestFullscreen && !document.fullscreenElement) d.requestFullscreen().catch(function(){}); }
   else if(document.fullscreenElement) document.exitFullscreen().catch(function(){});
   setTimeout(function(){ if(MV.ml) MV.ml.resize(); if(MV.lf) MV.lf.invalidateSize(); fitScene(); }, 120);

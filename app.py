@@ -11884,9 +11884,17 @@ async def api_forecast_service(svc: str = "", dir: int = 1, mode: str = "live", 
 
 
 @app.get("/api/forecast/bunching")
-async def api_forecast_bunching():
-    """Read existing collector observations; missing/stale samples never become zero."""
+async def api_forecast_bunching(services: str = ""):
+    """Watch requested services through the existing collector; never fabricate missing samples."""
     now = time.time()
+    requested = list(dict.fromkeys(s for s in re.split(r"[,\s]+", services.upper()) if re.fullmatch(r"[0-9A-Z]{1,6}", s)))
+    if requested:
+        if now - BB.get("last_req", 0) >= BB_IDLE_SEC:
+            BB["wake_at"] = now
+        BB["last_req"] = now
+        for service in requested[:max(1, BB_MAX_PAIRS // 2)]:
+            for direction in (1, 2):
+                BB["watch"][(service, direction)] = now
     max_age = 2 * BB["params"].get("refresh_sec", 60)
     rows = []
     for sample in list(BB["rows"].values()):
@@ -11895,8 +11903,16 @@ async def api_forecast_bunching():
         count = (sample.get("counts") or {}).get("bb3")
         available = (age is not None and age <= max_age and not sample.get("error")
                      and sample.get("issue") != "No data" and isinstance(count, (int, float)))
+        loads = {"SEA": 0, "SDA": 0, "LSD": 0}
+        if available:
+            for bus in sample.get("seq") or []:
+                load = str(bus.get("load") or "").upper()
+                if load in loads:
+                    loads[load] += 1
+        level = "LSD" if loads["LSD"] else "SDA" if loads["SDA"] else "SEA" if loads["SEA"] else None
         rows.append({"svc": str(sample.get("service") or "").upper(), "dir": sample.get("direction"),
-                     "groups3": count if available else None, "available": bool(available), "age_s": round(age) if age is not None else None})
+                     "groups3": count if available else None, "available": bool(available), "age_s": round(age) if age is not None else None,
+                     "load_level": level, "load_counts": loads, "load_sampled": sum(loads.values())})
     return {"rows": rows, "source": "bunching collector", "updated": now_sgt().isoformat(timespec="seconds")}
 
 
