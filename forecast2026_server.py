@@ -39,19 +39,23 @@ async def asset(request: Request):
 
 
 @app.get('/api/forecast/centre')
-async def centre(mode:str='demo',horizon:int=30,scenario:str='combined',tick:int=0,services:str='',exclude_cbs:int=0,category:str='all'):
+async def centre(mode:str='demo',horizon:int=30,scenario:str='combined',tick:int=0,services:str='',exclude_cbs:int=0,category:str='all',delay_min:float=.8):
     if mode not in ('live','demo') or horizon not in model.HORIZONS or scenario not in dict(model.SCENARIOS):
         return JSONResponse({'error':'Unsupported mode, horizon or scenario'},status_code=400)
+    try:
+        delay_min=model.delay_threshold(delay_min)
+    except ValueError as error:
+        return JSONResponse({'error':str(error)},status_code=400)
     ns=f'{mode}:{scenario if mode=="demo" else "network"}:{horizon}'
     raw={'error':'Standalone demo server: use the existing app.py deployment to connect public live providers.','age_s':999}
-    data=model.build_centre(mode,horizon,scenario,max(0,tick),raw=raw)
+    data=model.build_centre(mode,horizon,scenario,max(0,tick),raw=raw,delay_min=0)
     journal().sync(ns,data['alerts'],time.time(),can_resolve=mode=='demo')
     history,audit=journal().view(ns);status={a['id']:a['status'] for a in history}
-    filtered=model.build_centre(mode,horizon,scenario,max(0,tick),raw=raw,services=[s for s in services.upper().split(',') if s],exclude_cbs=bool(exclude_cbs),category=category)
+    filtered=model.build_centre(mode,horizon,scenario,max(0,tick),raw=raw,services=[s for s in services.upper().split(',') if s],exclude_cbs=bool(exclude_cbs),category=category,delay_min=delay_min)
     for a in filtered['alerts']:
         a['status']=status.get(a['id'],'new')
     wanted={s for s in services.upper().split(',') if s}
-    history=[a for a in history if (not wanted or a['svc'] in wanted) and (not exclude_cbs or a['svc'] not in model.CBS) and (category=='all' or a['category']==category)]
+    history=[a for a in history if (not wanted or a['svc'] in wanted) and (not exclude_cbs or a['svc'] not in model.CBS) and (category=='all' or a['category']==category) and (a['category']!='traffic' or model.meets_delay(a,delay_min))]
     return dict(filtered,history=history,audit=audit,namespace=ns,cameras=[])
 
 
@@ -72,6 +76,7 @@ async def services():
     return {'services':[{'svc':s,'dirs':[1],'operator':'SMRT' if s=='853' else 'SBST'} for s,_,_ in model.CORRIDORS],'demo':True}
 
 
+@app.get('/api/forecast/centre/cameras')
 @app.get('/api/cameras')
 async def cameras():
-    return {'cameras':[],'error':'No source credentials in the standalone demonstration.'}
+    return {'cameras':[],'error':'No source credentials in the standalone demonstration. Start uvicorn app:app for LTA and data.gov.sg camera adapters.','diagnostics':['Standalone DEMO has no external camera adapter.']}

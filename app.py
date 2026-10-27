@@ -5515,8 +5515,9 @@ async def cameras_state():
             d = dg.get(cid)
             if cid in lta:
                 c["src"] = "lta"
-                if d and d.get("taken") and (_age_min(d["taken"]) or 1e9) <= 15:
-                    c["taken"] = d["taken"]
+                if d and d.get("taken") and (_age_min(d["taken"]) if _age_min(d["taken"]) is not None else 1e9) <= 15:
+                    if not c.get("taken"):
+                        c["link"], c["taken"], c["src"] = d["link"], d["taken"], "datagov"
             else:
                 c["src"] = "datagov"
             merged[cid] = c
@@ -12035,14 +12036,18 @@ def fc26_enrich_context(raw, samples):
         context[f'{key[0]}:{key[1]}']=cached_rows
     if len(FC26_STOP_CONTEXT)>500:FC26_STOP_CONTEXT.clear()
     samples=[dict(s,route_stops=context.get(f"{str(s.get('service') or '').upper()}:{s.get('direction')}",s.get('route_stops') or [])) for s in samples]
-    return dict(raw,route_context=context),samples
+    return dict(raw,route_context=context,headway_schedule=fc26.master_schedule(BB.get('master',[]),keys,time.time())),samples
 
 
 @app.get('/api/forecast/centre')
 async def fc26_centre(mode: str='live', horizon: int=0, scenario: str='combined', tick: int=0,
-                     services: str='', exclude_cbs: int=0, category: str='all'):
+                     services: str='', exclude_cbs: int=0, category: str='all', delay_min: float=.8):
     if mode not in ('demo','live') or horizon not in fc26.HORIZONS or scenario not in dict(fc26.SCENARIOS):
         return JSONResponse({'error':'Unsupported data mode, horizon or scenario'},status_code=400)
+    try:
+        delay_min=fc26.delay_threshold(delay_min)
+    except ValueError as error:
+        return JSONResponse({'error':str(error)},status_code=400)
     raw, samples = {}, []
     if mode=='live':
         # Start LTA collection independently of traffic incidents or TomTom availability.
@@ -12054,7 +12059,7 @@ async def fc26_centre(mode: str='live', horizon: int=0, scenario: str='combined'
         samples = list(BB['rows'].values())
         raw,samples = await asyncio.to_thread(fc26_enrich_context,raw,samples)
     # Synchronise the full namespace before applying user filters. Filters cannot resolve alerts.
-    data = await asyncio.to_thread(fc26.build_centre,mode,horizon,scenario,max(0,tick),raw,samples)
+    data = await asyncio.to_thread(fc26.build_centre,mode,horizon,scenario,max(0,tick),raw,samples,delay_min=0)
     ns=f'{mode}:{scenario if mode=="demo" else "network"}:{horizon}'
     try:
         ledger=fc26_ledger()
@@ -12067,22 +12072,29 @@ async def fc26_centre(mode: str='live', horizon: int=0, scenario: str='combined'
     except sqlite3.Error:
         data.update(history=[],audit=[],namespace=ns,journal_error='Alert persistence is unavailable')
     wanted={s.strip().upper() for s in services.split(',') if s.strip()}
-    if wanted or exclude_cbs or category!='all':
-        filtered=fc26.build_centre(mode,horizon,scenario,max(0,tick),raw,samples,list(wanted),bool(exclude_cbs),category)
-        for key in ('services','alerts','events','buses','routes','stops','timeline','service_series','kpis','recommendations'):
+    if delay_min>=0:  # Always filter the full, unfiltered audit snapshot for this view.
+        filtered=fc26.build_centre(mode,horizon,scenario,max(0,tick),raw,samples,list(wanted),bool(exclude_cbs),category,delay_min=delay_min)
+        for key in ('services','alerts','events','buses','routes','stops','timeline','service_series','kpis','recommendations','context_routes','delay_filter','headway_history','headway_schedule'):
             data[key]=filtered[key]
         for a in data['alerts']:
             a['status']=statuses.get(a['id'],'new') if 'statuses' in locals() else 'new'
-        data['history']=[a for a in data.get('history',[]) if (not wanted or a['svc'] in wanted) and (not exclude_cbs or a['svc'] not in fc26.CBS) and (category=='all' or a['category']==category)]
+        data['history']=[a for a in data.get('history',[]) if (not wanted or a['svc'] in wanted) and (not exclude_cbs or a['svc'] not in fc26.CBS) and (category=='all' or a['category']==category) and (a['category']!='traffic' or fc26.meets_delay(a,delay_min))]
     if mode=='live' and wanted:
         world=FC.get('world') or {}
         idx=world.get('index')
         lines=idx.lines if idx is not None else {}
         for key,line in lines.items():
-            if key[0] in wanted and (not exclude_cbs or key[0] not in fc26.CBS) and len(data['routes'])<6:
+            if key[0] in wanted and (not exclude_cbs or key[0] not in fc26.CBS) and len(data['routes'])<40:
                 data['routes'].append({'svc':key[0],'dir':key[1],'line':forecast.simplify(line.pts,30),'mode':'live'})
                 for stop in (world.get('stops') or {}).get(key,[]):
                     data['stops'].append({'id':stop.get('code'),'name':stop.get('name'),'point':[stop['lon'],stop['lat']],'svc':key[0]})
+    if mode=='live':
+        idx=(FC.get('world') or {}).get('index')
+        if idx is not None:
+            data['context_routes']=[{'svc':k[0],'dir':k[1],'line':forecast.simplify(v.pts,45)} for k,v in list(idx.lines.items())[:250] if not exclude_cbs or k[0] not in fc26.CBS]
+            if not wanted:
+                present={(r['svc'],r['dir']) for r in data['routes']}
+                data['routes'] += [r for r in data['context_routes'] if any(s['svc']==r['svc'] and s['dir']==r['dir'] for s in data['services']) and (r['svc'],r['dir']) not in present]
     # Demo cameras are deliberately not filled with fabricated traffic photos.
     data['cameras']=[]
     if mode=='live':
@@ -12107,3 +12119,22 @@ async def fc26_transition(request: Request):
         return JSONResponse({'ok':ok},status_code=200 if ok else 404)
     except (ValueError,TypeError):
         return JSONResponse({'error':'Invalid alert transition'},status_code=400)
+
+
+@app.get('/api/forecast/centre/cameras')
+async def fc26_camera_context(lat: float=None, lon: float=None):
+    """Reuse shared camera cache; no static-route download or 350-metre cutoff."""
+    from forecast2026_amendments import select_cameras
+    if (lat is None)!=(lon is None) or (lat is not None and not in_sg(lat,lon)):
+        return JSONResponse({'error':'A valid Singapore latitude and longitude are required'},status_code=400)
+    cs=await cameras_state()
+    hit=CACHE.get('cameras')
+    notes=[]
+    if not KEY:
+        notes.append('LTA DataMall AccountKey is not configured; using public data.gov.sg fallback where available.')
+    if cs.get('raw_error'):notes.append('LTA: '+cs['raw_error'])
+    if cs.get('fallback_error'):notes.append('data.gov.sg: '+cs['fallback_error'])
+    return {'cameras':select_cameras(cs.get('cams') or [],[lon,lat] if lat is not None else None),
+            'fetched_epoch':hit[1] if hit else None,'source':cs.get('source'),'error':cs.get('error'),
+            'diagnostics':notes,'context':'Nearest available cameras; proximity does not confirm bus-route impact.' if lat is not None else 'Latest available network cameras',
+            'note':'Source still images; unknown capture times are labelled unverified.'}

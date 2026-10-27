@@ -3,7 +3,7 @@ export const COLORS={loading:'#ffb64a',traffic:'#ff695b',bunching:'#f755b5',gap:
 export const TITLES={loading:'Heavy passenger loading',traffic:'Traffic buildup',bunching:'Three-bus bunching',gap:'Long headway gaps'};
 export const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 export const num=(v,d=0)=>v==null?'—':Number(v).toFixed(d);
-export function apiURL(state){const p=new URLSearchParams({mode:state.mode,horizon:state.h,scenario:state.scenario,tick:state.tick,services:state.services.join(','),exclude_cbs:state.exclude?'1':'0',category:state.category});return '/api/forecast/centre?'+p;}
+export function apiURL(state){const p=new URLSearchParams({mode:state.mode,horizon:state.h,scenario:state.scenario,tick:state.tick,services:state.services.join(','),exclude_cbs:state.exclude?'1':'0',category:state.category,delay_min:state.delayMin??.8});return '/api/forecast/centre?'+p;}
 export function quality(mode,updated,now=Date.now()/1000,error=false){if(mode==='demo')return {label:'DEMO · SIMULATED',kind:'demo'};if(!updated)return {label:'OFFLINE',kind:'offline'};if(now-updated>150)return {label:'DATA DELAYED',kind:'delayed'};return {label:error?'FORECAST DEGRADED':'LIVE · ESTIMATED FORECAST',kind:error?'delayed':'live'};}
 export function riskServices(data){return [...(data.services||[])].map(s=>({...s,risk:(s.blocked?100:0)+(s.three||0)*30+(s.gaps||0)*25+(s.heavy_buses||0)*5+(s.delay||0)})).filter(s=>s.risk>0).sort((a,b)=>b.risk-a.risk);}
 export function slicePage(rows,page,size){const pages=Math.max(1,Math.ceil(rows.length/size));return {rows:rows.slice((page%pages)*size,(page%pages+1)*size),page:page%pages+1,pages};}
@@ -29,3 +29,38 @@ export function loadSummary(data){const counts={SEA:0,SDA:0,LSD:0,UNKNOWN:0};for
 export function stopText(stop){if(!stop)return 'Bus stop / sequence unavailable';return [stop.sequence!=null?'Seq '+stop.sequence:null,stop.code?'BS '+stop.code:null,stop.name].filter(Boolean).join(' · ')||'Bus stop / sequence unavailable';}
 export function watchLocation(s,category){if(category==='traffic'){let t=s.traffic_details?.[0];if(t)return (t.stops?.length?t.stops.map(stopText).join(' → '):'Bus stop / sequence unavailable')+' · '+t.road;}if(category==='bunching'){let b=s.bunching_details?.[0];if(b)return stopText(b.stop)+' · '+(b.location||s.location);}if(category==='gap'){let g=s.gap_details?.[0];if(g)return stopText(g.stop)+' · '+(g.location||s.location);}return s.location||'Location not supplied';}
 export function headwayView(data,scope='selected'){let selected=data.services?.find(s=>s.gaps)||data.services?.find(s=>s.three)||data.services?.find(s=>s.focus_headway!=null)||data.services?.[0];const number=x=>typeof x==='number'&&Number.isFinite(x);let counts=[];let values=(data.service_series||[]).map(t=>{let rows=scope==='network'?t.services:t.services.filter(s=>s.svc===selected?.svc&&s.dir===selected?.dir);let available=rows.map(s=>s.focus_headway).filter(number);counts.push(available.length);return available.length?available.reduce((a,b)=>a+b,0)/available.length:null;});return {selected,values,counts,scope};}
+
+export const toggleService=(selected,svc)=>selected.includes(svc)?selected.filter(s=>s!==svc):[...selected,svc];
+export const resetFilters=()=>({services:[],operator:'',exclude:false,category:'all',delayMin:.8});
+export const delayColor=(delay,thresholds={yellow:.8,orange:2,red:5})=>delay==null?'#7d9bab':delay>=thresholds.red?'#ff4d63':delay>=thresholds.orange?'#ff9b43':delay>=thresholds.yellow?'#f2df5e':'#39e4a2';
+export function hourlyHeadway(data,{interval=60,scope='network',direction='all'}={}){
+ const now=Number(data.generated)||Date.now()/1000,day=Math.floor((now+8*3600)/86400)*86400-8*3600;
+ const start=day+(now<day+5*3600?-19:5)*3600,end=start+24*3600;
+ const selected=(data.services||[]).filter(s=>(scope==='network'||s.svc===scope)&&(direction==='all'||String(s.dir)===String(direction)));
+ const keys=new Set(selected.map(s=>s.svc+':'+s.dir)),rows=Array.from({length:24*60/interval},(_,i)=>({at:start+i*interval*60,label:new Date((start+i*interval*60)*1000).toLocaleTimeString('en-SG',{timeZone:'Asia/Singapore',hour:'2-digit',minute:'2-digit',hour12:false}),scheduled:null,actual:null,forecast:null,confidence:null,n:0}));
+ const buckets=rows.map(()=>({scheduled:[],actual:[],forecast:[],confidence:[],actualTimes:[],forecastTimes:[]}));
+ const add=(at,kind,v,confidence)=>{let i=Math.floor((at-start)/(interval*60));if(i<0||i>=rows.length||!Number.isFinite(v)||v<=0)return;buckets[i][kind].push(v);if(kind!=='scheduled')buckets[i][kind+'Times'].push(at);if(kind==='forecast'&&Number.isFinite(confidence))buckets[i].confidence.push(confidence);};
+ const avg=xs=>xs.length?xs.reduce((n,v)=>n+v,0)/xs.length:null;
+ if(data.mode==='demo'){
+  rows.forEach((r,i)=>{let hour=((r.at+8*3600)%86400)/3600,scheduled=avg(selected.map(s=>s.scheduled).filter(Number.isFinite));if(scheduled==null)return;add(r.at,'scheduled',scheduled);if(r.at+interval*60/2<now)add(r.at,'actual',scheduled+Math.max(-2,Math.sin(hour*1.5)*2.5+Math.max(0,...selected.map(s=>s.delay||0))*.25));});
+ }else{
+  // Only records explicitly marked verified actual arrivals enter the actual line.
+  for(const r of data.headway_history||[])if(r.verified===true&&r.kind==='actual'&&r.at<=now&&keys.has(r.svc+':'+r.dir))add(r.at,'actual',r.headway);
+  for(const r of data.headway_schedule||[])if(r.verified===true&&keys.has(r.svc+':'+r.dir))add(r.at,'scheduled',r.headway);
+  if(!(data.headway_schedule||[]).length)for(const s of selected)add(now,'scheduled',s.scheduled);
+ }
+ for(const t of data.service_series||[])for(const s of t.services||[])if(keys.has(s.svc+':'+s.dir)&&t.h>0&&(data.mode==='demo'||t.h<=30))add(now+t.h*60,'forecast',s.focus_headway,s.confidence);
+ rows.forEach((r,i)=>{const b=buckets[i];for(const k of ['scheduled','actual','forecast','confidence'])r[k]=avg(b[k]);r.actual_at=avg(b.actualTimes);r.forecast_at=avg(b.forecastTimes);r.n=b.actual.length;r.difference=r.actual!=null&&r.scheduled!=null?r.actual-r.scheduled:null;r.abnormal=r.scheduled!=null&&((r.actual!=null&&r.actual-r.scheduled>=5)||(r.forecast!=null&&r.forecast-r.scheduled>=5));});
+ return {rows,start,end,now,interval,demo:data.mode==='demo',directions:selected.length,actualAvailable:rows.some(r=>r.actual!=null),forecastAvailable:rows.some(r=>r.forecast!=null),scheduleAvailable:rows.some(r=>r.scheduled!=null)};
+}
+export function hourlyChart(view,width=900){
+ const w=1000,h=200,p={l:48,r:18,t:23,b:42},x=t=>p.l+(t-view.start)/(view.end-view.start)*(w-p.l-p.r),max=Math.max(10,...view.rows.flatMap(r=>[r.actual,r.scheduled,r.forecast]).filter(Number.isFinite))*1.18,y=v=>h-p.b-v/max*(h-p.t-p.b),boundary=x(view.now);
+ let svg=`<svg class="hourly-chart" style="--chart-label-size:${Math.max(19,13000/Math.max(300,width))}px" viewBox="0 0 ${w} ${h}" role="img" aria-label="Hourly scheduled, actual and forecast headway; missing data is not plotted"><rect x="${boundary}" y="${p.t}" width="${Math.max(0,w-p.r-boundary)}" height="${h-p.b-p.t}" fill="#27648a" opacity=".12"/>`;
+ for(let i=0;i<=3;i++){let v=max*i/3;svg+=`<path d="M${p.l} ${y(v)}H${w-p.r}" stroke="#29475a" stroke-dasharray="3 5"/><text x="${p.l-8}" y="${y(v)+5}" text-anchor="end">${num(v)}</text>`;}
+ for(const [kind,color,dash] of [['scheduled','#92a8bd','7 5'],['actual','#40ddb5',''],['forecast','#61c8ff','5 5']]){
+  let previous=null;view.rows.forEach((r,i)=>{if(r[kind]==null){previous=null;return;}const at=kind==='scheduled'?r.at+view.interval*30:r[kind+'_at']??r.at+view.interval*30;let pt=[x(at),y(r[kind])];if(previous)svg+=`<path d="M${previous.join(' ')}L${pt.join(' ')}" stroke="${color}" stroke-width="3" stroke-dasharray="${dash}"/>`;svg+=`<circle cx="${pt[0]}" cy="${pt[1]}" r="4" fill="${color}"/>`;previous=pt;});
+ }
+ view.rows.forEach((r,i)=>{const xx=x(r.at);if(i%Math.max(1,Math.round((Math.ceil(1440/Math.max(3,Math.floor(width/75))/60)*60)/view.interval))===0)svg+=`<text x="${xx}" y="${h-13}" text-anchor="middle">${r.label}</text>`;if(r.abnormal)svg+=`<rect x="${xx}" y="${p.t}" width="${(w-p.l-p.r)*view.interval/1440}" height="${h-p.b-p.t}" fill="#ff5865" opacity=".13"/>`;svg+=`<rect data-hour="${i}" tabindex="0" role="button" aria-label="${esc(r.label)} headway values" x="${xx}" y="${p.t}" width="${(w-p.l-p.r)*view.interval/1440}" height="${h-p.b-p.t}" fill="transparent"><title>${r.label} SGT · Scheduled ${num(r.scheduled,1)} · Actual ${num(r.actual,1)} · Forecast ${num(r.forecast,1)} min</title></rect>`;});
+ svg+=`<path d="M${boundary} ${p.t}V${h-p.b}" stroke="#f1cb7c" stroke-dasharray="4 4"/><text x="${Math.max(100,Math.min(w-95,boundary))}" y="15" text-anchor="middle" fill="#f1cb7c">NOW · FORECAST →</text></svg>`;
+ return svg;
+}

@@ -253,6 +253,13 @@ def live_snapshot(raw, samples, h, now=None):
         touched=e.get("services") or []
         events.append({"id":e["id"],"kind":e["kind"],"road":e.get("road") or "Road name not supplied","point":point,"line":line,
                        "services":[x["svc"] for x in touched],"service_dirs":[[x["svc"],x["dir"]] for x in touched],"matches":touched,"delay":((e.get("delay_s") or 0)/60 if h==0 else ((e.get("fc") or {}).get(h,(e.get("fc") or {}).get(str(h))) or {}).get("mid",0)/60 if h<=60 else (e.get("delay_s") or 0)/60*math.exp(-120/90)),"confirmed":True,"mode":"live"})
+    for event, source in zip(events, [e for e in raw.get('events') or [] if e.get('status')=='confirmed' and traffic_ok]):
+        if h==0:
+            if source.get('current_travel_time_s') is not None and source.get('typical_travel_time_s') is not None:
+                event['delay']=max(0,(source['current_travel_time_s']-source['typical_travel_time_s'])/60)
+                event['delay_basis']='Current minus historical typical travel time'
+            elif source.get('delay_s') is None:
+                event['delay']=None
     keys={(s["svc"],s["dir"]):s for s in raw.get("services") or []}
     samples_by={(str(s.get("service") or "").upper(),s.get("direction")):s for s in samples}
     for key in set(keys)|set(samples_by):
@@ -267,7 +274,11 @@ def live_snapshot(raw, samples, h, now=None):
         point=ev.get("point") if ev and ev.get("point") else point
         delay=traffic_extra(s,h) if traffic_ok else None
         if h==0:
-            delay=max((e["delay"] for e in events if list(key) in e.get("service_dirs",[])),default=0) if traffic_ok else None
+            linked=[e for e in events if list(key) in e.get("service_dirs",[])]
+            values=[e["delay"] for e in linked if e["delay"] is not None]
+            delay=(max(values) if values else None if linked else 0) if traffic_ok else None
+        if s.get("blocked") and not delay:
+            delay=None  # a closure without a quantified delay is not zero extra time
         # Forecast categories use collector arrival-time models within their actual coverage.
         groups=[g for g in sample.get("groups",[]) if g.get("size")==3 and valid and
                 ((h==0 and g.get("status")=="confirmed") or (h>0 and h<=30 and g.get("t_occur") is not None and g["t_occur"]<=h))]
@@ -316,20 +327,30 @@ def live_snapshot(raw, samples, h, now=None):
             "rain":[{"point":[s["lon"],s["lat"]],"mmh":s.get("mmh",0)} for s in (raw.get("rain") or {}).get("stations",[]) if s.get("lat") and s.get("lon") and s.get("mmh",0)>0],"calibration":raw.get("calibration") or {},"error":raw.get("error")}
 
 
-def build_centre(mode="demo", horizon=30, scenario="combined", tick=0, raw=None, samples=None, services=None, exclude_cbs=False, category="all", now=None):
+from forecast2026_amendments import filter_traffic, delay_threshold, meets_delay, master_schedule
+
+
+def build_centre(mode="demo", horizon=30, scenario="combined", tick=0, raw=None, samples=None, services=None, exclude_cbs=False, category="all", now=None, delay_min=.8):
     if horizon not in HORIZONS:
         raise ValueError("Unsupported forecast horizon")
     now=now or time.time(); chosen={s.upper() for s in services or []}; samples=samples or []
     snapshots={h:demo_snapshot(h,scenario,tick,now) if mode=="demo" else live_snapshot(raw or {},samples,h,now) for h in HORIZONS}
     for snap in snapshots.values():
+        snap["context_routes"]=[r for r in snap["routes"] if not exclude_cbs or r["svc"] not in CBS]
+        filter_traffic(snap,delay_min)
         keep=lambda s:(not chosen or s["svc"] in chosen) and (not exclude_cbs or s["svc"] not in CBS)
         snap["services"]=[s for s in snap["services"] if keep(s)]
         included={s["svc"] for s in snap["services"]}
         snap["alerts"]=[a for a in snap["alerts"] if a["svc"] in included]
         snap["buses"]=[b for b in snap["buses"] if b["svc"] in included]
         snap["routes"]=[r for r in snap["routes"] if r["svc"] in included]
+        snap["stops"]=[r for r in snap["stops"] if r["svc"] in included]
         snap["events"]=[e for e in snap["events"] if e.get("svc") in included or any(s in included for s in e.get("services",[]))]
-        snap["kpis"]={c:{"count":sum((s.get({"loading":"heavy_buses","bunching":"three","gap":"gaps"}.get(c,"delay")) or 0) for s in snap["services"]) if c!="traffic" else len(snap["events"]),
+        for event in snap['events']:
+            if event.get('services'):
+                event['services']=[s for s in event['services'] if s in included]
+                event['service_dirs']=[p for p in event.get('service_dirs',[]) if p[0] in included]
+        snap["kpis"]={c:{"count":sum((s.get({"loading":"heavy_buses","bunching":"three","gap":"gaps"}.get(c,"delay")) or 0) for s in snap["services"]) if c!="traffic" else sum(e.get("congestion_eligible",False) for e in snap["events"]),
                            "services":len({a["svc"] for a in snap["alerts"] if a["category"]==c}),"earliest":min([a["onset"] for a in snap["alerts"] if a["category"]==c] or [0]),"available":snap["coverage"][c]} for c in CATEGORIES}
         snap["kpis"]["loading"]["occupancy"]=max([s["occupancy"] for s in snap["services"] if s.get("occupancy") is not None] or [0]) or None
         snap["kpis"]["traffic"]["delay"]=mean([s["delay"] for s in snap["services"] if s.get("delay") and not s.get("blocked")])
@@ -339,7 +360,7 @@ def build_centre(mode="demo", horizon=30, scenario="combined", tick=0, raw=None,
     if category in CATEGORIES:
         current["alerts"]=[a for a in current["alerts"] if a["category"]==category]
         ids={a["svc"] for a in current["alerts"]}
-        for key in ("services","buses","routes"):
+        for key in ("services","buses","routes","stops"):
             current[key]=[x for x in current[key] if x["svc"] in ids]
         current["events"]=[e for e in current["events"] if e.get("svc") in ids or any(s in ids for s in e.get("services",[]))]
     advice=[recommendation(a) for a in current["alerts"][:4]]
@@ -351,8 +372,10 @@ def build_centre(mode="demo", horizon=30, scenario="combined", tick=0, raw=None,
             r["constraints"]="DEMO assumptions: one spare; 10-min layover; 7-min minimum; meal protected. No live duty validation."
     return dict(current,horizon=horizon,generated=now,scenarios=[{"id":k,"label":v} for k,v in SCENARIOS],
                 timeline=[{"h":h,**snapshots[h]["kpis"]} for h in HORIZONS],
-                service_series=[{"h":h,"services":[{k:s.get(k) for k in ("svc","dir","headway","focus_headway","occupancy","delay")} for s in snapshots[h]["services"]]} for h in HORIZONS],
+                service_series=[{"h":h,"services":[{k:s.get(k) for k in ("svc","dir","headway","focus_headway","scheduled","occupancy","delay","confidence")} for s in snapshots[h]["services"]]} for h in HORIZONS],
                 recommendations=advice,
+                headway_history=(raw or {}).get("headway_history",[]),
+                headway_schedule=(raw or {}).get("headway_schedule",[]),
                 model={"name":"Explainable statistical baselines","trained":False,"validated":False,"confidence_note":"Heuristic evidence quality, not measured forecast accuracy.",
                        "thresholds":THRESHOLDS,"outcome_metrics":outcome_metrics([]),
                        "limitations":["Live occupancy percentages need demand/capacity data.","Live bunching/gap predictions use the collector's supported arrival-time horizon (up to 30 min).","120-min traffic is an explicitly estimated decay baseline.","Operational recommendations require duty and welfare constraint validation."]})

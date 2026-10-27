@@ -1,3 +1,5 @@
+> October 2026 amendments: see [AMENDMENTS_2026.md](AMENDMENTS_2026.md) for the latest upload list, filters, hourly-headway data contracts, camera diagnostics and verification limits.
+
 # S.E.N.T.R.Y — Forecast Centre 2026
 
 A working public-API prototype and Singapore demonstration command centre, rebuilt around the supplied reference. The map occupies about 60% of the main row. Four risk cards, a network-status rail, operational alerts, camera images and five analytics panels share a single forecast horizon and filter state.
@@ -15,10 +17,11 @@ Replace or add these files in the repository root:
 5. `forecast2026.js` — controller, analytics, playback, alerts and source UI.
 6. `forecast2026-core.js` — pure frontend formatting, query, freshness and chart helpers.
 7. `forecast2026-map.js` — MapLibre renderer and explicit offline schematic fallback.
+8. `bunching.py` — retains stop indices and ordered pair/headway metadata for the new detail panels.
 
-Keep the existing `forecast.py`, `bunching.py`, `map3d.js`, `basemap.js`, other application modules and `requirements.txt`. Their provider/route-matching functionality remains in use. Restart/redeploy with the existing `uvicorn app:app` command.
+Keep the existing `forecast.py`, `map3d.js`, `basemap.js`, other application modules and `requirements.txt`. Their provider/route-matching functionality remains in use. Restart/redeploy with the existing `uvicorn app:app` command.
 
-Open `/forecast` or the existing `/command` page. Demo is the default for the showcase. For public-source observations choose LIVE, or use `/forecast?mode=live`. The existing application environment must already have its valid LTA/TomTom credentials. No credentials are embedded or changed by this update.
+Open `/forecast` or the existing `/command` page. The existing app now opens in LIVE / NOW by default. Demo is an explicit option. For public-source observations choose LIVE, or use `/forecast?mode=live`. The existing application environment must already have its valid LTA/TomTom credentials. No credentials are embedded or changed by this update.
 
 Examples:
 
@@ -37,7 +40,7 @@ python -m pip install -r requirements.txt
 uvicorn forecast2026_server:app --host 0.0.0.0 --port 8080
 ```
 
-Open `http://localhost:8080/`. For the standalone route include the supplied `forecast2026_server.py`, `map3d.js` and `basemap.js` alongside the seven centre files. The standalone LIVE option explicitly reports unavailable live providers; use the existing `app.py` deployment for real integration.
+Open `http://localhost:8080/`. For the standalone route include the supplied `forecast2026_server.py`, `map3d.js` and `basemap.js` alongside the eight centre files. The standalone LIVE option explicitly reports unavailable live providers; use the existing `app.py` deployment for real integration.
 
 `SENTRY2026_DB` selects the standalone journal file; it defaults to `sentry2026.db`. In the main application, the journal uses the existing `FORECAST_DB` / `BUNCHING_DB` file in its own `fc26_alert` and `fc26_audit` tables. Existing tables are not dropped or changed.
 
@@ -113,7 +116,7 @@ Recommendations explain the supporting risk and require controller approval. No 
 Run the tested, dependency-free model and ASGI checks:
 
 ```bash
-python -m unittest test_forecast2026.py test_forecast2026_api.py test_forecast2026_geometry.py test_forecast_tiles.py test_forecast_bunching.py
+python -m unittest test_forecast2026_live.py test_forecast2026_group_metadata.py test_forecast2026.py test_forecast2026_api.py test_forecast2026_geometry.py test_forecast_tiles.py test_forecast_bunching.py
 node test_forecast2026_ui.cjs
 node --check forecast2026.js
 node --check forecast2026-map.js
@@ -121,7 +124,7 @@ node --check forecast2026-core.js
 python -m py_compile app.py forecast2026.py forecast2026_server.py
 ```
 
-37 Python tests passed at delivery, plus frontend helper checks and syntax checks. Coverage includes demand conservation/capacity, missing data, time-based 2BB/3BB/4BB separation, headway thresholds, all scenarios/horizons, opposite/parallel/crossing rejection, real ASGI API responses/assets, stale-source handling, categorical-load integrity, filters, lifecycle/ack/history, deterioration re-alerting and constraint-aware counterfactuals. `outcome_metrics()` computes MAE, precision, recall, false-alarm/miss rates and Brier score when verified outcomes are supplied; empty outcomes never produce an invented accuracy percentage.
+45 Python tests passed at delivery, plus frontend helper checks and syntax checks. Coverage includes demand conservation/capacity, missing data, time-based 2BB/3BB/4BB separation, headway thresholds, all scenarios/horizons, opposite/parallel/crossing rejection, real ASGI API responses/assets, stale-source handling, categorical-load integrity, filters, lifecycle/ack/history, deterioration re-alerting and constraint-aware counterfactuals. `outcome_metrics()` computes MAE, precision, recall, false-alarm/miss rates and Brier score when verified outcomes are supplied; empty outcomes never produce an invented accuracy percentage.
 
 Optional real viewport checks:
 
@@ -143,3 +146,13 @@ The older `test_forecast_map.cjs`, `test_forecast_tv.cjs` and `test_forecast_con
 4. Add transactional multi-worker persistence, retention, authenticated/CSRF-protected controller actions and outcome ingestion for production scale.
 5. Integrate actual duty, layover, vehicle availability and protected breaks before marking operational actions feasible.
 6. Only then introduce a trained LightGBM/XGBoost model and future CFMS/control adapters. No production-readiness claim is made.
+
+## Live/map/stop-context correction
+
+The latest patch also updates bunching.py (now eight main implementation files). It fixes map-host height when MapLibre injects its stylesheet, explicitly hides the Demo watermark in Live mode, keeps the LTA collector awake without needing a traffic incident, and preserves observed bus/load data when scheduled headway or overlapping ETAs are missing.
+
+The passenger panel in LIVE shows SEA (seats available), SDA (standing available), LSD (limited standing/heavy) counts from current sampled buses. Zero heavy means no known sample reported LSD; it does not mean the API is absent. A future occupancy percentage is still unavailable without demand history/capacity.
+
+Headway evolution defaults to a labelled service/direction focus pair, not a network average. A Network mean selector plots the arithmetic mean of available service-direction focus pairs within the filters, excluding unavailable values. Supported 10/20-minute collector points may be interpolated to the 15-minute display horizon; no headway extrapolation beyond collector coverage is made.
+
+Three-bus groups now carry direction, ordered bus references, stop name/code, original LTA StopSequence and pair separations. Traffic-watch context shows stop(s) on or bracketing the verified affected route interval (within 500 m along-route when no stop is inside). This is location context, not a claim that a stop itself is closed. Unknown or ambiguous stop/sequence fields remain unavailable. New metadata appears after the collector refreshes; it does not add another LTA polling stream.
