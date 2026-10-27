@@ -55,9 +55,12 @@ body.leave .lg{opacity:0;transform:scale(1.01);transition:opacity 260ms var(--ds
   .lg-side{padding:22px 14px 34px}
 }
 .hz-login-sbs{height:clamp(30px,3vw,44px);width:auto;display:block}
-.hz-login-h1{max-width:none!important;line-height:0!important}
-.hz-login-word{width:clamp(300px,40vw,680px);height:auto;filter:drop-shadow(0 0 24px rgba(63,211,255,.35))}
+.hz-login-h1{max-width:none!important;line-height:1!important;margin:0 0 6px!important}
+.hz-login-word{display:block;width:clamp(280px,40vw,680px);max-width:100%;height:auto;filter:drop-shadow(0 0 24px rgba(63,211,255,.35))}
 .hz-login-p{max-width:52ch}
+/* logo and copy sit clear of the decorative network drawing (it stays behind, dimmed, on narrow screens) */
+.lg-brand,.lg-copy{z-index:3}
+@media (max-width:900px){.lg-art svg.net{opacity:.28}}
 </style>
 </head>
 <body>

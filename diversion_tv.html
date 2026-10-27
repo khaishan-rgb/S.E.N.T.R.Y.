@@ -152,6 +152,7 @@ html{background:radial-gradient(70% 50% at 20% -10%,rgba(31,143,255,.16),transpa
 body{background:transparent!important}
 .brand .hz-mark{width:2.8rem;height:2.8rem;flex:none;border-radius:.7rem;box-shadow:0 0 1.4rem rgba(63,211,255,.35)}
 .brand .hz-nm{padding:0;text-align:left;text-shadow:none}
+.brand .hz-tl-plain{font:700 1.15rem/1 var(--hz-font-brand);letter-spacing:.3em;color:var(--hz-frost);text-shadow:0 0 .6rem rgba(63,211,255,.5)}
 .brand .hz-nm img{height:1.25rem;width:auto;display:block;filter:drop-shadow(0 0 .5rem rgba(63,211,255,.4))}
 .brand h1{font-family:var(--hz-font-brand)!important;font-weight:700!important;letter-spacing:.08em!important;text-transform:uppercase;font-size:2rem!important}
 .clock b{font-family:var(--hz-font-brand);letter-spacing:.05em;text-shadow:0 0 1.2rem rgba(63,211,255,.45)}
@@ -162,8 +163,8 @@ header.top{border-bottom:1px solid var(--hz-line-2)!important;box-shadow:0 1px 0
 <div class="tv" id="tv">
   <header class="top">
     <div class="brand">
-      <img class="hz-mark" src="/brand/horizon-mark.svg" alt="">
-      <div><div class="nm hz-nm"><img src="/brand/horizon-word.webp" alt="HORIZON"></div><h1 id="title">Live diversions</h1></div>
+      <img class="hz-mark" src="/brand/horizon-mark.svg" alt="" onerror="this.remove()">
+      <div><div class="nm hz-nm"><img src="/brand/horizon-word.webp" alt="HORIZON" onerror="this.outerHTML='<span class=&quot;hz-tl-plain&quot;>HORIZON</span>'"></div><h1 id="title">Live diversions</h1></div>
       <span class="pv" id="pv" hidden>Preview</span>
     </div>
     <div class="cnt zero" id="cnt"><span class="dot"></span><span id="cntT">Checking…</span></div>

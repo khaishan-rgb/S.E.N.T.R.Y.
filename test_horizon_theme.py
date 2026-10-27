@@ -51,6 +51,38 @@ class HorizonTheme(unittest.TestCase):
         self.assertRegex(shell, r'e\.ctrlKey \|\| e\.metaKey\) && !e\.shiftKey && !e\.altKey && \(e\.key === "k"')
         self.assertIn('window.HORIZON', shell)
 
+    def test_logos_never_show_as_broken_images(self):
+        shell = (ROOT / 'app_shell.js').read_text()
+        self.assertIn('function logoFallback', shell)
+        self.assertIn('document.addEventListener("error"', shell)       # capture phase: catches images that fail before the shell mounts
+        self.assertIn('.hz-tl-hz', (ROOT / 'design_system.css').read_text())
+        app = (ROOT / 'app.py').read_text()
+        self.assertIn('(HERE / name, "top-level file")', app)
+        self.assertEqual((ROOT / 'diversion_tv.html').read_text().count('onerror='), 2)
+
+    def test_logos_are_built_into_app_py_and_served_without_any_files(self):
+        import ast, base64, tempfile
+        src = (ROOT / 'app.py').read_text()
+        tree = ast.parse(src)
+        emb = next(n for n in tree.body if isinstance(n, ast.Assign) and getattr(n.targets[0], 'id', '') == '_BRAND_EMBEDDED')
+        embedded = ast.literal_eval(emb.value)
+        for name, b64 in embedded.items():                                         # built-in copies equal the brand files
+            self.assertEqual(base64.b64decode(b64), (ROOT / 'brand' / name).read_bytes(), name)
+        fn = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == '_brand_bytes')
+        for layout in ('none', 'top', 'folder'):
+            with tempfile.TemporaryDirectory() as tmp:
+                here = Path(tmp)
+                if layout == 'top':
+                    (here / 'sbs-transit.webp').write_bytes(b'TOP')
+                if layout == 'folder':
+                    (here / 'brand').mkdir(); (here / 'brand' / 'sbs-transit.webp').write_bytes(b'FOLDER')
+                scope = {'HERE': here, '_BRAND_EMBEDDED': embedded, 'base64': base64}
+                exec(compile(ast.Module([fn], []), 'app.py', 'exec'), scope)
+                data, where = scope['_brand_bytes']('sbs-transit.webp')
+                expected = {'none': ('built into app.py', base64.b64decode(embedded['sbs-transit.webp'])), 'top': ('top-level file', b'TOP'), 'folder': ('brand folder', b'FOLDER')}[layout]
+                self.assertEqual((where, data), expected, layout)
+                self.assertEqual(scope['_brand_bytes']('nope.webp'), (None, 'missing'))
+
     def test_brand_route_rejects_path_tricks(self):
         app = (ROOT / 'app.py').read_text()
         self.assertIn(r're.fullmatch(r"[a-z0-9-]+\.(webp|svg|png)", name)', app)

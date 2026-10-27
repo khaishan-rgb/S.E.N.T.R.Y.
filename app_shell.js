@@ -179,6 +179,23 @@
 
   /* ------------------------------------------------------------------ mount */
   var AUTH = {enabled:false, user:null};
+  /* ------------------------------------------------------------------ HORIZON logos never show as broken images:
+     if a /brand/ file cannot load (e.g. the brand folder is missing on the server), it is replaced by a styled text logo. */
+  function logoFallback(img){
+    if(!img || img.getAttribute("data-hz-fb")) return; img.setAttribute("data-hz-fb", "1");
+    var src = img.getAttribute("src") || "", sp = document.createElement("span");
+    sp.setAttribute("role", "img"); sp.setAttribute("aria-label", img.getAttribute("alt") || "HORIZON");
+    var word = '<span class="w">H<span class="o"></span>RIZON</span>', tag = '<span class="t">BUS OPERATIONS INTELLIGENCE</span>', sbs = '<span class="hz-tl-sbs"><b>SBS</b><i>Transit</i></span>';
+    if(/sbs-transit/.test(src)){ sp.className = "hz-tl-sbs " + img.className; sp.innerHTML = '<b>SBS</b><i>Transit</i>'; }
+    else if(/horizon-mark/.test(src)){ sp.className = "hz-tl-mark " + img.className; sp.innerHTML = '<span class="o"></span>'; }
+    else if(/horizon-lockup/.test(src)){ sp.className = "hz-tl-hz " + img.className; sp.innerHTML = sbs + word + tag; }
+    else { sp.className = "hz-tl-hz " + img.className; sp.innerHTML = word + (/wordmark/.test(src) ? tag : ""); }
+    if(img.parentNode) img.parentNode.replaceChild(sp, img);
+  }
+  document.addEventListener("error", function(e){ var t = e.target; if(t && t.tagName === "IMG" && /\/brand\//.test(t.getAttribute("src") || "")) logoFallback(t); }, true);
+  function checkLogos(){ document.querySelectorAll('img[src*="/brand/"]').forEach(function(i){ if(i.complete && !i.naturalWidth) logoFallback(i); }); }
+  window.addEventListener("load", checkLogos);
+
   /* ------------------------------------------------------------------ HORIZON: document brand, boot sequence, quick launch */
   var EXTRA = [   // launch targets that are views of a module rather than modules
     {id:"tv-forecast", name:"Forecast Centre \u2014 TV wall", icon:"tv", route:"/command?present=1", group:"COMMAND", enabled:true, desc:"Full-screen OCC wall: heavy loading, incidents, bunching & gaps"},
@@ -246,7 +263,7 @@
 
   function mount(){
     var b = document.body; if(!b) return;
-    brandDocument(); boot();
+    brandDocument(); boot(); setTimeout(checkLogos, 0);
     b.classList.add("ds-app"); b.setAttribute("data-ds-module", ACTIVE || "");
     document.documentElement.classList.remove("shell-off");            // the V13.14 per-page hide-menu flag is replaced by the collapsible sidebar
     if(BARE) return;
