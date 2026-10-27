@@ -218,7 +218,7 @@ def demo_snapshot(h, scenario="combined", tick=0, now=None):
         service={"svc":svc,"dir":1,"operator":"SMRT" if svc=="853" else "SBST","location":area,"delay":delay,
                  "occupancy":loading["occupancy"],"heavy_buses":3 if loading["occupancy"]>=THRESHOLDS["load_heavy"] else 0,
                  "three":len(hw["three"]),"two":len(hw["two"]),"gaps":len(hw["gaps"]),
-                 "headway":max(hw["headways"]),"focus_headway":hw["headways"][0],"focus_pair":{"lead":arrivals[0]["id"],"foll":arrivals[1]["id"]},"load_counts":{"SEA":3 if loading["occupancy"]<70 else 0,"SDA":3 if 70<=loading["occupancy"]<85 else 0,"LSD":3 if loading["occupancy"]>=85 else 0,"UNKNOWN":0},"bunching_details":[{"bus_order":[a["id"] for a in arrivals],"location":area,"stop":demo_stop,"headways":hw["headways"]}] if hw["three"] else [],"traffic_details":[{"event_id":f"SIM-{kind}-{svc}","road":area,"stops":stretch_stops,"kind":kind,"delay":delay}] if delay else [],"load_details":[{"bus":a["id"],"load":"LSD","stop":demo_stop,"near":area} for a in arrivals] if loading["occupancy"]>=THRESHOLDS["load_heavy"] else [],"gap_details":[{"location":area,"stop":demo_stop}] if hw["gaps"] else [],"scheduled":10,"headways":hw["headways"],"point":position,"confidence":.78,"blocked":False,"building":bool(traffic_active and h<=30)}
+                 "headway":max(hw["headways"]),"focus_headway":hw["headways"][0],"focus_pair":{"lead":arrivals[0]["id"],"foll":arrivals[1]["id"]},"load_counts":{"SEA":3 if loading["occupancy"]<70 else 0,"SDA":3 if 70<=loading["occupancy"]<85 else 0,"LSD":3 if loading["occupancy"]>=85 else 0,"UNKNOWN":0},"bunching_details":[{"bus_order":[a["id"] for a in arrivals],"location":area,"stop":demo_stop,"headways":hw["headways"]}] if hw["three"] else [],"traffic_details":[{"event_id":f"SIM-{kind}-{svc}","road":area,"stops":stretch_stops,"kind":kind,"delay":delay}] if delay else [],"load_details":[{"bus":a["id"],"load":"LSD","stop":demo_stop,"near":area,"point":next(b["point"] for b in buses if b["id"]==a["id"] and b["svc"]==svc)} for a in arrivals] if loading["occupancy"]>=THRESHOLDS["load_heavy"] else [],"gap_details":[{"location":area,"stop":demo_stop}] if hw["gaps"] else [],"scheduled":10,"headways":hw["headways"],"point":position,"confidence":.78,"blocked":False,"building":bool(traffic_active and h<=30)}
         services.append(service)
         if loading["occupancy"]>=THRESHOLDS["load_heavy"]:
             alerts.append(alert("loading",svc,area,f'{loading["occupancy"]:.0f}% occupancy',h,position,"Simulated boarding demand exceeds available capacity.",.78,occupancy=loading["occupancy"]))
@@ -354,7 +354,8 @@ def live_snapshot(raw, samples, h, now=None):
         gap_details=[{'stop':stop_context(stops,g.get('location'),g.get('stop_j')),'location':g.get('location'),
                       'headway':g.get('max_hw'),'lead':g.get('lead'),'follow':g.get('foll')} for g in gaps]
         counts={c:sum(b.get('load')==c for b in seq) for c in ('SEA','SDA','LSD')}
-        load_details=[{'bus':b.get('id'),'load':'LSD','near':b.get('near'),'stop':stop_context(stops,b.get('near'))} for b in seq if b.get('load')=='LSD'] if h==0 and observed else []
+        load_details=[{'bus':b.get('id'),'load':'LSD','near':b.get('near'),'stop':stop_context(stops,b.get('near')),'bus_point':[b['lon'],b['lat']] if b.get('lat') and b.get('lon') else None} for b in seq if b.get('load')=='LSD'] if h==0 and observed else []
+        for d in load_details:d['point']=(d['stop'] or {}).get('point') or d['bus_point'] or point
         counts['UNKNOWN']=len(seq)-sum(counts.values())
         location=(traffic_details[0]["road"] if traffic_details else None) or (ev or {}).get("road") or sample.get("location") or "Location not supplied"
         row={"svc":key[0],"dir":key[1],"location":location,"delay":delay,"blocked":bool(s.get("blocked")),"building":bool(s.get("building")),"occupancy":None,
@@ -365,14 +366,19 @@ def live_snapshot(raw, samples, h, now=None):
         services.append(row)
         if delay and delay>0 or row["blocked"]:
             alerts.append(alert("traffic",key[0],location,"Route blocked" if row["blocked"] else f"+{delay:.1f} min",h,point,("Verified same-direction incident/route match. Statistical travel-time baseline." if ev else "Route-specific speed or rainfall estimate; incident association not verified."),row["confidence"],direction=key[1],affected_stops=[stop for detail in traffic_details for stop in detail["stops"]],delay=delay,blocked=row["blocked"],event_id=(ev or {}).get("id","")))
+        def at(stop=None,bus=None):
+            if stop and stop.get("point"):return stop["point"]
+            if bus and bus.get("lat") and bus.get("lon"):return [bus["lon"],bus["lat"]]
+            return point
+        heavy_bus=next((b for b in seq if b.get("load")=="LSD"),None)
         if heavy and h==0:
-            alerts.append(alert("loading",key[0],location,f"{heavy} sampled buses: limited standing",0,point,"Observed LTA categorical load; exact occupancy is unavailable.",.7,direction=key[1]))
+            alerts.append(alert("loading",key[0],(load_details[0]["stop"] or {}).get("name") or load_details[0].get("near") or location if load_details else location,f"{heavy} sampled buses: limited standing",0,at((load_details[0]["stop"] if load_details else None),heavy_bus),"Observed LTA categorical load; exact occupancy is unavailable.",.7,direction=key[1]))
         for group in groups:
-            alerts.append(alert("bunching",key[0],group.get("location"),"Three-bus bunching",group.get("t_occur") or 0,point,"Collector downstream arrival-time headways, not bus distance.",.7,direction=key[1],event_id="bb:"+":".join(map(str,group.get("ids") or [])),stop=stop_context(stops,group.get("location"),group.get("stop_j")),buses=group.get("ids"),persistence=group.get("stops")))
+            alerts.append(alert("bunching",key[0],group.get("location"),"Three-bus bunching",group.get("t_occur") or 0,at(stop_context(stops,group.get("location"),group.get("stop_j"))),"Collector downstream arrival-time headways, not bus distance.",.7,direction=key[1],event_id="bb:"+":".join(map(str,group.get("ids") or [])),stop=stop_context(stops,group.get("location"),group.get("stop_j")),buses=group.get("ids"),persistence=group.get("stops")))
         for gap in gaps:
             scheduled=sample.get("sched_hw")
             if scheduled and (gap.get("max_hw") or 0)-scheduled>=5:
-                alerts.append(alert("gap",key[0],gap.get("location"),f'{gap.get("max_hw")} min headway',gap.get("t_occur") or 0,point,"Collector projected arrivals exceed the scheduled headway by at least five minutes.",.7,direction=key[1],event_id=f"gap:{gap.get('lead')}:{gap.get('foll')}",stop=stop_context(stops,gap.get("location"),gap.get("stop_j")),headway=gap.get("max_hw"),scheduled=scheduled))
+                alerts.append(alert("gap",key[0],gap.get("location"),f'{gap.get("max_hw")} min headway',gap.get("t_occur") or 0,at(stop_context(stops,gap.get("location"),gap.get("stop_j"))),"Collector projected arrivals exceed the scheduled headway by at least five minutes.",.7,direction=key[1],event_id=f"gap:{gap.get('lead')}:{gap.get('foll')}",stop=stop_context(stops,gap.get("location"),gap.get("stop_j")),headway=gap.get("max_hw"),scheduled=scheduled))
         # Live coordinates remain live coordinates at future horizons: no fabricated positions.
         for b in seq:
             if b.get("lat") and b.get("lon"):
@@ -409,21 +415,25 @@ def build_centre(mode="demo", horizon=30, scenario="combined", tick=0, raw=None,
                 event['service_dirs']=[p for p in event.get('service_dirs',[]) if p[0] in included]
             if event.get('impacts'):
                 event['impacts']=[p for p in event['impacts'] if p['svc'] in included]
-        snap["kpis"]={c:{"count":sum((s.get({"loading":"heavy_buses","bunching":"three","gap":"gaps"}.get(c,"delay")) or 0) for s in snap["services"]) if c!="traffic" else sum(e.get("congestion_eligible",False) for e in snap["events"]),
-                           "services":len({a["svc"] for a in snap["alerts"] if a["category"]==c}),"earliest":min([a["onset"] for a in snap["alerts"] if a["category"]==c] or [0]),"available":snap["coverage"][c]} for c in CATEGORIES}
+        snap["kpis"]={c:{"count":sum((s.get({"loading":"heavy_buses","bunching":"three","gap":"gaps"}.get(c,"delay")) or 0) for s in snap["services"]) if c!="traffic" else sum(1 for e in snap["events"] if e.get("point") or e.get("line")),
+                           "services":len({a["svc"] for a in snap["alerts"] if a["category"]==c}) if c!="traffic" else len({x for e in snap["events"] for x in ([e["svc"]] if e.get("svc") else e.get("services",[]))}),"earliest":min([a["onset"] for a in snap["alerts"] if a["category"]==c] or [0]),"available":snap["coverage"][c]} for c in CATEGORIES}
         snap["kpis"]["loading"]["occupancy"]=max([s["occupancy"] for s in snap["services"] if s.get("occupancy") is not None] or [0]) or None
         snap["kpis"]["traffic"]["delay"]=mean([s["delay"] for s in snap["services"] if s.get("delay") and not s.get("blocked")])
         snap["kpis"]["gap"]["headway"]=max([s.get("headway") or 0 for s in snap["services"] if s.get("gaps")] or [0]) or None
     current=snapshots[horizon]
     current["alerts"].sort(key=lambda a:(-a["score"],a["onset"],a["svc"]))
     if category in CATEGORIES:
+        # A selected card shows only its own category, on the map as well as in the lists.
         current["alerts"]=[a for a in current["alerts"] if a["category"]==category]
         ids={a["svc"] for a in current["alerts"]}
+        if category=="traffic":   # every incident the traffic card counts, and the services it hits
+            ids|={x for e in current["events"] for x in ([e["svc"]] if e.get("svc") else e.get("services",[]))}
+        else:
+            current["events"]=[]
         for key in ("services","buses","routes","stops"):
             current[key]=[x for x in current[key] if x["svc"] in ids]
-        current["events"]=[e for e in current["events"] if e.get("svc") in ids or any(s in ids for s in e.get("services",[]))]
-        for e in current["events"]:
-            if e.get("impacts"):e["impacts"]=[p for p in e["impacts"] if p["svc"] in ids]
+        if category!="loading":   # heavy-load bus markers belong to the loading card only
+            current["services"]=[dict(x,load_details=[]) for x in current["services"]]
     advice=[recommendation(a) for a in current["alerts"][:4]]
     if mode=="demo":
         for a,r in zip(current["alerts"][:4],advice):
