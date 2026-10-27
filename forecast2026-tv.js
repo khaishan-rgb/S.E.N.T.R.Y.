@@ -2,7 +2,7 @@
 //  1. Which service / direction / location has heavy passenger loading?
 //  2. Which incident, roadwork or traffic build-up affects which service / direction / location?
 //  3. Where is there three-bus bunching or a long headway gap (service / direction / location)?
-import {esc,num,icon} from './forecast2026-core.js?v=20261028-fix3';
+import {esc,num,icon} from './forecast2026-core.js?v=20261028-fix4';
 
 export const KINDS={
  road_closed:{label:'Road closed',icon:'road_closed',rank:0},
@@ -100,7 +100,7 @@ export function loadingCard(r,isNew=false,demo=false){
  return `<article class="tvb-card" data-key="${esc(r.key)}">${svcBadge(r.svc,r.dir)}${whereHTML(r.where)}<div class="tvb-metric"><b>${metric}</b><small>${label}</small></div>${r.buses.length?`<p class="tvb-foot">${newTag(isNew)}Buses ${r.buses.slice(0,4).map(b=>'#'+esc(b)).join(' · ')}${r.buses.length>4?' +'+(r.buses.length-4):''}</p>`:isNew?`<p class="tvb-foot">${newTag(true)}</p>`:''}</article>`;
 }
 export function trafficCard(g,isNew=false){
- const k=kindOf(g.kind),impact=g.blocked?'BLOCKED':g.delay!=null?'+'+num(g.delay,1)+' min':'Delay n/a';
+ const k=kindOf(g.kind),impact=g.blocked?'BLOCKED':g.delay!=null&&g.delay>=0.05?'+'+num(g.delay,1)+' min':g.delay!=null?'No delay yet':'Delay n/a';
  return `<article class="tvb-card tvb-event ${g.blocked?'is-blocked':''}" data-key="${esc(g.key)}"><header class="tvb-event-head"><span class="tvb-kind">${icon(k.icon)}${esc(k.label)}${g.building?'<em class="tvb-building">BUILDING</em>':''}${newTag(isNew)}</span><b class="tvb-impact">${impact}</b></header><p class="tvb-road" title="${esc(g.road)}">${esc(g.road)}</p><ul class="tvb-impacts">${g.impacts.slice(0,6).map(i=>`<li>${svcBadge(i.svc,i.dir)}${whereHTML(i.where)}</li>`).join('')}${g.impacts.length>6?`<li class="tvb-more">+${g.impacts.length-6} more service-directions</li>`:''}</ul></article>`;
 }
 export function headwayCard(r,isNew=false){

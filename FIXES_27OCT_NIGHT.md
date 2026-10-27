@@ -50,3 +50,13 @@ They now show **filled with data in both views**:
 - **TV mode:** the panels replace the bottom row, as before.
 
 Asset version is `20261028-fix3`.
+
+## Bottom row simplified; every case listed (28 Oct, 01:20)
+- The hourly headway chart, "Top services to watch" and "AI operational advice" are removed from the dashboard. The bottom row is now the three panels (Heavy loading · Incident & traffic · Bunching & long gaps), in both the normal view and TV mode.
+- **Normal view lists every case:**
+  - Phone: each panel grows to show all its cards.
+  - Desktop: each panel scrolls.
+  - The footer shows "N listed".
+- **TV mode** still rotates pages every 12 s, because a wall screen can't be scrolled.
+- A roadwork or incident with zero measured delay now reads "No delay yet" instead of "+0.0 min".
+- Asset version `20261028-fix4`.

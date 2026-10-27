@@ -124,7 +124,9 @@ def main():
                 page.set_viewport_size({'width':1366,'height':768});page.wait_for_timeout(250)
                 page.click('#exitTV');page.wait_for_timeout(200)
                 assert not page.evaluate('document.body.classList.contains("tv")')
-                page.locator('#serviceWatch [data-service="985"]').first.click()
+                # "Top services to watch" is retired; select the service from its alert ("Focus service on map").
+                page.locator('#alerts [data-alert*=":985:"]').first.click()
+                page.locator('#modalBody button[data-service="985"]').click()
                 page.wait_for_function('SENTRY2026.state.services.includes("985")')
                 assert page.locator('#routeSelection').is_visible();assert page.locator('.selected-route-svg').count()==1
                 page.click('#clearService');page.wait_for_function('SENTRY2026.state.services.length===0')

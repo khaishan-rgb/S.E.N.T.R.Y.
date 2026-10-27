@@ -95,11 +95,14 @@ body.tv{position:fixed;inset:0;width:100%;height:100dvh;min-height:0;display:fle
 /* ===== TV bottom row (20261028-fix2) =====
    In TV mode the bottom row (analytics / top services / AI advice) is replaced by three panels:
    heavy loading, incident & traffic, bunching & long gaps. Everything above is unchanged. */
+/* Bottom row = the three panels, in the normal view and in TV. The old analytics / top services / AI advice panels are retired. */
 .tvq{display:none}
-.question-row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;padding:0 12px 14px}
-.question-row>.tvq{display:flex;flex-direction:column;height:clamp(320px,38vh,520px)}
-body.tv .question-row{display:none}
-@media(max-width:1000px){.question-row{grid-template-columns:minmax(0,1fr)}.question-row>.tvq{height:clamp(300px,52vh,460px)}}
+.bottom-grid>.analytics-workspace,.bottom-grid>.panel:not(.tvq){display:none!important}
+.bottom-grid{grid-template-columns:repeat(3,minmax(0,1fr))!important}
+.bottom-grid>.tvq{display:flex;flex-direction:column;grid-column:auto;grid-row:1;border-top:3px solid var(--risk)}
+body:not(.tv) .tvq-list{overflow-y:auto;overscroll-behavior:contain}
+@media(max-width:1199px){body:not(.tv) .bottom-grid{grid-auto-rows:auto!important}body:not(.tv) .bottom-grid>.tvq{height:auto;min-height:220px}body:not(.tv) .tvq-list{flex:0 0 auto;overflow:visible}}
+@media(max-width:1000px){body:not(.tv) .bottom-grid{grid-template-columns:minmax(0,1fr)!important}body:not(.tv) .bottom-grid>.tvq{grid-row:auto}}
 body.tv .bottom-grid>.analytics-workspace,body.tv .bottom-grid>.panel:not(.tvq){display:none!important}
 body.tv .bottom-grid{grid-template-columns:repeat(3,minmax(0,1fr))!important}
 body.tv .bottom-grid>.tvq{display:flex;flex-direction:column;grid-column:auto;grid-row:1;border-top:3px solid var(--risk)}
