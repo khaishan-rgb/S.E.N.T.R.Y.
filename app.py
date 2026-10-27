@@ -11967,3 +11967,97 @@ async def api_forecast_health():
             "last": datetime.fromtimestamp(FC["last"], SGT).isoformat(timespec="seconds") if FC["last"] else None, "error": FC["err"],
             "cycle_ms": FC["cycle_ms"], "config": fc_config(), "calibration": FC["store"].calibration(time.time()),
             "index": len(FC["index"]) if FC["index"] is not None else 0, "probes": len(FC["probes"])}
+
+# S.E.N.T.R.Y 2026 standalone command-centre adapter. Existing provider collectors
+# and strict geometry/direction matching are reused without changing their API.
+import forecast2026 as fc26
+FC26_LEDGER = None
+
+
+def fc26_ledger():
+    global FC26_LEDGER
+    if FC26_LEDGER is None:
+        FC26_LEDGER = fc26.AlertLedger(FC_DB)
+    return FC26_LEDGER
+
+
+@app.get('/forecast2026.css')
+async def fc26_styles():
+    from fastapi.responses import Response
+    return Response((HERE / 'forecast2026.css').read_text(), media_type='text/css', headers={'Cache-Control':'no-cache'})
+
+
+@app.get('/forecast2026.js')
+@app.get('/forecast2026-core.js')
+@app.get('/forecast2026-map.js')
+async def fc26_script(request: Request):
+    from fastapi.responses import Response
+    name = request.url.path.rsplit('/', 1)[-1]
+    return Response((HERE / name).read_text(), media_type='application/javascript', headers={'Cache-Control':'no-cache'})
+
+
+@app.get('/api/forecast/centre')
+async def fc26_centre(mode: str='demo', horizon: int=30, scenario: str='combined', tick: int=0,
+                     services: str='', exclude_cbs: int=0, category: str='all'):
+    if mode not in ('demo','live') or horizon not in fc26.HORIZONS or scenario not in dict(fc26.SCENARIOS):
+        return JSONResponse({'error':'Unsupported data mode, horizon or scenario'},status_code=400)
+    raw, samples = {}, []
+    if mode=='live':
+        raw = await api_forecast_state()
+        # Refresh the existing bunching collector watch list, within its normal budget.
+        await api_forecast_bunching(services=services or ','.join(s['svc'] for s in raw.get('services',[])[:20]))
+        samples = list(BB['rows'].values())
+    # Synchronise the full namespace before applying user filters. Filters cannot resolve alerts.
+    data = await asyncio.to_thread(fc26.build_centre,mode,horizon,scenario,max(0,tick),raw,samples)
+    ns=f'{mode}:{scenario if mode=="demo" else "network"}:{horizon}'
+    try:
+        ledger=fc26_ledger()
+        ledger.sync(ns,data['alerts'],time.time(),can_resolve=mode=='demo')
+        history,audit=ledger.view(ns)
+        statuses={a['id']:a['status'] for a in history}
+        for a in data['alerts']:
+            a['status']=statuses.get(a['id'],'new')
+        data.update(history=history,audit=audit,namespace=ns)
+    except sqlite3.Error:
+        data.update(history=[],audit=[],namespace=ns,journal_error='Alert persistence is unavailable')
+    wanted={s.strip().upper() for s in services.split(',') if s.strip()}
+    if wanted or exclude_cbs or category!='all':
+        filtered=fc26.build_centre(mode,horizon,scenario,max(0,tick),raw,samples,list(wanted),bool(exclude_cbs),category)
+        for key in ('services','alerts','events','buses','routes','stops','timeline','service_series','kpis','recommendations'):
+            data[key]=filtered[key]
+        for a in data['alerts']:
+            a['status']=statuses.get(a['id'],'new') if 'statuses' in locals() else 'new'
+        data['history']=[a for a in data.get('history',[]) if (not wanted or a['svc'] in wanted) and (not exclude_cbs or a['svc'] not in fc26.CBS) and (category=='all' or a['category']==category)]
+    if mode=='live' and wanted:
+        world=FC.get('world') or {}
+        idx=world.get('index')
+        lines=idx.lines if idx is not None else {}
+        for key,line in lines.items():
+            if key[0] in wanted and len(data['routes'])<6:
+                data['routes'].append({'svc':key[0],'dir':key[1],'line':forecast.simplify(line.pts,30),'mode':'live'})
+                for stop in (world.get('stops') or {}).get(key,[]):
+                    data['stops'].append({'id':stop.get('code'),'name':stop.get('name'),'point':[stop['lon'],stop['lat']],'svc':key[0]})
+    # Demo cameras are deliberately not filled with fabricated traffic photos.
+    data['cameras']=[]
+    if mode=='live':
+        hit=CACHE.get('cameras')
+        if hit:
+            cams=(hit[2].get('cams') or []) if isinstance(hit[2],dict) else []
+            data['cameras']=[{'id':c['id'],'image':c['link'],'label':c.get('desc') or c.get('road') or 'Traffic camera','taken':c.get('taken')} for c in cams[:4]]
+    return data
+
+
+@app.post('/api/forecast/centre/alerts')
+async def fc26_transition(request: Request):
+    try:
+        body=await request.json()
+        ns=str(body.get('namespace',''))
+        if not re.fullmatch(r'(demo|live):[a-z_]+:(0|15|30|60|120)',ns):
+            raise ValueError('Invalid alert namespace')
+        user=auth.read(request.cookies.get(auth.COOKIE,'')) if hasattr(auth,'read') else None
+        identity=(user or {}).get('u') if isinstance(user,dict) else None
+        who=str((identity.get('name') or identity.get('id')) if isinstance(identity,dict) else identity or 'controller')[:80]
+        ok=fc26_ledger().transition(ns,str(body.get('id','')),str(body.get('status','')),who,time.time())
+        return JSONResponse({'ok':ok},status_code=200 if ok else 404)
+    except (ValueError,TypeError):
+        return JSONResponse({'error':'Invalid alert transition'},status_code=400)

@@ -1,0 +1,24 @@
+export const HORIZONS=[0,15,30,60,120];
+export const COLORS={loading:'#ffb64a',traffic:'#ff695b',bunching:'#f755b5',gap:'#61c8ff',normal:'#39e4a2',route:'#47ddff'};
+export const TITLES={loading:'Heavy passenger loading',traffic:'Traffic buildup',bunching:'Three-bus bunching',gap:'Long headway gaps'};
+export const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+export const num=(v,d=0)=>v==null?'—':Number(v).toFixed(d);
+export function apiURL(state){const p=new URLSearchParams({mode:state.mode,horizon:state.h,scenario:state.scenario,tick:state.tick,services:state.services.join(','),exclude_cbs:state.exclude?'1':'0',category:state.category});return '/api/forecast/centre?'+p;}
+export function quality(mode,updated,now=Date.now()/1000,error=false){if(mode==='demo')return {label:'DEMO · SIMULATED',kind:'demo'};if(!updated)return {label:'OFFLINE',kind:'offline'};if(now-updated>150)return {label:'DATA DELAYED',kind:'delayed'};return {label:error?'FORECAST DEGRADED':'LIVE · ESTIMATED FORECAST',kind:error?'delayed':'live'};}
+export function riskServices(data){return [...(data.services||[])].map(s=>({...s,risk:(s.blocked?100:0)+(s.three||0)*30+(s.gaps||0)*25+(s.heavy_buses||0)*5+(s.delay||0)})).filter(s=>s.risk>0).sort((a,b)=>b.risk-a.risk);}
+export function slicePage(rows,page,size){const pages=Math.max(1,Math.ceil(rows.length/size));return {rows:rows.slice((page%pages)*size,(page%pages+1)*size),page:page%pages+1,pages};}
+export function badge(category){return `<span class="risk-dot" style="--risk:${COLORS[category]||COLORS.normal}"></span>`;}
+export function icon(kind){const paths={road_closed:'<circle cx="12" cy="12" r="9"/><path d="M5 12h14"/>',bus:'<rect x="5" y="3" width="14" height="16" rx="3"/><path d="M5 10h14M8 19v2m8-2v2M8 15h1m6 0h1"/>',loading:'<circle cx="8" cy="6" r="3"/><circle cx="17" cy="7" r="2"/><path d="M3 21v-7a5 5 0 0 1 10 0v7m2-9a4 4 0 0 1 6 3v6M8 13v8"/>',traffic:'<path d="m12 3 10 18H2Z"/><path d="M12 9v5m0 3v1"/>',roadworks:'<path d="m9 3-6 18h18L15 3ZM6 12h12M5 16h14"/>',bunching:'<rect x="1" y="6" width="6" height="12" rx="1"/><rect x="9" y="6" width="6" height="12" rx="1"/><rect x="17" y="6" width="6" height="12" rx="1"/>',gap:'<path d="M2 8h4v8H2m16-8h4v8h-4M8 12h8m-5-3-3 3 3 3m2-6 3 3-3 3"/>',rain:'<path d="M6 14a5 5 0 1 1 9-6 4 4 0 0 1 3 8H6m1 2-1 3m6-3-1 3m6-3-1 3"/>',clock:'<circle cx="12" cy="12" r="9"/><path d="M12 6v6l4 2"/>',camera:'<rect x="2" y="6" width="20" height="15" rx="2"/><circle cx="12" cy="13" r="4"/><path d="m6 6 2-3h8l2 3"/>',spark:'<path d="m12 2 2.5 7.5L22 12l-7.5 2.5L12 22l-2.5-7.5L2 12l7.5-2.5Z"/>'};return `<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${paths[kind]||paths.traffic}</svg>`;}
+export function chartSVG(series,{color='#49d5ff',labels=[],max=null,bars=false,unit=''}={}){
+ const w=400,h=118,p=18,good=series.filter(x=>x!=null),top=max||Math.max(1,...good)*1.15;
+ const x=i=>p+i*(w-p*2)/Math.max(1,series.length-1),y=v=>h-24-(v/top)*(h-38);
+ let svg=`<svg class="mini-chart" viewBox="0 0 ${w} ${h}" role="img" aria-label="${esc(unit)} forecast chart">`;
+ for(let j=0;j<3;j++){let yy=y(top*j/2);svg+=`<path d="M${p} ${yy}H${w-p}" stroke="#254055" stroke-dasharray="3 5"/><text x="2" y="${yy+3}">${num(top*j/2)}${esc(unit)}</text>`;}
+ let segments=[],current=[];series.forEach((v,i)=>{if(v==null){if(current.length)segments.push(current);current=[];}else current.push([x(i),y(v)]);});if(current.length)segments.push(current);
+ if(bars)series.forEach((v,i)=>{if(v!=null)svg+=`<rect x="${x(i)-8}" y="${y(v)}" width="16" height="${h-24-y(v)}" rx="2" fill="${v>=85?'#ff6479':color}"/>`;});
+ else segments.forEach(points=>{svg+=`<polyline points="${points.map(p=>p.join(',')).join(' ')}" stroke="${color}" fill="none" stroke-width="2.5"/>`;points.forEach(([xx,yy])=>svg+=`<circle cx="${xx}" cy="${yy}" r="3" fill="${color}"/>`);});
+ labels.forEach((l,i)=>svg+=`<text x="${x(i)}" y="${h-4}" text-anchor="middle">${esc(l)}</text>`);
+ return svg+'</svg>';
+}
+
+export function operationalQueue(data,history=false){if(history)return data.history||[];const current=new Set((data.alerts||[]).map(a=>a.id));const retained=(data.history||[]).filter(a=>a.status!=='resolved'&&!current.has(a.id)).map(a=>({...a,evidence:'stale'}));return [...(data.alerts||[]),...retained];}
