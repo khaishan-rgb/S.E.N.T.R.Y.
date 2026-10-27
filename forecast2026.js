@@ -1,4 +1,4 @@
-import {HORIZONS,COLORS,TITLES,esc,num,apiURL,quality,riskServices,slicePage,badge,icon,chartSVG,operationalQueue,initialView,loadSummary,stopText,watchLocation,headwayView,toggleService,resetFilters,hourlyHeadway,hourlyChart,spotlightDeck} from './forecast2026-core.js?v=20261027-tv-board';
+import {HORIZONS,COLORS,TITLES,esc,num,apiURL,quality,riskServices,slicePage,badge,icon,chartSVG,operationalQueue,initialView,loadSummary,stopText,watchLocation,headwayView,toggleService,resetFilters,hourlyHeadway,hourlyChart,spotlightDeck,categoryView} from './forecast2026-core.js?v=20261027-tv-board';
 import {ForecastMap,LAYERS} from './forecast2026-map.js?v=20261027-tv-board';
 import {boardModel,loadingCard,trafficCard,headwayCard,emptyState,paginate} from './forecast2026-tv.js?v=20261027-tv-board';
 const $=id=>document.getElementById(id),query=new URLSearchParams(location.search);
@@ -106,8 +106,8 @@ function render(d){
 }
 async function fetchState(){
  const id=++requestId;if(controller)controller.abort();controller=new AbortController();const activeController=controller;let timedOut=false;const deadline=setTimeout(()=>{timedOut=true;activeController.abort();},55000);document.body.classList.add('fetching');
- try{let p={...state};if(state.operator){let byOp=state.catalog.filter(s=>s.operator===state.operator).map(s=>s.svc);p.services=state.services.length?state.services.filter(s=>byOp.includes(s)):byOp;if(!p.services.length)p.services=['NO_MATCH'];}
-  let response=await fetch(apiURL(p),{credentials:'same-origin',signal:controller.signal});if(!response.ok)throw Error('Forecast adapter returned '+response.status);let d=await response.json();if(id!==requestId)return;render(d);if(lastFocus){networkMap.focus(lastFocus);lastFocus=null;}if(state.mode==='live'&&Date.now()-cameraTime>60000)loadCameras();else if(state.mode==='demo')cameras([]);
+ try{let p={...state,category:'all'};if(state.operator){let byOp=state.catalog.filter(s=>s.operator===state.operator).map(s=>s.svc);p.services=state.services.length?state.services.filter(s=>byOp.includes(s)):byOp;if(!p.services.length)p.services=['NO_MATCH'];}
+  let response=await fetch(apiURL(p),{credentials:'same-origin',signal:controller.signal});if(!response.ok)throw Error('Forecast adapter returned '+response.status);let d=await response.json();if(id!==requestId)return;if(d.context_routes==null&&d.context_routes_cached&&state.contextRoutes)d.context_routes=state.contextRoutes;else{state.contextRoutes=d.context_routes||null;state.routesV=d.context_routes?d.context_routes_version||null:null;}state.full=d;render(categoryView(d,state.category));if(lastFocus){networkMap.focus(lastFocus);lastFocus=null;}if(state.mode==='live'&&Date.now()-cameraTime>60000)loadCameras();else if(state.mode==='demo')cameras([]);
  }catch(e){if(e.name==='AbortError'&&!timedOut)return;$('error').textContent='Forecast unavailable. '+e.message+'. Last successful data is retained and freshness stays visible.';if(state.data){state.data.error=e.message;updateStatus();}else{$('systemStatus').textContent='OFFLINE';$('systemStatus').className='status offline';}}
  finally{clearTimeout(deadline);if(id===requestId)document.body.classList.remove('fetching');}
 }
@@ -165,7 +165,7 @@ document.addEventListener('click',async e=>{let t=e.target.closest('button,[data
  if(t.id==='headwayValues'){expandAnalysis();return;}
  if(t.dataset.mode){state.mode=t.dataset.mode;state.page=0;state.tab='active';playback(false);state.catalog=[];state.operator='';$('operator').value='';cameraTime=0;cameraPoint=null;cameraRows=[];cameraRequest++;await fetchState();loadCatalog();return;}
  if(t.dataset.h!=null){state.h=+t.dataset.h;state.page=0;fetchState();return;}
- if(t.dataset.category){state.category=state.category===t.dataset.category?'all':t.dataset.category;state.page=0;fetchState();return;}
+ if(t.dataset.category){state.category=state.category===t.dataset.category?'all':t.dataset.category;state.page=0;if(state.full)render(categoryView(state.full,state.category));else fetchState();return;}
  if(t.dataset.service){closeModal();selectService(t.dataset.service);return;}
  if(t.dataset.tab){state.tab=t.dataset.tab;state.page=0;if(state.data)alerts(state.data);return;}
  if(t.dataset.recommend!=null){recommendationDetail(+t.dataset.recommend);return;}

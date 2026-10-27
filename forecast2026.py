@@ -268,6 +268,21 @@ def stop_context(stops, location=None, index=None):
             'point':[chosen['lon'],chosen['lat']] if chosen.get('lat') is not None and chosen.get('lon') is not None else None}
 
 
+def road_missing(road):
+    return not road or str(road).strip().lower().startswith("road name not supplied")
+
+
+def nearest_stop(stops, point, max_m=400):
+    """The route's own LTA stop closest to an event point (used when the provider gives no road / stretch)."""
+    if not point:return None
+    best=None
+    for i,s in enumerate(stops):
+        if s.get('lat') is None or s.get('lon') is None:continue
+        d=math.hypot((s['lon']-point[0])*111320*math.cos(math.radians(point[1])),(s['lat']-point[1])*111320)
+        if best is None or d<best[0]:best=(d,i)
+    return stop_context(stops,index=best[1]) if best and best[0]<=max_m else None
+
+
 def impact_stops(stops, start, end):
     if start is None or end is None:return []
     a,b=sorted((start,end));valid=[(i,s) for i,s in enumerate(stops) if s.get('route_m') is not None]
@@ -344,7 +359,14 @@ def live_snapshot(raw, samples, h, now=None):
             match=next((m for m in event.get('matches',[]) if (m['svc'],m['dir'])==key),None)
             if match is not None:
                 affected=impact_stops(stops,match.get('a_m'),match.get('b_m'))
-                traffic_details.append({'event_id':event['id'],'road':(event['road'] if event['road']!='Road name not supplied' else match.get('road') or event['road']),'kind':event['kind'],
+                if not affected:   # no verified stretch: name the route's nearest stop to the event instead of "unavailable"
+                    near=nearest_stop(stops,event.get('point'))
+                    affected=[near] if near else []
+                road=event['road']
+                if road_missing(road):road=match.get('road')
+                if road_missing(road):road=next((x.get('road') for x in affected if x and not road_missing(x.get('road'))),None)
+                if road_missing(road):road=('Near '+affected[0]['name']) if affected and affected[0].get('name') else event['road']
+                traffic_details.append({'event_id':event['id'],'road':road,'kind':event['kind'],
                                         'stops':affected,
                                         'relation':'Stops on / bracketing the verified affected route stretch','delay':event['delay']})
                 event.setdefault('impacts',[]).append({'svc':key[0],'dir':key[1],'stops':affected,'delay':event['delay']})
@@ -383,6 +405,10 @@ def live_snapshot(raw, samples, h, now=None):
         for b in seq:
             if b.get("lat") and b.get("lon"):
                 buses.append({"id":f"{key[0]}:{key[1]}:{b['id']}","svc":key[0],"dir":key[1],"point":[b["lon"],b["lat"]],"load":b.get("load"),"occupancy":None,"predicted":False,"mode":"live"})
+    for event in events:
+        if road_missing(event.get("road")):
+            named=[t["road"] for s_ in services for t in s_["traffic_details"] if t.get("event_id")==event["id"] and not road_missing(t.get("road"))]
+            if named:event["road"]=named[0]
     return {"mode":"live","services":services,"alerts":alerts,"buses":buses,"events":events,"routes":[],"stops":[],
             "coverage":{"traffic":traffic_ok,"loading":h==0 and any(s["heavy_buses"] is not None for s in services),"bunching":h<=30 and any(s["three"] is not None for s in services),"gap":h<=30 and any(s["gaps"] is not None for s in services)},
             "updated":now-age,"weather":{"text":((raw.get("rain") or {}).get("summary") or "NEA observations in source panel"),"temperature":None},
@@ -498,3 +524,18 @@ class AlertLedger:
             records=db.execute("SELECT body,status,first,last FROM fc26_alert WHERE ns=? ORDER BY score DESC,last DESC LIMIT 250",(ns,)).fetchall()
             audit=db.execute("SELECT id,action,who,ts FROM fc26_audit WHERE ns=? ORDER BY seq DESC LIMIT 100",(ns,)).fetchall()
         return [dict(json.loads(b),status=s,first=f,last=l) for b,s,f,l in records], [dict(id=i,action=a,who=w,ts=t) for i,a,w,t in audit]
+
+
+def simplify_latlon(pts, tol_m=5.0, nd=5):
+    """[(lat, lon)] -> [[lon, lat]] keeping every bend (Douglas-Peucker, metres). Far fewer points than uniform sampling."""
+    pts=[(float(a),float(b)) for a,b in pts]
+    if len(pts)<3:return [[round(b,nd),round(a,nd)] for a,b in pts]
+    lat0=math.radians(sum(p[0] for p in pts)/len(pts));P=[(p[1]*111320*math.cos(lat0),p[0]*111320) for p in pts]
+    keep=[False]*len(P);keep[0]=keep[-1]=True;stack=[(0,len(P)-1)]
+    while stack:
+        a,b=stack.pop();ax,ay=P[a];bx,by=P[b];dx,dy=bx-ax,by-ay;L=dx*dx+dy*dy;best,bi=-1.0,None
+        for i in range(a+1,b):
+            px,py=P[i];t=0 if L==0 else max(0,min(1,((px-ax)*dx+(py-ay)*dy)/L));d=math.hypot(px-ax-t*dx,py-ay-t*dy)
+            if d>best:best,bi=d,i
+        if bi is not None and best>tol_m:keep[bi]=True;stack+=[(a,bi),(bi,b)]
+    return [[round(p[1],nd),round(p[0],nd)] for p,k in zip(pts,keep) if k]

@@ -12040,9 +12040,44 @@ def fc26_enrich_context(raw, samples):
     return dict(raw,route_context=context,headway_schedule=fc26.master_schedule(BB.get('master',[]),keys,time.time())),samples
 
 
+FC26_LINES = {}   # (svc, dir, id(Line)) -> simplified [[lon, lat]]: built once per route-index build, not per request
+
+
+def fc26_line(key, L):
+    hit = FC26_LINES.get((key, id(L)))
+    if hit is None:
+        if len(FC26_LINES) > 6000:
+            FC26_LINES.clear()
+        hit = FC26_LINES[(key, id(L))] = fc26.simplify_latlon(L.pts, 5.0)
+    return hit
+
+
+async def fc26_live_state():
+    """Answer at once from the last completed evaluation; refresh it in the background when due."""
+    if FC["state"] is not None and time.time() - FC["last"] >= FC_EVERY - 5:
+        task = FC.get("fc26_refresh")
+        if task is None or task.done():
+            FC["fc26_refresh"] = asyncio.create_task(fc_cycle())
+        FC["last_req"] = time.time()
+        now = time.time()
+        return fc_payload(FC["state"], FC["book"].view(now, history=True), FC["book"].counts(), FC["store"].audit_list(40),
+                          {"config": fc_config(), "age_s": round(now - FC["last"]), "cycle_ms": FC["cycle_ms"], "error": FC["err"]})
+    return await api_forecast_state()
+
+
+def fc26_response(request, data):
+    """JSON, gzip-compressed when the browser accepts it (route geometry compresses ~5x)."""
+    import gzip as _gzip
+    from fastapi.responses import Response
+    body = json.dumps(data, separators=(',', ':'), default=lambda o: o.item() if hasattr(o, 'item') else str(o)).encode()
+    if len(body) > 2048 and 'gzip' in (request.headers.get('accept-encoding') or ''):
+        return Response(_gzip.compress(body, 5), media_type='application/json', headers={'Content-Encoding': 'gzip', 'Vary': 'Accept-Encoding', 'Cache-Control': 'no-store'})
+    return Response(body, media_type='application/json', headers={'Cache-Control': 'no-store'})
+
+
 @app.get('/api/forecast/centre')
-async def fc26_centre(mode: str='live', horizon: int=0, scenario: str='combined', tick: int=0,
-                     services: str='', exclude_cbs: int=0, category: str='all', delay_min: float=.8):
+async def fc26_centre(request: Request, mode: str='live', horizon: int=0, scenario: str='combined', tick: int=0,
+                     services: str='', exclude_cbs: int=0, category: str='all', delay_min: float=.8, routes_v: str=''):
     if mode not in ('demo','live') or horizon not in fc26.HORIZONS or scenario not in dict(fc26.SCENARIOS):
         return JSONResponse({'error':'Unsupported data mode, horizon or scenario'},status_code=400)
     try:
@@ -12054,7 +12089,7 @@ async def fc26_centre(mode: str='live', horizon: int=0, scenario: str='combined'
         # Start LTA collection independently of traffic incidents or TomTom availability.
         initial_watch = services or ','.join(FC_SERVICES) or BB_DEFAULT
         await api_forecast_bunching(services=initial_watch)
-        raw = await api_forecast_state()
+        raw = await fc26_live_state()
         # Refresh the existing bunching collector watch list, within its normal budget.
         await api_forecast_bunching(services=services or ','.join(s['svc'] for s in raw.get('services',[])[:20]) or initial_watch)
         samples = list(BB['rows'].values())
@@ -12076,7 +12111,7 @@ async def fc26_centre(mode: str='live', horizon: int=0, scenario: str='combined'
         data.update(history=[],audit=[],namespace=ns,journal_error='Alert persistence is unavailable')
     wanted={s.strip().upper() for s in services.split(',') if s.strip()}
     if delay_min>=0:  # Always filter the full, unfiltered audit snapshot for this view.
-        filtered=fc26.build_centre(mode,horizon,scenario,max(0,tick),raw,samples,list(wanted),bool(exclude_cbs),category,delay_min=delay_min)
+        filtered=await asyncio.to_thread(fc26.build_centre,mode,horizon,scenario,max(0,tick),raw,samples,list(wanted),bool(exclude_cbs),category,delay_min=delay_min)
         for key in ('services','alerts','events','buses','routes','stops','timeline','service_series','kpis','recommendations','context_routes','delay_filter','headway_history','headway_schedule'):
             data[key]=filtered[key]
         for a in data['alerts']:
@@ -12089,7 +12124,7 @@ async def fc26_centre(mode: str='live', horizon: int=0, scenario: str='combined'
         lines=idx.lines if idx is not None else {}
         for key,line in lines.items():
             if key[0] in wanted and (not exclude_cbs or key[0] not in fc26.CBS) and len(data['routes'])<40:
-                data['routes'].append({'svc':key[0],'dir':key[1],'line':forecast.simplify(line.pts,30),'mode':'live'})
+                data['routes'].append({'svc':key[0],'dir':key[1],'line':fc26_line(key,line),'mode':'live'})
                 for stop in (world.get('stops') or {}).get(key,[]):
                     data['stops'].append({'id':stop.get('code'),'name':stop.get('name'),'point':[stop['lon'],stop['lat']],'svc':key[0]})
     if mode=='live':
@@ -12097,10 +12132,17 @@ async def fc26_centre(mode: str='live', horizon: int=0, scenario: str='combined'
         if idx is not None:
             route_keys={(s['svc'],s['dir']) for s in data['services']}
             ordered=sorted(idx.lines.items(),key=lambda item:(item[0][0] not in wanted,item[0] not in route_keys))
-            data['context_routes']=[{'svc':k[0],'dir':k[1],'line':forecast.simplify(v.pts,30)} for k,v in ordered[:250] if not exclude_cbs or k[0] not in fc26.CBS]
+            context=[{'svc':k[0],'dir':k[1],'line':fc26_line(k,v)} for k,v in ordered[:250] if not exclude_cbs or k[0] not in fc26.CBS]
             if not wanted:
                 present={(r['svc'],r['dir']) for r in data['routes']}
-                data['routes'] += [r for r in data['context_routes'] if any(s['svc']==r['svc'] and s['dir']==r['dir'] for s in data['services']) and (r['svc'],r['dir']) not in present]
+                data['routes'] += [r for r in context if any(s['svc']==r['svc'] and s['dir']==r['dir'] for s in data['services']) and (r['svc'],r['dir']) not in present]
+            # The browser keeps the background route set; resend it only when it changes.
+            version=f"{FC.get('index_at')}:{hash(tuple((r['svc'],r['dir']) for r in context)) & 0xffffffff:x}"
+            data['context_routes_version']=version
+            if routes_v==version:
+                data['context_routes']=None;data['context_routes_cached']=True
+            else:
+                data['context_routes']=context
     # Demo cameras are deliberately not filled with fabricated traffic photos.
     data['cameras']=[]
     if mode=='live':
@@ -12108,7 +12150,7 @@ async def fc26_centre(mode: str='live', horizon: int=0, scenario: str='combined'
         if hit:
             cams=(hit[2].get('cams') or []) if isinstance(hit[2],dict) else []
             data['cameras']=[{'id':c['id'],'image':c['link'],'label':c.get('desc') or c.get('road') or 'Traffic camera','taken':c.get('taken')} for c in cams[:4]]
-    return data
+    return fc26_response(request, data)
 
 
 @app.post('/api/forecast/centre/alerts')

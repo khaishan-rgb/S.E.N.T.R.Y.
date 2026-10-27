@@ -3,7 +3,7 @@ export const COLORS={loading:'#ffb64a',traffic:'#ff695b',bunching:'#f755b5',gap:
 export const TITLES={loading:'Heavy passenger loading',traffic:'Traffic buildup',bunching:'Three-bus bunching',gap:'Long headway gaps'};
 export const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 export const num=(v,d=0)=>v==null?'—':Number(v).toFixed(d);
-export function apiURL(state){const p=new URLSearchParams({mode:state.mode,horizon:state.h,scenario:state.scenario,tick:state.tick,services:state.services.join(','),exclude_cbs:state.exclude?'1':'0',category:state.category,delay_min:state.delayMin??.8});return '/api/forecast/centre?'+p;}
+export function apiURL(state){const p=new URLSearchParams({mode:state.mode,horizon:state.h,scenario:state.scenario,tick:state.tick,services:state.services.join(','),exclude_cbs:state.exclude?'1':'0',category:state.category,delay_min:state.delayMin??.8});if(state.routesV)p.set('routes_v',state.routesV);return '/api/forecast/centre?'+p;}
 export function quality(mode,updated,now=Date.now()/1000,error=false){if(mode==='demo')return {label:'DEMO · SIMULATED',kind:'demo'};if(!updated)return {label:'OFFLINE',kind:'offline'};if(now-updated>150)return {label:'DATA DELAYED',kind:'delayed'};return {label:error?'FORECAST DEGRADED':'LIVE · ESTIMATED FORECAST',kind:error?'delayed':'live'};}
 export function riskServices(data){return [...(data.services||[])].map(s=>({...s,risk:(s.blocked?100:0)+(s.three||0)*30+(s.gaps||0)*25+(s.heavy_buses||0)*5+(s.delay||0)})).filter(s=>s.risk>0).sort((a,b)=>b.risk-a.risk);}
 export function slicePage(rows,page,size){const pages=Math.max(1,Math.ceil(rows.length/size));return {rows:rows.slice((page%pages)*size,(page%pages+1)*size),page:page%pages+1,pages};}
@@ -71,4 +71,17 @@ export function hourlyChart(view,width=900,height=200,fontSize=13){
  view.rows.forEach((r,i)=>{const xx=x(r.at);if(i%Math.max(1,Math.round((Math.ceil(1440/Math.max(3,Math.floor(width/75))/60)*60)/view.interval))===0)svg+=`<text x="${xx}" y="${h-13}" text-anchor="middle">${r.label}</text>`;if(r.abnormal)svg+=`<rect x="${xx}" y="${p.t}" width="${(w-p.l-p.r)*view.interval/1440}" height="${h-p.b-p.t}" fill="#ff5865" opacity=".13"/>`;svg+=`<rect data-hour="${i}" tabindex="0" role="button" aria-label="${esc(r.label)} headway values" x="${xx}" y="${p.t}" width="${(w-p.l-p.r)*view.interval/1440}" height="${h-p.b-p.t}" fill="transparent"><title>${r.label} SGT · Scheduled ${num(r.scheduled,1)} · Actual ${num(r.actual,1)} · Forecast ${num(r.forecast,1)} min</title></rect>`;});
  svg+=`<path d="M${boundary} ${p.t}V${h-p.b}" stroke="#f1cb7c" stroke-dasharray="4 4"/><text x="${Math.max(100,Math.min(w-95,boundary))}" y="15" text-anchor="middle" fill="#f1cb7c">NOW · FORECAST →</text></svg>`;
  return svg;
+}
+// Card selection is applied in the browser to the full snapshot, so selecting / clearing a card is instant.
+// Mirrors build_centre(category=...) in forecast2026.py.
+export function categoryView(data,category='all'){
+ if(!data||!category||category==='all'||!TITLES[category])return data;
+ const alerts=(data.alerts||[]).filter(a=>a.category===category),ids=new Set(alerts.map(a=>a.svc));
+ let events=[];
+ if(category==='traffic'){events=data.events||[];for(const e of events)for(const s of e.svc?[e.svc]:(e.services||[]))ids.add(s);}
+ const keep=rows=>(rows||[]).filter(x=>ids.has(x.svc));
+ let services=keep(data.services);if(category!=='loading')services=services.map(s=>({...s,load_details:[]}));
+ const alertIds=new Set(alerts.map(a=>a.id));
+ return {...data,category,alerts,events,services,buses:keep(data.buses),routes:keep(data.routes),stops:keep(data.stops),
+  recommendations:(data.recommendations||[]).filter(r=>alertIds.has(r.id)),history:(data.history||[]).filter(a=>a.category===category)};
 }

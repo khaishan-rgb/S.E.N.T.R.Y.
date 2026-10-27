@@ -95,7 +95,7 @@ body.tv{position:fixed;inset:0;width:100%;height:100dvh;min-height:0;display:fle
 /* ===== TV bottom row (20261027-tv-board) =====
    In TV mode the bottom row (analytics / top services / AI advice) is replaced by three panels:
    heavy loading, incident & traffic, bunching & long gaps. Everything above is unchanged. */
-.tvq{display:none}
+body:not(.tv) .tvq{display:none!important}   /* TV-only panels: never shown (empty) in the controller view */
 body.tv .bottom-grid>.analytics-workspace,body.tv .bottom-grid>.panel:not(.tvq){display:none!important}
 body.tv .bottom-grid{grid-template-columns:repeat(3,minmax(0,1fr))!important}
 body.tv .bottom-grid>.tvq{display:flex;flex-direction:column;grid-column:auto;grid-row:1;border-top:3px solid var(--risk)}

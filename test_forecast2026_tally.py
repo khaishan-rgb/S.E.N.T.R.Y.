@@ -86,3 +86,61 @@ class Tally(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class BrowserFilterParity(unittest.TestCase):
+    """The browser applies card selection locally (instant toggle); it must equal the server's category filter."""
+    def test_category_view_matches_server(self):
+        import json, subprocess, os
+        here = os.path.dirname(os.path.abspath(__file__))
+        for mode in ('live', 'demo'):
+            if mode == 'demo':
+                full = f.build_centre('demo', 30, 'combined', delay_min=.8)
+                by = {c: f.build_centre('demo', 30, 'combined', category=c, delay_min=.8) for c in f.CATEGORIES}
+            else:
+                raw, samples = fixture()
+                full = f.build_centre('live', 0, raw=raw, samples=samples, delay_min=.8)
+                by = {c: f.build_centre('live', 0, raw=raw, samples=samples, category=c, delay_min=.8) for c in f.CATEGORIES}
+            script = ("import('./forecast2026-core.js').then(m=>{const d=JSON.parse(require('fs').readFileSync(0,'utf8'));const out={};"
+                      "for(const c of ['loading','traffic','bunching','gap']){const v=m.categoryView(d,c);out[c]={alerts:v.alerts.map(a=>a.id).sort(),events:v.events.map(e=>e.id).sort(),"
+                      "services:v.services.map(s=>s.svc+':'+s.dir).sort(),buses:v.buses.map(b=>b.id).sort(),loads:v.services.reduce((n,s)=>n+(s.load_details||[]).length,0)};}"
+                      "console.log(JSON.stringify(out));})")
+            result = subprocess.run(['node', '-e', script], input=json.dumps(full, default=str), capture_output=True, text=True, cwd=here, check=True)
+            browser = json.loads(result.stdout)
+            for c, server in by.items():
+                expected = {'alerts': sorted(a['id'] for a in server['alerts']), 'events': sorted(e['id'] for e in server['events']),
+                            'services': sorted(f"{s['svc']}:{s['dir']}" for s in server['services']), 'buses': sorted(b['id'] for b in server['buses']),
+                            'loads': sum(len(s.get('load_details') or []) for s in server['services'])}
+                self.assertEqual(browser[c], expected, (mode, c))
+
+
+class RoadNames(unittest.TestCase):
+    def test_missing_road_and_stretch_are_filled_from_lta_stops(self):
+        now = time.time()
+        stops = [{'code': '51101', 'seq': 48, 'name': 'Bef Thomson Flyover', 'road': 'Thomson Rd', 'lat': 1.3301, 'lon': 103.8301, 'route_m': 900},
+                 {'code': '51109', 'seq': 49, 'name': 'Opp Thomson Plaza', 'road': 'Upp Thomson Rd', 'lat': 1.36, 'lon': 103.83, 'route_m': 4000}]
+        raw = {'age_s': 0, 'services': [{'svc': '506', 'dir': 1, 'blocked': True}],
+               'events': [{'id': 'X', 'kind': 'road_closed', 'status': 'confirmed', 'road': None, 'pt': [103.83, 1.33], 'delay_s': None,
+                           'services': [{'svc': '506', 'dir': 1}]}],           # no road, no a_m / b_m from the provider
+               'sources': {'tomtom_incidents': {'status': 'live'}}, 'route_context': {'506:1': stops}}
+        d = f.build_centre('live', 0, raw=raw, samples=[{'service': '506', 'direction': 1, 'at': now, 'route_stops': stops, 'seq': []}], delay_min=.8)
+        s = next(x for x in d['services'] if x['svc'] == '506')
+        detail = s['traffic_details'][0]
+        self.assertEqual(detail['road'], 'Thomson Rd')
+        self.assertEqual([x['code'] for x in detail['stops']], ['51101'])           # nearest route stop, not "unavailable"
+        self.assertEqual(d['events'][0]['road'], 'Thomson Rd')
+        self.assertEqual(next(a for a in d['alerts'] if a['category'] == 'traffic')['location'], 'Thomson Rd')
+
+    def test_far_event_is_not_attached_to_a_stop(self):
+        stops = [{'code': '1', 'seq': 1, 'name': 'Far', 'road': 'Far Rd', 'lat': 1.40, 'lon': 103.90}]
+        self.assertIsNone(f.nearest_stop(stops, [103.80, 1.30]))
+
+
+class Simplify(unittest.TestCase):
+    def test_keeps_bends_and_drops_straight_points(self):
+        straight = [(1.30, 103.80 + i * 0.0001) for i in range(100)]
+        bend = straight + [(1.30 + i * 0.0001, 103.8099) for i in range(1, 50)]
+        out = f.simplify_latlon(bend, 5.0)
+        self.assertEqual(out[0], [103.8, 1.3]); self.assertEqual(out[-1], [103.8099, 1.3049])
+        self.assertLessEqual(len(out), 4)                                            # two straight legs -> corner kept
+        self.assertTrue(any(abs(p[0] - 103.8099) < 2e-4 and abs(p[1] - 1.30) < 2e-4 for p in out))
