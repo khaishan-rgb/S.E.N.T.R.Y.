@@ -391,6 +391,13 @@ body.ds-app .ds-cmd{background:rgba(5,22,58,.82)!important}
   .fc-lg-icons{gap:3px 9px}.fc-lg-icons img{width:21px;height:21px}
   .fc-map-context{font-size:10px}
 }
+.fc-runtime{padding:14px;border:1px solid var(--fc-edge);border-radius:12px;background:rgba(4,20,42,.55);margin-top:12px}
+.fc-runtime>div:first-child{display:flex;flex-wrap:wrap;align-items:baseline;gap:8px 14px}
+.fc-runtime>div:first-child>b{font-size:26px;color:#fff}.fc-runtime small{font-size:12px}.fc-runtime span{color:#bacce0;font-size:12px}
+.fc-runtime p,.fc-runtime summary{font-size:12px;margin:10px 0 0}.fc-runtime summary{cursor:pointer;color:#bcefff}
+.fc-runtime-horizons{display:flex;gap:22px;padding-top:10px}.fc-runtime-horizons b{display:inline-block;margin-top:4px;color:#fff}
+.fc-map-actions{display:flex;gap:5px;margin-top:5px}.fc-map-actions button{height:28px;font-size:11px}
+#fcTop tr[data-risk-service]{cursor:pointer}#fcTop tr[data-risk-service]:hover,#fcTop tr[data-risk-service]:focus-visible{background:rgba(160,123,255,.15);outline:1px solid #a07bff}
 </style>
 </head>
 <body>
@@ -433,7 +440,8 @@ body.ds-app .ds-cmd{background:rgba(5,22,58,.82)!important}
     <label>Service <input class="ds-input" id="fcFilterSvc" list="fcSvcList" placeholder="All services" autocomplete="off"></label>
     <label>Operator <select class="ds-input" id="fcFilterOp"><option value="">All operators</option></select></label>
     <label>Minimum extra delay (min) <input class="ds-input" id="fcFilterMin" type="number" min="0" step="0.5" value="0" style="width:100px"></label>
-    <button type="button" class="ds-btn sm" id="fcFilterReset">Clear filters</button>
+    <button type="button" class="ds-btn sm" id="fcFilterReset">Clear all filters</button>
+    <button type="button" class="ds-btn sm" id="fcClearBuses">Clear buses</button>
     <label><input type="checkbox" id="fcLiveBuses" checked> Live buses</label>
     <small id="fcBusStatus" role="status">Waiting for live bus positions…</small>
     <small id="fcFilterNote">Filters apply to map route impacts, alerts, forecasts and risk rows. Minimum delay uses the largest prediction at 15 / 30 / 60 min. Only verified affected services are shown. Executive totals and weather cover the network; background traffic flow is hidden while filtering.</small>
@@ -473,7 +481,7 @@ body.ds-app .ds-cmd{background:rgba(5,22,58,.82)!important}
   <div class="fc-low">
     <section class="fc-glass" aria-label="Forecast comparison">
       <div class="fc-h"><h2>Predicted delay by forecast horizon</h2><span class="sp"></span><small id="fcMethodS">rule-based estimate</small></div>
-      <div class="fc-b"><p class="fc-muted">Compare expected extra running time 15, 30 and 60 minutes from now. Values are additional minutes per service-direction; ranges show uncertainty. Totals sum these minutes across service-directions, not individual buses.</p><div class="fc-cmp" id="fcCmp"></div></div>
+      <div class="fc-b"><p class="fc-muted">Compare expected extra running time 15, 30 and 60 minutes from now. Values are additional minutes per service-direction; ranges show uncertainty. The headline shows average extra minutes per affected service-direction, not a network sum.</p><div class="fc-cmp" id="fcCmp"></div></div>
     </section>
     <section class="fc-glass" aria-label="Services at risk">
       <div class="fc-h"><h2>Services at risk</h2><span class="sp"></span><small>verified evidence only</small></div>
@@ -988,7 +996,7 @@ function renderLayers(){
   var wasOpen = !!document.querySelector("#fcLayers details[open]");
   $("fcLayers").innerHTML = '<div class="fc-layer-main">'
     + button("traffic","Traffic","jam",counts.traffic) + button("events","Incidents","accident",counts.events) + button("works","Road works","roadworks",counts.works)
-    + button("unverified","Nearby reports",null,counts.reports) + button("legend","Key",null,null) + '</div>'
+    + button("unverified","Nearby reports",null,counts.reports) + button("legend","Key",null,null) + '</div><div class="fc-map-actions"><button type="button" data-clear-all>Clear all filters</button><button type="button" data-clear-buses>Clear buses</button></div>'
     + '<details class="fc-map-options"' + (wasOpen ? ' open' : '') + '><summary>More layers</summary><div>'
     + button("flow","Network traffic flow",null,null,!flowAvail || filterActive()) + button("heat","Congestion heat",null,null)
     + button("rain","Rain",null,null) + button("probes","Speed probes",null,null) + button("zones","Risk zones",null,null) + button("route","Selected route",null,null) + '</div></details>';
@@ -1011,9 +1019,46 @@ function renderHz(){
       selected.forEach(function(s){ var lv = (s.levels || {})[h]; if(counts[lv] != null) counts[lv]++; });
       c = Object.assign({}, c, counts, {extra_total:selected.reduce(function(n,s){ return n + s.extra[h].mid; },0)});
     }
-    var lv = c ? (c.critical ? "critical" : c.high ? "high" : c.watch ? "watch" : "") : "", sub = h ? (c ? (c.critical + c.high) + " at risk · +" + f1(c.extra_total) + " extra min total" : "–") : nowN + " verified events";
+    var lv = c ? (c.critical ? "critical" : c.high ? "high" : c.watch ? "watch" : "") : "", sub = h ? (c ? (c.critical + c.high) + " at risk · " + (horizonAverage(h) == null ? "avg unavailable" : "+" + f1(horizonAverage(h)) + " min avg") : "–") : nowN + " verified events";
     return '<button type="button" data-h="' + h + '" aria-pressed="' + (S.h === h) + '" style="--c:' + (lv ? COL[lv] : "#3b4c60") + '"><b>' + (h ? "+" + h + " min" : "Now") + '</b><span class="ln"></span><small>' + esc(sub) + '</small></button>';
   }).join("");
+}
+function meanMinutes(values){
+  var numbers=values.filter(function(v){return typeof v === "number" && Number.isFinite(v);});
+  return numbers.length ? numbers.reduce(function(a,b){return a+b;},0)/numbers.length : null;
+}
+function forecastRows(){
+  return ((S.st || {}).services || []).filter(function(s){return matchesService(s) && (s.blocked || LV[s.level]>=1 || predictedDelay(s)>0);});
+}
+function horizonAverage(h){
+  return meanMinutes(forecastRows().filter(function(s){return !s.blocked;}).map(function(s){return ((s.extra || {})[h] || {}).mid;}));
+}
+function serviceAverage(v){
+  if(v.blocked) return null;
+  return meanMinutes([15,30,60].map(function(h){return ((v.extra || {})[h] || {}).mid;}));
+}
+function compactRunningTime(v){
+  var avg=serviceAverage(v), total=v.blocked ? null : meanMinutes([15,30,60].map(function(h){return (v.pred_rt || {})[h];}));
+  return '<div class="fc-runtime"><div><small>Average extra running time</small><b>' + (avg == null ? 'Unavailable' : '+' + f1(avg) + ' min') + '</b><span>Mean of the 15, 30 and 60 min forecasts</span></div>'
+    + (v.blocked ? '<p class="fc-muted">Route blocked — a reliable running time is unavailable until it reopens.</p>' : total != null && v.hist_rt ? '<p>Average total running time: <b>' + f1(total) + ' min</b> · usual ' + f1(v.hist_rt) + ' min</p>' : '<p class="fc-muted">Total running time unavailable: no measured usual running time yet.</p>')
+    + '<details><summary>15 / 30 / 60 min details</summary><div class="fc-runtime-horizons">' + [15,30,60].map(function(h){var value=((v.extra || {})[h] || {}).mid;return '<span>In ' + h + ' min<br><b>' + (v.blocked || value == null ? 'Unavailable' : '+' + f1(value) + ' min') + '</b></span>';}).join('') + '</div></details></div>';
+}
+function focusRiskService(svc,dir){
+  $("fcFilterSvc").value=String(svc).toUpperCase();
+  S.view=null;
+  renderFiltered();
+  selectSvc(svc,dir).then(function(){ var map=document.querySelector('.fc-mapwrap');if(map) map.scrollIntoView({behavior:'smooth',block:'center'}); });
+}
+function clearAllFilters(){
+  $("fcFilterSvc").value="";$("fcFilterOp").value="";$("fcFilterMin").value="0";
+  S.svc=null;S.view=null;S.dir=1;$("fcSvcIn").value="";
+  $("fcSvc").innerHTML='<div class="fc-empty">Pick a service to see its route and running time.</div>';
+  document.querySelectorAll('#fcDir button').forEach(function(b){b.disabled=false;b.setAttribute('aria-pressed',String(b.getAttribute('data-d')==='1'));});
+  renderFiltered();fitScene();
+}
+function clearMapBuses(){
+  $("fcLiveBuses").checked=false;clearTimeout(busDebounce);busGeneration++;liveBuses=[];drawLiveBuses();
+  $("fcBusStatus").textContent='Buses cleared. Enable Live buses to show them again.';
 }
 function simpleReason(kind){
   return {jam:"Traffic",speed:"Traffic",rain:"Rain",roadworks:"Road works",road_closed:"Road closed",lane_closed:"Lane closed",accident:"Accident",breakdown:"Breakdown",flooding:"Flooding",hazard:"Road hazard",other:"Traffic disruption"}[kind] || "Traffic disruption";
@@ -1075,7 +1120,7 @@ function renderCmp(){
     var worst = (c.worst || []).map(function(w){ return '<li><b style="color:#fff">' + esc(w.svc) + ' d' + w.dir + '</b> +' + f1(w.extra.mid) + ' min <span class="fc-muted">(' + f1(w.extra.lo) + '–' + f1(w.extra.hi) + ')</span></li>'; }).join("");
     return '<div class="' + (S.h === c.h ? "on" : "") + '" data-h="' + c.h + '" role="button" tabindex="0"><h3>+' + c.h + ' min</h3><div class="row">' + (c.critical ? lvTag("critical").replace(">Critical<", ">" + c.critical + " critical<") : "")
       + (c.high ? lvTag("high").replace(">High<", ">" + c.high + " high<") : "") + (c.watch ? lvTag("watch").replace(">Watch<", ">" + c.watch + " watch<") : "") + (!c.critical && !c.high && !c.watch ? '<span class="fc-tag ok">No service at risk</span>' : '') + '</div>'
-      + '<div class="tot">+' + f1(c.extra_total) + ' <small>extra minutes summed across service-directions</small></div><ul>' + (worst || '<li class="fc-muted">No predicted extra delay.</li>') + '</ul>'
+      + '<div class="tot">' + (horizonAverage(c.h) == null ? 'Unavailable' : '+' + f1(horizonAverage(c.h)) + ' min') + ' <small>average extra time per affected service-direction' + (forecastRows().some(function(s){return s.blocked;}) ? ' · blocked routes excluded' : '') + '</small></div><ul>' + (worst || '<li class="fc-muted">No predicted extra delay.</li>') + '</ul>'
       + '<div class="note">' + (c.jams_building ? c.jams_building + ' jam(s) still building. ' : '') + esc(c.rain_note || "") + '</div></div>';
   }).join("") || '<div class="fc-empty">' + esc(st.error || "No forecast yet.") + '</div>';
 }
@@ -1084,7 +1129,7 @@ function renderTop(){
   $("fcTop").innerHTML = '<caption style="text-align:left;padding:0 0 8px;color:#b6c8dd">Extra running time predicted in 30 min</caption><thead><tr><th>Road</th><th>Service</th><th>Reason</th><th>Extra min</th></tr></thead><tbody>' + (rows.map(function(s){
     var reasons = (s.causes || []).map(function(c){return /^(unknown|jam|speed|other)$/i.test(c) ? 'Traffic' : c;});
     var delay = (s.extra || {})[30];
-    return '<tr data-svc="' + esc(s.svc) + '" data-dir="' + s.dir + '"><td>' + esc((s.roads || []).join(', ') || 'Road name unavailable') + '</td><td><b>' + esc(s.svc) + '</b> · D' + s.dir + '</td><td>' + esc(Array.from(new Set(reasons)).join(', ') || (s.heavy_share ? 'Rain' : 'Traffic disruption')) + '</td><td>' + (delay && delay.mid != null ? '+' + f1(delay.mid) + ' min' : 'Unavailable') + '</td></tr>';
+    return '<tr data-risk-service="true" tabindex="0" role="button" aria-label="Show service ' + esc(s.svc) + ' on map" data-svc="' + esc(s.svc) + '" data-dir="' + s.dir + '"><td>' + esc((s.roads || []).join(', ') || 'Road name unavailable') + '</td><td><b>' + esc(s.svc) + '</b> · D' + s.dir + '</td><td>' + esc(Array.from(new Set(reasons)).join(', ') || (s.heavy_share ? 'Rain' : 'Traffic disruption')) + '</td><td>' + (delay && delay.mid != null ? '+' + f1(delay.mid) + ' min' : 'Unavailable') + '</td></tr>';
   }).join('') || '<tr><td colspan="4" class="fc-empty">No affected services match the filters.</td></tr>') + '</tbody>';
 }
 function renderInt(){
@@ -1129,10 +1174,9 @@ function renderSvc(){
   var h = '<div class="fc-svc-h"><div class="fc-svcno"><b>' + esc(v.svc) + '</b><small>Dir ' + v.dir + '</small></div><div class="fc-svc-t"><div style="display:flex;gap:5px;flex-wrap:wrap">' + lvTag(v.level)
     + (v.blocked ? '<span class="fc-tag crit">Route blocked</span>' : v.maybe_blocked ? '<span class="fc-tag high">May be blocked</span>' : '') + (isDemo() ? '<span class="fc-tag demo">DEMO</span>' : '') + '</div>'
     + '<p>' + esc(v.from || "") + (v.toward ? ' → <b style="color:#fff">' + esc(v.toward) + '</b>' : '') + '</p><p class="fc-muted">' + f1(v.length_km) + ' km · headway ' + (v.hw ? f1(v.hw) + ' min (' + esc(v.hw_src || "") + ')' : "–") + '</p></div></div>';
-  h += '<div class="fc-sec"><h3>Predicted extra running time<span class="sp"></span><span class="fc-tag">80 % band</span></h3>' + rangeChart(v.extra, v.hw) + '</div>';
-  h += '<div class="fc-sec"><h3>Running time</h3>' + (v.hist_rt ? '<p style="margin:0;font-size:13px">Usual for this time: <b style="color:#fff">' + f1(v.hist_rt) + ' min</b> (measured). Predicted: '
-       + [15, 30, 60].map(function(x){ return '+' + x + ' <b style="color:#fff">' + f1((v.pred_rt || {})[x] || (v.pred_rt || {})[String(x)]) + '</b>'; }).join(" · ") + ' min.</p>' : '<p class="fc-muted" style="margin:0;font-size:12.5px">' + esc(v.rt_note || "Unavailable") + '</p>')
-       + (v.recovery_min != null ? '<p style="margin:6px 0 0;font-size:12.5px">Expected recovery: about ' + v.recovery_min + ' min.</p>' : v.building ? '<p style="margin:6px 0 0;font-size:12.5px;color:#ffe0c7">Congestion still building – no recovery estimate yet.</p>' : '') + '</div>';
+  h += compactRunningTime(v);
+  if(v.recovery_min != null) h += '<p class="fc-muted">Expected recovery: about ' + v.recovery_min + ' min.</p>';
+  else if(v.building) h += '<p class="fc-muted">Congestion still building; recovery time unavailable.</p>';
   if((v.critical || []).length) h += '<div class="fc-sec"><h3>Critical stretches</h3>' + v.critical.map(function(c){ return '<div class="fc-ev"><b>' + esc(KIND[c.kind] || c.label) + '</b> ' + esc(c.road || "") + ', route km ' + f1((c.a_m || 0) / 1000) + '–' + f1((c.b_m || 0) / 1000)
        + '<br>+' + f1((c.per || {})[30] || (c.per || {})["30"]) + ' min at +30' + (c.recovery_min != null ? ', recovers in ~' + c.recovery_min + ' min' : c.trend === "building" ? ', building' : '') + '<br><span class="fc-muted">' + esc(c.basis) + '</span></div>'; }).join("") + '</div>';
   var evItem = function(e, cls, tag){ return '<div class="fc-ev ' + cls + '">' + tag + ' <b>' + esc(e.kind === "other" ? "Traffic disruption · type not supplied" : KIND[e.kind] || e.label) + '</b> ' + esc(e.road || "") + (e.from || e.to ? ' <span class="fc-muted">(' + esc(e.from || "") + (e.to ? ' → ' + esc(e.to) : '') + ')</span>' : '')
@@ -1161,7 +1205,7 @@ function selectSvc(svc, dir, opts){
   var u = "/api/forecast/service?svc=" + encodeURIComponent(S.svc) + "&dir=" + S.dir + (isDemo() ? "&mode=demo&step=" + S.step : "");
   $("fcSvc").innerHTML = '<div class="fc-empty">Checking service ' + esc(S.svc) + ' direction ' + S.dir + ' against every event' + (isDemo() ? '' : ' and sampling traffic along it') + '…</div>';
   return api(u, {timeout:60000}).then(function(v){
-    if(S.svc !== String(svc).toUpperCase()) return;
+    if(S.svc !== String(svc).toUpperCase() || S.dir !== (+dir || 1)) return;
     S.view = v; renderSvc(); MV.update(); queueLiveBuses(); if(!(opts && opts.nofit)) fitScene();
     if(opts && opts.scroll && $("fcRecovery")) $("fcRecovery").scrollIntoView({block:"nearest", behavior:"smooth"});
   });
@@ -1191,7 +1235,8 @@ $("fcFilterSvc").addEventListener("input", renderFiltered);
 $("fcFilterOp").addEventListener("change", renderFiltered);
 $("fcFilterMin").addEventListener("input", renderFiltered);
 $("fcLiveBuses").addEventListener("change", queueLiveBuses);
-$("fcFilterReset").addEventListener("click", function(){ $("fcFilterSvc").value = ""; $("fcFilterOp").value = ""; $("fcFilterMin").value = "0"; renderFiltered(); });
+$("fcFilterReset").addEventListener("click", clearAllFilters);
+$("fcClearBuses").addEventListener("click", clearMapBuses);
 function loadSvcList(){
   api("/api/forecast/services" + (isDemo() ? "?mode=demo" : "")).then(function(j){
     S.svcs = (j && j.services) || [];
@@ -1240,6 +1285,9 @@ document.addEventListener("fullscreenchange", function(){ if(!document.fullscree
 /* ------------------------------------------------------------------ events */
 document.addEventListener("click", function(e){
   var t = e.target.closest("button,[data-h],tr[data-svc],[data-al]"); if(!t) return;
+  if(t.hasAttribute("data-clear-all")){clearAllFilters();return;}
+  if(t.hasAttribute("data-clear-buses")){clearMapBuses();return;}
+  if(t.hasAttribute("data-risk-service")){focusRiskService(t.getAttribute("data-svc"),t.getAttribute("data-dir"));return;}
   if(t.hasAttribute("data-mode")){ setMode(t.getAttribute("data-mode")); return; }
   if(t.hasAttribute("data-ack")){ ackAlert(t.getAttribute("data-ack"), t); return; }
   if(t.hasAttribute("data-svc")){ selectSvc(t.getAttribute("data-svc"), t.getAttribute("data-dir")); if(window.innerWidth < 1360){ var p = document.querySelector(".fc-svcpanel"); if(p) p.scrollIntoView({behavior:"smooth", block:"start"}); } return; }
@@ -1280,6 +1328,7 @@ function ackAlert(id, btn){
     else { btn.disabled = false; btn.textContent = "Acknowledge"; note((r && r.error) || "Could not acknowledge."); }
   });
 }
+$("fcTop").addEventListener("keydown",function(e){if(e.key==='Enter' || e.key===' '){var row=e.target.closest('[data-risk-service]');if(row){e.preventDefault();focusRiskService(row.getAttribute('data-svc'),row.getAttribute('data-dir'));}}});
 window.addEventListener("resize", function(){ if(MV.ml) MV.ml.resize(); });
 
 /* ------------------------------------------------------------------ start */
