@@ -16,7 +16,7 @@ THRESHOLDS = {"load_elevated":70,"load_heavy":85,"load_critical":95,"bunching_mi
 SCENARIOS = [
     ("combined", "Network pressure"), ("loading", "Evening passenger surge"),
     ("accident", "AYE accident"), ("roadworks", "Orchard roadworks"),
-    ("bunching", "Bishan three-bus convergence"), ("gap", "Bedok departure gap"),
+    ("bunching", "Thomson Rd three-bus convergence"), ("gap", "Bedok departure gap"),
     ("rain", "Eastern rain front"),
 ]
 # Approximate demonstration corridors, not licensed operational route geometry.
@@ -25,9 +25,9 @@ CORRIDORS = [
     ("166", "Bishan", [[103.817,1.279],[103.835,1.31],[103.846,1.337],[103.849,1.36],[103.838,1.39]]),
     ("12", "Pasir Ris", [[103.842,1.285],[103.875,1.31],[103.91,1.33],[103.945,1.35],[103.96,1.375]]),
     ("43", "Punggol", [[103.932,1.31],[103.91,1.34],[103.897,1.37],[103.905,1.398]]),
-    ("147", "Orchard", [[103.792,1.29],[103.819,1.304],[103.835,1.31],[103.85,1.33],[103.875,1.37]]),
+    ("190", "Orchard Rd", [[103.745,1.386],[103.776,1.34],[103.819,1.304],[103.835,1.3],[103.834,1.276]]),
     ("24", "Tampines", [[103.85,1.37],[103.889,1.35],[103.928,1.347],[103.963,1.345],[103.986,1.358]]),
-    ("10", "AYE", [[103.73,1.321],[103.76,1.311],[103.79,1.294],[103.83,1.28],[103.86,1.285]]),
+    ("97", "AYE", [[103.742,1.333],[103.76,1.311],[103.79,1.294],[103.83,1.28],[103.86,1.285]]),
     ("853", "Yishun", [[103.835,1.426],[103.849,1.397],[103.85,1.365],[103.856,1.335]]),
     ("156", "Clementi", [[103.766,1.316],[103.8,1.332],[103.833,1.35],[103.858,1.364]]),
     ("80", "Sengkang", [[103.839,1.287],[103.86,1.32],[103.882,1.36],[103.9,1.392]]),
@@ -72,6 +72,43 @@ def headway_risks(arrivals, scheduled, bunch_minutes=None, gap_excess=None):
             "gaps": [{"lead": ordered[i]["id"], "follow": ordered[i+1]["id"], "headway": round(g,1),
                       "excess": round(g-scheduled,1)} for i,g in enumerate(pairs) if scheduled and g-scheduled >= gap_excess],
             "headways": [round(g,1) for g in pairs]}
+
+
+# Real road geometry for the demo services (busrouter.sg / LTA-derived, baked offline). When the
+# file is missing the straight CORRIDORS above are used and labelled approximate.
+def _metres(line):
+    cum=[0.0]
+    for a,b in zip(line,line[1:]):
+        cum.append(cum[-1]+math.hypot((b[0]-a[0])*111320*math.cos(math.radians(a[1])),(b[1]-a[1])*111320))
+    return cum
+
+
+def point_at_m(line, cum, m):
+    m=max(0,min(cum[-1],m))
+    for i in range(len(cum)-1):
+        if cum[i+1]>=m:
+            t=0 if cum[i+1]==cum[i] else (m-cum[i])/(cum[i+1]-cum[i])
+            return [round(line[i][0]+(line[i+1][0]-line[i][0])*t,6),round(line[i][1]+(line[i+1][1]-line[i][1])*t,6)]
+    return list(line[-1])
+
+
+def slice_m(line, cum, a, b):
+    """The road stretch between two distances along the route, following every bend."""
+    a,b=sorted((max(0,a),min(cum[-1],b)))
+    return [point_at_m(line,cum,a)]+[list(p) for p,c in zip(line,cum) if a<c<b]+[point_at_m(line,cum,b)]
+
+
+def _load_demo_geometry():
+    try:
+        from pathlib import Path
+        data=json.loads((Path(__file__).resolve().parent/"forecast2026_demo_routes.json").read_text())
+        return {g["svc"]:dict(g,cum=_metres(g["line"])) for g in data["services"]}
+    except (OSError, ValueError, KeyError):
+        return {}
+
+
+DEMO_GEOMETRY=_load_demo_geometry()
+DEMO_SOURCE="busrouter.sg / LTA DataMall route data"
 
 
 def point_on(line, fraction):
@@ -153,27 +190,42 @@ def demo_snapshot(h, scenario="combined", tick=0, now=None):
             gaps=[9+delay*.75*min(h/20,1),10]
         arrivals=[{"id":f"SIM-{svc}-1", "eta":2}, {"id":f"SIM-{svc}-2","eta":2+gaps[0]}, {"id":f"SIM-{svc}-3","eta":2+sum(gaps)}]
         hw = headway_risks(arrivals,10)
-        position = point_on(line,.5)
+        geo = DEMO_GEOMETRY.get(svc)
+        if geo:   # real roads: the route, its LTA stops, and the actual road stretch the event sits on
+            line, cum, area = geo["line"], geo["cum"], geo["focus_road"]
+            focus_m = geo["focus_m"]; a_m, b_m = geo["stretch_m"]
+            route_stops = geo["stops"]
+            focus = next(s for s in route_stops if s["code"]==geo["focus_stop"])
+            demo_stop = {"name":focus["name"],"code":focus["code"],"sequence":focus["sequence"],"road":focus["road"]}
+            stretch_stops = [{"name":s["name"],"code":s["code"],"sequence":s["sequence"],"road":s["road"]} for s in route_stops if a_m<=s["route_m"]<=b_m] or [demo_stop]
+            stretch = slice_m(line, cum, a_m, b_m)
+            route_mode = "demo"
+        else:     # approximate straight corridor fallback
+            cum = _metres(line); focus_m = cum[-1]*.5
+            route_stops = [{"code":None,"name":area+" · demo stop","point":p,"sequence":j+1} for j,p in enumerate(line)]
+            demo_stop = {"name":area+" · demo stop","code":None,"sequence":3}
+            stretch_stops = [demo_stop]; stretch = line[1:3]; route_mode = "approximate"
+        position = point_at_m(line, cum, focus_m)
         kind = ("roadworks" if i==4 else "rain" if scenario=="rain" else "accident" if i==6 else "jam") if delay else None
-        demo_stop = {"name":area+" · demo stop","code":None,"sequence":3}
-        routes.append({"svc":svc,"dir":1,"line":line,"mode":"demo"})
-        for j,p in enumerate(line):
-            stops.append({"id":f"SIM-STOP-{i}-{j}","name":area+" · demo stop", "point":p,"svc":svc})
+        routes.append({"svc":svc,"dir":1,"line":line,"mode":route_mode})
+        for j,st in enumerate(route_stops):
+            stops.append({"id":st["code"] or f"SIM-STOP-{i}-{j}","name":st["name"],"point":st["point"],"svc":svc})
         for j,a in enumerate(arrivals):
-            point=point_on(line, max(.03,min(.96,.64+(tick%30)*.001+h*.0012-sum(gaps[:j])*.022)))
+            # Simulated buses sit on the real route around the focus stop, about 320 m per minute of headway apart.
+            point=point_at_m(line, cum, max(cum[-1]*.02,min(cum[-1]*.98,focus_m+250+(tick%30)*15+h*30-sum(gaps[:j])*320)))
             buses.append({"id":a["id"],"svc":svc,"dir":1,"point":point,"occupancy":loading["occupancy"],
                           "load":"LSD" if loading["occupancy"]>=THRESHOLDS["load_heavy"] else "SDA" if loading["occupancy"]>=THRESHOLDS["load_elevated"] else "SEA", "predicted":h>0,"mode":"demo"})
         service={"svc":svc,"dir":1,"operator":"SMRT" if svc=="853" else "SBST","location":area,"delay":delay,
                  "occupancy":loading["occupancy"],"heavy_buses":3 if loading["occupancy"]>=THRESHOLDS["load_heavy"] else 0,
                  "three":len(hw["three"]),"two":len(hw["two"]),"gaps":len(hw["gaps"]),
-                 "headway":max(hw["headways"]),"focus_headway":hw["headways"][0],"focus_pair":{"lead":arrivals[0]["id"],"foll":arrivals[1]["id"]},"load_counts":{"SEA":3 if loading["occupancy"]<70 else 0,"SDA":3 if 70<=loading["occupancy"]<85 else 0,"LSD":3 if loading["occupancy"]>=85 else 0,"UNKNOWN":0},"bunching_details":[{"bus_order":[a["id"] for a in arrivals],"location":area,"stop":{"name":area+" · demo stop","code":None,"sequence":3},"headways":hw["headways"]}] if hw["three"] else [],"traffic_details":[{"event_id":f"SIM-{kind}-{svc}","road":"AYE" if i==6 else "Orchard Road" if i==4 else area,"stops":[demo_stop],"kind":kind,"delay":delay}] if delay else [],"load_details":[{"bus":a["id"],"load":"LSD","stop":demo_stop,"near":area} for a in arrivals] if loading["occupancy"]>=THRESHOLDS["load_heavy"] else [],"gap_details":[{"location":area,"stop":{"name":area+" · demo stop","code":None,"sequence":3}}] if hw["gaps"] else [],"scheduled":10,"headways":hw["headways"],"point":position,"confidence":.78,"blocked":False,"building":bool(traffic_active and h<=30)}
+                 "headway":max(hw["headways"]),"focus_headway":hw["headways"][0],"focus_pair":{"lead":arrivals[0]["id"],"foll":arrivals[1]["id"]},"load_counts":{"SEA":3 if loading["occupancy"]<70 else 0,"SDA":3 if 70<=loading["occupancy"]<85 else 0,"LSD":3 if loading["occupancy"]>=85 else 0,"UNKNOWN":0},"bunching_details":[{"bus_order":[a["id"] for a in arrivals],"location":area,"stop":demo_stop,"headways":hw["headways"]}] if hw["three"] else [],"traffic_details":[{"event_id":f"SIM-{kind}-{svc}","road":area,"stops":stretch_stops,"kind":kind,"delay":delay}] if delay else [],"load_details":[{"bus":a["id"],"load":"LSD","stop":demo_stop,"near":area} for a in arrivals] if loading["occupancy"]>=THRESHOLDS["load_heavy"] else [],"gap_details":[{"location":area,"stop":demo_stop}] if hw["gaps"] else [],"scheduled":10,"headways":hw["headways"],"point":position,"confidence":.78,"blocked":False,"building":bool(traffic_active and h<=30)}
         services.append(service)
         if loading["occupancy"]>=THRESHOLDS["load_heavy"]:
             alerts.append(alert("loading",svc,area,f'{loading["occupancy"]:.0f}% occupancy',h,position,"Simulated boarding demand exceeds available capacity.",.78,occupancy=loading["occupancy"]))
         if delay:
             event_id=f"SIM-{kind}-{svc}"
-            events.append({"id":event_id,"kind":kind,"road": "AYE" if i==6 else "Orchard Road" if i==4 else area,"line":line[1:3],"point":position,"svc":svc,"delay":delay,"confirmed":True,"mode":"demo",
-                           "building":bool(h<=30),"impacts":[{"svc":svc,"dir":1,"stops":[demo_stop],"delay":delay}]})
+            events.append({"id":event_id,"kind":kind,"road":area,"line":stretch,"point":position,"svc":svc,"delay":delay,"confirmed":True,"mode":"demo",
+                           "building":bool(h<=30),"impacts":[{"svc":svc,"dir":1,"stops":stretch_stops,"delay":delay}]})
             alerts.append(alert("traffic",svc,events[-1]["road"],f"+{delay:.1f} min",h,position,f"Simulated {kind}: same-direction route overlap.",.78,event_id=event_id,delay=delay))
         if hw["three"]:
             alerts.append(alert("bunching",svc,area,"3 consecutive buses converging",h,position,"Uneven traffic delays compress two consecutive headways.",.78,buses=[x["id"] for x in hw["three"][0]],headways=hw["headways"],persistence=7))
@@ -185,7 +237,7 @@ def demo_snapshot(h, scenario="combined", tick=0, now=None):
     return {"services":services,"alerts":alerts,"buses":buses,"events":events,"routes":routes,"stops":stops,
             "rain":[{"point":[103.92,1.34],"mmh":18},{"point":[103.95,1.37],"mmh":26}] if scenario=="rain" else [],"coverage":{"loading":True,"traffic":True,"bunching":True,"gap":True},"updated":now,"mode":"demo",
             "weather":{"text":"Simulated rain" if scenario=="rain" else "Partly cloudy · simulated","temperature":None},
-            "sources":[{"name":"Scenario simulator","status":"demo","detail":"All buses, occupancy, incidents and approximate route corridors are simulated."}]}
+            "sources":[{"name":"Scenario simulator","status":"demo","detail":"Buses, occupancy and incidents are simulated. "+("Routes and stops are real road geometry ("+DEMO_SOURCE+")." if DEMO_GEOMETRY else "Route corridors are approximate straight lines.")}]}
 
 
 def traffic_extra(s,h):

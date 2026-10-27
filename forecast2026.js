@@ -100,7 +100,7 @@ function render(d){
  state.data=d;updateStatus();controls();kpiCards(d);networkStatus(d);alerts(d);analytics(d);networkMap.update(d);renderBoard(d);
  $('mapWatermark').hidden=d.mode!=='demo';$('mapWatermark').style.display=d.mode==='demo'?'grid':'none';
  $('mapMode').textContent=d.mode==='demo'?'DEMO':state.h?'ESTIMATED':'LIVE';$('mapHorizon').textContent=state.h===0?'Current observations':state.h+'-minute forecast';$('mapWatermark').hidden=d.mode!=='demo';$('weather').textContent=d.weather.text;
- $('mapDescription').textContent=d.mode==='demo'?'Simulated buses / approximate corridors':state.h?'Live bus positions retained · projected positions unavailable':'Verified observations · categorical loading';
+ $('mapDescription').textContent=d.mode==='demo'?'Simulated buses · real route roads and stops':state.h?'Live bus positions retained · projected positions unavailable':'Verified observations · categorical loading';
  if(state.tv&&spotlight.current){if(!d.alerts.some(a=>a.id===spotlight.current.id))clearSpotlight(false);else{spotlight.current=d.alerts.find(a=>a.id===spotlight.current.id);showActivityBanner(spotlight.current);highlightSpotlight();}}
  let u=new URL(location.href);u.searchParams.set('mode',state.mode);u.searchParams.set('h',state.h);u.searchParams.set('scenario',state.scenario);history.replaceState(null,'',u);$('error').textContent=d.journal_error||'';
 }
