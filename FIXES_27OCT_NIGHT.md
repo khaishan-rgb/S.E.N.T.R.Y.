@@ -41,3 +41,12 @@ Every update used the same asset version (`20261027-tv-board`), so browsers and 
 Make sure the deploy includes **every** file in the changed-files zip, especially `forecast.html`, `forecast2026.css`, `forecast2026.js`, `forecast2026-map.js`, `forecast2026-core.js`, `forecast2026-tv.js`, `forecast2026.py`, `forecast2026_demo_routes.json` and `app.py`. Check the deploy log shows the new commit.
 
 **How to confirm the new version is live:** on the dashboard, the normal (non-TV) view must not show the empty "Heavy loading / Incident · traffic / Bunching · long gaps" panels. If they still appear, the browser is on an old copy or the files weren't all uploaded.
+
+## Panels in the normal view (28 Oct, 00:45)
+Your uploaded repo matched the delivered files exactly, so the deploy was correct. The three panels had been made TV-only, which made them look "missing" in the normal view.
+
+They now show **filled with data in both views**:
+- **Normal view:** a full-width row below the dashboard (stacked on phones).
+- **TV mode:** the panels replace the bottom row, as before.
+
+Asset version is `20261028-fix3`.
