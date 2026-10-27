@@ -11999,6 +11999,7 @@ async def fc26_styles():
 @app.get('/forecast2026.js')
 @app.get('/forecast2026-core.js')
 @app.get('/forecast2026-map.js')
+@app.get('/forecast2026-tv.js')
 async def fc26_script(request: Request):
     from fastapi.responses import Response
     name = request.url.path.rsplit('/', 1)[-1]

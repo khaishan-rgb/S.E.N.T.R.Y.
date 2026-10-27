@@ -23,7 +23,7 @@ class PrototypeAPI(unittest.TestCase):
         return messages[0]['status'],b''.join(m.get('body',b'') for m in messages[1:])
 
     def test_html_modules_and_styles_are_served(self):
-        for path in ['/','/forecast','/forecast2026.css','/forecast2026.js','/forecast2026-core.js','/forecast2026-map.js','/map3d.js','/basemap.js']:
+        for path in ['/','/forecast','/forecast2026.css','/forecast2026.js','/forecast2026-core.js','/forecast2026-map.js','/forecast2026-tv.js','/map3d.js','/basemap.js']:
             status,body=self.request(path);self.assertEqual(status,200,path);self.assertTrue(body)
 
     def test_shared_horizon_and_filters(self):

@@ -154,6 +154,8 @@ def demo_snapshot(h, scenario="combined", tick=0, now=None):
         arrivals=[{"id":f"SIM-{svc}-1", "eta":2}, {"id":f"SIM-{svc}-2","eta":2+gaps[0]}, {"id":f"SIM-{svc}-3","eta":2+sum(gaps)}]
         hw = headway_risks(arrivals,10)
         position = point_on(line,.5)
+        kind = ("roadworks" if i==4 else "rain" if scenario=="rain" else "accident" if i==6 else "jam") if delay else None
+        demo_stop = {"name":area+" · demo stop","code":None,"sequence":3}
         routes.append({"svc":svc,"dir":1,"line":line,"mode":"demo"})
         for j,p in enumerate(line):
             stops.append({"id":f"SIM-STOP-{i}-{j}","name":area+" · demo stop", "point":p,"svc":svc})
@@ -164,14 +166,14 @@ def demo_snapshot(h, scenario="combined", tick=0, now=None):
         service={"svc":svc,"dir":1,"operator":"SMRT" if svc=="853" else "SBST","location":area,"delay":delay,
                  "occupancy":loading["occupancy"],"heavy_buses":3 if loading["occupancy"]>=THRESHOLDS["load_heavy"] else 0,
                  "three":len(hw["three"]),"two":len(hw["two"]),"gaps":len(hw["gaps"]),
-                 "headway":max(hw["headways"]),"focus_headway":hw["headways"][0],"focus_pair":{"lead":arrivals[0]["id"],"foll":arrivals[1]["id"]},"load_counts":{"SEA":3 if loading["occupancy"]<70 else 0,"SDA":3 if 70<=loading["occupancy"]<85 else 0,"LSD":3 if loading["occupancy"]>=85 else 0,"UNKNOWN":0},"bunching_details":[{"bus_order":[a["id"] for a in arrivals],"location":area,"stop":{"name":area+" · demo stop","code":None,"sequence":3},"headways":hw["headways"]}] if hw["three"] else [],"traffic_details":[{"road":area,"stops":[{"name":area+" · demo stop","code":None,"sequence":3}],"kind":"jam"}] if delay else [],"gap_details":[{"location":area,"stop":{"name":area+" · demo stop","code":None,"sequence":3}}] if hw["gaps"] else [],"scheduled":10,"headways":hw["headways"],"point":position,"confidence":.78,"blocked":False,"building":bool(traffic_active and h<=30)}
+                 "headway":max(hw["headways"]),"focus_headway":hw["headways"][0],"focus_pair":{"lead":arrivals[0]["id"],"foll":arrivals[1]["id"]},"load_counts":{"SEA":3 if loading["occupancy"]<70 else 0,"SDA":3 if 70<=loading["occupancy"]<85 else 0,"LSD":3 if loading["occupancy"]>=85 else 0,"UNKNOWN":0},"bunching_details":[{"bus_order":[a["id"] for a in arrivals],"location":area,"stop":{"name":area+" · demo stop","code":None,"sequence":3},"headways":hw["headways"]}] if hw["three"] else [],"traffic_details":[{"event_id":f"SIM-{kind}-{svc}","road":"AYE" if i==6 else "Orchard Road" if i==4 else area,"stops":[demo_stop],"kind":kind,"delay":delay}] if delay else [],"load_details":[{"bus":a["id"],"load":"LSD","stop":demo_stop,"near":area} for a in arrivals] if loading["occupancy"]>=THRESHOLDS["load_heavy"] else [],"gap_details":[{"location":area,"stop":{"name":area+" · demo stop","code":None,"sequence":3}}] if hw["gaps"] else [],"scheduled":10,"headways":hw["headways"],"point":position,"confidence":.78,"blocked":False,"building":bool(traffic_active and h<=30)}
         services.append(service)
         if loading["occupancy"]>=THRESHOLDS["load_heavy"]:
             alerts.append(alert("loading",svc,area,f'{loading["occupancy"]:.0f}% occupancy',h,position,"Simulated boarding demand exceeds available capacity.",.78,occupancy=loading["occupancy"]))
         if delay:
-            kind="roadworks" if i==4 else "rain" if scenario=="rain" else "accident" if i==6 else "jam"
             event_id=f"SIM-{kind}-{svc}"
-            events.append({"id":event_id,"kind":kind,"road": "AYE" if i==6 else "Orchard Road" if i==4 else area,"line":line[1:3],"point":position,"svc":svc,"delay":delay,"confirmed":True,"mode":"demo"})
+            events.append({"id":event_id,"kind":kind,"road": "AYE" if i==6 else "Orchard Road" if i==4 else area,"line":line[1:3],"point":position,"svc":svc,"delay":delay,"confirmed":True,"mode":"demo",
+                           "building":bool(h<=30),"impacts":[{"svc":svc,"dir":1,"stops":[demo_stop],"delay":delay}]})
             alerts.append(alert("traffic",svc,events[-1]["road"],f"+{delay:.1f} min",h,position,f"Simulated {kind}: same-direction route overlap.",.78,event_id=event_id,delay=delay))
         if hw["three"]:
             alerts.append(alert("bunching",svc,area,"3 consecutive buses converging",h,position,"Uneven traffic delays compress two consecutive headways.",.78,buses=[x["id"] for x in hw["three"][0]],headways=hw["headways"],persistence=7))
@@ -289,22 +291,25 @@ def live_snapshot(raw, samples, h, now=None):
         for event in events:
             match=next((m for m in event.get('matches',[]) if (m['svc'],m['dir'])==key),None)
             if match is not None:
+                affected=impact_stops(stops,match.get('a_m'),match.get('b_m'))
                 traffic_details.append({'event_id':event['id'],'road':(event['road'] if event['road']!='Road name not supplied' else match.get('road') or event['road']),'kind':event['kind'],
-                                        'stops':impact_stops(stops,match.get('a_m'),match.get('b_m')),
+                                        'stops':affected,
                                         'relation':'Stops on / bracketing the verified affected route stretch','delay':event['delay']})
+                event.setdefault('impacts',[]).append({'svc':key[0],'dir':key[1],'stops':affected,'delay':event['delay']})
         bunch_details=[{'bus_order':g.get('ids') or [],'stop':stop_context(stops,g.get('location'),g.get('stop_j')),
                         'location':g.get('location'),'headways':group_headways(g,h),
                         'status':g.get('status'),'onset':g.get('t_occur'),'persistence':g.get('stops')} for g in groups]
         gap_details=[{'stop':stop_context(stops,g.get('location'),g.get('stop_j')),'location':g.get('location'),
                       'headway':g.get('max_hw'),'lead':g.get('lead'),'follow':g.get('foll')} for g in gaps]
         counts={c:sum(b.get('load')==c for b in seq) for c in ('SEA','SDA','LSD')}
+        load_details=[{'bus':b.get('id'),'load':'LSD','near':b.get('near'),'stop':stop_context(stops,b.get('near'))} for b in seq if b.get('load')=='LSD'] if h==0 and observed else []
         counts['UNKNOWN']=len(seq)-sum(counts.values())
         location=(traffic_details[0]["road"] if traffic_details else None) or (ev or {}).get("road") or sample.get("location") or "Location not supplied"
         row={"svc":key[0],"dir":key[1],"location":location,"delay":delay,"blocked":bool(s.get("blocked")),"building":bool(s.get("building")),"occupancy":None,
              "heavy_buses":heavy if h==0 and observed and known_loads else None,"load_label":"Heavy" if heavy else "Standing" if any(b.get("load")=="SDA" for b in seq) else "Seats" if known_loads else "Unavailable",
              "three":len(groups) if valid and h<=30 else None,"two":sum(g.get("size")==2 for g in sample.get("groups",[])) if valid and h==0 else None,
              "gaps":len(gaps) if valid and h<=30 else None,"headway":(max([g.get("max_hw") or 0 for g in gaps] or [0]) or headway_at(sample.get("hw"),h)) if valid and h<=30 else None,
-             "scheduled":sample.get("sched_hw"),"headways":sample.get("hw") or {},"focus_headway":headway_at(sample.get("hw"),h) if valid and h<=30 else None,"focus_pair":sample.get("focus") or {},"load_counts":counts,"bunching_details":bunch_details,"traffic_details":traffic_details,"gap_details":gap_details,"point":point,"confidence":.55 if h==120 else .7}
+             "scheduled":sample.get("sched_hw"),"headways":sample.get("hw") or {},"focus_headway":headway_at(sample.get("hw"),h) if valid and h<=30 else None,"focus_pair":sample.get("focus") or {},"load_counts":counts,"load_details":load_details,"bunching_details":bunch_details,"traffic_details":traffic_details,"gap_details":gap_details,"point":point,"confidence":.55 if h==120 else .7}
         services.append(row)
         if delay and delay>0 or row["blocked"]:
             alerts.append(alert("traffic",key[0],location,"Route blocked" if row["blocked"] else f"+{delay:.1f} min",h,point,("Verified same-direction incident/route match. Statistical travel-time baseline." if ev else "Route-specific speed or rainfall estimate; incident association not verified."),row["confidence"],direction=key[1],affected_stops=[stop for detail in traffic_details for stop in detail["stops"]],delay=delay,blocked=row["blocked"],event_id=(ev or {}).get("id","")))
@@ -350,6 +355,8 @@ def build_centre(mode="demo", horizon=30, scenario="combined", tick=0, raw=None,
             if event.get('services'):
                 event['services']=[s for s in event['services'] if s in included]
                 event['service_dirs']=[p for p in event.get('service_dirs',[]) if p[0] in included]
+            if event.get('impacts'):
+                event['impacts']=[p for p in event['impacts'] if p['svc'] in included]
         snap["kpis"]={c:{"count":sum((s.get({"loading":"heavy_buses","bunching":"three","gap":"gaps"}.get(c,"delay")) or 0) for s in snap["services"]) if c!="traffic" else sum(e.get("congestion_eligible",False) for e in snap["events"]),
                            "services":len({a["svc"] for a in snap["alerts"] if a["category"]==c}),"earliest":min([a["onset"] for a in snap["alerts"] if a["category"]==c] or [0]),"available":snap["coverage"][c]} for c in CATEGORIES}
         snap["kpis"]["loading"]["occupancy"]=max([s["occupancy"] for s in snap["services"] if s.get("occupancy") is not None] or [0]) or None
@@ -363,6 +370,8 @@ def build_centre(mode="demo", horizon=30, scenario="combined", tick=0, raw=None,
         for key in ("services","buses","routes","stops"):
             current[key]=[x for x in current[key] if x["svc"] in ids]
         current["events"]=[e for e in current["events"] if e.get("svc") in ids or any(s in ids for s in e.get("services",[]))]
+        for e in current["events"]:
+            if e.get("impacts"):e["impacts"]=[p for p in e["impacts"] if p["svc"] in ids]
     advice=[recommendation(a) for a in current["alerts"][:4]]
     if mode=="demo":
         for a,r in zip(current["alerts"][:4],advice):

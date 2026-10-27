@@ -31,6 +31,7 @@ async def index():
 @app.get('/forecast2026.js')
 @app.get('/forecast2026-map.js')
 @app.get('/forecast2026-core.js')
+@app.get('/forecast2026-tv.js')
 @app.get('/map3d.js')
 @app.get('/basemap.js')
 async def asset(request: Request):
