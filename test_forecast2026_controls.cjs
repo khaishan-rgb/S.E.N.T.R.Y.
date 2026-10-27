@@ -4,7 +4,7 @@ const fs=require('fs'),assert=require('assert/strict'),path=require('path');
 (async()=>{
  const raw=JSON.parse(fs.readFileSync(path.join(__dirname,'test_forecast2026_demo.json'),'utf8'));raw.history=[];raw.coverage={loading:true,traffic:true,bunching:true,gap:true};
  class Element{
-  constructor(id=''){this.id=id;this.dataset={};this.value='';this.style={setProperty(){}};this.hidden=false;this.clientHeight=350;this.innerHTML='';this.textContent='';this.handlers={};this.classList={add(){},remove(){},toggle(){}};}
+  constructor(id=''){this.id=id;this.dataset={};this.value='';this.style={setProperty(){}};this.hidden=id==='modal';this.clientHeight=350;this.innerHTML='';this.textContent='';this.handlers={};this.classList={add(){},remove(){},toggle(){}};}
   setAttribute(){} addEventListener(type,fn){this.handlers[type]=fn;}querySelectorAll(){return [];}getBoundingClientRect(){return {top:190};}focus(){}checkValidity(){return true;}
  }
  const ids=new Map(),el=id=>{if(!ids.has(id))ids.set(id,new Element(id));return ids.get(id);};
@@ -24,5 +24,11 @@ const fs=require('fs'),assert=require('assert/strict'),path=require('path');
  el('headwayInterval').value='15';el('headwayInterval').onchange();assert.equal((el('headwayChart').innerHTML.match(/data-hour=/g)||[]).length,96);
  await click({analysis:'loading'});assert.equal(el('loadingModule').hidden,false);assert.equal(el('headwayModule').hidden,true);
  state.services=['14','166'];state.operator='SBST';state.exclude=true;await el('clearFilters').onclick();await settle();assert.deepEqual(state.services,[]);assert.equal(state.operator,'');assert.equal(state.category,'all');assert.equal(state.delayMin,.8);assert.equal(state.h,0);assert(el('selectedServices').innerHTML.includes('FULL NETWORK'));
+ const before=JSON.stringify({services:state.services,category:state.category,h:state.h,exclude:state.exclude,operator:state.operator});
+ await el('tv').onclick();window.SENTRY2026.tour.next();assert.equal(window.SENTRY2026.tour.state.current,null);window.SENTRY2026.tour.next();assert(window.SENTRY2026.tour.state.current);assert(el('activitySpotlight').innerHTML.includes('DEMO ACTIVITY'));assert.equal(state.headwayScope,window.SENTRY2026.tour.state.current.svc);assert(el('routeSelection').textContent.includes('ROUTE'));
+ assert.equal(JSON.stringify({services:state.services,category:state.category,h:state.h,exclude:state.exclude,operator:state.operator}),before);
+ el('spotlightToggle').onclick();assert.equal(window.SENTRY2026.tour.state.enabled,false);el('spotlightToggle').onclick();assert.equal(window.SENTRY2026.tour.state.enabled,true);
+ for(const handler of handlers.pointerdown)handler({isTrusted:true,target:{closest:()=>null}});assert(window.SENTRY2026.tour.state.pausedUntil>Date.now());assert.equal(window.SENTRY2026.tour.state.current,null);
+ await el('exitTV').onclick();assert.equal(state.tv,false);
  console.log('PASS: real UI startup/render and event wiring for service chips/toggle, category persistence, custom delay, headway intervals, module tabs and reset.');
 })().catch(e=>{console.error(e.stack?.slice(0,1800)||e);process.exitCode=1;});

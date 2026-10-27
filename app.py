@@ -12061,11 +12061,13 @@ async def fc26_centre(mode: str='live', horizon: int=0, scenario: str='combined'
     # Synchronise the full namespace before applying user filters. Filters cannot resolve alerts.
     data = await asyncio.to_thread(fc26.build_centre,mode,horizon,scenario,max(0,tick),raw,samples,delay_min=0)
     ns=f'{mode}:{scenario if mode=="demo" else "network"}:{horizon}'
+    journal_rows={}
     try:
         ledger=fc26_ledger()
         ledger.sync(ns,data['alerts'],time.time(),can_resolve=mode=='demo')
         history,audit=ledger.view(ns)
         statuses={a['id']:a['status'] for a in history}
+        journal_rows={a['id']:a for a in history}
         for a in data['alerts']:
             a['status']=statuses.get(a['id'],'new')
         data.update(history=history,audit=audit,namespace=ns)
@@ -12078,6 +12080,7 @@ async def fc26_centre(mode: str='live', horizon: int=0, scenario: str='combined'
             data[key]=filtered[key]
         for a in data['alerts']:
             a['status']=statuses.get(a['id'],'new') if 'statuses' in locals() else 'new'
+            a.update({key:journal_rows[a['id']][key] for key in ('first',) if key in journal_rows.get(a['id'],{})})
         data['history']=[a for a in data.get('history',[]) if (not wanted or a['svc'] in wanted) and (not exclude_cbs or a['svc'] not in fc26.CBS) and (category=='all' or a['category']==category) and (a['category']!='traffic' or fc26.meets_delay(a,delay_min))]
     if mode=='live' and wanted:
         world=FC.get('world') or {}
@@ -12091,7 +12094,9 @@ async def fc26_centre(mode: str='live', horizon: int=0, scenario: str='combined'
     if mode=='live':
         idx=(FC.get('world') or {}).get('index')
         if idx is not None:
-            data['context_routes']=[{'svc':k[0],'dir':k[1],'line':forecast.simplify(v.pts,45)} for k,v in list(idx.lines.items())[:250] if not exclude_cbs or k[0] not in fc26.CBS]
+            route_keys={(s['svc'],s['dir']) for s in data['services']}
+            ordered=sorted(idx.lines.items(),key=lambda item:(item[0][0] not in wanted,item[0] not in route_keys))
+            data['context_routes']=[{'svc':k[0],'dir':k[1],'line':forecast.simplify(v.pts,30)} for k,v in ordered[:250] if not exclude_cbs or k[0] not in fc26.CBS]
             if not wanted:
                 present={(r['svc'],r['dir']) for r in data['routes']}
                 data['routes'] += [r for r in data['context_routes'] if any(s['svc']==r['svc'] and s['dir']==r['dir'] for s in data['services']) and (r['svc'],r['dir']) not in present]

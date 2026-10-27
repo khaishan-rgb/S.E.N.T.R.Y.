@@ -50,6 +50,14 @@ class PrototypeAPI(unittest.TestCase):
         self.assertFalse(any(d['coverage'].values()));self.assertTrue(d['error'])
         self.assertEqual(json.loads(self.request('/api/cameras')[1])['cameras'],[])
 
+    def test_first_detection_is_preserved_across_filtered_refreshes(self):
+        data=json.loads(self.request('/api/forecast/centre')[1]);alert=data['alerts'][0]
+        self.assertGreater(alert['first'],0)
+        audit_record=next(a for a in data['history'] if a['id']==alert['id'])
+        self.assertEqual(alert['first'],audit_record['first'])
+        refreshed=json.loads(self.request('/api/forecast/centre','mode=demo&horizon=30&services='+alert['svc'])[1])
+        self.assertEqual(next(a for a in refreshed['alerts'] if a['id']==alert['id'])['first'],alert['first'])
+
     def test_invalid_transitions_never_dispatch(self):
         self.assertEqual(self.request('/api/forecast/centre/alerts',method='POST',body={'namespace':'demo:combined:30','id':'x','status':'dispatch'})[0],400)
         self.assertEqual(self.request('/api/forecast/centre/alerts',method='POST',body={'namespace':'../../x','id':'x','status':'resolved'})[0],400)

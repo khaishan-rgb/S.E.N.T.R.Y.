@@ -50,10 +50,11 @@ async def centre(mode:str='demo',horizon:int=30,scenario:str='combined',tick:int
     raw={'error':'Standalone demo server: use the existing app.py deployment to connect public live providers.','age_s':999}
     data=model.build_centre(mode,horizon,scenario,max(0,tick),raw=raw,delay_min=0)
     journal().sync(ns,data['alerts'],time.time(),can_resolve=mode=='demo')
-    history,audit=journal().view(ns);status={a['id']:a['status'] for a in history}
+    history,audit=journal().view(ns);status={a['id']:a['status'] for a in history};journal_rows={a['id']:a for a in history}
     filtered=model.build_centre(mode,horizon,scenario,max(0,tick),raw=raw,services=[s for s in services.upper().split(',') if s],exclude_cbs=bool(exclude_cbs),category=category,delay_min=delay_min)
     for a in filtered['alerts']:
         a['status']=status.get(a['id'],'new')
+        a.update({key:journal_rows[a['id']][key] for key in ('first',) if key in journal_rows.get(a['id'],{})})
     wanted={s for s in services.upper().split(',') if s}
     history=[a for a in history if (not wanted or a['svc'] in wanted) and (not exclude_cbs or a['svc'] not in model.CBS) and (category=='all' or a['category']==category) and (a['category']!='traffic' or model.meets_delay(a,delay_min))]
     return dict(filtered,history=history,audit=audit,namespace=ns,cameras=[])

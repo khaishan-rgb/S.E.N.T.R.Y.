@@ -52,6 +52,8 @@ def fixture(horizon):
          'route_context':{'985:1':[{'code':'51101','seq':31,'name':'Bef Thomson Flyover','road':'Thomson Road','lat':1.36,'lon':103.79,'route_m':1050}]}}
     samples=[{'service':'985','direction':1,'at':now,'issue':'No data','observed_buses':[{'id':'TEST-BUS','lat':1.36,'lon':103.79,'load':'LSD'}]}]
     data=forecast2026.build_centre('live',horizon,raw=raw,samples=samples,delay_min=3)
+    data['routes']=[{'svc':'985','dir':1,'line':[[103.73,1.33],[103.79,1.36],[103.86,1.39]]}]
+    data['context_routes']=list(data['routes'])
     data.update(history=[],namespace=f'live:network:{horizon}',audit=[])
     # Several advisory entries exercise automatic in-panel pagination.
     data['recommendations']*=3
@@ -70,7 +72,7 @@ def main():
                 except OSError:time.sleep(.1)
             with sync_playwright() as p:
                 browser=p.chromium.launch(executable_path=os.getenv('CHROMIUM_PATH') or shutil.which('chromium'),headless=True,args=['--no-sandbox','--disable-dev-shm-usage'])
-                page=browser.new_page();errors=[];page.on('pageerror',lambda e:errors.append(str(e)))
+                page=browser.new_page();page.clock.install();writes=[];page.on('request',lambda request:writes.append(request.url) if request.method not in ('GET','HEAD') else None);errors=[];page.on('pageerror',lambda e:errors.append(str(e)))
                 def route(request):
                     url=request.request.url
                     if not url.startswith('http://127.0.0.1:8098'):request.abort();return
@@ -87,15 +89,35 @@ def main():
                 page.goto('http://127.0.0.1:8098/?present=1&mode=live&h=15');page.wait_for_selector('.camera');page.wait_for_timeout(300)
                 for width,height in [(1280,720),(1366,768),(1920,1080),(2560,1440),(3840,2160)]:
                     page.set_viewport_size({'width':width,'height':height});page.wait_for_timeout(350)
+                    for _ in range(6):
+                        page.evaluate('SENTRY2026.tour.next()')
+                        if page.evaluate('!!SENTRY2026.tour.state.current'):break
+                    assert page.locator('#routeSelection').is_visible()
+                    assert page.evaluate('SENTRY2026.state.headwayScope===SENTRY2026.tour.state.current.svc')
+                    assert page.locator('.selected-route-svg').count()==1
                     issues=page.evaluate(CHECK)
                     assert not issues,(width,height,issues)
                     page.screenshot(path=str(root/f'tv-fit-{width}.png'))
                     # Different horizons preserve the same fixed layout.
                     page.click('[data-h="30"]');page.wait_for_timeout(200);assert not page.evaluate(CHECK)
+                before=page.evaluate('JSON.stringify({services:SENTRY2026.state.services,h:SENTRY2026.state.h,category:SENTRY2026.state.category,exclude:SENTRY2026.state.exclude,operator:SENTRY2026.state.operator})')
+                for _ in range(14):page.evaluate('SENTRY2026.tour.next()')
+                assert page.evaluate('JSON.stringify({services:SENTRY2026.state.services,h:SENTRY2026.state.h,category:SENTRY2026.state.category,exclude:SENTRY2026.state.exclude,operator:SENTRY2026.state.operator})')==before
+                page.click('#spotlightToggle');assert not page.evaluate('SENTRY2026.tour.state.enabled')
+                frozen=page.evaluate('SENTRY2026.tour.state.step');page.evaluate('SENTRY2026.tour.next()');assert page.evaluate('SENTRY2026.tour.state.step')==frozen
+                page.click('#spotlightToggle');assert page.evaluate('SENTRY2026.tour.state.enabled')
+                page.click('#date');assert page.evaluate('SENTRY2026.tour.state.pausedUntil>Date.now()+28000')
+                assert page.evaluate('SENTRY2026.tour.state.current===null')
+                paused_step=page.evaluate('SENTRY2026.tour.state.step');page.clock.fast_forward(31000);assert page.evaluate('SENTRY2026.tour.state.pausedUntil<=Date.now()');assert page.evaluate('SENTRY2026.tour.state.step')!=paused_step
+                assert not writes,writes
                 # Returning from fullscreen restores the ordinary scrollable controller layout.
                 page.set_viewport_size({'width':1366,'height':768});page.wait_for_timeout(250)
                 page.click('#exitTV');page.wait_for_timeout(200)
                 assert not page.evaluate('document.body.classList.contains("tv")')
+                page.locator('#serviceWatch [data-service="985"]').first.click()
+                page.wait_for_function('SENTRY2026.state.services.includes("985")')
+                assert page.locator('#routeSelection').is_visible();assert page.locator('.selected-route-svg').count()==1
+                page.click('#clearService');page.wait_for_function('SENTRY2026.state.services.length===0')
                 page.click('#tv');page.wait_for_timeout(300);assert not page.evaluate(CHECK)
                 for module in ('loading','bunching','headway'):
                     page.evaluate('(key)=>document.querySelector(`[data-analysis="${key}"]`).click()',module)
@@ -103,7 +125,7 @@ def main():
                     assert not page.evaluate(CHECK),(module,page.evaluate(CHECK))
                 assert not errors,errors
                 browser.close()
-                print('PASS: five TV viewports (720p, 1366x768, 1080p, 1440p, 4K), no page scrolling, no panel overlap or cropped panel bodies, populated camera containment, horizon changes and TV re-entry.')
+                print('PASS: five TV viewports (720p, 1366x768, 1080p, 1440p, 4K), no page scrolling, no panel overlap or cropped panel bodies, populated camera containment, horizon changes, selected-route visibility, repeated read-only spotlight cycles, preserved filters, manual pause/resume and TV re-entry.')
         finally:
             proc.terminate();proc.wait(timeout=10)
 

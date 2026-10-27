@@ -31,6 +31,14 @@ export function watchLocation(s,category){if(category==='traffic'){let t=s.traff
 export function headwayView(data,scope='selected'){let selected=data.services?.find(s=>s.gaps)||data.services?.find(s=>s.three)||data.services?.find(s=>s.focus_headway!=null)||data.services?.[0];const number=x=>typeof x==='number'&&Number.isFinite(x);let counts=[];let values=(data.service_series||[]).map(t=>{let rows=scope==='network'?t.services:t.services.filter(s=>s.svc===selected?.svc&&s.dir===selected?.dir);let available=rows.map(s=>s.focus_headway).filter(number);counts.push(available.length);return available.length?available.reduce((a,b)=>a+b,0)/available.length:null;});return {selected,values,counts,scope};}
 
 export const toggleService=(selected,svc)=>selected.includes(svc)?selected.filter(s=>s!==svc):[...selected,svc];
+export function spotlightDeck(data,random=Math.random,now=Date.now()/1000){
+ if(!data||data.mode==='live'&&(!data.updated||now-data.updated>150))return [];
+ const allowed=new Set((data.services||[]).map(s=>s.svc+':'+s.dir)),seen=new Set();
+ const rows=(data.alerts||[]).filter(a=>a.status!=='resolved'&&a.evidence!=='stale'&&allowed.has(a.svc+':'+a.dir)&&!seen.has(a.id)&&seen.add(a.id));
+ rows.sort((a,b)=>(b.first||b.updated||b.last||data.updated)-(a.first||a.updated||a.last||data.updated)||(b.score||0)-(a.score||0));
+ const latest=rows.shift();for(let i=rows.length-1;i>0;i--){const j=Math.floor(random()*(i+1));[rows[i],rows[j]]=[rows[j],rows[i]];}
+ return latest?[latest,...rows]:[];
+}
 export const resetFilters=()=>({services:[],operator:'',exclude:false,category:'all',delayMin:.8});
 export const delayColor=(delay,thresholds={yellow:.8,orange:2,red:5})=>delay==null?'#7d9bab':delay>=thresholds.red?'#ff4d63':delay>=thresholds.orange?'#ff9b43':delay>=thresholds.yellow?'#f2df5e':'#39e4a2';
 export function hourlyHeadway(data,{interval=60,scope='network',direction='all'}={}){
