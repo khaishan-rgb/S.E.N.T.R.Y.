@@ -160,3 +160,57 @@ body.tv .bottom-grid>.tvq{display:flex;flex-direction:column;grid-column:auto;gr
 .tvb-empty strong{font-size:clamp(14px,1.7dvh,30px);color:var(--text)}
 .tvb-empty small{font-size:clamp(10px,1.15dvh,19px)}
 .tvb-empty.is-unavailable b{color:var(--muted)}
+
+/* =====================================================================================================
+   HORIZON theme for the Forecast Centre (V17). Shares horizon-tokens.css + design-system.css with every other engine.
+   ===================================================================================================== */
+html:root{--bg:var(--hz-void);--panel:#071a33;--edge:var(--hz-line-2);--text:var(--hz-text);--muted:var(--hz-mut);--cyan:var(--hz-cyan);--green:var(--hz-ok);--red:var(--hz-crit);--magenta:var(--hz-bunching);--gap:var(--hz-gap)}
+body.ds-app{font-family:var(--hz-font-body)}
+/* header: module title in the normal view (the sidebar carries the logo); full lockup on the TV wall */
+.topbar{background:linear-gradient(180deg,rgba(4,16,34,.82),rgba(3,10,22,.55))!important;border-bottom:1px solid var(--hz-line)!important;position:relative}
+.topbar:after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:1px;background:linear-gradient(90deg,transparent,rgba(63,211,255,.6) 30%,rgba(63,211,255,.6) 70%,transparent)}
+.brand .fc-sbs,.brand .fc-word{display:none}
+.brand h1{font-family:var(--hz-font-brand)!important;letter-spacing:.08em!important;color:var(--hz-ice)}
+.brand h1 span{font-family:var(--hz-font-brand)!important;letter-spacing:.1em!important;background:linear-gradient(180deg,#fff 15%,var(--hz-frost) 70%,#6fd8ff);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;filter:drop-shadow(0 0 12px rgba(63,211,255,.3))}
+.brand p{font-family:var(--hz-font-display);font-weight:600;letter-spacing:.2em!important;color:var(--hz-mut)!important}
+body.tv .brand{display:grid;grid-template-columns:auto 1fr;grid-template-rows:auto auto;column-gap:14px;align-items:center}
+body.tv .brand .fc-sbs{display:block;grid-row:1/3;height:clamp(22px,3.2dvh,56px);width:auto}
+body.tv .brand .fc-word{display:block;height:.9em;width:auto;margin-bottom:.1em;filter:drop-shadow(0 0 10px rgba(63,211,255,.35))}
+body.tv .brand h1 span{font-size:.55em!important;letter-spacing:.32em!important}
+/* TV wall: no navigation chrome */
+body.tv .ds-side,body.tv .ds-cmd,body.tv .ds-bnav,body.tv .ds-scrim,body.tv .ds-sheet,body.tv .ds-pop{display:none!important}
+body.ds-app.tv{padding-left:10px!important;padding-bottom:8px!important}
+/* panels: HUD glass with corner brackets (same recipe as every other engine) */
+.panel,.risk-card,.controlbar,.filterbar{--hz-b:rgba(63,211,255,.7)}
+.panel,.risk-card{
+  background:
+    linear-gradient(var(--hz-b),var(--hz-b)) left top/var(--hz-bracket) 1.5px no-repeat,linear-gradient(var(--hz-b),var(--hz-b)) left top/1.5px var(--hz-bracket) no-repeat,
+    linear-gradient(var(--hz-b),var(--hz-b)) right top/var(--hz-bracket) 1.5px no-repeat,linear-gradient(var(--hz-b),var(--hz-b)) right top/1.5px var(--hz-bracket) no-repeat,
+    linear-gradient(var(--hz-b),var(--hz-b)) left bottom/var(--hz-bracket) 1.5px no-repeat,linear-gradient(var(--hz-b),var(--hz-b)) left bottom/1.5px var(--hz-bracket) no-repeat,
+    linear-gradient(var(--hz-b),var(--hz-b)) right bottom/var(--hz-bracket) 1.5px no-repeat,linear-gradient(var(--hz-b),var(--hz-b)) right bottom/1.5px var(--hz-bracket) no-repeat,
+    linear-gradient(90deg,transparent,rgba(63,211,255,.5) 50%,transparent) top/100% 1px no-repeat,
+    linear-gradient(180deg,rgba(12,38,76,.62),rgba(4,16,34,.80))!important;
+  border:1px solid var(--hz-line)!important;border-radius:var(--hz-radius)!important;
+  -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);
+  box-shadow:inset 0 0 40px -20px rgba(63,211,255,.28),0 16px 40px -26px #000!important}
+.risk-card{--hz-b:var(--risk)}
+.risk-card.active,.risk-card[aria-pressed="true"]{box-shadow:inset 0 0 0 1px var(--risk),inset 0 0 50px -14px color-mix(in srgb,var(--risk) 45%,transparent),0 0 30px -10px var(--risk)!important}
+.risk-card strong,.tvq-count b,.network-row strong{font-family:var(--hz-font-brand)!important;letter-spacing:.02em;text-shadow:0 0 18px color-mix(in srgb,var(--risk,#3fd3ff) 45%,transparent)}
+.risk-card h2,.panel-head h2,.tvq-head h2,.map-label strong{font-family:var(--hz-font-display)!important;font-weight:700!important;letter-spacing:.07em!important;text-transform:uppercase}
+.risk-card h2{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tvq{border-top:3px solid var(--risk)!important}
+.tvq .tvb-svc b,.tvb-metric b,.tvb-impact{font-family:var(--hz-font-brand)!important;letter-spacing:.01em}
+.tvb-card{border-radius:5px!important;background:linear-gradient(90deg,color-mix(in srgb,var(--risk) 10%,rgba(6,22,46,.9)),rgba(6,22,46,.85) 40%)!important}
+.controlbar,.filterbar{background:rgba(3,12,26,.55)!important;border-color:var(--hz-line)!important}
+.controlbar button,.timeline button,.filterbar select,.controlbar select{border-radius:4px!important;font-family:var(--hz-font-display)!important;font-weight:700!important;letter-spacing:.08em!important}
+.controlbar button.active,.timeline button[aria-pressed="true"],.mode-switch .active{background:linear-gradient(180deg,rgba(63,211,255,.32),rgba(31,143,255,.18))!important;border-color:var(--hz-cyan)!important;color:#fff!important;box-shadow:0 0 16px -4px var(--hz-glow)!important}
+.clock strong{font-family:var(--hz-font-brand)!important;letter-spacing:.06em;color:var(--hz-ice);text-shadow:0 0 16px rgba(63,211,255,.45)}
+.topnav button{font-family:var(--hz-font-display)!important;font-weight:700!important;letter-spacing:.12em!important}
+.topnav button.active{color:#fff!important;text-shadow:0 0 12px var(--hz-glow)}
+.map-panel{border-color:var(--hz-line-2)!important}
+.event-pin{border-radius:6px!important;background:rgba(2,10,22,.92)!important}
+/* alert cards keep their compact reading type (the TV wall measures them to fit whole cards per page) */
+body.ds-app{letter-spacing:normal}
+body.ds-app .alert h3,body.ds-app .alert p,body.ds-app .alert small{font-family:var(--hz-font-body)!important;letter-spacing:normal!important}
+/* TV wall: the control strip must stay one line at 1280 px */
+body.tv .controlbar button,body.tv .timeline button,body.tv .controlbar select,body.tv .filterbar select,body.tv .mode-switch button{letter-spacing:.02em!important}

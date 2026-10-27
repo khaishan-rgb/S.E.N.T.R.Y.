@@ -4,9 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#040a14">
-<title>Live diversions · TV · SG Transport Pulse</title>
+<title>Live diversions · TV · HORIZON</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/horizon-tokens.css">
+<link rel="icon" type="image/svg+xml" href="/brand/horizon-mark.svg">
 <style>
 /* V16.27 TV broadcast - live diversions for a 90-inch TV / LED panel. Everything is sized in rem and 1rem = 1/120 of the screen
    width (16 px on a 1920 x 1080 screen, 32 px on 4K), so the layout is the same on any 16:9 screen; other shapes fit inside.
@@ -143,14 +145,25 @@ body{margin:0;background:var(--bg);color:var(--ice);font:400 1.5rem/1.35 var(--s
 .leaflet-container{background:#081428!important}
 .lf-bus{display:inline-block}
 @media (prefers-reduced-motion:reduce){.cnt .dot{animation:none}.fade{animation:none}}
+/* HORIZON theme (V17): same palette and type as every other engine */
+:root{--bg:var(--hz-void);--panel:var(--hz-panel);--line:#123358;--ice:var(--hz-ice);--mut:var(--hz-mut);--dim:var(--hz-faint);--cyan:var(--hz-cyan);--green:var(--hz-ok);--red:var(--hz-crit);--amber:var(--hz-warn);
+  --cond:var(--hz-font-display);--sans:var(--hz-font-body)}
+html{background:radial-gradient(70% 50% at 20% -10%,rgba(31,143,255,.16),transparent 60%),radial-gradient(80% 40% at 50% 115%,rgba(63,211,255,.14),transparent 60%),var(--hz-void)!important}
+body{background:transparent!important}
+.brand .hz-mark{width:2.8rem;height:2.8rem;flex:none;border-radius:.7rem;box-shadow:0 0 1.4rem rgba(63,211,255,.35)}
+.brand .hz-nm{padding:0;text-align:left;text-shadow:none}
+.brand .hz-nm img{height:1.25rem;width:auto;display:block;filter:drop-shadow(0 0 .5rem rgba(63,211,255,.4))}
+.brand h1{font-family:var(--hz-font-brand)!important;font-weight:700!important;letter-spacing:.08em!important;text-transform:uppercase;font-size:2rem!important}
+.clock b{font-family:var(--hz-font-brand);letter-spacing:.05em;text-shadow:0 0 1.2rem rgba(63,211,255,.45)}
+header.top{border-bottom:1px solid var(--hz-line-2)!important;box-shadow:0 1px 0 rgba(63,211,255,.25)}
 </style>
 </head>
 <body>
 <div class="tv" id="tv">
   <header class="top">
     <div class="brand">
-      <svg viewBox="0 0 48 48" aria-hidden="true"><rect x="3" y="3" width="42" height="42" rx="11" fill="#0b2340" stroke="#38d6ff" stroke-width="2"/><path d="M12 31c5-1 7-12 13-12s7 9 11 9" fill="none" stroke="#2ee59d" stroke-width="3.4" stroke-linecap="round"/><circle cx="12" cy="31" r="3.4" fill="#38d6ff"/><circle cx="36" cy="28" r="3.4" fill="#38d6ff"/></svg>
-      <div><div class="nm">SG Transport Pulse</div><h1 id="title">Live diversions</h1></div>
+      <img class="hz-mark" src="/brand/horizon-mark.svg" alt="">
+      <div><div class="nm hz-nm"><img src="/brand/horizon-word.webp" alt="HORIZON"></div><h1 id="title">Live diversions</h1></div>
       <span class="pv" id="pv" hidden>Preview</span>
     </div>
     <div class="cnt zero" id="cnt"><span class="dot"></span><span id="cntT">Checking…</span></div>

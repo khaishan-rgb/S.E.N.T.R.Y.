@@ -1,4 +1,4 @@
-/* SG Transport Pulse — Command Platform design system (V16.0)
+/* HORIZON · Bus Operations Intelligence — Command Platform design system (V17 HORIZON theme; was SG Transport Pulse V16.0)
    One visual language for every page. Loaded AFTER a page's own <style>, so it re-skins existing modules
    (their ids, classes and scripts are untouched) and styles the shared shell built by /app-shell.js.
 
@@ -8,23 +8,25 @@
      purple    = AI · simulation · forecast · optimisation    grey   = inactive · unavailable · historical · locked
    Severity is always paired with a text label or shape (.ds-sev) so it never relies on colour alone. */
 
-@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Sans+Condensed:wght@500;600;700&display=swap");
+@import url("/horizon-tokens.css");   /* HORIZON palette, fonts and logo assets: one file, also usable by other systems */
 
 html:root{
   /* core tokens */
-  --ds-void:#040a14; --ds-deep:#07111f; --ds-surface:rgba(11,24,43,.78); --ds-surface-2:rgba(15,32,56,.86); --ds-raised:#0c1b30;
-  --ds-line:rgba(126,178,230,.14); --ds-line-2:rgba(126,178,230,.26); --ds-edge:rgba(56,214,255,.34);
-  --ds-text:#e6f1ff; --ds-text-2:#b6c8dd; --ds-mut:#8aa2bd; --ds-faint:#5f7690;
-  --ds-cyan:#38d6ff; --ds-blue:#2f8cff; --ds-green:#2ee59d; --ds-amber:#ffb547; --ds-red:#ff5566; --ds-purple:#a07bff; --ds-grey:#6f8399;
-  --ds-font:"IBM Plex Sans",Inter,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
-  --ds-display:"IBM Plex Sans Condensed","IBM Plex Sans",Inter,system-ui,sans-serif;
-  --ds-r:12px; --ds-r-sm:8px; --ds-side-w:244px; --ds-cmd-h:56px; --ds-gap:14px; --ds-pad:18px;
+  /* every --ds-* token now comes from the HORIZON tokens (horizon-tokens.css) */
+  --ds-void:var(--hz-void); --ds-deep:var(--hz-deep); --ds-surface:var(--hz-glass); --ds-surface-2:var(--hz-glass-2); --ds-raised:var(--hz-panel);
+  --ds-line:var(--hz-line); --ds-line-2:var(--hz-line-2); --ds-edge:var(--hz-edge);
+  --ds-text:var(--hz-text); --ds-text-2:var(--hz-text-2); --ds-mut:var(--hz-mut); --ds-faint:var(--hz-faint);
+  --ds-cyan:var(--hz-cyan); --ds-blue:var(--hz-blue); --ds-green:var(--hz-ok); --ds-amber:var(--hz-warn); --ds-red:var(--hz-crit); --ds-purple:var(--hz-ai); --ds-grey:var(--hz-off);
+  --ds-font:var(--hz-font-body);
+  --ds-display:var(--hz-font-display);
+  --ds-brandfont:var(--hz-font-brand);
+  --ds-r:var(--hz-radius); --ds-r-sm:var(--hz-radius-sm); --ds-side-w:244px; --ds-cmd-h:56px; --ds-gap:14px; --ds-pad:18px;
   --ds-ease:cubic-bezier(.2,.7,.2,1); --ds-t:220ms;
   --ds-shadow:0 1px 0 rgba(255,255,255,.03) inset,0 10px 30px -18px rgba(0,0,0,.8);
 
   /* legacy page variables mapped onto the tokens, so every existing module re-skins without code changes */
-  --bg:var(--ds-void); --bg2:var(--ds-deep); --panel:#0b182b; --panel2:#0f2038; --card:#0b182b; --card2:#0f2038;
-  --line:#16304e; --line2:#21446a; --text:var(--ds-text); --ink:var(--ds-text); --mut:var(--ds-mut);
+  --bg:var(--ds-void); --bg2:var(--ds-deep); --panel:#071a33; --panel2:#0b2445; --card:#071a33; --card2:#0b2445;
+  --line:#123358; --line2:#1c4a7a; --text:var(--ds-text); --ink:var(--ds-text); --mut:var(--ds-mut);
   --cyan:var(--ds-cyan); --blue:var(--ds-blue); --green:var(--ds-green); --grn:var(--ds-green); --amber:var(--ds-amber); --amb:var(--ds-amber);
   --red:var(--ds-red); --purple:var(--ds-purple); --pur:var(--ds-purple); --grey:var(--ds-grey);
   --font:var(--ds-font);
@@ -415,3 +417,183 @@ body.ds-app{margin:0}
   .ds-crumb{display:flex!important}.ds-mbrand{display:none!important}.ds-cmd-sp{display:block!important}
   .ds-sticky-act{bottom:0}
 }
+
+/* =====================================================================================================
+   HORIZON THEME LAYER (V17) — futuristic operations-centre skin on top of everything above.
+   Motifs from the logo: night-sky navy · ice-white type with cyan gradient · the glowing ring · the lens-flare horizon line.
+   All motion respects Settings › Reduce motion and the OS reduced-motion preference (rules above).
+   ===================================================================================================== */
+
+/* ---- space canvas: the page itself is transparent, the sky lives on <html> so decorative layers can sit behind it */
+html{background:
+    radial-gradient(1200px 520px at 18% -10%,rgba(31,143,255,.16),transparent 62%),
+    radial-gradient(900px 460px at 92% -8%,rgba(138,42,208,.10),transparent 60%),
+    radial-gradient(1400px 380px at 50% 112%,rgba(63,211,255,.16),transparent 64%),
+    var(--hz-void)!important;background-attachment:fixed!important;min-height:100%}
+body.ds-app{background:transparent!important}
+/* perspective grid "floor" receding to the horizon + a faint star field (fixed, behind all content, no pointer events) */
+html::before{content:"";position:fixed;left:-25%;right:-25%;bottom:-6%;height:46vh;z-index:-1;pointer-events:none;
+  background:
+    linear-gradient(rgba(63,211,255,.16) 1px,transparent 1px) 0 0/100% 46px,
+    linear-gradient(90deg,rgba(63,211,255,.13) 1px,transparent 1px) 0 0/72px 100%;
+  transform:perspective(520px) rotateX(64deg);transform-origin:50% 100%;
+  -webkit-mask-image:linear-gradient(to top,rgba(0,0,0,.85),transparent 92%);mask-image:linear-gradient(to top,rgba(0,0,0,.85),transparent 92%);
+  animation:hz-floor 9s linear infinite;opacity:.55}
+html::after{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;opacity:.5;
+  background-image:
+    radial-gradient(1px 1px at 12% 22%,rgba(255,255,255,.55),transparent 60%),radial-gradient(1px 1px at 68% 14%,rgba(190,240,255,.5),transparent 60%),
+    radial-gradient(1px 1px at 38% 38%,rgba(255,255,255,.35),transparent 60%),radial-gradient(1.2px 1.2px at 84% 33%,rgba(150,220,255,.5),transparent 60%),
+    radial-gradient(1px 1px at 22% 58%,rgba(255,255,255,.28),transparent 60%),radial-gradient(1px 1px at 58% 51%,rgba(190,240,255,.3),transparent 60%),
+    radial-gradient(1px 1px at 92% 64%,rgba(255,255,255,.3),transparent 60%),radial-gradient(1px 1px at 6% 80%,rgba(190,240,255,.25),transparent 60%)}
+@keyframes hz-floor{to{background-position:0 46px,0 0}}
+
+/* ---- type: brand face for titles and hero numbers, technical face for labels */
+body.ds-app{font-family:var(--hz-font-body)!important;letter-spacing:.005em}
+body.ds-app header.top h1,body.ds-app .ds-title,body.ds-app .module-intro h2{font-family:var(--hz-font-brand)!important;font-weight:700!important;letter-spacing:.06em!important;text-transform:uppercase;
+  background:linear-gradient(180deg,#ffffff 20%,var(--hz-frost) 75%,#7fdcff);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
+  filter:drop-shadow(0 0 14px rgba(63,211,255,.25))}
+body.ds-app .module-intro h2,body.ds-app .ds-title{font-size:clamp(20px,1.6vw,28px)!important}
+body.ds-app h2,body.ds-app h3,body.ds-app .ds-ph,body.ds-app .ds-grp,body.ds-app .ds-lgrp,body.ds-app .ds-pop h4,body.ds-app th,body.ds-app .ds-kpi .k,body.ds-app .ds-eyebrow{
+  font-family:var(--hz-font-display)!important;letter-spacing:.06em}
+body.ds-app .card h2,body.ds-app .card > header h2,body.ds-app .ds-ph{text-transform:uppercase;font-weight:700!important;color:var(--hz-ice)!important}
+body.ds-app .ds-kpi .v,body.ds-app .kpi .n{font-family:var(--hz-font-brand)!important;font-weight:600!important;letter-spacing:.02em!important;
+  text-shadow:0 0 18px rgba(63,211,255,.28)}
+
+/* ---- HUD glass panels: frosted glass, cyan hairline, lit top edge, corner brackets (drawn as background layers, so no layout change) */
+body.ds-app .card,body.ds-app section.card,body.ds-app .mapcard,body.ds-app .st-sec,body.ds-app .ds-panel,body.ds-app .kpi,body.ds-app .ds-kpi{
+  --hz-b:rgba(63,211,255,.75);
+  background:
+    linear-gradient(var(--hz-b),var(--hz-b)) left top/var(--hz-bracket) 1.5px no-repeat,
+    linear-gradient(var(--hz-b),var(--hz-b)) left top/1.5px var(--hz-bracket) no-repeat,
+    linear-gradient(var(--hz-b),var(--hz-b)) right top/var(--hz-bracket) 1.5px no-repeat,
+    linear-gradient(var(--hz-b),var(--hz-b)) right top/1.5px var(--hz-bracket) no-repeat,
+    linear-gradient(var(--hz-b),var(--hz-b)) left bottom/var(--hz-bracket) 1.5px no-repeat,
+    linear-gradient(var(--hz-b),var(--hz-b)) left bottom/1.5px var(--hz-bracket) no-repeat,
+    linear-gradient(var(--hz-b),var(--hz-b)) right bottom/var(--hz-bracket) 1.5px no-repeat,
+    linear-gradient(var(--hz-b),var(--hz-b)) right bottom/1.5px var(--hz-bracket) no-repeat,
+    linear-gradient(90deg,transparent,rgba(63,211,255,.55) 50%,transparent) top/100% 1px no-repeat,
+    linear-gradient(180deg,rgba(14,42,82,.66),rgba(5,18,38,.78))!important;
+  border:1px solid var(--hz-line)!important;border-radius:var(--hz-radius)!important;
+  -webkit-backdrop-filter:blur(10px) saturate(130%);backdrop-filter:blur(10px) saturate(130%);
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.015),inset 0 0 40px -18px rgba(63,211,255,.25),0 16px 40px -24px rgba(0,0,0,.9)!important;
+  transition:border-color var(--hz-t),box-shadow var(--hz-t)}
+body.ds-app .card:hover,body.ds-app .ds-panel:hover,body.ds-app .ds-kpi:hover,body.ds-app .kpi:hover{border-color:var(--hz-line-2)!important;
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.02),inset 0 0 46px -16px rgba(63,211,255,.32),0 0 26px -12px rgba(63,211,255,.35),0 16px 40px -24px rgba(0,0,0,.9)!important}
+/* status-tinted brackets */
+body.ds-app .ds-kpi[data-sev="bad"]{--hz-b:var(--hz-crit)} body.ds-app .ds-kpi[data-sev="warn"]{--hz-b:var(--hz-warn)} body.ds-app .ds-kpi[data-sev="ok"]{--hz-b:var(--hz-ok)} body.ds-app .ds-kpi[data-sev="ai"]{--hz-b:var(--hz-ai)}
+body.ds-app .ds-ai{border-radius:var(--hz-radius)}
+
+/* ---- sidebar: HORIZON lockup, light-beam active item */
+.ds-side{background:linear-gradient(180deg,rgba(3,12,26,.96),rgba(2,8,18,.98))!important;border-right:1px solid var(--hz-line)!important;
+  -webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px)}
+.ds-side:after{height:100%!important;background:linear-gradient(180deg,transparent,var(--hz-cyan) 30%,transparent 60%)!important;background-size:100% 300%!important;animation:hz-rail 7s linear infinite}
+@keyframes hz-rail{from{background-position:0 100%}to{background-position:0 -200%}}
+.ds-brand.hz-brand{flex-direction:column;align-items:stretch;gap:6px;padding:14px 14px 12px;min-height:0}
+.hz-brand .hz-sbs{display:block;height:30px;width:auto;align-self:center;object-fit:contain}
+.hz-brand .hz-word{display:block;width:100%;height:auto;filter:drop-shadow(0 0 8px rgba(63,211,255,.35))}
+.hz-brand .hz-mark{display:none;width:36px;height:36px;margin:0 auto;border-radius:9px}
+html.ds-side-collapsed .hz-brand .hz-sbs,html.ds-side-collapsed .hz-brand .hz-word{display:none}
+html.ds-side-collapsed .hz-brand .hz-mark{display:block}
+@media (min-width:700px) and (max-width:999px){html:not(.ds-drawer) .hz-brand .hz-sbs,html:not(.ds-drawer) .hz-brand .hz-word{display:none} html:not(.ds-drawer) .hz-brand .hz-mark{display:block}}
+.ds-grp{font-family:var(--hz-font-display)!important;font-weight:700!important;letter-spacing:.22em!important;color:var(--hz-faint)!important}
+.ds-link{font-family:var(--hz-font-display);font-weight:600!important;font-size:14.5px!important;letter-spacing:.04em;border-radius:5px!important}
+.ds-link:hover{background:linear-gradient(90deg,rgba(63,211,255,.10),transparent)!important}
+.ds-link.active{background:linear-gradient(90deg,rgba(63,211,255,.22),rgba(63,211,255,.03) 80%)!important;border-color:rgba(63,211,255,.30)!important;box-shadow:inset 0 0 18px -6px rgba(63,211,255,.35)}
+.ds-link.active:before{box-shadow:0 0 12px var(--hz-cyan),0 0 26px var(--hz-cyan)!important}
+
+/* ---- command bar: glass with the logo's lens-flare horizon line travelling along its base */
+.ds-cmd{background:linear-gradient(180deg,rgba(4,14,30,.88),rgba(3,10,22,.80))!important;border-bottom:1px solid var(--hz-line)!important}
+.ds-cmd:after{opacity:1!important;height:2px!important;bottom:-1px!important;
+  background:radial-gradient(closest-side,#ffffff,rgba(127,227,255,.95) 18%,rgba(31,143,255,.55) 45%,transparent 75%) 0 0/220px 100% no-repeat,
+             linear-gradient(90deg,transparent,rgba(63,211,255,.55) 20%,rgba(63,211,255,.55) 80%,transparent)!important;
+  animation:hz-flare 7s var(--hz-ease) infinite}
+@keyframes hz-flare{0%{background-position:-220px 0,0 0}60%,100%{background-position:calc(100% + 220px) 0,0 0}}
+.ds-crumb span:first-child{font-family:var(--hz-font-brand);font-weight:700;letter-spacing:.18em;font-size:11.5px;color:var(--hz-frost)}
+.ds-crumb b{font-family:var(--hz-font-display);font-weight:700!important;letter-spacing:.06em;font-size:15px}
+.ds-mbrand{font-family:var(--hz-font-brand)!important;letter-spacing:.24em!important;background:linear-gradient(180deg,#fff,var(--hz-frost));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.ds-live{font-family:var(--hz-font-display);font-weight:700!important;letter-spacing:.14em!important}
+.ds-iconbtn,.ds-prof{border-radius:6px!important}
+.ds-kbd{display:inline-flex;align-items:center;gap:6px;height:36px;padding:0 10px 0 12px;border-radius:6px;border:1px solid var(--hz-line-2);background:rgba(8,26,52,.55);
+  color:var(--hz-mut);font:600 13px var(--hz-font-display);letter-spacing:.06em;cursor:pointer;white-space:nowrap}
+.ds-kbd:hover{border-color:var(--hz-edge);color:#fff;box-shadow:0 0 18px -6px var(--hz-glow)}
+.ds-kbd svg{width:16px;height:16px}
+.ds-kbd kbd{font:600 11px var(--hz-font-body);padding:2px 6px;border-radius:4px;border:1px solid var(--hz-line-2);color:var(--hz-text-2);background:rgba(2,8,18,.6)}
+@media (max-width:1280px){.ds-kbd span,.ds-kbd kbd{display:none}.ds-kbd{width:36px;padding:0;justify-content:center}}
+
+/* ---- launcher, popovers, mobile bars */
+.ds-pop,.ds-sheet{background:linear-gradient(180deg,rgba(8,26,52,.96),rgba(3,12,26,.98))!important;border:1px solid var(--hz-line-2)!important;border-radius:8px!important;
+  box-shadow:0 30px 70px -10px rgba(0,0,0,.8),0 0 0 1px rgba(63,211,255,.08),0 0 40px -14px rgba(63,211,255,.35)!important}
+.ds-sheet{border-radius:14px 14px 0 0!important}
+.ds-app-tile{border-radius:6px!important;font-family:var(--hz-font-display);font-weight:600!important;font-size:12.5px!important;letter-spacing:.03em}
+.ds-app-tile .ic{border-radius:6px!important;background:radial-gradient(circle at 50% 30%,rgba(63,211,255,.18),rgba(8,26,52,.9) 70%)!important;border-color:var(--hz-line-2)!important;color:var(--hz-cyan)}
+.ds-app-tile:hover .ic{box-shadow:0 0 18px -4px var(--hz-glow)}
+.ds-bnav{background:linear-gradient(180deg,rgba(4,14,30,.92),rgba(2,8,18,.98))!important;border-top:1px solid var(--hz-line-2)!important}
+.ds-bnav a,.ds-bnav button{font-family:var(--hz-font-display)!important;font-weight:700!important;font-size:11px!important;letter-spacing:.12em!important}
+.ds-bnav .active{color:var(--hz-cyan)!important;background:radial-gradient(60% 80% at 50% 100%,rgba(63,211,255,.22),transparent)!important;text-shadow:0 0 10px var(--hz-glow)}
+
+/* ---- controls */
+body.ds-app .ds-btn,body.ds-app .btn{border-radius:5px!important;font-family:var(--hz-font-display)!important;font-weight:700!important;letter-spacing:.06em!important}
+body.ds-app .ds-btn:hover,body.ds-app .btn:hover{box-shadow:0 0 0 1px rgba(63,211,255,.25),0 0 22px -8px var(--hz-glow)!important}
+body.ds-app .ds-btn.pri,body.ds-app .btn.go{background:linear-gradient(180deg,#3fd3ff,#1f8fff 55%,#1460d0)!important;border-color:#7fe3ff!important;color:#021226!important;
+  text-shadow:0 1px 0 rgba(255,255,255,.35);box-shadow:0 0 0 1px rgba(127,227,255,.35),0 0 26px -6px rgba(63,211,255,.7)!important}
+body.ds-app input:not([type=checkbox]):not([type=radio]):not([type=range]),body.ds-app select,body.ds-app textarea,body.ds-app .ds-input,body.ds-app .ds-select{
+  border-radius:5px!important;background-color:rgba(2,10,22,.75)!important;border-color:var(--hz-line-2)!important;color:var(--hz-ice)!important}
+body.ds-app input:focus,body.ds-app select:focus,body.ds-app textarea:focus{border-color:var(--hz-cyan)!important;box-shadow:0 0 0 3px rgba(63,211,255,.16),0 0 18px -6px var(--hz-glow)!important;outline:none}
+body.ds-app .ds-segm,body.ds-app .seg{border-radius:6px!important}
+body.ds-app .ds-segm button[aria-pressed="true"]{background:linear-gradient(180deg,rgba(63,211,255,.28),rgba(31,143,255,.16))!important;box-shadow:inset 0 0 0 1px rgba(63,211,255,.5),0 0 14px -4px var(--hz-glow)!important;border-radius:4px}
+body.ds-app table{border-collapse:collapse}
+body.ds-app th{text-transform:uppercase;font-weight:700!important;font-size:11.5px!important;color:var(--hz-mut)!important}
+body.ds-app tbody tr:hover{background:linear-gradient(90deg,rgba(63,211,255,.08),transparent)!important}
+body.ds-app .ds-chip{border-radius:4px}
+body.ds-app ::-webkit-scrollbar{width:8px;height:8px}
+body.ds-app ::-webkit-scrollbar-thumb{background:linear-gradient(180deg,rgba(63,211,255,.45),rgba(31,143,255,.35))!important;border-radius:8px;border:2px solid var(--hz-void)}
+::selection{background:rgba(63,211,255,.32);color:#fff}
+.ds-live.ok .ds-dot{box-shadow:0 0 10px var(--hz-ok)}
+
+/* ---- maps: night-ops tint so every engine's map matches */
+body.ds-app .leaflet-container{background:#020a16!important}
+body.ds-app .leaflet-tile-pane{filter:hue-rotate(-6deg) saturate(1.1) brightness(.92)}
+body.ds-app .leaflet-bar,body.ds-app .maplibregl-ctrl-group{border-radius:6px!important;border:1px solid var(--hz-line-2)!important;box-shadow:0 0 18px -8px var(--hz-glow)!important}
+
+/* =====================================================================================================
+   QUICK LAUNCH (Ctrl/⌘ + K) — jump to any engine by typing
+   ===================================================================================================== */
+.hz-qk{position:fixed;inset:0;z-index:2147480000;display:grid;place-items:start center;padding-top:12vh;background:rgba(1,5,12,.62);
+  -webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);opacity:0;visibility:hidden;transition:opacity 160ms var(--hz-ease),visibility 0s 160ms}
+.hz-qk.open{opacity:1;visibility:visible;transition:opacity 160ms var(--hz-ease)}
+.hz-qk-box{width:min(640px,calc(100vw - 24px));border-radius:10px;overflow:hidden;border:1px solid var(--hz-edge);
+  background:linear-gradient(180deg,rgba(8,28,56,.97),rgba(3,12,26,.98));box-shadow:0 40px 90px -20px #000,0 0 60px -18px var(--hz-glow);
+  transform:translateY(-8px) scale(.985);transition:transform 180ms var(--hz-ease)}
+.hz-qk.open .hz-qk-box{transform:none}
+.hz-qk-in{display:flex;align-items:center;gap:12px;padding:14px 16px;border-bottom:1px solid var(--hz-line)}
+.hz-qk-in svg{width:20px;height:20px;color:var(--hz-cyan);flex:none}
+.hz-qk-in input{flex:1;min-width:0;background:transparent!important;border:0!important;outline:none!important;box-shadow:none!important;color:#fff!important;font:600 18px var(--hz-font-display)!important;letter-spacing:.04em}
+.hz-qk-in input::placeholder{color:var(--hz-faint)}
+.hz-qk-in kbd{font:600 11px var(--hz-font-body);padding:3px 7px;border-radius:4px;border:1px solid var(--hz-line-2);color:var(--hz-mut)}
+.hz-qk-list{max-height:min(56vh,480px);overflow:auto;padding:6px}
+.hz-qk-item{display:flex;align-items:center;gap:13px;padding:10px 12px;border-radius:6px;color:var(--hz-text-2);text-decoration:none;border:1px solid transparent;cursor:pointer}
+.hz-qk-item .ic{width:36px;height:36px;border-radius:6px;display:grid;place-items:center;flex:none;color:var(--hz-cyan);border:1px solid var(--hz-line-2);background:radial-gradient(circle at 50% 30%,rgba(63,211,255,.16),rgba(8,26,52,.9) 70%)}
+.hz-qk-item .ic svg{width:18px;height:18px}
+.hz-qk-item b{display:block;color:#fff;font:700 15px var(--hz-font-display);letter-spacing:.05em}
+.hz-qk-item small{display:block;color:var(--hz-mut);font-size:12.5px;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hz-qk-item .tx{min-width:0;flex:1}
+.hz-qk-item .grp{font:700 10px var(--hz-font-display);letter-spacing:.18em;color:var(--hz-faint)}
+.hz-qk-item.sel{background:linear-gradient(90deg,rgba(63,211,255,.18),rgba(63,211,255,.03));border-color:rgba(63,211,255,.35);box-shadow:inset 0 0 20px -8px var(--hz-glow)}
+.hz-qk-item.locked{opacity:.45;cursor:not-allowed}
+.hz-qk-foot{display:flex;gap:16px;padding:9px 16px;border-top:1px solid var(--hz-line);font-size:12px;color:var(--hz-faint)}
+.hz-qk-foot kbd{font:600 10.5px var(--hz-font-body);padding:1px 5px;border-radius:3px;border:1px solid var(--hz-line-2);color:var(--hz-mut);margin-right:4px}
+.hz-qk-none{padding:24px;text-align:center;color:var(--hz-mut)}
+
+/* =====================================================================================================
+   BOOT SEQUENCE — once per browser session, ~1.4 s, skippable, never with reduced motion
+   ===================================================================================================== */
+.hz-boot{position:fixed;inset:0;z-index:2147483000;display:grid;place-items:center;background:radial-gradient(900px 400px at 50% 55%,rgba(31,143,255,.18),transparent 70%),var(--hz-void);
+  transition:opacity 420ms var(--hz-ease),visibility 0s 420ms;cursor:pointer}
+.hz-boot.done{opacity:0;visibility:hidden}
+.hz-boot-in{width:min(760px,86vw);text-align:center}
+.hz-boot img{width:100%;height:auto;display:block;opacity:0;transform:scale(.96);filter:drop-shadow(0 0 30px rgba(63,211,255,.35));animation:hz-boot-logo 900ms var(--hz-ease) 80ms forwards}
+.hz-boot .ln{height:2px;margin:26px auto 14px;width:0;background:linear-gradient(90deg,transparent,#fff,var(--hz-cyan),transparent);box-shadow:0 0 18px var(--hz-cyan);animation:hz-boot-ln 1000ms var(--hz-ease) 250ms forwards}
+.hz-boot .st{font:600 12px var(--hz-font-display);letter-spacing:.38em;color:var(--hz-frost);opacity:0;animation:hz-boot-st 500ms ease 500ms forwards}
+@keyframes hz-boot-logo{to{opacity:1;transform:none}}
+@keyframes hz-boot-ln{to{width:100%}}
+@keyframes hz-boot-st{to{opacity:.9}}

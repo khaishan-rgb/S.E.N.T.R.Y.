@@ -1,4 +1,4 @@
-/* SG Transport Pulse — Command Platform application shell (V16.0)
+/* HORIZON · Bus Operations Intelligence — application shell (V17 HORIZON; was SG Transport Pulse V16.0)
 
    ONE navigation registry (MODULES below) generates EVERY navigation surface:
      desktop sidebar · App Launcher · Command Centre shortcut cards · mobile drawer · mobile bottom bar · mobile "More" sheet.
@@ -63,6 +63,8 @@
     bell:'<path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z"/><path d="M10 20.5a2 2 0 0 0 4 0"/>',
     grid:'<circle cx="5.5" cy="5.5" r="1.6"/><circle cx="12" cy="5.5" r="1.6"/><circle cx="18.5" cy="5.5" r="1.6"/><circle cx="5.5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="18.5" cy="12" r="1.6"/><circle cx="5.5" cy="18.5" r="1.6"/><circle cx="12" cy="18.5" r="1.6"/><circle cx="18.5" cy="18.5" r="1.6"/>',
     menu:'<path d="M4 7h16M4 12h16M4 17h16"/>',
+    search:'<circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5"/>',
+    tv:'<rect x="3" y="5" width="18" height="12" rx="1.5"/><path d="M8 20h8M12 17v3"/>',
     more:'<circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/>',
     chev:'<path d="m6 9 6 6 6-6"/>',
     collapse:'<path d="M4 5v14"/><path d="m14 8-4 4 4 4"/><path d="M10 12h10"/>',
@@ -116,8 +118,10 @@
     return '<a class="' + cls + (m.id === ACTIVE ? " active" : "") + '" href="' + m.route + '"' + (m.id === ACTIVE ? ' aria-current="page"' : "") + ' title="' + esc(m.name) + '">' + icon(m.icon) + '<span>' + esc(m.name) + '</span></a>';
   }
   function sidebarHTML(){
-    var h = '<a class="ds-brand" href="/command" aria-label="SG Transport Pulse \u2014 Forecast Centre"><span class="ds-logo">' + icon("logo", ' stroke-width="2"') + '</span>'
-      + '<span class="ds-brand-t"><b>SG TRANSPORT PULSE</b><small>Operational Intelligence Platform</small></span></a><nav class="ds-nav" aria-label="Primary">';
+    var h = '<a class="ds-brand hz-brand" href="/command" aria-label="SBS Transit HORIZON \u2014 Bus Operations Intelligence \u2014 Forecast Centre">'
+      + '<img class="hz-sbs" src="/brand/sbs-transit.webp" alt="SBS Transit" width="72" height="20">'
+      + '<img class="hz-word" src="/brand/horizon-wordmark.webp" alt="HORIZON \u2014 Bus Operations Intelligence" width="216" height="37">'
+      + '<img class="hz-mark" src="/brand/horizon-mark.svg" alt="HORIZON" width="36" height="36"></a><nav class="ds-nav" aria-label="Primary">';
     GROUPS.forEach(function(g){
       var items = MODULES.filter(function(m){ return m.group === g && !hid(m); }); if(!items.length) return;
       h += '<div class="ds-grp">' + g + '</div>' + items.map(function(m){ return linkHTML(m, "ds-link"); }).join("");
@@ -154,8 +158,9 @@
     var m = mod(ACTIVE);
     var crumb = m ? '<span>' + esc(m.group.charAt(0) + m.group.slice(1).toLowerCase()) + '</span><i>/</i><b>' + esc(m.name) + '</b>' : '<b>' + esc(document.title.split(/[\u00b7|\u2013-]/)[0]) + '</b>';
     return '<button class="ds-iconbtn ds-drawer-btn" type="button" id="dsDrawerBtn" aria-label="Open navigation">' + icon("menu") + '</button>'
-      + '<nav class="ds-crumb" aria-label="Breadcrumb"><span>SG Transport Pulse</span><i>/</i>' + crumb + '</nav>'
-      + '<span class="ds-mbrand">SG TRANSPORT PULSE</span><span class="ds-cmd-sp"></span>'
+      + '<nav class="ds-crumb" aria-label="Breadcrumb"><span>HORIZON</span><i>/</i>' + crumb + '</nav>'
+      + '<span class="ds-mbrand">HORIZON</span><span class="ds-cmd-sp"></span>'
+      + '<button class="ds-kbd" type="button" data-hz-qk aria-label="Launch an engine (Ctrl+K)" title="Launch any engine \u2014 Ctrl/\u2318 + K">' + icon("search") + '<span>Launch engine</span><kbd>Ctrl K</kbd></button>'
       + '<div class="ds-status"><span class="ds-live" id="dsLive" title="Checking data feeds"><i class="ds-dot"></i><span id="dsLiveT">CHECKING</span></span>'
       + '<span class="ds-fresh" id="dsFresh">Data updated <b id="dsFreshT">\u2013</b></span></div>'
       + '<button class="ds-iconbtn" type="button" data-ds-open="dsNotes" aria-label="Notifications" aria-expanded="false">' + icon("bell") + '<span class="ds-badge" id="dsBadge" hidden>0</span></button>'
@@ -174,11 +179,78 @@
 
   /* ------------------------------------------------------------------ mount */
   var AUTH = {enabled:false, user:null};
+  /* ------------------------------------------------------------------ HORIZON: document brand, boot sequence, quick launch */
+  var EXTRA = [   // launch targets that are views of a module rather than modules
+    {id:"tv-forecast", name:"Forecast Centre \u2014 TV wall", icon:"tv", route:"/command?present=1", group:"COMMAND", enabled:true, desc:"Full-screen OCC wall: heavy loading, incidents, bunching & gaps"},
+    {id:"tv-diversion", name:"Diversion Maps \u2014 TV wall", icon:"tv", route:"/diversion/tv", group:"RECOVERY", enabled:true, desc:"Live diversions on an LED / TV panel"}
+  ];
+  function brandDocument(){
+    if(/SG Transport Pulse|S\.E\.N\.T\.R\.Y/i.test(document.title)) document.title = document.title.replace(/SG Transport Pulse|S\.E\.N\.T\.R\.Y/ig, "HORIZON");
+    else if(!/HORIZON/.test(document.title)) document.title = (document.title ? document.title + " \u00b7 " : "") + "HORIZON";
+    if(!document.querySelector('link[rel~="icon"]')){ var l = document.createElement("link"); l.rel = "icon"; l.type = "image/svg+xml"; l.href = "/brand/horizon-mark.svg"; document.head.appendChild(l); }
+  }
+  function reduced(){ return prefs().reduceMotion || (window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches); }
+  function boot(){
+    var seen = false; try{ seen = sessionStorage.getItem("hz.boot") === "1"; sessionStorage.setItem("hz.boot", "1"); }catch(e){ seen = true; }
+    if(seen || reduced() || /[?&]present=1/.test(location.search) || /\/tv\b/.test(location.pathname)) return;
+    var o = document.createElement("div"); o.className = "hz-boot"; o.setAttribute("aria-hidden", "true");
+    o.innerHTML = '<div class="hz-boot-in"><img src="/brand/horizon-lockup.webp" alt=""><div class="ln"></div><div class="st">INITIALISING OPERATIONS INTELLIGENCE</div></div>';
+    document.body.appendChild(o);
+    var end = function(){ o.classList.add("done"); setTimeout(function(){ o.remove(); }, 500); };
+    o.addEventListener("click", end); setTimeout(end, 1500);
+  }
+  function qkItems(){
+    return MODULES.filter(function(m){ return !hid(m); }).concat(EXTRA);
+  }
+  function qkHTML(){
+    return '<div class="hz-qk-box" role="dialog" aria-modal="true" aria-label="Launch an engine"><div class="hz-qk-in">' + icon("search")
+      + '<input id="hzQkIn" type="text" autocomplete="off" spellcheck="false" placeholder="Launch engine \u2014 type a name, e.g. bunching, diversion, TV" aria-label="Engine name" aria-controls="hzQkList"><kbd>Esc</kbd></div>'
+      + '<div class="hz-qk-list" id="hzQkList" role="listbox"></div>'
+      + '<div class="hz-qk-foot"><span><kbd>\u2191</kbd><kbd>\u2193</kbd>choose</span><span><kbd>Enter</kbd>launch</span><span><kbd>Ctrl</kbd><kbd>Enter</kbd>new tab</span></div></div>';
+  }
+  var QK = {sel:0, list:[]};
+  function qkRender(){
+    var q = (document.getElementById("hzQkIn").value || "").trim().toLowerCase(), words = q.split(/\s+/).filter(Boolean);
+    QK.list = qkItems().filter(function(m){ var hay = [m.name, m.short, m.desc, m.group, m.route].concat(m.aliases || []).join(" ").toLowerCase();
+      return words.every(function(w){ return hay.indexOf(w) >= 0; }); });
+    QK.sel = Math.min(QK.sel, Math.max(0, QK.list.length - 1));
+    document.getElementById("hzQkList").innerHTML = QK.list.length ? QK.list.map(function(m, i){
+      return '<a class="hz-qk-item' + (i === QK.sel ? " sel" : "") + (m.enabled ? "" : " locked") + '" role="option" aria-selected="' + (i === QK.sel) + '" data-i="' + i + '"' + (m.enabled ? ' href="' + m.route + '"' : ' aria-disabled="true"') + '>'
+        + '<span class="ic">' + icon(m.enabled ? m.icon : "lock") + '</span><span class="tx"><b>' + esc(m.name) + '</b><small>' + esc(m.desc || "") + '</small></span><span class="grp">' + esc(m.id === ACTIVE ? "OPEN" : m.group) + '</span></a>';
+    }).join("") : '<div class="hz-qk-none">No engine matches \u201c' + esc(q) + '\u201d</div>';
+    var el = document.querySelector(".hz-qk-item.sel"); if(el && el.scrollIntoView) el.scrollIntoView({block:"nearest"});
+  }
+  function qkOpen(on){
+    var o = document.getElementById("hzQk"); if(!o) return;
+    o.classList.toggle("open", on);
+    if(on){ var i = document.getElementById("hzQkIn"); i.value = ""; QK.sel = 0; qkRender(); setTimeout(function(){ i.focus(); }, 30); }
+  }
+  function qkGo(i, newTab){ var m = QK.list[i]; if(!m || !m.enabled) return; if(newTab) window.open(m.route, "_blank", "noopener"); else location.href = m.route; }
+  function quickLaunch(){
+    var o = document.createElement("div"); o.className = "hz-qk"; o.id = "hzQk"; o.innerHTML = qkHTML(); document.body.appendChild(o);
+    o.addEventListener("click", function(e){ if(e.target === o) qkOpen(false); var it = e.target.closest(".hz-qk-item"); if(it){ e.preventDefault(); qkGo(+it.getAttribute("data-i"), e.ctrlKey || e.metaKey); } });
+    o.addEventListener("mousemove", function(e){ var it = e.target.closest(".hz-qk-item"); if(it && +it.getAttribute("data-i") !== QK.sel){ QK.sel = +it.getAttribute("data-i"); document.querySelectorAll(".hz-qk-item").forEach(function(x, i){ x.classList.toggle("sel", i === QK.sel); x.setAttribute("aria-selected", String(i === QK.sel)); }); } });
+    document.getElementById("hzQkIn").addEventListener("input", function(){ QK.sel = 0; qkRender(); });
+    document.addEventListener("keydown", function(e){
+      var open = o.classList.contains("open");
+      if((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && (e.key === "k" || e.key === "K")){ e.preventDefault(); qkOpen(!open); return; }
+      if(!open) return;
+      if(e.key === "Escape"){ e.preventDefault(); qkOpen(false); }
+      else if(e.key === "ArrowDown"){ e.preventDefault(); QK.sel = Math.min(QK.list.length - 1, QK.sel + 1); qkRender(); }
+      else if(e.key === "ArrowUp"){ e.preventDefault(); QK.sel = Math.max(0, QK.sel - 1); qkRender(); }
+      else if(e.key === "Enter"){ e.preventDefault(); qkGo(QK.sel, e.ctrlKey || e.metaKey); }
+    });
+    document.addEventListener("click", function(e){ if(e.target.closest("[data-hz-qk]")){ e.preventDefault(); qkOpen(true); } });
+  }
+  window.HORIZON = {launch:function(){ qkOpen(true); }, modules:function(){ return qkItems().map(function(m){ return {id:m.id, name:m.name, route:m.route, enabled:m.enabled}; }); }};
+
   function mount(){
     var b = document.body; if(!b) return;
+    brandDocument(); boot();
     b.classList.add("ds-app"); b.setAttribute("data-ds-module", ACTIVE || "");
     document.documentElement.classList.remove("shell-off");            // the V13.14 per-page hide-menu flag is replaced by the collapsible sidebar
     if(BARE) return;
+    quickLaunch();
     if(ACTIVE && hid(mod(ACTIVE)) && blockOn()){                 // V16.7: a hidden page opened by link / bookmark
       var alt = MODULES.filter(function(m){ return m.enabled && !hid(m) && m.id !== "settings"; })[0], ov = document.createElement("div");
       ov.setAttribute("role", "alertdialog"); ov.setAttribute("aria-label", "Page hidden");

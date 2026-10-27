@@ -1654,7 +1654,36 @@ async def map3d_js():
 async def design_system_css():
     from fastapi.responses import Response
     css = (HERE / "design_system.css").read_text(encoding="utf-8")
-    return Response(css, media_type="text/css", headers={"Cache-Control": "public, max-age=600"})
+    return Response(css, media_type="text/css", headers={"Cache-Control": "no-cache"})   # theme changes show on the next load
+
+
+# ---- HORIZON brand: logo cut-outs, ring mark (favicon) and the portable design tokens (CSS / JSON) for other systems.
+_BRAND_TYPES = {".webp": "image/webp", ".svg": "image/svg+xml", ".png": "image/png"}
+
+
+@app.get("/brand/{name}")
+async def brand_asset(name: str):
+    from fastapi.responses import Response
+    path = HERE / "brand" / name
+    if not re.fullmatch(r"[a-z0-9-]+\.(webp|svg|png)", name) or not path.is_file():
+        return Response(status_code=404)
+    return Response(path.read_bytes(), media_type=_BRAND_TYPES[path.suffix], headers={"Cache-Control": "public, max-age=86400"})
+
+
+@app.get("/favicon.ico")
+@app.get("/favicon.svg")
+async def favicon():
+    from fastapi.responses import Response
+    return Response((HERE / "brand" / "horizon-mark.svg").read_bytes(), media_type="image/svg+xml", headers={"Cache-Control": "public, max-age=86400"})
+
+
+@app.get("/horizon-tokens.css")
+@app.get("/horizon-tokens.json")
+async def horizon_tokens(request: Request):
+    from fastapi.responses import Response
+    name = request.url.path.lstrip("/")
+    return Response((HERE / name).read_text(encoding="utf-8"), media_type="text/css" if name.endswith(".css") else "application/json",
+                    headers={"Cache-Control": "public, max-age=600", "Access-Control-Allow-Origin": "*"})
 
 
 @app.get("/nav-registry.js")
@@ -6499,13 +6528,13 @@ async def api_auth_logout():
 
 # ---- V16.6: the login gate. When the login is on, every page and API needs a signed-in session (except the login page itself, its assets and the health check).
 # AUTH_GATE=0 keeps the login page but does not block anything.
-_GATE_OPEN = ("/login", "/api/auth/", "/api/health", "/app-shell.js", "/design-system.css", "/basemap.js", "/nav-registry.js", "/favicon")
+_GATE_OPEN = ("/login", "/api/auth/", "/api/health", "/app-shell.js", "/design-system.css", "/basemap.js", "/nav-registry.js", "/favicon", "/brand/", "/horizon-tokens")
 
 # V16.27: a TV / LED panel shows the live diversions without signing in (a login session expires). Set DIVERSION_TV_KEY in the
 # Render Environment and open /diversion/tv?key=<that key> once on the TV: a TV cookie then opens ONLY the TV page, its script,
 # the 3D map script and the read-only list of live diversions. Without DIVERSION_TV_KEY the TV page needs a normal login.
 TV_KEY = os.getenv("DIVERSION_TV_KEY", "").strip()
-_TV_PATHS = ("/diversion/tv", "/diversion-tv.js", "/api/dv2/live", "/map3d.js")
+_TV_PATHS = ("/diversion/tv", "/diversion-tv.js", "/api/dv2/live", "/map3d.js", "/brand/", "/design-system.css")
 
 
 def _tv_token():

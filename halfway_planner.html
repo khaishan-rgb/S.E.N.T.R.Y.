@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0b2545">
-<title>Halfway Planner &middot; SG Transport Pulse</title>
+<title>Halfway Planner &middot; HORIZON</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
@@ -663,7 +663,7 @@ tr.sel .radio{border-color:var(--ai);background:radial-gradient(circle,var(--ai)
     <section class="card s-plan o9" aria-labelledby="h10"><h2 id="h10">Controller action plan</h2><div id="acts"><div class="empty">Numbered instructions for the selected plan.</div></div></section>
   </div>
   </details>
-  <p class="note foot" style="margin:0 2px">Live: LTA DataMall bus positions (unchanged). Edited: buses OCC added, removed or moved in Route diagram &amp; buses (the live data itself is never changed). Forecast: 2 min between stops in service; off-service by real road routing; interchange departures on the target headway. Deploying an OS bus is in the <a href="/halfway/os">previous planner</a>. SG Transport Pulse V15.8</p>
+  <p class="note foot" style="margin:0 2px">Live: LTA DataMall bus positions (unchanged). Edited: buses OCC added, removed or moved in Route diagram &amp; buses (the live data itself is never changed). Forecast: 2 min between stops in service; off-service by real road routing; interchange departures on the target headway. Deploying an OS bus is in the <a href="/halfway/os">previous planner</a>. HORIZON V15.8</p>
 </main>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -680,7 +680,7 @@ if(window.SG3D){
 </script>
 <script>
 "use strict";
-/* SG Transport Pulse V15.1 - Halfway Planner.
+/* HORIZON V15.1 - Halfway Planner.
    Flow: service + late direction -> live buses -> late bus + lateness -> /api/hplan/plan (every stop of the next direction, real-road
    off-service time, front/rear regulation, downstream EWT) -> click any option: every section re-renders from that option's data. */
 const $ = id => document.getElementById(id);
@@ -2071,7 +2071,7 @@ async function brCardPng(P){
     y += hgt; });
   c.fillStyle = "#dff6ff"; c.font = F(800, 24);
   wrap(`Enter service at ${P.x.entry_clock}.` + (P.ahead ? ` ${P.ahead} about ${f0(P.sp[0])} min ahead, ${P.behind} about ${f0(P.sp[1])} min behind.` : ""), W - PAD * 2, F(800, 24)).forEach((t, i) => c.fillText(t, PAD, y + 30 + i * 32));
-  c.fillStyle = "#5f7690"; c.font = F(600, 18); c.fillText("SG Transport Pulse · Halfway Planner · estimate – follow road signs and check restrictions on site", PAD, H - 24);
+  c.fillStyle = "#5f7690"; c.font = F(600, 18); c.fillText("HORIZON · Halfway Planner · estimate – follow road signs and check restrictions on site", PAD, H - 24);
   const blob = await new Promise(ok => cv.toBlob(ok, "image/png"));
   if(blob){ const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `offservice_${ST.svc || "svc"}_stop${P.x.no}.png`; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 5000); }
   return {w:cv.width, h:cv.height, bytes:blob ? blob.size : 0};

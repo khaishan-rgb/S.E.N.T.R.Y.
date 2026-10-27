@@ -1,0 +1,63 @@
+/* HORIZON · Bus Operations Intelligence — design tokens (single source of truth)
+
+   Portable: any other engine, dashboard or app can load this one file
+     <link rel="stylesheet" href="https://<host>/horizon-tokens.css">
+   and use var(--hz-*) — or read the same values from /horizon-tokens.json (kept in sync by test_horizon_theme.py).
+
+   Palette is taken from the HORIZON lockup: deep-space navy, ice-white letterforms with a cyan gradient,
+   the electric-blue lens flare, and the SBS Transit red / purple as brand accents (never as status colours). */
+@import url("https://fonts.googleapis.com/css2?family=Orbitron:wght@500;600;700;800&family=Rajdhani:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap");
+
+:root{
+  /* space */
+  --hz-void:#020812;        /* page background — the logo's night sky */
+  --hz-deep:#041022;        /* sidebars, bars */
+  --hz-panel:#071a33;       /* solid panel */
+  --hz-glass:rgba(8,26,52,.62);    /* glass panel */
+  --hz-glass-2:rgba(12,36,70,.72); /* raised glass */
+
+  /* light (from the HORIZON letterforms and flare) */
+  --hz-ice:#eef9ff;         /* primary text, letter tops */
+  --hz-frost:#b9e9ff;       /* letter gradient end */
+  --hz-cyan:#3fd3ff;        /* the ring */
+  --hz-blue:#1f8fff;        /* the flare core */
+  --hz-glow:rgba(63,211,255,.55);
+  --hz-line:rgba(110,190,255,.16);
+  --hz-line-2:rgba(110,200,255,.30);
+  --hz-edge:rgba(63,211,255,.42);
+
+  /* text */
+  --hz-text:#e8f4ff; --hz-text-2:#b8cde4; --hz-mut:#8ca6c4; --hz-faint:#5d7898;
+
+  /* brand accents (SBS Transit) — identity only, not status */
+  --hz-sbs-red:#f2502a;
+  --hz-sbs-purple:#8a2ad0;
+
+  /* status semantics (meaning is the same on every page; always paired with text or shape) */
+  --hz-ok:#2ee8a0;          /* healthy · recovered */
+  --hz-warn:#ffb547;        /* attention · developing */
+  --hz-crit:#ff4d61;        /* intervention required */
+  --hz-ai:#a07bff;          /* AI · forecast · simulation */
+  --hz-off:#6f8399;         /* inactive · unavailable */
+
+  /* operations categories (Forecast Centre, TV wall, maps) */
+  --hz-loading:#ffb64a; --hz-traffic:#ff695b; --hz-bunching:#f755b5; --hz-gap:#61c8ff;
+
+  /* type */
+  --hz-font-brand:"Orbitron","Rajdhani",system-ui,sans-serif;          /* wordmark, big numbers, page titles */
+  --hz-font-display:"Rajdhani","IBM Plex Sans",system-ui,sans-serif;    /* panel titles, labels, tabs */
+  --hz-font-body:"IBM Plex Sans",Inter,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
+
+  /* shape + motion */
+  --hz-radius:6px; --hz-radius-sm:4px;
+  --hz-bracket:14px;        /* HUD corner bracket length */
+  --hz-ease:cubic-bezier(.2,.7,.2,1);
+  --hz-t:220ms;
+
+  /* assets (served by the HORIZON app; copy the /brand folder when reusing elsewhere) */
+  --hz-logo-lockup:url("/brand/horizon-lockup.webp");
+  --hz-logo-wordmark:url("/brand/horizon-wordmark.webp");
+  --hz-logo-word:url("/brand/horizon-word.webp");
+  --hz-logo-sbs:url("/brand/sbs-transit.webp");
+  --hz-logo-mark:url("/brand/horizon-mark.svg");
+}
