@@ -398,6 +398,56 @@ body.ds-app .ds-cmd{background:rgba(5,22,58,.82)!important}
 .fc-runtime-horizons{display:flex;gap:22px;padding-top:10px}.fc-runtime-horizons b{display:inline-block;margin-top:4px;color:#fff}
 .fc-map-actions{display:flex;gap:5px;margin-top:5px}.fc-map-actions button{height:28px;font-size:11px}
 #fcTop tr[data-risk-service]{cursor:pointer}#fcTop tr[data-risk-service]:hover,#fcTop tr[data-risk-service]:focus-visible{background:rgba(160,123,255,.15);outline:1px solid #a07bff}
+/* Operational filters and a TV wallboard layout. */
+.fc-grid{grid-template-columns:minmax(0,1fr) minmax(340px,410px)}
+.fc-filters{padding:12px;display:flex;gap:10px 14px;align-items:center;flex-wrap:wrap;margin-bottom:12px;z-index:20}
+.fc-filters label{font-size:12px;display:inline-flex;align-items:center;gap:6px}.fc-filters small{color:#b2c4da;font-size:11px}
+#fcFilterNote{flex-basis:100%}.fc-service-picker{position:relative;min-width:190px;max-width:340px}
+.fc-service-picker>summary{border:1px solid #466080;background:#0c1d36;border-radius:8px;padding:9px 12px;cursor:pointer;color:#e1eafa;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fc-service-menu{position:absolute;top:calc(100% + 7px);left:0;min-width:290px;max-width:85vw;z-index:40;padding:12px;background:#0e203a;border:1px solid #6683a7;border-radius:12px;box-shadow:0 16px 36px #020916}
+#fcServiceChoices{display:grid;grid-template-columns:repeat(2,minmax(100px,1fr));gap:5px;max-height:300px;overflow:auto;margin-top:8px}
+#fcServiceChoices label{display:flex;padding:6px;gap:6px;border-radius:6px;background:#142c49}#fcServiceChoices small{margin-left:auto;font-size:10px}
+.fc-reason-icon{width:22px;height:22px;vertical-align:middle;margin-right:5px;object-fit:contain}
+.fc-bunch-count{display:inline-grid;place-items:center;min-width:32px;padding:4px 8px;border-radius:7px;background:#122f43;color:#bde8e4;font-weight:700}.fc-bunch-count.active{background:#562749;color:#ffe0ee;border:1px solid #f37db5}
+.fc-3d-button{margin-left:6px}.fc-cmp h3 small{display:block;color:#a6c4e1;font-size:12px;margin-top:4px}
+@media(max-width:999px){.fc-grid{grid-template-columns:minmax(0,1fr)}}
+body.fc-present{overflow:hidden;background:#050f22!important}
+body.fc-present .fc{height:100dvh;box-sizing:border-box;display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);grid-template-rows:90px 100px minmax(0,1fr) 290px;gap:12px;padding:14px;overflow:hidden}
+body.fc-present .fc-hud{grid-column:1/-1;grid-row:1;margin:0;min-height:0}
+body.fc-present .fc-kpis{grid-column:1/-1;grid-row:2;grid-template-columns:repeat(8,minmax(0,1fr));gap:10px;margin:0}
+body.fc-present .fc-kpi{min-height:0;padding:10px}.fc-present .fc-kpi .v{font-size:clamp(26px,2vw,58px)}
+body.fc-present .fc-kpi .l{font-size:clamp(12px,.9vw,26px)}body.fc-present .fc-kpi .s{font-size:clamp(11px,.75vw,21px)}
+body.fc-present .fc-grid,body.fc-present .fc-low{display:contents}
+body.fc-present .fc-mapwrap{grid-column:1;grid-row:3;height:100%;min-height:0}
+body.fc-present .fc-alertpanel{grid-column:2;grid-row:3;height:100%;min-height:0;max-height:none}
+body.fc-present .fc-alertpanel .fc-scroll{max-height:none;overflow:hidden;flex:1}
+body.fc-present .fc-low>section:first-child{grid-column:1;grid-row:4;overflow:hidden}
+body.fc-present .fc-low>section:nth-child(2){grid-column:2;grid-row:4;overflow:hidden}
+body.fc-present .fc-low>section:nth-child(3),body.fc-present .fc-filters,body.fc-present .fc-demobar{display:none!important}
+body.fc-present .fc-low .fc-b{padding:8px 12px}body.fc-present .fc-low .fc-b>p{display:none}
+body.fc-present .fc-tbl{font-size:clamp(15px,.95vw,30px);line-height:1.25}
+body.fc-present .fc-tbl td,body.fc-present .fc-tbl th{padding:7px 6px}body.fc-present .fc-tbl th{font-size:clamp(12px,.8vw,24px)}
+body.fc-present .fc-low>section:nth-child(2) .fc-b{max-height:none!important;overflow:hidden!important}
+body.fc-present .fc-tbl caption{font-size:clamp(11px,.7vw,21px)}
+body.fc-present .fc-cmp{grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+body.fc-present .fc-cmp>div{padding:9px}body.fc-present .fc-cmp h3{font-size:clamp(19px,1.25vw,36px);margin:0 0 7px}
+body.fc-present .fc-cmp .tot{font-size:clamp(24px,1.7vw,48px)}body.fc-present .fc-cmp .tot small{font-size:clamp(11px,.65vw,20px)}
+body.fc-present .fc-cmp li{font-size:clamp(12px,.8vw,24px);margin-top:4px}
+body.fc-present .fc-cmp .note,body.fc-present .fcMethodS{display:none}
+body.fc-present .fc-tv-alerts{padding:8px 12px}body.fc-present .fc-tv-alerts>small{display:block;margin-top:10px;color:#a9c9e9;font-size:clamp(12px,.8vw,24px)}
+body.fc-present .fc-h h2{font-size:clamp(18px,1.05vw,32px)}body.fc-present .fc-reason-icon{width:clamp(22px,1.5vw,42px);height:clamp(22px,1.5vw,42px)}
+body.fc-present .fc-legend{max-width:300px;font-size:12px}body.fc-present .fc-map-actions,body.fc-present .fc-map-options{display:none}
+body.fc-present .fc-layers button{height:36px;font-size:13px}body.fc-present .fc-hz{width:calc(100% - 28px)}
+body.fc-present .fc-hz button b{font-size:clamp(18px,1.2vw,32px)}body.fc-present .fc-hz button small{font-size:clamp(11px,.7vw,20px)}
+@media(min-width:2600px){body.fc-present .fc{grid-template-rows:140px 170px minmax(0,1fr) 470px;gap:18px;padding:22px}body.fc-present .fc-low .fc-b{padding:14px 18px}body.fc-present .fc-tbl td,body.fc-present .fc-tbl th{padding:12px}body.fc-present .fc-cmp>div{padding:16px}}
+@media(max-height:800px){body.fc-present .fc{grid-template-rows:75px 80px minmax(0,1fr) 230px;gap:8px;padding:8px}body.fc-present .fc-tbl td,body.fc-present .fc-tbl th{padding:4px}body.fc-present .fc-cmp li{font-size:11px}body.fc-present .fc-legend{display:none}body.fc-present .fc-h{padding:7px 10px}}
+body.fc-present .fc-tbl{table-layout:fixed;width:100%}
+body.fc-present .fc-tbl td{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+body.fc-present .fc-tv-alerts .fc-tbl th:first-child{width:32%}body.fc-present .fc-tv-alerts .fc-tbl th:nth-child(2){width:17%}
+body.fc-present #fcTop th:first-child{width:28%}body.fc-present #fcTop th:nth-child(2){width:16%}body.fc-present #fcTop th:nth-child(3){width:24%}
+body.fc-present .fc-cmp ul{padding-left:16px;margin:6px 0}body.fc-present .fc-cmp .row{gap:4px}
+body.fc-present .fc-kpis{position:relative}body.fc-present .fc-kpis:before{content:'Network totals';position:absolute;top:-12px;left:2px;color:#9ab5d4;font-size:10px}
+.fc-horizon-lead{font-size:11px;color:#a9c7e8;white-space:nowrap}body.fc-present .fc-horizon-lead{font-size:clamp(12px,.8vw,23px)}
 </style>
 </head>
 <body>
@@ -419,11 +469,11 @@ body.ds-app .ds-cmd{background:rgba(5,22,58,.82)!important}
       <div class="ds-segm" role="group" aria-label="Data mode"><button type="button" data-mode="live" aria-pressed="true">Live</button><button type="button" data-mode="demo" aria-pressed="false">Demo</button></div>
       <span class="fc-pill" id="fcMode"><i class="fc-dot"></i><span>Checking</span></span>
     </div>
-    <div class="fc-hud-c fc-id"><h1>Forecast Centre</h1><p id="fcSub">verified route impact, forecast 15 / 30 / 60 min ahead</p></div>
+    <div class="fc-hud-c fc-id"><h1>Forecast Centre</h1><p id="fcSub">Network overview · verified route forecasts</p></div>
     <div class="fc-hud-r">
       <div class="fc-clock"><b id="fcClock">--:--:--</b><small id="fcDate">Singapore time</small></div>
-      <button type="button" class="ds-btn sm fc-enter" id="fcPresent" title="Full-screen presentation">Present</button>
-      <button type="button" class="ds-btn sm fc-exit" id="fcExit">Exit presentation</button>
+      <button type="button" class="ds-btn sm fc-enter" id="fcPresent" title="Full-screen presentation">TV mode</button>
+      <button type="button" class="ds-btn sm fc-exit" id="fcExit">Exit TV mode</button>
     </div>
     <div class="fc-hud-s fc-meta">
       <button type="button" class="fc-feeds" id="fcFeeds" aria-expanded="false" aria-controls="fcFeedPop" title="Data sources"></button>
@@ -436,28 +486,19 @@ body.ds-app .ds-cmd{background:rgba(5,22,58,.82)!important}
 
   <section class="fc-kpis" id="fcKpis" aria-label="Executive KPIs"></section>
 
-  <section class="fc-glass" style="padding:12px;margin-bottom:12px" aria-label="Forecast filters">
-    <label>Service <input class="ds-input" id="fcFilterSvc" list="fcSvcList" placeholder="All services" autocomplete="off"></label>
+  <section class="fc-glass fc-filters" aria-label="Forecast filters">
+    <input type="hidden" id="fcFilterSvc"><details id="fcServicePicker" class="fc-service-picker"><summary id="fcServiceLabel">All services</summary><div class="fc-service-menu"><input class="ds-input" id="fcServiceSearch" placeholder="Find services" aria-label="Find services"><div id="fcServiceChoices"></div></div></details>
+    <label class="fc-cbs"><input type="checkbox" id="fcExcludeCBS"> Exclude CBS <small>950, 160, 170, 170X</small></label>
     <label>Operator <select class="ds-input" id="fcFilterOp"><option value="">All operators</option></select></label>
     <label>Minimum extra delay (min) <input class="ds-input" id="fcFilterMin" type="number" min="0" step="0.5" value="0" style="width:100px"></label>
     <button type="button" class="ds-btn sm" id="fcFilterReset">Clear all filters</button>
     <button type="button" class="ds-btn sm" id="fcClearBuses">Clear buses</button>
     <label><input type="checkbox" id="fcLiveBuses" checked> Live buses</label>
     <small id="fcBusStatus" role="status">Waiting for live bus positions…</small>
-    <small id="fcFilterNote">Filters apply to map route impacts, alerts, forecasts and risk rows. Minimum delay uses the largest prediction at 15 / 30 / 60 min. Only verified affected services are shown. Executive totals and weather cover the network; background traffic flow is hidden while filtering.</small>
+    <small id="fcFilterNote">Filters apply to map route impacts, alerts, forecasts and risk rows. Minimum delay uses the largest prediction at 15 / 30 / 60 min. Only verified affected services are shown. CBS = 950, 160, 170 and 170X. Executive totals and weather cover the network; background traffic flow is hidden while filtering.</small>
   </section>
   <div class="fc-grid">
-    <aside class="fc-glass fc-side fc-svcpanel" aria-label="Service intelligence">
-      <div class="fc-summary" id="fcSummary"></div>
-      <div class="fc-h fc-svch"><h2>Service intelligence</h2><span class="sp"></span><small id="fcSvcMode"></small></div>
-      <div class="fc-search">
-        <input class="ds-input" id="fcSvcIn" list="fcSvcList" placeholder="Service, e.g. 12" autocomplete="off" aria-label="Bus service">
-        <div class="ds-segm" id="fcDir" role="group" aria-label="Direction"><button type="button" data-d="1" aria-pressed="true">Dir 1</button><button type="button" data-d="2" aria-pressed="false">Dir 2</button></div>
-        <datalist id="fcSvcList"></datalist>
-      </div>
-      <div class="fc-scroll"><div class="fc-b" id="fcSvc"><div class="fc-empty">Pick a service to see its route, the events that really touch it (and the ones rejected, with the reason), the predicted extra running time and recovery options.</div></div></div>
-    </aside>
-
+    <div hidden style="display:none!important"><div id="fcSummary"></div><span id="fcSvcMode"></span><input id="fcSvcIn"><div id="fcDir"><button data-d="1"></button><button data-d="2"></button></div><datalist id="fcSvcList"></datalist><div id="fcSvc"></div></div>
     <section class="fc-glass fc-mapwrap" aria-label="Singapore forecast map">
       <div id="fcMap" role="region" aria-label="Map"></div>
       <div class="fc-wm" aria-hidden="true"><span>DEMO</span></div>
@@ -484,7 +525,7 @@ body.ds-app .ds-cmd{background:rgba(5,22,58,.82)!important}
       <div class="fc-b"><p class="fc-muted">Compare expected extra running time 15, 30 and 60 minutes from now. Values are additional minutes per service-direction; ranges show uncertainty. The headline shows average extra minutes per affected service-direction, not a network sum.</p><div class="fc-cmp" id="fcCmp"></div></div>
     </section>
     <section class="fc-glass" aria-label="Services at risk">
-      <div class="fc-h"><h2>Services at risk</h2><span class="sp"></span><small>verified evidence only</small></div>
+      <div class="fc-h"><h2>Service watch</h2><span class="sp"></span><small id="fcWatchPage">route impacts · three-bus groups</small></div>
       <div class="fc-b" style="overflow:auto;max-height:340px"><table class="fc-tbl" id="fcTop"></table></div>
     </section>
     <section class="fc-glass" aria-label="Data integrity">
@@ -529,9 +570,9 @@ var KIND = {jam:"Jam", accident:"Accident", breakdown:"Broken-down vehicle", roa
 var qs = new URLSearchParams(location.search);
 var S = {mode:qs.get("demo") === "1" ? "demo" : "live", step:Math.max(0, Math.min(6, +(qs.get("step") || 0) || 0)), h:0, st:null, svc:null, dir:1, view:null,
          tab:"active", hist:{}, timer:null, play:false, playT:null, hzT:null, present:false, svcs:[], demoAck:{}, busy:false, lastT:null, first:true,
-         lay:{flow:true, heat:false, events:true, traffic:true, unverified:false, works:true, rain:true, probes:false, zones:false, route:true, legend:true}};
+         map3d:true, bunching:[], tvPage:0, lay:{flow:true, heat:false, events:true, traffic:true, unverified:false, works:true, rain:true, probes:false, zones:false, route:true, legend:true}};
 function store(k, v){ try{ if(v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); }catch(e){ return null; } }
-try{ var sl = JSON.parse(store("fc.map.layers.v2") || "null"); if(sl) Object.keys(S.lay).forEach(function(k){ if(typeof sl[k] === "boolean") S.lay[k] = sl[k]; }); }catch(e){}
+try{ var sl = JSON.parse(store("fc.map.layers.v3") || "null"); if(sl) Object.keys(S.lay).forEach(function(k){ if(typeof sl[k] === "boolean") S.lay[k] = sl[k]; }); }catch(e){}
 var hm = function(ts){ if(!ts) return "–"; var d = new Date(ts * 1000); return new Intl.DateTimeFormat("en-GB", {timeZone:"Asia/Singapore", hour:"2-digit", minute:"2-digit", hour12:false}).format(d); };
 var f1 = function(x){ return x == null || isNaN(x) ? "–" : (Math.round(x * 10) / 10).toFixed(Math.abs(x) >= 10 ? 0 : 1); };
 var lvTag = function(lv){ return '<span class="fc-tag ' + esc(lv) + '">' + esc(LVN[lv] || lv) + '</span>'; };
@@ -589,7 +630,7 @@ function forecastMapStyle(){
     var item = palette[l.id]; if(item) l.paint[item[0]] = item[1];
     if(l.id === "road-label"){l.minzoom=12; l.layout["text-size"]=12; l.layout["symbol-spacing"]=240; l.paint["text-halo-color"]="#111c2c"; l.paint["text-halo-width"]=2;}
     if(l.id === "place-label"){l.layout["text-transform"]="none";l.layout["text-letter-spacing"]=.02;}
-    if(l.id === "building-3d") l.layout=Object.assign({},l.layout,{visibility:"none"});
+    if(l.id === "building-3d") l.layout=Object.assign({},l.layout,{visibility:"visible"});
   });
   return style;
 }
@@ -644,7 +685,7 @@ MV.init = function(){
   var p = useML ? SG3D.load().then(function(){ return new Promise(function(res, rej){
     try{
       var m = MV.ml = new maplibregl.Map({container:"fcMap", style:forecastMapStyle(), center:[103.82, 1.352], zoom:10.6, minZoom:9.2, maxZoom:18.5, attributionControl:false,
-                                          pitch:0, dragRotate:false, pitchWithRotate:false, fadeDuration:0});
+                                          pitch:48, bearing:-12, dragRotate:true, pitchWithRotate:true, fadeDuration:0});
       m.addControl(new maplibregl.NavigationControl({showCompass:false}), "top-right");
       m.addControl(new maplibregl.AttributionControl({compact:true, customAttribution:'<a href="https://openfreemap.org" target="_blank" rel="noopener">OpenFreeMap</a> · TomTom · LTA · NEA'}), "bottom-right");
       var t = setTimeout(function(){ rej(new Error("map did not start")); }, 20000);
@@ -665,7 +706,7 @@ MV.init = function(){
   });
 };
 function mlLayers(m){
-  ["building-3d"].forEach(function(id){ if(m.getLayer(id)) m.setLayoutProperty(id, "visibility", "none"); });
+  ["building-3d"].forEach(function(id){ if(m.getLayer(id)) m.setLayoutProperty(id, "visibility", S.map3d ? "visible" : "none"); });
   m.addImage("fc-arr", arrowImg(), {sdf:true});
   Object.keys(ICON).forEach(function(k){
     m.addImage("fc-k-" + k, kindImg(k, false), {pixelRatio:2});
@@ -686,7 +727,7 @@ function mlLayers(m){
     ff, {filter:["all", ["has", "road_closure"], ff.filter]}), below);
   ["rainarea", "heat", "ev", "evp", "rain", "probe", "route", "rsec", "rcrit", "rrain", "rver", "stops"].forEach(function(id){ m.addSource(id, {type:"geojson", data:{type:"FeatureCollection", features:[]}}); });
   m.addLayer({id:"heat", type:"heatmap", source:"heat", layout:{visibility:"none"}, paint:{"heatmap-weight":["get", "w"], "heatmap-radius":["interpolate", ["linear"], ["zoom"], 9, 18, 14, 60],
-    "heatmap-intensity":1.1, "heatmap-opacity":.72, "heatmap-color":["interpolate", ["linear"], ["heatmap-density"], 0, "rgba(0,0,0,0)", .2, "rgba(255,181,71,.35)", .5, "rgba(255,138,61,.6)", .85, "rgba(255,85,102,.85)"]}});
+    "heatmap-intensity":1.1, "heatmap-opacity":.72, "heatmap-color":["interpolate", ["linear"], ["heatmap-density"], 0, "rgba(0,0,0,0)", .1, "rgba(46,229,157,.35)", .35, "rgba(163,230,53,.55)", .55, "rgba(250,204,21,.65)", .75, "rgba(251,146,60,.8)", 1, "rgba(239,68,68,.95)"]}});
   m.addLayer({id:"route-casing", type:"line", source:"route", layout:{"line-cap":"round", "line-join":"round"}, paint:{"line-color":"#02070f", "line-width":["interpolate", ["linear"], ["zoom"], 10, 6, 16, 14], "line-opacity":.9}});
   m.addLayer({id:"route-line", type:"line", source:"route", layout:{"line-cap":"round", "line-join":"round"}, paint:{"line-color":"#9be7ff", "line-width":["interpolate", ["linear"], ["zoom"], 10, 2.5, 16, 7], "line-opacity":.85}});
   m.addLayer({id:"rsec", type:"line", source:"rsec", layout:{"line-cap":"round"}, paint:{"line-color":["get", "c"], "line-width":["interpolate", ["linear"], ["zoom"], 10, 3, 16, 8]}});
@@ -732,7 +773,7 @@ function eventPoint(e){
 }
 function mapEventVisible(e){
   if(visibleEvent(e)) return true;
-  return e.status === "unverified" && layerOn("unverified") && !minDelay() && (e.unverified_services || []).some(matchesService);
+  return false;
 }
 function eventLayerVisible(e){ return mapEventVisible(e) && layerOn(eventCategory(e)); }
 function evColour(e, h){
@@ -757,7 +798,7 @@ MV.update = function(){
     if(e.line && e.line.length > 1) L_.push({type:"Feature", properties:props, geometry:{type:"LineString", coordinates:e.line}});
     var point = eventPoint(e);
     if(point) P_.push({type:"Feature", properties:props, geometry:{type:"Point", coordinates:point}});
-    if(e.kind === "jam" && e.line) { var mid = e.line[Math.floor(e.line.length / 2)]; heat.push({type:"Feature", properties:{w:Math.min(1, ((((e.fc || {})[h] || {}).mid || e.delay_s || 0) / 600))}, geometry:{type:"Point", coordinates:mid}}); }
+    if(e.kind === "jam" && e.line) { var mid = eventPoint(e); heat.push({type:"Feature", properties:{w:Math.min(1, ((((e.fc || {})[h] || {}).mid || e.delay_s || 0) / 600))}, geometry:{type:"Point", coordinates:mid}}); }
   });
   var probes = layerOn("probes") ? (st.probes || []).filter(matchesService).map(function(p){ return {type:"Feature", properties:{key:p.key, c:ratioColour(probeRatio(p, h))}, geometry:{type:"Point", coordinates:[p.lon, p.lat]}}; }) : [];
   var rain = layerOn("rain") ? ((st.rain || {}).stations || []).filter(function(s){ return s.mmh > 0; }).map(function(s){ return {type:"Feature", properties:{id:s.id, name:s.name, mmh:s.mmh, cls:s.cls}, geometry:{type:"Point", coordinates:[s.lon, s.lat]}}; }) : [];
@@ -790,6 +831,7 @@ MV.update = function(){
     L_.forEach(function(f){ var p = f.properties; L.polyline(f.geometry.coordinates.map(ll), {color:p.c, weight:p.w, opacity:p.o,dashArray:p.kind === "roadworks" ? "7 5" : p.kind === "road_closed" ? "3 5" : null}).bindPopup(function(){ return popHtml("event", p); }).addTo(p.status === "unverified" ? G.unverified : p.kind === "roadworks" ? G.works : G.events); });
     P_.forEach(function(f){ var p = f.properties, u = p.status !== "confirmed", k = ICON[p.kind] ? p.kind : "other", key = k + (u ? "u" : "k");
       L.marker(ll(f.geometry.coordinates), {zIndexOffset:300 + p.priority, icon:L.icon({iconUrl:iconUrl(k, u), iconSize:[36, 36], iconAnchor:[18, 18]})}).bindPopup(function(){ return popHtml("event", p); }).addTo(u ? G.unverified : p.kind === "roadworks" ? G.works : G.events); });
+    if(layerOn("heat")) heat.forEach(function(f){var w=f.properties.w,c=w<.2 ? '#2ee59d' : w<.4 ? '#a3e635' : w<.6 ? '#facc15' : w<.8 ? '#fb923c' : '#ef4444';[34,24,14].forEach(function(radius){L.circleMarker(ll(f.geometry.coordinates),{radius:radius,stroke:false,fillColor:c,fillOpacity:.12,interactive:false}).addTo(G.heat);});});
     probes.forEach(function(f){ L.circleMarker(ll(f.geometry.coordinates), {radius:5, color:"#02070f", weight:1.5, fillColor:f.properties.c, fillOpacity:1}).bindPopup(function(){ return popHtml("probe", f.properties); }).addTo(G.probes); });
     rain.forEach(function(f){ var r = f.properties.mmh; L.circleMarker(ll(f.geometry.coordinates), {radius:r > 0 ? 4 + Math.min(10, r / 4) : 2.5, color:"#bfefff", weight:r >= 10 ? 1.5 : 0, fillColor:r > 0 ? COL.rain : "#2a4a6a", fillOpacity:r > 0 ? .85 : .35}).bindPopup(function(){ return popHtml("rain", f.properties); }).addTo(G.rain); });
   }
@@ -800,10 +842,9 @@ MV.update = function(){
 // Bus positions use the existing sampled LTA arrival feed, never fictional demo data.
 var liveBuses = [], busMarkers = [], busGeneration = 0, busDebounce;
 function busTargets(){
-  var rows = [], svc = $("fcFilterSvc").value.trim().toUpperCase();
-  if(svc){
-    var meta = (S.svcs || []).find(function(s){return s.svc === svc;});
-    (meta && meta.dirs || []).forEach(function(d){rows.push({svc:svc,dir:d});});
+  var rows = [], selected = selectedServices();
+  if(selected.length){
+    selected.forEach(function(svc){var meta=(S.svcs || []).find(function(s){return s.svc===svc;});(meta && meta.dirs || []).forEach(function(d){rows.push({svc:svc,dir:d});});});
   } else if(S.svc) rows = [{svc:S.svc,dir:S.dir}];
   else rows = ((S.st || {}).services || []).filter(function(s){return predictedDelay(s) > 0 || s.blocked;});
   var seen = {};
@@ -892,7 +933,7 @@ function popHtml(kind, p){
 }
 MV.fit = function(bounds, pad){
   if(!MV.ready || !bounds) return;
-  if(MV.kind === "ml") MV.ml.fitBounds(bounds, {padding:pad || {top:60, bottom:110, left:40, right:60}, duration:S.first ? 0 : 900, maxZoom:15});
+  if(MV.kind === "ml") MV.ml.fitBounds(bounds, {padding:pad || {top:60, bottom:110, left:40, right:60}, duration:S.first ? 0 : 900, maxZoom:15, pitch:S.map3d ? 48 : 0});
   else if(MV.kind === "lf") MV.lf.fitBounds([[bounds[0][1], bounds[0][0]], [bounds[1][1], bounds[1][0]]], {padding:[40, 40], maxZoom:15});
 };
 function boundsOf(coords){
@@ -986,6 +1027,12 @@ function renderMapContext(){
   var verified=rows.filter(function(e){return e.status === "confirmed";}).length, reports=rows.length-verified;
   $("fcMapContext").textContent = verified + " route impact" + (verified === 1 ? "" : "s") + (reports ? " · " + reports + " nearby report" + (reports === 1 ? "" : "s") + " (unverified)" : "") + (filterActive() ? " · filters applied" : "");
   if(!rows.length) $("fcMapContext").textContent = "No mapped impacts match these filters and layers.";
+  var selected=selectedServices(), scope=[];
+  if(selected.length) scope.push(selected.join(', '));
+  if($("fcFilterOp").value) scope.push($("fcFilterOp").value);
+  if(excludeCBS()) scope.push('CBS excluded');
+  if(minDelay()) scope.push('minimum ' + minDelay() + ' min');
+  if(scope.length) $("fcMapContext").textContent += ' · ' + scope.join(' · ');
 }
 function renderLayers(){
   var st = S.st || {}, flowAvail = !isDemo() && st.config && st.config.tomtom_key, counts=mapCounts();
@@ -996,19 +1043,42 @@ function renderLayers(){
   var wasOpen = !!document.querySelector("#fcLayers details[open]");
   $("fcLayers").innerHTML = '<div class="fc-layer-main">'
     + button("traffic","Traffic","jam",counts.traffic) + button("events","Incidents","accident",counts.events) + button("works","Road works","roadworks",counts.works)
-    + button("unverified","Nearby reports",null,counts.reports) + button("legend","Key",null,null) + '</div><div class="fc-map-actions"><button type="button" data-clear-all>Clear all filters</button><button type="button" data-clear-buses>Clear buses</button></div>'
+    + button("legend","Key",null,null) + '</div><div class="fc-map-actions"><button type="button" data-clear-all>Clear all filters</button><button type="button" data-clear-buses>Clear buses</button></div>'
     + '<details class="fc-map-options"' + (wasOpen ? ' open' : '') + '><summary>More layers</summary><div>'
-    + button("flow","Network traffic flow",null,null,!flowAvail || filterActive()) + button("heat","Congestion heat",null,null)
-    + button("rain","Rain",null,null) + button("probes","Speed probes",null,null) + button("zones","Risk zones",null,null) + button("route","Selected route",null,null) + '</div></details>';
+    + button("flow","Network traffic flow",null,null,!flowAvail || filterActive()) + button("heat","Heat map",null,null)
+    + button("rain","Rain",null,null) + ((st.probes || []).some(matchesService) ? button("probes","Speed probes",null,null) : "") + button("zones","Risk zones",null,null) + button("route","Selected route",null,null) + '</div></details><button type="button" class="fc-3d-button" id="fcMap3D" aria-pressed="' + (MV.kind === 'ml' && S.map3d) + '"' + (MV.kind !== 'ml' ? ' disabled title="3D needs WebGL"' : '') + '>3D map</button>';
   $("fcLegend").classList.toggle("off", !S.lay.legend);
   var it = function(icon,label){return '<span>' + icon + label + '</span>';};
   var img = function(k,u){return '<img alt="" src="' + iconUrl(k,u) + '">';};
   $("fcLegend").innerHTML = '<b>Map key</b><div class="fc-lg-icons">'
     + it('<span class="fc-bus-key">▣</span>',"Live bus")
     + ["jam","accident","roadworks","road_closed","breakdown","other"].map(function(k){return it(img(k,false),KNAME[k]);}).join("")
-    + it(img("roadworks",true),"Unverified report") + '</div><div class="fc-lg-row sub">Traffic lines: yellow &lt;2 · orange 2–5 · red 5+ min delay. Nearby reports do not count as affected services.</div>';
+     + '</div><div class="fc-lg-row sub">Traffic lines: yellow &lt;2 · orange 2–5 · red 5+ min delay. Heat map: green → yellow → red = increasing congestion intensity.</div>';
   renderMapContext();
 }
+function horizonName(h){return {0:"Live",15:"Soon",30:"Next",60:"Later"}[h] || "Forecast";}
+function horizonLead(h){return h===0 ? "Right now" : h===60 ? "1 hour ahead" : h + " minutes ahead";}
+function selectedServices(){return Array.from(new Set($("fcFilterSvc").value.toUpperCase().split(/[,\s]+/).filter(Boolean)));}
+function excludeCBS(){return !!($("fcExcludeCBS") && $("fcExcludeCBS").checked);}
+function renderServiceChoices(){
+ var selected=selectedServices(),query=$("fcServiceSearch").value.trim().toUpperCase();
+ $("fcServiceLabel").textContent=selected.length ? selected.length + ' services: ' + selected.join(', ') : 'All services';
+ $("fcServiceChoices").innerHTML=(S.svcs || []).filter(function(s){return !query || s.svc.indexOf(query)>=0;}).map(function(s){return '<label><input type="checkbox" data-pick-service="' + esc(s.svc) + '"' + (selected.indexOf(s.svc)>=0 ? ' checked' : '') + '> <b>' + esc(s.svc) + '</b><small>' + esc(s.operator || '') + '</small></label>';}).join('');
+}
+function toggleMap3D(){
+ if(MV.kind!=="ml") return;S.map3d=!S.map3d;
+ MV.ml.easeTo({pitch:S.map3d ? 48 : 0,bearing:S.map3d ? -12 : 0,duration:700});
+ if(MV.ml.getLayer('building-3d')) MV.ml.setLayoutProperty('building-3d','visibility',S.map3d ? 'visible' : 'none');
+ renderLayers();
+}
+function bunchingRow(s){return (S.bunching || []).find(function(b){return b.svc===s.svc && b.dir===s.dir;});}
+function bunchingCell(s){var b=bunchingRow(s);return b && b.available ? '<span class="fc-bunch-count' + (b.groups3 ? ' active' : '') + '">' + b.groups3 + '</span>' : '<span class="fc-muted" title="No fresh bunching observations">Unavailable</span>';}
+async function loadBunching(){
+ if(isDemo()){S.bunching=[];renderTop();return;}
+ var j;try{j=await api('/api/forecast/bunching');}catch(e){j={};}if(isDemo()) return;S.bunching=(j && j.rows) || [];renderTop();
+}
+function tvSlice(rows,size){var pages=Math.max(1,Math.ceil(rows.length/size));return {rows:S.present ? rows.slice((S.tvPage%pages)*size,(S.tvPage%pages+1)*size) : rows,page:S.tvPage%pages+1,pages:pages};}
+setInterval(function(){if(S.present && !document.hidden){S.tvPage++;renderTop();renderAlerts();}},12000);
 function renderHz(){
   var cmp = {}; ((S.st || {}).comparison || []).forEach(function(c){ cmp[c.h] = c; });
   var nowN = ((S.st || {}).events || []).filter(visibleEvent).length;
@@ -1020,7 +1090,7 @@ function renderHz(){
       c = Object.assign({}, c, counts, {extra_total:selected.reduce(function(n,s){ return n + s.extra[h].mid; },0)});
     }
     var lv = c ? (c.critical ? "critical" : c.high ? "high" : c.watch ? "watch" : "") : "", sub = h ? (c ? (c.critical + c.high) + " at risk · " + (horizonAverage(h) == null ? "avg unavailable" : "+" + f1(horizonAverage(h)) + " min avg") : "–") : nowN + " verified events";
-    return '<button type="button" data-h="' + h + '" aria-pressed="' + (S.h === h) + '" style="--c:' + (lv ? COL[lv] : "#3b4c60") + '"><b>' + (h ? "+" + h + " min" : "Now") + '</b><span class="ln"></span><small>' + esc(sub) + '</small></button>';
+    return '<button type="button" data-h="' + h + '" aria-pressed="' + (S.h === h) + '" style="--c:' + (lv ? COL[lv] : "#3b4c60") + '"><b>' + horizonName(h) + '</b><span class="fc-horizon-lead">' + horizonLead(h) + '</span><span class="ln"></span><small>' + esc(sub) + '</small></button>';
   }).join("");
 }
 function meanMinutes(values){
@@ -1044,13 +1114,13 @@ function compactRunningTime(v){
     + '<details><summary>15 / 30 / 60 min details</summary><div class="fc-runtime-horizons">' + [15,30,60].map(function(h){var value=((v.extra || {})[h] || {}).mid;return '<span>In ' + h + ' min<br><b>' + (v.blocked || value == null ? 'Unavailable' : '+' + f1(value) + ' min') + '</b></span>';}).join('') + '</div></details></div>';
 }
 function focusRiskService(svc,dir){
-  $("fcFilterSvc").value=String(svc).toUpperCase();
+  $("fcFilterSvc").value=String(svc).toUpperCase();renderServiceChoices();
   S.view=null;
   renderFiltered();
   selectSvc(svc,dir).then(function(){ var map=document.querySelector('.fc-mapwrap');if(map) map.scrollIntoView({behavior:'smooth',block:'center'}); });
 }
 function clearAllFilters(){
-  $("fcFilterSvc").value="";$("fcFilterOp").value="";$("fcFilterMin").value="0";
+  $("fcFilterSvc").value="";$("fcFilterOp").value="";$("fcFilterMin").value="0";$("fcExcludeCBS").checked=false;renderServiceChoices();
   S.svc=null;S.view=null;S.dir=1;$("fcSvcIn").value="";
   $("fcSvc").innerHTML='<div class="fc-empty">Pick a service to see its route and running time.</div>';
   document.querySelectorAll('#fcDir button').forEach(function(b){b.disabled=false;b.setAttribute('aria-pressed',String(b.getAttribute('data-d')==='1'));});
@@ -1068,12 +1138,12 @@ function alertCard(a){
   var road = a.road || (a.location && a.location.indexOf("Road name not supplied") < 0 ? a.location : "") || "Road name unavailable";
   var rows = services.map(function(s){
     var delay = s.extra30;
-    return '<tr><td>' + esc(s.road || road) + '</td><td><button type="button" class="ds-btn sm" data-svc="' + esc(s.svc) + '" data-dir="' + s.dir + '">' + esc(s.svc) + ' · D' + s.dir + '</button></td><td>' + esc(simpleReason(a.kind)) + '</td><td>' + (delay == null ? 'Unavailable' : '+' + f1(delay) + ' min') + '</td></tr>';
+    return '<tr><td>' + esc(s.road || road) + '</td><td><button type="button" class="ds-btn sm" data-svc="' + esc(s.svc) + '" data-dir="' + s.dir + '">' + esc(s.svc) + ' · D' + s.dir + '</button></td><td>' + '<img class="fc-reason-icon" alt="" src="' + iconUrl(ICON[a.kind] ? a.kind : 'other',false) + '">' + esc(simpleReason(a.kind)) + '</td><td>' + (delay == null ? 'Unavailable' : '+' + f1(delay) + ' min') + '</td></tr>';
   }).join("");
   var ack = a.status === "resolved" ? 'Cleared' : acked ? 'Acknowledged' : '<button type="button" class="ds-btn sm pri" data-ack="' + esc(a.id) + '">Acknowledge</button>';
   return '<article class="fc-al ' + esc(a.level) + '" data-al="' + esc(a.id) + '"><div style="overflow:auto"><table class="fc-tbl"><thead><tr><th>Road</th><th>Service</th><th>Reason</th><th>Extra min</th></tr></thead><tbody>' + rows + '</tbody></table></div><div class="foot"><small class="fc-muted">Extra running time predicted in 30 min' + (isDemo() ? ' · DEMO' : '') + '</small><span class="sp"></span>' + ack + '</div></article>';
 }
-function filterActive(){ return !!($("fcFilterSvc").value.trim() || $("fcFilterOp").value || minDelay()); }
+function filterActive(){ return !!(selectedServices().length || $("fcFilterOp").value || minDelay() || excludeCBS()); }
 function minDelay(){ return Math.max(0, Number($("fcFilterMin").value) || 0); }
 function predictedDelay(s){
   var extra = s.extra || {}, values = [15,30,60].map(function(h){ var v = extra[h]; return Number(v && typeof v === "object" ? v.mid : v) || 0; });
@@ -1081,15 +1151,15 @@ function predictedDelay(s){
 }
 function visibleEvent(e){ return e.status === "confirmed" && (e.services || []).some(matchesService); }
 function matchesService(s){
-  var svc = $("fcFilterSvc").value.trim().toUpperCase(), op = $("fcFilterOp").value;
+  var selected = selectedServices(), op = $("fcFilterOp").value;
   var meta = (S.svcs || []).find(function(x){ return x.svc === s.svc; });
   var row = ((S.st || {}).services || []).find(function(x){return x.svc === s.svc && x.dir === s.dir;}) || s;
-  return (!svc || s.svc === svc) && (!op || meta && meta.operator === op) && (!minDelay() || predictedDelay(row) >= minDelay());
+  return (!selected.length || selected.indexOf(s.svc)>=0) && (!excludeCBS() || ["950","160","170","170X"].indexOf(s.svc)<0) && (!op || meta && meta.operator === op) && (!minDelay() || predictedDelay(row) >= minDelay());
 }
 function renderFiltered(){
   if(MV.pop){ MV.pop.remove(); MV.pop = null; }
   if(MV.lf) MV.lf.closePopup();
-  renderAlerts(); renderCmp(); renderTop(); renderHz(); renderLayers(); MV.update(); queueLiveBuses();
+  S.tvPage=0;renderAlerts(); renderCmp(); renderTop(); renderHz(); renderLayers(); MV.update(); queueLiveBuses();
 }
 function renderAlerts(){
   var st = S.st || {}, all = (st.alerts || []).filter(function(a){ return (a.services || []).some(matchesService); }), el = $("fcAlerts");
@@ -1106,7 +1176,14 @@ function renderAlerts(){
   var list = all.filter(function(a){ var ak = a.acked || S.demoAck[a.id];
     return S.tab === "active" ? a.status === "active" : S.tab === "acked" ? a.status === "active" && ak : a.status === "resolved"; });
   if(S.tab === "active") list.sort(function(a, b){ var x = !!(a.acked || S.demoAck[a.id]), y = !!(b.acked || S.demoAck[b.id]); return x === y ? 0 : x ? 1 : -1; });
-  el.innerHTML = list.length ? list.map(alertCard).join("") : '<div class="fc-empty">' + (S.tab === "active" ? (st.error && !isDemo() ? esc(st.error) : "No alerts match the selected service, operator and minimum delay.") : S.tab === "acked" ? "Nothing acknowledged." : "Nothing cleared in the last 24 hours.") + '</div>';
+  if(S.present){
+    var compact=[];list.forEach(function(a){(a.services || []).filter(matchesService).forEach(function(service){compact.push({alert:a,service:service});});});
+    var page=tvSlice(compact,6);
+    el.innerHTML='<div class="fc-tv-alerts"><table class="fc-tbl"><thead><tr><th>Road</th><th>Service</th><th>Reason</th><th>Extra min</th></tr></thead><tbody>' + page.rows.map(function(row){var a=row.alert,service=row.service;return '<tr data-al="' + esc(a.id) + '"><td>' + esc(service.road || a.road || 'Road name unavailable') + '</td><td><b>' + esc(service.svc) + '</b> · D' + service.dir + '</td><td><img class="fc-reason-icon" alt="" src="' + iconUrl(ICON[a.kind] ? a.kind : 'other',false) + '">' + esc(simpleReason(a.kind)) + '</td><td>' + (service.extra30==null ? 'Unavailable' : '+' + f1(service.extra30) + ' min') + '</td></tr>';}).join('') + '</tbody></table><small>Page ' + page.page + '/' + page.pages + ' · rotates every 12 s · ' + horizonLead(30) + '</small></div>';
+    if(!compact.length) el.innerHTML='<div class="fc-empty">No alerts match these filters.</div>';
+    return;
+  }
+  el.innerHTML = list.length ? tvSlice(list,2).rows.map(alertCard).join("") : '<div class="fc-empty">' + (S.tab === "active" ? (st.error && !isDemo() ? esc(st.error) : "No alerts match the selected service, operator and minimum delay.") : S.tab === "acked" ? "Nothing acknowledged." : "Nothing cleared in the last 24 hours.") + '</div>';
 }
 function renderCmp(){
   var st = S.st || {};
@@ -1118,7 +1195,7 @@ function renderCmp(){
       c = Object.assign({}, c, counts, {extra_total:rows.reduce(function(n,s){return n + s.extra[c.h].mid;},0), worst:rows.slice().sort(function(a,b){return b.extra[c.h].mid-a.extra[c.h].mid;}).slice(0,3).filter(function(s){return s.extra[c.h].mid>0;}).map(function(s){return {svc:s.svc,dir:s.dir,extra:s.extra[c.h]};}), jams_building:0});
     }
     var worst = (c.worst || []).map(function(w){ return '<li><b style="color:#fff">' + esc(w.svc) + ' d' + w.dir + '</b> +' + f1(w.extra.mid) + ' min <span class="fc-muted">(' + f1(w.extra.lo) + '–' + f1(w.extra.hi) + ')</span></li>'; }).join("");
-    return '<div class="' + (S.h === c.h ? "on" : "") + '" data-h="' + c.h + '" role="button" tabindex="0"><h3>+' + c.h + ' min</h3><div class="row">' + (c.critical ? lvTag("critical").replace(">Critical<", ">" + c.critical + " critical<") : "")
+    return '<div class="' + (S.h === c.h ? "on" : "") + '" data-h="' + c.h + '" role="button" tabindex="0"><h3>' + horizonName(c.h) + ' <small>' + horizonLead(c.h) + '</small></h3><div class="row">' + (c.critical ? lvTag("critical").replace(">Critical<", ">" + c.critical + " critical<") : "")
       + (c.high ? lvTag("high").replace(">High<", ">" + c.high + " high<") : "") + (c.watch ? lvTag("watch").replace(">Watch<", ">" + c.watch + " watch<") : "") + (!c.critical && !c.high && !c.watch ? '<span class="fc-tag ok">No service at risk</span>' : '') + '</div>'
       + '<div class="tot">' + (horizonAverage(c.h) == null ? 'Unavailable' : '+' + f1(horizonAverage(c.h)) + ' min') + ' <small>average extra time per affected service-direction' + (forecastRows().some(function(s){return s.blocked;}) ? ' · blocked routes excluded' : '') + '</small></div><ul>' + (worst || '<li class="fc-muted">No predicted extra delay.</li>') + '</ul>'
       + '<div class="note">' + (c.jams_building ? c.jams_building + ' jam(s) still building. ' : '') + esc(c.rain_note || "") + '</div></div>';
@@ -1126,11 +1203,13 @@ function renderCmp(){
 }
 function renderTop(){
   var rows = ((S.st || {}).services || []).filter(function(s){return matchesService(s) && (LV[s.level] >= 1 || predictedDelay(s) > 0);});
-  $("fcTop").innerHTML = '<caption style="text-align:left;padding:0 0 8px;color:#b6c8dd">Extra running time predicted in 30 min</caption><thead><tr><th>Road</th><th>Service</th><th>Reason</th><th>Extra min</th></tr></thead><tbody>' + (rows.map(function(s){
+  (S.bunching || []).forEach(function(b){if(b.available && b.groups3>0 && matchesService(b) && !rows.some(function(s){return s.svc===b.svc && s.dir===b.dir;})) rows.push(Object.assign({roads:[],causes:['Bunching'],extra:{}},b));});
+  var page=tvSlice(rows,4);rows=page.rows;$("fcWatchPage").textContent='three-bus groups' + (S.present ? ' · page ' + page.page + '/' + page.pages : '');
+  $("fcTop").innerHTML = '<caption style="text-align:left;padding:0 0 8px;color:#b6c8dd">Extra running time predicted in 30 min</caption><thead><tr><th>Road</th><th>Service</th><th>Reason</th><th>Extra min</th><th>3-bus bunching</th></tr></thead><tbody>' + (rows.map(function(s){
     var reasons = (s.causes || []).map(function(c){return /^(unknown|jam|speed|other)$/i.test(c) ? 'Traffic' : c;});
     var delay = (s.extra || {})[30];
-    return '<tr data-risk-service="true" tabindex="0" role="button" aria-label="Show service ' + esc(s.svc) + ' on map" data-svc="' + esc(s.svc) + '" data-dir="' + s.dir + '"><td>' + esc((s.roads || []).join(', ') || 'Road name unavailable') + '</td><td><b>' + esc(s.svc) + '</b> · D' + s.dir + '</td><td>' + esc(Array.from(new Set(reasons)).join(', ') || (s.heavy_share ? 'Rain' : 'Traffic disruption')) + '</td><td>' + (delay && delay.mid != null ? '+' + f1(delay.mid) + ' min' : 'Unavailable') + '</td></tr>';
-  }).join('') || '<tr><td colspan="4" class="fc-empty">No affected services match the filters.</td></tr>') + '</tbody>';
+    return '<tr data-risk-service="true" tabindex="0" role="button" aria-label="Show service ' + esc(s.svc) + ' on map" data-svc="' + esc(s.svc) + '" data-dir="' + s.dir + '"><td>' + esc((s.roads || []).join(', ') || 'Road name unavailable') + '</td><td><b>' + esc(s.svc) + '</b> · D' + s.dir + '</td><td>' + '<img class="fc-reason-icon" alt="" src="' + iconUrl((s.causes || []).some(function(c){return /road.?works/i.test(c);}) ? 'roadworks' : (s.causes || []).some(function(c){return /accident/i.test(c);}) ? 'accident' : (s.causes || []).some(function(c){return /jam|traffic|speed/i.test(c);}) ? 'jam' : 'other',false) + '">' + esc(Array.from(new Set(reasons)).join(', ') || (s.heavy_share ? 'Rain' : 'Traffic disruption')) + '</td><td>' + (delay && delay.mid != null ? '+' + f1(delay.mid) + ' min' : 'Unavailable') + '</td><td>' + bunchingCell(s) + '</td></tr>';
+  }).join('') || '<tr><td colspan="5" class="fc-empty">No affected services match the filters.</td></tr>') + '</tbody>';
 }
 function renderInt(){
   var st = S.st || {}, src = st.sources || {}, cfg = st.config || {}, cal = st.calibration || {};
@@ -1218,7 +1297,7 @@ function load(){
   var u = isDemo() ? "/api/forecast/state?mode=demo&step=" + S.step : "/api/forecast/state";
   return api(u, {timeout:90000}).then(function(st){
     if(!st || (st.error && !st.kpis)) st = Object.assign({kpis:[], alerts:[], events:[], comparison:[], services:[]}, st || {});
-    S.st = st; render(); tick(); queueLiveBuses();
+    S.st = st; render(); tick(); queueLiveBuses();loadBunching();
     if(S.first){ fitScene(); S.first = false; }
   }).finally(function(){ S.busy = false; });
 }
@@ -1231,7 +1310,9 @@ function setMode(m){
   history.replaceState(null, "", u.toString());
   loadSvcList(); load().then(function(){ if(isDemo()) choreo(); }); schedule();
 }
-$("fcFilterSvc").addEventListener("input", renderFiltered);
+$("fcServiceSearch").addEventListener("input",renderServiceChoices);
+$("fcExcludeCBS").addEventListener("change",renderFiltered);
+document.addEventListener('change',function(e){if(e.target.hasAttribute('data-pick-service')){var selected=selectedServices(),svc=e.target.getAttribute('data-pick-service');selected=selected.filter(function(x){return x!==svc;});if(e.target.checked) selected.push(svc);$("fcFilterSvc").value=selected.join(',');renderServiceChoices();renderFiltered();}});
 $("fcFilterOp").addEventListener("change", renderFiltered);
 $("fcFilterMin").addEventListener("input", renderFiltered);
 $("fcLiveBuses").addEventListener("change", queueLiveBuses);
@@ -1239,7 +1320,7 @@ $("fcFilterReset").addEventListener("click", clearAllFilters);
 $("fcClearBuses").addEventListener("click", clearMapBuses);
 function loadSvcList(){
   api("/api/forecast/services" + (isDemo() ? "?mode=demo" : "")).then(function(j){
-    S.svcs = (j && j.services) || [];
+    S.svcs = (j && j.services) || [];renderServiceChoices();
     var selectedOp = $("fcFilterOp").value;
     var ops = Array.from(new Set(S.svcs.map(function(s){return s.operator;}).filter(Boolean))).sort();
     $("fcFilterOp").innerHTML = '<option value="">All operators</option>' + ops.map(function(op){return '<option value="' + esc(op) + '">' + esc(op) + '</option>';}).join("");
@@ -1274,7 +1355,7 @@ function playLoop(){
 
 /* ------------------------------------------------------------------ presentation (full screen showcase) */
 function present(on){
-  S.present = on; document.body.classList.toggle("fc-present", on);
+  S.present = on;S.tvPage=0; document.body.classList.toggle("fc-present", on);renderTop();renderAlerts();renderCmp();
   if(on){ var d = document.documentElement; if(d.requestFullscreen && !document.fullscreenElement) d.requestFullscreen().catch(function(){}); }
   else if(document.fullscreenElement) document.exitFullscreen().catch(function(){});
   setTimeout(function(){ if(MV.ml) MV.ml.resize(); if(MV.lf) MV.lf.invalidateSize(); fitScene(); }, 120);
@@ -1285,13 +1366,14 @@ document.addEventListener("fullscreenchange", function(){ if(!document.fullscree
 /* ------------------------------------------------------------------ events */
 document.addEventListener("click", function(e){
   var t = e.target.closest("button,[data-h],tr[data-svc],[data-al]"); if(!t) return;
+  if(t.id==="fcMap3D"){toggleMap3D();return;}
   if(t.hasAttribute("data-clear-all")){clearAllFilters();return;}
   if(t.hasAttribute("data-clear-buses")){clearMapBuses();return;}
   if(t.hasAttribute("data-risk-service")){focusRiskService(t.getAttribute("data-svc"),t.getAttribute("data-dir"));return;}
   if(t.hasAttribute("data-mode")){ setMode(t.getAttribute("data-mode")); return; }
   if(t.hasAttribute("data-ack")){ ackAlert(t.getAttribute("data-ack"), t); return; }
   if(t.hasAttribute("data-svc")){ selectSvc(t.getAttribute("data-svc"), t.getAttribute("data-dir")); if(window.innerWidth < 1360){ var p = document.querySelector(".fc-svcpanel"); if(p) p.scrollIntoView({behavior:"smooth", block:"start"}); } return; }
-  if(t.hasAttribute("data-layer")){ var k = t.getAttribute("data-layer"); S.lay[k] = !S.lay[k]; store("fc.map.layers.v2", JSON.stringify(S.lay)); renderLayers(); if(k !== "legend") MV.update(); return; }
+  if(t.hasAttribute("data-layer")){ var k = t.getAttribute("data-layer"); S.lay[k] = !S.lay[k]; store("fc.map.layers.v3", JSON.stringify(S.lay)); renderLayers(); if(k !== "legend") MV.update(); return; }
   if(t.hasAttribute("data-h")){ S.h = +t.getAttribute("data-h"); clearInterval(S.hzT); renderHz(); renderCmp(); MV.update(); if(S.view) renderSvc(); return; }
   if(t.hasAttribute("data-tab")){ S.tab = t.getAttribute("data-tab"); renderAlerts(); return; }
   if(t.hasAttribute("data-step")){ stopPlay(); goStep(+t.getAttribute("data-step")); return; }
@@ -1333,7 +1415,7 @@ window.addEventListener("resize", function(){ if(MV.ml) MV.ml.resize(); });
 
 /* ------------------------------------------------------------------ start */
 renderLayers(); renderHz();
-MV.init().then(function(){ MV.update(); fitScene(); });
+MV.init().then(function(){ renderLayers();MV.update(); fitScene(); });
 loadSvcList();
 load().then(function(){
   if(isDemo()) choreo();

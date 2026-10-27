@@ -11707,6 +11707,9 @@ async def fc_cycle(force=False):
             state = await asyncio.to_thread(forecast.evaluate, world)
             keys = set(state["impacts"].keys())
             dtn = now_sgt()
+            route_static = await static()
+            for k in keys:
+                world["stops"][k] = route_stops(route_static, k[0], k[1])
             for k in keys:                                                   # headways + running-time history, then re-evaluate those services
                 try:
                     hw_, _ = bb_resolve_hw(k[0], k[1], dtn, fq)
@@ -11717,7 +11720,7 @@ async def fc_cycle(force=False):
                 rt_ = await asyncio.to_thread(fc_hist_rt, k[0], k[1], now)
                 if rt_:
                     world["hist_rt"][k] = rt_
-            if world["headways"] or world["hist_rt"]:
+            if world["headways"] or world["hist_rt"] or world["stops"]:
                 state = await asyncio.to_thread(forecast.evaluate, world)
             fresh = {n: v["status"] == "live" for n, v in world["sources"].items()}
             fc_store()
@@ -11878,6 +11881,23 @@ async def api_forecast_service(svc: str = "", dir: int = 1, mode: str = "live", 
     st = await static()
     v["directions"] = st.get("dirs", {}).get(svc, [])
     return v
+
+
+@app.get("/api/forecast/bunching")
+async def api_forecast_bunching():
+    """Read existing collector observations; missing/stale samples never become zero."""
+    now = time.time()
+    max_age = 2 * BB["params"].get("refresh_sec", 60)
+    rows = []
+    for sample in list(BB["rows"].values()):
+        observed = sample.get("at")
+        age = max(0, now - observed) if observed else None
+        count = (sample.get("counts") or {}).get("bb3")
+        available = (age is not None and age <= max_age and not sample.get("error")
+                     and sample.get("issue") != "No data" and isinstance(count, (int, float)))
+        rows.append({"svc": str(sample.get("service") or "").upper(), "dir": sample.get("direction"),
+                     "groups3": count if available else None, "available": bool(available), "age_s": round(age) if age is not None else None})
+    return {"rows": rows, "source": "bunching collector", "updated": now_sgt().isoformat(timespec="seconds")}
 
 
 @app.get("/api/forecast/services")
