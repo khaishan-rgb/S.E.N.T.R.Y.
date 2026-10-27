@@ -14,7 +14,7 @@ const fs=require('fs'),assert=require('assert/strict'),path=require('path');
  chart=core.hourlyHeadway(data,{scope:'14',direction:'1',interval:15});assert.equal(chart.rows.length,96);assert(chart.actualAvailable);let actual=chart.rows.find(r=>r.actual!=null);assert.equal(actual.actual,18);assert.equal(actual.difference,8);assert(actual.abnormal);assert.equal(core.hourlyHeadway(data,{scope:'14',direction:'2'}).actualAvailable,false);
  assert(core.hourlyChart(chart).includes('NOW · FORECAST'));assert(core.hourlyChart(chart).includes('data-hour='));assert(!core.hourlyChart(chart).includes('NaN'));
  assert(core.hourlyHeadway({...data,mode:'demo'},{scope:'14',direction:'1'}).demo);
- const elements=[];global.document={createElement(){let el={style:{setProperty(){}},setAttribute(){},addEventListener(){}};elements.push(el);return el;}};
+ const elements=[];global.document={createElement(){let el={style:{setProperty(){}},classList:{_s:new Set(),add(c){this._s.add(c)},toggle(c,on){on?this._s.add(c):this._s.delete(c)},contains(c){return this._s.has(c)}},setAttribute(){},addEventListener(){}};elements.push(el);return el;}};
  let created=0,removed=0;
  class Marker{constructor({element}){this.el=element;created++;}setLngLat(p){this.point=p;return this;}setPopup(p){this.popup=p;return this;}getPopup(){return this.popup;}addTo(){return this;}setOffset(o){this.offset=o;return this;}remove(){removed++;}}
  class Popup{setHTML(h){this.html=h;return this;}}

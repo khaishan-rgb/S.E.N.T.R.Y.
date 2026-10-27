@@ -23,3 +23,21 @@
 - The 5-viewport TV regression passes.
 - In the browser, two card presses toggled filtered/unfiltered in about 0.2 s with no server request.
 - `app.py` could not be run here (FastAPI unavailable); its changes were syntax-checked and reuse the existing payload builder.
+
+## Follow-up — map icons still jumping (28 Oct, 00:20)
+**Root cause:** on every refresh the map code overwrote each icon's CSS classes (`el.className = 'event-pin …'`). That removed the `maplibregl-marker` class the map engine adds to pin an icon to its coordinates. The icons then fell back to normal page layout, stacked one under another, and "flew" around the map as it moved or refreshed.
+
+**Fix:** the code now only adds or removes its own classes (`event-pin`, `estimated`, `spotlight-pin`) and leaves MapLibre's classes alone.
+
+**Verified with the real MapLibre 4.7.1 engine** at desktop size and at phone size (412×900, 2.6× pixel ratio), measuring every icon against its true map location:
+- before the fix, icons were 568–832 px off;
+- after the fix, they are 0 px off after zoom, after three refresh-and-pan cycles, and in 3D tilt.
+
+`test_forecast2026_markers.cjs` now fails if the class overwrite ever returns.
+
+## Old version still showing after upload
+Every update used the same asset version (`20261027-tv-board`), so browsers and caches kept the old CSS/JS. The version is now `20261028-fix2`, and pages are served with `Cache-Control: no-cache`, so each redeploy is picked up on the next page load.
+
+Make sure the deploy includes **every** file in the changed-files zip, especially `forecast.html`, `forecast2026.css`, `forecast2026.js`, `forecast2026-map.js`, `forecast2026-core.js`, `forecast2026-tv.js`, `forecast2026.py`, `forecast2026_demo_routes.json` and `app.py`. Check the deploy log shows the new commit.
+
+**How to confirm the new version is live:** on the dashboard, the normal (non-TV) view must not show the empty "Heavy loading / Incident · traffic / Bunching · long gaps" panels. If they still appear, the browser is on an old copy or the files weren't all uploaded.

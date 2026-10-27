@@ -6384,7 +6384,8 @@ import auth  # noqa: E402  (authentication boundary - see auth.py; no built-in c
 
 
 def _page(name):
-    return HTMLResponse((HERE / name).read_text(encoding="utf-8"))
+    # no-cache: browsers must re-check the page on every visit, so a redeploy is picked up immediately
+    return HTMLResponse((HERE / name).read_text(encoding="utf-8"), headers={"Cache-Control": "no-cache"})
 
 
 @app.get("/login", response_class=HTMLResponse)

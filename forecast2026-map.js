@@ -1,4 +1,4 @@
-import {COLORS,esc,icon,delayColor} from './forecast2026-core.js?v=20261027-tv-board';
+import {COLORS,esc,icon,delayColor} from './forecast2026-core.js?v=20261028-fix2';
 export const LAYERS={buses:'Bus positions',routes:'Bus routes',flow:'Traffic flow',incidents:'Traffic incidents',works:'Roadworks',rain:'Rainfall',loading:'Passenger loading',bunching:'Bus bunching',gap:'Long headway gaps',heat:'Forecast heatmap'};
 export class ForecastMap{
  constructor(host,onPick){this.host=host;this.onPick=onPick;this.flags=Object.fromEntries(Object.keys(LAYERS).map(k=>[k,k!=='heat']));this.markers=new Map();this.kind='schematic';this.tilt=false;this.selectedServices=[];this.spotlight=null;this.viewService=null;}
@@ -56,8 +56,9 @@ export class ForecastMap{
  }
  marker(key,point,kind,color,title,svc,body){
   this.seen.add(key);let item=this.markers.get(key);const html=`<h3>${esc(title)}</h3><p>${body}</p><p>${svc?'Service '+esc(svc):'Source event'}</p>${svc?`<button data-service="${esc(svc)}">Toggle service filter</button>`:''}`;
-  if(!item){const el=document.createElement('button');const marker=new maplibregl.Marker({element:el}).setLngLat(point).setPopup(new maplibregl.Popup({maxWidth:'360px'})).addTo(this.map);item={marker,el,point};el.addEventListener('click',()=>this.onPick(svc,item.point));this.markers.set(key,item);}
-  item.point=point;item.el.className='event-pin '+(this.data.horizon?'estimated ':'')+(this.spotlight?.id===key.replace(/^alert:/,'')||this.spotlight?.event_id&&key==='event:'+this.spotlight.event_id?'spotlight-pin':'');item.el.style.setProperty('--risk',color);item.el.innerHTML=icon(kind);item.el.title=title;item.el.setAttribute('aria-label',title);item.marker.setLngLat(point);if(item.html!==html){item.marker.getPopup().setHTML(html);item.html=html;}
+  if(!item){const el=document.createElement('button');el.classList.add('event-pin');const marker=new maplibregl.Marker({element:el}).setLngLat(point).setPopup(new maplibregl.Popup({maxWidth:'360px'})).addTo(this.map);item={marker,el,point};el.addEventListener('click',()=>this.onPick(svc,item.point));this.markers.set(key,item);}
+  item.point=point;// Never overwrite className: MapLibre's own maplibregl-marker classes are what pin the icon to its coordinates.
+  item.el.classList.add('event-pin');item.el.classList.toggle('estimated',!!this.data.horizon);item.el.classList.toggle('spotlight-pin',!!(this.spotlight?.id===key.replace(/^alert:/,'')||this.spotlight?.event_id&&key==='event:'+this.spotlight.event_id));item.el.style.setProperty('--risk',color);item.el.innerHTML=icon(kind);item.el.title=title;item.el.setAttribute('aria-label',title);item.marker.setLngLat(point);if(item.html!==html){item.marker.getPopup().setHTML(html);item.html=html;}
  }
  // Fan out only icons that share the same spot (~15 m), in a fixed order. Offsets do not change while panning/zooming.
  layoutMarkers(){if(!this.map||this.kind!=='ml')return;const groups=new Map();for(const [key,item] of [...this.markers.entries()].sort((a,b)=>a[0].localeCompare(b[0]))){const g=Math.round(item.point[0]*7000)+':'+Math.round(item.point[1]*7000);if(!groups.has(g))groups.set(g,[]);groups.get(g).push(item);}
