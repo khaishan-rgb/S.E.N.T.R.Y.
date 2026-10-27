@@ -1331,6 +1331,14 @@ async def bb_eval(svc, d, now, st, fq):
                              "stop_labels": [f"{s['name']} ({s['code']})" if s.get("code") else s["name"] for s in stops],
                              "tm": tm, "H": H, "H_src": H_src, "prior": trk.prior(), "prior_gap": trk.prior_gap(),
                              "prior_last": trk.prior_last(), "prior_last_gap": trk.prior_last_gap(), "now_ts": ts}, BB["params"])
+    # Position/crowding observations remain usable even if headway modelling lacks
+    # a timetable or overlapping ETAs. Keep risk availability separate from observations.
+    res["observed_buses"] = [{"id": x.get("id", i + 1), "lat": x.get("lat"), "lon": x.get("lon"),
+                              "load": x.get("load"), "near": x.get("near"), "monitored": x.get("monitored", True)}
+                             for i, x in enumerate(buses)]
+    res["route_stops"] = [{"code": s.get("code"), "name": s.get("name"), "road": s.get("road"),
+                           "seq": s.get("seq"), "lat": s.get("lat"), "lon": s.get("lon"),
+                           "route_m": float(prep["stop_s"][i]) * 1000} for i,s in enumerate(stops)]
     BB["labels"][key] = [f"{s['name']} ({s['code']})" if s.get("code") else s["name"] for s in stops]
     trk.commit(res.pop("bunched_pairs", {}), res.pop("long_pairs", {}), ts)
     try:
@@ -11996,17 +12004,55 @@ async def fc26_script(request: Request):
     return Response((HERE / name).read_text(), media_type='application/javascript', headers={'Cache-Control':'no-cache'})
 
 
+FC26_STOP_CONTEXT = {}
+
+
+def fc26_enrich_context(raw, samples):
+    """Reuse cached LTA StopSequence and verified route-chainage context, no API calls."""
+    static_hit=CACHE.get('static')
+    st=static_hit[2] if static_hit and isinstance(static_hit[2],dict) else {}
+    idx=(FC.get('world') or {}).get('index')
+    lines=idx.lines if idx is not None else {}
+    sample_by={(str(s.get('service') or '').upper(),s.get('direction')):s for s in samples}
+    keys=set(sample_by)
+    for event in raw.get('events') or []:
+        if event.get('status')=='confirmed':
+            keys.update((s['svc'],s['dir']) for s in event.get('services') or [])
+    context={}
+    for key in keys:
+        sample=sample_by.get(key,{})
+        stops=sample.get('route_stops') or (route_stops(st,*key) if st.get('routes') else [])
+        line=lines.get(key)
+        cache_key=(key,id(line),id(st),tuple((s.get('code'),s.get('seq')) for s in stops))
+        cached_rows=FC26_STOP_CONTEXT.get(cache_key)
+        if cached_rows is None:
+            cached_rows=[dict(s) for s in stops]
+            valid=[(i,s) for i,s in enumerate(cached_rows) if s.get('lat') is not None and s.get('lon') is not None]
+            if line is not None and valid:
+                _,positions,_=line.locate([forecast.to_xy(s['lat'],s['lon']) for _,s in valid])
+                for (i,_),position in zip(valid,positions):cached_rows[i]['route_m']=float(position)
+            FC26_STOP_CONTEXT[cache_key]=cached_rows
+        context[f'{key[0]}:{key[1]}']=cached_rows
+    if len(FC26_STOP_CONTEXT)>500:FC26_STOP_CONTEXT.clear()
+    samples=[dict(s,route_stops=context.get(f"{str(s.get('service') or '').upper()}:{s.get('direction')}",s.get('route_stops') or [])) for s in samples]
+    return dict(raw,route_context=context),samples
+
+
 @app.get('/api/forecast/centre')
-async def fc26_centre(mode: str='demo', horizon: int=30, scenario: str='combined', tick: int=0,
+async def fc26_centre(mode: str='live', horizon: int=0, scenario: str='combined', tick: int=0,
                      services: str='', exclude_cbs: int=0, category: str='all'):
     if mode not in ('demo','live') or horizon not in fc26.HORIZONS or scenario not in dict(fc26.SCENARIOS):
         return JSONResponse({'error':'Unsupported data mode, horizon or scenario'},status_code=400)
     raw, samples = {}, []
     if mode=='live':
+        # Start LTA collection independently of traffic incidents or TomTom availability.
+        initial_watch = services or ','.join(FC_SERVICES) or BB_DEFAULT
+        await api_forecast_bunching(services=initial_watch)
         raw = await api_forecast_state()
         # Refresh the existing bunching collector watch list, within its normal budget.
-        await api_forecast_bunching(services=services or ','.join(s['svc'] for s in raw.get('services',[])[:20]))
+        await api_forecast_bunching(services=services or ','.join(s['svc'] for s in raw.get('services',[])[:20]) or initial_watch)
         samples = list(BB['rows'].values())
+        raw,samples = await asyncio.to_thread(fc26_enrich_context,raw,samples)
     # Synchronise the full namespace before applying user filters. Filters cannot resolve alerts.
     data = await asyncio.to_thread(fc26.build_centre,mode,horizon,scenario,max(0,tick),raw,samples)
     ns=f'{mode}:{scenario if mode=="demo" else "network"}:{horizon}'
@@ -12033,7 +12079,7 @@ async def fc26_centre(mode: str='demo', horizon: int=30, scenario: str='combined
         idx=world.get('index')
         lines=idx.lines if idx is not None else {}
         for key,line in lines.items():
-            if key[0] in wanted and len(data['routes'])<6:
+            if key[0] in wanted and (not exclude_cbs or key[0] not in fc26.CBS) and len(data['routes'])<6:
                 data['routes'].append({'svc':key[0],'dir':key[1],'line':forecast.simplify(line.pts,30),'mode':'live'})
                 for stop in (world.get('stops') or {}).get(key,[]):
                     data['stops'].append({'id':stop.get('code'),'name':stop.get('name'),'point':[stop['lon'],stop['lat']],'svc':key[0]})

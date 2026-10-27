@@ -240,7 +240,7 @@ def build_groups(vecs, pairs, P, H, names):
         j = start_j if start_j is not None else vecs[a]["j0"]
         cur = vecs[a]["j0"]
         first = max(0, cur - (0 if status == "early" else trav(a, b)))           # stop where this group was first seen bunched
-        return {"a": a, "b": b, "cur_j": cur, "since_j": first, "ids": [vecs[k]["id"] for k in range(a, b + 1)], "size": size, "label": f"{size}BB",
+        return {"a": a, "b": b, "stop_j": j, "headways": [_r(pairs[k].get("now")) for k in range(a,b)], "headway_forecasts": {str(h): [_r(pairs[k].get("hws",{}).get(h)) for k in range(a,b)] for h in HORIZONS if h<=P["horizon_min"]}, "cur_j": cur, "since_j": first, "ids": [vecs[k]["id"] for k in range(a, b + 1)], "size": size, "label": f"{size}BB",
                 "bucket": "2BB" if size == 2 else "3BB" if size == 3 else "4BB+", "status": status, "stops": stops,
                 "min_hw": _r(min(pairs[i]["min_hw"] for i in range(a, b))), "hw_now": _r(min(pairs[i]["now"] for i in range(a, b))),
                 "t_occur": _r(t_occur), "joining": [], "near": vecs[a]["near"],
@@ -351,7 +351,7 @@ def evaluate(ctx, P=None):
                          "state": p["gap_state"], "t_occur": _r(p["t_gap"]), "trend": tr, "hws": {str(k): _r(v) for k, v in p["hws"].items()},
                          "stops": p["gap_run"] + p["gap_travelled"] if p["long_now"] else 0, "active": bool(p["long_now"]), "cur_j": cur, "since_j": since,
                          "since_stop": lab(since), "cur_stop": lab(cur),
-                         "location": names[p["max_at"]] if 0 <= p["max_at"] < len(names) else vecs[i]["near"], "i": i})
+                         "stop_j": p["max_at"], "location": names[p["max_at"]] if 0 <= p["max_at"] < len(names) else vecs[i]["near"], "i": i})
 
     conf = [g for g in groups if g["status"] == "confirmed"]
     devn = [g for g in groups if g["status"] == "developing"]

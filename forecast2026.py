@@ -164,7 +164,7 @@ def demo_snapshot(h, scenario="combined", tick=0, now=None):
         service={"svc":svc,"dir":1,"operator":"SMRT" if svc=="853" else "SBST","location":area,"delay":delay,
                  "occupancy":loading["occupancy"],"heavy_buses":3 if loading["occupancy"]>=THRESHOLDS["load_heavy"] else 0,
                  "three":len(hw["three"]),"two":len(hw["two"]),"gaps":len(hw["gaps"]),
-                 "headway":max(hw["headways"]),"scheduled":10,"headways":hw["headways"],"point":position,"confidence":.78,"blocked":False}
+                 "headway":max(hw["headways"]),"focus_headway":hw["headways"][0],"focus_pair":{"lead":arrivals[0]["id"],"foll":arrivals[1]["id"]},"load_counts":{"SEA":3 if loading["occupancy"]<70 else 0,"SDA":3 if 70<=loading["occupancy"]<85 else 0,"LSD":3 if loading["occupancy"]>=85 else 0,"UNKNOWN":0},"bunching_details":[{"bus_order":[a["id"] for a in arrivals],"location":area,"stop":{"name":area+" · demo stop","code":None,"sequence":3},"headways":hw["headways"]}] if hw["three"] else [],"traffic_details":[{"road":area,"stops":[{"name":area+" · demo stop","code":None,"sequence":3}],"kind":"jam"}] if delay else [],"gap_details":[{"location":area,"stop":{"name":area+" · demo stop","code":None,"sequence":3}}] if hw["gaps"] else [],"scheduled":10,"headways":hw["headways"],"point":position,"confidence":.78,"blocked":False,"building":bool(traffic_active and h<=30)}
         services.append(service)
         if loading["occupancy"]>=THRESHOLDS["load_heavy"]:
             alerts.append(alert("loading",svc,area,f'{loading["occupancy"]:.0f}% occupancy',h,position,"Simulated boarding demand exceeds available capacity.",.78,occupancy=loading["occupancy"]))
@@ -201,6 +201,47 @@ def traffic_extra(s,h):
     return None
 
 
+def stop_context(stops, location=None, index=None):
+    """Use the route's actual LTA sequence; never substitute array index + 1."""
+    chosen=None
+    if isinstance(index,int) and 0<=index<len(stops):chosen=stops[index]
+    elif location:
+        found=[s for s in stops if s.get('name')==location or (s.get('code') and str(s['code']) in str(location))]
+        if len(found)==1:chosen=found[0]
+    if chosen is None:return None
+    return {'code':str(chosen['code']) if chosen.get('code') is not None else None,'name':chosen.get('name'),
+            'sequence':chosen.get('seq'), 'road':chosen.get('road'),
+            'point':[chosen['lon'],chosen['lat']] if chosen.get('lat') is not None and chosen.get('lon') is not None else None}
+
+
+def impact_stops(stops, start, end):
+    if start is None or end is None:return []
+    a,b=sorted((start,end));valid=[(i,s) for i,s in enumerate(stops) if s.get('route_m') is not None]
+    inside=[i for i,s in valid if a<=s['route_m']<=b]
+    if not inside:
+        before=[(i,s) for i,s in valid if s['route_m']<a and a-s['route_m']<=500]
+        after=[(i,s) for i,s in valid if s['route_m']>b and s['route_m']-b<=500]
+        inside=([max(before,key=lambda p:p[1]['route_m'])[0]] if before else [])+([min(after,key=lambda p:p[1]['route_m'])[0]] if after else [])
+    return [stop_context(stops,index=i) for i in inside[:8]]
+
+
+def headway_at(series, horizon):
+    """Interpolate inside collector coverage (e.g. 10/20 -> 15); never extrapolate."""
+    points=sorted((float(k),v) for k,v in (series or {}).items() if isinstance(v,(int,float)) and math.isfinite(v))
+    for t,v in points:
+        if t==horizon:return v
+    for (a,x),(b,y) in zip(points,points[1:]):
+        if a<horizon<b:return round(x+(y-x)*(horizon-a)/(b-a),1)
+    return None
+
+
+def group_headways(group, horizon):
+    if horizon==0:return group.get('headways')
+    forecasts=group.get('headway_forecasts') or {}
+    count=max([len(v) for v in forecasts.values() if isinstance(v,list)] or [0])
+    return [headway_at({h:v[i] for h,v in forecasts.items() if isinstance(v,list) and i<len(v)},horizon) for i in range(count)] or None
+
+
 def live_snapshot(raw, samples, h, now=None):
     now=now or time.time(); alerts=[]; services=[]; buses=[]
     age=raw.get("age_s",0); traffic_ok=bool(raw.get("services")) and age<=150 and not raw.get("error") and any((raw.get("sources",{}).get(k) or {}).get("status")=="live" for k in ("tomtom_incidents","tomtom_tiles","tomtom_flow","waze"))
@@ -211,13 +252,14 @@ def live_snapshot(raw, samples, h, now=None):
         line=e.get("line") or []; point=e.get("pt") or (line[len(line)//2] if line else None)
         touched=e.get("services") or []
         events.append({"id":e["id"],"kind":e["kind"],"road":e.get("road") or "Road name not supplied","point":point,"line":line,
-                       "services":[x["svc"] for x in touched],"service_dirs":[[x["svc"],x["dir"]] for x in touched],"delay":((e.get("delay_s") or 0)/60 if h==0 else ((e.get("fc") or {}).get(h,(e.get("fc") or {}).get(str(h))) or {}).get("mid",0)/60 if h<=60 else (e.get("delay_s") or 0)/60*math.exp(-120/90)),"confirmed":True,"mode":"live"})
+                       "services":[x["svc"] for x in touched],"service_dirs":[[x["svc"],x["dir"]] for x in touched],"matches":touched,"delay":((e.get("delay_s") or 0)/60 if h==0 else ((e.get("fc") or {}).get(h,(e.get("fc") or {}).get(str(h))) or {}).get("mid",0)/60 if h<=60 else (e.get("delay_s") or 0)/60*math.exp(-120/90)),"confirmed":True,"mode":"live"})
     keys={(s["svc"],s["dir"]):s for s in raw.get("services") or []}
     samples_by={(str(s.get("service") or "").upper(),s.get("direction")):s for s in samples}
     for key in set(keys)|set(samples_by):
         s=keys.get(key,{"svc":key[0],"dir":key[1]}); sample=samples_by.get(key,{})
-        valid=fresh(sample.get("at"),now) and not sample.get("error") and sample.get("issue")!="No data"
-        seq=sample.get("seq") or [] if valid else []
+        observed=fresh(sample.get("at"),now) and not sample.get("error")
+        valid=observed and sample.get("issue")!="No data"
+        seq=(sample.get("seq") or sample.get("observed_buses") or []) if observed else []
         known_loads=[b for b in seq if b.get("load") in ("SEA","SDA","LSD")]
         heavy=sum(b.get("load")=="LSD" for b in known_loads)
         point=next(([b["lon"],b["lat"]] for b in seq if b.get("lat") and b.get("lon")),None)
@@ -231,23 +273,38 @@ def live_snapshot(raw, samples, h, now=None):
                 ((h==0 and g.get("status")=="confirmed") or (h>0 and h<=30 and g.get("t_occur") is not None and g["t_occur"]<=h))]
         gaps=[g for g in sample.get("gaps",[]) if valid and ((h==0 and g.get("active")) or (0<h<=30 and g.get("t_occur") is not None and g["t_occur"]<=h))]
         gaps=[g for g in gaps if sample.get("sched_hw") and (g.get("max_hw") or 0)-sample["sched_hw"]>=5]
-        location=(ev or {}).get("road") or sample.get("location") or "Location not supplied"
-        row={"svc":key[0],"dir":key[1],"location":location,"delay":delay,"blocked":bool(s.get("blocked")),"occupancy":None,
-             "heavy_buses":heavy if h==0 and valid and known_loads else None,"load_label":"Heavy" if heavy else "Standing" if any(b.get("load")=="SDA" for b in seq) else "Seats" if known_loads else "Unavailable",
+        stops=sample.get('route_stops') or (raw.get('route_context') or {}).get(f'{key[0]}:{key[1]}',[])
+        traffic_details=[]
+        for event in events:
+            match=next((m for m in event.get('matches',[]) if (m['svc'],m['dir'])==key),None)
+            if match is not None:
+                traffic_details.append({'event_id':event['id'],'road':(event['road'] if event['road']!='Road name not supplied' else match.get('road') or event['road']),'kind':event['kind'],
+                                        'stops':impact_stops(stops,match.get('a_m'),match.get('b_m')),
+                                        'relation':'Stops on / bracketing the verified affected route stretch','delay':event['delay']})
+        bunch_details=[{'bus_order':g.get('ids') or [],'stop':stop_context(stops,g.get('location'),g.get('stop_j')),
+                        'location':g.get('location'),'headways':group_headways(g,h),
+                        'status':g.get('status'),'onset':g.get('t_occur'),'persistence':g.get('stops')} for g in groups]
+        gap_details=[{'stop':stop_context(stops,g.get('location'),g.get('stop_j')),'location':g.get('location'),
+                      'headway':g.get('max_hw'),'lead':g.get('lead'),'follow':g.get('foll')} for g in gaps]
+        counts={c:sum(b.get('load')==c for b in seq) for c in ('SEA','SDA','LSD')}
+        counts['UNKNOWN']=len(seq)-sum(counts.values())
+        location=(traffic_details[0]["road"] if traffic_details else None) or (ev or {}).get("road") or sample.get("location") or "Location not supplied"
+        row={"svc":key[0],"dir":key[1],"location":location,"delay":delay,"blocked":bool(s.get("blocked")),"building":bool(s.get("building")),"occupancy":None,
+             "heavy_buses":heavy if h==0 and observed and known_loads else None,"load_label":"Heavy" if heavy else "Standing" if any(b.get("load")=="SDA" for b in seq) else "Seats" if known_loads else "Unavailable",
              "three":len(groups) if valid and h<=30 else None,"two":sum(g.get("size")==2 for g in sample.get("groups",[])) if valid and h==0 else None,
-             "gaps":len(gaps) if valid and h<=30 else None,"headway":(max([g.get("max_hw") or 0 for g in gaps] or [0]) or (sample.get("hw") or {}).get(str(h))) if valid and h<=30 else None,
-             "scheduled":sample.get("sched_hw"),"headways":sample.get("hw") or {},"point":point,"confidence":.55 if h==120 else .7}
+             "gaps":len(gaps) if valid and h<=30 else None,"headway":(max([g.get("max_hw") or 0 for g in gaps] or [0]) or headway_at(sample.get("hw"),h)) if valid and h<=30 else None,
+             "scheduled":sample.get("sched_hw"),"headways":sample.get("hw") or {},"focus_headway":headway_at(sample.get("hw"),h) if valid and h<=30 else None,"focus_pair":sample.get("focus") or {},"load_counts":counts,"bunching_details":bunch_details,"traffic_details":traffic_details,"gap_details":gap_details,"point":point,"confidence":.55 if h==120 else .7}
         services.append(row)
         if delay and delay>0 or row["blocked"]:
-            alerts.append(alert("traffic",key[0],location,"Route blocked" if row["blocked"] else f"+{delay:.1f} min",h,point,("Verified same-direction incident/route match. Statistical travel-time baseline." if ev else "Route-specific speed or rainfall estimate; incident association not verified."),row["confidence"],direction=key[1],delay=delay,blocked=row["blocked"],event_id=(ev or {}).get("id","")))
+            alerts.append(alert("traffic",key[0],location,"Route blocked" if row["blocked"] else f"+{delay:.1f} min",h,point,("Verified same-direction incident/route match. Statistical travel-time baseline." if ev else "Route-specific speed or rainfall estimate; incident association not verified."),row["confidence"],direction=key[1],affected_stops=[stop for detail in traffic_details for stop in detail["stops"]],delay=delay,blocked=row["blocked"],event_id=(ev or {}).get("id","")))
         if heavy and h==0:
             alerts.append(alert("loading",key[0],location,f"{heavy} sampled buses: limited standing",0,point,"Observed LTA categorical load; exact occupancy is unavailable.",.7,direction=key[1]))
         for group in groups:
-            alerts.append(alert("bunching",key[0],group.get("location"),"Three-bus bunching",group.get("t_occur") or 0,point,"Collector downstream arrival-time headways, not bus distance.",.7,direction=key[1],event_id="bb:"+":".join(map(str,group.get("ids") or [])),buses=group.get("ids"),persistence=group.get("stops")))
+            alerts.append(alert("bunching",key[0],group.get("location"),"Three-bus bunching",group.get("t_occur") or 0,point,"Collector downstream arrival-time headways, not bus distance.",.7,direction=key[1],event_id="bb:"+":".join(map(str,group.get("ids") or [])),stop=stop_context(stops,group.get("location"),group.get("stop_j")),buses=group.get("ids"),persistence=group.get("stops")))
         for gap in gaps:
             scheduled=sample.get("sched_hw")
             if scheduled and (gap.get("max_hw") or 0)-scheduled>=5:
-                alerts.append(alert("gap",key[0],gap.get("location"),f'{gap.get("max_hw")} min headway',gap.get("t_occur") or 0,point,"Collector projected arrivals exceed the scheduled headway by at least five minutes.",.7,direction=key[1],event_id=f"gap:{gap.get('lead')}:{gap.get('foll')}",headway=gap.get("max_hw"),scheduled=scheduled))
+                alerts.append(alert("gap",key[0],gap.get("location"),f'{gap.get("max_hw")} min headway',gap.get("t_occur") or 0,point,"Collector projected arrivals exceed the scheduled headway by at least five minutes.",.7,direction=key[1],event_id=f"gap:{gap.get('lead')}:{gap.get('foll')}",stop=stop_context(stops,gap.get("location"),gap.get("stop_j")),headway=gap.get("max_hw"),scheduled=scheduled))
         # Live coordinates remain live coordinates at future horizons: no fabricated positions.
         for b in seq:
             if b.get("lat") and b.get("lon"):
@@ -294,7 +351,7 @@ def build_centre(mode="demo", horizon=30, scenario="combined", tick=0, raw=None,
             r["constraints"]="DEMO assumptions: one spare; 10-min layover; 7-min minimum; meal protected. No live duty validation."
     return dict(current,horizon=horizon,generated=now,scenarios=[{"id":k,"label":v} for k,v in SCENARIOS],
                 timeline=[{"h":h,**snapshots[h]["kpis"]} for h in HORIZONS],
-                service_series=[{"h":h,"services":[{k:s.get(k) for k in ("svc","dir","headway","occupancy","delay")} for s in snapshots[h]["services"]]} for h in HORIZONS],
+                service_series=[{"h":h,"services":[{k:s.get(k) for k in ("svc","dir","headway","focus_headway","occupancy","delay")} for s in snapshots[h]["services"]]} for h in HORIZONS],
                 recommendations=advice,
                 model={"name":"Explainable statistical baselines","trained":False,"validated":False,"confidence_note":"Heuristic evidence quality, not measured forecast accuracy.",
                        "thresholds":THRESHOLDS,"outcome_metrics":outcome_metrics([]),

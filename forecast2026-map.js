@@ -1,10 +1,10 @@
-import {COLORS,esc,icon} from './forecast2026-core.js';
+import {COLORS,esc,icon} from './forecast2026-core.js?v=20261027-live-map-stops';
 export const LAYERS={buses:'Bus positions',routes:'Bus routes',flow:'Traffic flow',incidents:'Traffic incidents',works:'Roadworks',rain:'Rainfall',loading:'Passenger loading',bunching:'Bus bunching',gap:'Long headway gaps',heat:'Forecast heatmap'};
 export class ForecastMap{
  constructor(host,onPick){this.host=host;this.onPick=onPick;this.flags=Object.fromEntries(Object.keys(LAYERS).map(k=>[k,k!=='heat']));this.markers=[];this.kind='schematic';this.tilt=false;}
  async init(){
   try{if(!window.SG3D)throw Error('Vector map library unavailable');await Promise.race([SG3D.load(),new Promise((_,reject)=>setTimeout(()=>reject(Error('Map library timeout')),9000))]);let style=SG3D.style();style.layers.forEach(l=>{if(l.id==='bg')l.paint['background-color']='#061622';if(l.id==='road-label'){l.minzoom=12;l.paint['text-color']='#94bacd';}if(l.id==='building-3d')l.layout={visibility:'none'};if(l.id==='road-major')l.paint['line-color']='#214d63';if(l.id==='road-motorway')l.paint['line-color']='#285f73';if(l.id==='water')l.paint['fill-color']='#020d17';});
-   this.kind='loading';this.map=new maplibregl.Map({container:this.host,style,center:[103.83,1.35],zoom:10.7,minZoom:9.5,maxZoom:18,pitch:0,attributionControl:false,dragRotate:true});this.map.addControl(new maplibregl.NavigationControl({showCompass:false}),'top-right');this.map.addControl(new maplibregl.AttributionControl({compact:true,customAttribution:'© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> · OpenFreeMap'}));
+   this.kind='loading';this.map=new maplibregl.Map({container:this.host,style,center:[103.83,1.35],zoom:10.7,minZoom:9.5,maxZoom:18,pitch:0,attributionControl:false,dragRotate:true});if(typeof ResizeObserver==='function'){this.observer=new ResizeObserver(()=>this.map?.resize());this.observer.observe(this.host);}this.map.addControl(new maplibregl.NavigationControl({showCompass:false}),'top-right');this.map.addControl(new maplibregl.AttributionControl({compact:true,customAttribution:'© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> · OpenFreeMap'}));
    await new Promise((resolve,reject)=>{let timer=setTimeout(()=>reject(Error('Map tiles slow')),18000);this.map.once('load',()=>{clearTimeout(timer);resolve();});});this.kind='ml';
    for(let id of ['routes','flow','buses','heat','rain','stops'])this.map.addSource('sentry-'+id,{type:'geojson',data:{type:'FeatureCollection',features:[]}});
    this.map.addLayer({id:'sentry-routes',type:'line',source:'sentry-routes',layout:{'line-cap':'round','line-join':'round'},paint:{'line-color':['get','color'],'line-width':['interpolate',['linear'],['zoom'],10,2,15,5],'line-opacity':.78}});
@@ -16,7 +16,7 @@ export class ForecastMap{
    this.map.addLayer({id:'sentry-stops',type:'circle',source:'sentry-stops',minzoom:11,paint:{'circle-radius':3,'circle-color':'#4ebfee','circle-stroke-color':'#d3f3ff','circle-stroke-width':.8}});
    this.map.addLayer({id:'sentry-buses',type:'circle',source:'sentry-buses',paint:{'circle-radius':['interpolate',['linear'],['zoom'],10,3.5,15,7],'circle-color':['get','color'],'circle-stroke-color':'#dae7ff','circle-stroke-width':1,'circle-opacity':['case',['get','predicted'],.65,1]}});
    this.map.on('click','sentry-buses',e=>{let p=e.features[0].properties;this.onPick(p.svc);});document.getElementById('mapFallback').hidden=true;
-  }catch(e){if(this.map){try{this.map.remove();}catch{}}this.map=null;this.kind='schematic';document.getElementById('mapFallback').hidden=true;this.host.innerHTML='';}
+  }catch(e){this.observer?.disconnect();if(this.map){try{this.map.remove();}catch{}}this.map=null;this.kind='schematic';document.getElementById('mapFallback').hidden=true;this.host.innerHTML='';}
   if(this.data)this.update(this.data);return this.kind;
  }
  setLayer(key,value){this.flags[key]=value;if(this.data)this.update(this.data);}
@@ -24,7 +24,7 @@ export class ForecastMap{
  focus(svc){let r=this.data?.routes.find(r=>r.svc===svc);if(this.map&&r){let lng=r.line.map(p=>p[0]),lat=r.line.map(p=>p[1]);this.map.fitBounds([[Math.min(...lng),Math.min(...lat)],[Math.max(...lng),Math.max(...lat)]],{padding:65,maxZoom:14,duration:650});}}
  toggle3D(){if(!this.map)return false;this.tilt=!this.tilt;this.map.easeTo({pitch:this.tilt?52:0,bearing:this.tilt?-14:0,duration:650});if(this.map.getLayer('building-3d'))this.map.setLayoutProperty('building-3d','visibility',this.tilt?'visible':'none');return this.tilt;}
  update(data){this.data=data;if(this.kind==='loading')return;if(this.kind!=='ml'){this.drawSchematic(data);return;}
-  this.markers.forEach(m=>m.remove());this.markers=[];let fc=f=>({type:'FeatureCollection',features:f});let feature=(geometry,properties)=>({type:'Feature',geometry,properties});
+  this.map.resize();this.markers.forEach(m=>m.remove());this.markers=[];let fc=f=>({type:'FeatureCollection',features:f});let feature=(geometry,properties)=>({type:'Feature',geometry,properties});
   this.map.getSource('sentry-routes').setData(fc(this.flags.routes?data.routes.map(r=>feature({type:'LineString',coordinates:r.line},{color:COLORS.route})):[]));let segments=[];
   if(this.flags.flow){if(data.mode==='demo')data.routes.forEach(r=>{let s=data.services.find(s=>s.svc===r.svc),d=s?.delay||0;segments.push(feature({type:'LineString',coordinates:r.line},{color:d>=8?'#eb4155':d>=4?'#ffa348':d>0?'#e2df54':'#38df94'}));});data.events.filter(e=>e.line?.length>1).forEach(e=>segments.push(feature({type:'LineString',coordinates:e.line},{color:e.delay>=8?'#f4445d':'#ffb14b'})));}
   this.map.getSource('sentry-rain').setData(fc(this.flags.rain?(data.rain||[]).map(s=>feature({type:'Point',coordinates:s.point},{mmh:s.mmh})):[]));
