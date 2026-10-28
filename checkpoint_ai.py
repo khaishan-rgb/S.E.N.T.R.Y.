@@ -8,8 +8,7 @@ How it works
   never from TomTom (its daily cap is shared with the Forecast Centre traffic layer). Otherwise no level is shown (never guessed).
 - Crossing time = typical time for that level (CROSSING_MIN). It is an estimate, labelled as such: the cameras show the
   road queue, not the immigration hall.
-- Cost control: AI reads only the 4 checkpoint photos, shrunk (app.py), once per CAMERA_AI_EVERY_MIN (15) for everyone,
-  05:00-24:00 SGT only, at most CAMERA_AI_DAILY_CAP (80) calls a day. Everything else uses free LTA speed bands.
+- Results are cached per camera photo for CACHE_S seconds, so a page refresh does not call the AI again.
 
 Pure logic here; app.py passes in the network functions (fetch_image, ask_model, flow) so this is testable offline.
 """
@@ -22,11 +21,7 @@ import time
 
 LEVELS = ["Smooth", "Medium", "Jam", "Super Jam"]
 MODEL = os.environ.get("CAMERA_AI_MODEL", "claude-haiku-5-5").strip()
-CACHE_S = int(float(os.environ.get("CAMERA_AI_EVERY_MIN", "15")) * 60)   # one AI reading per checkpoint camera per 15 min, shared by every viewer
-AI_HOURS = tuple(int(x) for x in os.environ.get("CAMERA_AI_HOURS", "5-24").split("-"))   # SGT hours when AI runs (outside: free LTA speed bands)
-AI_DAILY_CAP = int(os.environ.get("CAMERA_AI_DAILY_CAP", "80"))                          # max AI calls a day (each call = the 4 checkpoint photos)
-AI_ONLY_CHECKPOINTS = os.environ.get("CAMERA_AI_ALL_CAMERAS", "0") != "1"                # other cameras use LTA speed bands (free)
-SGT_OFFSET = 8 * 3600
+CACHE_S = int(os.environ.get("CAMERA_AI_CACHE_S", "300"))
 MAX_IMAGES = 10
 
 # Woodlands Causeway and Tuas Second Link (LTA camera IDs). Both photos of a crossing are read for both directions.
@@ -135,17 +130,10 @@ def parse_reply(text, n):
     """Model text -> {index: {level, to_jb, to_sg, confidence}} (index 0-based). Tolerates prose around the JSON."""
     if not text:
         return {}
-    rows = None
-    for cand in (text, *(x.group(0) for x in [re.search(r"\[.*\]", text, re.S), re.search(r"\{.*\}", text, re.S)] if x)):
-        try:
-            rows = json.loads(cand)
-            break
-        except (ValueError, TypeError):
-            continue
-    if isinstance(rows, dict):                       # {"images": [...]} or {"1": {...}, "2": {...}}
-        lists = [v for v in rows.values() if isinstance(v, list)]
-        rows = lists[0] if lists else [dict(v, image=v.get("image", k)) for k, v in rows.items() if isinstance(v, dict)]
-    if not isinstance(rows, list):
+    m = re.search(r"\[.*\]", text, re.S)
+    try:
+        rows = json.loads(m.group(0) if m else text)
+    except (ValueError, TypeError):
         return {}
     out = {}
     for pos, r in enumerate(rows if isinstance(rows, list) else []):
@@ -166,21 +154,7 @@ def parse_reply(text, n):
 
 
 def _key(c):
-    return str(c["id"])          # per camera, not per photo: LTA posts a new photo every minute or two
-
-
-def ai_allowed(now):
-    """(allowed, reason): inside the SGT time window and under today's call cap."""
-    sgt = time.gmtime(now + SGT_OFFSET)
-    day = time.strftime("%Y-%m-%d", sgt)
-    if STATUS.get("day") != day:
-        STATUS.update(day=day, calls_today=0)
-    lo, hi = (AI_HOURS + (24,))[:2] if len(AI_HOURS) == 1 else AI_HOURS[:2]
-    if not lo <= sgt.tm_hour < hi:
-        return False, f"AI runs {lo:02d}:00-{hi:02d}:00 SGT only; LTA speed bands now"
-    if STATUS["calls_today"] >= AI_DAILY_CAP:
-        return False, f"today's AI limit ({AI_DAILY_CAP} readings) reached; LTA speed bands until midnight"
-    return True, None
+    return (str(c["id"]), str(c.get("taken") or c.get("link") or ""))
 
 
 def crossings(results):
@@ -217,24 +191,9 @@ async def analyse(cams, fetch_image=None, ask_model=None, flow=None, now=None, f
         else:
             todo.append(c)
     error = None
-    todo_ai = [c for c in todo if str(c["id"]) in CHECKPOINT_IDS or not AI_ONLY_CHECKPOINTS]
-    allowed, why = ai_allowed(now)
-    if todo_ai and ask_model and fetch_image and not (allowed or force):
-        STATUS["paused"] = why
-    if todo_ai and ask_model and fetch_image and (allowed or force):
+    if todo and ask_model and fetch_image:
         async with _LOCK:
-            # another viewer's request may have refreshed these while this one waited for the lock
-            for c in list(todo_ai):
-                hit = _CACHE.get(_key(c))
-                if hit and now - hit[0] < CACHE_S and not force:
-                    results[str(c["id"])] = hit[1]
-                    todo_ai.remove(c)
-            todo = todo_ai
             try:
-                if not todo:
-                    raise StopAsyncIteration
-                STATUS["calls_today"] = STATUS.get("calls_today", 0) + 1
-                STATUS["paused"] = None
                 images = await asyncio.gather(*(fetch_image(c["link"]) for c in todo), return_exceptions=True)
                 ok = [(c, img[0], sniff_mime(img[0], img[1])) for c, img in zip(todo, images) if not isinstance(img, BaseException) and img and img[0]]
                 ok = [(c, (data, mime)) for c, data, mime in ok if mime]
@@ -260,8 +219,6 @@ async def analyse(cams, fetch_image=None, ask_model=None, flow=None, now=None, f
                             res = dict(r, source="AI camera analytics", model=MODEL, at=now)
                             _CACHE[_key(c)] = (now, res)
                             results[str(c["id"])] = res
-            except StopAsyncIteration:
-                pass
             except Exception as e:      # network / quota / parse problems fall back to speed data
                 error = "AI camera reading failed: " + (str(e)[:220] or type(e).__name__)
                 STATUS.update(error=error, error_at=now)
@@ -283,7 +240,6 @@ async def analyse(cams, fetch_image=None, ask_model=None, flow=None, now=None, f
     if len(_CACHE) > 500:
         for k in sorted(_CACHE, key=lambda k: _CACHE[k][0])[:200]:
             _CACHE.pop(k, None)
-    return {"cameras": results, "crossings": crossings(results), "ai": bool(ask_model), "ai_paused": STATUS.get("paused"),
-            "ai_usage": {"calls_today": STATUS.get("calls_today", 0), "daily_cap": AI_DAILY_CAP, "every_min": CACHE_S // 60, "hours": list(AI_HOURS)},
+    return {"cameras": results, "crossings": crossings(results), "ai": bool(ask_model),
             "note": "Estimate from camera stills (road queue only, not the immigration hall). Level: Smooth / Medium / Jam / Super Jam.",
             "error": error, "updated": now}

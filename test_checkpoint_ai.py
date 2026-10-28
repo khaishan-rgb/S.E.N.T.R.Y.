@@ -23,20 +23,12 @@ class Logic(unittest.TestCase):
         self.assertEqual(out[0], {"level": "Medium", "to_jb": "Jam", "to_sg": "Smooth", "confidence": .8})
         self.assertIsNone(out[1]["level"])
         self.assertEqual(cpa.parse_reply("no json", 2), {})
-        self.assertEqual(cpa.parse_reply('```json\n{"images":[{"image":1,"level":"Jam"}]}\n```', 1)[0]["level"], "Jam")
-        self.assertEqual(cpa.parse_reply('{"1":{"level":"Smooth"},"2":{"level":"Super Jam"}}', 2)[1]["level"], "Super Jam")
 
 
 class Analyse(unittest.TestCase):
     def setUp(self):
         cpa._CACHE.clear()
-        cpa.STATUS.update(day=None, calls_today=0)
-        self.only = cpa.AI_ONLY_CHECKPOINTS
-        cpa.AI_ONLY_CHECKPOINTS = False                   # these tests send every camera to the AI
         self.calls = 0
-
-    def tearDown(self):
-        cpa.AI_ONLY_CHECKPOINTS = self.only
 
     async def fetch(self, url):
         return b"jpeg", "image/jpeg"
@@ -57,31 +49,6 @@ class Analyse(unittest.TestCase):
         self.assertEqual(self.calls, 1)                                           # same photos -> no second AI call
         asyncio.run(cpa.analyse(CAMS, self.fetch, self.ask, now=1000 + cpa.CACHE_S + 1))
         self.assertEqual(self.calls, 2)
-
-    def test_cost_controls_checkpoints_only_window_cap_and_shared_cache(self):
-        cpa.AI_ONLY_CHECKPOINTS = True
-        sent = []
-        async def ask(content):
-            sent.append(sum(1 for c in content if c["type"] == "image"))
-            return '[{"image":1,"level":"Jam"},{"image":2,"level":"Jam"}]'
-        async def bands(lat, lon):
-            return {"level": "Smooth", "source": "LTA speed bands"}
-        noon = 1793160000                                           # 2026-10-28 12:00 SGT
-        out = asyncio.run(cpa.analyse(CAMS, self.fetch, ask, bands, now=noon))
-        self.assertEqual(sent, [2])                                 # only the 2 checkpoint photos went to the AI
-        self.assertEqual(out["cameras"]["6710"]["source"], "LTA speed bands")
-        asyncio.run(cpa.analyse(CAMS, self.fetch, ask, bands, now=noon + 600))
-        self.assertEqual(sent, [2])                                 # new photos within 15 min: no new AI call
-        cpa._CACHE.clear()
-        night = 1793124000                                          # 02:00 SGT: outside 05-24
-        out = asyncio.run(cpa.analyse(CAMS, self.fetch, ask, bands, now=night))
-        self.assertEqual(sent, [2])
-        self.assertIn("SGT only", out["ai_paused"])
-        self.assertEqual(out["cameras"]["2701"]["source"], "LTA speed bands")
-        cpa.STATUS.update(calls_today=cpa.AI_DAILY_CAP)
-        out = asyncio.run(cpa.analyse(CAMS, self.fetch, ask, bands, now=noon + 3600))
-        self.assertIn("limit", out["ai_paused"])
-        self.assertEqual(sent, [2])
 
     def test_without_ai_uses_speed_and_never_guesses(self):
         async def flow(lat, lon):
