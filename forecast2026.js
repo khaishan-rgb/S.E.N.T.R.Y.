@@ -1,6 +1,6 @@
-import {HORIZONS,COLORS,TITLES,esc,num,apiURL,quality,riskServices,slicePage,badge,icon,chartSVG,operationalQueue,initialView,loadSummary,stopText,watchLocation,headwayView,toggleService,resetFilters,hourlyHeadway,hourlyChart,spotlightDeck,categoryView} from './forecast2026-core.js?v=20261028-hz5';
-import {ForecastMap,LAYERS} from './forecast2026-map.js?v=20261028-hz5';
-import {boardModel,loadingCard,trafficCard,headwayCard,emptyState,paginate} from './forecast2026-tv.js?v=20261028-hz5';
+import {HORIZONS,COLORS,TITLES,esc,num,apiURL,quality,riskServices,slicePage,badge,icon,chartSVG,operationalQueue,initialView,loadSummary,stopText,watchLocation,headwayView,toggleService,resetFilters,hourlyHeadway,hourlyChart,spotlightDeck,categoryView} from './forecast2026-core.js?v=20261028-hz6';
+import {ForecastMap,LAYERS} from './forecast2026-map.js?v=20261028-hz6';
+import {boardModel,loadingCard,trafficCard,headwayCard,emptyState,paginate} from './forecast2026-tv.js?v=20261028-hz6';
 const $=id=>document.getElementById(id),query=new URLSearchParams(location.search);
 const initial=initialView(query,{mode:document.documentElement.dataset.defaultMode||'live',horizon:document.documentElement.dataset.defaultHorizon||0});
 if(initial.h===120)initial.h=60;   // old links to the retired NEXT 2H view open the 60-minute view
@@ -127,10 +127,11 @@ async function selectService(svc){cameraTime=0;cameraPoint=null;cameraRequest++;
 let cameraAI=null,cameraAIAt=0,cameraAIKey='';
 const LEVEL_CLASS={'Smooth':'lv-smooth','Medium':'lv-medium','Jam':'lv-jam','Super Jam':'lv-super'};
 async function loadCameraAI(force=false){if(state.mode==='demo'){cameraAI=null;paintCameraAI();return;}const ids=cameraRows.map(c=>c.id).join(',');if(!force&&ids===cameraAIKey&&Date.now()-cameraAIAt<120000)return;cameraAIKey=ids;cameraAIAt=Date.now();
- try{const r=await fetch('/api/forecast/centre/camera-ai?ids='+encodeURIComponent(ids));if(!r.ok)return;cameraAI=await r.json();paintCameraAI();}catch(e){}}
+ try{const r=await fetch('/api/forecast/centre/camera-ai?ids='+encodeURIComponent(ids));cameraAI=r.ok?await r.json():{status:'Camera analytics unavailable (server answered HTTP '+r.status+')'};}catch(e){cameraAI={status:'Camera analytics unavailable (network error)'};}paintCameraAI();}
+function cameraAIStatus(ai){if(ai.status)return ai.status;const c=ai.configured||{};if(!c.ai&&!c.speed)return 'JB / SG crossing time is off · add ANTHROPIC_API_KEY (AI camera reading) or TOMTOM_API_KEY (speed) in Render → Environment';if(ai.error)return 'JB / SG crossing time: '+ai.error+(c.speed?' · speed data not available for the checkpoint cameras':'');return 'JB / SG crossing time: checkpoint cameras not in the live LTA feed right now';}
 function paintCameraAI(){const box=$('crossings');const ai=state.mode==='demo'?null:cameraAI;
  document.querySelectorAll('[data-cam-level]').forEach(el=>{const r=ai?.cameras?.[el.dataset.camLevel];el.hidden=!r?.level;if(r?.level){el.className='cam-level '+(LEVEL_CLASS[r.level]||'');el.textContent=(r.source==='TomTom speed'?'':'AI · ')+r.level.toUpperCase();el.title=r.source+(r.speed!=null?` · ${r.speed} km/h (free flow ${r.free_speed})`:'')+(r.confidence!=null?` · confidence ${Math.round(r.confidence*100)}%`:'');}});
- if(!box)return;const rows=ai?.crossings||[];box.hidden=!rows.length;
+ if(!box)return;const rows=ai?.crossings||[];box.hidden=!ai;if(ai&&!rows.length){box.innerHTML=`<div class="xing-off">${esc(cameraAIStatus(ai))}</div>`;return;}
  const dir=(label,x)=>x?`<span class="xing-dir"><em>${label}</em><b>≈ ${x.minutes} min</b><i class="${LEVEL_CLASS[x.level]||''}">${esc(x.level)}</i></span>`:`<span class="xing-dir muted"><em>${label}</em><b>—</b></span>`;
  box.innerHTML=rows.map(x=>`<div class="xing" title="${esc(ai.note||'')}"><strong>${esc(x.name)}</strong>${x.any?dir('JB / SG',x.any):dir('→ JB',x.to_jb)+dir('→ SG',x.to_sg)}</div>`).join('')+(rows.length?`<small class="xing-note">${rows[0].source==='TomTom speed'?'Speed-based':'AI camera'} estimate · road queue only</small>`:'');}
 function cameras(items,meta={}){cameraRows=items.slice(0,6);cameraMeta=meta;const count=state.tv?4:6,cameraPage=slicePage(cameraRows,state.page,count);$('cameraStatus').textContent=state.mode==='demo'?'No simulated photos':(meta.context?.startsWith('Nearest')?'NEAREST':'SOURCE IMAGES')+(cameraPage.pages>1?' · '+cameraPage.page+'/'+cameraPage.pages:'');
@@ -179,7 +180,7 @@ $('modal').addEventListener('click',e=>{if(e.target===$('modal'))closeModal();})
 document.addEventListener('input',e=>{if(e.target.id==='searchAlerts'){state.search=e.target.value;if(state.data)alerts(state.data);}});
 document.addEventListener('change',e=>{if(e.target.dataset.pick){let svc=e.target.dataset.pick;state.services=state.services.filter(s=>s!==svc);if(e.target.checked)state.services.push(svc);state.page=0;lastFocus=e.target.checked?svc:state.services[0]||null;controls();cameraTime=0;fetchState();}if(e.target.dataset.layer)networkMap.setLayer(e.target.dataset.layer,e.target.checked);});
 document.addEventListener('click',async e=>{let t=e.target.closest('button,[data-alert],[data-service]');if(!t)return;
- if(t.dataset.clearRoute){clearServices();return;}
+ if(t.dataset.clearRoute){if(state.tv){spotlight.pausedUntil=Date.now()+30000;spotlight.nextAt=spotlight.pausedUntil;clearSpotlight(false);spotlightControl();}clearServices();return;}
  if(t.dataset.removeService){selectService(t.dataset.removeService);return;}
  if(t.dataset.camera!=null){let c=cameraRows[+t.dataset.camera];if(c)openModal(c.label||'Traffic camera '+c.id,`<img class="camera-enlarged" src="${esc(c.image)}" alt="${esc(c.label)}" referrerpolicy="no-referrer"><p>${c.stale?'STALE / CAPTURE TIME UNVERIFIED':'SOURCE STILL IMAGE'} · Camera ${esc(c.id)} · ${esc(c.taken||'Capture timestamp unavailable')}</p><p>Coordinates ${c.lat}, ${c.lon}. Nearest-camera context does not confirm route impact.</p>`);return;}
  if(t.dataset.analysis){setAnalysis(t.dataset.analysis);return;}

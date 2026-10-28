@@ -236,7 +236,6 @@ body .right-rail.cameras-only{grid-template-rows:minmax(0,1fr)}
 .route-selection{display:flex;align-items:center;gap:10px}
 .route-selection .route-clear{pointer-events:auto;display:grid;place-items:center;width:24px;height:24px;padding:0;border:1px solid #6df0ff88;border-radius:50%;background:#0a3346;color:#e8ffff;font:700 16px/1 'IBM Plex Sans',sans-serif;cursor:pointer}
 .route-selection .route-clear:hover{background:#ff4d63;border-color:#ff8a98}
-.tv .route-selection .route-clear{display:none}
 
 /* AI camera analytics */
 .camera{position:relative}
@@ -253,3 +252,6 @@ body .right-rail.cameras-only{grid-template-rows:minmax(0,1fr)}
 .xing-note{display:block;font-size:10px;color:#6f9db3;letter-spacing:.05em}
 .tv .crossings{padding:0 8px 6px}.tv .xing{padding:4px 8px}
 .route-selection[hidden]{display:none}
+
+.xing-off{padding:6px 9px;border:1px dashed #2b6a85;border-radius:6px;color:#8fb8cc;font-size:11px;line-height:1.35}
+.route-selection .route-clear{flex:none;width:26px;height:26px;font-size:18px;box-shadow:0 0 8px #3fd2ff55}

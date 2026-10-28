@@ -2,7 +2,7 @@
 //  1. Which service / direction / location has heavy passenger loading?
 //  2. Which incident, roadwork or traffic build-up affects which service / direction / location?
 //  3. Where is there three-bus bunching or a long headway gap (service / direction / location)?
-import {esc,num,icon} from './forecast2026-core.js?v=20261028-hz5';
+import {esc,num,icon} from './forecast2026-core.js?v=20261028-hz6';
 
 export const KINDS={
  road_closed:{label:'Closure reported',icon:'road_closed',rank:0},
