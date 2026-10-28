@@ -344,3 +344,4 @@ body .right-rail.cameras-only{grid-template-rows:minmax(0,1fr)}
 .ca-dir{grid-template-columns:auto auto 1fr;gap:6px}
 .ca-dir b{font-size:15px}
 @media (max-width:900px){.cam-ai{position:static;max-width:none;margin-top:8px;backdrop-filter:none;background:#03121e}.ca-level{font-size:20px}}
+body>.modal{z-index:2000}

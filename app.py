@@ -12385,10 +12385,15 @@ def fc26_camera_ai_io(cpa):
         for model in dict.fromkeys([cpa.MODEL,DV_AI_MODEL]):          # camera model first, then the Diversion review model
             r=await client().post('https://api.anthropic.com/v1/messages',timeout=60,
                                   headers={'x-api-key':DV_AI_KEY,'anthropic-version':'2023-06-01','content-type':'application/json'},
-                                  json={'model':model,'max_tokens':900,'messages':[{'role':'user','content':content}]})
+                                  json={'model':model,'max_tokens':4000,'messages':[{'role':'user','content':content}]})
             if r.status_code==200:
                 cpa.STATUS['model']=model
-                return ''.join(b.get('text','') for b in (r.json().get('content') or []) if isinstance(b,dict))
+                j=r.json()
+                blocks=[b for b in (j.get('content') or []) if isinstance(b,dict)]
+                text=''.join(b.get('text','') for b in blocks if b.get('type')=='text')
+                if not text.strip():          # say why: e.g. stop_reason max_tokens / refusal, or only non-text blocks came back
+                    raise RuntimeError(f"Claude ({model}) returned no text: stop_reason={j.get('stop_reason')}, blocks={[b.get('type') for b in blocks]}")
+                return text
             try:
                 msg=(r.json().get('error') or {}).get('message') or r.text[:160]
             except Exception:

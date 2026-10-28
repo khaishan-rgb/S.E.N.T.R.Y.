@@ -130,10 +130,17 @@ def parse_reply(text, n):
     """Model text -> {index: {level, to_jb, to_sg, confidence}} (index 0-based). Tolerates prose around the JSON."""
     if not text:
         return {}
-    m = re.search(r"\[.*\]", text, re.S)
-    try:
-        rows = json.loads(m.group(0) if m else text)
-    except (ValueError, TypeError):
+    rows = None
+    for cand in (text, *(x.group(0) for x in [re.search(r"\[.*\]", text, re.S), re.search(r"\{.*\}", text, re.S)] if x)):
+        try:
+            rows = json.loads(cand)
+            break
+        except (ValueError, TypeError):
+            continue
+    if isinstance(rows, dict):                       # {"images": [...]} or {"1": {...}, "2": {...}}
+        lists = [v for v in rows.values() if isinstance(v, list)]
+        rows = lists[0] if lists else [dict(v, image=v.get("image", k)) for k, v in rows.items() if isinstance(v, dict)]
+    if not isinstance(rows, list):
         return {}
     out = {}
     for pos, r in enumerate(rows if isinstance(rows, list) else []):

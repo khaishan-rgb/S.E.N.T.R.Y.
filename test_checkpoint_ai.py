@@ -23,6 +23,8 @@ class Logic(unittest.TestCase):
         self.assertEqual(out[0], {"level": "Medium", "to_jb": "Jam", "to_sg": "Smooth", "confidence": .8})
         self.assertIsNone(out[1]["level"])
         self.assertEqual(cpa.parse_reply("no json", 2), {})
+        self.assertEqual(cpa.parse_reply('```json\n{"images":[{"image":1,"level":"Jam"}]}\n```', 1)[0]["level"], "Jam")
+        self.assertEqual(cpa.parse_reply('{"1":{"level":"Smooth"},"2":{"level":"Super Jam"}}', 2)[1]["level"], "Super Jam")
 
 
 class Analyse(unittest.TestCase):
