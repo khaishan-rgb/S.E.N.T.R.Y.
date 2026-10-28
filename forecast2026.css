@@ -323,3 +323,17 @@ body .right-rail.cameras-only{grid-template-rows:minmax(0,1fr)}
 .stop-pop .sp-meta{margin-top:3px;color:#8fb8cc;font-size:11px}
 .xing-warn{display:block;font-size:10px;color:#ffb36b;letter-spacing:.03em;line-height:1.3}
 .tv .xing-warn{display:none}
+
+/* AI reading on the enlarged camera */
+.cam-wrap{position:relative}
+.cam-ai{position:absolute;left:12px;top:12px;min-width:210px;max-width:46%;padding:10px 12px;border:1px solid #3fd2ff88;border-radius:8px;background:#03121ed9;backdrop-filter:blur(4px);box-shadow:0 0 22px #3fd2ff33;color:#e1edf5}
+.ca-head{display:flex;align-items:center;gap:6px;font:700 11px/1 Rajdhani,'IBM Plex Sans',sans-serif;letter-spacing:.14em;color:#7fe9ff}
+.ca-head svg{width:14px;height:14px}
+.ca-level{margin-top:6px;font:800 30px/1 Orbitron,'IBM Plex Sans',sans-serif;letter-spacing:.06em;text-shadow:0 0 14px currentColor}
+.ca-src{margin-top:4px;font-size:11px;color:#9fc3d6}
+.ca-dir{display:grid;grid-template-columns:96px auto 1fr;align-items:baseline;gap:8px;margin-top:6px}
+.ca-dir em{font-style:normal;font-size:11px;letter-spacing:.08em;color:#8fb8cc}
+.ca-dir b{font:700 18px/1 Orbitron,'IBM Plex Sans',sans-serif;color:#fff}
+.ca-dir i{font-style:normal;font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
+.ca-warn{margin-top:6px;font-size:11px;color:#ffb36b;line-height:1.3}
+.ca-test{display:inline-block;margin-top:6px;font-size:11px;color:#7fe9ff}
