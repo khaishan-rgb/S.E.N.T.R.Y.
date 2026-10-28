@@ -12303,8 +12303,11 @@ async def fc26_centre(request: Request, mode: str='live', horizon: int=0, scenar
         for key,line in lines.items():
             if key[0] in wanted and (not exclude_cbs or key[0] not in fc26.CBS) and len(data['routes'])<40:
                 data['routes'].append({'svc':key[0],'dir':key[1],'line':fc26_line(key,line),'mode':'live'})
-                for stop in (world.get('stops') or {}).get(key,[]):
-                    data['stops'].append({'id':stop.get('code'),'name':stop.get('name'),'point':[stop['lon'],stop['lat']],'svc':key[0]})
+                rs=(world.get('stops') or {}).get(key,[])
+                dest=(rs[-1].get('name') if rs else None)
+                for stop in rs:
+                    data['stops'].append({'id':stop.get('code'),'name':stop.get('name'),'point':[stop['lon'],stop['lat']],'svc':key[0],'dir':key[1],
+                                          'seq':stop.get('seq'),'km':stop.get('dist'),'road':stop.get('road'),'dest':dest})
     if mode=='live':
         idx=(FC.get('world') or {}).get('index')
         if idx is not None:

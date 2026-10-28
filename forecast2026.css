@@ -308,3 +308,16 @@ body .right-rail.cameras-only{grid-template-rows:minmax(0,1fr)}
 .tv .tvq-count b{font-family:Orbitron,'IBM Plex Sans',sans-serif}
 .tv #delayBasis,.tv .severity-key{display:none}
 .tv .console::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;background:repeating-linear-gradient(0deg,transparent 0 3px,#4edbff06 3px 4px)}
+
+/* Bus stop popup */
+.hz-stop-pop .maplibregl-popup-content{padding:9px 12px;background:#04182a;border:1px solid #3fd2ff66;border-radius:8px;box-shadow:0 0 18px #3fd2ff33;color:#e1edf5}
+.hz-stop-pop .maplibregl-popup-tip{border-top-color:#04182a;border-bottom-color:#04182a}
+.stop-pop .sp-head{display:flex;gap:10px;align-items:baseline}
+.stop-pop .sp-head b{font:700 16px/1.2 Orbitron,'IBM Plex Sans',sans-serif;color:#7fe9ff;letter-spacing:.04em}
+.stop-pop .sp-head span{font-size:14px;font-weight:600}
+.stop-pop .sp-route{display:flex;align-items:baseline;gap:6px;margin-top:4px;font-size:14px}
+.stop-pop .sp-route em{font-style:normal;font-weight:700;color:#ffd166}
+.stop-pop .sp-route i{font-style:normal;color:#7fb4cc}
+.stop-pop .sp-route strong{color:#eaffff;letter-spacing:.06em}
+.stop-pop .sp-route small{color:#8fb8cc;font-size:11px}
+.stop-pop .sp-meta{margin-top:3px;color:#8fb8cc;font-size:11px}

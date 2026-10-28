@@ -209,7 +209,8 @@ def demo_snapshot(h, scenario="combined", tick=0, now=None):
         kind = ("roadworks" if i==4 else "rain" if scenario=="rain" else "accident" if i==6 else "jam") if delay else None
         routes.append({"svc":svc,"dir":1,"line":line,"mode":route_mode})
         for j,st in enumerate(route_stops):
-            stops.append({"id":st["code"] or f"SIM-STOP-{i}-{j}","name":st["name"],"point":st["point"],"svc":svc})
+            stops.append({"id":st["code"] or f"SIM-STOP-{i}-{j}","name":st["name"],"point":st["point"],"svc":svc,"dir":1,"seq":st.get("sequence"),
+                          "km":round(st["route_m"]/1000,1) if st.get("route_m") is not None else None,"road":st.get("road"),"dest":route_stops[-1]["name"]})
         for j,a in enumerate(arrivals):
             # Simulated buses sit on the real route around the focus stop, about 320 m per minute of headway apart.
             point=point_at_m(line, cum, max(cum[-1]*.02,min(cum[-1]*.98,focus_m+250+(tick%30)*15+h*30-sum(gaps[:j])*320)))

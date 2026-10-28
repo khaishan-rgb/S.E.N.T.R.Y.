@@ -1,6 +1,6 @@
-import {HORIZONS,COLORS,TITLES,esc,num,apiURL,quality,riskServices,slicePage,badge,icon,chartSVG,operationalQueue,initialView,loadSummary,stopText,watchLocation,headwayView,toggleService,resetFilters,hourlyHeadway,hourlyChart,spotlightDeck,categoryView} from './forecast2026-core.js?v=20261028-hz11';
-import {ForecastMap,LAYERS} from './forecast2026-map.js?v=20261028-hz11';
-import {boardModel,loadingCard,trafficCard,headwayCard,emptyState,paginate} from './forecast2026-tv.js?v=20261028-hz11';
+import {HORIZONS,COLORS,TITLES,esc,num,apiURL,quality,riskServices,slicePage,badge,icon,chartSVG,operationalQueue,initialView,loadSummary,stopText,watchLocation,headwayView,toggleService,resetFilters,hourlyHeadway,hourlyChart,spotlightDeck,categoryView} from './forecast2026-core.js?v=20261028-hz12';
+import {ForecastMap,LAYERS} from './forecast2026-map.js?v=20261028-hz12';
+import {boardModel,loadingCard,trafficCard,headwayCard,emptyState,paginate} from './forecast2026-tv.js?v=20261028-hz12';
 const $=id=>document.getElementById(id),query=new URLSearchParams(location.search);
 const initial=initialView(query,{mode:document.documentElement.dataset.defaultMode||'live',horizon:document.documentElement.dataset.defaultHorizon||0});
 if(initial.h===120)initial.h=60;   // old links to the retired NEXT 2H view open the 60-minute view
