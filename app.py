@@ -12379,7 +12379,17 @@ def fc26_camera_ai_io(cpa):
     async def fetch_image(url):
         r=await client().get(url,timeout=15)
         r.raise_for_status()
-        return r.content,r.headers.get('content-type','')
+        data,mime=r.content,r.headers.get('content-type','')
+        try:                                   # shrink to 768 px wide: about a sixth of the image tokens, still enough to see a queue
+            from PIL import Image
+            import io as _io
+            im=Image.open(_io.BytesIO(data)).convert('RGB')
+            if im.width>768:
+                im=im.resize((768,round(im.height*768/im.width)))
+            buf=_io.BytesIO();im.save(buf,'JPEG',quality=72);data,mime=buf.getvalue(),'image/jpeg'
+        except Exception:
+            pass                               # Pillow missing or not an image: send as is
+        return data,mime
     async def ask_model(content):
         last=None
         for model in dict.fromkeys([cpa.MODEL,DV_AI_MODEL]):          # camera model first, then the Diversion review model

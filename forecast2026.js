@@ -1,6 +1,6 @@
-import {HORIZONS,COLORS,TITLES,esc,num,apiURL,quality,riskServices,slicePage,badge,icon,chartSVG,operationalQueue,initialView,loadSummary,stopText,watchLocation,headwayView,toggleService,resetFilters,hourlyHeadway,hourlyChart,spotlightDeck,categoryView} from './forecast2026-core.js?v=20261028-hz18';
-import {ForecastMap,LAYERS} from './forecast2026-map.js?v=20261028-hz18';
-import {boardModel,loadingCard,trafficCard,headwayCard,emptyState,paginate} from './forecast2026-tv.js?v=20261028-hz18';
+import {HORIZONS,COLORS,TITLES,esc,num,apiURL,quality,riskServices,slicePage,badge,icon,chartSVG,operationalQueue,initialView,loadSummary,stopText,watchLocation,headwayView,toggleService,resetFilters,hourlyHeadway,hourlyChart,spotlightDeck,categoryView} from './forecast2026-core.js?v=20261028-hz19';
+import {ForecastMap,LAYERS} from './forecast2026-map.js?v=20261028-hz19';
+import {boardModel,loadingCard,trafficCard,headwayCard,emptyState,paginate} from './forecast2026-tv.js?v=20261028-hz19';
 const $=id=>document.getElementById(id),query=new URLSearchParams(location.search);
 const initial=initialView(query,{mode:document.documentElement.dataset.defaultMode||'live',horizon:document.documentElement.dataset.defaultHorizon||0});
 if(initial.h===120)initial.h=60;   // old links to the retired NEXT 2H view open the 60-minute view
@@ -138,6 +138,8 @@ function camAIHTML(id,busy=true){const ai=cameraAI,r=ai?.cameras?.[id],x=CHECKPO
  if(ai?.error&&ai?.configured?.ai)h+=`<div class="ca-warn">${esc(ai.error)}</div>`;
  else if(ai?.configured&&!ai.configured.ai)h+=`<div class="ca-warn">AI is off: ANTHROPIC_API_KEY not set on the server</div>`;
  if(ai?.status)h+=`<div class="ca-warn">${esc(ai.status)}</div>`;
+ if(ai?.ai_paused)h+=`<div class="ca-src">${esc(ai.ai_paused)}</div>`;
+ if(ai?.ai_usage&&ai?.configured?.ai)h+=`<div class="ca-src">AI reads the 4 checkpoint photos every ${ai.ai_usage.every_min} min · ${ai.ai_usage.calls_today}/${ai.ai_usage.daily_cap} today</div>`;
  return h+`<a class="ca-test" href="/api/camera-ai/test" target="_blank" rel="noopener">Run AI check ↗</a>`;}
 async function analyseCamera(id){const ids=[...new Set([id,...cameraRows.map(c=>c.id)])].slice(0,6).join(',');
  try{const r=await fetch('/api/forecast/centre/camera-ai?ids='+encodeURIComponent(ids));cameraAI=r.ok?await r.json():{status:'Camera analytics unavailable (server answered HTTP '+r.status+')'};}catch(e){cameraAI={status:'Camera analytics unavailable (network error)'};}
