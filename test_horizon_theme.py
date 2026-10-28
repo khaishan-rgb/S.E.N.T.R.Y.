@@ -94,5 +94,15 @@ class HorizonTheme(unittest.TestCase):
         self.assertIn('"/brand/"', app)
 
 
+
+class HideablePages(unittest.TestCase):
+    def test_every_page_in_the_menu_can_be_hidden_in_settings(self):
+        import re
+        ids = set(re.findall(r'\{id:"([a-z0-9]+)",\s*name:', (ROOT / 'app_shell.js').read_text(encoding='utf-8'))) - {'settings'}
+        m = re.search(r'^SITE_PAGE_IDS = \(([^)]*)\)', (ROOT / 'app.py').read_text(encoding='utf-8'), re.M)
+        allowed = set(re.findall(r'"([a-z0-9]+)"', m.group(1)))
+        self.assertTrue(ids)
+        self.assertEqual(ids - allowed, set(), 'pages in the menu that Settings cannot hide')
+
 if __name__ == '__main__':
     unittest.main()
