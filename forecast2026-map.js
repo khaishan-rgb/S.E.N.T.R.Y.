@@ -1,5 +1,5 @@
-import {COLORS,esc,icon,delayColor} from './forecast2026-core.js?v=20261028-hz7';
-export const LAYERS={buses:'Bus positions',routes:'Bus routes',flow:'Traffic flow',incidents:'Traffic incidents',works:'Roadworks',rain:'Rainfall',loading:'Passenger loading',bunching:'Bus bunching',gap:'Long headway gaps',heat:'Forecast heatmap'};
+import {COLORS,esc,icon,delayColor} from './forecast2026-core.js?v=20261028-hz10';
+export const LAYERS={speed:'Road speed · LTA (green smooth → red jam)',buses:'Bus positions',routes:'Bus routes',flow:'Traffic flow',incidents:'Traffic incidents',works:'Roadworks',rain:'Rainfall',loading:'Passenger loading',bunching:'Bus bunching',gap:'Long headway gaps',heat:'Forecast heatmap'};
 export class ForecastMap{
  constructor(host,onPick){this.host=host;this.onPick=onPick;this.flags=Object.fromEntries(Object.keys(LAYERS).map(k=>[k,k!=='heat']));this.markers=new Map();this.kind='schematic';this.tilt=false;this.selectedServices=[];this.spotlight=null;this.viewService=null;}
  addIcons(){if(!this.map.addImage||typeof document.createElement!=='function')return;const make=(w,h,draw)=>{const c=document.createElement('canvas');c.width=w;c.height=h;const g=c.getContext('2d');draw(g);return g.getImageData(0,0,w,h);};
@@ -8,6 +8,14 @@ export class ForecastMap{
    g.fillStyle=fill;rr(g,19,15,26,30,5);g.fill();g.fillStyle='#04182a';rr(g,22,19,20,10,2);g.fill();g.fillRect(23,33,5,3);g.fillRect(36,33,5,3);g.fillStyle=fill;g.fillRect(21,45,6,5);g.fillRect(37,45,6,5);});
   this.map.addImage('hz-bus',bus('#c79bff'),{pixelRatio:2});this.map.addImage('hz-bus-heavy',bus('#ffb64a'),{pixelRatio:2});
   this.map.addImage('hz-rain',make(64,64,g=>{g.fillStyle='#bfe6ff';g.beginPath();g.arc(24,28,10,0,7);g.arc(36,24,12,0,7);g.arc(46,30,9,0,7);g.fill();g.fillRect(24,28,22,11);g.strokeStyle='#5ab8ff';g.lineWidth=3.5;g.lineCap='round';for(const x of [24,34,44]){g.beginPath();g.moveTo(x,45);g.lineTo(x-4,55);g.stroke();}}),{pixelRatio:2});
+ }
+ async loadSpeed(force=false){
+  // Whole island when zoomed out; only the visible area (plus margin) when zoomed in. LTA refreshes about every 5 min.
+  if(!this.map||!this.flags.speed||typeof fetch!=='function'||typeof this.map.getZoom!=='function')return;const z=this.map.getZoom(),b=this.map.getBounds?.();
+  const box=z>=12&&b?[b.getSouth(),b.getWest(),b.getNorth(),b.getEast()].map(v=>v.toFixed(3)).join(','):'';
+  if(!force&&box===this.speedBox)return;this.speedBox=box;
+  try{const r=await fetch('/api/speedbands'+(box?'?bbox='+box:''));if(!r.ok)return;const j=await r.json();
+   this.speedNote=j.error||'';this.map.getSource('lta-speed')?.setData({type:'FeatureCollection',features:(j.segments||[]).map(([a,b2,c,d,band,lv])=>({type:'Feature',geometry:{type:'LineString',coordinates:[[b2,a],[d,c]]},properties:{band,lv}}))});}catch(e){}
  }
  installLock(){const host=this.host,HANDLERS=['scrollZoom','dragPan','dragRotate','touchZoomRotate','touchPitch','doubleClickZoom','keyboard','boxZoom'];
   let hint=document.createElement('div');hint.className='map-lock-hint';hint.setAttribute('aria-hidden','true');host.appendChild(hint);this.lockHint=hint;let timer=0;
@@ -27,6 +35,11 @@ export class ForecastMap{
    await new Promise((resolve,reject)=>{let timer=setTimeout(()=>reject(Error('Map tiles slow')),18000);this.map.once('load',()=>{clearTimeout(timer);resolve();});});this.kind='ml';
    for(let id of ['routes','flow','buses','busicons','heat','rain','stops','selection','route-labels','route-ends'])this.map.addSource('sentry-'+id,{type:'geojson',data:{type:'FeatureCollection',features:[]}});
    try{this.addIcons();}catch(e){}
+   // Live road speed along every road: LTA Traffic Speed Bands (DataMall, refreshed by LTA about every 5 min), from /api/speedbands.
+   this.map.addSource('lta-speed',{type:'geojson',data:{type:'FeatureCollection',features:[]}});
+   this.map.addLayer({id:'lta-speed',type:'line',source:'lta-speed',layout:{'line-cap':'round','line-join':'round'},paint:{'line-color':['match',['get','lv'],'smooth','#22d36a','moderate','#ffc21a','slow','#ff8a1f','congested','#ff4d55','#2f7dff'],'line-width':['interpolate',['linear'],['zoom'],10,1.6,13,3.2,16,6],'line-opacity':['interpolate',['linear'],['zoom'],10,.7,14,.9]}});
+   for(const ev of ['dragend','zoomend'])this.map.on(ev,()=>{clearTimeout(this.speedTimer);this.speedTimer=setTimeout(()=>this.loadSpeed(),400);});   // reload the road-speed layer only (never re-lays out icons)
+   const speedTick=setInterval(()=>this.loadSpeed(true),300000);speedTick?.unref?.();this.loadSpeed(true);
    this.map.addLayer({id:'sentry-routes',type:'line',source:'sentry-routes',layout:{'line-cap':'round','line-join':'round'},paint:{'line-color':['get','color'],'line-width':['interpolate',['linear'],['zoom'],10,2,15,5],'line-opacity':['get','opacity']}});
    this.map.addLayer({id:'sentry-selection-glow',type:'line',source:'sentry-selection',layout:{'line-cap':'round','line-join':'round'},paint:{'line-color':['get','color'],'line-width':['interpolate',['linear'],['zoom'],10,19,15,28],'line-blur':7,'line-opacity':.65}});
    this.map.addLayer({id:'sentry-selection-casing',type:'line',source:'sentry-selection',layout:{'line-cap':'round','line-join':'round'},paint:{'line-color':'#02111c','line-width':['interpolate',['linear'],['zoom'],10,13,15,20]}});
@@ -56,7 +69,7 @@ export class ForecastMap{
  fit(){this.viewService=null;if(this.map)this.map.fitBounds([[103.68,1.235],[104.02,1.465]],{padding:{top:45,bottom:45,left:20,right:35},duration:700});else if(this.data)this.drawSchematic(this.data);}
  focus(svc,dir=null,point=null){this.viewService=svc;const routes=this.routesFor(svc,dir),points=routes.flatMap(r=>r.line);if(this.map&&points.length){const lng=points.map(p=>p[0]),lat=points.map(p=>p[1]);this.map.fitBounds([[Math.min(...lng),Math.min(...lat)],[Math.max(...lng),Math.max(...lat)]],{padding:{top:95,bottom:80,left:55,right:55},maxZoom:14,duration:900});}else if(this.map&&point)this.map.easeTo({center:point,zoom:12.8,duration:900});else if(!this.map&&this.data)this.drawSchematic(this.data);}  // never wipe the vector map when a route has no geometry
  toggle3D(){if(!this.map)return false;this.tilt=!this.tilt;this.map.easeTo({pitch:this.tilt?52:0,bearing:this.tilt?-14:0,duration:650});if(this.map.getLayer('building-3d'))this.map.setLayoutProperty('building-3d','visibility',this.tilt?'visible':'none');return this.tilt;}
- update(data){this.data=data;this.selectionHUD();if(this.kind==='loading')return;if(this.kind!=='ml'){this.drawSchematic(data);return;}
+ update(data){this.data=data;this.selectionHUD();if(this.kind==='loading')return;if(this.kind!=='ml'){this.drawSchematic(data);return;}if(this.map.getLayer?.('lta-speed'))this.map.setLayoutProperty('lta-speed','visibility',this.flags.speed?'visible':'none');
   this.map.resize();this.seen=new Set();let fc=f=>({type:'FeatureCollection',features:f});let feature=(geometry,properties)=>({type:'Feature',geometry,properties});
   const highlighted=this.selectedRoutes().length>0;const active=new Set(data.routes.map(r=>r.svc+':'+r.dir));const routes=new Map([...(data.context_routes||[]),...data.routes].map(r=>[r.svc+':'+r.dir,r]));
   this.map.getSource('sentry-routes').setData(fc(this.flags.routes?[...routes.values()].filter(r=>r.line?.length>1).map(r=>{const selected=active.has(r.svc+':'+r.dir);return feature({type:'LineString',coordinates:r.line},{color:selected?COLORS.route:'#4a738b',opacity:highlighted?(selected?.28:.08):(selected?.85:.18),active:selected});}):[]));let segments=[];

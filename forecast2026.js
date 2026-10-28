@@ -1,6 +1,6 @@
-import {HORIZONS,COLORS,TITLES,esc,num,apiURL,quality,riskServices,slicePage,badge,icon,chartSVG,operationalQueue,initialView,loadSummary,stopText,watchLocation,headwayView,toggleService,resetFilters,hourlyHeadway,hourlyChart,spotlightDeck,categoryView} from './forecast2026-core.js?v=20261028-hz7';
-import {ForecastMap,LAYERS} from './forecast2026-map.js?v=20261028-hz7';
-import {boardModel,loadingCard,trafficCard,headwayCard,emptyState,paginate} from './forecast2026-tv.js?v=20261028-hz7';
+import {HORIZONS,COLORS,TITLES,esc,num,apiURL,quality,riskServices,slicePage,badge,icon,chartSVG,operationalQueue,initialView,loadSummary,stopText,watchLocation,headwayView,toggleService,resetFilters,hourlyHeadway,hourlyChart,spotlightDeck,categoryView} from './forecast2026-core.js?v=20261028-hz10';
+import {ForecastMap,LAYERS} from './forecast2026-map.js?v=20261028-hz10';
+import {boardModel,loadingCard,trafficCard,headwayCard,emptyState,paginate} from './forecast2026-tv.js?v=20261028-hz10';
 const $=id=>document.getElementById(id),query=new URLSearchParams(location.search);
 const initial=initialView(query,{mode:document.documentElement.dataset.defaultMode||'live',horizon:document.documentElement.dataset.defaultHorizon||0});
 if(initial.h===120)initial.h=60;   // old links to the retired NEXT 2H view open the 60-minute view
@@ -182,7 +182,6 @@ document.addEventListener('change',e=>{if(e.target.dataset.pick){let svc=e.targe
 document.addEventListener('click',async e=>{let t=e.target.closest('button,[data-alert],[data-service]');if(!t)return;
  if(t.dataset.ack){ackCard(t.dataset.ack);return;}
  if(t.dataset.unack){ackCard(t.dataset.unack,true);return;}
- if(t.dataset.showAcked){showAcked=!showAcked;if(state.data)renderBoard(state.data);return;}
  if(t.dataset.clearRoute){if(state.tv){spotlight.pausedUntil=Date.now()+30000;spotlight.nextAt=spotlight.pausedUntil;clearSpotlight(false);spotlightControl();}clearServices();return;}
  if(t.dataset.removeService){selectService(t.dataset.removeService);return;}
  if(t.dataset.camera!=null){let c=cameraRows[+t.dataset.camera];if(c)openModal(c.label||'Traffic camera '+c.id,`<img class="camera-enlarged" src="${esc(c.image)}" alt="${esc(c.label)}" referrerpolicy="no-referrer"><p>${c.stale?'STALE / CAPTURE TIME UNVERIFIED':'SOURCE STILL IMAGE'} · Camera ${esc(c.id)} · ${esc(c.taken||'Capture timestamp unavailable')}</p><p>Coordinates ${c.lat}, ${c.lon}. Nearest-camera context does not confirm route impact.</p>`);return;}
@@ -205,16 +204,16 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal();if((e.k
 // ---------- TV operations board: loading / traffic / bunching & gaps ----------
 const tvSeen=new Map();let tvPrimed=false;
 function freshKey(key){const now=Date.now();if(!tvSeen.has(key))tvSeen.set(key,tvPrimed?now:0);const t=tvSeen.get(key);return t>0&&now-t<300000;}
-const localAcks={};let showAcked=false;
+const localAcks={};
 function ackOf(key){return localAcks[key]||state.data?.acks?.[key]||null;}
 function withAck(html,key){
- const a=ackOf(key),i=html.lastIndexOf('</article>');if(i<0)return html;
+ const a=ackOf(key),j=html.lastIndexOf('</article>');if(j<0)return html;
  if(a){const t=new Date(a.ts*1000).toLocaleTimeString('en-SG',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Singapore'});
-  html=html.replace('class="tvb-card','class="tvb-card is-acked'+(a.fresh?' is-acking':''));const j=html.lastIndexOf('</article>');
-  return html.slice(0,j)+`<div class="tvb-stamp" aria-label="Acknowledged"><b>ACKNOWLEDGED</b><small>${esc(a.who||'controller')} · ${t}</small></div>`+(!state.tv&&!a.fresh?`<button type="button" class="tvb-unack" data-unack="${esc(key)}">Undo</button>`:'')+html.slice(j);}
+  html=html.replace('class="tvb-card','class="tvb-card is-acked has-stamp'+(a.fresh?' is-acking':''));const k=html.lastIndexOf('</article>');
+  return html.slice(0,k)+`<div class="tvb-stamp" title="Acknowledged by ${esc(a.who||'controller')} at ${t}"><b>✓ ACKNOWLEDGED</b><small>${esc(a.who||'controller')} · ${t}</small>${state.tv?'':`<button type="button" class="tvb-unack" data-unack="${esc(key)}" title="Undo acknowledgement" aria-label="Undo acknowledgement">↺</button>`}</div>`+html.slice(k);}
  if(state.tv)return html;
- html=html.replace('class="tvb-card','class="tvb-card has-ack');const j=html.lastIndexOf('</article>');
- return html.slice(0,j)+`<button type="button" class="tvb-ack" data-ack="${esc(key)}" title="Acknowledge for every controller" aria-label="Acknowledge">${icon('spark')}<span>ACK</span></button>`+html.slice(j);
+ html=html.replace('class="tvb-card','class="tvb-card has-ack');const k=html.lastIndexOf('</article>');
+ return html.slice(0,k)+`<button type="button" class="tvb-ack" data-ack="${esc(key)}" title="Acknowledge for every controller" aria-label="Acknowledge">${icon('spark')}<span>ACK</span></button>`+html.slice(k);
 }
 async function ackCard(key,undo=false){
  if(undo){delete localAcks[key];if(state.data?.acks)delete state.data.acks[key];}
@@ -222,20 +221,20 @@ async function ackCard(key,undo=false){
  if(state.data)renderBoard(state.data);
  try{const r=await fetch('/api/forecast/centre/ack',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({key,undo})});const j=await r.json().catch(()=>({}));
   if(!r.ok)throw Error(j.error||'Could not save acknowledgement');
-  if(!undo){localAcks[key]={...localAcks[key],who:j.who||'You'};if(state.data){state.data.acks=state.data.acks||{};state.data.acks[key]={who:j.who||'You',ts:j.ts||localAcks[key].ts};}}}
+  if(!undo){localAcks[key]={...localAcks[key],who:j.who||'You'};if(state.data){state.data.acks=state.data.acks||{};state.data.acks[key]={who:j.who||'You',ts:j.ts||localAcks[key].ts};}if(state.data)renderBoard(state.data);}}
  catch(err){$('error').textContent=err.message+' · acknowledged on this screen only';}
- if(!undo)setTimeout(()=>{if(localAcks[key])localAcks[key].fresh=false;if(state.data)renderBoard(state.data);},3600);
+ if(!undo)setTimeout(()=>{if(localAcks[key])localAcks[key].fresh=false;},1200);
 }
 function boardColumn(prefix,rows,card,empty){
  const list=$(prefix+'List');
- // Acknowledged cards: the chop shows for ~3.5 s, then the card fades out and stays hidden (2 h, or until it clears).
- const hidden=rows.filter(r=>{const a=ackOf(r.key);return a&&!a.fresh;});
- if(!showAcked||state.tv)rows=rows.filter(r=>!hidden.includes(r));
- const ackNote=hidden.length&&!state.tv?` <button type="button" class="tvb-showack" data-show-acked="1">${showAcked?'Hide':'Show'} ${hidden.length} acknowledged</button>`:'';
- if(!rows.length){list.innerHTML=hidden.length?`<div class="empty tvb-allack"><b>✓ All acknowledged</b><small>${hidden.length} case${hidden.length===1?'':'s'} acknowledged · still being tracked</small></div>`:empty;$(prefix+'Page').innerHTML=ackNote;return;}
+ // Acknowledged cards stay listed with a small chop (bottom right) and move below the open ones; a card only
+ // leaves the panel when the problem itself clears.
+ rows=[...rows.filter(r=>!ackOf(r.key)),...rows.filter(r=>ackOf(r.key))];
+ const nAck=rows.filter(r=>ackOf(r.key)).length,ackNote=nAck?` · ${nAck} acknowledged`:'';
+ if(!rows.length){list.innerHTML=empty;$(prefix+'Page').textContent='';return;}
  list.innerHTML=rows.map(r=>withAck(card(r,freshKey(r.key)),r.key)).join('');
  // Normal view lists every case (the panel scrolls); only TV, which nobody can scroll, pages through them.
- if(!state.tv||typeof getComputedStyle!=='function'||!list.children){$(prefix+'Page').innerHTML=(rows.length>1?rows.length+' listed':'')+ackNote;return;}   // no layout engine (tests): show all
+ if(!state.tv||typeof getComputedStyle!=='function'||!list.children){$(prefix+'Page').textContent=(rows.length>1?rows.length+' listed':'')+ackNote;return;}   // no layout engine (tests): show all
  const items=[...list.children],gap=parseFloat(getComputedStyle(list).rowGap)||0;
  const pad=parseFloat(getComputedStyle(list).paddingTop)+parseFloat(getComputedStyle(list).paddingBottom)||0;
  const pages=paginate(items.map(x=>x.offsetHeight),list.clientHeight-pad,gap),n=state.page%pages.length,keep=new Set(pages[n]);

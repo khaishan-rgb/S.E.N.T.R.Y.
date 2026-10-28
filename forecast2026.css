@@ -262,19 +262,17 @@ body .right-rail.cameras-only{grid-template-rows:minmax(0,1fr)}
 .tvb-ack{position:absolute;right:8px;top:50%;transform:translateY(-50%);display:flex;align-items:center;gap:4px;padding:6px 9px;border:1px solid #3fd2ff88;border-radius:6px;background:linear-gradient(180deg,#0c3a52,#072535);color:#dff8ff;font:700 12px/1 Rajdhani,'IBM Plex Sans',sans-serif;letter-spacing:.1em;cursor:pointer;box-shadow:0 0 10px #3fd2ff33}
 .tvb-ack svg{width:13px;height:13px}
 .tvb-ack:hover{background:#3fd2ff;color:#02131d;box-shadow:0 0 16px #3fd2ffaa}
-.tvb-stamp{position:absolute;left:50%;top:50%;z-index:3;display:flex;flex-direction:column;align-items:center;padding:4px 14px;border:3px double #34e39a;border-radius:6px;color:#34e39a;background:#02150ecc;transform:translate(-50%,-50%) rotate(-8deg);pointer-events:none;text-shadow:0 0 8px #34e39a88;box-shadow:0 0 18px #34e39a44,inset 0 0 12px #34e39a33}
-.tvb-stamp b{font:800 clamp(14px,1.6dvh,26px)/1 Orbitron,'IBM Plex Sans',sans-serif;letter-spacing:.14em}
-.tvb-stamp small{font:600 11px/1.3 Rajdhani,'IBM Plex Sans',sans-serif;letter-spacing:.06em;color:#9ff5cf}
-.tvb-card.is-acked>:not(.tvb-stamp):not(.tvb-unack){opacity:.35;filter:saturate(.4)}
-.tvb-card.is-acking{animation:ackFade 3.6s ease forwards}
-.tvb-card.is-acking .tvb-stamp{animation:stampIn .35s cubic-bezier(.2,1.6,.4,1) both}
-@keyframes stampIn{0%{opacity:0;transform:translate(-50%,-50%) rotate(-8deg) scale(2.4)}100%{opacity:1;transform:translate(-50%,-50%) rotate(-8deg) scale(1)}}
-@keyframes ackFade{0%,65%{opacity:1;max-height:400px}100%{opacity:0;max-height:0;padding-top:0;padding-bottom:0;margin:0;border-width:0}}
-.tvb-unack{position:absolute;right:8px;top:8px;z-index:4;padding:3px 8px;border:1px solid #3d6277;border-radius:5px;background:#072535;color:#bfe6f5;font-size:11px;cursor:pointer}
-.tvb-showack{margin-left:8px;padding:2px 8px;border:1px solid #2b6a85;border-radius:999px;background:transparent;color:#9fd8ee;font-size:11px;cursor:pointer}
-.tvb-allack{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;color:#34e39a}
-.tvb-allack small{color:#8fb8cc}
-.ds-reduce-motion .tvb-card.is-acking,.ds-reduce-motion .tvb-card.is-acking .tvb-stamp{animation:none}
+.tvb-card.has-stamp{padding-bottom:clamp(20px,2.4dvh,30px)!important}
+.tvb-stamp{position:absolute;right:8px;bottom:5px;z-index:3;display:flex;align-items:center;gap:6px;padding:2px 4px 2px 8px;border:1.5px solid #34e39a;border-radius:4px;color:#34e39a;background:#02150ee6;transform:rotate(-3deg);text-shadow:0 0 6px #34e39a66;box-shadow:0 0 10px #34e39a33}
+.tvb-stamp b{font:800 10px/1 Orbitron,'IBM Plex Sans',sans-serif;letter-spacing:.1em;white-space:nowrap}
+.tvb-stamp small{font:600 10px/1 Rajdhani,'IBM Plex Sans',sans-serif;letter-spacing:.04em;color:#9ff5cf;white-space:nowrap}
+.tvb-card.is-acked{opacity:.78;border-left-color:#34e39a!important}
+.tvb-card.is-acking .tvb-stamp{animation:stampIn .4s cubic-bezier(.2,1.6,.4,1) both}
+@keyframes stampIn{0%{opacity:0;transform:rotate(-3deg) scale(2.2)}100%{opacity:1;transform:rotate(-3deg) scale(1)}}
+.tvb-unack{padding:0 5px;border:0;border-left:1px solid #34e39a55;background:transparent;color:#9ff5cf;font-size:12px;line-height:14px;cursor:pointer}
+.tvb-unack:hover{color:#fff}
+.tv .tvb-stamp{transform:none}
+.ds-reduce-motion .tvb-card.is-acking .tvb-stamp{animation:none}
 
 /* ---------- TV mode: wall-display presence ---------- */
 @keyframes tvBreath{0%,100%{box-shadow:0 0 0 1px color-mix(in srgb,var(--risk) 45%,transparent),0 0 14px color-mix(in srgb,var(--risk) 22%,transparent)}50%{box-shadow:0 0 0 1px color-mix(in srgb,var(--risk) 85%,transparent),0 0 34px color-mix(in srgb,var(--risk) 50%,transparent)}}

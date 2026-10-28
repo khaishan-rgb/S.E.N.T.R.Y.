@@ -528,7 +528,7 @@ class AlertLedger:
             db.execute("INSERT INTO fc26_audit(ns,id,action,who,ts) VALUES(?,?,?,?,?)",(ns,aid,status,who,now))
         return True
 
-    ACK_TTL = 2 * 3600      # an acknowledged board card stays hidden for 2 h (or until it clears)
+    ACK_TTL = 12 * 3600     # an acknowledgement is kept 12 h; the card itself disappears when the problem clears
 
     def ack(self, key, who, now, undo=False):
         """Acknowledge one board card (shared by every controller). key = the card key, e.g. '3bb:89:1:B1-B2-B3:0'."""
