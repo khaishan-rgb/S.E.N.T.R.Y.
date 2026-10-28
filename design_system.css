@@ -620,3 +620,13 @@ html.ds-side-collapsed .hz-brand .hz-tl-mark{display:grid}
 .hz-tl-hz.hz-login-word{font-size:clamp(44px,7vw,100px);width:auto}
 .hz-tl-sbs.fc-sbs{font-size:clamp(18px,2.4dvh,40px)}
 .hz-tl-hz.fc-word{font-size:.9em}
+
+/* Tablets (700-999 px): no permanent icon rail - the page uses the full width and the ☰ button opens the menu as a drawer. */
+@media (min-width:700px) and (max-width:999px){
+  body.ds-app{padding-left:0!important}
+  .ds-side{transform:translateX(-102%)!important;width:264px!important}
+  html.ds-drawer .ds-side{transform:none!important;box-shadow:20px 0 60px rgba(0,0,0,.6)}
+  html:not(.ds-drawer) .ds-side{visibility:hidden}
+}
+/* Collapsed rail on desktop: group names never show half-cut ("COMMAN") */
+@media (min-width:1000px){html.ds-side-collapsed:not(.ds-drawer) .ds-side .ds-grp{font-size:0!important;letter-spacing:0!important;height:1px;margin:12px 10px;background:var(--ds-line);overflow:hidden}}
