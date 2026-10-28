@@ -321,3 +321,5 @@ body .right-rail.cameras-only{grid-template-rows:minmax(0,1fr)}
 .stop-pop .sp-route strong{color:#eaffff;letter-spacing:.06em}
 .stop-pop .sp-route small{color:#8fb8cc;font-size:11px}
 .stop-pop .sp-meta{margin-top:3px;color:#8fb8cc;font-size:11px}
+.xing-warn{display:block;font-size:10px;color:#ffb36b;letter-spacing:.03em;line-height:1.3}
+.tv .xing-warn{display:none}

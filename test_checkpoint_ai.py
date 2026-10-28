@@ -61,6 +61,23 @@ class Analyse(unittest.TestCase):
         self.assertIsNone(out["crossings"][0]["to_jb"])
         self.assertEqual(asyncio.run(cpa.analyse(CAMS, None, None, None, now=1000))["cameras"], {})
 
+    def test_photos_from_s3_are_sent_with_a_real_image_type(self):
+        self.assertEqual(cpa.sniff_mime(b"\xff\xd8\xff\xe0rest", "binary/octet-stream"), "image/jpeg")
+        self.assertEqual(cpa.sniff_mime(b"\x89PNG\r\n\x1a\nxxxx", ""), "image/png")
+        self.assertIsNone(cpa.sniff_mime(b"<html>denied", "text/html"))
+        seen = []
+        async def fetch(url):
+            return b"\xff\xd8\xff\xe0jpeg", "binary/octet-stream"
+        async def ask(content):
+            seen.extend(c["source"]["media_type"] for c in content if c["type"] == "image")
+            return '[{"image":1,"level":"Jam"},{"image":2,"level":"Jam"},{"image":3,"level":"Jam"}]'
+        asyncio.run(cpa.analyse(CAMS, fetch, ask, now=1000))
+        self.assertEqual(seen, ["image/jpeg"] * 3)
+        async def html(url):
+            return b"<html>AccessDenied", "text/html"
+        out = asyncio.run(cpa.analyse(CAMS, html, ask, now=99999))
+        self.assertIn("no camera photo could be downloaded", out["error"])
+
     def test_lta_speed_band_fallback(self):
         self.assertEqual([cpa.level_from_band(b) for b in (8, 5, 4, 3, 2, 1, None)], ["Smooth", "Smooth", "Medium", "Jam", "Jam", "Super Jam", None])
         async def bands(lat, lon):
@@ -76,7 +93,7 @@ class Analyse(unittest.TestCase):
         async def flow(lat, lon):
             return {"cur": 50.0, "free": 55.0, "ratio": .9, "conf": 1}
         out = asyncio.run(cpa.analyse(CAMS, self.fetch, broken, flow, now=1000))
-        self.assertIn("unavailable", out["error"])
+        self.assertEqual(out["error"], "AI camera reading failed: quota")              # the real reason is shown
         self.assertEqual(out["cameras"]["6710"]["level"], "Smooth")
 
 

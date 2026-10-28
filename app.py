@@ -12374,6 +12374,52 @@ async def fc26_transition(request: Request):
         return JSONResponse({'error':'Invalid alert transition'},status_code=400)
 
 
+def fc26_camera_ai_io(cpa):
+    """Network helpers for checkpoint_ai: download a camera photo; ask Claude (vision). Errors carry the API's own message."""
+    async def fetch_image(url):
+        r=await client().get(url,timeout=15)
+        r.raise_for_status()
+        return r.content,r.headers.get('content-type','')
+    async def ask_model(content):
+        last=None
+        for model in dict.fromkeys([cpa.MODEL,DV_AI_MODEL]):          # camera model first, then the Diversion review model
+            r=await client().post('https://api.anthropic.com/v1/messages',timeout=60,
+                                  headers={'x-api-key':DV_AI_KEY,'anthropic-version':'2023-06-01','content-type':'application/json'},
+                                  json={'model':model,'max_tokens':900,'messages':[{'role':'user','content':content}]})
+            if r.status_code==200:
+                cpa.STATUS['model']=model
+                return ''.join(b.get('text','') for b in (r.json().get('content') or []) if isinstance(b,dict))
+            try:
+                msg=(r.json().get('error') or {}).get('message') or r.text[:160]
+            except Exception:
+                msg=r.text[:160]
+            last=f'Claude API HTTP {r.status_code} ({model}): {msg}'
+            if r.status_code not in (400,404) or 'model' not in str(msg).lower():
+                break                                                     # only a model problem is worth retrying
+        raise RuntimeError(last or 'Claude API did not answer')
+    return fetch_image,ask_model
+
+
+@app.get('/api/camera-ai/test')
+async def api_camera_ai_test():
+    """One-click check of AI camera analytics: is the key set, can the checkpoint photos be downloaded, does Claude answer."""
+    import checkpoint_ai as cpa
+    if not DV_AI_KEY:
+        return {'ok':False,'key_set':False,'answer':'ANTHROPIC_API_KEY is not set on this server (Render > Environment), so cameras use LTA speed bands only.'}
+    cs=await cameras_state()
+    cams={str(c['id']):c for c in (cs.get('cams') or [])}
+    pick=[cams[i] for x in cpa.CROSSINGS for i in x['cams'] if i in cams]
+    if not pick:
+        return {'ok':False,'key_set':True,'answer':'The checkpoint cameras (2701, 2702, 4703, 4713) are not in the LTA camera feed right now.','camera_error':cs.get('error')}
+    fetch_image,ask_model=fc26_camera_ai_io(cpa)
+    out=await cpa.analyse(pick,fetch_image,ask_model,None,force=True)
+    ok=not out.get('error') and bool(out.get('cameras'))
+    return {'ok':ok,'key_set':True,'model':cpa.STATUS.get('model'),'photos_sent':cpa.STATUS.get('images'),
+            'answer':'AI camera analytics is working.' if ok else (out.get('error') or 'Claude answered but gave no level for these photos.'),
+            'levels':{k:{x:v.get(x) for x in ('level','to_jb','to_sg')} for k,v in out.get('cameras',{}).items()},
+            'crossings':out.get('crossings'),'ai_reply':cpa.STATUS.get('reply')}
+
+
 @app.get('/api/forecast/centre/camera-ai')
 async def fc26_camera_ai(ids: str=''):
     """AI camera analytics: traffic level (Smooth / Medium / Jam / Super Jam) for the cameras on screen and estimated
@@ -12384,16 +12430,7 @@ async def fc26_camera_ai(ids: str=''):
     cams={str(c['id']):c for c in (cs.get('cams') or [])}
     want=[i for i in dict.fromkeys([x.strip() for x in ids.split(',') if x.strip()][:6]) if i in cams]
     pick=[cams[i] for i in dict.fromkeys(want+[c for x in cpa.CROSSINGS for c in x['cams']]) if i in cams]
-    async def fetch_image(url):
-        r=await client().get(url,timeout=15)
-        r.raise_for_status()
-        return r.content,r.headers.get('content-type','image/jpeg')
-    async def ask_model(content):
-        r=await client().post('https://api.anthropic.com/v1/messages',timeout=45,
-                              headers={'x-api-key':DV_AI_KEY,'anthropic-version':'2023-06-01','content-type':'application/json'},
-                              json={'model':cpa.MODEL,'max_tokens':900,'messages':[{'role':'user','content':content}]})
-        r.raise_for_status()
-        return ''.join(b.get('text','') for b in (r.json().get('content') or []) if isinstance(b,dict))
+    fetch_image,ask_model=fc26_camera_ai_io(cpa)
     bs=await bands_state()
     idx=bs.get('idx')
     async def flow(lat,lon):
@@ -12411,6 +12448,7 @@ async def fc26_camera_ai(ids: str=''):
         return {'level':cpa.level_from_band(best[0]),'speed':best[1],'free_speed':best[2],'band':best[0],'road':best[3],'source':'LTA speed bands'}
     out=await cpa.analyse(pick,fetch_image if DV_AI_KEY else None,ask_model if DV_AI_KEY else None,flow)
     out['configured']={'ai':bool(DV_AI_KEY),'speed':idx is not None}
+    out['ai_status']={k:cpa.STATUS.get(k) for k in ('ok_at','error','error_at','model')}
     return out
 
 

@@ -1,6 +1,6 @@
-import {HORIZONS,COLORS,TITLES,esc,num,apiURL,quality,riskServices,slicePage,badge,icon,chartSVG,operationalQueue,initialView,loadSummary,stopText,watchLocation,headwayView,toggleService,resetFilters,hourlyHeadway,hourlyChart,spotlightDeck,categoryView} from './forecast2026-core.js?v=20261028-hz12';
-import {ForecastMap,LAYERS} from './forecast2026-map.js?v=20261028-hz12';
-import {boardModel,loadingCard,trafficCard,headwayCard,emptyState,paginate} from './forecast2026-tv.js?v=20261028-hz12';
+import {HORIZONS,COLORS,TITLES,esc,num,apiURL,quality,riskServices,slicePage,badge,icon,chartSVG,operationalQueue,initialView,loadSummary,stopText,watchLocation,headwayView,toggleService,resetFilters,hourlyHeadway,hourlyChart,spotlightDeck,categoryView} from './forecast2026-core.js?v=20261028-hz14';
+import {ForecastMap,LAYERS} from './forecast2026-map.js?v=20261028-hz14';
+import {boardModel,loadingCard,trafficCard,headwayCard,emptyState,paginate} from './forecast2026-tv.js?v=20261028-hz14';
 const $=id=>document.getElementById(id),query=new URLSearchParams(location.search);
 const initial=initialView(query,{mode:document.documentElement.dataset.defaultMode||'live',horizon:document.documentElement.dataset.defaultHorizon||0});
 if(initial.h===120)initial.h=60;   // old links to the retired NEXT 2H view open the 60-minute view
@@ -133,7 +133,7 @@ function paintCameraAI(){const box=$('crossings');const ai=state.mode==='demo'?n
  document.querySelectorAll('[data-cam-level]').forEach(el=>{const r=ai?.cameras?.[el.dataset.camLevel];el.hidden=!r?.level;if(r?.level){el.className='cam-level '+(LEVEL_CLASS[r.level]||'');el.textContent=(r.source==='AI camera analytics'?'AI · ':'')+r.level.toUpperCase();el.title=r.source+(r.speed!=null?` · ${r.speed}–${r.free_speed} km/h`:'')+(r.confidence!=null?` · confidence ${Math.round(r.confidence*100)}%`:'');}});
  if(!box)return;const rows=ai?.crossings||[];box.hidden=!ai;if(ai&&!rows.length){box.innerHTML=`<div class="xing-off">${esc(cameraAIStatus(ai))}</div>`;return;}
  const dir=(label,x)=>x?`<span class="xing-dir"><em>${label}</em><b>≈ ${x.minutes} min</b><i class="${LEVEL_CLASS[x.level]||''}">${esc(x.level)}</i></span>`:`<span class="xing-dir muted"><em>${label}</em><b>—</b></span>`;
- box.innerHTML=rows.map(x=>`<div class="xing" title="${esc(ai.note||'')}"><strong>${esc(x.name)}</strong>${x.any?dir('JB / SG',x.any):dir('→ JB',x.to_jb)+dir('→ SG',x.to_sg)}</div>`).join('')+(rows.length?`<small class="xing-note">${rows[0].source==='AI camera analytics'?'AI camera':'LTA speed-band'} estimate · road queue only</small>`:'');}
+ box.innerHTML=rows.map(x=>`<div class="xing" title="${esc(ai.note||'')}"><strong>${esc(x.name)}</strong>${x.any?dir('JB / SG',x.any):dir('→ JB',x.to_jb)+dir('→ SG',x.to_sg)}</div>`).join('')+(rows.length?`<small class="xing-note">${rows[0].source==='AI camera analytics'?'AI camera':'LTA speed-band'} estimate · road queue only</small>`:'')+(ai.error&&ai.configured?.ai?`<small class="xing-warn" title="Open /api/camera-ai/test for details">${esc(ai.error)} · showing LTA speed bands</small>`:'');}
 function cameras(items,meta={}){cameraRows=items.slice(0,6);cameraMeta=meta;const count=state.tv?4:6,cameraPage=slicePage(cameraRows,state.page,count);$('cameraStatus').textContent=state.mode==='demo'?'No simulated photos':(meta.context?.startsWith('Nearest')?'NEAREST':'SOURCE IMAGES')+(cameraPage.pages>1?' · '+cameraPage.page+'/'+cameraPage.pages:'');
  $('cameras').innerHTML=cameraRows.length?cameraPage.rows.map(c=>{const i=cameraRows.indexOf(c);return `<button class="camera" data-camera="${i}" title="Enlarge camera ${esc(c.id)}"><img src="${esc(c.image)}" alt="${esc(c.label||'Traffic camera')}" loading="lazy" referrerpolicy="no-referrer"><span class="cam-level" data-cam-level="${esc(c.id)}" hidden></span><p>${esc(c.label||'Camera '+c.id)}${c.distance_km!=null?' · '+c.distance_km+' km':''}</p><small class="${c.stale?'stale':''}">${c.taken?timeString(Date.parse(c.taken)/1000)+' SGT':'Capture time unknown'}${c.stale?' · STALE / UNVERIFIED':''}</small></button>`;}).join(''):`<div class="camera-message">${state.mode==='demo'?'DEMO · no artificial camera images. Switch to LIVE for source cameras.':esc(meta.error||'Waiting for camera adapter…')}</div>`;
  paintCameraAI();loadCameraAI();
@@ -196,6 +196,9 @@ document.addEventListener('click',async e=>{let t=e.target.closest('button,[data
  if(t.dataset.transition){t.disabled=true;try{let r=await fetch('/api/forecast/centre/alerts',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({namespace:state.data.namespace,id:t.dataset.id,status:t.dataset.transition})});if(!r.ok)throw Error('Could not save alert status');closeModal();await fetchState();}catch(err){$('error').textContent=err.message;t.disabled=false;}return;}
  if(t.dataset.alert)alertDetail(t.dataset.alert);
 });
+// The Map layers menu closes when you click or tap anywhere outside it (map included), or press Esc.
+document.addEventListener('pointerdown',e=>{document.querySelectorAll('details.layers[open]').forEach(d=>{if(!d.contains(e.target))d.open=false;});},true);
+document.addEventListener('keydown',e=>{if(e.key==='Escape')document.querySelectorAll('details.layers[open]').forEach(d=>{d.open=false;});});
 document.addEventListener('pointerover',e=>{let t=e.target.closest('[data-hour]');if(t)inspectHour(+t.dataset.hour);});
 document.addEventListener('focusin',e=>{if(e.target.dataset.hour!=null)inspectHour(+e.target.dataset.hour);});
 document.addEventListener('click',e=>{if(e.target.dataset.hour!=null)inspectHour(+e.target.dataset.hour);});

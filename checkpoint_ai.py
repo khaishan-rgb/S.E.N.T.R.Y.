@@ -34,6 +34,7 @@ CHECKPOINT_IDS = {c for x in CROSSINGS for c in x["cams"]}
 CROSSING_MIN = {"Smooth": 15, "Medium": 30, "Jam": 60, "Super Jam": 90}
 
 _CACHE = {}          # (camera id, photo time or link) -> (epoch, result dict)
+STATUS = {"ok_at": None, "error": None, "error_at": None, "model": MODEL, "images": 0}   # last AI call, for /api/camera-ai/test
 _LOCK = None
 
 
@@ -63,6 +64,21 @@ def level_from_band(band):
     if band >= 2:
         return "Jam"
     return "Super Jam" if band >= 1 else None
+
+
+def sniff_mime(data, header=None):
+    """Claude accepts image/jpeg, png, gif, webp only. Camera hosts (S3) often send binary/octet-stream: read the bytes."""
+    b = bytes(data[:12]) if data else b""
+    if b[:3] == b"\xff\xd8\xff":
+        return "image/jpeg"
+    if b[:8] == b"\x89PNG\r\n\x1a\n":
+        return "image/png"
+    if b[:6] in (b"GIF87a", b"GIF89a"):
+        return "image/gif"
+    if b[:4] == b"RIFF" and b[8:12] == b"WEBP":
+        return "image/webp"
+    h = (header or "").split(";")[0].strip().lower()
+    return h if h in ("image/jpeg", "image/png", "image/gif", "image/webp") else None
 
 
 def norm_level(value):
@@ -154,7 +170,7 @@ def crossings(results):
     return out
 
 
-async def analyse(cams, fetch_image=None, ask_model=None, flow=None, now=None):
+async def analyse(cams, fetch_image=None, ask_model=None, flow=None, now=None, force=False):
     """cams: camera dicts (id, link, lat, lon, taken, desc). Returns {"cameras": {id: result}, "crossings": [...], "ai": bool, "note": str}."""
     global _LOCK
     now = now or time.time()
@@ -163,7 +179,7 @@ async def analyse(cams, fetch_image=None, ask_model=None, flow=None, now=None):
     results, todo = {}, []
     for c in cams:
         hit = _CACHE.get(_key(c))
-        if hit and now - hit[0] < CACHE_S:
+        if hit and now - hit[0] < CACHE_S and not force:
             results[str(c["id"])] = hit[1]
         else:
             todo.append(c)
@@ -172,14 +188,24 @@ async def analyse(cams, fetch_image=None, ask_model=None, flow=None, now=None):
         async with _LOCK:
             try:
                 images = await asyncio.gather(*(fetch_image(c["link"]) for c in todo), return_exceptions=True)
-                ok = [(c, img) for c, img in zip(todo, images) if not isinstance(img, BaseException) and img and img[0]]
+                ok = [(c, img[0], sniff_mime(img[0], img[1])) for c, img in zip(todo, images) if not isinstance(img, BaseException) and img and img[0]]
+                ok = [(c, (data, mime)) for c, data, mime in ok if mime]
+                STATUS["images"] = len(ok)
+                if not ok:
+                    bad = [img for img in images if isinstance(img, BaseException)]
+                    raise RuntimeError("no camera photo could be downloaded" + (f" ({type(bad[0]).__name__}: {str(bad[0])[:80]})" if bad else " (not an image)"))
                 if ok:
                     content = []
                     for c, (data, mime) in ok:
-                        content.append({"type": "image", "source": {"type": "base64", "media_type": (mime or "image/jpeg").split(";")[0],
+                        content.append({"type": "image", "source": {"type": "base64", "media_type": mime,
                                                                     "data": base64.b64encode(data).decode()}})
                     content.append({"type": "text", "text": prompt([c for c, _ in ok])})
-                    parsed = parse_reply(await ask_model(content), len(ok))
+                    reply = await ask_model(content)
+                    STATUS["reply"] = (reply or "")[:400]
+                    parsed = parse_reply(reply, len(ok))
+                    if not parsed:
+                        raise RuntimeError("the AI reply had no readable levels: " + (reply or "")[:120])
+                    STATUS.update(ok_at=now, error=None)
                     for i, (c, _) in enumerate(ok):
                         r = parsed.get(i)
                         if r and (r["level"] or r["to_jb"] or r["to_sg"]):
@@ -187,7 +213,8 @@ async def analyse(cams, fetch_image=None, ask_model=None, flow=None, now=None):
                             _CACHE[_key(c)] = (now, res)
                             results[str(c["id"])] = res
             except Exception as e:      # network / quota / parse problems fall back to speed data
-                error = "AI camera analytics unavailable: " + type(e).__name__
+                error = "AI camera reading failed: " + (str(e)[:220] or type(e).__name__)
+                STATUS.update(error=error, error_at=now)
     if flow:
         for c in cams:
             if str(c["id"]) in results:
