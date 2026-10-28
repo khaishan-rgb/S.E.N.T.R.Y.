@@ -51,6 +51,13 @@ def level_from_ratio(ratio):
     return "Super Jam"
 
 
+def _num(v):
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return None
+
+
 def level_from_band(band):
     """LTA Traffic Speed Band (1 = 0-9 km/h ... 8 = 70+ km/h) -> level."""
     try:
@@ -226,7 +233,7 @@ async def analyse(cams, fetch_image=None, ask_model=None, flow=None, now=None, f
             f = f or {}
             lv = f.get("level") or level_from_ratio(f.get("ratio"))
             if lv:
-                sp, fr = f.get("speed", f.get("cur")), f.get("free_speed", f.get("free"))
+                sp, fr = _num(f.get("speed", f.get("cur"))), _num(f.get("free_speed", f.get("free")))   # LTA sends speeds as text
                 results[str(c["id"])] = {"level": lv, "to_jb": None, "to_sg": None, "confidence": f.get("conf"),
                                          "source": f.get("source", "TomTom speed"), "speed": round(sp) if sp is not None else None,
                                          "free_speed": round(fr) if fr is not None else None, "at": now}

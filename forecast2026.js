@@ -1,6 +1,6 @@
-import {HORIZONS,COLORS,TITLES,esc,num,apiURL,quality,riskServices,slicePage,badge,icon,chartSVG,operationalQueue,initialView,loadSummary,stopText,watchLocation,headwayView,toggleService,resetFilters,hourlyHeadway,hourlyChart,spotlightDeck,categoryView} from './forecast2026-core.js?v=20261028-hz15';
-import {ForecastMap,LAYERS} from './forecast2026-map.js?v=20261028-hz15';
-import {boardModel,loadingCard,trafficCard,headwayCard,emptyState,paginate} from './forecast2026-tv.js?v=20261028-hz15';
+import {HORIZONS,COLORS,TITLES,esc,num,apiURL,quality,riskServices,slicePage,badge,icon,chartSVG,operationalQueue,initialView,loadSummary,stopText,watchLocation,headwayView,toggleService,resetFilters,hourlyHeadway,hourlyChart,spotlightDeck,categoryView} from './forecast2026-core.js?v=20261028-hz16';
+import {ForecastMap,LAYERS} from './forecast2026-map.js?v=20261028-hz16';
+import {boardModel,loadingCard,trafficCard,headwayCard,emptyState,paginate} from './forecast2026-tv.js?v=20261028-hz16';
 const $=id=>document.getElementById(id),query=new URLSearchParams(location.search);
 const initial=initialView(query,{mode:document.documentElement.dataset.defaultMode||'live',horizon:document.documentElement.dataset.defaultHorizon||0});
 if(initial.h===120)initial.h=60;   // old links to the retired NEXT 2H view open the 60-minute view
@@ -136,7 +136,7 @@ function camAIHTML(id,busy=true){const ai=cameraAI,r=ai?.cameras?.[id],x=CHECKPO
  else h+=`<div class="ca-src">${busy?'Analysing photo…':'No traffic level for this camera'}</div>`;
  if(x)h+=x.any?dir('JB / SG',x.any):dir('→ JOHOR',x.to_jb)+dir('→ SINGAPORE',x.to_sg);
  if(ai?.error&&ai?.configured?.ai)h+=`<div class="ca-warn">${esc(ai.error)}</div>`;
- else if(ai&&!ai.configured?.ai)h+=`<div class="ca-warn">AI is off: ANTHROPIC_API_KEY not set on the server</div>`;
+ else if(ai?.configured&&!ai.configured.ai)h+=`<div class="ca-warn">AI is off: ANTHROPIC_API_KEY not set on the server</div>`;
  if(ai?.status)h+=`<div class="ca-warn">${esc(ai.status)}</div>`;
  return h+`<a class="ca-test" href="/api/camera-ai/test" target="_blank" rel="noopener">Run AI check ↗</a>`;}
 async function analyseCamera(id){const ids=[...new Set([id,...cameraRows.map(c=>c.id)])].slice(0,6).join(',');
