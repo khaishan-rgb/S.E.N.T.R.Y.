@@ -449,10 +449,13 @@ html::after{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;opa
 
 /* ---- type: brand face for titles and hero numbers, technical face for labels */
 body.ds-app{font-family:var(--hz-font-body)!important;letter-spacing:.005em}
-body.ds-app header.top h1,body.ds-app .ds-title,body.ds-app .module-intro h2{font-family:var(--hz-font-brand)!important;font-weight:700!important;letter-spacing:.06em!important;text-transform:uppercase;
-  background:linear-gradient(180deg,#ffffff 20%,var(--hz-frost) 75%,#7fdcff);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
-  filter:drop-shadow(0 0 14px rgba(63,211,255,.25))}
-body.ds-app .module-intro h2,body.ds-app .ds-title{font-size:clamp(20px,1.6vw,28px)!important}
+/* One page-title style for every engine. Solid colour + glow (no gradient-clipped text: some Android browsers and
+   "dark mode" rendering turn clipped text almost invisible). */
+body.ds-app header.top h1,body.ds-app .ds-title,body.ds-app .module-intro h2,body.ds-app .hz-page-title{font-family:var(--hz-font-brand)!important;font-weight:700!important;letter-spacing:.08em!important;text-transform:uppercase;
+  color:#eaf8ff!important;-webkit-text-fill-color:#eaf8ff!important;background:none!important;filter:none!important;
+  text-shadow:0 0 18px rgba(63,211,255,.45),0 0 2px rgba(255,255,255,.6)}
+body.ds-app .module-intro h2,body.ds-app .ds-title,body.ds-app .hz-page-title{font-size:clamp(22px,2vw,32px)!important;line-height:1.15!important}
+body.ds-app .module-intro h2::after,body.ds-app .ds-title::after{content:"";display:block;width:64px;height:2px;margin-top:8px;background:linear-gradient(90deg,var(--hz-cyan),transparent);box-shadow:0 0 8px var(--hz-cyan)}
 body.ds-app h2,body.ds-app h3,body.ds-app .ds-ph,body.ds-app .ds-grp,body.ds-app .ds-lgrp,body.ds-app .ds-pop h4,body.ds-app th,body.ds-app .ds-kpi .k,body.ds-app .ds-eyebrow{
   font-family:var(--hz-font-display)!important;letter-spacing:.06em}
 body.ds-app .card h2,body.ds-app .card > header h2,body.ds-app .ds-ph{text-transform:uppercase;font-weight:700!important;color:var(--hz-ice)!important}
@@ -630,3 +633,13 @@ html.ds-side-collapsed .hz-brand .hz-tl-mark{display:grid}
 }
 /* Collapsed rail on desktop: group names never show half-cut ("COMMAN") */
 @media (min-width:1000px){html.ds-side-collapsed:not(.ds-drawer) .ds-side .ds-grp{font-size:0!important;letter-spacing:0!important;height:1px;margin:12px 10px;background:var(--ds-line);overflow:hidden}}
+
+/* Page titles: one look on every page (wins over older page-specific h1 rules) */
+html body.ds-app :is(h1,h2).hz-page-title.hz-page-title,html body.ds-app .module-intro h2.module-intro-h,html body.ds-app header.top h1.hz-page-title{
+  font-family:var(--hz-font-brand)!important;font-weight:700!important;font-size:clamp(20px,2vw,32px)!important;line-height:1.15!important;letter-spacing:.08em!important;
+  text-transform:uppercase!important;color:#eaf8ff!important;-webkit-text-fill-color:#eaf8ff!important;background:none!important;filter:none!important;
+  text-shadow:0 0 18px rgba(63,211,255,.45),0 0 2px rgba(255,255,255,.6);white-space:normal}
+html body.ds-app .hz-page-title small,html body.ds-app .hz-page-title em{display:block;margin-top:3px;font:400 12px/1.35 var(--hz-font-body)!important;letter-spacing:.01em!important;text-transform:none!important;
+  color:var(--ds-mut)!important;-webkit-text-fill-color:var(--ds-mut)!important;text-shadow:none}
+html body.ds-app h1.hz-page-title.dp-h1.dp-h1.dp-h1{font-size:clamp(16px,1.4vw,22px)!important;margin:0 10px 0 4px;white-space:nowrap}
+html body.ds-app header.top h1.hz-page-title{margin-left:8px!important}
