@@ -358,7 +358,9 @@ def parse_tomtom_incidents(j, now=None):
 
 _LTA_TIME = re.compile(r"^\((\d{1,2})/(\d{1,2})\)\s*(\d{1,2}):(\d{2})\s*")
 _LTA_ROAD = re.compile(r"\bon\s+(.+?)(?:\s+\(towards\s+([^)]+)\))?(?:\s+(?:after|before|at|near|from)\b|\.|$)", re.I)
-LTA_KIND = {"accident": "accident", "vehicle breakdown": "breakdown", "road block": "road_closed", "roadwork": "roadworks",
+# LTA "Road Block" = a police / CISCO / event road block point report. LTA does not say the road is shut to
+# buses, so it is treated as a hazard (lane / checkpoint), never as a verified closure ("BLOCKED").
+LTA_KIND = {"accident": "accident", "vehicle breakdown": "breakdown", "road block": "hazard", "roadwork": "roadworks",
             "obstacle": "hazard", "heavy traffic": "jam", "diversion": "road_closed", "unattended vehicle": "hazard",
             "misc.": "other", "plant failure": "other", "reverse flow": "hazard", "weather": "hazard"}
 

@@ -26,6 +26,24 @@ class AmendmentPolicies(unittest.TestCase):
         self.assertTrue(out['services'][2]['traffic_eligible'])
         self.assertFalse(out['events'][-1]['congestion_eligible'])
 
+    def test_delay_filter_applies_to_roadworks_and_incidents_with_a_delay(self):
+        events=[{'id':'w1','kind':'roadworks','delay':2.6},{'id':'w2','kind':'roadworks','delay':6.0},{'id':'i1','kind':'accident','delay':1.0},
+                {'id':'i2','kind':'accident','delay':None},{'id':'c','kind':'road_closed','delay':0.5},{'id':'w3','kind':'roadworks','delay':None}]
+        out=filter_traffic({'mode':'live','events':[dict(e) for e in events],'services':[],'alerts':[]},5)
+        self.assertEqual([e['id'] for e in out['events']],['w2','i2','c','w3'])          # +2.6 roadworks and +1.0 accident hidden at >= 5 min
+        out=filter_traffic({'mode':'live','events':[dict(e) for e in events],'services':[],'alerts':[]},0)
+        self.assertEqual(len(out['events']),6)                                            # All delays shows everything
+
+    def test_lta_road_block_is_not_a_closure_and_is_hidden_without_a_delay(self):
+        import forecast
+        ev=forecast.parse_lta_incidents([{'Type':'Road Block','Latitude':1.34,'Longitude':103.77,'Message':'(28/10)11:30 Road Block on Toh Tuck Ave.'}])[0]
+        self.assertEqual(ev['kind'],'hazard')
+        self.assertTrue(ev['passable'])
+        events=[{'id':'rb','kind':'hazard','delay':None},{'id':'rb2','kind':'hazard','delay':7.0},{'id':'x','kind':'other','delay':None},{'id':'a','kind':'accident','delay':None}]
+        for minimum in (0,5):
+            out=filter_traffic({'mode':'live','events':[dict(e) for e in events],'services':[],'alerts':[]},minimum)
+            self.assertEqual([e['id'] for e in out['events']],['rb2','a'])
+
     def test_invalid_delay_values(self):
         for v in [-.1,181,math.nan,math.inf]:
             with self.assertRaises(ValueError):delay_threshold(v)
@@ -49,11 +67,12 @@ class AmendmentPolicies(unittest.TestCase):
         self.assertIn('historical typical',d['events'][0]['delay_basis'])
         self.assertEqual(model.build_centre('live',0,raw=raw,delay_min=2)['kpis']['traffic']['count'],0)
 
-    def test_nearest_four_cameras_deduplicate_and_keep_stale(self):
+    def test_nearest_six_cameras_deduplicate_and_keep_stale(self):
         now=datetime(2026,10,27,6,tzinfo=timezone.utc).timestamp()
         cameras=[{'id':str(i),'lat':1.3,'lon':103.8+i*.01,'link':'https://example.test/'+str(i),'taken':'2026-10-27T06:00:00Z' if i==0 else '2026-10-27T05:00:00Z'} for i in range(6)]
         rows=select_cameras(cameras+[cameras[0]],[103.8,1.3],now)
-        self.assertEqual([c['id'] for c in rows],['0','1','2','3'])
+        self.assertEqual([c['id'] for c in rows],['0','1','2','3','4','5'])
+        self.assertEqual([c['id'] for c in select_cameras(cameras,[103.8,1.3],now,limit=4)],['0','1','2','3'])
         self.assertEqual(rows[0]['age_minutes'],0)
         self.assertFalse(rows[0]['stale'])
         self.assertTrue(rows[1]['stale'])

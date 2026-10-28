@@ -37,13 +37,13 @@ CHECK = r'''()=>{
   for(const old of document.querySelectorAll('.bottom-grid>.panel:not(.tvq)'))if(visible(old))issues.push('old bottom panel visible '+old.className);
   for(const list of document.querySelectorAll('.tvq-list'))for(const card of [...list.children].filter(visible))if(rect(card).bottom>rect(list).bottom+1)issues.push('card cut off in '+list.id);
  }
- for(const id of ['networkStatus','riskOutlook','alerts','headwayChart','serviceWatch','recommendations','cameras','loadingChart','bunchingPanel','tvLoadList','tvTrafficList','tvHeadwayList']){
+ for(const id of ['networkStatus','riskOutlook','headwayChart','serviceWatch','recommendations','cameras','loadingChart','bunchingPanel','tvLoadList','tvTrafficList','tvHeadwayList']){
   const element=document.getElementById(id);if(!visible(element))continue;
   if(element.scrollHeight>element.clientHeight+2)issues.push('content cropped in '+id+' '+element.scrollHeight+'/'+element.clientHeight);
   if(element.scrollWidth>element.clientWidth+2)issues.push('content wider than '+id);
  }
  const cameras=[...document.querySelectorAll('.camera')];
- if(cameras.length!==2)issues.push('expected two rotating camera slots');
+ if(cameras.length!==4)issues.push('expected four camera slots');
  for(const camera of cameras)if(!inside(rect(camera),rect(document.getElementById('cameras'))))issues.push('camera overlaps its panel');
  for(const element of document.querySelectorAll('.topbar .brand h1,.topbar .clock strong'))if(visible(element)&&!inside(rect(element),rect(document.querySelector('.topbar'))))issues.push('header text clipped');
  return issues;
@@ -125,8 +125,8 @@ def main():
                 page.click('#exitTV');page.wait_for_timeout(200)
                 assert not page.evaluate('document.body.classList.contains("tv")')
                 # "Top services to watch" is retired; select the service from its alert ("Focus service on map").
-                page.locator('#alerts [data-alert*=":985:"]').first.click()
-                page.locator('#modalBody button[data-service="985"]').click()
+                assert page.locator('#alerts').count()==0          # Operational alerts panel retired
+                page.locator('.tvb-svc[data-service="985"]').first.click()
                 page.wait_for_function('SENTRY2026.state.services.includes("985")')
                 assert page.locator('#routeSelection').is_visible();assert page.locator('.selected-route-svg').count()==1
                 page.click('#clearService');page.wait_for_function('SENTRY2026.state.services.length===0')

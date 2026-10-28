@@ -15,11 +15,28 @@ def meets_delay(row, minimum):
                 isinstance(row.get('delay'), (float, int)) and row['delay'] > 0 and row['delay'] >= minimum)
 
 
+NOISE_WITHOUT_DELAY = {'jam', 'hazard', 'other'}
+
+
+def event_shown(event, minimum):
+    """The Traffic delay filter applies to every event with a measured delay (jams, roadworks, incidents).
+    Closures always show. Incidents / roadworks with NO delay figure still show (delay not reported, cannot be judged)."""
+    if event.get('kind') == 'road_closed' or event.get('blocked'):
+        return True
+    delay = event.get('delay')
+    if not isinstance(delay, (float, int)) or math.isnan(delay):
+        # No delay figure: keep physical obstructions and approved works; drop low-information point
+        # reports (LTA road blocks / obstacles / misc.) that cannot be judged against the filter.
+        return event.get('kind') not in NOISE_WITHOUT_DELAY
+    if minimum <= 0:
+        return delay > 0 or event.get('kind') not in NOISE_WITHOUT_DELAY
+    return delay >= minimum
+
+
 def filter_traffic(snapshot, minimum):
     """Threshold verified impacts, retaining safety closures independently of delay."""
     minimum = delay_threshold(minimum)
-    snapshot['events'] = list({str(e['id']): e for e in snapshot['events']
-                               if meets_delay(e, minimum) or e.get('kind') != 'jam'}.values())
+    snapshot['events'] = list({str(e['id']): e for e in snapshot['events'] if event_shown(e, minimum)}.values())
     # Incidents / works remain visible as source evidence. Their unknown / small
     # delays do not become qualifying congestion or inflate the congestion KPI.
     for event in snapshot['events']:
@@ -40,8 +57,8 @@ def filter_traffic(snapshot, minimum):
     return snapshot
 
 
-def select_cameras(cameras, point=None, now=None):
-    """Four nearest visual-context cameras, never evidence of a route impact."""
+def select_cameras(cameras, point=None, now=None, limit=6):
+    """Nearest (default six) visual-context cameras, never evidence of a route impact."""
     now = now or datetime.now(timezone.utc).timestamp()
     unique = {}
     for camera in cameras:
@@ -71,7 +88,7 @@ def select_cameras(cameras, point=None, now=None):
         rows.sort(key=lambda c: c['distance_km'])
     else:
         rows.sort(key=lambda c: (c['stale'], c['age_minutes'] if c['age_minutes'] is not None else math.inf, c['id']))
-    return rows[:4]
+    return rows[:limit]
 
 
 def master_schedule(masters, keys, now):

@@ -2,7 +2,7 @@
 //  1. Which service / direction / location has heavy passenger loading?
 //  2. Which incident, roadwork or traffic build-up affects which service / direction / location?
 //  3. Where is there three-bus bunching or a long headway gap (service / direction / location)?
-import {esc,num,icon} from './forecast2026-core.js?v=20261028-hz1';
+import {esc,num,icon} from './forecast2026-core.js?v=20261028-hz3';
 
 export const KINDS={
  road_closed:{label:'Road closed',icon:'road_closed',rank:0},
@@ -90,7 +90,7 @@ export function boardModel(data){
 }
 
 // ---------- rendering ----------
-const svcBadge=(svc,dir)=>`<div class="tvb-svc"><b>${esc(svc)}</b><span>DIR ${esc(dir)}</span></div>`;
+const svcBadge=(svc,dir)=>`<div class="tvb-svc" data-service="${esc(svc)}" title="Show service ${esc(svc)} on the map"><b>${esc(svc)}</b><span>DIR ${esc(dir)}</span></div>`;
 const whereHTML=w=>`<div class="tvb-where"><strong title="${esc(w.name)}">${esc(w.name)}</strong>${w.meta?`<small>${esc(w.meta)}</small>`:''}</div>`;
 const newTag=isNew=>isNew?'<em class="tvb-new">NEW</em>':'';
 

@@ -1,10 +1,22 @@
-import {COLORS,esc,icon,delayColor} from './forecast2026-core.js?v=20261028-hz1';
+import {COLORS,esc,icon,delayColor} from './forecast2026-core.js?v=20261028-hz3';
 export const LAYERS={buses:'Bus positions',routes:'Bus routes',flow:'Traffic flow',incidents:'Traffic incidents',works:'Roadworks',rain:'Rainfall',loading:'Passenger loading',bunching:'Bus bunching',gap:'Long headway gaps',heat:'Forecast heatmap'};
 export class ForecastMap{
  constructor(host,onPick){this.host=host;this.onPick=onPick;this.flags=Object.fromEntries(Object.keys(LAYERS).map(k=>[k,k!=='heat']));this.markers=new Map();this.kind='schematic';this.tilt=false;this.selectedServices=[];this.spotlight=null;this.viewService=null;}
+ installLock(){const host=this.host,HANDLERS=['scrollZoom','dragPan','dragRotate','touchZoomRotate','touchPitch','doubleClickZoom','keyboard','boxZoom'];
+  let hint=document.createElement('div');hint.className='map-lock-hint';hint.setAttribute('aria-hidden','true');host.appendChild(hint);this.lockHint=hint;let timer=0;
+  const flash=()=>{hint.classList.add('show');clearTimeout(timer);timer=setTimeout(()=>hint.classList.remove('show'),1400);};
+  this.setLocked=locked=>{this.locked=locked;for(const h of HANDLERS)this.map[h]?.[locked?'disable':'enable']?.();host.classList.toggle('map-locked',locked);host.classList.toggle('map-unlocked',!locked);hint.textContent=locked?'Click the map to pan / zoom':'Map unlocked · Esc or click outside to lock';if(!locked)flash();};
+  this.setLocked(true);
+  host.addEventListener('click',()=>{if(this.locked)this.setLocked(false);});
+  host.addEventListener('touchstart',e=>{if(this.locked&&e.touches.length>1)flash();},{passive:true});
+  host.addEventListener('wheel',()=>{if(this.locked)flash();},{passive:true});
+  host.addEventListener('mouseleave',()=>{if(!this.locked)this.setLocked(true);});
+  document.addEventListener('pointerdown',e=>{if(!this.locked&&!host.contains(e.target))this.setLocked(true);},true);
+  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!this.locked)this.setLocked(true);});
+ }
  async init(){
   try{if(!window.SG3D)throw Error('Vector map library unavailable');await Promise.race([SG3D.load(),new Promise((_,reject)=>setTimeout(()=>reject(Error('Map library timeout')),9000))]);let style=SG3D.style();style.layers.forEach(l=>{if(l.id==='bg')l.paint['background-color']='#061622';if(l.id==='road-label'){l.minzoom=12;l.paint['text-color']='#b4d1e1';l.layout['text-size']=14;l.layout['symbol-spacing']=380;}if(l.id==='place-label')l.layout['text-size']=15;if(l.id==='building-3d')l.layout={visibility:'none'};if(l.id==='road-major')l.paint['line-color']='#214d63';if(l.id==='road-motorway')l.paint['line-color']='#285f73';if(l.id==='water')l.paint['fill-color']='#020d17';});
-   this.kind='loading';this.map=new maplibregl.Map({container:this.host,style,center:[103.83,1.35],zoom:10.7,minZoom:9.5,maxZoom:18,pitch:0,attributionControl:false,dragRotate:true});if(typeof ResizeObserver==='function'){this.observer=new ResizeObserver(()=>this.map?.resize());this.observer.observe(this.host);}this.map.addControl(new maplibregl.NavigationControl({showCompass:false}),'top-right');this.map.addControl(new maplibregl.AttributionControl({compact:true,customAttribution:'© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> · OpenFreeMap'}));
+   this.kind='loading';this.map=new maplibregl.Map({container:this.host,style,center:[103.83,1.35],zoom:10.7,minZoom:9.5,maxZoom:18,pitch:0,attributionControl:false,dragRotate:true});if(typeof ResizeObserver==='function'){this.observer=new ResizeObserver(()=>this.map?.resize());this.observer.observe(this.host);}this.map.addControl(new maplibregl.NavigationControl({showCompass:false}),'top-right');try{this.installLock();}catch(e){}this.map.addControl(new maplibregl.AttributionControl({compact:true,customAttribution:'© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> · OpenFreeMap'}));
    await new Promise((resolve,reject)=>{let timer=setTimeout(()=>reject(Error('Map tiles slow')),18000);this.map.once('load',()=>{clearTimeout(timer);resolve();});});this.kind='ml';
    for(let id of ['routes','flow','buses','heat','rain','stops','selection','route-labels','route-ends'])this.map.addSource('sentry-'+id,{type:'geojson',data:{type:'FeatureCollection',features:[]}});
    this.map.addLayer({id:'sentry-routes',type:'line',source:'sentry-routes',layout:{'line-cap':'round','line-join':'round'},paint:{'line-color':['get','color'],'line-width':['interpolate',['linear'],['zoom'],10,2,15,5],'line-opacity':['get','opacity']}});

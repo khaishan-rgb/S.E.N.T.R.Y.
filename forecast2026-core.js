@@ -3,7 +3,7 @@ export const COLORS={loading:'#ffb64a',traffic:'#ff695b',bunching:'#f755b5',gap:
 export const TITLES={loading:'Heavy passenger loading',traffic:'Traffic buildup',bunching:'Three-bus bunching',gap:'Long headway gaps'};
 export const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 export const num=(v,d=0)=>v==null?'—':Number(v).toFixed(d);
-export function apiURL(state){const p=new URLSearchParams({mode:state.mode,horizon:state.h,scenario:state.scenario,tick:state.tick,services:state.services.join(','),exclude_cbs:state.exclude?'1':'0',category:state.category,delay_min:state.delayMin??.8});if(state.routesV)p.set('routes_v',state.routesV);return '/api/forecast/centre?'+p;}
+export function apiURL(state){const p=new URLSearchParams({mode:state.mode,horizon:state.h,scenario:state.scenario,tick:state.tick,services:state.services.join(','),exclude_cbs:state.exclude?'1':'0',category:state.category,delay_min:state.delayMin??5});if(state.routesV)p.set('routes_v',state.routesV);return '/api/forecast/centre?'+p;}
 export function quality(mode,updated,now=Date.now()/1000,error=false){if(mode==='demo')return {label:'DEMO · SIMULATED',kind:'demo'};if(!updated)return {label:'OFFLINE',kind:'offline'};if(now-updated>150)return {label:'DATA DELAYED',kind:'delayed'};return {label:error?'FORECAST DEGRADED':'LIVE · ESTIMATED FORECAST',kind:error?'delayed':'live'};}
 export function riskServices(data){return [...(data.services||[])].map(s=>({...s,risk:(s.blocked?100:0)+(s.three||0)*30+(s.gaps||0)*25+(s.heavy_buses||0)*5+(s.delay||0)})).filter(s=>s.risk>0).sort((a,b)=>b.risk-a.risk);}
 export function slicePage(rows,page,size){const pages=Math.max(1,Math.ceil(rows.length/size));return {rows:rows.slice((page%pages)*size,(page%pages+1)*size),page:page%pages+1,pages};}
@@ -39,7 +39,7 @@ export function spotlightDeck(data,random=Math.random,now=Date.now()/1000){
  const latest=rows.shift();for(let i=rows.length-1;i>0;i--){const j=Math.floor(random()*(i+1));[rows[i],rows[j]]=[rows[j],rows[i]];}
  return latest?[latest,...rows]:[];
 }
-export const resetFilters=()=>({services:[],operator:'',exclude:false,category:'all',delayMin:.8});
+export const resetFilters=()=>({services:[],operator:'',exclude:false,category:'all',delayMin:5});
 export const delayColor=(delay,thresholds={yellow:.8,orange:2,red:5})=>delay==null?'#7d9bab':delay>=thresholds.red?'#ff4d63':delay>=thresholds.orange?'#ff9b43':delay>=thresholds.yellow?'#f2df5e':'#39e4a2';
 export function hourlyHeadway(data,{interval=60,scope='network',direction='all'}={}){
  const now=Number(data.generated)||Date.now()/1000,day=Math.floor((now+8*3600)/86400)*86400-8*3600;

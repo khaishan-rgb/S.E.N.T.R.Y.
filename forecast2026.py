@@ -380,7 +380,7 @@ def live_snapshot(raw, samples, h, now=None):
         for d in load_details:d['point']=(d['stop'] or {}).get('point') or d['bus_point'] or point
         counts['UNKNOWN']=len(seq)-sum(counts.values())
         location=(traffic_details[0]["road"] if traffic_details else None) or (ev or {}).get("road") or sample.get("location") or "Location not supplied"
-        row={"svc":key[0],"dir":key[1],"location":location,"delay":delay,"blocked":bool(s.get("blocked")),"building":bool(s.get("building")),"occupancy":None,
+        row={"svc":key[0],"dir":key[1],"location":location,"delay":delay,"blocked":bool(s.get("blocked")) and traffic_ok,"building":bool(s.get("building")),"occupancy":None,
              "heavy_buses":heavy if h==0 and observed and known_loads else None,"load_label":"Heavy" if heavy else "Standing" if any(b.get("load")=="SDA" for b in seq) else "Seats" if known_loads else "Unavailable",
              "three":len(groups) if valid and h<=30 else None,"two":sum(g.get("size")==2 for g in sample.get("groups",[])) if valid and h==0 else None,
              "gaps":len(gaps) if valid and h<=30 else None,"headway":(max([g.get("max_hw") or 0 for g in gaps] or [0]) or headway_at(sample.get("hw"),h)) if valid and h<=30 else None,

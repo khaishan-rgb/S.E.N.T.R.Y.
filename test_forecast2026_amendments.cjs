@@ -3,7 +3,7 @@ const fs=require('fs'),assert=require('assert/strict'),path=require('path');
  const url=code=>'data:text/javascript;base64,'+Buffer.from(code).toString('base64');
  const coreURL=url(fs.readFileSync(path.join(__dirname,'forecast2026-core.js'),'utf8')),core=await import(coreURL);
  assert.deepEqual(core.toggleService(['14','166'],'14'),['166']);assert.deepEqual(core.toggleService(['14'],'166'),['14','166']);assert.deepEqual(core.toggleService(['14'],'14'),[]);
- assert.deepEqual(core.resetFilters(),{services:[],operator:'',exclude:false,category:'all',delayMin:.8});
+ assert.deepEqual(core.resetFilters(),{services:[],operator:'',exclude:false,category:'all',delayMin:5});
  assert.equal(new URL(core.apiURL({...core.resetFilters(),mode:'live',h:0,scenario:'combined',tick:0,delayMin:3}),'http://local').searchParams.get('delay_min'),'3');
  for(const [d,c] of [[.79,'#39e4a2'],[.8,'#f2df5e'],[1.99,'#f2df5e'],[2,'#ff9b43'],[4.99,'#ff9b43'],[5,'#ff4d63']])assert.equal(core.delayColor(d),c);
  const now=Date.parse('2026-10-27T06:00:00Z')/1000;
