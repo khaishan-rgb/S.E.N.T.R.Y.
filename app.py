@@ -12321,6 +12321,10 @@ async def fc26_centre(request: Request, mode: str='live', horizon: int=0, scenar
                 data['context_routes']=None;data['context_routes_cached']=True
             else:
                 data['context_routes']=context
+    try:
+        data['acks']=fc26_ledger().acks(time.time())
+    except sqlite3.Error:
+        data['acks']={}
     # Demo cameras are deliberately not filled with fabricated traffic photos.
     data['cameras']=[]
     if mode=='live':
@@ -12329,6 +12333,26 @@ async def fc26_centre(request: Request, mode: str='live', horizon: int=0, scenar
             cams=(hit[2].get('cams') or []) if isinstance(hit[2],dict) else []
             data['cameras']=[{'id':c['id'],'image':c['link'],'label':c.get('desc') or c.get('road') or 'Traffic camera','taken':c.get('taken')} for c in cams[:4]]
     return fc26_response(request, data)
+
+
+@app.post('/api/forecast/centre/ack')
+async def fc26_ack(request: Request):
+    """Acknowledge (or undo) one Heavy loading / Incident-traffic / Bunching-gap board card for every controller."""
+    try:
+        body=await request.json()
+        key=str(body.get('key',''))
+        if not re.fullmatch(r'(load|event|svc|3bb|gap):[A-Za-z0-9:._#\-]{1,190}',key):
+            raise ValueError('Invalid card')
+        user=auth.read(request.cookies.get(auth.COOKIE,'')) if hasattr(auth,'read') else None
+        identity=(user or {}).get('u') if isinstance(user,dict) else None
+        who=str((identity.get('name') or identity.get('id')) if isinstance(identity,dict) else identity or 'controller')[:80]
+        now=time.time()
+        fc26_ledger().ack(key,who,now,undo=bool(body.get('undo')))
+        return {'ok':True,'key':key,'who':who,'ts':now}
+    except (ValueError,TypeError):
+        return JSONResponse({'error':'Invalid acknowledgement'},status_code=400)
+    except sqlite3.Error:
+        return JSONResponse({'error':'Acknowledgement store unavailable'},status_code=503)
 
 
 @app.post('/api/forecast/centre/alerts')
@@ -12367,10 +12391,23 @@ async def fc26_camera_ai(ids: str=''):
                               json={'model':cpa.MODEL,'max_tokens':900,'messages':[{'role':'user','content':content}]})
         r.raise_for_status()
         return ''.join(b.get('text','') for b in (r.json().get('content') or []) if isinstance(b,dict))
+    bs=await bands_state()
+    idx=bs.get('idx')
     async def flow(lat,lon):
-        return await tomtom_flow(lat,lon) if TT.get('key') else None
+        # LTA Traffic Speed Bands (free, already cached for Route Traffic). Never TomTom: its shared daily cap feeds the
+        # Forecast Centre traffic layer, and camera look-ups must not use it up.
+        if idx is None:
+            return None
+        k,best=math.cos(math.radians(lat)),None
+        for alat,alon,blat,blon,band,road,mn,mx,cat in idx.segs:
+            for pa,po in ((alat,alon),(blat,blon),((alat+blat)/2,(alon+blon)/2)):
+                if ((pa-lat)*111.32)**2+((po-lon)*111.32*k)**2<=0.09 and (best is None or band<best[0]):
+                    best=(band,mn,mx,road)
+        if not best:
+            return None
+        return {'level':cpa.level_from_band(best[0]),'speed':best[1],'free_speed':best[2],'band':best[0],'road':best[3],'source':'LTA speed bands'}
     out=await cpa.analyse(pick,fetch_image if DV_AI_KEY else None,ask_model if DV_AI_KEY else None,flow)
-    out['configured']={'ai':bool(DV_AI_KEY),'speed':bool(TT.get('key'))}
+    out['configured']={'ai':bool(DV_AI_KEY),'speed':idx is not None}
     return out
 
 

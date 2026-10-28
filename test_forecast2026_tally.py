@@ -110,6 +110,18 @@ class SameRulesAsBunchingPage(unittest.TestCase):
         self.assertEqual(next(s for s in later['services'] if s['svc'] == '88')['three'], 1)    # only the group predicted within 15 min
 
 
+class BoardAcknowledgement(unittest.TestCase):
+    def test_ack_is_shared_expires_and_can_be_undone(self):
+        import os, tempfile
+        ledger = f.AlertLedger(os.path.join(tempfile.mkdtemp(), 'ack.db'))
+        ledger.ack('3bb:89:1:B1-B2-B3:0', 'Kim', 1000)
+        self.assertEqual(ledger.acks(1001), {'3bb:89:1:B1-B2-B3:0': {'who': 'Kim', 'ts': 1000.0}})
+        self.assertEqual(ledger.acks(1000 + ledger.ACK_TTL + 1), {})                  # expires after 2 h
+        ledger.ack('gap:167:1:B7:B9', 'Kim', 5000)
+        ledger.ack('gap:167:1:B7:B9', 'Kim', 5001, undo=True)
+        self.assertEqual(ledger.acks(5002), {})
+
+
 if __name__ == '__main__':
     unittest.main()
 

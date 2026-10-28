@@ -493,6 +493,7 @@ class AlertLedger:
         with self.connect() as db:
             db.execute("CREATE TABLE IF NOT EXISTS fc26_alert(ns TEXT,id TEXT,status TEXT,score INTEGER,first REAL,last REAL,body TEXT,PRIMARY KEY(ns,id))")
             db.execute("CREATE TABLE IF NOT EXISTS fc26_audit(seq INTEGER PRIMARY KEY AUTOINCREMENT,ns TEXT,id TEXT,action TEXT,who TEXT,ts REAL)")
+            db.execute("CREATE TABLE IF NOT EXISTS fc26_ack(key TEXT PRIMARY KEY,who TEXT,ts REAL)")
 
     def connect(self):
         return sqlite3.connect(self.path, timeout=10)
@@ -526,6 +527,24 @@ class AlertLedger:
             db.execute("UPDATE fc26_alert SET status=? WHERE ns=? AND id=?",(status,ns,aid))
             db.execute("INSERT INTO fc26_audit(ns,id,action,who,ts) VALUES(?,?,?,?,?)",(ns,aid,status,who,now))
         return True
+
+    ACK_TTL = 2 * 3600      # an acknowledged board card stays hidden for 2 h (or until it clears)
+
+    def ack(self, key, who, now, undo=False):
+        """Acknowledge one board card (shared by every controller). key = the card key, e.g. '3bb:89:1:B1-B2-B3:0'."""
+        key = str(key)[:200]
+        with self.connect() as db:
+            if undo:
+                db.execute("DELETE FROM fc26_ack WHERE key=?", (key,))
+            else:
+                db.execute("INSERT OR REPLACE INTO fc26_ack VALUES(?,?,?)", (key, str(who)[:80], now))
+            db.execute("INSERT INTO fc26_audit(ns,id,action,who,ts) VALUES(?,?,?,?,?)", ("board", key, "unacknowledged" if undo else "acknowledged", str(who)[:80], now))
+        return True
+
+    def acks(self, now):
+        with self.connect() as db:
+            db.execute("DELETE FROM fc26_ack WHERE ts<?", (now - self.ACK_TTL,))
+            return {k: {"who": w, "ts": t} for k, w, t in db.execute("SELECT key,who,ts FROM fc26_ack")}
 
     def view(self, ns):
         with self.connect() as db:

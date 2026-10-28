@@ -1,4 +1,4 @@
-import {COLORS,esc,icon,delayColor} from './forecast2026-core.js?v=20261028-hz6';
+import {COLORS,esc,icon,delayColor} from './forecast2026-core.js?v=20261028-hz7';
 export const LAYERS={buses:'Bus positions',routes:'Bus routes',flow:'Traffic flow',incidents:'Traffic incidents',works:'Roadworks',rain:'Rainfall',loading:'Passenger loading',bunching:'Bus bunching',gap:'Long headway gaps',heat:'Forecast heatmap'};
 export class ForecastMap{
  constructor(host,onPick){this.host=host;this.onPick=onPick;this.flags=Object.fromEntries(Object.keys(LAYERS).map(k=>[k,k!=='heat']));this.markers=new Map();this.kind='schematic';this.tilt=false;this.selectedServices=[];this.spotlight=null;this.viewService=null;}

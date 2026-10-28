@@ -1,6 +1,6 @@
-import {HORIZONS,COLORS,TITLES,esc,num,apiURL,quality,riskServices,slicePage,badge,icon,chartSVG,operationalQueue,initialView,loadSummary,stopText,watchLocation,headwayView,toggleService,resetFilters,hourlyHeadway,hourlyChart,spotlightDeck,categoryView} from './forecast2026-core.js?v=20261028-hz6';
-import {ForecastMap,LAYERS} from './forecast2026-map.js?v=20261028-hz6';
-import {boardModel,loadingCard,trafficCard,headwayCard,emptyState,paginate} from './forecast2026-tv.js?v=20261028-hz6';
+import {HORIZONS,COLORS,TITLES,esc,num,apiURL,quality,riskServices,slicePage,badge,icon,chartSVG,operationalQueue,initialView,loadSummary,stopText,watchLocation,headwayView,toggleService,resetFilters,hourlyHeadway,hourlyChart,spotlightDeck,categoryView} from './forecast2026-core.js?v=20261028-hz7';
+import {ForecastMap,LAYERS} from './forecast2026-map.js?v=20261028-hz7';
+import {boardModel,loadingCard,trafficCard,headwayCard,emptyState,paginate} from './forecast2026-tv.js?v=20261028-hz7';
 const $=id=>document.getElementById(id),query=new URLSearchParams(location.search);
 const initial=initialView(query,{mode:document.documentElement.dataset.defaultMode||'live',horizon:document.documentElement.dataset.defaultHorizon||0});
 if(initial.h===120)initial.h=60;   // old links to the retired NEXT 2H view open the 60-minute view
@@ -34,7 +34,7 @@ function controls(){
  $('mapLayers').innerHTML=Object.entries(LAYERS).map(([key,label])=>`<label><input type="checkbox" data-layer="${key}" ${networkMap.flags[key]?'checked':''}>${label}</label>`).join('');
 }
 function kpiCards(d){
- $('riskCards').innerHTML=Object.entries(TITLES).map(([cat,title])=>{let k=d.kpis[cat],value=k.available?num(k.count):'—',detail=cat==='loading'?(k.occupancy!=null?num(k.occupancy)+'% peak':d.horizon?'Demand history needed':'Categorical load readings'):cat==='traffic'?(k.delay!=null?'+'+num(k.delay,1)+' min avg':'Route-specific impact'):cat==='bunching'?`3BB · headway < ${num(d.rules?.bunch_min??3,0)} min`:`Scheduled + ${num(d.rules?.gap_add_min??10,0)} min`;return `<button class="risk-card ${state.category===cat?'active':''}" data-category="${cat}" style="--risk:${COLORS[cat]}" aria-pressed="${state.category===cat}"><span class="risk-icon">${icon(cat)}</span><span><h2 title="${title}">${title.replace('passenger ','')}</h2><strong>${value}</strong><small>${k.available?detail:'Not available at this horizon'}</small></span><span class="risk-aside"><b>${k.available?num(k.services):'—'}</b>services<small>${d.mode==='demo'?'SIMULATED':d.horizon?'ESTIMATED':'OBSERVED'}</small></span></button>`;}).join('');
+ $('riskCards').innerHTML=Object.entries(TITLES).map(([cat,title])=>{let k=d.kpis[cat],value=k.available?num(k.count):'—',detail=cat==='loading'?(k.occupancy!=null?num(k.occupancy)+'% peak':d.horizon?'Demand history needed':'Categorical load readings'):cat==='traffic'?(k.delay!=null?'+'+num(k.delay,1)+' min avg':'Route-specific impact'):cat==='bunching'?`3BB · headway < ${num(d.rules?.bunch_min??3,0)} min`:`Scheduled + ${num(d.rules?.gap_add_min??10,0)} min`;return `<button class="risk-card ${state.category===cat?'active':''} ${k.available?(k.count>0?'hot':'clear'):''}" data-category="${cat}" style="--risk:${COLORS[cat]}" aria-pressed="${state.category===cat}"><span class="risk-icon">${icon(cat)}</span><span><h2 title="${title}">${title.replace('passenger ','')}</h2><strong>${value}</strong><small>${k.available?detail:'Not available at this horizon'}</small></span><span class="risk-aside"><b>${k.available?num(k.services):'—'}</b>services<small>${d.mode==='demo'?'SIMULATED':d.horizon?'ESTIMATED':'OBSERVED'}</small></span></button>`;}).join('');
 }
 function networkStatus(d){
  let headways=d.services.map(s=>s.focus_headway).filter(v=>v!=null),avg=headways.length?headways.reduce((a,b)=>a+b,0)/headways.length:null;
@@ -128,12 +128,12 @@ let cameraAI=null,cameraAIAt=0,cameraAIKey='';
 const LEVEL_CLASS={'Smooth':'lv-smooth','Medium':'lv-medium','Jam':'lv-jam','Super Jam':'lv-super'};
 async function loadCameraAI(force=false){if(state.mode==='demo'){cameraAI=null;paintCameraAI();return;}const ids=cameraRows.map(c=>c.id).join(',');if(!force&&ids===cameraAIKey&&Date.now()-cameraAIAt<120000)return;cameraAIKey=ids;cameraAIAt=Date.now();
  try{const r=await fetch('/api/forecast/centre/camera-ai?ids='+encodeURIComponent(ids));cameraAI=r.ok?await r.json():{status:'Camera analytics unavailable (server answered HTTP '+r.status+')'};}catch(e){cameraAI={status:'Camera analytics unavailable (network error)'};}paintCameraAI();}
-function cameraAIStatus(ai){if(ai.status)return ai.status;const c=ai.configured||{};if(!c.ai&&!c.speed)return 'JB / SG crossing time is off · add ANTHROPIC_API_KEY (AI camera reading) or TOMTOM_API_KEY (speed) in Render → Environment';if(ai.error)return 'JB / SG crossing time: '+ai.error+(c.speed?' · speed data not available for the checkpoint cameras':'');return 'JB / SG crossing time: checkpoint cameras not in the live LTA feed right now';}
+function cameraAIStatus(ai){if(ai.status)return ai.status;const c=ai.configured||{};if(!c.ai&&!c.speed)return 'JB / SG crossing time is off · add ANTHROPIC_API_KEY in Render → Environment (LTA speed bands also unavailable)';if(ai.error)return 'JB / SG crossing time: '+ai.error+(c.speed?' · speed data not available for the checkpoint cameras':'');return 'JB / SG crossing time: checkpoint cameras not in the live LTA feed right now';}
 function paintCameraAI(){const box=$('crossings');const ai=state.mode==='demo'?null:cameraAI;
- document.querySelectorAll('[data-cam-level]').forEach(el=>{const r=ai?.cameras?.[el.dataset.camLevel];el.hidden=!r?.level;if(r?.level){el.className='cam-level '+(LEVEL_CLASS[r.level]||'');el.textContent=(r.source==='TomTom speed'?'':'AI · ')+r.level.toUpperCase();el.title=r.source+(r.speed!=null?` · ${r.speed} km/h (free flow ${r.free_speed})`:'')+(r.confidence!=null?` · confidence ${Math.round(r.confidence*100)}%`:'');}});
+ document.querySelectorAll('[data-cam-level]').forEach(el=>{const r=ai?.cameras?.[el.dataset.camLevel];el.hidden=!r?.level;if(r?.level){el.className='cam-level '+(LEVEL_CLASS[r.level]||'');el.textContent=(r.source==='AI camera analytics'?'AI · ':'')+r.level.toUpperCase();el.title=r.source+(r.speed!=null?` · ${r.speed}–${r.free_speed} km/h`:'')+(r.confidence!=null?` · confidence ${Math.round(r.confidence*100)}%`:'');}});
  if(!box)return;const rows=ai?.crossings||[];box.hidden=!ai;if(ai&&!rows.length){box.innerHTML=`<div class="xing-off">${esc(cameraAIStatus(ai))}</div>`;return;}
  const dir=(label,x)=>x?`<span class="xing-dir"><em>${label}</em><b>≈ ${x.minutes} min</b><i class="${LEVEL_CLASS[x.level]||''}">${esc(x.level)}</i></span>`:`<span class="xing-dir muted"><em>${label}</em><b>—</b></span>`;
- box.innerHTML=rows.map(x=>`<div class="xing" title="${esc(ai.note||'')}"><strong>${esc(x.name)}</strong>${x.any?dir('JB / SG',x.any):dir('→ JB',x.to_jb)+dir('→ SG',x.to_sg)}</div>`).join('')+(rows.length?`<small class="xing-note">${rows[0].source==='TomTom speed'?'Speed-based':'AI camera'} estimate · road queue only</small>`:'');}
+ box.innerHTML=rows.map(x=>`<div class="xing" title="${esc(ai.note||'')}"><strong>${esc(x.name)}</strong>${x.any?dir('JB / SG',x.any):dir('→ JB',x.to_jb)+dir('→ SG',x.to_sg)}</div>`).join('')+(rows.length?`<small class="xing-note">${rows[0].source==='AI camera analytics'?'AI camera':'LTA speed-band'} estimate · road queue only</small>`:'');}
 function cameras(items,meta={}){cameraRows=items.slice(0,6);cameraMeta=meta;const count=state.tv?4:6,cameraPage=slicePage(cameraRows,state.page,count);$('cameraStatus').textContent=state.mode==='demo'?'No simulated photos':(meta.context?.startsWith('Nearest')?'NEAREST':'SOURCE IMAGES')+(cameraPage.pages>1?' · '+cameraPage.page+'/'+cameraPage.pages:'');
  $('cameras').innerHTML=cameraRows.length?cameraPage.rows.map(c=>{const i=cameraRows.indexOf(c);return `<button class="camera" data-camera="${i}" title="Enlarge camera ${esc(c.id)}"><img src="${esc(c.image)}" alt="${esc(c.label||'Traffic camera')}" loading="lazy" referrerpolicy="no-referrer"><span class="cam-level" data-cam-level="${esc(c.id)}" hidden></span><p>${esc(c.label||'Camera '+c.id)}${c.distance_km!=null?' · '+c.distance_km+' km':''}</p><small class="${c.stale?'stale':''}">${c.taken?timeString(Date.parse(c.taken)/1000)+' SGT':'Capture time unknown'}${c.stale?' · STALE / UNVERIFIED':''}</small></button>`;}).join(''):`<div class="camera-message">${state.mode==='demo'?'DEMO · no artificial camera images. Switch to LIVE for source cameras.':esc(meta.error||'Waiting for camera adapter…')}</div>`;
  paintCameraAI();loadCameraAI();
@@ -180,6 +180,9 @@ $('modal').addEventListener('click',e=>{if(e.target===$('modal'))closeModal();})
 document.addEventListener('input',e=>{if(e.target.id==='searchAlerts'){state.search=e.target.value;if(state.data)alerts(state.data);}});
 document.addEventListener('change',e=>{if(e.target.dataset.pick){let svc=e.target.dataset.pick;state.services=state.services.filter(s=>s!==svc);if(e.target.checked)state.services.push(svc);state.page=0;lastFocus=e.target.checked?svc:state.services[0]||null;controls();cameraTime=0;fetchState();}if(e.target.dataset.layer)networkMap.setLayer(e.target.dataset.layer,e.target.checked);});
 document.addEventListener('click',async e=>{let t=e.target.closest('button,[data-alert],[data-service]');if(!t)return;
+ if(t.dataset.ack){ackCard(t.dataset.ack);return;}
+ if(t.dataset.unack){ackCard(t.dataset.unack,true);return;}
+ if(t.dataset.showAcked){showAcked=!showAcked;if(state.data)renderBoard(state.data);return;}
  if(t.dataset.clearRoute){if(state.tv){spotlight.pausedUntil=Date.now()+30000;spotlight.nextAt=spotlight.pausedUntil;clearSpotlight(false);spotlightControl();}clearServices();return;}
  if(t.dataset.removeService){selectService(t.dataset.removeService);return;}
  if(t.dataset.camera!=null){let c=cameraRows[+t.dataset.camera];if(c)openModal(c.label||'Traffic camera '+c.id,`<img class="camera-enlarged" src="${esc(c.image)}" alt="${esc(c.label)}" referrerpolicy="no-referrer"><p>${c.stale?'STALE / CAPTURE TIME UNVERIFIED':'SOURCE STILL IMAGE'} · Camera ${esc(c.id)} · ${esc(c.taken||'Capture timestamp unavailable')}</p><p>Coordinates ${c.lat}, ${c.lon}. Nearest-camera context does not confirm route impact.</p>`);return;}
@@ -202,12 +205,37 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal();if((e.k
 // ---------- TV operations board: loading / traffic / bunching & gaps ----------
 const tvSeen=new Map();let tvPrimed=false;
 function freshKey(key){const now=Date.now();if(!tvSeen.has(key))tvSeen.set(key,tvPrimed?now:0);const t=tvSeen.get(key);return t>0&&now-t<300000;}
+const localAcks={};let showAcked=false;
+function ackOf(key){return localAcks[key]||state.data?.acks?.[key]||null;}
+function withAck(html,key){
+ const a=ackOf(key),i=html.lastIndexOf('</article>');if(i<0)return html;
+ if(a){const t=new Date(a.ts*1000).toLocaleTimeString('en-SG',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Singapore'});
+  html=html.replace('class="tvb-card','class="tvb-card is-acked'+(a.fresh?' is-acking':''));const j=html.lastIndexOf('</article>');
+  return html.slice(0,j)+`<div class="tvb-stamp" aria-label="Acknowledged"><b>ACKNOWLEDGED</b><small>${esc(a.who||'controller')} · ${t}</small></div>`+(!state.tv&&!a.fresh?`<button type="button" class="tvb-unack" data-unack="${esc(key)}">Undo</button>`:'')+html.slice(j);}
+ if(state.tv)return html;
+ html=html.replace('class="tvb-card','class="tvb-card has-ack');const j=html.lastIndexOf('</article>');
+ return html.slice(0,j)+`<button type="button" class="tvb-ack" data-ack="${esc(key)}" title="Acknowledge for every controller" aria-label="Acknowledge">${icon('spark')}<span>ACK</span></button>`+html.slice(j);
+}
+async function ackCard(key,undo=false){
+ if(undo){delete localAcks[key];if(state.data?.acks)delete state.data.acks[key];}
+ else localAcks[key]={who:'You',ts:Date.now()/1000,fresh:true};
+ if(state.data)renderBoard(state.data);
+ try{const r=await fetch('/api/forecast/centre/ack',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({key,undo})});const j=await r.json().catch(()=>({}));
+  if(!r.ok)throw Error(j.error||'Could not save acknowledgement');
+  if(!undo){localAcks[key]={...localAcks[key],who:j.who||'You'};if(state.data){state.data.acks=state.data.acks||{};state.data.acks[key]={who:j.who||'You',ts:j.ts||localAcks[key].ts};}}}
+ catch(err){$('error').textContent=err.message+' · acknowledged on this screen only';}
+ if(!undo)setTimeout(()=>{if(localAcks[key])localAcks[key].fresh=false;if(state.data)renderBoard(state.data);},3600);
+}
 function boardColumn(prefix,rows,card,empty){
  const list=$(prefix+'List');
- if(!rows.length){list.innerHTML=empty;$(prefix+'Page').textContent='';return;}
- list.innerHTML=rows.map(r=>card(r,freshKey(r.key))).join('');
+ // Acknowledged cards: the chop shows for ~3.5 s, then the card fades out and stays hidden (2 h, or until it clears).
+ const hidden=rows.filter(r=>{const a=ackOf(r.key);return a&&!a.fresh;});
+ if(!showAcked||state.tv)rows=rows.filter(r=>!hidden.includes(r));
+ const ackNote=hidden.length&&!state.tv?` <button type="button" class="tvb-showack" data-show-acked="1">${showAcked?'Hide':'Show'} ${hidden.length} acknowledged</button>`:'';
+ if(!rows.length){list.innerHTML=hidden.length?`<div class="empty tvb-allack"><b>✓ All acknowledged</b><small>${hidden.length} case${hidden.length===1?'':'s'} acknowledged · still being tracked</small></div>`:empty;$(prefix+'Page').innerHTML=ackNote;return;}
+ list.innerHTML=rows.map(r=>withAck(card(r,freshKey(r.key)),r.key)).join('');
  // Normal view lists every case (the panel scrolls); only TV, which nobody can scroll, pages through them.
- if(!state.tv||typeof getComputedStyle!=='function'||!list.children){$(prefix+'Page').textContent=rows.length>1?rows.length+' listed':'';return;}   // no layout engine (tests): show all
+ if(!state.tv||typeof getComputedStyle!=='function'||!list.children){$(prefix+'Page').innerHTML=(rows.length>1?rows.length+' listed':'')+ackNote;return;}   // no layout engine (tests): show all
  const items=[...list.children],gap=parseFloat(getComputedStyle(list).rowGap)||0;
  const pad=parseFloat(getComputedStyle(list).paddingTop)+parseFloat(getComputedStyle(list).paddingBottom)||0;
  const pages=paginate(items.map(x=>x.offsetHeight),list.clientHeight-pad,gap),n=state.page%pages.length,keep=new Set(pages[n]);

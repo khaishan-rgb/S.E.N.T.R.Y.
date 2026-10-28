@@ -61,6 +61,15 @@ class Analyse(unittest.TestCase):
         self.assertIsNone(out["crossings"][0]["to_jb"])
         self.assertEqual(asyncio.run(cpa.analyse(CAMS, None, None, None, now=1000))["cameras"], {})
 
+    def test_lta_speed_band_fallback(self):
+        self.assertEqual([cpa.level_from_band(b) for b in (8, 5, 4, 3, 2, 1, None)], ["Smooth", "Smooth", "Medium", "Jam", "Jam", "Super Jam", None])
+        async def bands(lat, lon):
+            return {"level": "Medium", "speed": 30, "free_speed": 39, "source": "LTA speed bands"}
+        out = asyncio.run(cpa.analyse(CAMS, None, None, bands, now=1000))
+        self.assertEqual(out["cameras"]["6710"], {"level": "Medium", "to_jb": None, "to_sg": None, "confidence": None, "source": "LTA speed bands",
+                                                  "speed": 30, "free_speed": 39, "at": 1000})
+        self.assertEqual(out["crossings"][0]["any"], {"level": "Medium", "minutes": 30})
+
     def test_ai_failure_falls_back(self):
         async def broken(content):
             raise RuntimeError("quota")

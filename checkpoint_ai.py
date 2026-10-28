@@ -4,8 +4,8 @@ How it works
 - The camera still images (LTA Traffic Images) are sent to Claude (vision) in ONE batched request, which returns a
   traffic level per image: Smooth / Medium / Jam / Super Jam, and for the checkpoint cameras the level in each
   direction (towards Johor, towards Singapore). Only when ANTHROPIC_API_KEY is set.
-- Without the key (or if the AI call fails) the level comes from TomTom speed now vs free-flow speed at the camera
-  point, when a TomTom key is set. Otherwise no level is shown (never guessed).
+- Without the key (or if the AI call fails) the level comes from LTA Traffic Speed Bands near the camera (app.py),
+  never from TomTom (its daily cap is shared with the Forecast Centre traffic layer). Otherwise no level is shown (never guessed).
 - Crossing time = typical time for that level (CROSSING_MIN). It is an estimate, labelled as such: the cameras show the
   road queue, not the immigration hall.
 - Results are cached per camera photo for CACHE_S seconds, so a page refresh does not call the AI again.
@@ -48,6 +48,21 @@ def level_from_ratio(ratio):
     if ratio >= .25:
         return "Jam"
     return "Super Jam"
+
+
+def level_from_band(band):
+    """LTA Traffic Speed Band (1 = 0-9 km/h ... 8 = 70+ km/h) -> level."""
+    try:
+        band = int(band)
+    except (TypeError, ValueError):
+        return None
+    if band >= 5:                    # same split as the Route Traffic speed layer (smooth >= 5, moderate 4)
+        return "Smooth"
+    if band == 4:
+        return "Medium"
+    if band >= 2:
+        return "Jam"
+    return "Super Jam" if band >= 1 else None
 
 
 def norm_level(value):
@@ -181,10 +196,13 @@ async def analyse(cams, fetch_image=None, ask_model=None, flow=None, now=None):
                 f = await flow(c["lat"], c["lon"])
             except Exception:
                 f = None
-            lv = level_from_ratio((f or {}).get("ratio"))
+            f = f or {}
+            lv = f.get("level") or level_from_ratio(f.get("ratio"))
             if lv:
-                results[str(c["id"])] = {"level": lv, "to_jb": None, "to_sg": None, "confidence": (f or {}).get("conf"),
-                                         "source": "TomTom speed", "speed": round(f["cur"]), "free_speed": round(f["free"]), "at": now}
+                sp, fr = f.get("speed", f.get("cur")), f.get("free_speed", f.get("free"))
+                results[str(c["id"])] = {"level": lv, "to_jb": None, "to_sg": None, "confidence": f.get("conf"),
+                                         "source": f.get("source", "TomTom speed"), "speed": round(sp) if sp is not None else None,
+                                         "free_speed": round(fr) if fr is not None else None, "at": now}
     if len(_CACHE) > 500:
         for k in sorted(_CACHE, key=lambda k: _CACHE[k][0])[:200]:
             _CACHE.pop(k, None)
