@@ -73,6 +73,13 @@ def _keep(e, kind, direction, service, operator, opmap, services=None):
     return True
 
 
+def _lvk(e):
+    """'bb2' / 'bb3p' (3BB and 4BB+) / 'gap'."""
+    if e.get("kind") == "gap":
+        return "gap"
+    return "bb3p" if int(e.get("level") or 2) >= 3 else "bb2"
+
+
 def _w(e):
     return float(e.get("w", 1) or 0)
 
@@ -81,17 +88,24 @@ def _r(x):
     return round(x, 1) if isinstance(x, float) else x
 
 
-def aggregate(events, prev_events, stops, p, kind="all", direction=0, service="", operator="", opmap=None, top_n=10, services=None):
+def aggregate(events, prev_events, stops, p, kind="all", direction=0, service="", operator="", opmap=None, top_n=10, services=None, hour=None, stop=""):
     """events / prev_events: [{kind 'bb'|'gap', service, direction, start, end, level, stops, start_stop, alerts, open?, w?}].
     w = weight of the record: 1 for a case (default), minutes for a time observation."""
     svc_filter = {s.upper() for s in (services or []) if s}
-    ev = [e for e in (events or []) if e.get("start") is not None and p["start"] <= e["start"] < p["end"] and _keep(e, kind, direction, service, operator, opmap, svc_filter)]
-    pv = [e for e in (prev_events or []) if e.get("start") is not None and _keep(e, kind, direction, service, operator, opmap, svc_filter)]
+    def extra(e):                     # hour of day / location filters (Bunching & Gap past section)
+        if hour is not None and 0 <= int(hour) <= 23 and local_parts(e["start"])[2] != int(hour):
+            return False
+        if stop and stop_of(e.get("start_stop"), stops)["code"] != stop and stop_of(e.get("start_stop"), stops)["name"] != stop:
+            return False
+        return True
+    ev = [e for e in (events or []) if e.get("start") is not None and p["start"] <= e["start"] < p["end"] and _keep(e, kind, direction, service, operator, opmap, svc_filter) and extra(e)]
+    pv = [e for e in (prev_events or []) if e.get("start") is not None and _keep(e, kind, direction, service, operator, opmap, svc_filter) and extra(e)]
     n_bb = sum(_w(e) for e in ev if e["kind"] == "bb")
     n_gap = sum(_w(e) for e in ev if e["kind"] == "gap")
 
     svc = {}
-    hours = [{"h": h, "bb": 0, "gap": 0} for h in range(24)]
+    hours = [{"h": h, "bb": 0, "gap": 0, "bb2": 0, "bb3p": 0} for h in range(24)]
+    day_index = {}
     heat = [[0] * 24 for _ in range(7)]
     days = {}
     roads, stops_out = {}, {}
@@ -102,9 +116,17 @@ def aggregate(events, prev_events, stops, p, kind="all", direction=0, service=""
         k, w = e["kind"], _w(e)
         s = str(e.get("service", ""))
         d = int(e.get("direction") or 0)
-        x = svc.setdefault(s, {"service": s, "events": 0, "bb": 0, "gap": 0, "d1": 0, "d2": 0, "d1_bb": 0, "d1_gap": 0, "d2_bb": 0, "d2_gap": 0, "stops": 0, "max_stops": 0})
+        x = svc.setdefault(s, {"service": s, "events": 0, "bb": 0, "gap": 0, "d1": 0, "d2": 0, "d1_bb": 0, "d1_gap": 0, "d2_bb": 0, "d2_gap": 0, "stops": 0, "max_stops": 0,
+                               "bb2": 0, "bb3p": 0, "dur_sum": 0.0, "dur_n": 0, "daily": Counter()})
         x["events"] += w
         x[k] += w
+        lk = _lvk(e)
+        if lk != "gap":
+            x[lk] += w
+        if e.get("end") and e["end"] > e["start"]:
+            x["dur_sum"] += (e["end"] - e["start"]) / 60
+            x["dur_n"] += 1
+        x["daily"][local_parts(e["start"])[0]] += w
         if d in (1, 2):
             x[f"d{d}"] += w
             x[f"d{d}_{k}"] += w
@@ -113,9 +135,13 @@ def aggregate(events, prev_events, stops, p, kind="all", direction=0, service=""
         x["max_stops"] = max(x["max_stops"], n)
         date, wd, hr = local_parts(e["start"])
         hours[hr][k] += w
+        if lk != "gap":
+            hours[hr][lk] += w
         heat[wd][hr] += w
-        dd = days.setdefault(date, {"date": date, "bb": 0, "gap": 0})
+        dd = days.setdefault(date, {"date": date, "bb": 0, "gap": 0, "bb2": 0, "bb3p": 0})
         dd[k] += w
+        if lk != "gap":
+            dd[lk] += w
         if k == "bb":
             lv[min(4, max(2, int(e.get("level") or 2)))] += w
         if n:
@@ -128,9 +154,14 @@ def aggregate(events, prev_events, stops, p, kind="all", direction=0, service=""
             durs.append((e["end"] - e["start"]) / 60)
         st = stop_of(e.get("start_stop"), stops)
         key = st["code"] or st["name"]
-        so = stops_out.setdefault(key, {**st, "events": 0, "bb": 0, "gap": 0, "svc": Counter(), "len": 0, "n": 0})
+        so = stops_out.setdefault(key, {**st, "events": 0, "bb": 0, "gap": 0, "bb2": 0, "bb3p": 0, "svc": Counter(), "len": 0, "n": 0, "dur_sum": 0.0, "dur_n": 0})
         so["events"] += w
         so[k] += w
+        if lk != "gap":
+            so[lk] += w
+        if e.get("end") and e["end"] > e["start"]:
+            so["dur_sum"] += (e["end"] - e["start"]) / 60
+            so["dur_n"] += 1
         so["svc"][s] += w
         so["len"] += n
         so["n"] += 1 if n else 0
@@ -146,9 +177,14 @@ def aggregate(events, prev_events, stops, p, kind="all", direction=0, service=""
     t = p["start"]
     while t < p["end"]:
         date, wd, _ = local_parts(t + 1)
-        day_list.append({**days.get(date, {"date": date, "bb": 0, "gap": 0}), "wd": WEEKDAYS[wd]})
+        day_list.append({**days.get(date, {"date": date, "bb": 0, "gap": 0, "bb2": 0, "bb3p": 0}), "wd": WEEKDAYS[wd]})
         t += DAY
 
+    dates = [d["date"] for d in day_list]
+    for x in svc.values():                                   # per-service daily counts (sparkline) and average case length in minutes
+        x["avg_min"] = round(x["dur_sum"] / x["dur_n"], 1) if x["dur_n"] else None
+        x["daily"] = [x["daily"].get(d0, 0) for d0 in dates]
+        x.pop("dur_sum"), x.pop("dur_n")
     services = sorted(svc.values(), key=lambda x: (-x["events"], -x["max_stops"], x["service"]))
     road_list = sorted(roads.values(), key=lambda r: (-r["events"], r["road"]))
     stop_list = sorted(stops_out.values(), key=lambda s: (-s["events"], s["name"]))
@@ -165,7 +201,8 @@ def aggregate(events, prev_events, stops, p, kind="all", direction=0, service=""
         "roads": [{"road": r["road"], "events": r["events"], "bb": r["bb"], "gap": r["gap"], "stops": len(r["stops"]),
                    "services": [s for s, _ in r["svc"].most_common(6)]} for r in road_list[:8]],
         "stops": [{"code": s["code"], "name": s["name"], "road": s["road"], "lat": s["lat"], "lon": s["lon"], "events": s["events"], "bb": s["bb"], "gap": s["gap"],
-                   "avg_stops": round(s["len"] / s["n"], 1) if s["n"] else None, "services": [x for x, _ in s["svc"].most_common(6)]} for s in stop_list[:30]],
+                   "avg_stops": round(s["len"] / s["n"], 1) if s["n"] else None, "services": [x for x, _ in s["svc"].most_common(6)],
+                   "n_services": len(s["svc"]), "bb2": s["bb2"], "bb3p": s["bb3p"], "avg_min": round(s["dur_sum"] / s["dur_n"], 1) if s["dur_n"] else None} for s in stop_list[:30]],
     })
 
 

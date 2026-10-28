@@ -352,11 +352,12 @@ def live_snapshot(raw, samples, h, now=None):
         # Forecast categories use collector arrival-time models within their actual coverage.
         # Same rules and counts as the Bunching & Gap page (one engine: bunching.py, its settings apply to both pages):
         # 3BB now = groups of exactly 3 buses that are bunched now (confirmed or developing) = the page's "3BB" count;
-        # long headway now = the page's "Long gaps" list (scheduled + gap_add_min, first gap_skip_stops stops ignored).
+        # long headway now = gaps that are long NOW (scheduled + gap_add_min, first gap_skip_stops stops ignored) = the
+        # Bunching & Gap page's live "Long headway" card (bunching_live.py).
         # Forecast horizons: the engine's predicted onset (t_occur) within its 30-min horizon.
         groups=[g for g in sample.get("groups",[]) if g.get("size")==3 and valid and
                 ((h==0 and g.get("status") in ("confirmed","developing")) or (h>0 and h<=30 and g.get("t_occur") is not None and g["t_occur"]<=h))]
-        gaps=[g for g in sample.get("gaps",[]) if valid and (h==0 or (0<h<=30 and g.get("t_occur") is not None and g["t_occur"]<=h))]
+        gaps=[g for g in sample.get("gaps",[]) if valid and ((h==0 and g.get("active")) or (0<h<=30 and g.get("t_occur") is not None and g["t_occur"]<=h))]
         stops=sample.get('route_stops') or (raw.get('route_context') or {}).get(f'{key[0]}:{key[1]}',[])
         traffic_details=[]
         for event in events:

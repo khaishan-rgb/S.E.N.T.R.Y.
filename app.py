@@ -1089,6 +1089,7 @@ import contextlib
 from collections import deque
 import bunching
 import bunching_analytics
+import bunching_live
 
 BB_DB = os.getenv("BUNCHING_DB", str(HERE / "bunching.db"))
 BB_DEFAULT = os.getenv("BUNCHING_SERVICES", "32,145,65,33,51,74,89,200,27,157")
@@ -1203,6 +1204,7 @@ def bb_init():
     bb_sql("CREATE TABLE IF NOT EXISTS service_headway_config(service TEXT, direction INTEGER, day_type TEXT, t_from TEXT, t_to TEXT, hw REAL)")
     bb_sql("CREATE TABLE IF NOT EXISTS bunching_event(id INTEGER PRIMARY KEY AUTOINCREMENT, service TEXT, direction INTEGER, start_ts REAL, end_ts REAL, bus_group TEXT, "
            "max_level INTEGER, start_stop TEXT, end_stop TEXT, stops INTEGER, min_hw REAL)")
+    bb_sql("CREATE TABLE IF NOT EXISTS bb_ack(id INTEGER PRIMARY KEY AUTOINCREMENT, event_id INTEGER, kind TEXT, service TEXT, direction INTEGER, action TEXT, who TEXT, ts REAL)")
     bb_sql("CREATE TABLE IF NOT EXISTS gap_event(id INTEGER PRIMARY KEY AUTOINCREMENT, service TEXT, direction INTEGER, start_ts REAL, end_ts REAL, buses TEXT, "
            "max_hw REAL, max_ratio REAL, sched_hw REAL, location TEXT)")
     for tbl, cols in (("gap_event", (("start_stop", "TEXT"), ("end_stop", "TEXT"), ("stops", "INTEGER"), ("alerts", "INTEGER"))),   # older files: add the new columns
@@ -1433,7 +1435,10 @@ def bb_events(key, res, ts):
         e["ids"] |= ids
         e["cur_ids"] = ids                                                            # who is in the group NOW (matching uses this, not everyone ever seen)
         e["sched"] = res.get("sched_hw")
-        e["max_level"] = max(e["max_level"], g["size"] + len(g["joining"]))
+        lv_now = g["size"] + len(g["joining"])
+        if e["max_level"] and lv_now > e["max_level"]:
+            e["escalated_at"] = ts                                                     # e.g. 2BB grew into 3BB: same case, higher level
+        e["max_level"] = max(e["max_level"], lv_now)
         e["min_hw"] = min(e["min_hw"], g["min_hw"])
         if g["cur_j"] >= e["last_j"]:
             e["last_j"], e["end_stop"] = g["cur_j"], g["cur_stop"]
@@ -1562,7 +1567,8 @@ async def bb_cycle(keys=None):
         if r and not r.get("error"):
             c = r["counts"]
             per[r["key"]] = (c["gaps"], c["bb"], c["bb2"], c["bb3"], c["bb4"], c["early"])
-    BB["hist"].append({"ts": t0, "per": per})
+    per2 = {r["key"]: bunching_live.kpi_tuple(r) for r in (BB["rows"].get(f"{k[0]}:{k[1]}") for k in keys) if r and not r.get("error")}
+    BB["hist"].append({"ts": t0, "per": per, "per2": per2})
     BB["cycle"] = {"at": t0, "took": round(time.time() - t0, 1), "pairs": len(keys)}
     BB["loop_at"] = time.time()
     try:
@@ -1635,6 +1641,12 @@ def bb_sum(keys, which):
 @app.get("/bunching", response_class=HTMLResponse)
 async def bunching_page():
     return HTMLResponse((HERE / "bunching.html").read_text(encoding="utf-8"))
+
+
+@app.get("/bunching/classic", response_class=HTMLResponse)
+async def bunching_classic_page():
+    """The previous Bunching & Gap page (settings, headway master, event log, alert list, patterns) - linked from the new page."""
+    return HTMLResponse((HERE / "bunching_classic.html").read_text(encoding="utf-8"))
 
 
 # ---- V14.1 shared basemap: CARTO raster tiles (keyed) with OneMap / OpenStreetMap fallback. The key is read from the environment;
@@ -1802,6 +1814,32 @@ async def api_bunching(services: str = "", direction: int = 0):
             "open_events": sum(1 for e in bb_open_public() if e["service"] + ":" + str(e["direction"]) in kk), "alerts": bb_alerts(set(kk))}
 
 
+@app.get("/api/bunching/live")
+async def api_bunching_live(services: str = "", direction: int = 0):
+    """Live Bunching & Long Headway: every monitored service-direction with an active 2BB / 3BB / 4BB+ / long-gap case, grouped
+    (one row per service-direction, its cases inside), with the KPI cards from the same list and the change vs about 1 hour ago."""
+    base = await api_bunching(services, direction)
+    keys = {r["key"] for r in base["rows"]}
+    rows = [BB["rows"][k] for k in keys if k in BB["rows"]]
+    try:
+        opmap = await occ_operator_map()
+    except Exception:
+        opmap = {}
+    now = time.time()
+    view = bunching_live.live_view(rows, list(BB["open"].values()), now, opmap)
+    prev = prev_age = None
+    for h in reversed(BB["hist"]):
+        if now - h["ts"] >= 55 * 60 and h.get("per2") is not None:
+            prev, prev_age = bunching_live.kpi_from_hist({k: v for k, v in h["per2"].items() if k in keys}), round((now - h["ts"]) / 60)
+            break
+    hist_min = round((now - BB["hist"][0]["ts"]) / 60, 1) if BB["hist"] else 0
+    return {"updated": base["updated"], "updated_ts": now, **view, "kpi_prev": prev, "kpi_prev_min": prev_age, "history_min": hist_min,
+            "params": base["params"], "errors": base["errors"], "collector": base["collector"],
+            "rules": {"bunch_min": base["params"]["bunch_min"], "gap_add_min": base["params"]["gap_add_min"], "confirm_stops": base["params"]["confirm_stops"],
+                      "gap_stops": base["params"]["gap_stops"], "gap_skip_stops": base["params"].get("gap_skip_stops", 0)},
+            "source": "LTA DataMall Bus Arrival - estimated headways from arrival predictions (not confirmed actual headways)"}
+
+
 @app.get("/api/bunching/detail")
 async def api_bunching_detail(service: str = "", direction: int = 1):
     svc = service.strip().upper()
@@ -1908,10 +1946,22 @@ async def api_bb_alert_ack(request: Request):
     except (ValueError, TypeError):
         return JSONResponse({"error": "Body must be JSON with the alert id."}, status_code=400)
     e = BB["open"].get(eid)
-    if not e or not e.get("alerts"):
-        return JSONResponse({"error": "That alert is no longer active."}, status_code=404)
-    e["acked_n"], e["acked_ts"] = len(e["alerts"]), time.time()
-    return {"ok": True, "alert": bb_alert_public(e)}
+    if not e:
+        return JSONResponse({"error": "That case is no longer active."}, status_code=404)
+    undo = bool(body.get("undo"))
+    who = _who(request)
+    if undo:
+        e["acked_n"], e["acked_ts"], e["acked_by"] = 0, None, None
+    else:
+        e["acked_n"], e["acked_ts"], e["acked_by"] = len(e.get("alerts") or []), time.time(), who
+    bb_sql("INSERT INTO bb_ack(event_id, kind, service, direction, action, who, ts) VALUES (?,?,?,?,?,?,?)",
+           (eid, e["kind"], e["service"], e["direction"], "unacknowledged" if undo else "acknowledged", who, time.time()))      # audit trail
+    return {"ok": True, "alert": bb_alert_public(e) if e.get("alerts") else None, "acked_ts": e["acked_ts"], "acked_by": e.get("acked_by")}
+
+
+@app.get("/api/bunching/ack-log")
+async def api_bb_ack_log(limit: int = 100):
+    return {"log": bb_sql("SELECT event_id, kind, service, direction, action, who, ts FROM bb_ack ORDER BY id DESC LIMIT ?", (max(1, min(500, limit)),), fetch=True)}
 
 
 # ---------------------------------------------------------------------------
@@ -2480,7 +2530,8 @@ _BB_TRIP_SQL = "SELECT trip_key, kind, service, direction, start_ts AS start, la
 
 
 @app.get("/api/bunching/analytics")
-async def api_bb_analytics(period: str = "7d", kind: str = "all", direction: int = 0, service: str = "", operator: str = "", services: str = "", measure: str = "trips"):
+async def api_bb_analytics(period: str = "7d", kind: str = "all", direction: int = 0, service: str = "", operator: str = "", services: str = "", measure: str = "trips",
+                           hour: int = -1, stop: str = "", top: int = 10):
     p = bunching_analytics.period_bounds(period, time.time())
     measure = "cases" if measure == "cases" else "trips"
     h0 = lambda t: int(t // 3600) * 3600
@@ -2502,15 +2553,14 @@ async def api_bb_analytics(period: str = "7d", kind: str = "all", direction: int
         stops = (await static()).get("stops") or {}
     except Exception:
         stops = {}
-    opmap = {}
-    if operator:
-        try:
-            opmap = await occ_operator_map()
-        except Exception:
-            opmap = {}
+    try:
+        opmap = await occ_operator_map()                                            # also returned, for "group by operator"
+    except Exception:
+        opmap = {}
     svc_list = [x for x in re.split(r"[,\s]+", services.upper()) if re.fullmatch(r"[0-9A-Z]{1,6}", x)][:60]
     out = bunching_analytics.aggregate(cur, prev, stops, p, kind=kind if kind in ("bb", "gap") else "all", direction=direction if direction in (1, 2) else 0,
-                                       service=re.sub(r"[^0-9A-Za-z]", "", service)[:6], operator=operator.strip().upper()[:6], opmap=opmap, services=svc_list)
+                                       service=re.sub(r"[^0-9A-Za-z]", "", service)[:6], operator=operator.strip().upper()[:6], opmap=opmap, services=svc_list,
+                                       top_n=max(10, min(300, top)), hour=hour if 0 <= hour <= 23 else None, stop=re.sub(r"[^0-9A-Za-z ()'&.-]", "", stop)[:80])
     cov_rows = bb_sql("SELECT hour_ts, service, direction, sec FROM bb_cov WHERE hour_ts >= ? AND hour_ts < ?", (h0(p["start"]), p["end"]), fetch=True)
     if svc_list:
         cov_rows = [r for r in cov_rows if r["service"] in svc_list]
@@ -2519,6 +2569,7 @@ async def api_bb_analytics(period: str = "7d", kind: str = "all", direction: int
     first = bb_sql("SELECT MIN(t) AS t FROM (SELECT MIN(start_ts) AS t FROM bunching_event UNION ALL SELECT MIN(start_ts) FROM gap_event)", fetch=True)
     first_obs = bb_sql("SELECT MIN(hour_ts) AS t FROM bb_cov", fetch=True)                # when this server's recorded history begins
     rec = bb_rec_status()
+    out["operators"] = {x["service"]: opmap.get(x["service"].upper(), "") for x in out.get("services", [])}
     out.update(measure=measure, coverage=bunching_analytics.coverage(cov_rows, p), db_ok=BB["db_ok"], db_err=BB["db_err"], first_ts=(first[0]["t"] if first else None),
                first_obs_ts=(first_obs[0]["t"] if first_obs else None),
                always_on=BB_ALWAYS, keep_days=BB_KEEP_DAYS, collecting=rec["state"] in ("on", "starting"), recording=rec,
