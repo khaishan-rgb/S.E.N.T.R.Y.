@@ -1,4 +1,4 @@
-import {COLORS,esc,icon,delayColor} from './forecast2026-core.js?v=20261028-hz16';
+import {COLORS,esc,icon,delayColor} from './forecast2026-core.js?v=20261028-hz17';
 export const LAYERS={speed:'Selected route speed · LTA (green smooth → red jam)',speedall:'All roads speed · LTA (green smooth → red jam)',buses:'Bus positions',routes:'Bus routes',flow:'Traffic flow',incidents:'Traffic incidents',works:'Roadworks',rain:'Rainfall',loading:'Passenger loading',bunching:'Bus bunching',gap:'Long headway gaps',heat:'Forecast heatmap'};
 const termCode=name=>{const w=String(name||'').replace(/[^A-Za-z0-9 ]/g,' ').split(/\s+/).filter(Boolean);return w.length?w.slice(0,4).map(x=>/^\d/.test(x)?x:x[0].toUpperCase()).join(''):'';};
 export function stopPopup(p){const km=p.km!=null&&p.km!==''&&!isNaN(+p.km)?(+p.km).toFixed(1)+' km':null,dest=p.dest&&p.dest!=='null'?p.dest:null;

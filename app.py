@@ -12438,13 +12438,16 @@ async def fc26_camera_ai(ids: str=''):
         # Forecast Centre traffic layer, and camera look-ups must not use it up.
         if idx is None:
             return None
-        k,best=math.cos(math.radians(lat)),None
+        # Typical (median) band of the road links within 300 m, not the single worst one: the worst link near a
+        # checkpoint is usually the immigration plaza or a slip road, which read "Super Jam" even on an empty night.
+        k,near=math.cos(math.radians(lat)),[]
         for alat,alon,blat,blon,band,road,mn,mx,cat in idx.segs:
-            for pa,po in ((alat,alon),(blat,blon),((alat+blat)/2,(alon+blon)/2)):
-                if ((pa-lat)*111.32)**2+((po-lon)*111.32*k)**2<=0.09 and (best is None or band<best[0]):
-                    best=(band,mn,mx,road)
-        if not best:
+            if any(((pa-lat)*111.32)**2+((po-lon)*111.32*k)**2<=0.09 for pa,po in ((alat,alon),(blat,blon),((alat+blat)/2,(alon+blon)/2))):
+                near.append((band,mn,mx,road))
+        if not near:
             return None
+        near.sort(key=lambda x:x[0])
+        best=near[(len(near)-1)//2]
         return {'level':cpa.level_from_band(best[0]),'speed':best[1],'free_speed':best[2],'band':best[0],'road':best[3],'source':'LTA speed bands'}
     out=await cpa.analyse(pick,fetch_image if DV_AI_KEY else None,ask_model if DV_AI_KEY else None,flow)
     out['configured']={'ai':bool(DV_AI_KEY),'speed':idx is not None}
