@@ -603,8 +603,16 @@ async def on_error(request, exc):
     return JSONResponse({"error": f"{type(exc).__name__}: {exc}"}, status_code=500)
 
 
-@app.get("/", response_class=HTMLResponse)
-async def home():
+@app.get("/")
+async def home(request: Request):
+    """The site opens on the Command Centre (Forecast Centre). Old Route Traffic links (/?svc=..&dir=..) still land on Route Traffic."""
+    from fastapi.responses import RedirectResponse
+    q = request.url.query
+    return RedirectResponse("/route-traffic?" + q if q else "/command", status_code=307)
+
+
+@app.get("/route-traffic", response_class=HTMLResponse)
+async def route_traffic_page():
     return HTMLResponse((HERE / "index.html").read_text(encoding="utf-8"))
 
 
@@ -12379,16 +12387,31 @@ def fc26_camera_ai_io(cpa):
     async def fetch_image(url):
         r=await client().get(url,timeout=15)
         r.raise_for_status()
-        return r.content,r.headers.get('content-type','')
+        data,mime=r.content,r.headers.get('content-type','')
+        try:                                   # shrink to 768 px wide: about a sixth of the image tokens, still enough to see a queue
+            from PIL import Image
+            import io as _io
+            im=Image.open(_io.BytesIO(data)).convert('RGB')
+            if im.width>768:
+                im=im.resize((768,round(im.height*768/im.width)))
+            buf=_io.BytesIO();im.save(buf,'JPEG',quality=72);data,mime=buf.getvalue(),'image/jpeg'
+        except Exception:
+            pass                               # Pillow missing or not an image: send as is
+        return data,mime
     async def ask_model(content):
         last=None
         for model in dict.fromkeys([cpa.MODEL,DV_AI_MODEL]):          # camera model first, then the Diversion review model
             r=await client().post('https://api.anthropic.com/v1/messages',timeout=60,
                                   headers={'x-api-key':DV_AI_KEY,'anthropic-version':'2023-06-01','content-type':'application/json'},
-                                  json={'model':model,'max_tokens':900,'messages':[{'role':'user','content':content}]})
+                                  json={'model':model,'max_tokens':4000,'messages':[{'role':'user','content':content}]})
             if r.status_code==200:
                 cpa.STATUS['model']=model
-                return ''.join(b.get('text','') for b in (r.json().get('content') or []) if isinstance(b,dict))
+                j=r.json()
+                blocks=[b for b in (j.get('content') or []) if isinstance(b,dict)]
+                text=''.join(b.get('text','') for b in blocks if b.get('type')=='text')
+                if not text.strip():          # say why: e.g. stop_reason max_tokens / refusal, or only non-text blocks came back
+                    raise RuntimeError(f"Claude ({model}) returned no text: stop_reason={j.get('stop_reason')}, blocks={[b.get('type') for b in blocks]}")
+                return text
             try:
                 msg=(r.json().get('error') or {}).get('message') or r.text[:160]
             except Exception:
@@ -12438,13 +12461,16 @@ async def fc26_camera_ai(ids: str=''):
         # Forecast Centre traffic layer, and camera look-ups must not use it up.
         if idx is None:
             return None
-        k,best=math.cos(math.radians(lat)),None
+        # Typical (median) band of the road links within 300 m, not the single worst one: the worst link near a
+        # checkpoint is usually the immigration plaza or a slip road, which read "Super Jam" even on an empty night.
+        k,near=math.cos(math.radians(lat)),[]
         for alat,alon,blat,blon,band,road,mn,mx,cat in idx.segs:
-            for pa,po in ((alat,alon),(blat,blon),((alat+blat)/2,(alon+blon)/2)):
-                if ((pa-lat)*111.32)**2+((po-lon)*111.32*k)**2<=0.09 and (best is None or band<best[0]):
-                    best=(band,mn,mx,road)
-        if not best:
+            if any(((pa-lat)*111.32)**2+((po-lon)*111.32*k)**2<=0.09 for pa,po in ((alat,alon),(blat,blon),((alat+blat)/2,(alon+blon)/2))):
+                near.append((band,mn,mx,road))
+        if not near:
             return None
+        near.sort(key=lambda x:x[0])
+        best=near[(len(near)-1)//2]
         return {'level':cpa.level_from_band(best[0]),'speed':best[1],'free_speed':best[2],'band':best[0],'road':best[3],'source':'LTA speed bands'}
     out=await cpa.analyse(pick,fetch_image if DV_AI_KEY else None,ask_model if DV_AI_KEY else None,flow)
     out['configured']={'ai':bool(DV_AI_KEY),'speed':idx is not None}

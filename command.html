@@ -199,7 +199,7 @@
       list.push('<article class="att ' + (a.level === "critical" ? "crit" : "warn") + '"><div class="svc"><small>SVC</small><b>' + esc(a.svc) + '</b></div>'
         + '<div class="l1">' + DS.sev(a.level === "critical" ? "critical" : "warning", String(a.kind || "traffic").toUpperCase()) + '<span>Dir ' + esc(a.dir) + '</span></div>'
         + '<div class="l2">' + esc(a.location || "") + (a.delay_min ? ' \u00b7 est. delay +' + f0(a.delay_min) + ' min' : '') + '</div>'
-        + '<div class="l3"><a class="ds-btn sm" style="margin-left:auto" href="/?svc=' + encodeURIComponent(a.svc) + '&dir=' + esc(a.dir) + '">Analyse</a></div></article>'); });
+        + '<div class="l3"><a class="ds-btn sm" style="margin-left:auto" href="/route-traffic?svc=' + encodeURIComponent(a.svc) + '&dir=' + esc(a.dir) + '">Analyse</a></div></article>'); });
     $("attN").textContent = list.length ? list.length + " open" : "";
     $("att").innerHTML = list.length ? list.join("") : (bbErr && (!TR || TR.error)
       ? DS.empty({title:"LIVE DATA UNAVAILABLE", text:"The collectors could not be reached (" + (bbErr || TR.error) + "). Check Settings \u203a Data & Refresh.", action:"Open data status", href:"/settings#data"})

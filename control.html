@@ -597,7 +597,7 @@ function renderDetail(){
   $("detail").hidden = !it; if(!it) return;
   $("dTitle").innerHTML = `Service ${esc(it.service)} &ndash; Dir ${it.direction} <span class="rk ${it.risk}" style="width:14px;height:14px;vertical-align:middle;margin-left:6px" title="${RISK[it.risk]}"></span>`;
   $("dSub").textContent = `${it.stops} stops \u2022 ${it.n_buses} live bus${it.n_buses === 1 ? "" : "es"} (${it.monitored} GPS-tracked) \u2022 ${it.hw_source || "scheduled headway unknown"}`;
-  $("mapLink").href = `/?svc=${encodeURIComponent(it.service)}&dir=${it.direction}`;
+  $("mapLink").href = `/route-traffic?svc=${encodeURIComponent(it.service)}&dir=${it.direction}`;
   $("strip").innerHTML = it.buses.length ? stripSVG(it) + turnTable(it) + planTable(it) : `<div class="empty">No live bus positions found on this route right now.</div>`;
   const ic = {triggered:"!", watch:"~", clear:"\u2713", na:"?"};
   $("checks").innerHTML = it.checks.map(c => `<div class="chk"><div class="ci ${c.state}" title="${c.state}">${ic[c.state]}</div><div><b>${c.id}. ${esc(c.name)} <small class="m" style="font-weight:500">${c.state === "na" ? "not evaluable" : c.state}</small></b><span>${esc(c.detail)}</span></div></div>`).join("");

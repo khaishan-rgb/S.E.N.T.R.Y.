@@ -2,7 +2,7 @@
    ONE registry drives sidebar, launcher, shortcuts and mobile navigation. */
 (function(){
   var MODULES = [
-    {id:"route",name:"Route Traffic",icon:"▬",route:"/",group:"ANALYSIS TOOLS",mobile:true,shortcut:true,enabled:true},
+    {id:"route",name:"Route Traffic",icon:"▬",route:"/route-traffic",group:"ANALYSIS TOOLS",mobile:true,shortcut:true,enabled:true},
     {id:"headway",name:"Headway Control",icon:"↔",route:"/control",group:"ANALYSIS TOOLS",mobile:true,shortcut:true,enabled:true},
     {id:"bunching",name:"Bunching & Gap",icon:"▪",route:"/bunching",group:"ANALYSIS TOOLS",mobile:true,shortcut:true,enabled:true},
     {id:"halfplan",name:"Halfway Planner",icon:"½",route:"/halfway",group:"ANALYSIS TOOLS",mobile:true,shortcut:true,enabled:true},

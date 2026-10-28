@@ -20,7 +20,7 @@
      desc:"Combined live alert queue and OCC Connect \u2014 the always-on Service Controller workspace."},
     {id:"command",  name:"Forecast Centre",          short:"Home",     icon:"home",    route:"/command",      group:"COMMAND",   permission:"view", shortcut:false, mobile:"home",     enabled:true,
      aliases:["/forecast"], desc:"Predictive OCC home: verified route impact, 15 / 30 / 60-min forecasts, smart alerts"},
-    {id:"route",    name:"Route Traffic",            short:"Traffic",  icon:"route",   route:"/",             group:"COMMAND",   permission:"view", shortcut:true,  mobile:"traffic",  enabled:true,
+    {id:"route",    name:"Route Traffic",            short:"Traffic",  icon:"route",   route:"/route-traffic", aliases:["/"], group:"COMMAND",   permission:"view", shortcut:true,  mobile:"traffic",  enabled:true,
      desc:"Live route map: speed, incidents, road works, cameras"},
     {id:"headway",  name:"Headway Control",          short:"Control",  icon:"headway", route:"/control",      group:"COMMAND",   permission:"view", shortcut:true,  mobile:"control",  enabled:true,
      desc:"Pre-emptive departure adjustment by headway"},
