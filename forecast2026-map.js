@@ -1,5 +1,5 @@
-import {COLORS,esc,icon,delayColor} from './forecast2026-core.js?v=20261028-hz10';
-export const LAYERS={speed:'Road speed · LTA (green smooth → red jam)',buses:'Bus positions',routes:'Bus routes',flow:'Traffic flow',incidents:'Traffic incidents',works:'Roadworks',rain:'Rainfall',loading:'Passenger loading',bunching:'Bus bunching',gap:'Long headway gaps',heat:'Forecast heatmap'};
+import {COLORS,esc,icon,delayColor} from './forecast2026-core.js?v=20261028-hz11';
+export const LAYERS={speed:'Selected route speed · LTA (green smooth → red jam)',buses:'Bus positions',routes:'Bus routes',flow:'Traffic flow',incidents:'Traffic incidents',works:'Roadworks',rain:'Rainfall',loading:'Passenger loading',bunching:'Bus bunching',gap:'Long headway gaps',heat:'Forecast heatmap'};
 export class ForecastMap{
  constructor(host,onPick){this.host=host;this.onPick=onPick;this.flags=Object.fromEntries(Object.keys(LAYERS).map(k=>[k,k!=='heat']));this.markers=new Map();this.kind='schematic';this.tilt=false;this.selectedServices=[];this.spotlight=null;this.viewService=null;}
  addIcons(){if(!this.map.addImage||typeof document.createElement!=='function')return;const make=(w,h,draw)=>{const c=document.createElement('canvas');c.width=w;c.height=h;const g=c.getContext('2d');draw(g);return g.getImageData(0,0,w,h);};
@@ -10,12 +10,30 @@ export class ForecastMap{
   this.map.addImage('hz-rain',make(64,64,g=>{g.fillStyle='#bfe6ff';g.beginPath();g.arc(24,28,10,0,7);g.arc(36,24,12,0,7);g.arc(46,30,9,0,7);g.fill();g.fillRect(24,28,22,11);g.strokeStyle='#5ab8ff';g.lineWidth=3.5;g.lineCap='round';for(const x of [24,34,44]){g.beginPath();g.moveTo(x,45);g.lineTo(x-4,55);g.stroke();}}),{pixelRatio:2});
  }
  async loadSpeed(force=false){
-  // Whole island when zoomed out; only the visible area (plus margin) when zoomed in. LTA refreshes about every 5 min.
-  if(!this.map||!this.flags.speed||typeof fetch!=='function'||typeof this.map.getZoom!=='function')return;const z=this.map.getZoom(),b=this.map.getBounds?.();
-  const box=z>=12&&b?[b.getSouth(),b.getWest(),b.getNorth(),b.getEast()].map(v=>v.toFixed(3)).join(','):'';
-  if(!force&&box===this.speedBox)return;this.speedBox=box;
-  try{const r=await fetch('/api/speedbands'+(box?'?bbox='+box:''));if(!r.ok)return;const j=await r.json();
-   this.speedNote=j.error||'';this.map.getSource('lta-speed')?.setData({type:'FeatureCollection',features:(j.segments||[]).map(([a,b2,c,d,band,lv])=>({type:'Feature',geometry:{type:'LineString',coordinates:[[b2,a],[d,c]]},properties:{band,lv}}))});}catch(e){}
+  // LTA Traffic Speed Bands for the area around the selected route(s) only; refreshed every 5 min (LTA's own cycle).
+  if(!this.map||typeof fetch!=='function')return;const routes=this.flags.speed?this.selectedRoutes():[];
+  if(!routes.length){this.speedSegs=[];this.speedKey='';this.paintSpeed();return;}
+  const pts=routes.flatMap(r=>r.line),lon=pts.map(p=>p[0]),lat=pts.map(p=>p[1]);
+  const box=[Math.min(...lat)-.004,Math.min(...lon)-.004,Math.max(...lat)+.004,Math.max(...lon)+.004].map(v=>v.toFixed(3)).join(',');
+  if(!force&&box===this.speedKey)return this.paintSpeed();this.speedKey=box;
+  try{const r=await fetch('/api/speedbands?bbox='+box);if(!r.ok)return;const j=await r.json();this.speedSegs=j.segments||[];this.speedNote=j.error||'';}catch(e){return;}
+  this.paintSpeed();
+ }
+ paintSpeed(){
+  // Colour the selected route itself, piece by piece, with the LTA speed band of the road link it runs on
+  // (same direction of travel, within 35 m). Roads off the route stay uncoloured.
+  const src=this.map?.getSource?.('lta-speed');if(!src)return;const routes=this.flags.speed?this.selectedRoutes():[];
+  if(!routes.length||!this.speedSegs?.length){src.setData({type:'FeatureCollection',features:[]});return;}
+  const k=Math.cos(1.35*Math.PI/180),M=111320,xy=(lo,la)=>[lo*M*k,la*M],LV={1:'congested',2:'congested',3:'slow',4:'moderate'};
+  const segs=this.speedSegs.map(([a,b,c,d,band])=>{const p=xy(b,a),q=xy(d,c);return {p,q,band,ang:Math.atan2(q[1]-p[1],q[0]-p[0])};});
+  const near=(m,ang)=>{let best=null,bd=35;for(const s of segs){const dx=s.q[0]-s.p[0],dy=s.q[1]-s.p[1],L=dx*dx+dy*dy||1,t=Math.max(0,Math.min(1,((m[0]-s.p[0])*dx+(m[1]-s.p[1])*dy)/L));
+    const d=Math.hypot(s.p[0]+t*dx-m[0],s.p[1]+t*dy-m[1]);if(d>bd)continue;let da=Math.abs(s.ang-ang)%(2*Math.PI);if(da>Math.PI)da=2*Math.PI-da;if(da>Math.PI/3)continue;bd=d;best=s;}return best;};
+  const features=[];
+  for(const r of routes){let run=null;for(let i=1;i<r.line.length;i++){const a=r.line[i-1],b=r.line[i],pa=xy(a[0],a[1]),pb=xy(b[0],b[1]);
+    const s=near([(pa[0]+pb[0])/2,(pa[1]+pb[1])/2],Math.atan2(pb[1]-pa[1],pb[0]-pa[0])),lv=s?(s.band>=5?'smooth':LV[s.band]||'congested'):null;
+    if(run&&run.lv===lv)run.c.push(b);else{if(run&&run.lv)features.push({type:'Feature',geometry:{type:'LineString',coordinates:run.c},properties:{lv:run.lv,svc:r.svc}});run={lv,c:[a,b]};}}
+   if(run&&run.lv)features.push({type:'Feature',geometry:{type:'LineString',coordinates:run.c},properties:{lv:run.lv,svc:r.svc}});}
+  src.setData({type:'FeatureCollection',features});
  }
  installLock(){const host=this.host,HANDLERS=['scrollZoom','dragPan','dragRotate','touchZoomRotate','touchPitch','doubleClickZoom','keyboard','boxZoom'];
   let hint=document.createElement('div');hint.className='map-lock-hint';hint.setAttribute('aria-hidden','true');host.appendChild(hint);this.lockHint=hint;let timer=0;
@@ -37,13 +55,12 @@ export class ForecastMap{
    try{this.addIcons();}catch(e){}
    // Live road speed along every road: LTA Traffic Speed Bands (DataMall, refreshed by LTA about every 5 min), from /api/speedbands.
    this.map.addSource('lta-speed',{type:'geojson',data:{type:'FeatureCollection',features:[]}});
-   this.map.addLayer({id:'lta-speed',type:'line',source:'lta-speed',layout:{'line-cap':'round','line-join':'round'},paint:{'line-color':['match',['get','lv'],'smooth','#22d36a','moderate','#ffc21a','slow','#ff8a1f','congested','#ff4d55','#2f7dff'],'line-width':['interpolate',['linear'],['zoom'],10,1.6,13,3.2,16,6],'line-opacity':['interpolate',['linear'],['zoom'],10,.7,14,.9]}});
-   for(const ev of ['dragend','zoomend'])this.map.on(ev,()=>{clearTimeout(this.speedTimer);this.speedTimer=setTimeout(()=>this.loadSpeed(),400);});   // reload the road-speed layer only (never re-lays out icons)
-   const speedTick=setInterval(()=>this.loadSpeed(true),300000);speedTick?.unref?.();this.loadSpeed(true);
+   const speedTick=setInterval(()=>this.loadSpeed(true),300000);speedTick?.unref?.();
    this.map.addLayer({id:'sentry-routes',type:'line',source:'sentry-routes',layout:{'line-cap':'round','line-join':'round'},paint:{'line-color':['get','color'],'line-width':['interpolate',['linear'],['zoom'],10,2,15,5],'line-opacity':['get','opacity']}});
    this.map.addLayer({id:'sentry-selection-glow',type:'line',source:'sentry-selection',layout:{'line-cap':'round','line-join':'round'},paint:{'line-color':['get','color'],'line-width':['interpolate',['linear'],['zoom'],10,19,15,28],'line-blur':7,'line-opacity':.65}});
    this.map.addLayer({id:'sentry-selection-casing',type:'line',source:'sentry-selection',layout:{'line-cap':'round','line-join':'round'},paint:{'line-color':'#02111c','line-width':['interpolate',['linear'],['zoom'],10,13,15,20]}});
    this.map.addLayer({id:'sentry-selection',type:'line',source:'sentry-selection',layout:{'line-cap':'round','line-join':'round'},paint:{'line-color':['get','color'],'line-width':['interpolate',['linear'],['zoom'],10,9,15,14],'line-opacity':1}});
+   this.map.addLayer({id:'lta-speed',type:'line',source:'lta-speed',layout:{'line-cap':'round','line-join':'round'},paint:{'line-color':['match',['get','lv'],'smooth','#22d36a','moderate','#ffc21a','slow','#ff8a1f','congested','#ff4d55','#2f7dff'],'line-width':['interpolate',['linear'],['zoom'],10,5,15,9]}});   // selected route coloured by LTA speed, inside its cyan glow
    this.map.addLayer({id:'sentry-flow-glow',type:'line',source:'sentry-flow',paint:{'line-color':['get','color'],'line-width':['interpolate',['linear'],['zoom'],10,12,15,20],'line-opacity':.3,'line-blur':4}});
    this.map.addLayer({id:'sentry-flow',type:'line',source:'sentry-flow',layout:{'line-cap':'round','line-join':'round'},paint:{'line-color':['get','color'],'line-width':['interpolate',['linear'],['zoom'],10,5,15,9]}});
    this.map.addLayer({id:'sentry-route-direction',type:'symbol',source:'sentry-selection',layout:{'symbol-placement':'line','symbol-spacing':75,'text-field':'➤','text-font':['Noto Sans Regular'],'text-size':23,'text-keep-upright':false,'text-rotation-alignment':'map','text-allow-overlap':false},paint:{'text-color':'#efffff','text-halo-color':'#07516c','text-halo-width':2}});
@@ -75,7 +92,7 @@ export class ForecastMap{
   this.map.getSource('sentry-routes').setData(fc(this.flags.routes?[...routes.values()].filter(r=>r.line?.length>1).map(r=>{const selected=active.has(r.svc+':'+r.dir);return feature({type:'LineString',coordinates:r.line},{color:selected?COLORS.route:'#4a738b',opacity:highlighted?(selected?.28:.08):(selected?.85:.18),active:selected});}):[]));let segments=[];
   if(this.flags.flow){data.events.filter(e=>e.line?.length>1&&e.congestion_eligible).forEach(e=>segments.push(feature({type:'LineString',coordinates:e.line},{color:e.kind==='road_closed'?'#ff4d63':delayColor(e.delay,data.delay_filter),road:e.road,svc:e.svc||e.services?.[0],services:e.service_dirs?.map(([s,d])=>s+' · Dir '+d).join(', ')||e.svc,delay:e.delay??'Unknown · closure',basis:e.delay_basis||'Provider-reported delay',updated:new Date(data.updated*1000).toLocaleString('en-SG',{timeZone:'Asia/Singapore'})})));}
   const selectedRoutes=this.flags.routes?this.selectedRoutes():[];const lineFeatures=selectedRoutes.map(r=>feature({type:'LineString',coordinates:r.line},{svc:r.svc,dir:r.dir,color:Number(r.dir)===2?'#8cbaff':'#35edff'}));
-  this.map.getSource('sentry-selection').setData(fc(lineFeatures));
+  this.map.getSource('sentry-selection').setData(fc(lineFeatures));this.loadSpeed();
   this.map.getSource('sentry-route-labels').setData(fc(selectedRoutes.map(r=>feature({type:'Point',coordinates:r.line[Math.floor(r.line.length/2)]},{label:r.svc+' · DIR '+r.dir}))));
   this.map.getSource('sentry-route-ends').setData(fc(selectedRoutes.flatMap(r=>[r.line[0],r.line.at(-1)].map(point=>feature({type:'Point',coordinates:point},{color:Number(r.dir)===2?'#8cbaff':'#35edff'})))));
   this.map.getSource('sentry-rain').setData(fc(this.flags.rain?(data.rain||[]).map(s=>feature({type:'Point',coordinates:s.point},{mmh:s.mmh})):[]));
