@@ -2,10 +2,10 @@
 //  1. Which service / direction / location has heavy passenger loading?
 //  2. Which incident, roadwork or traffic build-up affects which service / direction / location?
 //  3. Where is there three-bus bunching or a long headway gap (service / direction / location)?
-import {esc,num,icon} from './forecast2026-core.js?v=20261028-hz3';
+import {esc,num,icon} from './forecast2026-core.js?v=20261028-hz4';
 
 export const KINDS={
- road_closed:{label:'Road closed',icon:'road_closed',rank:0},
+ road_closed:{label:'Closure reported',icon:'road_closed',rank:0},
  accident:{label:'Accident',icon:'traffic',rank:1},
  incident:{label:'Incident',icon:'traffic',rank:1},
  roadworks:{label:'Roadworks',icon:'roadworks',rank:2},
@@ -52,7 +52,7 @@ export function trafficGroups(data){
   if(!impacts.length&&e.svc&&byKey.size){const s=services.find(x=>x.svc===e.svc);if(s)impacts.push({svc:s.svc,dir:s.dir,stops:s.traffic_details?.[0]?.stops||[],delay:e.delay});}
   if(!impacts.length)continue;
   const seen=new Set();impacts=impacts.filter(i=>{const k=i.svc+':'+i.dir;if(seen.has(k))return false;seen.add(k);covered.add(e.id+'|'+k);return true;});
-  const blocked=e.kind==='road_closed'||impacts.some(i=>byKey.get(i.svc+':'+i.dir)?.blocked);
+  const blocked=impacts.some(i=>byKey.get(i.svc+':'+i.dir)?.blocked);  // a reported closure alone is not 'BLOCKED' (buses may still pass)
   const building=!!e.building||impacts.some(i=>byKey.get(i.svc+':'+i.dir)?.building);
   groups.push({key:'event:'+e.id,kind:e.kind,road:e.road||'Road not supplied',delay:finite(e.delay)?e.delay:null,blocked,building,
    impacts:impacts.map(i=>({svc:i.svc,dir:i.dir,where:stretch(i.stops,e.road)})).sort((a,b)=>String(a.svc).localeCompare(String(b.svc),undefined,{numeric:true})||a.dir-b.dir)});

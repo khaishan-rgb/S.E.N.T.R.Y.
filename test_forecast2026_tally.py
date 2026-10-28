@@ -69,7 +69,11 @@ class Tally(unittest.TestCase):
         self.check('demo')
 
     def test_markers_sit_at_the_problem_stop_not_the_incident(self):
-        d = self.build('all')
+        old, f.START_STOPS_IGNORED = f.START_STOPS_IGNORED, 0                       # fixture routes are only 3 stops long
+        try:
+            d = self.build('all')
+        finally:
+            f.START_STOPS_IGNORED = old
         bunch = sorted(a['point'] for a in d['alerts'] if a['category'] == 'bunching')
         self.assertEqual(len(bunch), 2)
         self.assertNotEqual(bunch[0], bunch[1])                                     # two groups, two places
@@ -80,8 +84,24 @@ class Tally(unittest.TestCase):
 
     def test_traffic_card_counts_every_incident_shown(self):
         d = self.build('all')
-        self.assertEqual(d['kpis']['traffic']['count'], 3)                          # closure + roadworks + unknown-delay incident
+        self.assertEqual(d['kpis']['traffic']['count'], 2)                          # roadworks + unknown-delay incident (closure with no delay hidden)
         self.assertEqual(d['kpis']['traffic']['services'], 2)                       # 105 and 167 (190 is not a watched service)
+
+
+class StartStopGaps(unittest.TestCase):
+    def test_long_gap_at_first_three_stops_is_dropped(self):
+        stops = [{'code': str(i), 'seq': i + 1, 'name': 'S%d' % i, 'lat': 1.3, 'lon': 103.8, 'route_m': i * 300} for i in range(8)]
+        self.assertTrue(f.near_start(stops, {'stop_j': 2}))
+        self.assertFalse(f.near_start(stops, {'stop_j': 3}))
+        self.assertTrue(f.near_start(stops, {'location': 'S1'}))
+        self.assertFalse(f.near_start(stops, {'location': 'nowhere'}))                # unknown position is kept
+        now = time.time()
+        sample = {'service': '88', 'direction': 1, 'at': now, 'route_stops': stops, 'sched_hw': 10, 'hw': {'0': 20},
+                  'gaps': [{'active': True, 'max_hw': 25, 'stop_j': 1, 'location': 'S1'}, {'active': True, 'max_hw': 22, 'stop_j': 5, 'location': 'S5'}]}
+        d = f.build_centre('live', 0, raw={'age_s': 0, 'services': [{'svc': '88', 'dir': 1}], 'sources': {}}, samples=[sample])
+        row = next(s for s in d['services'] if s['svc'] == '88')
+        self.assertEqual(row['gaps'], 1)
+        self.assertEqual(row['gap_details'][0]['location'], 'S5')
 
 
 if __name__ == '__main__':
@@ -119,8 +139,8 @@ class RoadNames(unittest.TestCase):
         now = time.time()
         stops = [{'code': '51101', 'seq': 48, 'name': 'Bef Thomson Flyover', 'road': 'Thomson Rd', 'lat': 1.3301, 'lon': 103.8301, 'route_m': 900},
                  {'code': '51109', 'seq': 49, 'name': 'Opp Thomson Plaza', 'road': 'Upp Thomson Rd', 'lat': 1.36, 'lon': 103.83, 'route_m': 4000}]
-        raw = {'age_s': 0, 'services': [{'svc': '506', 'dir': 1, 'blocked': True}],
-               'events': [{'id': 'X', 'kind': 'road_closed', 'status': 'confirmed', 'road': None, 'pt': [103.83, 1.33], 'delay_s': None,
+        raw = {'age_s': 0, 'services': [{'svc': '506', 'dir': 1}],
+               'events': [{'id': 'X', 'kind': 'accident', 'status': 'confirmed', 'road': None, 'pt': [103.83, 1.33], 'delay_s': 400,
                            'services': [{'svc': '506', 'dir': 1}]}],           # no road, no a_m / b_m from the provider
                'sources': {'tomtom_incidents': {'status': 'live'}}, 'route_context': {'506:1': stops}}
         d = f.build_centre('live', 0, raw=raw, samples=[{'service': '506', 'direction': 1, 'at': now, 'route_stops': stops, 'seq': []}], delay_min=.8)

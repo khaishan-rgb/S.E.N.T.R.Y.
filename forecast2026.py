@@ -268,6 +268,24 @@ def stop_context(stops, location=None, index=None):
             'point':[chosen['lon'],chosen['lat']] if chosen.get('lat') is not None and chosen.get('lon') is not None else None}
 
 
+START_STOPS_IGNORED=3
+
+
+def near_start(stops, gap):
+    """True when a long gap sits at one of the route's first START_STOPS_IGNORED stops (terminal dispatch / layover,
+    not a service gap). Unknown positions are kept."""
+    index=gap.get('stop_j')
+    if not isinstance(index,int):
+        ctx=stop_context(stops,gap.get('location'))
+        index=next((i for i,s in enumerate(stops) if ctx and s.get('code') is not None and str(s['code'])==ctx['code']),None)
+    if isinstance(index,int) and 0<=index<len(stops):
+        seqs=sorted(s.get('seq') for s in stops if isinstance(s.get('seq'),(int,float)))
+        seq=stops[index].get('seq')
+        if isinstance(seq,(int,float)) and seqs:return seqs.index(seq)<START_STOPS_IGNORED if seq in seqs else index<START_STOPS_IGNORED
+        return index<START_STOPS_IGNORED
+    return False
+
+
 def road_missing(road):
     return not road or str(road).strip().lower().startswith("road name not supplied")
 
@@ -354,6 +372,7 @@ def live_snapshot(raw, samples, h, now=None):
         gaps=[g for g in sample.get("gaps",[]) if valid and ((h==0 and g.get("active")) or (0<h<=30 and g.get("t_occur") is not None and g["t_occur"]<=h))]
         gaps=[g for g in gaps if sample.get("sched_hw") and (g.get("max_hw") or 0)-sample["sched_hw"]>=5]
         stops=sample.get('route_stops') or (raw.get('route_context') or {}).get(f'{key[0]}:{key[1]}',[])
+        gaps=[g for g in gaps if not near_start(stops,g)]   # gaps at the first 3 stops are dispatch / layover noise
         traffic_details=[]
         for event in events:
             match=next((m for m in event.get('matches',[]) if (m['svc'],m['dir'])==key),None)
@@ -380,7 +399,7 @@ def live_snapshot(raw, samples, h, now=None):
         for d in load_details:d['point']=(d['stop'] or {}).get('point') or d['bus_point'] or point
         counts['UNKNOWN']=len(seq)-sum(counts.values())
         location=(traffic_details[0]["road"] if traffic_details else None) or (ev or {}).get("road") or sample.get("location") or "Location not supplied"
-        row={"svc":key[0],"dir":key[1],"location":location,"delay":delay,"blocked":bool(s.get("blocked")) and traffic_ok,"building":bool(s.get("building")),"occupancy":None,
+        row={"svc":key[0],"dir":key[1],"location":location,"delay":delay,"blocked":False,"building":bool(s.get("building")),"occupancy":None,
              "heavy_buses":heavy if h==0 and observed and known_loads else None,"load_label":"Heavy" if heavy else "Standing" if any(b.get("load")=="SDA" for b in seq) else "Seats" if known_loads else "Unavailable",
              "three":len(groups) if valid and h<=30 else None,"two":sum(g.get("size")==2 for g in sample.get("groups",[])) if valid and h==0 else None,
              "gaps":len(gaps) if valid and h<=30 else None,"headway":(max([g.get("max_hw") or 0 for g in gaps] or [0]) or headway_at(sample.get("hw"),h)) if valid and h<=30 else None,

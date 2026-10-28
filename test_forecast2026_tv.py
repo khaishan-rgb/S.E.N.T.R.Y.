@@ -52,8 +52,8 @@ CHECK = r'''()=>{
 
 def fixture(horizon):
     now=time.time()
-    raw={'age_s':0,'services':[{'svc':'985','dir':1,'blocked':True,'extra':{15:{'mid':0},30:{'mid':0},60:{'mid':0}}}],
-         'events':[{'id':'TEST-closure','kind':'road_closed','status':'confirmed','road':'Near Bukit Timah Expressway / Thomson Road (test fixture)','pt':[103.79,1.36],'delay_s':None,'services':[{'svc':'985','dir':1,'a_m':1000,'b_m':1100}]}],
+    raw={'age_s':0,'services':[{'svc':'985','dir':1,'extra':{15:{'mid':7},30:{'mid':6},60:{'mid':4}}}],
+         'events':[{'id':'TEST-accident','kind':'accident','status':'confirmed','road':'Near Bukit Timah Expressway / Thomson Road (test fixture)','pt':[103.79,1.36],'delay_s':420,'fc':{'15':{'mid':420},'30':{'mid':360},'60':{'mid':240}},'services':[{'svc':'985','dir':1,'a_m':1000,'b_m':1100}]}],
          'sources':{'tomtom_incidents':{'status':'live','detail':'TEST FIXTURE, not a provider observation'}},
          'route_context':{'985:1':[{'code':'51101','seq':31,'name':'Bef Thomson Flyover','road':'Thomson Road','lat':1.36,'lon':103.79,'route_m':1050}]}}
     samples=[{'service':'985','direction':1,'at':now,'issue':'No data','observed_buses':[{'id':'TEST-BUS','lat':1.36,'lon':103.79,'load':'LSD'}]}]
@@ -95,7 +95,7 @@ def main():
                 page.goto('http://127.0.0.1:8098/?present=1&mode=live&h=15');page.wait_for_selector('.camera');page.wait_for_timeout(300)
                 # Bottom row answers: closure -> service / direction / stop; observed load is not shown as a forecast.
                 card=page.locator('#tvTrafficList .tvb-event').first.inner_text()
-                assert 'BLOCKED' in card and '985' in card and 'DIR 1' in card and 'Bef Thomson Flyover' in card,card
+                assert 'BLOCKED' not in card and '+7.0 min' in card and '985' in card and 'DIR 1' in card and 'Bef Thomson Flyover' in card,card
                 assert 'unavailable' in page.locator('#tvLoadList').inner_text().lower()
                 for width,height in [(1280,720),(1366,768),(1920,1080),(2560,1440),(3840,2160)]:
                     page.set_viewport_size({'width':width,'height':height});page.wait_for_timeout(350)
@@ -127,8 +127,8 @@ def main():
                 # "Top services to watch" is retired; select the service from its alert ("Focus service on map").
                 assert page.locator('#alerts').count()==0          # Operational alerts panel retired
                 page.locator('.tvb-svc[data-service="985"]').first.click()
-                page.wait_for_function('SENTRY2026.state.services.includes("985")')
-                assert page.locator('#routeSelection').is_visible();assert page.locator('.selected-route-svg').count()==1
+                page.wait_for_function('SENTRY2026.state.services.includes("985")');page.wait_for_selector('#routeSelection:not([hidden])')
+                assert page.locator('#routeSelection').is_visible();assert page.locator('#routeSelection [data-clear-route]').count()==1;assert page.locator('.selected-route-svg').count()==1
                 page.click('#clearService');page.wait_for_function('SENTRY2026.state.services.length===0')
                 page.click('#tv');page.wait_for_timeout(300);assert not page.evaluate(CHECK)
                 for module in ('loading','bunching','headway'):

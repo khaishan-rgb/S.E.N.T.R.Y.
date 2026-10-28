@@ -18,21 +18,22 @@ class AmendmentPolicies(unittest.TestCase):
               'services':[{'svc':'1','delay':.79,'building':True},{'svc':'2','delay':.8},{'svc':'3','delay':None,'blocked':True}],
               'alerts':[{'id':'1','category':'traffic','delay':.79},{'id':'2','category':'traffic','delay':.8},{'id':'3','category':'traffic','delay':None,'blocked':True}]}
         out=filter_traffic(snap,.8)
-        self.assertEqual([e['id'] for e in out['events']],['b','c','d'])
-        self.assertEqual([e['id'] for e in out['alerts']],['2','3'])
+        self.assertEqual([e['id'] for e in out['events']],['b','d'])            # a reported closure with no delay is not shown (buses may still pass)
+        self.assertEqual([e['id'] for e in out['alerts']],['2'])
         self.assertFalse(out['services'][0]['traffic_eligible'])
         self.assertFalse(out['services'][0]['building'])
         self.assertIsNone(out['services'][0]['delay'])
-        self.assertTrue(out['services'][2]['traffic_eligible'])
+        self.assertFalse(out['services'][2]['traffic_eligible'])
+        self.assertFalse(out['services'][2]['blocked'])                          # 'BLOCKED' is retired
         self.assertFalse(out['events'][-1]['congestion_eligible'])
 
     def test_delay_filter_applies_to_roadworks_and_incidents_with_a_delay(self):
         events=[{'id':'w1','kind':'roadworks','delay':2.6},{'id':'w2','kind':'roadworks','delay':6.0},{'id':'i1','kind':'accident','delay':1.0},
                 {'id':'i2','kind':'accident','delay':None},{'id':'c','kind':'road_closed','delay':0.5},{'id':'w3','kind':'roadworks','delay':None}]
         out=filter_traffic({'mode':'live','events':[dict(e) for e in events],'services':[],'alerts':[]},5)
-        self.assertEqual([e['id'] for e in out['events']],['w2','i2','c','w3'])          # +2.6 roadworks and +1.0 accident hidden at >= 5 min
+        self.assertEqual([e['id'] for e in out['events']],['w2','i2','w3'])          # +2.6 roadworks and +1.0 accident hidden at >= 5 min
         out=filter_traffic({'mode':'live','events':[dict(e) for e in events],'services':[],'alerts':[]},0)
-        self.assertEqual(len(out['events']),6)                                            # All delays shows everything
+        self.assertEqual([e['id'] for e in out['events']],['w1','w2','i1','i2','c','w3'])   # All delays: the closure shows with its measured +0.5
 
     def test_lta_road_block_is_not_a_closure_and_is_hidden_without_a_delay(self):
         import forecast

@@ -3604,6 +3604,121 @@ async def api_rt_watch(request: Request):
     return {"ok": True, "watch": rt_watch_list()}
 
 
+# ---- V17.3 Stop-by-Stop measured running time report (stop_report.py). Uses the rt_trip passing times recorded by the live collector.
+import stop_report
+
+
+def _sr_date(v, default):
+    try:
+        return datetime.strptime((v or "").strip(), "%Y-%m-%d").date()
+    except ValueError:
+        return default
+
+
+async def sr_load(service, direction, day_type, date_from, date_to, demo):
+    """-> (meta, trips, stops) or (error, None, None)"""
+    today = now_sgt().date()
+    d_to = _sr_date(date_to, today)
+    d_from = _sr_date(date_from, d_to - timedelta(days=29))
+    if d_from > d_to:
+        d_from, d_to = d_to, d_from
+    if demo:
+        rows, stops = await asyncio.to_thread(stop_report.demo)
+        svc, d, hol = "14", 1, []
+        d_from = d_to = None
+    else:
+        svc = service.strip().upper()
+        if not re.fullmatch(r"[0-9A-Z]{1,6}", svc):
+            return {"error": "Choose a bus service."}, None, None
+        d = 2 if str(direction) == "2" else 1
+        a = datetime(d_from.year, d_from.month, d_from.day, tzinfo=SGT).timestamp()
+        b = datetime(d_to.year, d_to.month, d_to.day, tzinfo=SGT).timestamp() + 86400
+        rows = bb_sql("SELECT id, date, day_type, start_ts, rt_min, cover, marks FROM rt_trip WHERE service=? AND direction=? AND start_ts>=? AND start_ts<? "
+                      "ORDER BY start_ts LIMIT 20000", (svc, d, a, b), fetch=True)
+        st = await static()
+        stops = route_stops(st, svc, d)
+        hol = [r["date"] for r in bb_sql("SELECT date FROM holiday", (), fetch=True)]
+        if not stops:
+            return {"error": f"No LTA stop list for service {svc} direction {d}."}, None, None
+    trips = stop_report.clean_trips(rows, stops, hol)
+    if day_type in ("Weekday", "Saturday", "Sunday/PH"):
+        trips = [t for t in trips if t["day_type"] == day_type]
+    meta = {"service": svc, "direction": d, "day_type": day_type if day_type in ("Weekday", "Saturday", "Sunday/PH") else "All",
+            "from": d_from.isoformat() if d_from else None, "to": d_to.isoformat() if d_to else None, "demo": bool(demo),
+            "generated": now_sgt().strftime("%d %b %Y %H:%M SGT") + (" · DEMO (simulated trips)" if demo else "")}
+    return meta, trips, stops
+
+
+def _sr_params(period, basis, min_n):
+    p = int(in_num(period, 60, 15, 120))
+    p = min((15, 30, 60, 120), key=lambda x: abs(x - p))
+    return p, ("stop" if basis == "stop" else "trip"), int(in_num(min_n, 3, 1, 50))
+
+
+def _sr_name(meta, ext):
+    span = f"{meta['from']}_{meta['to']}" if meta.get("from") else "DEMO"
+    return f"HORIZON_stop_running_time_{meta['service']}_D{meta['direction']}_{span}.{ext}"
+
+
+@app.get("/stop-running-time", response_class=HTMLResponse)
+async def stop_rt_page():
+    return _page("stop_rt.html")
+
+
+@app.get("/api/stop-rt/services")
+async def api_sr_services():
+    rows = bb_sql("SELECT service, direction, COUNT(*) n, MIN(start_ts) a, MAX(start_ts) b FROM rt_trip GROUP BY service, direction ORDER BY service, direction", (), fetch=True)
+    return {"measuring": rt_watch_list(), "max": RT_MAX_SERVICES, "keep_days": RT_KEEP_DAYS,
+            "collecting": bool(BB_ALWAYS or time.time() - BB["last_req"] < BB_IDLE_SEC or rt_watch_list()),
+            "with_data": [{"service": r["service"], "direction": r["direction"], "trips": r["n"],
+                           "from": datetime.fromtimestamp(r["a"], SGT).strftime("%Y-%m-%d"), "to": datetime.fromtimestamp(r["b"], SGT).strftime("%Y-%m-%d")} for r in rows],
+            "db_ok": BB.get("db_ok", True), "storage": bb_rec_status()}
+
+
+@app.get("/api/stop-rt/report")
+async def api_sr_report(service: str = "", direction: str = "1", day_type: str = "", date_from: str = "", date_to: str = "",
+                        period: str = "60", basis: str = "trip", min_n: str = "3", demo: int = 0):
+    meta, trips, stops = await sr_load(service, direction, day_type, date_from, date_to, demo)
+    if trips is None:
+        return {"ok": False, **meta}
+    if not trips:
+        return {"ok": False, "meta": meta, "error": f"No measured trips for service {meta['service']} direction {meta['direction']} in this period. "
+                                                     "Add the service to the measuring list; history starts from then."}
+    p, b, mn = _sr_params(period, basis, min_n)
+    rep = await asyncio.to_thread(stop_report.summarise, trips, stops, p, b, mn)
+    return {"ok": True, "meta": meta, "report": rep}
+
+
+@app.get("/api/stop-rt/report.xlsx")
+async def api_sr_xlsx(service: str = "", direction: str = "1", day_type: str = "", date_from: str = "", date_to: str = "",
+                      period: str = "60", basis: str = "trip", min_n: str = "3", demo: int = 0):
+    from fastapi.responses import Response
+    meta, trips, stops = await sr_load(service, direction, day_type, date_from, date_to, demo)
+    if not trips:
+        return JSONResponse({"error": (meta or {}).get("error") or "No measured trips in this period."}, status_code=404)
+    p, b, mn = _sr_params(period, basis, min_n)
+
+    def build():
+        rep = stop_report.summarise(trips, stops, p, b, mn)
+        return stop_report.excel(meta, rep, trips, stops, stop_report.segment_records(trips, stops, p, b))
+    data = await asyncio.to_thread(build)
+    return Response(data, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    headers={"Content-Disposition": f'attachment; filename="{_sr_name(meta, "xlsx")}"', "Cache-Control": "no-store"})
+
+
+@app.get("/api/stop-rt/segments.csv")
+async def api_sr_csv(service: str = "", direction: str = "1", day_type: str = "", date_from: str = "", date_to: str = "",
+                     period: str = "60", basis: str = "trip", demo: int = 0):
+    from fastapi.responses import Response
+    meta, trips, stops = await sr_load(service, direction, day_type, date_from, date_to, demo)
+    if not trips:
+        return JSONResponse({"error": (meta or {}).get("error") or "No measured trips in this period."}, status_code=404)
+    p, b, _ = _sr_params(period, basis, "3")
+    text = await asyncio.to_thread(lambda: stop_report.csv_segments(stop_report.segment_records(trips, stops, p, b)))
+    return Response(text.encode("utf-8"), media_type="text/csv; charset=utf-8",
+                    headers={"Content-Disposition": f'attachment; filename="{_sr_name(meta, "csv")}"', "Cache-Control": "no-store"})
+
+
 @app.get("/api/rt/sources")
 async def api_rt_sources():
     n = lambda q: bb_sql(q, (), fetch=True)[0]["n"]
@@ -12229,6 +12344,33 @@ async def fc26_transition(request: Request):
         return JSONResponse({'ok':ok},status_code=200 if ok else 404)
     except (ValueError,TypeError):
         return JSONResponse({'error':'Invalid alert transition'},status_code=400)
+
+
+@app.get('/api/forecast/centre/camera-ai')
+async def fc26_camera_ai(ids: str=''):
+    """AI camera analytics: traffic level (Smooth / Medium / Jam / Super Jam) for the cameras on screen and estimated
+    crossing time to JB / SG from the Woodlands and Tuas checkpoint cameras. Claude vision when ANTHROPIC_API_KEY is
+    set, else TomTom speed at the camera, else nothing. Cached per photo (checkpoint_ai.CACHE_S)."""
+    import checkpoint_ai as cpa
+    cs=await cameras_state()
+    cams={str(c['id']):c for c in (cs.get('cams') or [])}
+    want=[i for i in dict.fromkeys([x.strip() for x in ids.split(',') if x.strip()][:6]) if i in cams]
+    pick=[cams[i] for i in dict.fromkeys(want+[c for x in cpa.CROSSINGS for c in x['cams']]) if i in cams]
+    async def fetch_image(url):
+        r=await client().get(url,timeout=15)
+        r.raise_for_status()
+        return r.content,r.headers.get('content-type','image/jpeg')
+    async def ask_model(content):
+        r=await client().post('https://api.anthropic.com/v1/messages',timeout=45,
+                              headers={'x-api-key':DV_AI_KEY,'anthropic-version':'2023-06-01','content-type':'application/json'},
+                              json={'model':cpa.MODEL,'max_tokens':900,'messages':[{'role':'user','content':content}]})
+        r.raise_for_status()
+        return ''.join(b.get('text','') for b in (r.json().get('content') or []) if isinstance(b,dict))
+    async def flow(lat,lon):
+        return await tomtom_flow(lat,lon) if TT.get('key') else None
+    out=await cpa.analyse(pick,fetch_image if DV_AI_KEY else None,ask_model if DV_AI_KEY else None,flow)
+    out['configured']={'ai':bool(DV_AI_KEY),'speed':bool(TT.get('key'))}
+    return out
 
 
 @app.get('/api/forecast/centre/cameras')

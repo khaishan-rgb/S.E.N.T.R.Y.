@@ -11,18 +11,16 @@ def delay_threshold(value):
 
 
 def meets_delay(row, minimum):
-    return bool(row.get('blocked') or row.get('kind') == 'road_closed' or
-                isinstance(row.get('delay'), (float, int)) and row['delay'] > 0 and row['delay'] >= minimum)
+    # Closures get no special pass: a reported closure that buses can still pass is only shown with a measured delay.
+    return bool(isinstance(row.get('delay'), (float, int)) and row['delay'] > 0 and row['delay'] >= minimum)
 
 
-NOISE_WITHOUT_DELAY = {'jam', 'hazard', 'other'}
+NOISE_WITHOUT_DELAY = {'jam', 'hazard', 'other', 'road_closed'}
 
 
 def event_shown(event, minimum):
     """The Traffic delay filter applies to every event with a measured delay (jams, roadworks, incidents).
     Closures always show. Incidents / roadworks with NO delay figure still show (delay not reported, cannot be judged)."""
-    if event.get('kind') == 'road_closed' or event.get('blocked'):
-        return True
     delay = event.get('delay')
     if not isinstance(delay, (float, int)) or math.isnan(delay):
         # No delay figure: keep physical obstructions and approved works; drop low-information point
@@ -49,11 +47,11 @@ def filter_traffic(snapshot, minimum):
         if not row['traffic_eligible']:
             row['delay'] = 0 if row.get('delay') == 0 else None
             row['building'] = False
-        row['traffic_details'] = [t for t in row.get('traffic_details', [])
-                                  if row.get('blocked') or meets_delay(t, minimum)]
+        row['blocked'] = False
+        row['traffic_details'] = [t for t in row.get('traffic_details', []) if meets_delay(t, minimum)]
     snapshot['delay_filter'] = {'minimum': minimum, 'yellow': .8, 'orange': 2, 'red': 5,
                               'baseline': 'SIMULATED' if snapshot['mode'] == 'demo' else 'Provider-reported / free-flow; historical typical time only where supplied',
-                              'closures_retained': True}
+                              'closures_retained': False}
     return snapshot
 
 
