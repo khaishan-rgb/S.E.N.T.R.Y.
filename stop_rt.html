@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#020812">
+<title>Stop-by-Stop Running Time · HORIZON</title>
+<link rel="icon" type="image/svg+xml" href="/brand/horizon-mark.svg">
+<link rel="stylesheet" href="/design-system.css">
+<script src="/app-shell.js" data-module="stoprt"></script>
+<style>
+.sr-grid{display:grid;grid-template-columns:minmax(0,1fr);gap:var(--ds-gap)}
+.sr-filters{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;align-items:end}
+.sr-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.sr-measure{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.sr-chip{display:inline-flex;align-items:center;gap:8px;height:30px;padding:0 6px 0 12px;border-radius:5px;border:1px solid var(--hz-line-2);background:rgba(8,26,52,.7);
+  font:700 14px var(--hz-font-display);letter-spacing:.05em;color:#fff}
+.sr-chip button{width:22px;height:22px;border-radius:4px;border:1px solid var(--hz-line);background:transparent;color:var(--hz-mut);cursor:pointer;display:grid;place-items:center;padding:0}
+.sr-chip button:hover{color:#fff;border-color:var(--hz-crit)}
+.sr-chip.has-data{border-color:rgba(46,232,160,.45)}
+.sr-warn{display:flex;gap:12px;align-items:flex-start;padding:12px 14px;border-radius:6px;border:1px solid rgba(255,181,71,.45);background:rgba(255,181,71,.08);color:#ffe2b3;font-size:13px;line-height:1.5}
+.sr-warn b{color:#fff}
+.sr-warn svg{flex:none;width:20px;height:20px;color:var(--hz-warn);margin-top:1px}
+.sr-tabs{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
+.sr-legend{display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--hz-mut);margin-left:auto}
+.sr-legend i{display:inline-block;width:14px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px}
+.sr-wrap{overflow:auto;max-height:70vh;border:1px solid var(--hz-line);border-radius:6px}
+table.sr{border-collapse:separate;border-spacing:0;font-size:12.5px;min-width:100%}
+table.sr th,table.sr td{padding:6px 8px;border-bottom:1px solid rgba(110,190,255,.08);white-space:nowrap;text-align:right;font-variant-numeric:tabular-nums}
+table.sr thead th{position:sticky;top:0;z-index:2;background:#061a33;color:var(--hz-mut);font:700 11px var(--hz-font-display);letter-spacing:.06em;text-transform:uppercase;border-bottom:1px solid var(--hz-line-2)}
+table.sr .l{text-align:left}
+table.sr .stick{position:sticky;left:0;z-index:1;background:#05152b}
+table.sr thead .stick{z-index:3;background:#061a33}
+table.sr td.stop{text-align:left;max-width:300px;overflow:hidden;text-overflow:ellipsis}
+table.sr td.stop b{color:#fff;font-weight:600}
+table.sr td.stop small{color:var(--hz-mut);margin:0 6px}
+table.sr td.stop small:first-child{display:inline-block;min-width:1.8em;margin:0 6px 0 0;text-align:right;color:var(--hz-faint)}
+table.sr td.stop .arrow{color:var(--hz-cyan);margin:0 6px}
+table.sr td.med{color:#fff;font-weight:700}
+table.sr td.low{color:var(--hz-faint);font-style:italic}
+table.sr td.cell{min-width:58px}
+table.sr tbody tr:hover td{background-color:rgba(63,211,255,.06)}
+table.sr tfoot td{position:sticky;bottom:0;background:#061a33;font-weight:700;color:#fff;border-top:1px solid var(--hz-line-2)}
+.sr-empty{padding:30px 18px;text-align:center;color:var(--hz-mut)}
+.sr-empty b{display:block;color:#fff;font:700 15px var(--hz-font-display);letter-spacing:.06em;margin-bottom:6px}
+.sr-demo{display:inline-flex;align-items:center;gap:6px;font:700 11px var(--hz-font-display);letter-spacing:.12em;color:#ffd79a;border:1px dashed rgba(255,181,71,.6);border-radius:4px;padding:3px 7px}
+.sr-busy{opacity:.55;pointer-events:none}
+@media (max-width:640px){table.sr{font-size:12px} table.sr td.stop{max-width:190px}}
+</style>
+</head>
+<body>
+<main class="ds-page ds-main">
+  <div class="ds-head">
+    <div>
+      <div class="ds-eyebrow">ANALYTICS · MEASURED</div>
+      <h1 class="ds-title">Stop-by-Stop Running Time</h1>
+      <p class="ds-sub">How long buses actually take between every pair of stops, by time of day — measured from live bus positions. Download everything as Excel or CSV.</p>
+    </div>
+  </div>
+
+  <div class="sr-grid">
+    <section class="ds-panel" aria-labelledby="measH">
+      <div class="ds-ph" id="measH">SERVICES BEING MEASURED <span class="sp"></span><small id="measCount"></small></div>
+      <div id="storageWarn"></div>
+      <div class="sr-measure" id="measList" style="margin:10px 0 12px"></div>
+      <div class="sr-actions">
+        <input class="ds-input" id="addSvc" placeholder="Add service, e.g. 14" aria-label="Service to start measuring" style="max-width:200px" maxlength="6">
+        <button class="ds-btn pri" id="addBtn" type="button">Start measuring</button>
+        <span class="ds-note" id="measNote">Each measured service is followed round the clock in both directions. History starts when measuring starts.</span>
+      </div>
+    </section>
+
+    <section class="ds-panel" aria-labelledby="repH">
+      <div class="ds-ph" id="repH">REPORT <span class="sp"></span><span id="demoTag"></span></div>
+      <div class="sr-filters">
+        <div class="ds-field"><label for="fSvc">Service</label><select class="ds-select" id="fSvc"></select></div>
+        <div class="ds-field"><span class="lb">Direction</span><div class="ds-segm" id="fDir"><button type="button" data-v="1" aria-pressed="true">Dir 1</button><button type="button" data-v="2" aria-pressed="false">Dir 2</button></div></div>
+        <div class="ds-field"><label for="fDay">Day type</label><select class="ds-select" id="fDay"><option value="">All days</option><option>Weekday</option><option>Saturday</option><option>Sunday/PH</option></select></div>
+        <div class="ds-field"><label for="fFrom">From</label><input class="ds-input" type="date" id="fFrom"></div>
+        <div class="ds-field"><label for="fTo">To</label><input class="ds-input" type="date" id="fTo"></div>
+        <div class="ds-field"><label for="fPer">Time period</label><select class="ds-select" id="fPer"><option value="15">15 min</option><option value="30">30 min</option><option value="60" selected>1 hour</option><option value="120">2 hours</option></select></div>
+        <div class="ds-field"><label for="fBasis">Period by</label><select class="ds-select" id="fBasis"><option value="trip" selected>Trip start time</option><option value="stop">Time bus left the stop</option></select></div>
+      </div>
+      <div class="sr-actions" style="margin-top:14px">
+        <button class="ds-btn pri" id="showBtn" type="button">Show report</button>
+        <a class="ds-btn" id="xlsBtn" href="#" download>Download Excel</a>
+        <a class="ds-btn" id="csvBtn" href="#" download>Download CSV (every stop-to-stop record)</a>
+        <button class="ds-btn ghost" id="demoBtn" type="button">Preview with demo data</button>
+      </div>
+    </section>
+
+    <div class="ds-kpis" id="kpis" hidden></div>
+
+    <section class="ds-panel" id="outPanel" aria-live="polite">
+      <div class="sr-tabs">
+        <div class="ds-segm" id="view"><button type="button" data-v="seg" aria-pressed="true">Stop to stop</button><button type="button" data-v="cum" aria-pressed="false">Time from first stop</button></div>
+        <div class="sr-legend" id="legend"></div>
+      </div>
+      <div id="out"><div class="sr-empty"><b>CHOOSE A SERVICE AND PRESS SHOW REPORT</b>Measured services with history appear in the Service list.</div></div>
+      <p class="ds-note" id="foot" style="margin-top:10px"></p>
+    </section>
+  </div>
+</main>
+<script>
+(function(){
+  "use strict";
+  var $ = function(id){ return document.getElementById(id); };
+  var esc = function(s){ return String(s == null ? "" : s).replace(/[&<>"']/g, function(c){ return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]; }); };
+  var num = function(v, d){ return v == null ? "—" : Number(v).toFixed(d == null ? 2 : d); };
+  var S = {dir:"1", view:"seg", demo:false, data:null, svc:null};
+  function sgtDate(offsetDays){ var d = new Date(Date.now() + 8 * 3600e3 + (offsetDays || 0) * 86400e3); return d.toISOString().slice(0, 10); }
+  function seg(id, key){ $(id).addEventListener("click", function(e){ var b = e.target.closest("button[data-v]"); if(!b) return;
+    S[key] = b.getAttribute("data-v"); $(id).querySelectorAll("button").forEach(function(x){ x.setAttribute("aria-pressed", String(x === b)); });
+    if(key === "view" && S.data) render(); if(key === "dir") links(); }); }
+  function query(extra){
+    var p = new URLSearchParams({service:$("fSvc").value || "", direction:S.dir, day_type:$("fDay").value, date_from:$("fFrom").value, date_to:$("fTo").value,
+      period:$("fPer").value, basis:$("fBasis").value});
+    if(S.demo) p.set("demo", "1");
+    if(extra) for(var k in extra) p.set(k, extra[k]);
+    return p.toString();
+  }
+  function links(){
+    var ok = S.demo || $("fSvc").value;
+    $("xlsBtn").href = ok ? "/api/stop-rt/report.xlsx?" + query() : "#"; $("csvBtn").href = ok ? "/api/stop-rt/segments.csv?" + query() : "#";
+    $("xlsBtn").toggleAttribute("aria-disabled", !ok); $("csvBtn").toggleAttribute("aria-disabled", !ok);
+    $("demoTag").innerHTML = S.demo ? '<span class="sr-demo">DEMO · SIMULATED TRIPS</span>' : "";
+  }
+  function api(url, opt){ return fetch(url, Object.assign({credentials:"same-origin"}, opt || {})).then(function(r){ return r.json().catch(function(){ return {error:"HTTP " + r.status}; }); })
+    .catch(function(){ return {error:"Server not reachable"}; }); }
+
+  /* ---------------- measuring list */
+  var SVC = {measuring:[], with_data:[], max:8};
+  function loadServices(){
+    return api("/api/stop-rt/services").then(function(j){
+      if(j.error){ $("measList").innerHTML = '<span class="ds-note">' + esc(j.error) + '</span>'; return; }
+      SVC = j; var withData = {}; (j.with_data || []).forEach(function(r){ (withData[r.service] = withData[r.service] || []).push(r); });
+      $("measCount").textContent = (j.measuring || []).length + " of " + j.max;
+      $("measList").innerHTML = (j.measuring || []).length ? j.measuring.map(function(s){
+        var d = withData[s], tip = d ? d.map(function(r){ return "Dir " + r.direction + ": " + r.trips + " trips " + r.from + " → " + r.to; }).join(" · ") : "No completed trips yet";
+        return '<span class="sr-chip' + (d ? " has-data" : "") + '" title="' + esc(tip) + '">' + esc(s) + '<button type="button" data-rm="' + esc(s) + '" aria-label="Stop measuring ' + esc(s) + '">×</button></span>';
+      }).join("") : '<span class="ds-note">No service is being measured yet — add one below to start building stop-by-stop history.</span>';
+      var st = j.storage || {}, warn = [];
+      if(st.persistent === false) warn.push("<b>History is not kept permanently on this server.</b> It is deleted on every upload, restart and (Render free plan) 15-minute sleep. For lasting history: a Render paid instance with a disk, and set <b>BUNCHING_DB=/var/data/bunching.db</b>.");
+      if(st.always_on === false) warn.push("<b>Recording pauses when nobody has a HORIZON page open.</b> To measure round the clock set <b>BUNCHING_ALWAYS_ON=1</b> in Render › Environment.");
+      if(st.state === "off") warn.push("<b>No LTA key</b> — live bus positions cannot be read, so nothing is measured.");
+      $("storageWarn").innerHTML = warn.length ? '<div class="sr-warn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 4 2.8 19.5h18.4z"/><path d="M12 10v4.5M12 17v.5"/></svg><div>' + warn.join("<br>") + '</div></div>' : "";
+      var opts = {}; (j.with_data || []).forEach(function(r){ opts[r.service] = true; }); (j.measuring || []).forEach(function(s){ opts[s] = opts[s] || false; });
+      var keep = $("fSvc").value || new URLSearchParams(location.search).get("service") || "";
+      $("fSvc").innerHTML = '<option value="">Choose…</option>' + Object.keys(opts).sort(function(a, b){ return a.localeCompare(b, undefined, {numeric:true}); })
+        .map(function(s){ return '<option value="' + esc(s) + '">' + esc(s) + (opts[s] ? "" : " (no trips yet)") + '</option>'; }).join("");
+      if(keep && opts.hasOwnProperty(keep)) $("fSvc").value = keep;
+      links();
+    });
+  }
+  function watch(svc, remove){
+    svc = String(svc || "").trim().toUpperCase(); if(!svc) return;
+    return api("/api/rt/watch", {method:"POST", headers:{"content-type":"application/json"}, body:JSON.stringify({service:svc, remove:!!remove})}).then(function(j){
+      $("measNote").textContent = j.error ? j.error : (remove ? "Stopped measuring " + svc + ". Its recorded history is kept." : "Measuring " + svc + " in both directions. The first trips appear once a bus completes the route.");
+      $("addSvc").value = ""; loadServices();
+    });
+  }
+  $("addBtn").addEventListener("click", function(){ watch($("addSvc").value); });
+  $("addSvc").addEventListener("keydown", function(e){ if(e.key === "Enter") watch($("addSvc").value); });
+  $("measList").addEventListener("click", function(e){ var b = e.target.closest("[data-rm]"); if(b) watch(b.getAttribute("data-rm"), true); });
+
+  /* ---------------- report */
+  function show(){
+    if(!S.demo && !$("fSvc").value){ $("out").innerHTML = '<div class="sr-empty"><b>CHOOSE A SERVICE</b>Pick a measured service, or preview with demo data.</div>'; return; }
+    links(); $("outPanel").classList.add("sr-busy");
+    $("out").innerHTML = '<div class="ds-load"><b>BUILDING STOP-BY-STOP REPORT</b><div class="bar"><i></i></div></div>';
+    history.replaceState(null, "", "?" + query());
+    api("/api/stop-rt/report?" + query()).then(function(j){
+      $("outPanel").classList.remove("sr-busy");
+      if(!j.ok){ S.data = null; $("kpis").hidden = true; $("legend").innerHTML = ""; $("foot").textContent = "";
+        $("out").innerHTML = '<div class="sr-empty"><b>NO REPORT</b>' + esc(j.error || "No data") + '</div>'; return; }
+      S.data = j; render();
+    });
+  }
+  function heat(v, base){
+    if(v == null || !base) return "";
+    var r = v / base;                                                       // this period vs the segment's own median
+    var c = r <= 0.95 ? "46,232,160" : r <= 1.10 ? "63,211,255" : r <= 1.30 ? "255,181,71" : "255,77,97";
+    var a = r <= 0.95 ? .16 : r <= 1.10 ? .08 : r <= 1.30 ? .22 : .30;
+    return ' style="background:rgba(' + c + ',' + a + ')"';
+  }
+  function render(){
+    var j = S.data, R = j.report, M = j.meta, P = R.periods;
+    $("kpis").hidden = false;
+    $("kpis").innerHTML = [["TRIPS MEASURED", R.trips, R.days + " day" + (R.days === 1 ? "" : "s") + (R.dates ? " · " + R.dates[0] + " → " + R.dates[1] : "")],
+      ["ROUTE TIME (MEDIAN)", num(R.route_rt.median, 1) + " min", "P85 " + num(R.route_rt.p85, 1) + " · range " + num(R.route_rt.min, 0) + "–" + num(R.route_rt.max, 0)],
+      ["STOP PAIRS", R.segments.length, R.segment_records.toLocaleString() + " stop-to-stop records"],
+      ["SLOWEST STRETCH", (function(){ var w = R.segments.filter(function(s){ return s.kmh; }).sort(function(a, b){ return a.kmh - b.kmh; })[0]; return w ? num(w.kmh, 1) + " km/h" : "—"; })(),
+        (function(){ var w = R.segments.filter(function(s){ return s.kmh; }).sort(function(a, b){ return a.kmh - b.kmh; })[0]; return w ? esc(w.from.name) + " → " + esc(w.to.name) : ""; })()]]
+      .map(function(k){ return '<div class="ds-kpi"><div class="k">' + k[0] + '</div><div class="v">' + k[1] + '</div><div class="s">' + k[2] + '</div></div>'; }).join("");
+    $("legend").innerHTML = S.view === "seg" ? '<span><i style="background:rgba(46,232,160,.5)"></i>faster than its median</span><span><i style="background:rgba(255,181,71,.6)"></i>10–30% slower</span><span><i style="background:rgba(255,77,97,.7)"></i>30%+ slower</span><span style="font-style:italic">grey italics = fewer than ' + R.min_n + ' trips</span>' : "";
+    var h = '<div class="sr-wrap"><table class="sr"><thead><tr>';
+    if(S.view === "seg"){
+      h += '<th class="stick l">Stop to stop</th><th>km</th><th>Trips</th><th>Median</th><th>P85</th><th>km/h</th>' + P.map(function(p){ return "<th>" + esc(p) + "</th>"; }).join("") + "</tr></thead><tbody>";
+      R.segments.forEach(function(s){
+        h += '<tr><td class="stick stop" title="' + esc(s.from.code + " " + s.from.name + " → " + s.to.code + " " + s.to.name) + '"><small>' + esc(s.from.seq) + '</small><b>' + esc(s.from.name) + '</b><span class="arrow">→</span><b>' + esc(s.to.name) + '</b></td>'
+          + '<td>' + num(s.km, 2) + '</td><td' + (s.low_n ? ' class="low"' : "") + '>' + s.n + '</td><td class="med">' + num(s.median) + '</td><td>' + num(s.p85) + '</td><td>' + num(s.kmh, 1) + '</td>'
+          + P.map(function(p){ var c = s.periods[p]; return c ? '<td class="cell' + (c.low_n ? " low" : "") + '"' + (c.low_n ? "" : heat(c.median, s.median)) + ' title="' + esc(p + ": median " + num(c.median) + " min, P85 " + num(c.p85) + ", " + c.n + " trips") + '">' + num(c.median) + "</td>" : '<td class="cell low">—</td>'; }).join("") + "</tr>";
+      });
+      var tot = function(get){ var s = 0, any = false; R.segments.forEach(function(x){ var v = get(x); if(v != null){ s += v; any = true; } }); return any ? num(s, 1) : "—"; };
+      h += '</tbody><tfoot><tr><td class="stick l">Sum of stop-to-stop medians (min)</td><td></td><td></td><td>' + tot(function(x){ return x.median; }) + '</td><td></td><td></td>'
+        + P.map(function(p){ return "<td>" + tot(function(x){ return x.periods[p] && x.periods[p].median; }) + "</td>"; }).join("") + "</tr></tfoot></table></div>";
+    } else {
+      h += '<th class="stick l">Stop</th><th>km</th><th>Trips</th><th>Median</th>' + P.map(function(p){ return "<th>" + esc(p) + "</th>"; }).join("") + "</tr></thead><tbody>";
+      R.cumulative.forEach(function(s){
+        h += '<tr><td class="stick stop"><small>' + esc(s.seq) + '</small><b>' + esc(s.name) + '</b><small>' + esc(s.code) + '</small></td><td>' + num(s.km, 2) + '</td><td>' + s.n + '</td><td class="med">' + num(s.median, 1) + '</td>'
+          + P.map(function(p){ var c = s.periods[p]; return c ? '<td class="cell' + (c.low_n ? " low" : "") + '">' + num(c.median, 1) + "</td>" : '<td class="cell low">—</td>'; }).join("") + "</tr>";
+      });
+      h += "</tbody></table></div>";
+    }
+    $("out").innerHTML = h;
+    $("foot").textContent = "Minutes. Service " + M.service + " direction " + M.direction + " · " + M.day_type + (M.from ? " · " + M.from + " to " + M.to : "") + " · periods by "
+      + (R.basis === "trip" ? "trip start time" : "time the bus left the stop") + ". Stop-to-stop time includes the dwell at the first stop. Measured from live LTA bus positions; a single short stretch can be off by tens of seconds, medians are reliable."
+      + (R.route_changed ? " " + R.route_changed + " trips were recorded on an older stop list." : "") + (M.demo ? " DEMO: simulated trips on service 14's real stops." : "");
+  }
+  $("showBtn").addEventListener("click", function(){ S.demo = false; show(); });
+  $("demoBtn").addEventListener("click", function(){ S.demo = true; show(); });
+  ["fSvc", "fDay", "fFrom", "fTo", "fPer", "fBasis"].forEach(function(id){ $(id).addEventListener("change", function(){ if(id === "fSvc") S.demo = false; links(); }); });
+  $("xlsBtn").addEventListener("click", function(e){ if($("xlsBtn").getAttribute("href") === "#"){ e.preventDefault(); show(); } });
+  $("csvBtn").addEventListener("click", function(e){ if($("csvBtn").getAttribute("href") === "#"){ e.preventDefault(); show(); } });
+  seg("fDir", "dir"); seg("view", "view");
+
+  var q = new URLSearchParams(location.search);
+  $("fTo").value = q.get("date_to") || sgtDate(0); $("fFrom").value = q.get("date_from") || sgtDate(-29);
+  if(q.get("day_type")) $("fDay").value = q.get("day_type"); if(q.get("period")) $("fPer").value = q.get("period"); if(q.get("basis")) $("fBasis").value = q.get("basis");
+  if(q.get("direction") === "2"){ S.dir = "2"; $("fDir").querySelectorAll("button").forEach(function(x){ x.setAttribute("aria-pressed", String(x.getAttribute("data-v") === "2")); }); }
+  S.demo = q.get("demo") === "1";
+  loadServices().then(function(){ if(S.demo || (q.get("service") && $("fSvc").value)) show(); });
+})();
+</script>
+</body>
+</html>

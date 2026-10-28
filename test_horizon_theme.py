@@ -8,8 +8,13 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent
 SHELL_PAGES = ['index.html', 'occ_live.html', 'control.html', 'bunching.html', 'halfway_planner.html', 'hplanner.html', 'halfway.html',
                'recovery_guide.html', 'insight.html', 'cameras.html', 'traffic.html', 'login.html', 'forecast.html', 'command.html', 'settings.html',
-               'diversion.html', 'diversion_classic.html', 'diversion_history.html']
+               'diversion.html', 'diversion_classic.html', 'diversion_history.html', 'stop_rt.html']
 
+
+
+def brand_file(name):
+    """Logos may sit in brand/ or at the top level (GitHub web upload cannot create folders)."""
+    return ROOT / 'brand' / name if (ROOT / 'brand' / name).is_file() else ROOT / name
 
 class HorizonTheme(unittest.TestCase):
     def test_json_tokens_match_css(self):
@@ -27,10 +32,10 @@ class HorizonTheme(unittest.TestCase):
     def test_brand_assets_exist_and_are_referenced(self):
         css = (ROOT / 'horizon-tokens.css').read_text()
         for url in re.findall(r'url\("(/brand/[^"]+)"\)', css):
-            self.assertTrue((ROOT / url.lstrip('/')).is_file(), url)
+            self.assertTrue(brand_file(url.rsplit('/', 1)[-1]).is_file() if url.startswith('/brand/') else (ROOT / url.lstrip('/')).is_file(), url)
         shell = (ROOT / 'app_shell.js').read_text()
         for asset in re.findall(r'/brand/[a-z0-9-]+\.(?:webp|svg)', shell):
-            self.assertTrue((ROOT / asset.lstrip('/')).is_file(), asset)
+            self.assertTrue(brand_file(asset.rsplit('/', 1)[-1]).is_file() if asset.startswith('/brand/') else (ROOT / asset.lstrip('/')).is_file(), asset)
 
     def test_every_engine_page_uses_the_shared_theme_and_shell(self):
         for page in SHELL_PAGES:
@@ -67,7 +72,7 @@ class HorizonTheme(unittest.TestCase):
         emb = next(n for n in tree.body if isinstance(n, ast.Assign) and getattr(n.targets[0], 'id', '') == '_BRAND_EMBEDDED')
         embedded = ast.literal_eval(emb.value)
         for name, b64 in embedded.items():                                         # built-in copies equal the brand files
-            self.assertEqual(base64.b64decode(b64), (ROOT / 'brand' / name).read_bytes(), name)
+            self.assertEqual(base64.b64decode(b64), brand_file(name).read_bytes(), name)
         fn = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == '_brand_bytes')
         for layout in ('none', 'top', 'folder'):
             with tempfile.TemporaryDirectory() as tmp:

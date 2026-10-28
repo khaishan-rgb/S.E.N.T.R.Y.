@@ -69,11 +69,7 @@ class Tally(unittest.TestCase):
         self.check('demo')
 
     def test_markers_sit_at_the_problem_stop_not_the_incident(self):
-        old, f.START_STOPS_IGNORED = f.START_STOPS_IGNORED, 0                       # fixture routes are only 3 stops long
-        try:
-            d = self.build('all')
-        finally:
-            f.START_STOPS_IGNORED = old
+        d = self.build('all')
         bunch = sorted(a['point'] for a in d['alerts'] if a['category'] == 'bunching')
         self.assertEqual(len(bunch), 2)
         self.assertNotEqual(bunch[0], bunch[1])                                     # two groups, two places
@@ -88,20 +84,30 @@ class Tally(unittest.TestCase):
         self.assertEqual(d['kpis']['traffic']['services'], 2)                       # 105 and 167 (190 is not a watched service)
 
 
-class StartStopGaps(unittest.TestCase):
-    def test_long_gap_at_first_three_stops_is_dropped(self):
-        stops = [{'code': str(i), 'seq': i + 1, 'name': 'S%d' % i, 'lat': 1.3, 'lon': 103.8, 'route_m': i * 300} for i in range(8)]
-        self.assertTrue(f.near_start(stops, {'stop_j': 2}))
-        self.assertFalse(f.near_start(stops, {'stop_j': 3}))
-        self.assertTrue(f.near_start(stops, {'location': 'S1'}))
-        self.assertFalse(f.near_start(stops, {'location': 'nowhere'}))                # unknown position is kept
+class SameRulesAsBunchingPage(unittest.TestCase):
+    def test_counts_match_the_bunching_page(self):
+        """NOW: 3BB = exactly-3 groups bunched now (confirmed + developing) and long gaps = the page's gap list."""
         now = time.time()
-        sample = {'service': '88', 'direction': 1, 'at': now, 'route_stops': stops, 'sched_hw': 10, 'hw': {'0': 20},
-                  'gaps': [{'active': True, 'max_hw': 25, 'stop_j': 1, 'location': 'S1'}, {'active': True, 'max_hw': 22, 'stop_j': 5, 'location': 'S5'}]}
-        d = f.build_centre('live', 0, raw={'age_s': 0, 'services': [{'svc': '88', 'dir': 1}], 'sources': {}}, samples=[sample])
+        stops = [{'code': str(i), 'seq': i + 1, 'name': 'S%d' % i, 'lat': 1.3, 'lon': 103.8, 'route_m': i * 300} for i in range(30)]
+        groups = [{'size': 3, 'status': 'confirmed', 'ids': ['a', 'b', 'c'], 'stop_j': 5, 'location': 'S5'},
+                  {'size': 3, 'status': 'developing', 'ids': ['d', 'e', 'f'], 'stop_j': 9, 'location': 'S9'},
+                  {'size': 3, 'status': 'early', 'ids': ['g', 'h', 'i'], 'stop_j': 12, 'location': 'S12', 't_occur': 10},
+                  {'size': 2, 'status': 'confirmed', 'ids': ['j', 'k'], 'stop_j': 14, 'location': 'S14'},
+                  {'size': 4, 'status': 'confirmed', 'ids': ['l', 'm', 'n', 'o'], 'stop_j': 16, 'location': 'S16'}]
+        gaps = [{'active': True, 'state': 'confirmed', 'max_hw': 25, 'stop_j': 6, 'location': 'S6'},
+                {'active': True, 'state': 'developing', 'max_hw': 21, 'stop_j': 20, 'location': 'S20', 't_occur': 0}]
+        page = {'bb3': 2, 'gaps': 2}                                                          # bunching.evaluate counts for this row
+        sample = {'service': '88', 'direction': 1, 'at': now, 'route_stops': stops, 'sched_hw': 10, 'hw': {'0': 2}, 'groups': groups, 'gaps': gaps,
+                  'counts': {'bb3': page['bb3'], 'gaps': page['gaps']}}
+        raw = {'age_s': 0, 'services': [{'svc': '88', 'dir': 1}], 'sources': {}, 'bb_params': {'gap_add_min': 12, 'bunch_min': 2.5}}
+        d = f.build_centre('live', 0, raw=raw, samples=[sample])
         row = next(s for s in d['services'] if s['svc'] == '88')
-        self.assertEqual(row['gaps'], 1)
-        self.assertEqual(row['gap_details'][0]['location'], 'S5')
+        self.assertEqual(row['three'], page['bb3'])
+        self.assertEqual(row['gaps'], page['gaps'])
+        self.assertEqual(d['rules']['gap_add_min'], 12)
+        self.assertEqual(d['rules']['bunch_min'], 2.5)
+        later = f.build_centre('live', 15, raw=raw, samples=[sample])
+        self.assertEqual(next(s for s in later['services'] if s['svc'] == '88')['three'], 1)    # only the group predicted within 15 min
 
 
 if __name__ == '__main__':

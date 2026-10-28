@@ -1,6 +1,6 @@
-import {HORIZONS,COLORS,TITLES,esc,num,apiURL,quality,riskServices,slicePage,badge,icon,chartSVG,operationalQueue,initialView,loadSummary,stopText,watchLocation,headwayView,toggleService,resetFilters,hourlyHeadway,hourlyChart,spotlightDeck,categoryView} from './forecast2026-core.js?v=20261028-hz4';
-import {ForecastMap,LAYERS} from './forecast2026-map.js?v=20261028-hz4';
-import {boardModel,loadingCard,trafficCard,headwayCard,emptyState,paginate} from './forecast2026-tv.js?v=20261028-hz4';
+import {HORIZONS,COLORS,TITLES,esc,num,apiURL,quality,riskServices,slicePage,badge,icon,chartSVG,operationalQueue,initialView,loadSummary,stopText,watchLocation,headwayView,toggleService,resetFilters,hourlyHeadway,hourlyChart,spotlightDeck,categoryView} from './forecast2026-core.js?v=20261028-hz5';
+import {ForecastMap,LAYERS} from './forecast2026-map.js?v=20261028-hz5';
+import {boardModel,loadingCard,trafficCard,headwayCard,emptyState,paginate} from './forecast2026-tv.js?v=20261028-hz5';
 const $=id=>document.getElementById(id),query=new URLSearchParams(location.search);
 const initial=initialView(query,{mode:document.documentElement.dataset.defaultMode||'live',horizon:document.documentElement.dataset.defaultHorizon||0});
 if(initial.h===120)initial.h=60;   // old links to the retired NEXT 2H view open the 60-minute view
@@ -34,7 +34,7 @@ function controls(){
  $('mapLayers').innerHTML=Object.entries(LAYERS).map(([key,label])=>`<label><input type="checkbox" data-layer="${key}" ${networkMap.flags[key]?'checked':''}>${label}</label>`).join('');
 }
 function kpiCards(d){
- $('riskCards').innerHTML=Object.entries(TITLES).map(([cat,title])=>{let k=d.kpis[cat],value=k.available?num(k.count):'—',detail=cat==='loading'?(k.occupancy!=null?num(k.occupancy)+'% peak':d.horizon?'Demand history needed':'Categorical load readings'):cat==='traffic'?(k.delay!=null?'+'+num(k.delay,1)+' min avg':'Route-specific impact'):cat==='bunching'?'Exactly three buses':'Scheduled headway +5 min';return `<button class="risk-card ${state.category===cat?'active':''}" data-category="${cat}" style="--risk:${COLORS[cat]}" aria-pressed="${state.category===cat}"><span class="risk-icon">${icon(cat)}</span><span><h2 title="${title}">${title.replace('passenger ','')}</h2><strong>${value}</strong><small>${k.available?detail:'Not available at this horizon'}</small></span><span class="risk-aside"><b>${k.available?num(k.services):'—'}</b>services<small>${d.mode==='demo'?'SIMULATED':d.horizon?'ESTIMATED':'OBSERVED'}</small></span></button>`;}).join('');
+ $('riskCards').innerHTML=Object.entries(TITLES).map(([cat,title])=>{let k=d.kpis[cat],value=k.available?num(k.count):'—',detail=cat==='loading'?(k.occupancy!=null?num(k.occupancy)+'% peak':d.horizon?'Demand history needed':'Categorical load readings'):cat==='traffic'?(k.delay!=null?'+'+num(k.delay,1)+' min avg':'Route-specific impact'):cat==='bunching'?`3BB · headway < ${num(d.rules?.bunch_min??3,0)} min`:`Scheduled + ${num(d.rules?.gap_add_min??10,0)} min`;return `<button class="risk-card ${state.category===cat?'active':''}" data-category="${cat}" style="--risk:${COLORS[cat]}" aria-pressed="${state.category===cat}"><span class="risk-icon">${icon(cat)}</span><span><h2 title="${title}">${title.replace('passenger ','')}</h2><strong>${value}</strong><small>${k.available?detail:'Not available at this horizon'}</small></span><span class="risk-aside"><b>${k.available?num(k.services):'—'}</b>services<small>${d.mode==='demo'?'SIMULATED':d.horizon?'ESTIMATED':'OBSERVED'}</small></span></button>`;}).join('');
 }
 function networkStatus(d){
  let headways=d.services.map(s=>s.focus_headway).filter(v=>v!=null),avg=headways.length?headways.reduce((a,b)=>a+b,0)/headways.length:null;
@@ -227,7 +227,7 @@ function renderBoard(d){
  boardColumn('tvTraffic',m.traffic.rows,trafficCard,emptyState(m.traffic.available,'incidents affecting services','Traffic feed not live'));
  $('tvHeadwayCount').textContent=m.headway.available?m.headway.rows.length:'—';
  $('tvHeadwaySub').textContent=m.headway.available?`${when} · ${bunch} three-bus bunch${bunch===1?'':'es'} · ${gaps} long gap${gaps===1?'':'s'}`:(d.mode==='live'&&state.h>30?'Headway forecast covers ≤30 min':'Headway data unavailable');
- $('tvHeadwayNote').textContent=demo?'DEMO · simulated':'ETA headways · gap = ≥5 min over schedule';
+ $('tvHeadwayNote').textContent=demo?'DEMO · simulated':`Same rules as Bunching & Gap · 3BB < ${num(d.rules?.bunch_min??3,0)} min · gap ≥ scheduled + ${num(d.rules?.gap_add_min??10,0)} min · first ${d.rules?.gap_skip_stops??3} stops ignored`;
  boardColumn('tvHeadway',m.headway.rows,headwayCard,emptyState(m.headway.available,'bunching or long gaps',d.mode==='live'&&state.h>30?'Beyond 30-min coverage':'Waiting for headway collector'));
  document.querySelectorAll('.tvq').forEach(x=>x.classList.toggle('is-stale',stale));tvPrimed=true;
 }

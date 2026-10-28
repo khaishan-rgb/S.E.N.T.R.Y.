@@ -118,9 +118,7 @@ class ForecastBaselines(unittest.TestCase):
                 'seq':[{'id':'B1','lat':1.3,'lon':103.8,'load':'SDA'}]}
         raw={'services':[{'svc':'151','dir':2}], 'sources':{'tomtom_flow':{'status':'live'}},
              'events':[{'id':'e','kind':'jam','status':'confirmed','pt':[103.8,1.3],'road':'Example Road','delay_s':120,'services':[{'svc':'151','dir':2,'a_m':100,'b_m':300}]}]}
-        old,f.START_STOPS_IGNORED=f.START_STOPS_IGNORED,0     # 2-stop fixture route
-        try:d=f.build_centre(mode='live',horizon=0,raw=raw,samples=[sample],now=1000)
-        finally:f.START_STOPS_IGNORED=old
+        d=f.build_centre(mode='live',horizon=0,raw=raw,samples=[sample],now=1000)
         row=d['services'][0]
         self.assertEqual(row['bunching_details'][0]['stop']['sequence'],23)
         self.assertEqual(row['bunching_details'][0]['bus_order'],['B1','B2','B3'])

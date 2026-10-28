@@ -238,6 +238,7 @@
               ["reg_hold_max", "Adjustment warning threshold", "min", "Maximum departure adjustment the engine may propose (hold / release), capped at 8 min."],
               ["balance_trips", "Default analysis horizon (balance trips)", "trips", "Subsequent trips simulated for every recovery decision (simulation depth)."]];
   var BB_F = [["bunch_min", "Bunching threshold", "min", "Buses closer than this are bunched."], ["gap_add_min", "Long-gap threshold", "min above schedule", "A headway this much above scheduled is a long gap."],
+              ["gap_skip_stops", "Long gap: ignore first stops", "stops", "Long gaps at the route's first stops (terminal dispatch / layover) are not counted."],
               ["confirm_stops", "Bunching confirmation", "stops", "Consecutive stops before a bunching case is confirmed."], ["horizon_min", "Prediction horizon", "min", "How far ahead bunching and gaps are predicted."],
               ["refresh_sec", "Collector interval", "s", "How often live bus positions are polled."]];
   function opRows(el, key, fields, d){

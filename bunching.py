@@ -10,6 +10,7 @@ interpolated between them (and extrapolated past the last one with the traffic m
 Headway at a stop = ETA(follower) - ETA(leader).
   Bunched      = headway  <  bunch_min minutes (default 3, absolute)           -> Confirmed after confirm_stops (15) consecutive stops
   Long headway = headway  >= scheduled HW + gap_add_min (default +10 min)     -> Confirmed after gap_stops (15) consecutive stops
+                 (not counted at the route's first gap_skip_stops (3) stops: terminal dispatch / layover noise)
 Consecutive stops = stops already travelled in that state since we first saw it + predicted stops ahead. Fewer stops = Developing.
 Not in the state yet but predicted to be = Early warning (bunching) / Developing (gap).
 """
@@ -21,6 +22,7 @@ PARAMS = {
     "confirm_stops": 15,    # bunching must persist this many consecutive stops to be confirmed (and to be logged)
     "gap_add_min": 10.0,    # long headway:   HW >= scheduled HW + 10 min
     "gap_stops": 15,        # long headway must persist this many consecutive stops to be confirmed (and to be logged)
+    "gap_skip_stops": 3,    # long headway is not counted at the route's first N stops (terminal dispatch / layover noise)
     "alert_step": 5,        # alerts: 1st alert when confirmed (15 stops), then one more every 5 stops (20, 25, 30 ...) while it lasts
     "horizon_min": 30,      # prediction horizon
     "refresh_sec": 30,      # collector interval
@@ -186,13 +188,15 @@ def analyse_pair(lead, foll, ser, H, P, prior, prior_gap=None):
     now = ser[0][1]
     key = (lead["id"], foll["id"])
 
-    def run_from(pred):
+    def run_from(pred, s=ser):
         """(now?, first-index, consecutive stops from there) for hw satisfying pred, starting now or at the first predicted stop within the horizon."""
-        now_ok = pred(now)
-        k0 = 0 if now_ok else next((k for k, (j, hw, e) in enumerate(ser) if pred(hw) and e <= hz), None)
+        if not s:
+            return False, None, 0
+        now_ok = s[0] is ser[0] and pred(s[0][1])
+        k0 = 0 if now_ok else next((k for k, (j, hw, e) in enumerate(s) if pred(hw) and e <= hz), None)
         run = 0
         if k0 is not None:
-            for j, hw, e in ser[k0:]:
+            for j, hw, e in s[k0:]:
                 if not pred(hw):
                     break
                 run += 1
@@ -200,7 +204,10 @@ def analyse_pair(lead, foll, ser, H, P, prior, prior_gap=None):
 
     bunched_now, k0, run = run_from(lambda v: v <= thr)
     travelled = max(0, lead["j0"] - prior[key]) if (bunched_now and key in prior) else 0
-    long_now, kg, run_g = run_from(lambda v: v >= long_thr)
+    skip = int(P.get("gap_skip_stops", 0) or 0)
+    ser_g = [x for x in ser if x[0] >= skip]                                         # long headway ignores the first `skip` stops
+    long_now, kg, run_g = run_from(lambda v: v >= long_thr, ser_g)
+    within_g = [x for x in ser_g if x[2] <= hz] or ser_g[:1]
     travelled_g = max(0, lead["j0"] - prior_gap[key]) if (long_now and key in prior_gap) else 0
     mx = max(x[1] for x in within)
     vals = [v for v in hws.values() if v is not None]
@@ -214,7 +221,8 @@ def analyse_pair(lead, foll, ser, H, P, prior, prior_gap=None):
              t_bunch=0.0 if bunched_now else (ser[k0][2] if k0 is not None else None),
              min_hw=min(x[1] for x in within), max_hw=mx, max_ratio=mx / H, max_at=next(x[0] for x in within if x[1] == mx),
              delta=delta, gap_state=gap_state, long_now=long_now, gap_run=run_g, gap_travelled=travelled_g,
-             t_gap=0.0 if long_now else (ser[kg][2] if kg is not None else None),
+             t_gap=0.0 if long_now else (ser_g[kg][2] if kg is not None else None),
+             gap_max_hw=max((x[1] for x in within_g), default=None), gap_max_at=max(within_g, key=lambda x: x[1])[0] if within_g else None,
              smap={j: hw for j, hw, e in ser})
     return a
 
@@ -347,11 +355,12 @@ def evaluate(ctx, P=None):
             tr = "widening" if p["delta"] >= trend_thr else "recovering" if p["delta"] <= -trend_thr else "stable"
             cur = vecs[i]["j0"]
             since = max(0, cur - p["gap_travelled"])
-            gaps.append({"lead": p["lead"], "foll": p["foll"], "order": i + 1, "now": _r(p["now"]), "max_hw": _r(p["max_hw"]), "ratio": round(p["max_ratio"], 2),
+            gmx, gat = p.get("gap_max_hw", p["max_hw"]), p.get("gap_max_at", p["max_at"])
+            gaps.append({"lead": p["lead"], "foll": p["foll"], "order": i + 1, "now": _r(p["now"]), "max_hw": _r(gmx), "ratio": round(gmx / H, 2),
                          "state": p["gap_state"], "t_occur": _r(p["t_gap"]), "trend": tr, "hws": {str(k): _r(v) for k, v in p["hws"].items()},
                          "stops": p["gap_run"] + p["gap_travelled"] if p["long_now"] else 0, "active": bool(p["long_now"]), "cur_j": cur, "since_j": since,
                          "since_stop": lab(since), "cur_stop": lab(cur),
-                         "stop_j": p["max_at"], "location": names[p["max_at"]] if 0 <= p["max_at"] < len(names) else vecs[i]["near"], "i": i})
+                         "stop_j": gat, "location": names[gat] if 0 <= gat < len(names) else vecs[i]["near"], "i": i})
 
     conf = [g for g in groups if g["status"] == "confirmed"]
     devn = [g for g in groups if g["status"] == "developing"]

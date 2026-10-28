@@ -1139,8 +1139,8 @@ def bb_rec_status(now=None):
     return {"state": state, "always_on": bool(BB_ALWAYS), "persistent": BB_PERSIST, "keep_days": BB_KEEP_DAYS, "since": round(BB_BOOT), "db_ok": BB["db_ok"]}
 
 
-BB_INT_PARAMS = ("confirm_stops", "gap_stops", "alert_step", "refresh_sec", "horizon_min")
-PARAM_RANGES = {"bunch_min": (0.5, 10), "confirm_stops": (1, 60), "gap_add_min": (1, 60), "gap_stops": (1, 60), "alert_step": (1, 30), "horizon_min": (10, 60), "refresh_sec": (15, 600),
+BB_INT_PARAMS = ("confirm_stops", "gap_stops", "gap_skip_stops", "alert_step", "refresh_sec", "horizon_min")
+PARAM_RANGES = {"bunch_min": (0.5, 10), "confirm_stops": (1, 60), "gap_add_min": (1, 60), "gap_stops": (1, 60), "gap_skip_stops": (0, 20), "alert_step": (1, 30), "horizon_min": (10, 60), "refresh_sec": (15, 600),
                 "w_gap": (0, 100), "w_bunch": (0, 100), "w_persist": (0, 100), "w_deter": (0, 100), "w_time": (0, 100), "yellow_conv": (0.3, 1), "yellow_div": (1, 3)}
 
 
@@ -12270,6 +12270,7 @@ async def fc26_centre(request: Request, mode: str='live', horizon: int=0, scenar
         # Refresh the existing bunching collector watch list, within its normal budget.
         await api_forecast_bunching(services=services or ','.join(s['svc'] for s in raw.get('services',[])[:20]) or initial_watch)
         samples = list(BB['rows'].values())
+        raw = dict(raw or {}, bb_params=dict(BB['params']))
         raw,samples = await asyncio.to_thread(fc26_enrich_context,raw,samples)
     # Synchronise the full namespace before applying user filters. Filters cannot resolve alerts.
     data = await asyncio.to_thread(fc26.build_centre,mode,horizon,scenario,max(0,tick),raw,samples,delay_min=0)

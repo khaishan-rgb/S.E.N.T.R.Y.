@@ -427,7 +427,7 @@ async function post(url, body){
 }
 
 /* ------------------------------------------------------------------ helpers (plain-language wording; the engine's numbers are unchanged) */
-const P = () => (S.data && S.data.params) || {bunch_min:3, confirm_stops:15, gap_add_min:10, gap_stops:15, alert_step:5, horizon_min:30};
+const P = () => (S.data && S.data.params) || {bunch_min:3, confirm_stops:15, gap_add_min:10, gap_stops:15, gap_skip_stops:3, alert_step:5, horizon_min:30};
 function hwCls(v, H){ if(v == null || !H) return ""; const p = P(); return v < p.bunch_min - 1e-6 || v >= H + p.gap_add_min - 1e-6 ? "c-red" : ""; }
 const tOcc = t => t == null ? "–" : t <= 0 ? "Now" : Math.round(t) + " min";
 const LETTER = o => o >= 1 && o <= 26 ? String.fromCharCode(64 + o) : String(o);            // bus A = front bus (furthest along the route)
@@ -820,7 +820,7 @@ function addSvc(v){ v = (v || "").trim().toUpperCase(); if(!v) return; if(!/^[0-
 function syncSegs(){ document.querySelectorAll("#dirSeg button").forEach(b => b.setAttribute("aria-pressed", +b.dataset.d === S.dir)); document.querySelectorAll("#viewSeg button").forEach(b => b.setAttribute("aria-pressed", b.dataset.v === S.view)); document.querySelectorAll("#issueSeg button").forEach(b => b.setAttribute("aria-pressed", b.dataset.i === S.issue)); document.querySelectorAll(".sorts button[data-s]").forEach(b => b.setAttribute("aria-pressed", b.dataset.s === S.sort)); $("win").value = String(S.win); }
 
 /* ------------------------------------------------------------------ settings tab */
-const PLAB = {bunch_min:["Bunching: headway below", "min (absolute)"], confirm_stops:["Bunching: confirm and log after", "consecutive stops"], gap_add_min:["Long headway: scheduled HW plus", "min"], gap_stops:["Long headway: confirm and log after", "consecutive stops"], alert_step:["Alerts: repeat every", "more stops after the first alert"], horizon_min:["Prediction horizon", "min"], refresh_sec:["Refresh interval", "sec"],
+const PLAB = {bunch_min:["Bunching: headway below", "min (absolute)"], confirm_stops:["Bunching: confirm and log after", "consecutive stops"], gap_add_min:["Long headway: scheduled HW plus", "min"], gap_stops:["Long headway: confirm and log after", "consecutive stops"], gap_skip_stops:["Long headway: ignore the first", "stops of the route (terminal / layover)"], alert_step:["Alerts: repeat every", "more stops after the first alert"], horizon_min:["Prediction horizon", "min"], refresh_sec:["Refresh interval", "sec"],
   w_gap:["Risk weight: gap severity", "%"], w_bunch:["Risk weight: bunching level", "%"], w_persist:["Risk weight: persistence", "%"], w_deter:["Risk weight: deterioration", "%"], w_time:["Risk weight: time to occur", "%"], yellow_conv:["Yellow: converging below", "\u00d7 scheduled HW"], yellow_div:["Yellow: widening above", "\u00d7 scheduled HW"]};
 async function loadSettings(){
   const j = await getJSON("/api/bunching/settings", 20000); if(j.error){ $("params").innerHTML = `<div class="msg bad">${esc(j.error)}</div>`; return; }

@@ -268,24 +268,6 @@ def stop_context(stops, location=None, index=None):
             'point':[chosen['lon'],chosen['lat']] if chosen.get('lat') is not None and chosen.get('lon') is not None else None}
 
 
-START_STOPS_IGNORED=3
-
-
-def near_start(stops, gap):
-    """True when a long gap sits at one of the route's first START_STOPS_IGNORED stops (terminal dispatch / layover,
-    not a service gap). Unknown positions are kept."""
-    index=gap.get('stop_j')
-    if not isinstance(index,int):
-        ctx=stop_context(stops,gap.get('location'))
-        index=next((i for i,s in enumerate(stops) if ctx and s.get('code') is not None and str(s['code'])==ctx['code']),None)
-    if isinstance(index,int) and 0<=index<len(stops):
-        seqs=sorted(s.get('seq') for s in stops if isinstance(s.get('seq'),(int,float)))
-        seq=stops[index].get('seq')
-        if isinstance(seq,(int,float)) and seqs:return seqs.index(seq)<START_STOPS_IGNORED if seq in seqs else index<START_STOPS_IGNORED
-        return index<START_STOPS_IGNORED
-    return False
-
-
 def road_missing(road):
     return not road or str(road).strip().lower().startswith("road name not supplied")
 
@@ -367,12 +349,14 @@ def live_snapshot(raw, samples, h, now=None):
         if s.get("blocked") and not delay:
             delay=None  # a closure without a quantified delay is not zero extra time
         # Forecast categories use collector arrival-time models within their actual coverage.
+        # Same rules and counts as the Bunching & Gap page (one engine: bunching.py, its settings apply to both pages):
+        # 3BB now = groups of exactly 3 buses that are bunched now (confirmed or developing) = the page's "3BB" count;
+        # long headway now = the page's "Long gaps" list (scheduled + gap_add_min, first gap_skip_stops stops ignored).
+        # Forecast horizons: the engine's predicted onset (t_occur) within its 30-min horizon.
         groups=[g for g in sample.get("groups",[]) if g.get("size")==3 and valid and
-                ((h==0 and g.get("status")=="confirmed") or (h>0 and h<=30 and g.get("t_occur") is not None and g["t_occur"]<=h))]
-        gaps=[g for g in sample.get("gaps",[]) if valid and ((h==0 and g.get("active")) or (0<h<=30 and g.get("t_occur") is not None and g["t_occur"]<=h))]
-        gaps=[g for g in gaps if sample.get("sched_hw") and (g.get("max_hw") or 0)-sample["sched_hw"]>=5]
+                ((h==0 and g.get("status") in ("confirmed","developing")) or (h>0 and h<=30 and g.get("t_occur") is not None and g["t_occur"]<=h))]
+        gaps=[g for g in sample.get("gaps",[]) if valid and (h==0 or (0<h<=30 and g.get("t_occur") is not None and g["t_occur"]<=h))]
         stops=sample.get('route_stops') or (raw.get('route_context') or {}).get(f'{key[0]}:{key[1]}',[])
-        gaps=[g for g in gaps if not near_start(stops,g)]   # gaps at the first 3 stops are dispatch / layover noise
         traffic_details=[]
         for event in events:
             match=next((m for m in event.get('matches',[]) if (m['svc'],m['dir'])==key),None)
@@ -415,11 +399,11 @@ def live_snapshot(raw, samples, h, now=None):
         if heavy and h==0:
             alerts.append(alert("loading",key[0],(load_details[0]["stop"] or {}).get("name") or load_details[0].get("near") or location if load_details else location,f"{heavy} sampled buses: limited standing",0,at((load_details[0]["stop"] if load_details else None),heavy_bus),"Observed LTA categorical load; exact occupancy is unavailable.",.7,direction=key[1]))
         for group in groups:
-            alerts.append(alert("bunching",key[0],group.get("location"),"Three-bus bunching",group.get("t_occur") or 0,at(stop_context(stops,group.get("location"),group.get("stop_j"))),"Collector downstream arrival-time headways, not bus distance.",.7,direction=key[1],event_id="bb:"+":".join(map(str,group.get("ids") or [])),stop=stop_context(stops,group.get("location"),group.get("stop_j")),buses=group.get("ids"),persistence=group.get("stops")))
+            alerts.append(alert("bunching",key[0],group.get("location"),f"Three-bus bunching ({group.get('status') or 'predicted'})",group.get("t_occur") or 0,at(stop_context(stops,group.get("location"),group.get("stop_j"))),"Collector downstream arrival-time headways, not bus distance.",.7,direction=key[1],event_id="bb:"+":".join(map(str,group.get("ids") or [])),stop=stop_context(stops,group.get("location"),group.get("stop_j")),buses=group.get("ids"),persistence=group.get("stops")))
         for gap in gaps:
             scheduled=sample.get("sched_hw")
             if scheduled and (gap.get("max_hw") or 0)-scheduled>=5:
-                alerts.append(alert("gap",key[0],gap.get("location"),f'{gap.get("max_hw")} min headway',gap.get("t_occur") or 0,at(stop_context(stops,gap.get("location"),gap.get("stop_j"))),"Collector projected arrivals exceed the scheduled headway by at least five minutes.",.7,direction=key[1],event_id=f"gap:{gap.get('lead')}:{gap.get('foll')}",stop=stop_context(stops,gap.get("location"),gap.get("stop_j")),headway=gap.get("max_hw"),scheduled=scheduled))
+                alerts.append(alert("gap",key[0],gap.get("location"),f'{gap.get("max_hw")} min headway',gap.get("t_occur") or 0,at(stop_context(stops,gap.get("location"),gap.get("stop_j"))),f"Bunching & Gap engine: headway at or above scheduled + {(raw.get('bb_params') or {}).get('gap_add_min',10):g} min ({gap.get('state') or 'predicted'}).",.7,direction=key[1],event_id=f"gap:{gap.get('lead')}:{gap.get('foll')}",stop=stop_context(stops,gap.get("location"),gap.get("stop_j")),headway=gap.get("max_hw"),scheduled=scheduled))
         # Live coordinates remain live coordinates at future horizons: no fabricated positions.
         for b in seq:
             if b.get("lat") and b.get("lon"):
@@ -438,12 +422,17 @@ def live_snapshot(raw, samples, h, now=None):
 from forecast2026_amendments import filter_traffic, delay_threshold, meets_delay, master_schedule
 
 
+BB_DEFAULT_RULES={"bunch_min":3.0,"confirm_stops":15,"gap_add_min":10.0,"gap_stops":15,"gap_skip_stops":3,"horizon_min":30}
+
+
 def build_centre(mode="demo", horizon=30, scenario="combined", tick=0, raw=None, samples=None, services=None, exclude_cbs=False, category="all", now=None, delay_min=.8):
     if horizon not in HORIZONS:
         raise ValueError("Unsupported forecast horizon")
     now=now or time.time(); chosen={s.upper() for s in services or []}; samples=samples or []
     snapshots={h:demo_snapshot(h,scenario,tick,now) if mode=="demo" else live_snapshot(raw or {},samples,h,now) for h in HORIZONS}
+    rules={k:(raw or {}).get("bb_params",{}).get(k,BB_DEFAULT_RULES[k]) for k in BB_DEFAULT_RULES}
     for snap in snapshots.values():
+        snap["rules"]=rules   # Bunching & Gap engine settings, shown on the cards
         snap["context_routes"]=[r for r in snap["routes"] if not exclude_cbs or r["svc"] not in CBS]
         filter_traffic(snap,delay_min)
         keep=lambda s:(not chosen or s["svc"] in chosen) and (not exclude_cbs or s["svc"] not in CBS)
