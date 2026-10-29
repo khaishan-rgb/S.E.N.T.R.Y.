@@ -246,6 +246,7 @@ class Chain:
         rows = np.arange(Sn)[:, None]
         m = len(prof)
         maxg = np.zeros((Sn, m)); ming = np.zeros((Sn, m)); sq = np.zeros(Sn); cnt = np.zeros(Sn)
+        hrv = np.full((Sn, m), np.nan); hrn = np.zeros((Sn, m))   # hourly average headway: the worst 60-min window at each evaluation point
         rec = np.full(Sn, -np.inf)
         beta = nz["beta"][:, None] if nz else P["beta_det"]
         legf = nz["leg"][:, L][:, None] if nz else 1.0
@@ -315,6 +316,7 @@ class Chain:
                 aw = np.where((n_h >= 2) & (s1 > 0), s2 / (2.0 * np.maximum(s1, EPS)), np.nan)
             awt_[:, p] = aw
             ewt[:, p] = aw - swt_[p]
+            hrv[:, p], hrn[:, p] = _hourly(T)
             dev = np.where(np.isnan(g), 0.0, (g - H) ** 2)
             sq += w[p] * dev.sum(1)
             cnt += w[p] * (~np.isnan(g)).sum(1)
@@ -328,8 +330,17 @@ class Chain:
                 pts_store.append((T[0].copy(), order[0].copy(), g[0].copy()))
         A = np.empty_like(T)
         A[rows, order] = T
-        ewt[:, ~(self.ewt_mask_up if up else self.ewt_mask_dn)] = np.nan          # not an AITP: simulated, but not an EWT evaluation point
-        return {"end": A, "maxg": maxg, "ming": ming, "sq": sq, "cnt": cnt, "rec": rec, "w": w,
+        nonpt = ~(self.ewt_mask_up if up else self.ewt_mask_dn)
+        ewt[:, nonpt] = np.nan          # not an AITP: simulated, but not an EWT evaluation point
+        hrv[:, nonpt] = np.nan
+        with np.errstate(all="ignore"):
+            import warnings
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                hr_leg = np.nanmax(hrv, 1)
+        hr_at = np.argmax(np.where(np.isnan(hrv), -np.inf, hrv), 1)
+        hr_n = hrn[np.arange(Sn), hr_at]
+        return {"hr": hr_leg, "hr_n": hr_n, "hr_p": hr_at, "end": A, "maxg": maxg, "ming": ming, "sq": sq, "cnt": cnt, "rec": rec, "w": w,
                 "dep_T": first_T, "dep_order": first_order, "dep_g": first_g, "pts": pts_store,
                 "ewt": ewt, "awt": awt_, "swt": swt_, "sch_h": sch_h}
 
@@ -397,7 +408,14 @@ class Chain:
         bunch_tot = sum(lg["w"].sum() for lg in legs)
         g0 = legs[0]["dep_g"]
         ic_short = np.nansum(np.maximum(0.0, 0.5 * H - g0), 1)
-        out = {"ic_short": ic_short, "leg_min": leg_min, "max": np.nanmax(leg_max, 1), "ic_max": np.nanmax(g0, 1), "ic_sq": np.nansum((g0 - H) ** 2, 1), "wmax": leg_wmax.mean(1), "leg_max": leg_max, "leg_wmax": leg_wmax,
+        # HOURLY AVERAGE HEADWAY (worst hour): at every evaluation point, the 60-min window with the highest average gap, over every balance trip
+        hr_all = np.stack([np.where(np.isnan(lg["hr"]), -np.inf, lg["hr"]) for lg in legs], 1)
+        hr_L = hr_all.argmax(1)
+        hr_hw = hr_all.max(1)
+        hr_hw = np.where(np.isfinite(hr_hw), hr_hw, np.nan)
+        hr_n = np.array([legs[L]["hr_n"][i] for i, L in enumerate(hr_L)])
+        hr_p = np.array([legs[L]["hr_p"][i] for i, L in enumerate(hr_L)])
+        out = {"hr_hw": hr_hw, "hr_n": hr_n, "hr_L": hr_L, "hr_p": hr_p, "ic_short": ic_short, "leg_min": leg_min, "max": np.nanmax(leg_max, 1), "ic_max": np.nanmax(g0, 1), "ic_sq": np.nansum((g0 - H) ** 2, 1), "wmax": leg_wmax.mean(1), "leg_max": leg_max, "leg_wmax": leg_wmax,
                "rms": np.sqrt(sq / np.maximum(cnt, 1)), "bunch": bunch_pts / bunch_tot, "any_bunch": (leg_min < P["bunch_min"] - EPS).any(1),
                "rec": np.where(np.isinf(rec), 0.0, np.maximum(0.0, rec - self.ref)), "unrec": late_irr, "bc": bc, "bc_max": np.maximum(bc, 0).max(1),
                "bc_sum": np.maximum(bc, 0).sum(1), "up1_late": up1_late, "D": D, "ewt_avg": ewt_avg, "ewt_max": ewt_max, "ewt_n": n_ok}
@@ -472,6 +490,26 @@ class Chain:
 
 
 # ============================================================================ plans
+def _hourly(T, win=60.0):
+    """Hourly average headway at one point: for every bus, the buses passing in the next 60 min; average gap = (last - first) / (buses - 1).
+    Returns (the worst window's average gap, number of gaps in it) per row. A gap longer than an hour counts as its own window."""
+    Ts = np.sort(T, axis=1)                               # missing (halfway-skipped) buses -> NaN, sorted to the end
+    B = Ts.shape[1]
+    if B < 2:
+        return np.full(Ts.shape[0], np.nan), np.zeros(Ts.shape[0])
+    val = Ts[:, 1:] - Ts[:, :-1]
+    kk = np.ones_like(val)
+    for k in range(2, B):
+        d = Ts[:, k:] - Ts[:, :-k]
+        ok = d <= win + EPS
+        val[:, :B - k] = np.where(ok, d / k, val[:, :B - k])
+        kk[:, :B - k] = np.where(ok, k, kk[:, :B - k])
+    v = np.where(np.isnan(val), -np.inf, val)
+    i = v.argmax(1)
+    best = v[np.arange(len(i)), i]
+    return np.where(np.isfinite(best), best, np.nan), kk[np.arange(len(i)), i]
+
+
 def _cost(m, w, H, km, adj, w_short=1.5):
     return (w.get("ewt", 0.0) * m["ewt_avg"] + w_short * m["ic_short"] + w["mx"] * np.maximum(0.0, m["max"] - H) + w["wmx"] * np.maximum(0.0, m["wmax"] - H) + w["rms"] * m["rms"] + w["bunch"] * 10.0 * m["bunch"]
             + w["rec"] * m["rec"] / H + w["km"] * km + w["bc"] * m["bc_max"] + w["bcsum"] * m["bc_sum"] / 10.0 + w["adj"] * adj)
@@ -734,6 +772,20 @@ class Optimiser:
         return cur, best
 
     # -------------------------------------------------- describe a plan
+    def _hr_where(self, L, p):
+        """Where the worst hourly headway is: '<stop> · <balance trip>'."""
+        C = self.C
+        try:
+            if L % 2 == 0:
+                nm = C.names[C.pts_up[p]]
+            else:
+                nm = C.dn_lbl[p][0]
+                if nm is None:
+                    nm = "Far terminal" if p == 0 else (C.names[0] if p == len(C.frac_dn) - 1 else f"{100.0 * C.frac_dn[p]:.0f}% along the return trip")
+        except Exception:
+            nm = ""
+        return f"{nm} \u00b7 {leg_name(L)}" if nm else leg_name(L)
+
     def describe(self, plan, det, mc, label, key, disp_j=None):
         C, P = self.C, self.P
         hwb = {h[0]: h for h in plan["hw"]}
@@ -796,14 +848,16 @@ class Optimiser:
         ewt_blk = {"avg": _r(det["ewt_avg"][0], 3), "max": _r(det["ewt_max"][0], 2), "n_points": len(valid), "n_points_all": len(ewt_pts),
                    "worst": {"label": worst["label"], "leg": worst["leg"], "ewt": worst["ewt"]} if worst else None, "points": ewt_pts}
         out = {"key": key, "label": label, "fam": plan.get("fam"), "rows": rows, "chain": chain, "ewt": ewt_blk, "term_adj": term_adj,
-               "det": {"max": _r(det["max"][0]), "ic_max": _r(det["ic_max"][0]), "wmax": _r(det["wmax"][0]), "rms": _r(det["rms"][0], 2),
+               "det": {"hr_hw": _r(float(det["hr_hw"][0]), 1) if np.isfinite(det["hr_hw"][0]) else None, "hr_buses": int(det["hr_n"][0]) + 1 if np.isfinite(det["hr_hw"][0]) else None,
+                       "hr_where": self._hr_where(int(det["hr_L"][0]), int(det["hr_p"][0])) if np.isfinite(det["hr_hw"][0]) else None, "max": _r(det["max"][0]), "ic_max": _r(det["ic_max"][0]), "wmax": _r(det["wmax"][0]), "rms": _r(det["rms"][0], 2),
                        "bunch_pct": _r(100 * det["bunch"][0], 0), "rec": _r(det["rec"][0], 0), "recovered": bool(not det["unrec"][0]), "min_hw": _r(float(np.nanmin(det["leg_min"][0])) if "leg_min" in det else None, 1), "km": _r(det["km"][0], 2), "adj": _r(det["adj"][0], 0),
                        "bc_max": _r(det["bc_max"][0], 1), "bc_sum": _r(det["bc_sum"][0], 1), "cost": _r(det["cost"][0], 1),
                        "bc": [_r(x, 1) for x in det["bc"][0]], "up1_late": [_r(x, 1) for x in det["up1_late"][0]]},
                "ic_hw": ic, "down_hw": down, "at_j": at_j, "up1_times": {str(k): v for k, v in up1.items()}, "n_adjusted": sum(1 for r in rows if r["type"] == "full" and abs(r["shift"]) >= 0.5),
                "n_halfway": len(hwb), "n_full": sum(1 for r in rows if r["type"] != "halfway")}
         if mc is not None:
-            out["mc"] = {"n": int(len(mc["max"])), "max_mean": _r(mc["max"].mean()), "max_p50": _pct(mc["max"], 50), "max_p85": _pct(mc["max"], 85), "max_p90": _pct(mc["max"], 90),
+            out["mc"] = {"n": int(len(mc["max"])), "hr_hw_p50": _pct(mc["hr_hw"][np.isfinite(mc["hr_hw"])], 50) if np.isfinite(mc["hr_hw"]).any() else None,
+                         "hr_hw_p85": _pct(mc["hr_hw"][np.isfinite(mc["hr_hw"])], 85) if np.isfinite(mc["hr_hw"]).any() else None, "max_mean": _r(mc["max"].mean()), "max_p50": _pct(mc["max"], 50), "max_p85": _pct(mc["max"], 85), "max_p90": _pct(mc["max"], 90),
                          "wmax_p50": _pct(mc["wmax"], 50), "wmax_p85": _pct(mc["wmax"], 85),
                          "rec_p50": _pct(mc["rec"], 50), "rec_p85": _pct(mc["rec"], 85), "p_recovered": _r(100.0 * (~mc["unrec"]).mean(), 0), "p_bunch": _r(100.0 * mc["any_bunch"].mean(), 0),
                          "bc_p50": _pct(mc["bc_max"], 50), "bc_p85": _pct(mc["bc_max"], 85), "km": _r(det["km"][0], 2),

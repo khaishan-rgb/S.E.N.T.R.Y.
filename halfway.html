@@ -707,8 +707,8 @@ function rvCard(k, p, r){
     ${p.down_hw ? `<h4>Headways passengers see at ${esc(r.disp_name || "mid-route")}</h4>${rvPat(p.down_hw, H, bm, n, hwT)}` : ""}
     <div class="rvkv"><span>Average EWT (${r.balance_trips} balance trips)</span><b class="${cls(p.ewt && p.ewt.avg, .5, 2)}">${p.ewt ? f2(p.ewt.avg) : "\u2013"} min</b>
       <span>EWT P50 / P85 (stress test)</span><b>${f2(m.ewt_p50)} / ${f2(m.ewt_p85)}</b>
-      <span>Max headway, expected</span><b class="${cls(d.max, 1.2 * H, 2 * H)}">${f1(d.max)} min</b>
-      <span>Max headway P50 / P85 / P90</span><b>${f1(m.max_p50)} / <span style="color:#fff">${f1(m.max_p85)}</span> / ${f1(m.max_p90)}</b>
+      <span>Hourly average headway, worst hour</span><b class="${cls(d.hr_hw, 1.1 * H, 1.5 * H)}" title="${esc(d.hr_where || "")}">${f1(d.hr_hw)} min${d.hr_buses ? ` <small style="font-weight:400">(${d.hr_buses} buses in the hour)</small>` : ""}</b>
+      <span>Hourly average headway P50 / P85</span><b>${f1(m.hr_hw_p50)} / <span style="color:#fff">${f1(m.hr_hw_p85)}</span></b>
       <span>Normal headway restored</span><b class="${d.recovered ? "ok" : "bad"}">${rvRec(p)}</b>
       <span>Settles in (of ${m.n.toLocaleString()} futures)</span><b class="${cls(100 - m.p_recovered, 20, 60)}">${f1(m.p_recovered)}%</b>
       <span>Bunching risk (&lt; ${f1(bm)} min, any trip)</span><b class="${cls(m.p_bunch, 20, 60)}">${f1(m.p_bunch)}%</b>
@@ -760,8 +760,8 @@ function hoRenderRecovery(){
   h += `<ul class="rvins">${(HO.rvAll ? now_ : main).map(li).join("")}</ul>${later.length ? `<details class="hall" style="margin:-2px 0 10px"><summary>Later trips \u2013 ${later.length} terminal instruction${later.length > 1 ? "s" : ""} (even-spacing regulation)</summary><ul class="rvins" style="margin-top:8px">${later.map(li).join("")}</ul></details>` : ""}${rest.length ? `<button class="rvmore" type="button" id="rvMore" style="width:100%;margin:-4px 0 10px">${HO.rvAll ? "Show only the trips that change" : `+ ${rest.length} trip${rest.length > 1 ? "s" : ""} unchanged (on time, departed) \u2013 show all`}</button>` : ""}`;
   h += rvEwt(r);
   const bcFull = (Hw && r.decision === "halfway") ? P[r.full_choice] : ch;
-  h += `<div class="rvhead"><div><small>Without intervention<br>max HW (P85)</small><b>${Math.round(N.mc.max_p85)} min</b></div><div><small>Adjustment only<br>max HW (P85)</small><b>${Math.round(A.mc.max_p85)} min</b></div>
-    <div class="ai"><small>AI plan<br>max HW (P85)</small><b>${Math.round(ch.mc.max_p85)} min</b></div><div><small>Normal headway<br>no action \u2192 AI</small><b style="font-size:15px">${rvRec(N)} \u2192 ${rvRec(ch)}</b></div>
+  h += `<div class="rvhead"><div><small>Without intervention<br>hourly avg HW (P85)</small><b>${f1(N.mc.hr_hw_p85)} min</b></div><div><small>Adjustment only<br>hourly avg HW (P85)</small><b>${f1(A.mc.hr_hw_p85)} min</b></div>
+    <div class="ai"><small>AI plan<br>hourly avg HW (P85)</small><b>${f1(ch.mc.hr_hw_p85)} min</b></div><div><small>Normal headway<br>no action \u2192 AI</small><b style="font-size:15px">${rvRec(N)} \u2192 ${rvRec(ch)}</b></div>
     <div><small>Mileage loss<br>AI plan</small><b>${f1(ch.det.km)} km</b></div><div><small>BC finishing delay (P85)<br>no action \u2192 AI</small><b>+${Math.round(N.mc.bc_p85)} \u2192 +${Math.round(ch.mc.bc_p85)}</b></div></div>`;
   h += `<div class="rvcards">${["none", "adjust", "halfway"].filter(k => P[k]).map(k => rvCard(k, P[k], r)).join("")}${!Hw ? `<div class="rvc"><h3>Halfway + regulation</h3><div class="tl">No feasible halfway start: no tested stop can be reached inside the slot window${r.halfway_trips_tested && r.halfway_trips_tested.length ? "" : " (no trip is late enough to be considered)"}.</div></div>` : ""}</div>`;
   h += `<div class="rvwhy"><h3>Why the AI chose this</h3><ol>${(r.why || []).map(w => `<li>${esc(w)}</li>`).join("")}</ol>
@@ -1254,7 +1254,7 @@ function hoRenderRec(){
   const title = r.decision === "halfway" ? "Halfway + regulation" : r.decision === "adjust" ? "Full trip + adjustment" : "No action";
   const top = (r.instructions || []).filter(i => i.kind === "halfway" || i.kind === "hold" || i.kind === "release").slice(0, 6);
   el.innerHTML = `<header style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:0"><h2>Trip-level check</h2><span class="pill g">Recovery Decision Engine</span></header>
-    <div class="ttl"><span class="star" style="color:#ff9f1c">\u2605</span><div><h3>${title}</h3><div class="sub2">P85 max headway ${Math.round(r.plans.none.mc.max_p85)} \u2192 ${Math.round(ch.mc.max_p85)} min \u00b7 ${f1(ch.det.km)} km lost \u00b7 BC finish +${Math.round(ch.mc.bc_p85)} min (P85)</div></div></div>
+    <div class="ttl"><span class="star" style="color:#ff9f1c">\u2605</span><div><h3>${title}</h3><div class="sub2">P85 hourly average headway ${f1(r.plans.none.mc.hr_hw_p85)} \u2192 ${f1(ch.mc.hr_hw_p85)} min \u00b7 ${f1(ch.det.km)} km lost \u00b7 BC finish +${Math.round(ch.mc.bc_p85)} min (P85)</div></div></div>
     ${top.length ? `<div class="hoplan"><b>Key actions</b><ol class="hosteps">${top.map(i => `<li><time>${esc(i.time)}</time><span>${esc(i.text.replace(/^Trip \d+ \u2014 /, "Trip " + i.n + ": "))}</span></li>`).join("")}</ol></div>` : ""}
     <div class="btns"><button class="btn sm go" type="button" id="rvGo">Full comparison: full trip vs halfway</button></div>
     <details class="hall"><summary>Stop-level what-if for this decision (earlier engine: map, heatmap, per-stop options)</summary><div class="ho-note">The stop-level view re-simulates the same halfway trip and stop with the earlier single-direction engine, so its hold minutes can differ from the Recovery Decision Engine plan above. The plan in the trip table is the Recovery Decision Engine's.</div>${legacy}</details>`;
@@ -2330,11 +2330,11 @@ document.addEventListener("click", function(e){
       var p = P[k];
       if(!p || !p.ewt){ h += '<div class="ln-row off" role="listitem"><div class="ln-name"><b>' + NAME[k] + '</b><small>' + (k === "halfway" ? "Not possible: no halfway stop can be reached in time." : "Not simulated in this run.") + '</small></div><div class="ln-bar"></div><div class="ln-val">&ndash;</div></div>'; return; }
       var v = avgE(p), rec = r.decision === k, d = base != null && k !== "none" ? v - base : null, pct = d != null && base > 0.005 ? Math.round(100 * -d / base) : null;
-      var tip = NAME[k] + ": average EWT " + f2(v) + " min · max gap " + f0(p.det.max) + " min · " + ((p.det.km || 0) > 0 ? f1(p.det.km) + " km not run" : "no km lost") + (p.mc && p.mc.ewt_p85 != null ? " · stress test P85 " + f2(p.mc.ewt_p85) + " min" : "");
+      var tip = NAME[k] + ": average EWT " + f2(v) + " min · hourly average headway (worst hour) " + f1(p.det.hr_hw) + " min" + (p.det.hr_buses ? ", " + p.det.hr_buses + " buses in that hour" : "") + (p.det.hr_where ? " at " + p.det.hr_where : "") + " · " + ((p.det.km || 0) > 0 ? f1(p.det.km) + " km not run" : "no km lost") + (p.mc && p.mc.ewt_p85 != null ? " · stress test P85 " + f2(p.mc.ewt_p85) + " min" : "");
       h += '<div class="ln-row' + (rec ? " rec" : "") + '" role="listitem" data-k="' + k + '" title="' + esc(tip) + '"><div class="ln-name"><b>' + NAME[k] + (rec ? ' <span class="ln-chip rec">RECOMMENDED</span>' : '') + (k === best && keys.length > 1 ? ' <span class="ln-chip">LOWEST EWT</span>' : '') + '</b><small>' + planDesc(k, p, r) + '</small></div>'
         + '<div class="ln-bar" aria-hidden="true"><i style="width:' + Math.max(0.6, 100 * Math.max(0, v) / mx).toFixed(1) + '%"></i></div>'
         + '<div class="ln-val"><b>' + f2(v) + '</b>min' + (function(){ var L = pts(p), sm = L.reduce(function(a, q){ return a + q.ewt; }, 0); return L.length ? '<em class="fx">= &Sigma; ' + sm.toFixed(2) + ' &divide; ' + L.length + '</em>' : ""; })() + (d != null ? '<em class="' + (d < -0.005 ? "dn" : d > 0.005 ? "up" : "") + '">' + (d < -0.005 ? "▼ " + f2(-d) + " min" + (pct != null ? " (" + pct + "%)" : "") + " vs no action" : d > 0.005 ? "▲ " + f2(d) + " min vs no action" : "same as no action") + '</em>' : '<em>the baseline</em>') + '</div>'
-        + '<div class="ln-g"><span>Max gap ' + f0(p.det.max) + ' min</span><span>' + ((p.det.km || 0) > 0 ? f1(p.det.km) + ' km not run' : 'no km lost') + '</span></div></div>';
+        + '<div class="ln-g"><span>Hourly avg headway ' + f1(p.det.hr_hw) + ' min</span><span>' + ((p.det.km || 0) > 0 ? f1(p.det.km) + ' km not run' : 'no km lost') + '</span></div></div>';
     });
     h += '</div><div class="ln-axis" aria-hidden="true"><span></span><div><span>0</span><span>' + f2(mx) + ' min</span></div><span></span></div>';
     h += squares(r) + redNote(r);
@@ -2388,7 +2388,7 @@ document.addEventListener("click", function(e){
       + '<p style="margin-top:10px">' + why + '</p>'
       + '<div class="ln-kpis">' + kpi("EWT vs no action", f2(base) + " &rarr; " + f2(v) + " min", pct != null && pct > 0 ? "▼ " + pct + "% less waiting" : "no change", pct > 0 ? "" : "n")
       + kpi("Red AITPs", counts(pts(N)).r + " &rarr; " + counts(pts(p)).r, "of " + pts(p).length + " checks", "n")
-      + kpi("Max gap", f0(N.det.max) + " &rarr; " + f0(p.det.max) + " min", "", "") + kpi("Mileage", (p.det.km || 0) > 0 ? f1(p.det.km) + " km not run" : "none lost", "", "") + '</div>'
+      + kpi("Hourly avg headway", f1(N.det.hr_hw) + " &rarr; " + f1(p.det.hr_hw) + " min", "worst hour" + (p.det.hr_where ? " · " + esc(p.det.hr_where) : "") + " · scheduled " + f1(r.H) + " min", "n") + kpi("Mileage", (p.det.km || 0) > 0 ? f1(p.det.km) + " km not run" : "none lost", "", "") + '</div>'
       + '<div class="ln-btns"><button class="ds-btn pri" type="button" data-dec="' + k + '">Accept recommendation</button>'
       + others.map(function(x){ return '<button class="ds-btn sm ghost" type="button" data-dec="' + x + '">Choose ' + esc(NAME[x].toLowerCase()) + '</button>'; }).join("")
       + (k === "halfway" ? '<button class="ds-btn sm" type="button" id="lnRoute">Off-service route</button>' : '') + '</div>'
