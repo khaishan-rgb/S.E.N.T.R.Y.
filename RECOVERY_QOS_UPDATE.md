@@ -39,3 +39,32 @@ Before this fix, the same case gave Trip adjustment 0.33 against No action 0.62,
 
 ## Files
 `recovery.py`, `halfway.py` (defaults), `app.py` (passes the QoS setting, one-time removal of the old stored 8-min total), `halfway.html`, new `test_recovery_qos.py` (8 tests).
+
+---
+
+# Update 2 (30 Oct, 16:00): each option behaves the way the OCC reads it (model `recovery-2.2-pattern`)
+
+**The question (service 147):** why do headways of 0 and 4.4 min appear? Can each trip show **average · max** headway for the 30 min before and after the long headway?
+
+**Why 0 min:** trip 6's bus arrived 15 min late (17:05). With the 7-min rest it is ready at 17:12, exactly when trip 7 is due. Under No action both leave together and run as a pair (0-min headway) behind a 24-min gap. This happens on the road too.
+
+**Why 4.4 min (before this update):** the adjustment sent trip 7 (ready 17:09) ahead of the late trip 6. Trip 6 followed 6 min behind and, carrying fewer passengers, closed up to 4.4 min.
+
+**Now:**
+
+| Option | Later trips | What you see (case above) |
+|---|---|---|
+| No action | nothing adjusted | every trip: avg 12, max 25.6 → 24.1 → 22.4 → 20.4. The gap carries on and shrinks only by the 3 min of layover above the 7-min minimum. Shortest 0 (the pair). |
+| Trip adjustment | every bus keeps its adjusted first-trip slot on every later trip (hold ≤ 8, early ≤ 3 per departure, ≥ 7-min rest, QoS 1.2) | **the same on every trip:** avg 12, max 15.4, shortest 7 |
+| Halfway | no other trip adjusted | 1st trip: avg 12.5, max 24.2 (the stops before the halfway start). 2nd trip onwards: scheduled 12 / 12 |
+
+* **Headway view:**
+  * Each square = the **longest headway** at that AITP, from 30 min before the long headway to 30 min after it.
+  * A white dot = two buses within 3 min of each other.
+  * Each trip ends with **avg · max**, and "All trips" gives the overall avg · max and the shortest headway.
+  * Tap a square to see every bus's headway and the window figures.
+* **Settings** (Recovery settings):
+  * "Trip adjustment keeps its spacing on later trips" (1 = new, 0 = former even spacing);
+  * "Halfway also adjusts the trips around it" (0 = new, 1 = former);
+  * "Average / max headway window" (30 min).
+* **Tests:** `test_recovery_qos.py` now has 13 tests, including this service 147 case.

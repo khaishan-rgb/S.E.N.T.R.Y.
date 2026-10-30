@@ -2585,13 +2585,13 @@ import halfway
 import bisect
 
 HO = {"params": dict(halfway.PARAMS), "points": []}
-HO_INT = ("n_trips", "reg_window", "recover_points", "reg_min_side", "reg_even_share", "max_disrupted", "balance_trips", "allow_adjacent_halfway", "term_reg", "term_zone")
+HO_INT = ("n_trips", "reg_window", "recover_points", "reg_min_side", "reg_even_share", "max_disrupted", "balance_trips", "allow_adjacent_halfway", "term_reg", "term_zone", "term_pattern", "halfway_regulate")
 HO_RANGES = {"n_trips": (5, 20), "layover_min": (0, 60), "min_layover_min": (0, 30), "start_delay_min": (-30, 60), "reg_hold_max": (0, 8), "reg_early_max": (0, 30), "reg_window": (1, 9), "reg_min_side": (0, 5), "auto_late_min": (0, 120), "reg_even_share": (0, 1), "max_disrupted": (1, 6), "reg_early_future": (0, 30),
              "min_dep_gap": (0, 10), "start_early_max": (0, 30), "start_late_max": (0, 60), "min_remaining_pct": (0, 90), "min_improve_pct": (0, 100), "max_mileage_km": (0.5, 100),
              "recover_tol_pct": (5, 100), "recover_points": (1, 8), "w_regularity": (0, 100), "w_maxgap": (0, 100), "w_recovery": (0, 100), "w_holding": (0, 100), "w_mileage": (0, 100),
              "w_bunching": (0, 100), "pref_recovery_boost": (1, 5), "pref_mileage_boost": (1, 10), "load_sens": (0, 0.3), "fallback_kmh": (5, 60), "offsvc_factor": (0.3, 1.0),
              "balance_trips": (1, 16), "ewt_gain_min": (0, 5), "ewt_gain_pct": (0, 100), "ewt_gain_per_km": (0, 1), "ewt_adjust_min": (0, 5), "allow_adjacent_halfway": (0, 1),
-             "term_reg": (0, 1), "term_hold_max": (0, 8), "term_early_max": (0, 8), "term_tol_pct": (5, 100), "term_zone": (1, 9), "term_total_max": (0, 20), "qos_over_max": (0, 30)}
+             "term_reg": (0, 1), "term_hold_max": (0, 8), "term_early_max": (0, 8), "term_tol_pct": (5, 100), "term_zone": (1, 9), "term_total_max": (0, 20), "qos_over_max": (0, 30), "term_pattern": (0, 1), "halfway_regulate": (0, 1), "win_min": (10, 120)}
 HO_MAX_CANDIDATES = 12
 HO_MAX_SCAN = 60                                                             # stops the AI tests when it searches the whole route (a stride is used on longer routes)
 
@@ -5283,6 +5283,7 @@ async def api_ho_recovery(service: str = "", direction: int = 1, ref: str = "", 
                       "min_remaining_pct": P["min_remaining_pct"], "sims": max(100, min(3000, ns)), "bunch_min": BB["params"]["bunch_min"],
                       "balance_trips": nbal, "ewt_gain_min": P["ewt_gain_min"], "ewt_gain_pct": P["ewt_gain_pct"], "ewt_gain_per_km": P["ewt_gain_per_km"],
                       "ewt_adjust_min": P["ewt_adjust_min"], "allow_adjacent_halfway": adj_ok, "term_reg": t_reg,
+                      "term_mode": "pattern" if P.get("term_pattern", 1) else "even", "halfway_regulate": int(P.get("halfway_regulate", 0)), "win_min": P.get("win_min", 30.0),
                       **{k_: P[k_] for k_ in ("term_hold_max", "term_early_max", "term_tol_pct", "term_zone", "term_total_max", "qos_over_max")}}}
     if sched_dep:
         ctx["sched_dep"] = sched_dep
@@ -5293,7 +5294,7 @@ async def api_ho_recovery(service: str = "", direction: int = 1, ref: str = "", 
     if a_up or a_dn:                                                              # AITP ticked: the EWT is calculated at these stops only
         ctx["aitp_up"], ctx["aitp_dn"] = a_up, a_dn
     ckey = json.dumps([svc, direction, t0, H, lay, lates, mode, veh, ns, scope, now.hour * 60 + now.minute, nbal, sched_dep,
-                       [P[k_] for k_ in ("ewt_gain_min", "ewt_gain_pct", "ewt_gain_per_km", "ewt_adjust_min", "term_hold_max", "term_early_max", "term_tol_pct", "term_zone", "term_total_max", "qos_over_max")], adj_ok, t_reg, sorted(a_up), sorted(a_dn), recovery.MODEL_VERSION], default=str)
+                       [P[k_] for k_ in ("ewt_gain_min", "ewt_gain_pct", "ewt_gain_per_km", "ewt_adjust_min", "term_hold_max", "term_early_max", "term_tol_pct", "term_zone", "term_total_max", "qos_over_max", "term_pattern", "halfway_regulate", "win_min")], adj_ok, t_reg, sorted(a_up), sorted(a_dn), recovery.MODEL_VERSION], default=str)
     hit = RV_CACHE.get(ckey)
     if hit and time.time() - hit[0] < 300:
         res = json.loads(hit[1])

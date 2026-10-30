@@ -1,5 +1,6 @@
-"""Recovery Decision Engine V13.10 (30 Oct 2026): No action adjusts no trip, Trip adjustment also adjusts the later trips,
-QoS 1.2 (adjusted departure headway <= scheduled + 6 min). Run: python3 -m unittest test_recovery_qos"""
+"""Recovery Decision Engine V13.10-V13.11 (30 Oct 2026): No action adjusts no trip; Trip adjustment keeps its adjusted spacing on every later
+trip; Halfway leaves the other trips alone (timetable from the 2nd trip); QoS 1.2 (adjusted departure headway <= scheduled + 6 min);
+average / max headway 30 min either side of the long headway. Run: python3 -m unittest test_recovery_qos"""
 import unittest
 
 import recovery as R
@@ -7,12 +8,14 @@ import recovery as R
 N_ST = 49
 TAU = [round(i * 75.0 / (N_ST - 1), 2) for i in range(N_ST)]           # 75-min trip, 49 stops
 CODES = [f"{10000 + i}" for i in range(N_ST)]
+DOWN = [(f"Stop D{i}", f"{20000 + i}", round(i * 22.0 / (N_ST - 1), 3)) for i in range(N_ST)]
 
 
 def ctx(late, params=None, now=None):
     return {"H": 12.0, "tau": TAU, "stop_s": [round(i * 22.0 / (N_ST - 1), 3) for i in range(N_ST)], "route_km": 22.0,
             "stop_names": [f"Stop {i}" for i in range(N_ST)], "stop_codes": CODES, "t0": 420.0, "late": late,
-            "candidates": [{"j": j} for j in (10, 15, 20, 25)], "aitp_up": CODES, "now": now,
+            "candidates": [{"j": j} for j in (10, 15, 20, 25)], "aitp_up": CODES, "now": now, "down_stops": DOWN,
+            "aitp_dn": [DOWN[int(round(k * (N_ST - 1) / 9))][1] for k in range(10)],
             "params": dict({"balance_trips": 4, "sims": 150}, **(params or {})), "mode": "balanced"}
 
 
@@ -66,6 +69,51 @@ class Scenarios(unittest.TestCase):
         r = R.optimise(ctx(LATE6, {"qos_over_max": 3.0}))
         self.assertIn("3", r["plans"]["adjust"]["qos"]["rule"])
         self.assertEqual(r["params"]["qos_over_max"], 3.0)
+
+
+def per_trip(plan):
+    return {c["leg"]: c["win"] for c in plan["chain"]}
+
+
+class SameAsTheOCCReadsIt(unittest.TestCase):
+    """Service 147 case (30 Oct): 12-min headway, trip 6 arrives 15 min late (ready exactly when trip 7 is due)."""
+    @classmethod
+    def setUpClass(cls):
+        cls.r = R.optimise(ctx([0, 0, 0, 0, 0, 15, 0, 0, 0, 0]))
+
+    def test_no_action_keeps_the_gap_and_the_pair(self):
+        w = per_trip(self.r["plans"]["none"])
+        self.assertEqual({round(x["avg"]) for x in w.values()}, {12})          # no trip lost: average stays 12
+        mx = [w[k]["max"] for k in ("UP 1", "DOWN 1", "UP 2", "DOWN 2")]
+        self.assertGreater(mx[0], 23)                                           # the long gap ...
+        self.assertTrue(all(a >= b - 0.05 for a, b in zip(mx, mx[1:])))         # ... carries on, shrinking only by the layover slack
+        self.assertLess(mx[0] - mx[-1], 3 * 3 + 0.5)                            # at most 3 min (10 scheduled - 7 minimum) per terminal
+        self.assertLess(w["UP 1"]["min"], 1.0)                                  # trip 6 (ready 17:12) and trip 7 (due 17:12) leave together
+
+    def test_trip_adjustment_is_the_same_on_every_trip(self):
+        w = per_trip(self.r["plans"]["adjust"])
+        self.assertEqual(len({(x["avg"], x["max"], x["min"]) for x in w.values()}), 1, w)
+        self.assertLessEqual(max(x["max"] for x in w.values()), 12 + 6 + 0.5)   # QoS 1.2 holds on every trip
+
+    def test_halfway_first_trip_then_timetable(self):
+        p = self.r["plans"]["halfway"]
+        w = per_trip(p)
+        self.assertGreater(w["UP 1"]["max"], 20)                                # the stops before the halfway start lose trip 6
+        for lg in ("UP 2", "DOWN 2"):
+            self.assertAlmostEqual(w[lg]["max"], 12.0, delta=0.5)
+            self.assertAlmostEqual(w[lg]["min"], 12.0, delta=0.5)
+        self.assertLessEqual(w["DOWN 1"]["max"], 12.0 + 1.0)
+        self.assertEqual([r_["n"] for r_ in p["rows"] if r_["type"] == "full" and abs(r_["shift"]) >= 0.5], [])   # no other trip held / released
+        self.assertEqual(p["term_adj"], [])
+
+    def test_former_rules_still_available(self):
+        r = R.optimise(ctx([0, 0, 0, 0, 0, 15, 0, 0, 0, 0], {"term_mode": "even", "halfway_regulate": 1}))
+        self.assertTrue(r["plans"]["adjust"]["later_adjusted"])
+        self.assertEqual(r["params"]["term_mode"], "even")
+
+    def test_window_figures(self):
+        self.assertEqual(R.win_stats([12, 12, 12, 24, 0, 12, 12, 12], 30, 12), {"avg": 12.0, "max": 24.0, "min": 0.0, "n": 6})
+        self.assertEqual(R.win_stats([12] * 8, 30, 12)["max"], 12.0)
 
 
 class Limits(unittest.TestCase):
