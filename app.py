@@ -2591,7 +2591,7 @@ HO_RANGES = {"n_trips": (5, 20), "layover_min": (0, 60), "min_layover_min": (0, 
              "recover_tol_pct": (5, 100), "recover_points": (1, 8), "w_regularity": (0, 100), "w_maxgap": (0, 100), "w_recovery": (0, 100), "w_holding": (0, 100), "w_mileage": (0, 100),
              "w_bunching": (0, 100), "pref_recovery_boost": (1, 5), "pref_mileage_boost": (1, 10), "load_sens": (0, 0.3), "fallback_kmh": (5, 60), "offsvc_factor": (0.3, 1.0),
              "balance_trips": (1, 16), "ewt_gain_min": (0, 5), "ewt_gain_pct": (0, 100), "ewt_gain_per_km": (0, 1), "ewt_adjust_min": (0, 5), "allow_adjacent_halfway": (0, 1),
-             "term_reg": (0, 1), "term_hold_max": (0, 8), "term_early_max": (0, 8), "term_tol_pct": (5, 100), "term_zone": (1, 9), "term_total_max": (0, 20)}
+             "term_reg": (0, 1), "term_hold_max": (0, 8), "term_early_max": (0, 8), "term_tol_pct": (5, 100), "term_zone": (1, 9), "term_total_max": (0, 20), "qos_over_max": (0, 30)}
 HO_MAX_CANDIDATES = 12
 HO_MAX_SCAN = 60                                                             # stops the AI tests when it searches the whole route (a stride is used on longer routes)
 
@@ -2632,6 +2632,10 @@ def ho_init():
         bb_sql("INSERT OR REPLACE INTO halfway_parameter(k, v) VALUES ('reg_early_future', 8)")
         bb_sql("INSERT OR REPLACE INTO halfway_parameter(k, v) VALUES ('min_layover_min', 7)")
         bb_sql("INSERT OR REPLACE INTO halfway_parameter(k, v) VALUES ('mig_v121_welfare', 1)")
+    if not bb_sql("SELECT 1 FROM halfway_parameter WHERE k='mig_v1310_qos'", fetch=True):
+        # V13.10: the 8-min TOTAL hold per BC stopped later trips from being adjusted at all; it is now off by default (per-departure cap only)
+        bb_sql("DELETE FROM halfway_parameter WHERE k='term_total_max' AND v=8")
+        bb_sql("INSERT OR REPLACE INTO halfway_parameter(k, v) VALUES ('mig_v1310_qos', 1)")
     for r in bb_sql("SELECT k, v FROM halfway_parameter", fetch=True):
         if r["k"] in HO["params"]:
             HO["params"][r["k"]] = int(r["v"]) if r["k"] in HO_INT else r["v"]
@@ -5279,7 +5283,7 @@ async def api_ho_recovery(service: str = "", direction: int = 1, ref: str = "", 
                       "min_remaining_pct": P["min_remaining_pct"], "sims": max(100, min(3000, ns)), "bunch_min": BB["params"]["bunch_min"],
                       "balance_trips": nbal, "ewt_gain_min": P["ewt_gain_min"], "ewt_gain_pct": P["ewt_gain_pct"], "ewt_gain_per_km": P["ewt_gain_per_km"],
                       "ewt_adjust_min": P["ewt_adjust_min"], "allow_adjacent_halfway": adj_ok, "term_reg": t_reg,
-                      **{k_: P[k_] for k_ in ("term_hold_max", "term_early_max", "term_tol_pct", "term_zone", "term_total_max")}}}
+                      **{k_: P[k_] for k_ in ("term_hold_max", "term_early_max", "term_tol_pct", "term_zone", "term_total_max", "qos_over_max")}}}
     if sched_dep:
         ctx["sched_dep"] = sched_dep
     if down_stops:
@@ -5289,7 +5293,7 @@ async def api_ho_recovery(service: str = "", direction: int = 1, ref: str = "", 
     if a_up or a_dn:                                                              # AITP ticked: the EWT is calculated at these stops only
         ctx["aitp_up"], ctx["aitp_dn"] = a_up, a_dn
     ckey = json.dumps([svc, direction, t0, H, lay, lates, mode, veh, ns, scope, now.hour * 60 + now.minute, nbal, sched_dep,
-                       [P[k_] for k_ in ("ewt_gain_min", "ewt_gain_pct", "ewt_gain_per_km", "ewt_adjust_min", "term_hold_max", "term_early_max", "term_tol_pct", "term_zone", "term_total_max")], adj_ok, t_reg, sorted(a_up), sorted(a_dn)], default=str)
+                       [P[k_] for k_ in ("ewt_gain_min", "ewt_gain_pct", "ewt_gain_per_km", "ewt_adjust_min", "term_hold_max", "term_early_max", "term_tol_pct", "term_zone", "term_total_max", "qos_over_max")], adj_ok, t_reg, sorted(a_up), sorted(a_dn), recovery.MODEL_VERSION], default=str)
     hit = RV_CACHE.get(ckey)
     if hit and time.time() - hit[0] < 300:
         res = json.loads(hit[1])

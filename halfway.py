@@ -74,7 +74,8 @@ PARAMS = {
     "term_early_max": 3.0,       # terminal early release cap, min (never before arrival + minimum layover)
     "term_tol_pct": 20.0,        # terminal headway within +/- this % of scheduled = normal (not regulated)
     "term_zone": 2,              # buses either side of an abnormal terminal headway that take part
-    "term_total_max": 8.0,       # total artificial hold per BC over the horizon (UP 1 included), min
+    "term_total_max": 0.0,       # optional cap on the total artificial hold per BC over the horizon (UP 1 included), min; 0 = off (each departure is capped by term_hold_max)
+    "qos_over_max": 6.0,         # QoS 1.2: an adjusted departure headway may be at most this many min longer than the scheduled headway
     "allow_adjacent_halfway": 0, # 0 = two back-to-back trips may NOT both be disrupted / start halfway (AI and manual ticks); 1 = allowed. Editable per run on the page      # a departure adjustment replaces "no action" only if it lowers the Average EWT by at least this
 }
 PREFS = ("balanced", "recovery", "mileage")
