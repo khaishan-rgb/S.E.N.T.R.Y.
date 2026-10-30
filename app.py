@@ -12474,6 +12474,44 @@ def fc26_camera_ai_io(cpa):
     return fetch_image,ask_model
 
 
+CAM_SWAP = {"loaded": False, "info": {}}
+
+
+def cam_swap_load(cpa):
+    """Checkpoint cameras whose two directions a controller swapped (kept in the database, shared by every viewer)."""
+    if CAM_SWAP["loaded"]:
+        return
+    bb_sql("CREATE TABLE IF NOT EXISTS camera_dir_swap(cam TEXT PRIMARY KEY, swapped INTEGER, who TEXT, ts REAL)")
+    for r in bb_sql("SELECT cam, swapped, who, ts FROM camera_dir_swap", fetch=True) or []:
+        cam = str(r["cam"])
+        (cpa.SWAPPED.add if r["swapped"] else cpa.SWAPPED.discard)(cam)
+        CAM_SWAP["info"][cam] = {"swapped": bool(r["swapped"]), "who": r["who"], "ts": r["ts"]}
+    CAM_SWAP["loaded"] = True
+
+
+@app.post('/api/forecast/centre/camera-ai/swap')
+async def fc26_camera_swap(request: Request):
+    """A controller says a checkpoint camera shows its two directions the wrong way round: swap them (or undo) for everyone."""
+    import checkpoint_ai as cpa
+    try:
+        body = await request.json()
+        cam = str(body.get('id', '')).strip()
+        if cam not in cpa.CHECKPOINT_IDS:
+            raise ValueError('not a checkpoint camera')
+        on = bool(body.get('swapped'))
+    except (ValueError, TypeError, AttributeError):
+        return JSONResponse({'error': 'Pick one of the checkpoint cameras: ' + ', '.join(sorted(cpa.CHECKPOINT_IDS)) + '.'}, status_code=400)
+    cam_swap_load(cpa)
+    user = auth.read(request.cookies.get(auth.COOKIE, '')) if hasattr(auth, 'read') else None
+    identity = (user or {}).get('u') if isinstance(user, dict) else None
+    who = str((identity.get('name') or identity.get('id')) if isinstance(identity, dict) else identity or 'controller')[:80]
+    now = time.time()
+    (cpa.SWAPPED.add if on else cpa.SWAPPED.discard)(cam)
+    bb_sql("INSERT OR REPLACE INTO camera_dir_swap(cam, swapped, who, ts) VALUES (?,?,?,?)", (cam, int(on), who, now))
+    CAM_SWAP["info"][cam] = {"swapped": on, "who": who, "ts": now}
+    return {'ok': True, 'id': cam, 'swapped': on, 'who': who, 'ts': now, 'saved': bool(BB.get('db_ok', True))}
+
+
 @app.get('/api/camera-ai/test')
 async def api_camera_ai_test():
     """One-click check of AI camera analytics: is the key set, can the checkpoint photos be downloaded, does Claude answer."""
@@ -12485,12 +12523,13 @@ async def api_camera_ai_test():
     pick=[cams[i] for x in cpa.CROSSINGS for i in x['cams'] if i in cams]
     if not pick:
         return {'ok':False,'key_set':True,'answer':'The checkpoint cameras (2701, 2702, 4703, 4713) are not in the LTA camera feed right now.','camera_error':cs.get('error')}
+    cam_swap_load(cpa)
     fetch_image,ask_model=fc26_camera_ai_io(cpa)
     out=await cpa.analyse(pick,fetch_image,ask_model,None,force=True)
     ok=not out.get('error') and bool(out.get('cameras'))
     return {'ok':ok,'key_set':True,'model':cpa.STATUS.get('model'),'photos_sent':cpa.STATUS.get('images'),
             'answer':'AI camera analytics is working.' if ok else (out.get('error') or 'Claude answered but gave no level for these photos.'),
-            'levels':{k:{x:v.get(x) for x in ('level','to_jb','to_sg')} for k,v in out.get('cameras',{}).items()},
+            'levels':{k:{x:v.get(x) for x in ('level','to_jb','to_sg','sg_where','jb_where','swapped') if v.get(x) is not None} for k,v in out.get('cameras',{}).items()},
             'crossings':out.get('crossings'),'ai_reply':cpa.STATUS.get('reply')}
 
 
@@ -12500,6 +12539,7 @@ async def fc26_camera_ai(ids: str=''):
     crossing time to JB / SG from the Woodlands and Tuas checkpoint cameras. Claude vision when ANTHROPIC_API_KEY is
     set, else TomTom speed at the camera, else nothing. Cached per photo (checkpoint_ai.CACHE_S)."""
     import checkpoint_ai as cpa
+    cam_swap_load(cpa)
     cs=await cameras_state()
     cams={str(c['id']):c for c in (cs.get('cams') or [])}
     want=[i for i in dict.fromkeys([x.strip() for x in ids.split(',') if x.strip()][:6]) if i in cams]
@@ -12525,6 +12565,7 @@ async def fc26_camera_ai(ids: str=''):
         return {'level':cpa.level_from_band(best[0]),'speed':best[1],'free_speed':best[2],'band':best[0],'road':best[3],'source':'LTA speed bands'}
     out=await cpa.analyse(pick,fetch_image if DV_AI_KEY else None,ask_model if DV_AI_KEY else None,flow)
     out['configured']={'ai':bool(DV_AI_KEY),'speed':idx is not None}
+    out['swap_info']={k:v for k,v in CAM_SWAP['info'].items() if v.get('swapped')}
     out['ai_status']={k:cpa.STATUS.get(k) for k in ('ok_at','error','error_at','model')}
     return out
 

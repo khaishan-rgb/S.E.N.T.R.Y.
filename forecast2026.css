@@ -337,6 +337,12 @@ body .right-rail.cameras-only{grid-template-rows:minmax(0,1fr)}
 .ca-dir i{font-style:normal;font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
 .ca-warn{margin-top:6px;font-size:11px;color:#ffb36b;line-height:1.3}
 .ca-test{display:inline-block;margin-top:6px;font-size:11px;color:#7fe9ff}
+.ca-sub{margin-top:8px;padding-top:6px;border-top:1px solid rgba(127,233,255,.18);font:700 10px/1 Rajdhani,'IBM Plex Sans',sans-serif;letter-spacing:.14em;text-transform:uppercase;color:#7fe9ff}
+.ca-own{grid-template-columns:96px auto 1fr;margin-top:4px}
+.ca-own small{font-size:11px;color:#9fc3d6;line-height:1.25}
+.ca-swap{display:block;margin-top:8px;padding:5px 9px;border-radius:6px;border:1px solid rgba(127,233,255,.45);background:rgba(3,18,30,.7);color:#bff4ff;font:600 11px/1.2 'IBM Plex Sans',sans-serif;cursor:pointer;text-align:left}
+.ca-swap:hover{background:rgba(127,233,255,.12)}
+.ca-swap:disabled{opacity:.6;cursor:progress}
 
 /* Enlarged camera: keep the photo visible. Compact box on wide screens; below the photo on phones. */
 .cam-ai{max-width:min(300px,38%);min-width:0;padding:8px 10px}

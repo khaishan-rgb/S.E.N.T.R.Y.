@@ -134,7 +134,12 @@ function camAIHTML(id,busy=true){const ai=cameraAI,r=ai?.cameras?.[id],x=CHECKPO
  let h=`<div class="ca-head">${icon('spark')}<span>${r?.source==='AI camera analytics'?'AI CAMERA ANALYTICS':'TRAFFIC LEVEL'}</span></div>`;
  if(r?.level)h+=`<div class="ca-level ${LEVEL_CLASS[r.level]||''}">${esc(r.level.toUpperCase())}</div><div class="ca-src">${r.source==='AI camera analytics'?'Read from this photo by AI'+(r.confidence!=null?' · '+Math.round(r.confidence*100)+'% sure':''):'LTA speed band near camera'+(r.speed!=null?` · ${r.speed}–${r.free_speed} km/h`:'')}</div>`;
  else h+=`<div class="ca-src">${busy?'Analysing photo…':'No traffic level for this camera'}</div>`;
- if(x)h+=x.any?dir('JB / SG',x.any):dir('→ JOHOR',x.to_jb)+dir('→ SINGAPORE',x.to_sg);
+ const own=(label,lv,where)=>`<div class="ca-dir ca-own"><em>${label}</em>${lv?`<i class="${LEVEL_CLASS[lv]||''}">${esc(lv)}</i><small>${esc(where||'')}</small>`:'<small>not seen in this photo</small>'}</div>`;
+ const isCP=!!CHECKPOINT_CAMS[id],swapped=(ai?.swapped||[]).includes(String(id)),sw=ai?.swap_info?.[id];
+ if(isCP&&r&&(r.to_jb||r.to_sg))h+=`<div class="ca-sub">This photo</div>`+own('→ SINGAPORE',r.to_sg,r.sg_where)+own('→ JOHOR',r.to_jb,r.jb_where);
+ if(x)h+=`<div class="ca-sub">${esc(x.name)} crossing · ${x.any?'speed estimate':'both '+esc(x.name)+' cameras'}</div>`+(x.any?dir('JB / SG',x.any):dir('→ SINGAPORE',x.to_sg)+dir('→ JOHOR',x.to_jb));
+ if(isCP&&(swapped||r?.to_jb||r?.to_sg))h+=(swapped?`<div class="ca-src">Directions swapped${sw?.who?' by '+esc(sw.who):''}${sw?.ts?' at '+timeString(sw.ts):''}</div>`:'')
+   +`<button type="button" class="ca-swap" data-cam-swap="${esc(id)}" data-on="${swapped?'0':'1'}">${swapped?'Undo the direction swap':'Directions wrong way round? Swap them'}</button>`;
  if(ai?.error&&ai?.configured?.ai)h+=`<div class="ca-warn">${esc(ai.error)}</div>`;
  else if(ai?.configured&&!ai.configured.ai)h+=`<div class="ca-warn">AI is off: ANTHROPIC_API_KEY not set on the server</div>`;
  if(ai?.status)h+=`<div class="ca-warn">${esc(ai.status)}</div>`;
@@ -201,6 +206,7 @@ document.addEventListener('click',async e=>{let t=e.target.closest('button,[data
  if(t.dataset.unack){ackCard(t.dataset.unack,true);return;}
  if(t.dataset.clearRoute){if(state.tv){spotlight.pausedUntil=Date.now()+30000;spotlight.nextAt=spotlight.pausedUntil;clearSpotlight(false);spotlightControl();}clearServices();return;}
  if(t.dataset.removeService){selectService(t.dataset.removeService);return;}
+ if(t.dataset.camSwap){const id=t.dataset.camSwap;t.disabled=true;try{const r=await fetch('/api/forecast/centre/camera-ai/swap',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({id,swapped:t.dataset.on==='1'})});if(!r.ok)throw new Error('HTTP '+r.status);}catch(err){t.disabled=false;t.textContent='Could not save the swap ('+err.message+')';return;}await analyseCamera(id);return;}
  if(t.dataset.camera!=null){let c=cameraRows[+t.dataset.camera];if(c){openModal(c.label||'Traffic camera '+c.id,`<div class="cam-wrap"><img class="camera-enlarged" src="${esc(c.image)}" alt="${esc(c.label)}" referrerpolicy="no-referrer"><div class="cam-ai" id="camAI" data-cam="${esc(c.id)}">${camAIHTML(c.id)}</div></div><p>${c.stale?'STALE / CAPTURE TIME UNVERIFIED':'SOURCE STILL IMAGE'} · Camera ${esc(c.id)} · ${esc(c.taken||'Capture timestamp unavailable')}</p><p>Coordinates ${c.lat}, ${c.lon}. Nearest-camera context does not confirm route impact.</p>`);analyseCamera(c.id);}return;}
  if(t.dataset.analysis){setAnalysis(t.dataset.analysis);return;}
  if(t.id==='headwayValues'){expandAnalysis();return;}
