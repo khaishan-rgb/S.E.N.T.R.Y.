@@ -31,28 +31,12 @@ Model
   * stress test: every short-listed plan is re-run under `sims` sampled futures (traffic per leg, bus-to-bus running time, dwell / load
     sensitivity, a random incident, uncertainty of predicted arrivals, off-service running time) giving P50 / P85 / P90 distributions.
 
-V13.10 (30 Oct 2026) - consistent scenarios + QoS 1.2
-  * NO ACTION really is no action: no trip is adjusted, neither UP 1 nor any later trip (every bus leaves at max(schedule, arrival + 7)).
-  * TRIP ADJUSTMENT adjusts the later trips too: every terminal departure may be held / released within the same per-trip limits as UP 1
-    (+/-8 min, never under the 7-min layover). The old 8-min TOTAL per BC over the whole horizon is off by default (term_total_max = 0),
-    because UP 1 used it up and the later trips could then not be adjusted at all.
-  * QoS 1.2: an adjusted departure headway may be at most `qos_over_max` (6) min longer than its scheduled headway. Plans that break it
-    are only kept when nothing within the limits can meet it, and every plan reports its QoS 1.2 result.
-
-V13.11 (30 Oct 2026) - each option behaves the way the OCC reads it
-  * TRIP ADJUSTMENT keeps its adjusted pattern on every later trip: each bus leaves at its UP 1 slot + the scheduled cycle (term_mode
-    "pattern"), when ready, within hold <= 8 / early <= 3 min per departure - so the spacing (average / max headway) is the same on every trip.
-    term_mode "even" = the former even-spacing regulation at each terminal.
-  * HALFWAY starts the late trip at the halfway stop and leaves every other trip alone (halfway_regulate = 0): the first trip shows the gap
-    before the halfway stop, and from the second trip the buses run at the scheduled headway. halfway_regulate = 1 = former "halfway + regulation".
-  * Window figures: at every AITP, the headways from 30 min (win_min) before the longest headway to 30 min after it -> average and max.
-
 Pure computation (numpy), no I/O. Decision support only.
 """
 import math
 import numpy as np
 
-MODEL_VERSION = "recovery-2.2-pattern"
+MODEL_VERSION = "recovery-2.0-ewt"
 EPS = 1e-6
 
 PARAMS = {
@@ -75,12 +59,7 @@ PARAMS = {
     "term_min_adj": 1.0,          # dead band: changes smaller than this are not instructed (the bus keeps its natural time)
     "term_tol_pct": 20.0,         # a terminal headway within +/- this % of scheduled is normal: only buses near an abnormal headway are regulated
     "term_zone": 2,               # ... and at most this many buses either side of an abnormal headway take part
-    "term_total_max": 0.0,        # optional cap on the TOTAL artificial hold per BC over the horizon (UP 1 included); 0 = off - each departure is capped by term_hold_max
-    "qos_over_max": 6.0,
-    "term_mode": "pattern",       # later trips of an adjusted plan: "pattern" = every bus keeps its adjusted UP 1 slot (same spacing every trip); "even" = even spacing at each terminal
-    "halfway_regulate": 0,        # 0 = a halfway plan adjusts no other trip (from the 2nd trip the timetable runs); 1 = also hold / release the trips around it
-    "win_min": 30.0,              # window for the average / max headway: this many min before and after the longest headway at each AITP          # QoS 1.2 (HARD): an adjusted departure headway may be at most this many min longer than the scheduled headway
-    "w_qos": 40.0,                # search cost per minute a departure headway is over the QoS 1.2 limit  # 0 = two back-to-back trips (e.g. T3 + T4) may NOT both start halfway; 1 = allowed       # a departure adjustment is used (instead of no action) only if it cuts the Average EWT by at least this
+    "term_total_max": 8.0,        # HARD (BC welfare): total artificial hold per BC over the whole horizon, UP 1 included  # 0 = two back-to-back trips (e.g. T3 + T4) may NOT both start halfway; 1 = allowed       # a departure adjustment is used (instead of no action) only if it cuts the Average EWT by at least this
     "down_run_factor": 1.0,       # DOWN running time = UP running time x this
     "halfway_min_late": 1.0,      # V13.9: every trip that would leave late gets a Halfway scenario simulated (EWT decides, not the delay)
     "halfway_skip_layover": 1.0,  # 1 = the halfway bus leaves the interchange straight away (starts downstream, no interchange layover)
@@ -129,25 +108,6 @@ def ewt_parts(h_act, h_sch):
     awt = sum(x * x for x in a) / (2.0 * sum(a))
     swt = sum(x * x for x in s_) / (2.0 * sum(s_))
     return {"awt": awt, "swt": swt, "ewt": awt - swt, "n": len(a), "sum_h": sum(a), "sum_h2": sum(x * x for x in a), "sum_hs": sum(s_), "sum_hs2": sum(x * x for x in s_)}
-
-
-def win_stats(gaps, win=30.0, H=None, off=1.0):
-    """The disturbed period at one point: from `win` min before the first headway more than `off` min away from the scheduled H to `win` min
-    after the last one (around the longest headway when none is off). -> average / max / min of the headways inside it."""
-    g = [float(x) for x in gaps if x is not None and not math.isnan(x)]
-    if not g:
-        return None
-    t = [0.0]
-    for x in g:
-        t.append(t[-1] + x)
-    bad = [k for k in range(len(g)) if H is not None and abs(g[k] - H) > off + 1e-9]
-    if bad:
-        a, b = t[bad[0]] - win, t[bad[-1] + 1] + win
-    else:
-        m = max(range(len(g)), key=lambda k: (g[k], -k))
-        a, b = t[m] - win, t[m + 1] + win
-    W = [g[k] for k in range(len(g)) if t[k] >= a - 1e-9 and t[k + 1] <= b + 1e-9]
-    return {"avg": _r(sum(W) / len(W), 1), "max": _r(max(W), 1), "min": _r(min(W), 1), "n": len(W)}
 
 
 def hm(m):
@@ -385,7 +345,7 @@ class Chain:
                 "ewt": ewt, "awt": awt_, "swt": swt_, "sch_h": sch_h}
 
     # ---------------------------------------------------------------- full chain
-    def run(self, dep1, halfway=None, nz=None, keep=False, reg=True):
+    def run(self, dep1, halfway=None, nz=None, keep=False):
         """dep1: (S, B) planned interchange departures for UP 1 (anchors / halfway columns ignored).
         halfway: list of (trip b, stop j, start (S,)) - start = the time the halfway bus starts at stop j.
         nz: stress test noise (see noise()), None = deterministic."""
@@ -406,8 +366,6 @@ class Chain:
         legs = []
         term = []
         used = np.maximum(0.0, np.nan_to_num(D - np.maximum(self.nat[None, :], ready)))     # artificial hold already given at UP 1
-        keepk = np.nan_to_num(D - self.S[None, :], nan=0.0)                         # each bus's UP 1 slot against its timetable (halfway bus: 0 = back on its slot)
-        qos = [self._qos_dep(D, self.S, 0)]                                         # QoS 1.2 at the UP 1 interchange departures
         rec = np.full(Sn, -np.inf)
         late_irr = np.zeros(Sn, bool)
         cur = D
@@ -422,19 +380,12 @@ class Chain:
                 rdy = lg["end"] + self.ml
                 nxt = np.maximum(sched[None, :], rdy)
                 nxt[:, 0], nxt[:, -1] = sched[0], sched[-1]
-                if P.get("term_reg") and reg and P.get("term_mode", "pattern") == "pattern":
-                    rg = self.keep_pattern(nxt, rdy, sched, keepk, used)        # TRIP ADJUSTMENT: the adjusted spacing is kept on every later trip
-                    used = used + np.maximum(0.0, rg - nxt)
+                if P.get("term_reg"):
+                    reg = self.term_regulate(nxt, rdy, used)
+                    used = used + np.maximum(0.0, reg - nxt)
                     if keep:
-                        term.append((L + 1, nxt[0].copy(), rg[0].copy()))
-                    nxt = rg
-                elif P.get("term_reg") and reg:                          # NO ACTION (reg=False): later trips are not adjusted either
-                    rg = self.term_regulate(nxt, rdy, used, sched=sched)
-                    used = used + np.maximum(0.0, rg - nxt)
-                    if keep:
-                        term.append((L + 1, nxt[0].copy(), rg[0].copy()))
-                    nxt = rg
-                qos.append(self._qos_dep(nxt, sched, L + 1))
+                        term.append((L + 1, nxt[0].copy(), reg[0].copy()))
+                    nxt = reg
                 cur = nxt
         sched_end = self.S + self.off[-1] + self.R[-1]
         bc = legs[-1]["end"][:, 1:-1] - sched_end[None, 1:-1]
@@ -467,31 +418,14 @@ class Chain:
         out = {"hr_hw": hr_hw, "hr_n": hr_n, "hr_L": hr_L, "hr_p": hr_p, "ic_short": ic_short, "leg_min": leg_min, "max": np.nanmax(leg_max, 1), "ic_max": np.nanmax(g0, 1), "ic_sq": np.nansum((g0 - H) ** 2, 1), "wmax": leg_wmax.mean(1), "leg_max": leg_max, "leg_wmax": leg_wmax,
                "rms": np.sqrt(sq / np.maximum(cnt, 1)), "bunch": bunch_pts / bunch_tot, "any_bunch": (leg_min < P["bunch_min"] - EPS).any(1),
                "rec": np.where(np.isinf(rec), 0.0, np.maximum(0.0, rec - self.ref)), "unrec": late_irr, "bc": bc, "bc_max": np.maximum(bc, 0).max(1),
-               "bc_sum": np.maximum(bc, 0).sum(1), "up1_late": up1_late, "D": D, "ewt_avg": ewt_avg, "ewt_max": ewt_max, "ewt_n": n_ok,
-               "qos_ex": sum(q["ex"] for q in qos), "qos_over": np.max(np.stack([q["over"] for q in qos], 1), 1), "qos_n": sum(q["n"] for q in qos)}
-        if keep:
-            out["qos_legs"] = qos
+               "bc_sum": np.maximum(bc, 0).sum(1), "up1_late": up1_late, "D": D, "ewt_avg": ewt_avg, "ewt_max": ewt_max, "ewt_n": n_ok}
         if keep:
             out["legs"] = legs
             out["term"] = term
         return out
 
-    def _qos_dep(self, D, sched, L):
-        """Departure headways at the start of balance trip L against the positional scheduled headways. A halfway trip (NaN at the
-        interchange) is left out together with its slot, so the gap it leaves is compared with the scheduled gap across that slot."""
-        add = float(self.P.get("qos_over_max") or 0.0)
-        ok = ~np.isnan(D[0])
-        Dv = np.sort(D[:, ok], axis=1)
-        sv = np.sort(np.asarray(sched, float)[ok])
-        g = np.diff(Dv, axis=1)
-        sg = np.diff(sv)[None, :]
-        over = g - sg
-        ex = np.maximum(0.0, over - add) if add > 0 else np.zeros_like(over)
-        return {"L": L, "over": over.max(1) if over.shape[1] else np.zeros(D.shape[0]), "ex": ex.sum(1), "n": (ex > EPS).sum(1),
-                "g": g, "sg": sg[0], "order": np.argsort(D[:, ok], axis=1, kind="stable"), "ids": np.nonzero(ok)[0]}
-
     # ---------------------------------------------------------------- terminal regulation (later balance trips)
-    def term_regulate(self, N, R, used=None, iters=40, alpha=0.5, sched=None):
+    def term_regulate(self, N, R, used=None, iters=40, alpha=0.5):
         """Two-way even-spacing holding at a terminal. N: natural departures (Sn, B), R: arrival + minimum layover.
         Each bus moves towards the midpoint of its neighbours, d_i* = (d_(i-1) + d_(i+1)) / 2, inside
         max(R_i, N_i - early) <= d_i <= N_i + hold; the on-schedule buses 0 and n+1 stay fixed; no overtaking;
@@ -500,8 +434,7 @@ class Chain:
         Sn, B = N.shape
         R = np.where(np.isnan(R), N, R)
         lo = np.maximum(R, N - P["term_early_max"])
-        tot = float(P.get("term_total_max") or 0.0)
-        room = P["term_hold_max"] if (used is None or tot <= 0) else np.clip(tot - used, 0.0, P["term_hold_max"])
+        room = P["term_hold_max"] if used is None else np.clip(P["term_total_max"] - used, 0.0, P["term_hold_max"])
         hi = N + room
         lo[:, 0], hi[:, 0], lo[:, -1], hi[:, -1] = N[:, 0], N[:, 0], N[:, -1], N[:, -1]
         order = np.argsort(N, axis=1, kind="stable")
@@ -528,48 +461,7 @@ class Chain:
         D = np.where(np.abs(D - N) >= P["term_min_adj"] - EPS, np.round(D), N)
         D = np.clip(D, lo, hi)
         D[:, 0], D[:, -1] = N[:, 0], N[:, -1]
-        if sched is not None:
-            D = self.qos_fix(D, lo, hi, sched)
         return D
-
-    def keep_pattern(self, N, R, sched, k, used=None):
-        """Later trip of an adjusted plan: every bus leaves at its own UP 1 slot shifted by the scheduled cycle (sched + k), i.e. the adjusted
-        spacing is kept. Never before it is ready (arrival + minimum layover), hold <= term_hold_max and early <= term_early_max against its
-        natural departure N; the on-schedule buses 0 and n+1 stay fixed; changes under the dead band are dropped; then QoS 1.2."""
-        P = self.P
-        R = np.where(np.isnan(R), N, R)
-        lo = np.maximum(R, N - P["term_early_max"])
-        tot = float(P.get("term_total_max") or 0.0)
-        hi = N + (P["term_hold_max"] if (used is None or tot <= 0) else np.clip(tot - used, 0.0, P["term_hold_max"]))
-        T = np.clip(np.asarray(sched, float)[None, :] + k, lo, hi)
-        T = np.where(np.abs(T - N) >= P["term_min_adj"] - EPS, np.round(T), N)
-        T = np.clip(T, lo, hi)
-        T[:, 0], T[:, -1] = N[:, 0], N[:, -1]
-        return self.qos_fix(T, lo, hi, sched)
-
-    def qos_fix(self, D, lo, hi, sched):
-        """QoS 1.2: no departure headway more than qos_over_max over its scheduled headway, where the limits allow it. Holds the bus in front
-        of a long gap (no later than hi) and releases the bus behind it (no earlier than lo = arrival + 7 min); keeps the order."""
-        P = self.P
-        add = float(P.get("qos_over_max") or 0.0)
-        if add <= 0:
-            return D
-        Sn, B = D.shape
-        order = np.argsort(D, axis=1, kind="stable")
-        T = np.take_along_axis(D, order, 1).astype(float)
-        los, his = np.take_along_axis(lo, order, 1), np.take_along_axis(hi, order, 1)
-        lim = np.diff(np.sort(np.asarray(sched, float))) + add                       # positional scheduled headway + 6
-        for _ in range(3):
-            for k in range(B - 2, -1, -1):                                         # hold the bus in front of a long gap
-                need = T[:, k + 1] - lim[k]
-                T[:, k] = np.where(T[:, k] < need - EPS, np.minimum(his[:, k], np.ceil(need - EPS)), T[:, k])
-            for k in range(B - 1):                                                 # release the bus behind it
-                cap = T[:, k] + lim[k]
-                T[:, k + 1] = np.where(T[:, k + 1] > cap + EPS, np.maximum(los[:, k + 1], np.floor(cap + EPS)), T[:, k + 1])
-            T = np.maximum.accumulate(T, axis=1)
-        out = np.empty_like(T)
-        out[np.arange(Sn)[:, None], order] = T
-        return out
 
     # ---------------------------------------------------------------- stress test noise
     def noise(self, Sn, rng):
@@ -618,8 +510,8 @@ def _hourly(T, win=60.0):
     return np.where(np.isfinite(best), best, np.nan), kk[np.arange(len(i)), i]
 
 
-def _cost(m, w, H, km, adj, w_short=1.5, w_qos=40.0):
-    return (w_qos * m.get("qos_ex", 0.0) + w.get("ewt", 0.0) * m["ewt_avg"] + w_short * m["ic_short"] + w["mx"] * np.maximum(0.0, m["max"] - H) + w["wmx"] * np.maximum(0.0, m["wmax"] - H) + w["rms"] * m["rms"] + w["bunch"] * 10.0 * m["bunch"]
+def _cost(m, w, H, km, adj, w_short=1.5):
+    return (w.get("ewt", 0.0) * m["ewt_avg"] + w_short * m["ic_short"] + w["mx"] * np.maximum(0.0, m["max"] - H) + w["wmx"] * np.maximum(0.0, m["wmax"] - H) + w["rms"] * m["rms"] + w["bunch"] * 10.0 * m["bunch"]
             + w["rec"] * m["rec"] / H + w["km"] * km + w["bc"] * m["bc_max"] + w["bcsum"] * m["bc_sum"] / 10.0 + w["adj"] * adj)
 
 
@@ -709,13 +601,13 @@ class Optimiser:
         hw = None
         if plans[0]["hw"]:
             hw = [(b, j, np.array([pl["hw"][k][2] for pl in plans])) for k, (b, j, _) in enumerate(plans[0]["hw"])]
-        m = C.run(D, hw, nz, reg=plans[0].get("reg", True))
+        m = C.run(D, hw, nz)
         km = np.array([sum(C.stop_s[j] for (_, j, _) in pl["hw"]) for pl in plans])
         hwb = [{h[0] for h in pl["hw"]} for pl in plans]
         adj = np.array([sum(abs(x - C.nat[b]) for b, x in pl["dep"].items() if b not in hwb[r]) for r, pl in enumerate(plans)])
         m["km"], m["adj"] = km, adj
-        m["cost"] = _cost(m, self.W, C.H, km, adj, self.P["w_ic_short"], self.P["w_qos"])
-        m["local"] = _local_cost(m, C.H) + self.P["w_qos"] * m["qos_ex"]
+        m["cost"] = _cost(m, self.W, C.H, km, adj, self.P["w_ic_short"])
+        m["local"] = _local_cost(m, C.H)
         return m
 
     # -------------------------------------------------- candidate generation
@@ -758,57 +650,13 @@ class Optimiser:
             d[b] = float(min(max(x, lo), hi)) if lo <= hi else float(math.ceil(C.nat[b]))
         return d
 
-    def _qos_repair(self, dep, drop=()):
-        """QoS 1.2 at the interchange: hold the bus in front of a departure gap longer than scheduled + qos_over_max, or release the bus
-        behind it, within each trip's limits (+/-8 min, 7-min layover, departed trips locked). -> repaired {b: x} (may still break it)."""
-        C, P = self.C, self.P
-        add = float(P.get("qos_over_max") or 0.0)
-        if add <= 0:
-            return dict(dep)
-        x = {b: dep.get(b, float(C.nat[b])) for b in range(1, C.n + 1) if b not in drop}
-        x[0], x[C.n + 1] = float(C.S[0]), float(C.S[-1])
-        slots = sorted(float(C.S[b]) for b in x)
-        lim = [slots[k + 1] - slots[k] + add for k in range(len(slots) - 1)]
-        def box(b):
-            if b in (0, C.n + 1) or C.locked[b]:
-                return x[b], x[b]
-            lo, hi = self._bounds(b)
-            return float(lo), float(hi)
-        for _ in range(4):
-            seq = sorted(x, key=lambda b: (x[b], b))
-            changed = False
-            for k in range(len(seq) - 2, -1, -1):                       # hold the bus in front
-                a, c = seq[k], seq[k + 1]
-                if x[c] - x[a] > lim[k] + EPS:
-                    lo, hi = box(a)
-                    nx = min(hi, float(math.ceil(x[c] - lim[k] - EPS)))
-                    if nx > x[a] + EPS:
-                        x[a], changed = nx, True
-            seq = sorted(x, key=lambda b: (x[b], b))
-            for k in range(len(seq) - 1):                               # release the bus behind
-                a, c = seq[k], seq[k + 1]
-                if x[c] - x[a] > lim[k] + EPS:
-                    lo, hi = box(c)
-                    nx = max(lo, float(math.floor(x[a] + lim[k] + EPS)))
-                    if nx < x[c] - EPS:
-                        x[c], changed = nx, True
-            if not changed:
-                break
-        return {b: v for b, v in x.items() if 1 <= b <= C.n and not C.locked[b] and abs(v - C.nat[b]) > 0.49}
-
     def generate(self):
         C, P = self.C, self.P
         lateb, focus = self._focus()
         self.lateb, self.focus = lateb, focus
         feas = {"adjust": [], "halfway": {}}
-        feas["adjust"].append({"dep": {}, "hw": [], "fam": "No intervention", "reg": False})      # NO ACTION: no trip adjusted, later trips neither
+        feas["adjust"].append({"dep": {}, "hw": [], "fam": "No intervention"})
         self._count("No intervention", [])
-        feas["adjust"].append({"dep": {}, "hw": [], "fam": "Regulate the later trips only", "reg": True})
-        self._count("Regulate the later trips only", [])
-        q0 = self._qos_repair({})
-        if q0 and not self._check(q0, []):
-            feas["adjust"].append({"dep": q0, "hw": [], "fam": "QoS 1.2 repair (hold / release to the 6-min limit)", "reg": True})
-            self._count("QoS 1.2 repair (hold / release to the 6-min limit)", [])
         # one trip at a time
         for b in focus:
             for sh in (-10, -8, -6, -4, -2, 2, 4, 6, 8, 10):
@@ -816,26 +664,20 @@ class Optimiser:
                 why = self._check(dep, [])
                 self._count("Adjust one trip", why)
                 if not why:
-                    feas["adjust"].append({"dep": dep, "hw": [], "fam": "Adjust one trip", "reg": True})
+                    feas["adjust"].append({"dep": dep, "hw": [], "fam": "Adjust one trip"})
         # spread departure timings (raw and repaired)
         for dep in self._spreads(focus):
             why = self._check(dep, [])
             fam = "Spread departure timings" if len(dep) >= 3 else "Adjust several trips (\u00b18 min)"
             self._count(fam, why)
             if not why:
-                feas["adjust"].append({"dep": dep, "hw": [], "fam": fam, "reg": True})
+                feas["adjust"].append({"dep": dep, "hw": [], "fam": fam})
             pr = self._project(dep)
             if pr and pr != dep:
                 why2 = self._check(pr, [])
                 self._count("Full trip + departure regulation", why2)
                 if not why2:
-                    feas["adjust"].append({"dep": pr, "hw": [], "fam": "Full trip + departure regulation", "reg": True})
-            qr = self._qos_repair(pr or dep)
-            if qr and qr != (pr or dep):
-                why3 = self._check(qr, [])
-                self._count("QoS 1.2 repair (hold / release to the 6-min limit)", why3)
-                if not why3:
-                    feas["adjust"].append({"dep": qr, "hw": [], "fam": "Full trip + departure regulation", "reg": True})
+                    feas["adjust"].append({"dep": pr, "hw": [], "fam": "Full trip + departure regulation"})
         feas["halfway"] = self._gen_halfway(lateb, focus)
         return feas
 
@@ -858,9 +700,8 @@ class Optimiser:
                     self.reject[k_] = self.reject.get(k_, 0) + 1
                     continue
                 combos.append((sev[x], sev[y]))
-        hreg = bool(P.get("halfway_regulate"))
         for combo in combos:
-            regs = [{}] + ([self._project(d, combo) for d in self._spreads(focus, combo)[:12]] if hreg else [])
+            regs = [{}] + [self._project(d, combo) for d in self._spreads(focus, combo)[:12]]
             for j in js:
                 key = (combo, j)
                 lst = []
@@ -881,7 +722,7 @@ class Optimiser:
                                "Halfway one trip, others run full trips" if len(combo) == 1 else "Two halfway starts + regulation")
                         self._count(fam, why)
                         if not why:
-                            lst.append({"dep": dep, "hw": hw, "fam": fam, "reg": hreg})          # halfway only: later trips run their natural times
+                            lst.append({"dep": dep, "hw": hw, "fam": fam})
                 if lst:
                     out[key] = lst
         return out
@@ -891,9 +732,7 @@ class Optimiser:
         C, P = self.C, self.P
         hwb = {h[0] for h in plan["hw"]}
         vars_ = [b for b in self.focus if not C.locked[b] and b not in hwb]
-        if plan["hw"] and not P.get("halfway_regulate"):
-            vars_ = []                                                  # halfway only: just the halfway start time is tuned
-        cur = {"dep": dict(plan["dep"]), "hw": list(plan["hw"]), "fam": plan.get("fam"), "reg": plan.get("reg", True)}
+        cur = {"dep": dict(plan["dep"]), "hw": list(plan["hw"]), "fam": plan.get("fam")}
         best = self._eval([cur])[objective][0]
         for _ in range(sweeps):
             improved = False
@@ -908,7 +747,7 @@ class Optimiser:
                         d.pop(b, None)
                     if self._check(d, cur["hw"]):
                         continue
-                    trial.append({"dep": d, "hw": cur["hw"], "fam": cur["fam"], "reg": cur["reg"]})
+                    trial.append({"dep": d, "hw": cur["hw"], "fam": cur["fam"]})
                 if not trial:
                     continue
                 m = self._eval(trial)[objective]
@@ -922,7 +761,7 @@ class Optimiser:
                     hw = list(cur["hw"]); hw[q] = (b, j, float(x))
                     if self._check(cur["dep"], hw):
                         continue
-                    trial.append({"dep": cur["dep"], "hw": hw, "fam": cur["fam"], "reg": cur["reg"]})
+                    trial.append({"dep": cur["dep"], "hw": hw, "fam": cur["fam"]})
                 if trial:
                     m = self._eval(trial)[objective]
                     k = int(np.argmin(m))
@@ -1003,20 +842,12 @@ class Optimiser:
                 if abs(sh) >= 0.5:
                     term_adj.append({"n": b, "L": L, "leg": leg_name(L), "where": where, "nat_clock": hm(nat[b]), "dep_clock": hm(reg[b]), "dep": _r(float(reg[b]), 1),
                                      "shift": _r(sh, 1), "halfway_bus": b in hwb})
-        qos = self.qos_report(det)
         ewt_pts = self.ewt_points(det)
         valid = [q for q in ewt_pts if q["ewt"] is not None]
         worst = max(valid, key=lambda q: q["ewt"]) if valid else None
-        wins = [q["win"] for q in ewt_pts if q.get("win")]
-        for c_ in chain:
-            ws = [q["win"] for q in ewt_pts if q.get("win") and q["leg"] == c_["leg"]]
-            c_["win"] = {"avg": _r(sum(w["avg"] for w in ws) / len(ws), 1), "max": _r(max(w["max"] for w in ws), 1), "min": _r(min(w["min"] for w in ws), 1)} if ws else None
-        win_all = {"avg": _r(sum(w["avg"] for w in wins) / len(wins), 1), "max": _r(max(w["max"] for w in wins), 1), "min": _r(min(w["min"] for w in wins), 1),
-                   "window_min": float(P.get("win_min") or 30.0)} if wins else None
         ewt_blk = {"avg": _r(det["ewt_avg"][0], 3), "max": _r(det["ewt_max"][0], 2), "n_points": len(valid), "n_points_all": len(ewt_pts),
                    "worst": {"label": worst["label"], "leg": worst["leg"], "ewt": worst["ewt"]} if worst else None, "points": ewt_pts}
-        out = {"key": key, "label": label, "fam": plan.get("fam"), "rows": rows, "chain": chain, "ewt": ewt_blk, "term_adj": term_adj, "qos": qos, "win": win_all,
-               "later_adjusted": bool(plan.get("reg", True) and self.P.get("term_reg")),
+        out = {"key": key, "label": label, "fam": plan.get("fam"), "rows": rows, "chain": chain, "ewt": ewt_blk, "term_adj": term_adj,
                "det": {"hr_hw": _r(float(det["hr_hw"][0]), 1) if np.isfinite(det["hr_hw"][0]) else None, "hr_buses": int(det["hr_n"][0]) + 1 if np.isfinite(det["hr_hw"][0]) else None,
                        "hr_where": self._hr_where(int(det["hr_L"][0]), int(det["hr_p"][0])) if np.isfinite(det["hr_hw"][0]) else None, "max": _r(det["max"][0]), "ic_max": _r(det["ic_max"][0]), "wmax": _r(det["wmax"][0]), "rms": _r(det["rms"][0], 2),
                        "bunch_pct": _r(100 * det["bunch"][0], 0), "rec": _r(det["rec"][0], 0), "recovered": bool(not det["unrec"][0]), "min_hw": _r(float(np.nanmin(det["leg_min"][0])) if "leg_min" in det else None, 1), "km": _r(det["km"][0], 2), "adj": _r(det["adj"][0], 0),
@@ -1035,24 +866,6 @@ class Optimiser:
                          "ewt_p85": _r(float(np.percentile(mc["ewt_avg"], 85)), 3), "ewt_p90": _r(float(np.percentile(mc["ewt_avg"], 90)), 3),
                          "hist": _hist(mc["max"])}
         return out
-
-    def qos_report(self, det):
-        """QoS 1.2 for one plan: every departure (UP 1 at the interchange, every later terminal) against scheduled headway + qos_over_max."""
-        C, P = self.C, self.P
-        add = float(P.get("qos_over_max") or 0.0)
-        name = lambda b: "the bus before" if b == 0 else ("the next bus" if b == C.n + 1 else f"Trip {b}")
-        br = []
-        for q in det.get("qos_legs") or []:
-            g, sg, o, ids = q["g"][0], q["sg"], q["order"][0], q["ids"]
-            where = C.names[0] if q["L"] % 2 == 0 else C.names[-1]
-            for k in range(len(g)):
-                if g[k] - sg[k] > add + EPS:
-                    br.append({"leg": leg_name(q["L"]), "where": where, "headway": _r(float(g[k]), 1), "scheduled": _r(float(sg[k]), 1),
-                               "over": _r(float(g[k] - sg[k]), 1), "between": f"{name(int(ids[o[k]]))} and {name(int(ids[o[k + 1]]))}"})
-        br.sort(key=lambda x: -x["over"])
-        mx = float(det["qos_over"][0]) if "qos_over" in det else 0.0
-        return {"rule": f"QoS 1.2: a departure headway may be at most {add:g} min longer than scheduled", "limit_add": add, "ok": not br,
-                "n_breaches": len(br), "max_over": _r(mx, 1), "breaches": br[:8]}
 
     # -------------------------------------------------- LEVEL 1 table: EWT at every evaluation point of every balance trip (deterministic run)
     def ewt_points(self, det):
@@ -1077,14 +890,13 @@ class Optimiser:
                     kind = "dep" if p == 0 else ("arr" if p == len(C.frac_dn) - 1 else "")
                 h = [(int(o_[k]), float(g_[k])) for k in range(len(o_)) if not math.isnan(g_[k])]
                 prt = ewt_parts([x[1] for x in h], sch_h)
-                wn = win_stats([x[1] for x in h], float(self.P.get("win_min") or 30.0), C.H)
                 e = lg["ewt"][0, p]
                 out.append({"L": L, "leg": leg_name(L), "p": p, "label": nm + (" (dep.)" if kind == "dep" else " (arr.)" if kind == "arr" else ""), "code": cd,
                             "pct": _r(pct, 0), "ewt": None if math.isnan(e) else _r(float(e), 3),
                             "awt": _r(prt["awt"], 3) if prt else None, "swt": _r(prt["swt"], 3) if prt else None, "n_hw": len(h),
                             "sum_h": _r(prt["sum_h"], 2) if prt else None, "sum_h2": _r(prt["sum_h2"], 1) if prt else None,
                             "sum_hs": _r(prt["sum_hs"], 2) if prt else None, "sum_hs2": _r(prt["sum_hs2"], 1) if prt else None,
-                            "h": [[b, _r(g, 2)] for b, g in h], "hs": [_r(x, 2) for x in sch_h], "win": wn})
+                            "h": [[b, _r(g, 2)] for b, g in h], "hs": [_r(x, 2) for x in sch_h]})
         return out
 
     # -------------------------------------------------- the whole run
@@ -1104,20 +916,18 @@ class Optimiser:
                     "plans": {}, "instructions": [], "why": ["No trip would leave the interchange late, so the schedule is kept as it is."], "generated": self._gen_info(), "H": C.H}
         # ---- evaluate every feasible plan (deterministic)
         adj = feas["adjust"]
-        m0 = self._eval(adj[:1])                                       # no action: nothing adjusted on any trip
-        ma = self._eval(adj[1:])
-        base_cost = float(m0["cost"][0])
-        base_down = float(np.nanmax(m0["leg_max"][0, 1:])) if C.NL > 1 else float(m0["max"][0])
-        adj[0]["_cost"] = base_cost
+        ma = self._eval(adj)
+        base_cost = float(ma["cost"][0])
+        base_down = float(np.nanmax(ma["leg_max"][0, 1:])) if C.NL > 1 else float(ma["max"][0])
         keep = []
-        for k, pl in enumerate(adj[1:]):
+        for k, pl in enumerate(adj):
             pl["_cost"] = float(ma["cost"][k])
             dn = float(np.nanmax(ma["leg_max"][k, 1:])) if C.NL > 1 else float(ma["max"][k])
-            if dn > base_down + 2.0 and pl["_cost"] >= base_cost * 0.97:
+            if k > 0 and dn > base_down + 2.0 and pl["_cost"] >= base_cost * 0.97:
                 self.reject["Worse downstream headway without enough benefit"] = self.reject.get("Worse downstream headway without enough benefit", 0) + 1
                 continue
             keep.append(pl)
-        seeds_a = sorted(keep, key=lambda p: p["_cost"])[:4]
+        seeds_a = sorted(keep, key=lambda p: p["_cost"])[:3]
         hbest = []
         for key, lst in feas["halfway"].items():
             mh = self._eval(lst)
@@ -1134,7 +944,7 @@ class Optimiser:
         # ---- refine the best seeds
         none_plan = adj[0]
         best_a, ca = None, 1e18
-        for s in seeds_a + [adj[1]]:
+        for s in seeds_a + [none_plan]:
             r, c = self.refine(s)
             if c < ca:
                 best_a, ca = r, c
@@ -1143,7 +953,7 @@ class Optimiser:
             r, c = self.refine(s)
             if c < ch:
                 best_h, ch = r, c
-        local, _ = self.refine(dict(none_plan, reg=False, fam="Next-departure-only fix"), objective="local", sweeps=2)   # UP 1 only, later trips not adjusted
+        local, _ = self.refine(none_plan, objective="local", sweeps=2)
         # ---- stress test
         rng = np.random.default_rng(int(P["seed"]))
         sims = int(max(50, min(5000, P["sims"])))
@@ -1151,7 +961,7 @@ class Optimiser:
         res = {}
         cand = [("none", none_plan, "No action"), ("adjust", best_a, "Full trip + adjustment")]
         if best_h is not None:
-            cand.append(("halfway", best_h, "Halfway + regulation" if P.get("halfway_regulate") else "Halfway (other trips unchanged)"))
+            cand.append(("halfway", best_h, "Halfway + regulation"))
         cand.append(("local", local, "Next-departure-only fix"))
         disp_j = best_h["hw"][0][1] if best_h is not None else min(C.pts_up, key=lambda j: abs(j - (C.n_st - 1) / 2))
         self.disp_j = disp_j
@@ -1169,12 +979,12 @@ class Optimiser:
         for b, x in pl["dep"].items():
             D[0, b] = x
         hw = [(b, j, np.array([st])) for (b, j, st) in pl["hw"]] or None
-        m = C.run(D, hw, None, keep=True, reg=pl.get("reg", True))
+        m = C.run(D, hw, None, keep=True)
         km = np.array([sum(C.stop_s[j] for (_, j, _) in pl["hw"])])
         hwb = {h[0] for h in pl["hw"]}
         adj = np.array([sum(abs(x - C.nat[b]) for b, x in pl["dep"].items() if b not in hwb)])
         m["km"], m["adj"] = km, adj
-        m["cost"] = _cost(m, self.W, C.H, km, adj, self.P["w_ic_short"], self.P["w_qos"])
+        m["cost"] = _cost(m, self.W, C.H, km, adj, self.P["w_ic_short"])
         return m
 
     def _eval_mc(self, pl, nz, sims):
@@ -1192,12 +1002,12 @@ class Optimiser:
                     arrive = leave + _off(C, P, j) * nz["off"] + P["prep_min"]
                     s = np.maximum(s, arrive - C.tau[j])
                 hw.append((b, j, s))
-        m = C.run(D, hw, nz, reg=pl.get("reg", True))
+        m = C.run(D, hw, nz)
         km = np.full(sims, sum(C.stop_s[j] for (_, j, _) in pl["hw"]))
         hwb = {h[0] for h in pl["hw"]}
         adj = np.full(sims, sum(abs(x - C.nat[b]) for b, x in pl["dep"].items() if b not in hwb))
         m["km"] = km
-        m["cost"] = _cost(m, self.W, C.H, km, adj, self.P["w_ic_short"], self.P["w_qos"])
+        m["cost"] = _cost(m, self.W, C.H, km, adj, self.P["w_ic_short"])
         return m
 
     # -------------------------------------------------- the decision: EWT over the Balance Trips horizon
@@ -1210,10 +1020,7 @@ class Optimiser:
         e_n, e_a = N["ewt"]["avg"], A["ewt"]["avg"]
         a_gain = (e_n or 0.0) - (e_a or 0.0)
         a_useful = a_gain >= P["ewt_adjust_min"] - EPS
-        q_n, q_a = N.get("qos") or {}, A.get("qos") or {}
-        a_qos = (not q_n.get("ok", True)) and (q_a.get("ok") or (q_a.get("max_over") or 0) < (q_n.get("max_over") or 0) - EPS)   # QoS 1.2 needs the adjustment
-        a_any = A["n_adjusted"] > 0 or bool(A.get("term_adj"))
-        full = "adjust" if (a_any and (a_useful or a_qos)) else "none"
+        full = "adjust" if (a_useful and A["n_adjusted"] > 0) else "none"
         F = res[full]
         e_c = F["ewt"]["avg"] or 0.0
         h_ok, benefit, tests = False, {}, []
@@ -1236,17 +1043,13 @@ class Optimiser:
             if self.mode == "mileage":
                 tests.append({"test": f"Worth the mileage: \u2265 {P['ewt_gain_per_km']:g} min EWT per km not operated", "value": f"{diff / max(km, 0.1):.3f} min/km",
                               "pass": diff / max(km, 0.1) >= P["ewt_gain_per_km"] - EPS})
-            q_f, q_h = F.get("qos") or {}, Hw.get("qos") or {}
-            tests.append({"test": f"QoS 1.2 not worse (departure headway \u2264 scheduled + {P['qos_over_max']:g} min)",
-                          "value": ("met" if q_h.get("ok") else f"{q_h.get('n_breaches', 0)} over the limit, worst +{q_h.get('max_over')} min"),
-                          "pass": bool(q_h.get("ok")) or (q_h.get("max_over") or 0) <= (q_f.get("max_over") or 0) + EPS})
             h_ok = all(t["pass"] for t in tests)
         prio = {"headway": "Headway priority (EWT gain threshold halved)", "mileage": "Mileage priority (EWT gain must also be worth the km lost)"}.get(self.mode, "Balanced")
         rule = (f"{prio}: Continue full trip vs Halfway compared on Average EWT across {self._npts(F)} evaluation points over {horizon_text(C.NL)}. "
                 f"Halfway only if it lowers the Average EWT by \u2265 {P['ewt_gain_min']:g} min and \u2265 {P['ewt_gain_pct'] * (0.5 if self.mode == 'headway' else 1.0):g}% and the stress test agrees. "
                 f"Delay ({delay:.0f} min) is an input to the simulation, not a decision threshold.")
         choice = "halfway" if (Hw is not None and h_ok) else full
-        return {"choice": choice, "full_choice": full, "halfway_ok": h_ok, "benefit": benefit, "rule": rule, "delay": delay, "adjust_useful": a_useful, "adjust_for_qos": bool(a_qos),
+        return {"choice": choice, "full_choice": full, "halfway_ok": h_ok, "benefit": benefit, "rule": rule, "delay": delay, "adjust_useful": a_useful,
                 "adjust_unacceptable": bool(F["mc"]["max_p85"] >= max(30.0, 2.0 * C.H) - EPS), "tests": tests}
 
     @staticmethod
@@ -1303,7 +1106,7 @@ class Optimiser:
                 "generated": self._gen_info(), "live": C.live, "veh": self.veh, "needs_standby": self.needs_standby, "not_recovered_min": _r(C.chain_len, 0), "now": _r(C.now, 1), "now_clock": hm(C.now) if C.now is not None else None,
                 "locked": [b for b in range(1, C.n + 1) if C.locked[b]], "first_stop": C.names[0], "pts_up": C.pts_up, "pts_km": [_r(C.stop_s[j], 3) for j in C.pts_up], "prep_min": P["prep_min"], "disp_j": disp_j, "disp_name": C.names[disp_j] if disp_j is not None else None,
                 "trips": [{"n": b, "sch": hm(C.S[b]), "act_arr": hm(C.act_arr[b]), "late": C.late[b - 1], "ready": hm(C.ready[b]), "nat": hm(C.nat[b])} for b in range(1, C.n + 1)],
-                "qos": {k: res[k].get("qos") for k in res}, "params": {k: P[k] for k in ("qos_over_max", "term_mode", "halfway_regulate", "win_min", "bunch_min", "adj_max", "min_layover_min", "balance_trips", "horizon_side", "sims", "halfway_min_late", "offsvc_factor", "prep_min",
+                "params": {k: P[k] for k in ("bunch_min", "adj_max", "min_layover_min", "balance_trips", "horizon_side", "sims", "halfway_min_late", "offsvc_factor", "prep_min",
                                                    "ewt_gain_min", "ewt_gain_pct", "ewt_gain_per_km", "ewt_adjust_min", "allow_adjacent_halfway",
                                                    "term_reg", "term_hold_max", "term_early_max", "term_min_adj", "term_tol_pct", "term_zone", "term_total_max")}}
 
@@ -1375,8 +1178,7 @@ class Optimiser:
             F = res[ch]
             f = F["mc"]
             if ch == "adjust":
-                out.append(f"The full trip is kept: adjusting departures lowers the Average EWT over {hz} from {N['ewt']['avg']:.2f} to {F['ewt']['avg']:.2f} min without losing mileage"
-                           + (" and is needed for QoS 1.2 (no action leaves a departure headway more than " + f"{self.P['qos_over_max']:g} min over schedule)." if dec.get("adjust_for_qos") else "."))
+                out.append(f"The full trip is kept: adjusting departures lowers the Average EWT over {hz} from {N['ewt']['avg']:.2f} to {F['ewt']['avg']:.2f} min without losing mileage.")
             else:
                 out.append(f"No intervention: the natural departures give an Average EWT of {F['ewt']['avg']:.2f} min over {hz}; no departure adjustment lowers it by the "
                            f"{self.P['ewt_adjust_min']:g} min needed to be worth making.")
@@ -1391,24 +1193,9 @@ class Optimiser:
                 out.append(f"No halfway start is feasible here (no stop can be reached inside the slot window, even with a standby bus), so the AI balances the trips around the late bus.")
         if self.P.get("term_reg"):
             n_l = sum(1 for a in (res[ch].get("term_adj") or []))
-            tot = float(self.P.get("term_total_max") or 0.0)
-            pat = self.P.get("term_mode", "pattern") == "pattern"
-            out.append(f"No action adjusts no trip: every later trip leaves at the later of its schedule and arrival + {self.P['min_layover_min']:g} min, so the gap "
-                       f"stays almost the same on every trip (the late bus only catches up the layover above the {self.P['min_layover_min']:g}-min minimum). "
-                       + (f"Trip adjustment keeps its adjusted spacing on every later trip: each bus leaves at its adjusted UP 1 time plus the scheduled cycle "
-                          f"(hold \u2264 {self.P['term_hold_max']:g}, early \u2264 {self.P['term_early_max']:g} min, \u2265 {self.P['min_layover_min']:g} min layover, QoS 1.2). "
-                          if pat else
-                          f"Trip adjustment evens out the later trips at each terminal (hold \u2264 {self.P['term_hold_max']:g}, early \u2264 {self.P['term_early_max']:g} min, "
-                          f"\u2265 {self.P['min_layover_min']:g} min layover" + (f", \u2264 {tot:g} min total hold per BC" if tot > 0 else "") + ", QoS 1.2). ")
-                       + ("Halfway adjusts no other trip: from the second trip the buses run their timetable. " if not self.P.get("halfway_regulate") else "Halfway also adjusts the trips around it. ")
-                       + f"The chosen plan needs {n_l} later-trip instruction{'s' if n_l != 1 else ''}.")
-        q = res[ch].get("qos") or {}
-        if q and not q.get("ok"):
-            w = (q.get("breaches") or [{}])[0]
-            out.append(f"QoS 1.2 cannot be fully met within the limits (\u00b1{self.P['adj_max']:g} min, {self.P['min_layover_min']:g}-min layover, departed trips locked): "
-                       f"worst {w.get('headway')} min against {w.get('scheduled')} scheduled on {w.get('leg')} at {w.get('where')}, between {w.get('between')}.")
-        elif q:
-            out.append(f"QoS 1.2 met: every departure headway is at most {self.P['qos_over_max']:g} min over its scheduled headway.")
+            out.append(f"On the later balance trips both scenarios get the same terminal regulation (each bus moves towards the midpoint of the buses either side, "
+                       f"hold \u2264 {self.P['term_hold_max']:g} min, early \u2264 {self.P['term_early_max']:g} min, \u2265 {self.P['min_layover_min']:g} min layover, "
+                       f"\u2264 {self.P['term_total_max']:g} min total hold per BC); the chosen plan needs {n_l} such terminal instruction{'s' if n_l != 1 else ''}.")
         # is the biggest interchange gap physically unavoidable? (bus before it already held to the cap, bus after it leaves as soon as it is ready)
         best = res[ch]
         full = sorted([r for r in best["rows"] if r["type"] != "halfway"], key=lambda r: r["dep"])
