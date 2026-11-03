@@ -1,6 +1,6 @@
-import {HORIZONS,COLORS,TITLES,esc,num,apiURL,quality,riskServices,slicePage,badge,icon,chartSVG,operationalQueue,initialView,loadSummary,stopText,watchLocation,headwayView,toggleService,resetFilters,hourlyHeadway,hourlyChart,spotlightDeck,categoryView} from './forecast2026-core.js?v=20261103-hz31';
-import {ForecastMap,LAYERS} from './forecast2026-map.js?v=20261103-hz31';
-import {boardModel,loadingCard,trafficCard,headwayCard,emptyState,paginate} from './forecast2026-tv.js?v=20261103-hz31';
+import {HORIZONS,COLORS,TITLES,esc,num,apiURL,quality,riskServices,slicePage,badge,icon,chartSVG,operationalQueue,initialView,loadSummary,stopText,watchLocation,headwayView,toggleService,resetFilters,hourlyHeadway,hourlyChart,spotlightDeck,categoryView} from './forecast2026-core.js?v=20261103-hz37';
+import {ForecastMap,LAYERS} from './forecast2026-map.js?v=20261103-hz37';
+import {boardModel,loadingCard,trafficCard,headwayCard,emptyState,paginate} from './forecast2026-tv.js?v=20261103-hz37';
 const $=id=>document.getElementById(id),query=new URLSearchParams(location.search);
 const initial=initialView(query,{mode:document.documentElement.dataset.defaultMode||'live',horizon:document.documentElement.dataset.defaultHorizon||0});
 if(initial.h===120)initial.h=60;   // old links to the retired NEXT 2H view open the 60-minute view
@@ -176,6 +176,8 @@ function recommendationDetail(index){let r=state.data.recommendations[index];if(
 function sourcesModal(){let d=state.data;if(!d)return;openModal('Data sources & forecast integrity',`<span class="tag ${state.mode==='demo'?'demo':'estimated'}">${esc(d.model.name)}</span>${d.sources.map(s=>`<div class="source-row"><b>${esc(s.name)}</b><span>${esc(s.status)}</span><small>${esc(s.detail)}</small></div>`).join('')}<p>Last successful observation: ${new Date(d.updated*1000).toLocaleString('en-SG',{timeZone:'Asia/Singapore'})} SGT</p><p>${esc(d.model.confidence_note)}</p><h3>Current limitations</h3>${d.model.limitations.map(l=>`<p>• ${esc(l)}</p>`).join('')}<h3>Forecast accuracy</h3><p>${d.calibration?.n>=30?'Historical calibration observations available; see legacy forecast integrity records.':'Not validated. Precision, recall, false-alarm rate and occupancy error need outcome history; no accuracy percentage is claimed.'}</p>`);}
 function placeRisk(){const r=$('riskCards'),c=document.querySelector('.console'),mp=document.querySelector('.map-panel'),mg=document.querySelector('.main-grid');if(!r||!c||!mp||!mg||typeof mp.appendChild!=='function'||typeof c.insertBefore!=='function')return;
  const wide=typeof matchMedia==='function'&&matchMedia('(min-width:1200px)').matches;
+ const bg=document.querySelector('.bottom-grid');
+ if(bg&&typeof mg.appendChild==='function'){if(wide){if(bg.parentElement!==mg)mg.appendChild(bg);}else if(bg.parentElement!==c)c.appendChild(bg);}   // V17.7 desktop: bottom panels at 75% height beside the cameras column
  if(wide){if(r.parentElement!==mg)mg.insertBefore(r,mg.firstChild);}            // V17.6 desktop / TV: 75% cards parked above the map, MRT panel runs up beside them
  else if(state.tv){if(r.parentElement!==c)c.insertBefore(r,c.firstChild);}
  else if(r.parentElement!==mp)mp.appendChild(r);}                               // phone / tablet: chips on the map
