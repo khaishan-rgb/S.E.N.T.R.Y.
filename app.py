@@ -70,8 +70,29 @@ _sem = None
 def client():
     global _client
     if _client is None:
-        _client = httpx.AsyncClient(timeout=httpx.Timeout(20.0, connect=10.0))
+        _client = httpx.AsyncClient(timeout=httpx.Timeout(20.0, connect=10.0, pool=15.0))
     return _client
+
+
+NET = {"fails": 0, "resets": 0, "reset_at": 0.0}     # V17.3: consecutive network failures to LTA; the HTTP client is rebuilt when it gets stuck
+
+
+def net_fail():
+    """A connection-level failure (timeout, reset, pool exhausted). After 4 in a row the shared HTTP client is replaced:
+    a wedged connection pool otherwise keeps failing every request until the server restarts."""
+    global _client
+    NET["fails"] += 1
+    if NET["fails"] >= 4 and time.time() - NET["reset_at"] > 60 and _client is not None:
+        old, _client = _client, None
+        NET.update(fails=0, resets=NET["resets"] + 1, reset_at=time.time())
+        try:
+            asyncio.get_running_loop().create_task(old.aclose())
+        except Exception:
+            pass
+
+
+def net_ok():
+    NET["fails"] = 0
 
 
 def sem():
@@ -83,6 +104,7 @@ def sem():
 
 # --------------------------------------------------------------------------- caching
 CACHE = {}   # key -> (expires_at, stored_at, value)
+CACHE_TIMEOUT_S = 150       # one refresh of a cached feed (e.g. all speed-band pages) may take at most this long
 LOCKS = {}
 
 
@@ -98,7 +120,14 @@ async def cached(key, factory):
         hit = CACHE.get(key)
         if hit and hit[0] > now:
             return hit[2]
-        val, ttl, ok = await factory()
+        try:
+            val, ttl, ok = await asyncio.wait_for(factory(), timeout=CACHE_TIMEOUT_S)
+        except asyncio.TimeoutError:
+            # V17.3: a hung feed used to keep this lock forever, so the feed stayed 'unavailable' until a restart. Give up, keep the last good data, retry soon.
+            if hit:
+                CACHE[key] = (now + TTL_NEGATIVE, hit[1], hit[2])
+                return hit[2]
+            raise
         if ok:
             CACHE[key] = (now + ttl, now, val)
             return val
@@ -128,14 +157,18 @@ async def get_lta(path, params=None, retries=1):
                 continue
             r.raise_for_status()
             j = r.json()
+            net_ok()
             return j if isinstance(j, dict) else {"value": j}
         except httpx.HTTPStatusError as e:
+            net_ok()
             code = e.response.status_code
             last = {"value": [], "_error": f"{path}: HTTP {code}", "_status": code}
             if code not in (429, 500, 502, 503, 504):
                 break
         except Exception as e:
             last = {"value": [], "_error": f"{path}: {type(e).__name__}", "_status": -1}
+            if isinstance(e, (httpx.TransportError, asyncio.TimeoutError)):
+                net_fail()
             if attempt < retries:
                 await asyncio.sleep(0.6)
     return last
@@ -6219,6 +6252,24 @@ async def tr_refresh(force=False):
         now = time.time()
         if not force and TR["last"] and now - TR["last"] < P["refresh_s"] * 0.9:
             return
+        try:
+            await asyncio.wait_for(_tr_refresh_body(P, now), timeout=TR_CYCLE_TIMEOUT_S)
+            TR["fail_n"], TR["fail_err"] = 0, None
+        except asyncio.TimeoutError:
+            # V17.3: a feed that hangs no longer blocks every later refresh: the cycle is abandoned, the lock is released and the next cycle retries
+            TR["fail_n"] = TR.get("fail_n", 0) + 1
+            TR["fail_err"] = f"refresh took over {TR_CYCLE_TIMEOUT_S} s - retrying"
+        except Exception as e:
+            TR["fail_n"] = TR.get("fail_n", 0) + 1
+            TR["fail_err"] = f"{type(e).__name__}: {str(e)[:160]}"
+            raise
+
+
+TR_CYCLE_TIMEOUT_S = 180
+
+
+async def _tr_refresh_body(P, now):
+    if True:
         st, bs, inc, rain, (rw, rw_err), _tt = await asyncio.gather(static(), bands_state(), api_incidents(), api_rain(), tr_roadworks(now), tomtom_incidents())     # concurrent: a slow feed no longer holds up the others
         book = TR["book"]
         snap = int(CACHE["bands"][1]) if "bands" in CACHE else None
@@ -11948,7 +11999,7 @@ async def fc_cycle(force=False):
             return FC["state"]
         t0 = time.time()
         try:
-            world, fq = await fc_world(now)
+            world, fq = await asyncio.wait_for(fc_world(now), timeout=150)      # V17.3: a hung source cannot freeze the Forecast Centre
             state = await asyncio.to_thread(forecast.evaluate, world)
             keys = set(state["impacts"].keys())
             dtn = now_sgt()
