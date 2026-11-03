@@ -349,18 +349,48 @@ body>.modal{z-index:2147482500}
 .brand h1 span{font-size:clamp(22px,2vw,32px)!important}
 .tv .brand h1 span{font-size:inherit!important}
 
-/* V17.4 MRT line status (above the checkpoint crossing times) */
-.mrt{display:grid;gap:5px;padding:0 10px 8px}
-.mrt-head{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
-.mrt-head span{font:700 12px/1 Rajdhani,'IBM Plex Sans',sans-serif;letter-spacing:.14em;text-transform:uppercase;color:#bfefff}
-.mrt-head small{font-size:10px;color:#6f9db3;letter-spacing:.05em}
-.mrt-row{display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center;gap:9px;padding:6px 9px;border:1px solid #2b6a85;border-radius:6px;background:linear-gradient(90deg,#062a3d,#041a29)}
-.mrt-line{min-width:44px;text-align:center;padding:4px 6px;border-radius:4px;font:700 13px/1 Orbitron,'IBM Plex Sans',sans-serif;color:#fff;background:#4b6170}
+/* V17.5 MRT / LRT status: its own panel above the cameras, 3 x 3 tiles (MRT 2 rows, LRT 1 row) */
+body .right-rail.cameras-only{grid-template-rows:auto minmax(0,1fr)}
+.mrt-panel .panel-head small.bad{color:#ff8a8f;font-weight:700}
+.mrt{display:grid;gap:5px;padding:0 10px 9px}
+.mrt-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px}
+.mrt-tile{display:flex;align-items:center;gap:5px;min-width:0;padding:4px 6px;border:1px solid #1f4a60;border-radius:5px;background:#041a29}
+.mrt-tile em{font-style:normal;font:700 11px/1 Rajdhani,'IBM Plex Sans',sans-serif;letter-spacing:.03em;text-transform:uppercase;color:#7dffb0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mrt-tile.is-disrupted{border-color:#ff5a5f;background:linear-gradient(90deg,#3a0d14,#1c0a10);animation:mrtPulse 2.4s ease-in-out infinite}
+.mrt-tile.is-disrupted em{color:#ff8a8f}
+.mrt-tile.is-unknown em{color:#8fb8cc}
+@keyframes mrtPulse{50%{box-shadow:0 0 14px -2px #ff5a5f}}
+.mrt-line{flex:none;min-width:34px;text-align:center;padding:3px 4px;border-radius:4px;font:700 11px/1 Orbitron,'IBM Plex Sans',sans-serif;font-style:normal;color:#fff;background:#748477}
 .mrt-DTL{background:#005ec4}.mrt-NEL{background:#9900aa}.mrt-NSL{background:#d42e12}.mrt-EWL{background:#009645}.mrt-CCL{background:#fa9e0d;color:#1a1200}.mrt-TEL{background:#9d5b25}
-.mrt-txt{display:flex;flex-direction:column;min-width:0;line-height:1.2}
-.mrt-txt b{font:700 14px/1.15 Rajdhani,'IBM Plex Sans',sans-serif;letter-spacing:.06em;text-transform:uppercase;color:#7dffb0}
-.mrt-txt small{font-size:11px;color:#8fb8cc;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
-.mrt-row.is-disrupted{border-color:#ff5a5f;background:linear-gradient(90deg,#3a0d14,#1c0a10)}
-.mrt-row.is-disrupted .mrt-txt b{color:#ff8a8f}
-.mrt-row.is-unknown .mrt-txt b{color:#8fb8cc}
-.tv .mrt{padding:0 8px 6px}.tv .mrt-row{padding:4px 8px}
+.mrt-detail{margin:0;padding:5px 8px;border-left:3px solid #ff5a5f;background:#2a0b12;border-radius:4px;font-size:11px;line-height:1.3;color:#f3c4c6;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.mrt-detail b{color:#fff}
+.tv .mrt{padding:0 8px 6px}.tv .mrt-tile{padding:3px 5px}
+@media (prefers-reduced-motion:reduce){.mrt-tile.is-disrupted{animation:none}}
+
+/* V17.5 risk counters minimised onto the network map (not in TV mode, where they stay on top) */
+body:not(.tv) .console>.main-grid{grid-row:1 / span 2}
+body:not(.tv) .console>.bottom-grid{grid-row:3}
+body:not(.tv) .map-panel>.risk-strip{position:absolute;left:10px;top:52px;z-index:6;width:min(285px,48%);display:flex;flex-direction:column;gap:5px;height:auto;padding:0;margin:0;background:none;border:0;box-shadow:none}
+body:not(.tv) .map-panel .risk-card{display:grid;grid-template-columns:20px minmax(0,1fr) auto;align-items:center;gap:7px;padding:5px 8px;min-height:0;height:auto;background:#051521ee!important;backdrop-filter:blur(3px)}
+body:not(.tv) .map-panel .risk-card .risk-icon{width:20px;height:20px;padding:0}
+body:not(.tv) .map-panel .risk-card .risk-icon svg{width:16px;height:16px}
+body:not(.tv) .map-panel .risk-card>span:nth-child(2){display:flex;align-items:baseline;gap:6px;min-width:0}
+body:not(.tv) .map-panel .risk-card h2{flex:1;min-width:0;font-size:11px!important;line-height:1.2;margin:0;letter-spacing:.04em!important}
+body:not(.tv) .map-panel .risk-card strong{font-size:18px!important;line-height:1}
+body:not(.tv) .map-panel .risk-card small{display:none}
+body:not(.tv) .map-panel .risk-card .risk-aside{display:flex;align-items:baseline;gap:3px;font-size:9px;white-space:nowrap;color:#9fc3d6}
+body:not(.tv) .map-panel .risk-card .risk-aside b{font-size:13px;color:var(--risk)}
+@media(max-width:600px){body:not(.tv) .map-panel>.risk-strip{top:46px;left:8px;right:8px;width:auto;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px}
+ body:not(.tv) .map-panel .risk-card{grid-template-columns:minmax(0,1fr) auto;gap:5px;padding:4px 6px}body:not(.tv) .map-panel .risk-card .risk-icon{display:none}body:not(.tv) .map-panel>.risk-strip{grid-auto-rows:auto!important}body:not(.tv) .map-panel .risk-card{min-height:0!important;height:auto!important}body:not(.tv) .map-panel .risk-card .risk-aside{display:flex!important}body:not(.tv) .map-panel .risk-card h2{color:#cfe9f5!important;-webkit-text-fill-color:#cfe9f5}
+ body:not(.tv) .map-panel .risk-card h2{font-size:10px!important;letter-spacing:.02em!important}
+ body:not(.tv) .map-panel .risk-card strong{font-size:15px!important}
+ body:not(.tv) .map-panel .risk-card .risk-aside{font-size:0}body:not(.tv) .map-panel .risk-card .risk-aside b{font-size:11px}
+ .mrt-tile{padding:4px 4px;gap:4px}.mrt-tile em{font-size:10px;letter-spacing:0}.mrt-line{min-width:31px;font-size:10px}}
+@media(max-width:1699px) and (min-width:601px){.mrt-tile{padding:4px 4px;gap:4px}.mrt-tile em{letter-spacing:0;font-size:10.5px}.mrt-line{min-width:31px;font-size:10px}}
+.cameras-only .camera img{min-height:36px}
+/* V17.5 cameras 2 x 3: the label sits on the photo so all six fit */
+body:not(.tv) .cameras-only .camera{position:relative}
+body:not(.tv) .cameras-only .camera img{flex:1 1 auto;min-height:0;height:100%!important}
+body:not(.tv) .cameras-only .camera p{position:absolute;left:0;right:0;bottom:0;margin:0;padding:14px 7px 4px;font-size:11px;line-height:1.2;color:#eaf6ff;background:linear-gradient(transparent,rgba(2,10,18,.88));pointer-events:none}
+body:not(.tv) .cameras-only .camera small{position:absolute;right:5px;top:4px;padding:1px 5px;border-radius:3px;font-size:9px;background:rgba(2,10,18,.75);pointer-events:none}
+@media(max-width:1199px){body:not(.tv) .cameras-only .camera img{height:130px!important}}
