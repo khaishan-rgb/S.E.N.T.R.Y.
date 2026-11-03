@@ -431,3 +431,19 @@ body:not(.tv) .cameras-only .camera small{position:absolute;right:5px;top:4px;pa
 @media(min-width:1700px) and (min-height:950px){body:not(.tv) .main-grid:has(>.bottom-grid){height:auto}}
 @media(min-width:2600px){body:not(.tv) .main-grid:has(>.bottom-grid){height:auto}}
 .tvb-where{min-width:0}.tvb-type{display:flex;align-items:center;gap:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+/* V17.8 bottom panels taller; the Network status / Risk outlook / map row gives up the space */
+@media(min-width:1200px){.main-grid:has(>.risk-strip):has(>.bottom-grid){grid-template-rows:auto minmax(0,1fr) minmax(200px,.68fr)!important}}
+/* V17.8 compact Network status / Risk outlook on desktop (same one-line rows as TV mode) */
+@media(min-width:1200px){
+ body:not(.tv) .left-rail .panel-head{min-height:30px;padding:7px 10px 5px;flex-wrap:nowrap}
+ body:not(.tv) .left-rail .panel-head h2{font-size:17px!important;line-height:1.1}
+ body:not(.tv) .network-row{padding:3px 0;gap:7px;min-height:0}
+ body:not(.tv) .network-row>svg{width:17px;height:17px}
+ body:not(.tv) .network-row>div:first-of-type{display:flex;flex-wrap:nowrap;align-items:center;justify-content:space-between;gap:6px;min-width:0;flex:1}
+ body:not(.tv) .network-row span{font-size:12px;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+ body:not(.tv) .network-row strong{font-size:18px;line-height:1.1;white-space:nowrap}
+ body:not(.tv) .network-foot{display:none}
+ body:not(.tv) .timeline-row{grid-template-columns:18px minmax(0,1fr) auto;gap:6px;min-height:0;margin:2px 0}
+ body:not(.tv) .timeline-row small,body:not(.tv) .evidence-note{display:none}
+ body:not(.tv) .timeline-row b{font-size:12px}
+}
