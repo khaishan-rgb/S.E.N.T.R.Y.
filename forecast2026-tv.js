@@ -2,7 +2,7 @@
 //  1. Which service / direction / location has heavy passenger loading?
 //  2. Which incident, roadwork or traffic build-up affects which service / direction / location?
 //  3. Where is there three-bus bunching or a long headway gap (service / direction / location)?
-import {esc,num,icon} from './forecast2026-core.js?v=20261103-hz20';
+import {esc,num,icon} from './forecast2026-core.js?v=20261103-hz22';
 
 export const KINDS={
  road_closed:{label:'Closure reported',icon:'road_closed',rank:0},
@@ -81,7 +81,7 @@ export function headwayRows(data){
 
 export function boardModel(data){
  const cov=data.coverage||{};
- const traffic=trafficGroups(data);
+ const traffic=trafficGroups(data).filter(g=>g.blocked||(g.delay!=null&&g.delay>=0.05));   // only incidents with a measured delay (or a confirmed blockage); no-minute cards are noise
  return {
   loading:{rows:cov.loading?loadingRows(data):[],available:!!cov.loading},
   traffic:{rows:traffic,available:!!cov.traffic,services:new Set(traffic.flatMap(g=>g.impacts.map(i=>i.svc+':'+i.dir))).size},

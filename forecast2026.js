@@ -1,6 +1,6 @@
-import {HORIZONS,COLORS,TITLES,esc,num,apiURL,quality,riskServices,slicePage,badge,icon,chartSVG,operationalQueue,initialView,loadSummary,stopText,watchLocation,headwayView,toggleService,resetFilters,hourlyHeadway,hourlyChart,spotlightDeck,categoryView} from './forecast2026-core.js?v=20261103-hz20';
-import {ForecastMap,LAYERS} from './forecast2026-map.js?v=20261103-hz20';
-import {boardModel,loadingCard,trafficCard,headwayCard,emptyState,paginate} from './forecast2026-tv.js?v=20261103-hz20';
+import {HORIZONS,COLORS,TITLES,esc,num,apiURL,quality,riskServices,slicePage,badge,icon,chartSVG,operationalQueue,initialView,loadSummary,stopText,watchLocation,headwayView,toggleService,resetFilters,hourlyHeadway,hourlyChart,spotlightDeck,categoryView} from './forecast2026-core.js?v=20261103-hz22';
+import {ForecastMap,LAYERS} from './forecast2026-map.js?v=20261103-hz22';
+import {boardModel,loadingCard,trafficCard,headwayCard,emptyState,paginate} from './forecast2026-tv.js?v=20261103-hz22';
 const $=id=>document.getElementById(id),query=new URLSearchParams(location.search);
 const initial=initialView(query,{mode:document.documentElement.dataset.defaultMode||'live',horizon:document.documentElement.dataset.defaultHorizon||0});
 if(initial.h===120)initial.h=60;   // old links to the retired NEXT 2H view open the 60-minute view
@@ -145,6 +145,14 @@ async function analyseCamera(id){const ids=[...new Set([id,...cameraRows.map(c=>
  try{const r=await fetch('/api/forecast/centre/camera-ai?ids='+encodeURIComponent(ids));cameraAI=r.ok?await r.json():{status:'Camera analytics unavailable (server answered HTTP '+r.status+')'};}catch(e){cameraAI={status:'Camera analytics unavailable (network error)'};}
  cameraAIAt=Date.now();paintCameraAI();const box=document.getElementById('camAI');if(box&&box.dataset.cam===String(id))box.innerHTML=camAIHTML(id,false);}
 function cameraAIStatus(ai){if(ai.status)return ai.status;const c=ai.configured||{};if(!c.ai&&!c.speed)return 'JB / SG crossing time is off · add ANTHROPIC_API_KEY in Render → Environment (LTA speed bands also unavailable)';if(ai.error)return 'JB / SG crossing time: '+ai.error+(c.speed?' · speed data not available for the checkpoint cameras':'');return 'JB / SG crossing time: checkpoint cameras not in the live LTA feed right now';}
+let mrt=null;
+async function loadMRT(){if(state.mode==='live'){try{const r=await fetch('/api/train-status');mrt=r.ok?await r.json():null;}catch(e){mrt=null;}}paintMRT();}
+function paintMRT(){const box=$('mrtStatus');if(!box)return;if(state.mode!=='live'||!mrt||!(mrt.lines||[]).length){box.hidden=true;return;}box.hidden=false;
+ const LBL={normal:'Normal service',disrupted:'Disrupted',unknown:'Status unavailable'};
+ box.innerHTML=`<div class="mrt-head"><span>MRT status</span><small>LTA train service alerts</small></div>`+mrt.lines.map(l=>{
+  const seg=(l.segments||[])[0],msg=(l.messages||[])[0];
+  const detail=l.state==='disrupted'&&seg?[seg.direction&&('Towards '+seg.direction),seg.stations&&('Stations '+seg.stations.replace(/,/g,', ')),seg.free_bus&&('Free bus: '+seg.free_bus),seg.shuttle&&('MRT shuttle: '+seg.shuttle)].filter(Boolean).join(' · '):(msg?msg.text:'');
+  return `<div class="mrt-row is-${esc(l.state)}" title="${esc((l.messages||[]).map(m=>m.text).join('\n'))}"><span class="mrt-line mrt-${esc(l.line)}">${esc(l.line)}</span><div class="mrt-txt"><b>${esc(LBL[l.state]||l.state)}</b><small>${esc(l.name)}${detail?' · '+esc(detail):''}</small></div></div>`;}).join('');}
 function paintCameraAI(){const box=$('crossings');const ai=state.mode==='demo'?null:cameraAI;
  document.querySelectorAll('[data-cam-level]').forEach(el=>{const r=ai?.cameras?.[el.dataset.camLevel];el.hidden=!r?.level;if(r?.level){el.className='cam-level '+(LEVEL_CLASS[r.level]||'');el.textContent=(r.source==='AI camera analytics'?'AI · ':'')+r.level.toUpperCase();el.title=r.source+(r.speed!=null?` · ${r.speed}–${r.free_speed} km/h`:'')+(r.confidence!=null?` · confidence ${Math.round(r.confidence*100)}%`:'');}});
  if(!box)return;const rows=ai?.crossings||[];box.hidden=!ai;if(!ai)return;if(!rows.length){box.innerHTML=`<div class="xing-off">${esc(cameraAIStatus(ai))}</div>`;return;}
@@ -289,5 +297,5 @@ document.addEventListener('visibilitychange',()=>{if(!document.hidden)fetchState
 document.addEventListener('error',e=>{if(e.target.tagName==='IMG'&&e.target.closest('.camera')){let parent=e.target.closest('.camera');parent.innerHTML='<div class="camera-empty">'+icon('camera')+'</div><p>Image unavailable from source</p>';}},true);
 document.querySelectorAll('[data-icon]').forEach(el=>el.innerHTML=icon(el.dataset.icon));clock();setInterval(clock,1000);controls();
 networkMap.init().then(kind=>{$('mapEngine').textContent=kind==='ml'?'Vector map · OpenStreetMap':'Basemap unavailable · geographic fallback';if(kind==='schematic'){$('map3D').disabled=true;$('map3D').title='3D requires WebGL and vector tiles';}});
-fetchState().then(loadCatalog);if(state.tv)tv(true);setInterval(()=>{if(!document.hidden&&!state.playing)fetchState();},60000);setInterval(()=>{if(state.data&&!document.hidden){state.page++;alerts(state.data);analytics(state.data);renderBoard(state.data);if(state.tv&&cameraRows.length)cameras(cameraRows,cameraMeta);}},12000);
+fetchState().then(()=>{loadCatalog();loadMRT();});setInterval(()=>{if(!document.hidden)loadMRT();},60000);if(state.tv)tv(true);setInterval(()=>{if(!document.hidden&&!state.playing)fetchState();},60000);setInterval(()=>{if(state.data&&!document.hidden){state.page++;alerts(state.data);analytics(state.data);renderBoard(state.data);if(state.tv&&cameraRows.length)cameras(cameraRows,cameraMeta);}},12000);
 window.SENTRY2026={state,map:networkMap,refresh:fetchState,tour:{state:spotlight,next:()=>advanceSpotlight(true)}};
