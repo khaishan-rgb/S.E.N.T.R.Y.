@@ -11,7 +11,7 @@
   var T = {
     en: {sub: "Operations Assistant", on: "online", off: "not set up", ph: "Ask about an alert, service or incident", send: "Send", mic: "Speak your question",
          micNo: "Voice input works in Chrome or Edge", listen: "Listening…", speaking: "Speaking", idle: "Ready", think: "Checking the live data…",
-         faces: {agent: "Agent", orb: "Orb", photo: "Photo"}, replay: "Replay", mute: "Mute voice", unmute: "Voice on", stop: "Stop",
+         faces: {agent: "Officer", orb: "Orb", photo: "Photo"}, replay: "Replay", mute: "Mute voice", unmute: "Voice on", stop: "Stop",
          min: "Minimise", big: "Bigger", small: "Smaller", you: "You", hello: "Hello, I'm HORIZON AI. Ask me about any alert, service or incident on this page and I'll explain why it happened and what to do.",
          foot: "Advisory only · answers from this page's data · the Service Controller decides", choose: "Choose photo", photoNote: "Use a picture you have permission to use. It stays in this browser only.",
          noPhoto: "No photo yet", fab: "Ask HORIZON AI", noVoice: "No voice for this language on this computer: showing text only.", idVoice: "No Malay voice on this computer: using an Indonesian voice.",
@@ -20,7 +20,7 @@
          err: "Could not get an answer", offMsg: "HORIZON AI is not set up yet: add ANTHROPIC_API_KEY in Render > Environment."},
     zh: {sub: "运营助理", on: "在线", off: "未设置", ph: "询问警报、巴士服务或事故", send: "发送", mic: "说出你的问题",
          micNo: "语音输入请使用 Chrome 或 Edge", listen: "正在聆听…", speaking: "正在说话", idle: "就绪", think: "正在查看实时数据…",
-         faces: {agent: "助理", orb: "光环", photo: "照片"}, replay: "重播", mute: "关闭语音", unmute: "开启语音", stop: "停止",
+         faces: {agent: "职员", orb: "光环", photo: "照片"}, replay: "重播", mute: "关闭语音", unmute: "开启语音", stop: "停止",
          min: "最小化", big: "放大", small: "缩小", you: "你", hello: "您好，我是 HORIZON AI。请问我本页上的任何警报、巴士服务或事故，我会解释原因和处理方法。",
          foot: "仅供参考 · 根据本页数据回答 · 由服务控制员决定", choose: "选择照片", photoNote: "请使用您有权使用的照片。照片只保存在此浏览器中。",
          noPhoto: "尚未选择照片", fab: "询问 HORIZON AI", noVoice: "此电脑没有中文语音：只显示文字。", idVoice: "",
@@ -29,7 +29,7 @@
          err: "无法取得回答", offMsg: "HORIZON AI 尚未设置：请在 Render > Environment 加入 ANTHROPIC_API_KEY。"},
     ms: {sub: "Pembantu Operasi", on: "dalam talian", off: "belum disediakan", ph: "Tanya tentang amaran, perkhidmatan atau insiden", send: "Hantar", mic: "Sebut soalan anda",
          micNo: "Input suara berfungsi dalam Chrome atau Edge", listen: "Sedang mendengar…", speaking: "Sedang bercakap", idle: "Sedia", think: "Sedang menyemak data langsung…",
-         faces: {agent: "Ejen", orb: "Orb", photo: "Foto"}, replay: "Main semula", mute: "Senyapkan suara", unmute: "Suara dihidupkan", stop: "Henti",
+         faces: {agent: "Pegawai", orb: "Orb", photo: "Foto"}, replay: "Main semula", mute: "Senyapkan suara", unmute: "Suara dihidupkan", stop: "Henti",
          min: "Kecilkan", big: "Besarkan", small: "Kecilkan saiz", you: "Anda", hello: "Helo, saya HORIZON AI. Tanya saya tentang sebarang amaran, perkhidmatan atau insiden di halaman ini, dan saya akan terangkan sebabnya dan apa yang perlu dibuat.",
          foot: "Nasihat sahaja · jawapan daripada data halaman ini · Pengawal Perkhidmatan yang memutuskan", choose: "Pilih foto", photoNote: "Gunakan gambar yang anda dibenarkan guna. Ia disimpan dalam pelayar ini sahaja.",
          noPhoto: "Belum ada foto", fab: "Tanya HORIZON AI", noVoice: "Tiada suara Bahasa Melayu pada komputer ini: teks sahaja.", idVoice: "Tiada suara Bahasa Melayu pada komputer ini: menggunakan suara Bahasa Indonesia.",
@@ -50,30 +50,120 @@
   var clock = function(){ return new Date().toLocaleTimeString("en-SG", {hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Asia/Singapore"}); };
 
   /* ---------------- faces ---------------- */
-  function agentSVG(){            // an original drawn agent with a headset; mouth and eyes are animated
-    return '<svg class="hai-agent" viewBox="0 0 200 200" aria-hidden="true">'
-      + '<defs><radialGradient id="haiBg" cx="50%" cy="38%" r="70%"><stop offset="0" stop-color="#16407a"/><stop offset="1" stop-color="#061631"/></radialGradient>'
-      + '<linearGradient id="haiSuit" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#14305a"/><stop offset="1" stop-color="#0a1b36"/></linearGradient></defs>'
-      + '<rect width="200" height="200" fill="url(#haiBg)"/>'
-      + '<path d="M30 200c4-34 26-52 52-58h36c26 6 48 24 52 58z" fill="url(#haiSuit)"/>'
-      + '<path d="M82 142l18 22 18-22" fill="none" stroke="#3fd3ff" stroke-width="2.4" stroke-linejoin="round"/>'
-      + '<path d="M88 124h24v20c0 6-24 6-24 0z" fill="#d9a988"/>'
-      + '<path d="M60 92c0-34 18-54 40-54s40 20 40 54c0 10-2 22-6 30l-6-26-56 0-6 26c-4-8-6-20-6-30z" fill="#1a1f2e"/>'
-      + '<ellipse cx="100" cy="96" rx="31" ry="37" fill="#e8bd9b"/>'
-      + '<path d="M68 88c4-22 18-32 34-32 14 0 26 8 31 24-12-8-26-12-40-10-10 2-18 8-25 18z" fill="#1a1f2e"/>'
-      + '<path d="M80 86q8-4 15 0M105 86q8-4 15 0" fill="none" stroke="#2a2230" stroke-width="2.2" stroke-linecap="round"/>'
-      + '<g class="blink"><ellipse cx="88" cy="95" rx="3.4" ry="4" fill="#1c2232"/><ellipse cx="112" cy="95" rx="3.4" ry="4" fill="#1c2232"/>'
-      + '<circle cx="89.2" cy="93.6" r="1" fill="#fff"/><circle cx="113.2" cy="93.6" r="1" fill="#fff"/></g>'
-      + '<path d="M100 99q-2 9 0 12h3" fill="none" stroke="#c48f70" stroke-width="1.6" stroke-linecap="round"/>'
-      + '<ellipse cx="82" cy="110" rx="6" ry="3.4" fill="#f09a8a" opacity=".28"/><ellipse cx="118" cy="110" rx="6" ry="3.4" fill="#f09a8a" opacity=".28"/>'
-      + '<g id="haiMouth"><path id="haiLipU" d="M91 118q9 -3 18 0" fill="none" stroke="#b5615a" stroke-width="2.2" stroke-linecap="round"/>'
-      + '<ellipse id="haiOpen" cx="100" cy="119.5" rx="7" ry="0.1" fill="#5a1f28"/>'
-      + '<path id="haiLipL" d="M91 118q9 4 18 0" fill="none" stroke="#b5615a" stroke-width="2.2" stroke-linecap="round"/></g>'
-      + '<path d="M62 96c0-30 16-46 38-46s38 16 38 46" fill="none" stroke="#2c3a56" stroke-width="5" stroke-linecap="round"/>'
-      + '<rect x="55" y="88" width="13" height="22" rx="6" fill="#2c3a56"/><rect x="132" y="88" width="13" height="22" rx="6" fill="#2c3a56"/>'
-      + '<rect x="57" y="92" width="4" height="14" rx="2" fill="#3fd3ff" opacity=".85"/>'
-      + '<path d="M62 109c2 12 10 18 24 17" fill="none" stroke="#2c3a56" stroke-width="3" stroke-linecap="round"/><rect x="84" y="123" width="8" height="5" rx="2.5" fill="#3fd3ff"/>'
-      + "</svg>";
+  /* Agent: an original drawn male operations officer in a white shirt with purple collar and shoulders and an orange
+     stripe (the SBS Transit uniform colours). He breathes, blinks, glances, raises his hand while he talks, and his
+     mouth takes the shape of the letters being spoken. k = id suffix for extra copies; mini = head only. */
+  function mouthD(o, w, r){        // o = open, w = wide, r = round (0..1) -> lip and mouth paths
+    var cx = 120, cy = 137.2, hw = 11.4 * (1 + .2 * w - .36 * r), h = .5 + 8.6 * o, s = 1.5 * (1 - o) * (1 - r);
+    var L = (cx - hw).toFixed(2) + " " + (cy - s).toFixed(2), R = (cx + hw).toFixed(2) + " " + (cy - s).toFixed(2), f = function(v){ return v.toFixed(2); };
+    var top = cy - h * .32, bot = cy + h * .68;
+    return {
+      cav: "M" + L + "Q" + cx + " " + f(top - .6) + " " + R + "Q" + cx + " " + f(bot + .8) + " " + L + "Z",
+      teeth: "M" + f(cx - hw * .72) + " " + f(top - .4) + "H" + f(cx + hw * .72) + "V" + f(top + Math.min(2.6, h * .42)) + "Q" + cx + " " + f(top + Math.min(3.2, h * .5)) + " " + f(cx - hw * .72) + " " + f(top + Math.min(2.6, h * .42)) + "Z",
+      up: "M" + L + "C" + f(cx - hw * .62) + " " + f(top - 3.6) + " " + f(cx - 2.2) + " " + f(top - 3.4) + " " + cx + " " + f(top - 2.5) + "C" + f(cx + 2.2) + " " + f(top - 3.4) + " " + f(cx + hw * .62) + " " + f(top - 3.6) + " " + R
+        + "Q" + cx + " " + f(top - .2) + " " + L + "Z",
+      lo: "M" + L + "Q" + cx + " " + f(bot + .9) + " " + R + "C" + f(cx + hw * .55) + " " + f(bot + 4.6) + " " + f(cx - hw * .55) + " " + f(bot + 4.6) + " " + L + "Z"
+    };
+  }
+  function agentSVG(k, mini){
+    k = k || "";
+    var id = function(n){ return ' id="hai' + n + k + '"'; }, u = function(n){ return "url(#hai" + n + k + ")"; }, m = mouthD(0, 0, 0);
+    var SK = "#e9b893", SKD = "#c98f6c", LINE = "#a8714f";
+    return '<svg class="hai-agent' + (mini ? " mini" : "") + '" viewBox="' + (mini ? "76 40 88 88" : "16 20 208 277") + '" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><defs>'
+      + '<radialGradient' + id("Bg") + ' cx="50%" cy="30%" r="80%"><stop offset="0" stop-color="#3b3f97"/><stop offset=".42" stop-color="#16205a"/><stop offset="1" stop-color="#050b1f"/></radialGradient>'
+      + '<radialGradient' + id("Glow") + ' cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#3fd3ff" stop-opacity=".32"/><stop offset="1" stop-color="#3fd3ff" stop-opacity="0"/></radialGradient>'
+      + '<radialGradient' + id("Skin") + ' cx="44%" cy="38%" r="70%"><stop offset="0" stop-color="#f7d6b8"/><stop offset=".62" stop-color="' + SK + '"/><stop offset="1" stop-color="' + SKD + '"/></radialGradient>'
+      + '<linearGradient' + id("Neck") + ' x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#b87b5a"/><stop offset=".55" stop-color="#d9a17e"/><stop offset="1" stop-color="#e3ad89"/></linearGradient>'
+      + '<linearGradient' + id("Arm") + ' x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#cf966f"/><stop offset=".5" stop-color="#ebbb96"/><stop offset="1" stop-color="#cf966f"/></linearGradient>'
+      + '<linearGradient' + id("Hair") + ' x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2f3445"/><stop offset="1" stop-color="#11131b"/></linearGradient>'
+      + '<linearGradient' + id("Shirt") + ' x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#b9bdcb"/><stop offset=".3" stop-color="#eef0f5"/><stop offset=".62" stop-color="#f8f9fc"/><stop offset="1" stop-color="#b5b9c8"/></linearGradient>'
+      + '<linearGradient' + id("Purple") + ' x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5a2a72"/><stop offset="1" stop-color="#3a1850"/></linearGradient>'
+      + '<clipPath' + id("EyeL") + '><path d="M96.6 98.4C100 94.6 109 94.1 113.4 97.9C109.2 101.2 100.8 101.5 96.6 98.4Z"/></clipPath>'
+      + '<clipPath' + id("EyeR") + '><path d="M143.4 98.4C140 94.6 131 94.1 126.6 97.9C130.8 101.2 139.2 101.5 143.4 98.4Z"/></clipPath>'
+      + '<clipPath' + id("Cav") + '><path' + id("CavClip") + ' d="' + m.cav + '"/></clipPath>'
+      + "</defs>"
+      + '<rect width="240" height="320" fill="' + u("Bg") + '"/>'
+      + '<circle cx="120" cy="104" r="96" fill="' + u("Glow") + '"/>'
+      + '<g class="breathe">'
+      // arms (skin below the sleeves)
+      + '<path d="M26 258C22 280 20 300 20 320H52C52 300 54 282 58 262Z" fill="' + u("Arm") + '"/>'
+      + '<path d="M214 258C218 280 220 300 220 320H188C188 300 186 282 182 262Z" fill="' + u("Arm") + '"/>'
+      // shirt with sleeves
+      + '<path d="M104 170C92 176 74 181 58 186C40 192 30 206 26 226L22 263C34 267 48 268 58 265L60 252C61 276 62 300 62 320H178C178 300 179 276 180 252L182 265C192 268 206 267 218 263L214 226C210 206 200 192 182 186C166 181 148 176 136 170C130 177 110 177 104 170Z" fill="' + u("Shirt") + '"/>'
+      + '<path d="M60 252C59 240 58 228 56 216M180 252C181 240 182 228 184 216" fill="none" stroke="#a3a8ba" stroke-width="1.1" opacity=".8"/>'
+      + '<path d="M22 263C34 267 48 268 58 265M182 265C192 268 206 267 218 263" fill="none" stroke="#8f95aa" stroke-width="1.3"/>'
+      + '<path d="M70 280C72 296 72 308 70 320M170 280C168 296 168 308 170 320" fill="none" stroke="#b4b9c8" stroke-width="1" opacity=".7"/>'
+      // purple raglan shoulders, orange stripe from collar to sleeve
+      + '<path d="M104 170C92 176 74 181 58 186C40 192 30 206 26 226L22 263C28 265 33 266 38 266C44 236 64 204 108 184Z" fill="' + u("Purple") + '"/>'
+      + '<path d="M136 170C148 176 166 181 182 186C200 192 210 206 214 226L218 263C212 265 207 266 202 266C196 236 176 204 132 184Z" fill="' + u("Purple") + '"/>'
+      + '<path d="M108 184C64 204 44 236 38 266M132 184C176 204 196 236 202 266" fill="none" stroke="#f28a1e" stroke-width="3.4" stroke-linecap="round"/>'
+      + '<path d="M60 190C76 186 92 180 102 174" fill="none" stroke="#7b4a96" stroke-width="1.2" opacity=".55"/><path d="M180 190C164 186 148 180 138 174" fill="none" stroke="#7b4a96" stroke-width="1.2" opacity=".55"/>'
+      // neck
+      + '<path d="M105 132V172C110 181 130 181 135 172V132Z" fill="' + u("Neck") + '"/>'
+      + '<path d="M105 148C112 158 128 158 135 148V136H105Z" fill="#9e6446" opacity=".32"/>'
+      + '<path d="M135 140V170M184 187C201 193 211 207 214.6 228" fill="none" stroke="#7fe0ff" stroke-width="1.2" opacity=".3"/>'
+      // collar and placket
+      + '<path d="M103 166C97 172 91 177 86 181L104 202L118 185C111 184 106 176 103 166Z" fill="' + u("Purple") + '"/>'
+      + '<path d="M137 166C143 172 149 177 154 181L136 202L122 185C129 184 134 176 137 166Z" fill="' + u("Purple") + '"/>'
+      + '<path d="M104 202L118 185M136 202L122 185" fill="none" stroke="#24102f" stroke-width=".9" opacity=".6"/>'
+      + '<path d="M115.5 185H124.5V228H115.5Z" fill="#e6e8ef" stroke="#c5c9d6" stroke-width=".8"/>'
+      + '<circle cx="120" cy="196" r="1.5" fill="#9aa0b4"/><circle cx="120" cy="212" r="1.5" fill="#9aa0b4"/>'
+      // name badge
+      + '<rect x="131" y="222" width="30" height="10" rx="2" fill="#0c1a36"/><rect x="133" y="224.6" width="4.6" height="4.6" rx="1" fill="#3fd3ff"/>'
+      + '<text x="140" y="229.4" font-family="Rajdhani,Arial,sans-serif" font-size="5.6" font-weight="700" fill="#e8f4ff" textLength="19" lengthAdjust="spacingAndGlyphs">HORIZON</text>'
+      // head
+      + '<g class="head">'
+      + '<path d="M85 101C77 96 72 104 74 113C76 122 82 126 88 123Z" fill="' + SKD + '"/><path d="M84 105C80 104 78 110 80 115" fill="none" stroke="' + LINE + '" stroke-width="1" opacity=".7"/>'
+      + '<path d="M155 101C163 96 168 104 166 113C164 122 158 126 152 123Z" fill="' + SKD + '"/><path d="M156 105C160 104 162 110 160 115" fill="none" stroke="' + LINE + '" stroke-width="1" opacity=".7"/>'
+      + '<path d="M84 94C84 66 99 50 120 50C141 50 156 66 156 94C156 116 152 131 143 142C135 151 127 155.5 120 155.5C113 155.5 105 151 97 142C88 131 84 116 84 94Z" fill="' + u("Skin") + '"/>'
+      + '<path d="M90 126C96 142 108 152 120 152.5C132 152 144 142 150 126C146 146 134 156 120 156C106 156 94 146 90 126Z" fill="#b98063" opacity=".35"/>'
+      + '<path d="M84.6 96C85 116 90 132 99 143C92 128 88.6 112 89.6 96Z" fill="#a8694a" opacity=".22"/><path d="M155.4 96C155 116 150 132 141 143C148 128 151.4 112 150.4 96Z" fill="#a8694a" opacity=".22"/>'
+      + '<path d="M101 106C104 108 109 108.6 112 107.6M139 106C136 108 131 108.6 128 107.6" fill="none" stroke="#b87a5a" stroke-width=".8" opacity=".2"/>'
+      + '<ellipse cx="108" cy="76" rx="13" ry="5" fill="#fff" opacity=".1"/>'
+      // hair: short cut, side part, swept to one side
+      + '<path d="M86 100C82 84 83 66 92 54C100 44 112 39 124 39.5C140 40 152 47 157 60C161 72 160 88 156 100L153.6 99C153 90 152 82 149.4 76.6C146 70 139 65.6 129 64.6C118 63.8 107 65 99.6 69C94 72.6 91 79 90 86.6L88.6 100Z" fill="' + u("Hair") + '"/>'
+      + '<path d="M91 84C93 70 101 60 113 55C127 50 145 52 153 61C157.6 66.6 158.6 73 157.6 81C152.6 71 143.6 64.6 130 63.6C117 62.8 105 65.4 98 70.6C94.6 73.4 92.4 78 91 84Z" fill="#283044"/>'
+      + '<path d="M104 47C116 42.6 133 43 145 49.6C150 52.4 154 56.6 156 62C150 55 140 50.6 128 49.6C118 48.8 110 49.6 104 52Z" fill="#4a5470" opacity=".55"/>'
+      + '<path d="M100 51C108 47 122 46 134 48.6M97 58C108 52.6 124 51.4 140 54.6M104 63C116 58.6 132 58.4 148 62.6M94 70C102 64 112 61 122 60.4" fill="none" stroke="#6a7592" stroke-width="1.1" stroke-linecap="round" opacity=".45"/>'
+      + '<path d="M101.6 47.6C99.4 52 98.4 57 98.8 62" fill="none" stroke="#0a0c12" stroke-width="1.1" opacity=".7"/>'
+      + '<path d="M86.6 96L88.6 108L90.2 107.4L89.6 95ZM153.4 96L151.4 108L149.8 107.4L150.4 95Z" fill="#1b1e29" opacity=".85"/>'
+      // brows
+      + '<g class="brows"><path d="M95.5 88.6C100.5 84.2 108 83.4 114 85.6L113.6 89.2C107.8 87.6 101.6 88.4 96.6 91.2Z" fill="#1d1a20"/>'
+      + '<path d="M144.5 88.6C139.5 84.2 132 83.4 126 85.6L126.4 89.2C132.2 87.6 138.4 88.4 143.4 91.2Z" fill="#1d1a20"/></g>'
+      // eyes
+      + '<g class="blink">'
+      + '<path d="M96.6 98.4C100 94.6 109 94.1 113.4 97.9C109.2 101.2 100.8 101.5 96.6 98.4Z" fill="#f3efea"/>'
+      + '<g clip-path="' + u("EyeL") + '"><g class="iris"><circle cx="105.2" cy="97.8" r="3.9" fill="#4a2f1d"/><circle cx="105.2" cy="97.8" r="2.1" fill="#120c09"/><circle cx="106.6" cy="96.5" r=".95" fill="#fff"/></g></g>'
+      + '<path d="M96 98.6C99.6 93.8 109.2 93.2 114 97.6" fill="none" stroke="#1e1612" stroke-width="1.6" stroke-linecap="round"/>'
+      + '<path d="M98.6 100.4C102.4 101.6 108.6 101.4 112 99.6" fill="none" stroke="' + LINE + '" stroke-width=".7" opacity=".7"/>'
+      + '<path d="M143.4 98.4C140 94.6 131 94.1 126.6 97.9C130.8 101.2 139.2 101.5 143.4 98.4Z" fill="#f3efea"/>'
+      + '<g clip-path="' + u("EyeR") + '"><g class="iris"><circle cx="134.8" cy="97.8" r="3.9" fill="#4a2f1d"/><circle cx="134.8" cy="97.8" r="2.1" fill="#120c09"/><circle cx="136.2" cy="96.5" r=".95" fill="#fff"/></g></g>'
+      + '<path d="M144 98.6C140.4 93.8 130.8 93.2 126 97.6" fill="none" stroke="#1e1612" stroke-width="1.6" stroke-linecap="round"/>'
+      + '<path d="M141.4 100.4C137.6 101.6 131.4 101.4 128 99.6" fill="none" stroke="' + LINE + '" stroke-width=".7" opacity=".7"/>'
+      + "</g>"
+      + '<path d="M97 92.6C101 91 108 90.8 112 92.2M143 92.6C139 91 132 90.8 128 92.2" fill="none" stroke="' + LINE + '" stroke-width=".7" opacity=".45"/>'
+      // nose
+      + '<path d="M118 100C117 108 115.4 115 113.6 120.6" fill="none" stroke="' + LINE + '" stroke-width="1.1" opacity=".45" stroke-linecap="round"/>'
+      + '<path d="M112.6 121.6C114.6 125.6 125.4 125.6 127.4 121.6" fill="none" stroke="' + LINE + '" stroke-width="1.3" stroke-linecap="round"/>'
+      + '<ellipse cx="116" cy="123.2" rx="1.9" ry="1" fill="#8f5a40" opacity=".55"/><ellipse cx="124" cy="123.2" rx="1.9" ry="1" fill="#8f5a40" opacity=".55"/>'
+      + '<ellipse cx="121" cy="117" rx="2.2" ry="3" fill="#fff" opacity=".14"/>'
+      + '<ellipse cx="100" cy="117" rx="7" ry="4" fill="#e28d77" opacity=".14"/><ellipse cx="140" cy="117" rx="7" ry="4" fill="#e28d77" opacity=".14"/>'
+      // mouth
+      + '<g' + id("Mouth") + ' data-open="0"><path' + id("Open") + ' d="' + m.cav + '" fill="#4a1a22"/>'
+      + '<path' + id("Teeth") + ' d="' + m.teeth + '" fill="#f4efe8" clip-path="' + u("Cav") + '"/>'
+      + '<path' + id("LipU") + ' d="' + m.up + '" fill="#b06a5a"/><path' + id("LipL") + ' d="' + m.lo + '" fill="#c07d6b"/>'
+      + '<path d="M115 143.6C118 145 122 145 125 143.6" fill="none" stroke="#fff" stroke-width=".8" opacity=".22"/></g>'
+      + '<path d="M113 130.2C116 131 124 131 127 130.2" fill="none" stroke="' + LINE + '" stroke-width=".7" opacity=".35"/>'
+      + "</g>"
+      // gesturing forearm and hand (rotates up from the elbow while he talks)
+      + '<g class="fore">'
+      + '<path d="M34 306C46 286 62 264 77 245L95 255C83 273 69 295 59 314Z" fill="' + u("Arm") + '"/><path d="M59 314C69 295 83 273 95 255" fill="none" stroke="#b97e5c" stroke-width="1" opacity=".5"/>'
+      + '<g transform="rotate(-14 94 246)">'
+      + '<path d="M80 246C82 236 84 226 87 218C88 214 92 214 92.6 218L92 230L95 214C96 209.6 100.4 210 100.6 214.4L99 232L102.6 217C103.8 213 108 213.8 107.6 218L104.6 236L107.6 225C108.8 221.6 112.6 222.6 112.2 226L108.4 246C107 254 100 260 92 258L84 254C80 252 78 250 80 246Z" fill="#ebbb96" stroke="' + LINE + '" stroke-width=".8"/>'
+      + '<path d="M80 246C76 240 72 234 71 229C70 225 74 223 77 226L84 236" fill="#e2ad87" stroke="' + LINE + '" stroke-width=".8"/>'
+      + '<path d="M92 230L91.6 238M99 232L98.2 240M104.6 236L103 242" fill="none" stroke="' + LINE + '" stroke-width=".7" opacity=".6"/>'
+      + "</g></g>"
+      + "</g></svg>";
   }
   function orbSVG(){
     return '<svg class="hai-orb" viewBox="0 0 200 200" aria-hidden="true"><defs><radialGradient id="haiCore" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#eef9ff"/><stop offset=".35" stop-color="#3fd3ff"/><stop offset="1" stop-color="#1f8fff" stop-opacity="0"/></radialGradient></defs>'
@@ -87,7 +177,7 @@
     var src = store("photo");
     return src ? '<img id="haiImg" alt="" src="' + esc(src) + '">' : '<div class="hai-nophoto">' + esc(t("noPhoto")) + "</div>";
   }
-  function faceHTML(){ return S.face === "orb" ? orbSVG() : S.face === "photo" ? photoHTML() : agentSVG(); }
+  function faceHTML(mini){ return S.face === "orb" ? orbSVG() : S.face === "photo" ? photoHTML() : mini ? agentSVG("Fab", true) : agentSVG(); }
 
   /* ---------------- panel ---------------- */
   var css = document.createElement("style");
@@ -131,10 +221,11 @@
       + (S.face === "photo" ? '<label class="hai-btn" for="haiFile" style="cursor:pointer">' + esc(t("choose")) + '</label><input type="file" id="haiFile" accept="image/*" hidden>' : "");
     $("haiNote").textContent = S.face === "photo" ? t("photoNote") : (S.voiceNote || "");
     say(S.speaking);
-    fab.innerHTML = '<span class="mini">' + faceHTML() + "</span>" + esc(t("fab"));
+    fab.innerHTML = '<span class="mini">' + faceHTML(true) + "</span>" + esc(t("fab"));
     fab.hidden = S.open; el.hidden = !S.open;
   }
-  function drawFace(){ $("haiFace").innerHTML = faceHTML(); }
+  function drawFace(){ var f = $("haiFace"); f.innerHTML = faceHTML(); f.classList.toggle("tall", S.face === "agent"); talk(S.speaking); }
+  function talk(on){ var a = document.querySelector("#haiFace .hai-agent"); if(a) a.classList.toggle("talk", !!on); }
   function say(on){
     var s = $("haiSay"); if(!s) return;
     s.classList.toggle("on", !!on); s.lastChild.textContent = S.listening ? t("listen") : on ? t("speaking") : t("idle");
@@ -235,14 +326,29 @@
 
   /* ---------------- voice out ---------------- */
   var synth = window.speechSynthesis || null, queue = [], anim = 0;
-  function pickVoice(){
-    if(!synth) return null;
-    var vs = synth.getVoices() || [], want = {en: ["en-SG", "en-GB", "en-AU", "en-US", "en"], zh: ["zh-CN", "zh-SG", "cmn", "zh-TW", "zh"], ms: ["ms-MY", "ms"]}[S.lang];
+  // male voice names in Chrome, Edge, Windows and Apple (the Officer face is a man; Orb and Photo take the most natural voice)
+  var MALE = /\bmale\b|ryan|wayne|guy|davis|tony|jason|christopher|eric|andrew|brian|roger|steffan|william|thomas|liam|george|oliver|james|daniel|aaron|alex|fred|rishi|prabhat|david|mark|yunxi|yunjian|yunyang|yunxia|yunze|kangkang|osman|ardi|danny|reed|rocko|grandpa/i;
+  function chooseVoice(lang, face){
+    if(!synth) return {v: null, how: "none"};
+    var vs = synth.getVoices() || [], want = {en: ["en-SG", "en-GB", "en-AU", "en-US", "en"], zh: ["zh-CN", "zh-SG", "cmn", "zh-TW", "zh"], ms: ["ms-MY", "ms"]}[lang] || ["en"];
     var find = function(p){ return vs.filter(function(v){ return (v.lang || "").replace("_", "-").toLowerCase().indexOf(p.toLowerCase()) === 0; }); };
-    for(var i = 0; i < want.length; i++){ var hit = find(want[i]); if(hit.length){ S.voiceNote = ""; return hit.find(function(v){ return /natural|neural|google|online/i.test(v.name); }) || hit[0]; } }
-    if(S.lang === "ms"){ var id = find("id"); if(id.length){ S.voiceNote = t("idVoice"); return id[0]; } }
-    S.voiceNote = vs.length ? t("noVoice") : "";
-    return null;
+    var nice = function(v){ return /natural|neural|google|online|premium|enhanced/i.test(v.name); };
+    var male = function(v){ return MALE.test(v.name) && !/female/i.test(v.name); };
+    var best = function(hit){
+      if(face === "agent") return hit.find(function(v){ return male(v) && nice(v); }) || hit.find(male) || hit.find(nice) || hit[0];
+      return hit.find(nice) || hit[0];
+    };
+    var all = [], i;
+    for(i = 0; i < want.length; i++) all = all.concat(find(want[i]).filter(function(v){ return all.indexOf(v) < 0; }));
+    if(face === "agent" && all.length && !all.some(male)){ for(i = 0; i < want.length; i++){ var h0 = find(want[i]); if(h0.length) return {v: best(h0), how: "ok", male: false}; } }
+    for(i = 0; i < want.length; i++){ var hit = find(want[i]); if(hit.length){ var pick = face === "agent" && all.some(male) ? best(all) : best(hit); return {v: pick, how: "ok", male: male(pick)}; } }
+    if(lang === "ms"){ var id = find("id"); if(id.length){ var b2 = best(id); return {v: b2, how: "id", male: male(b2)}; } }
+    return {v: null, how: vs.length ? "none" : "wait"};
+  }
+  function pickVoice(){
+    var c = chooseVoice(S.lang, S.face);
+    S.voiceNote = c.how === "id" ? t("idVoice") : c.how === "none" ? t("noVoice") : "";
+    return c.v;
   }
   function speak(text){
     if(!synth || S.mute) return;
@@ -257,16 +363,16 @@
     if(!queue.length){ setSpeaking(false); return; }
     var u = new SpeechSynthesisUtterance(queue.shift()), v = pickVoice();
     if(v){ u.voice = v; u.lang = v.lang; } else u.lang = STT[S.lang];
-    u.rate = S.lang === "en" ? 1.02 : 1; u.pitch = 1.05;
-    u.onstart = function(){ setSpeaking(true); };
-    u.onboundary = function(){ S.kick = 1; };
+    u.rate = S.lang === "en" ? 1.02 : 1; u.pitch = S.face === "agent" ? 1 : 1.05;
+    u.onstart = function(){ S.cur = {text: u.text, t0: performance.now(), i0: 0}; setSpeaking(true); };
+    u.onboundary = function(e){ S.kick = 1; if(S.cur && e && typeof e.charIndex === "number" && e.name !== "sentence"){ S.cur.i0 = e.charIndex; S.cur.t0 = performance.now(); } };
     u.onend = function(){ next(); };
     u.onerror = function(){ next(); };
     synth.speak(u);
   }
   function stopSpeaking(){ queue = []; if(synth){ try{ synth.cancel(); }catch(e){} } setSpeaking(false); }
   function setSpeaking(on){
-    S.speaking = on; say(on);
+    S.speaking = on; say(on); talk(on);
     if(on && !anim) anim = requestAnimationFrame(tick);
   }
   function tick(ts){
@@ -276,11 +382,38 @@
     render(S.level);
     if(S.speaking || S.level > .01) anim = requestAnimationFrame(tick); else { anim = 0; render(0); }
   }
+  // mouth shape for the letter being spoken now: [open, wide, round]. The browser does not say which sound is playing,
+  // so the position is estimated from the speaking rate and corrected at every word the voice reports.
+  function viseme(lv){
+    var c = S.cur; if(!S.speaking || !c) return [0, 0, 0];
+    var cps = S.lang === "zh" ? 4.4 : 13.5, pos = c.i0 + (performance.now() - c.t0) * cps / 1000, i = Math.floor(pos), f = pos - i;
+    if(i >= c.text.length) return [.15 + lv * .55, .25, 0];
+    var ch = c.text.charAt(i).toLowerCase();
+    if(S.lang === "zh"){
+      if(/[\s，。！？、,.!?：:；;（）()]/.test(ch)) return [.04, 0, 0];
+      var o = .15 + .75 * Math.sin(Math.PI * f), kind = ch.charCodeAt(0) % 3;
+      return kind === 0 ? [o, .25, 0] : kind === 1 ? [o * .65, .8, 0] : [o * .75, 0, .85];
+    }
+    if(/[aáàâä]/.test(ch)) return [.85, .3, 0];
+    if(/[eéèiíy]/.test(ch)) return [.42, .85, 0];
+    if(/[oóòuúw]/.test(ch)) return [.6, 0, .9];
+    if(/[mbp]/.test(ch)) return [0, .1, 0];
+    if(/[fv]/.test(ch)) return [.1, .35, 0];
+    if(/[a-z0-9]/.test(ch)) return [.28, .3, 0];
+    return [.04, 0, 0];
+  }
   function render(lv){
     var f = $("haiFace"); if(f) f.style.setProperty("--lv", lv.toFixed(3));
-    var o = $("haiOpen"); if(o){ o.setAttribute("ry", (0.1 + lv * 6.2).toFixed(2)); }
-    var lu = $("haiLipU"), ll = $("haiLipL");
-    if(lu && ll){ lu.setAttribute("d", "M91 " + (118 - lv * 2.5).toFixed(2) + "q9 " + (-3 - lv * 2).toFixed(2) + " 18 0"); ll.setAttribute("d", "M91 " + (118 + lv * 2.5).toFixed(2) + "q9 " + (4 + lv * 5).toFixed(2) + " 18 0"); }
+    var mo = $("haiMouth");
+    if(mo){
+      var v = viseme(lv), now = performance.now(), dt = Math.min(250, now - (S.mt || now)), a1 = 1 - Math.exp(-dt / 45), a2 = 1 - Math.exp(-dt / 60);
+      S.mt = now;                                                   // smoothing by time, so a slow PC shows the same shapes
+      S.mo = (S.mo || 0) + (v[0] - (S.mo || 0)) * a1; S.mw = (S.mw || 0) + (v[1] - (S.mw || 0)) * a2; S.mr = (S.mr || 0) + (v[2] - (S.mr || 0)) * a2;
+      if(!S.speaking && lv <= .011){ S.mo = S.mw = S.mr = 0; }
+      var d = mouthD(S.mo, S.mw, S.mr);
+      $("haiOpen").setAttribute("d", d.cav); $("haiCavClip").setAttribute("d", d.cav); $("haiTeeth").setAttribute("d", d.teeth);
+      $("haiLipU").setAttribute("d", d.up); $("haiLipL").setAttribute("d", d.lo); mo.setAttribute("data-open", S.mo.toFixed(2));
+    }
     var c = $("haiCoreC"), w = $("haiWave"); if(c){ c.setAttribute("r", (34 + lv * 10).toFixed(1)); } if(w){ w.setAttribute("r", (44 + lv * 26).toFixed(1)); w.setAttribute("opacity", (lv * .8).toFixed(2)); }
     var bars = document.querySelectorAll("#haiSay .hai-bars i");
     for(var i = 0; i < bars.length; i++) bars[i].style.height = (3 + lv * (6 + 5 * Math.abs(Math.sin(i * 1.7 + performance.now() / 120)))).toFixed(1) + "px";
@@ -350,6 +483,7 @@
   setTimeout(function(){ clearInterval(sugWait); }, 60000);
   setInterval(suggestions, 30000);
   window.HORIZON_AI = {ask: ask, speak: speak, stop: stopSpeaking, state: S, snapshot: snapshot, setFace: function(f){ S.face = f; store("face", f); drawFace(); words(); }, setLang: function(l){ $("haiLang").value = l; $("haiLang").dispatchEvent(new Event("change")); },
-    faceSVG: function(f){ return f === "orb" ? orbSVG() : agentSVG(); }, setPhoto: setPhoto,
+    voiceFor: function(lang, face){ return chooseVoice(lang, face || S.face); },
+    faceSVG: function(f, k, mini){ return f === "orb" ? orbSVG() : agentSVG(k, mini); }, setPhoto: setPhoto,
     open: function(on){ S.open = on !== false; store("open", S.open ? "1" : "0"); words(); }};
 })();

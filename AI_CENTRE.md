@@ -1,4 +1,4 @@
-# AI Operations Centre (HORIZON AI) - 08 Nov 2026
+# AI Operations Centre (HORIZON AI) - 08 Nov 2026 (officer face updated 13:50)
 
 A new page, **/ai-centre** (menu: COMMAND > AI Operations Centre). It is a copy of the Forecast Centre with a
 talking assistant, **HORIZON AI**, docked on the right. Controllers ask about any alert, service or incident and get
@@ -14,7 +14,11 @@ The Forecast Centre page (/command, /forecast) is unchanged apart from one new t
 - **Advisory only.** It never changes anything. Anything that changes service is marked "Service Controller approval".
   In demo mode it says the data is simulated.
 - **Three faces**, picked in the panel:
-  - **Agent**: a drawn control-room agent with a headset. She blinks and her mouth moves with the voice.
+  - **Officer** (default): a drawn male operations officer, head to waist, in the SBS uniform colours (white shirt,
+    purple collar and shoulders, orange stripe). He breathes, blinks and glances around. When he talks his hand comes
+    up and his mouth takes the shape of the letters being spoken. He uses a male voice where the browser has one:
+    Edge on Windows has Wayne (English, Singapore), Yunxi (Mandarin) and Osman (Malay); Chrome has a male English
+    voice only.
   - **Orb**: an abstract AI core. The rings turn and the core pulses with the voice.
   - **Photo**: a picture chosen in the panel (Choose photo). Only use a picture you have permission to use.
     It is kept in that browser only. To give everyone the same photo, upload it as `brand/assistant-face.webp`
