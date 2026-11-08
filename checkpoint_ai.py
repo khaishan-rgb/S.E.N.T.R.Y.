@@ -6,6 +6,10 @@ How it works
   direction (towards Johor, towards Singapore). Only when ANTHROPIC_API_KEY is set.
 - Without the key (or if the AI call fails) the level comes from LTA Traffic Speed Bands near the camera (app.py),
   never from TomTom (its daily cap is shared with the Forecast Centre traffic layer). Otherwise no level is shown (never guessed).
+- Directions: the AI is told that all four checkpoint cameras stand on the Singapore side, that a camera's name says where it LOOKS
+  (not where its traffic goes), and the confirmed view of camera 4703 (the lorry queue beside the sea is arriving INTO Singapore).
+  It says which part of the photo it read for each direction (sg_where / jb_where). A controller can swap a camera's two
+  directions for everyone (app.py stores it; CAMERA_AI_SWAP=2701,... sets defaults).
 - Crossing time = typical time for that level (CROSSING_MIN). It is an estimate, labelled as such: the cameras show the
   road queue, not the immigration hall.
 - Cost control: AI reads only the 4 checkpoint photos, shrunk (app.py), once per CAMERA_AI_EVERY_MIN (15) for everyone,
@@ -35,6 +39,23 @@ CROSSINGS = [
     {"id": "tuas", "name": "Tuas", "cams": ["4703", "4713"]},
 ]
 CHECKPOINT_IDS = {c for x in CROSSINGS for c in x["cams"]}
+
+# Which way the traffic in each checkpoint photo is going. All four cameras stand on the SINGAPORE side of the crossing. LTA's camera
+# names ("Woodlands Causeway (Towards Johor)") say which way the camera LOOKS, not which way the traffic goes, and without this the AI
+# guessed - camera 4703 had the lorry queue entering Singapore labelled "to Johor" (controller report, 30 Oct 2026).
+VIEW_RULE = ("All four checkpoint cameras stand on the Singapore side of the crossing. A camera name such as \"(Towards Johor)\" says "
+             "which way the camera LOOKS, not which way the traffic goes. to_sg = vehicles coming off the Causeway / Second Link "
+             "towards the Singapore checkpoint (arriving in Singapore). to_jb = vehicles coming from Singapore's roads towards the "
+             "checkpoint and the bridge (leaving for Johor). A queue belongs to the direction its vehicles travel in: judge it by "
+             "which way the vehicles face. If you cannot tell which way a road's traffic is going, use null for that direction "
+             "rather than guessing.")
+VIEWS = {   # confirmed views of individual cameras (from controllers who know the site)
+    "4703": ("Tuas Second Link, Singapore side. The long straight multi-lane road beside the sea, where lorries queue nose to "
+             "tail towards the checkpoint, is traffic ARRIVING INTO SINGAPORE from the Second Link bridge: read it as to_sg. "
+             "Give to_jb only if you can clearly see traffic leaving Singapore towards the bridge; otherwise to_jb is null."),
+}
+# Cameras whose two directions a controller has swapped (app.py loads these from the database; CAMERA_AI_SWAP gives defaults).
+SWAPPED = {x.strip() for x in os.environ.get("CAMERA_AI_SWAP", "").split(",") if x.strip()}
 # Typical door-to-door crossing time (approach road + bridge + checkpoint) for each level, minutes.
 CROSSING_MIN = {"Smooth": 15, "Medium": 30, "Jam": 60, "Super Jam": 90}
 
@@ -119,16 +140,41 @@ def worst(levels):
 def prompt(cams):
     lines = []
     for i, c in enumerate(cams):
-        where = c.get("desc") or c.get("label") or ("Camera " + str(c["id"]))
-        lines.append(f"Image {i + 1}: camera {c['id']} - {where}" + (" (Singapore-Johor border crossing)" if c["id"] in CHECKPOINT_IDS else ""))
+        cid = str(c["id"])
+        where = c.get("desc") or c.get("label") or ("Camera " + cid)
+        lines.append(f"Image {i + 1}: camera {cid} - {where}" + (" (Singapore-Johor border crossing)" if cid in CHECKPOINT_IDS else "")
+                     + (" - VIEW: " + VIEWS[cid] if cid in VIEWS else ""))
+    has_cp = any(str(c["id"]) in CHECKPOINT_IDS for c in cams)
     return ("You are a traffic analyst for a Singapore bus operations centre. Below are " + str(len(cams)) +
             " still images from LTA expressway traffic cameras, in order.\n" + "\n".join(lines) +
             "\n\nFor each image judge how congested the road is from vehicle density, queue length and spacing. "
             "Use exactly one of: Smooth, Medium, Jam, Super Jam (Super Jam = stationary queue filling the carriageway). "
             "For border-crossing images also judge each direction separately where visible: to_jb (traffic heading to Johor) and "
-            "to_sg (traffic heading into Singapore); use null if that direction is not visible. If an image is unreadable "
-            "(dark, blurred, frozen) use null for level.\n"
-            'Reply with JSON only: [{"image":1,"level":"Medium","to_jb":null,"to_sg":null,"confidence":0.7}, ...]')
+            "to_sg (traffic heading into Singapore); use null if that direction is not visible. For each direction you give, say in "
+            "a few words which part of the photo you read (sg_where, jb_where), e.g. \"lorry queue along the sea, top\". "
+            + ("\nDirections at the checkpoints: " + VIEW_RULE + "\n" if has_cp else "") +
+            "If an image is unreadable (dark, blurred, frozen) use null for level.\n"
+            'Reply with JSON only: [{"image":1,"level":"Medium","to_jb":null,"to_sg":"Jam","sg_where":"lorry queue, top","jb_where":null,'
+            '"confidence":0.7}, ...]')
+
+
+def _where(v):
+    v = " ".join(str(v).split())[:80] if v not in (None, "", "null") else ""
+    return v or None
+
+
+def swap_dirs(cid, res):
+    """A camera whose directions a controller swapped: exchange to_jb / to_sg (and where each was read). Cached readings stay raw,
+    so a swap (or undoing it) takes effect at once."""
+    if str(cid) not in SWAPPED or not res or not (res.get("to_jb") or res.get("to_sg")):
+        return res
+    out = dict(res, to_jb=res.get("to_sg"), to_sg=res.get("to_jb"), swapped=True)
+    for a, b in (("jb_where", "sg_where"), ("sg_where", "jb_where")):
+        if b in res:
+            out[a] = res[b]
+        else:
+            out.pop(a, None)
+    return out
 
 
 def parse_reply(text, n):
@@ -162,6 +208,10 @@ def parse_reply(text, n):
         except (TypeError, ValueError):
             conf = None
         out[i] = {"level": norm_level(r.get("level")), "to_jb": norm_level(r.get("to_jb")), "to_sg": norm_level(r.get("to_sg")), "confidence": conf}
+        for k, d in (("sg_where", "to_sg"), ("jb_where", "to_jb")):
+            w = _where(r.get(k))
+            if w and out[i][d]:
+                out[i][k] = w
     return out
 
 
@@ -283,7 +333,9 @@ async def analyse(cams, fetch_image=None, ask_model=None, flow=None, now=None, f
     if len(_CACHE) > 500:
         for k in sorted(_CACHE, key=lambda k: _CACHE[k][0])[:200]:
             _CACHE.pop(k, None)
+    results = {cid: swap_dirs(cid, r) for cid, r in results.items()}
     return {"cameras": results, "crossings": crossings(results), "ai": bool(ask_model), "ai_paused": STATUS.get("paused"),
+            "swapped": sorted(SWAPPED & CHECKPOINT_IDS),
             "ai_usage": {"calls_today": STATUS.get("calls_today", 0), "daily_cap": AI_DAILY_CAP, "every_min": CACHE_S // 60, "hours": list(AI_HOURS)},
             "note": "Estimate from camera stills (road queue only, not the immigration hall). Level: Smooth / Medium / Jam / Super Jam.",
             "error": error, "updated": now}

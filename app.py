@@ -70,29 +70,8 @@ _sem = None
 def client():
     global _client
     if _client is None:
-        _client = httpx.AsyncClient(timeout=httpx.Timeout(20.0, connect=10.0, pool=15.0))
+        _client = httpx.AsyncClient(timeout=httpx.Timeout(20.0, connect=10.0))
     return _client
-
-
-NET = {"fails": 0, "resets": 0, "reset_at": 0.0}     # V17.3: consecutive network failures to LTA; the HTTP client is rebuilt when it gets stuck
-
-
-def net_fail():
-    """A connection-level failure (timeout, reset, pool exhausted). After 4 in a row the shared HTTP client is replaced:
-    a wedged connection pool otherwise keeps failing every request until the server restarts."""
-    global _client
-    NET["fails"] += 1
-    if NET["fails"] >= 4 and time.time() - NET["reset_at"] > 60 and _client is not None:
-        old, _client = _client, None
-        NET.update(fails=0, resets=NET["resets"] + 1, reset_at=time.time())
-        try:
-            asyncio.get_running_loop().create_task(old.aclose())
-        except Exception:
-            pass
-
-
-def net_ok():
-    NET["fails"] = 0
 
 
 def sem():
@@ -104,7 +83,6 @@ def sem():
 
 # --------------------------------------------------------------------------- caching
 CACHE = {}   # key -> (expires_at, stored_at, value)
-CACHE_TIMEOUT_S = 150       # one refresh of a cached feed (e.g. all speed-band pages) may take at most this long
 LOCKS = {}
 
 
@@ -120,14 +98,7 @@ async def cached(key, factory):
         hit = CACHE.get(key)
         if hit and hit[0] > now:
             return hit[2]
-        try:
-            val, ttl, ok = await asyncio.wait_for(factory(), timeout=CACHE_TIMEOUT_S)
-        except asyncio.TimeoutError:
-            # V17.3: a hung feed used to keep this lock forever, so the feed stayed 'unavailable' until a restart. Give up, keep the last good data, retry soon.
-            if hit:
-                CACHE[key] = (now + TTL_NEGATIVE, hit[1], hit[2])
-                return hit[2]
-            raise
+        val, ttl, ok = await factory()
         if ok:
             CACHE[key] = (now + ttl, now, val)
             return val
@@ -157,18 +128,14 @@ async def get_lta(path, params=None, retries=1):
                 continue
             r.raise_for_status()
             j = r.json()
-            net_ok()
             return j if isinstance(j, dict) else {"value": j}
         except httpx.HTTPStatusError as e:
-            net_ok()
             code = e.response.status_code
             last = {"value": [], "_error": f"{path}: HTTP {code}", "_status": code}
             if code not in (429, 500, 502, 503, 504):
                 break
         except Exception as e:
             last = {"value": [], "_error": f"{path}: {type(e).__name__}", "_status": -1}
-            if isinstance(e, (httpx.TransportError, asyncio.TimeoutError)):
-                net_fail()
             if attempt < retries:
                 await asyncio.sleep(0.6)
     return last
@@ -2618,13 +2585,13 @@ import halfway
 import bisect
 
 HO = {"params": dict(halfway.PARAMS), "points": []}
-HO_INT = ("n_trips", "reg_window", "recover_points", "reg_min_side", "reg_even_share", "max_disrupted", "balance_trips", "allow_adjacent_halfway", "term_reg", "term_zone")
+HO_INT = ("n_trips", "reg_window", "recover_points", "reg_min_side", "reg_even_share", "max_disrupted", "balance_trips", "allow_adjacent_halfway", "term_reg", "term_zone", "term_pattern", "halfway_regulate")
 HO_RANGES = {"n_trips": (5, 20), "layover_min": (0, 60), "min_layover_min": (0, 30), "start_delay_min": (-30, 60), "reg_hold_max": (0, 8), "reg_early_max": (0, 30), "reg_window": (1, 9), "reg_min_side": (0, 5), "auto_late_min": (0, 120), "reg_even_share": (0, 1), "max_disrupted": (1, 6), "reg_early_future": (0, 30),
              "min_dep_gap": (0, 10), "start_early_max": (0, 30), "start_late_max": (0, 60), "min_remaining_pct": (0, 90), "min_improve_pct": (0, 100), "max_mileage_km": (0.5, 100),
              "recover_tol_pct": (5, 100), "recover_points": (1, 8), "w_regularity": (0, 100), "w_maxgap": (0, 100), "w_recovery": (0, 100), "w_holding": (0, 100), "w_mileage": (0, 100),
              "w_bunching": (0, 100), "pref_recovery_boost": (1, 5), "pref_mileage_boost": (1, 10), "load_sens": (0, 0.3), "fallback_kmh": (5, 60), "offsvc_factor": (0.3, 1.0),
              "balance_trips": (1, 16), "ewt_gain_min": (0, 5), "ewt_gain_pct": (0, 100), "ewt_gain_per_km": (0, 1), "ewt_adjust_min": (0, 5), "allow_adjacent_halfway": (0, 1),
-             "term_reg": (0, 1), "term_hold_max": (0, 8), "term_early_max": (0, 8), "term_tol_pct": (5, 100), "term_zone": (1, 9), "term_total_max": (0, 20)}
+             "term_reg": (0, 1), "term_hold_max": (0, 8), "term_early_max": (0, 8), "term_tol_pct": (5, 100), "term_zone": (1, 9), "term_total_max": (0, 20), "qos_over_max": (0, 30), "term_pattern": (0, 1), "halfway_regulate": (0, 1), "halfway_adj_max": (-1, 8), "win_min": (10, 120)}
 HO_MAX_CANDIDATES = 12
 HO_MAX_SCAN = 60                                                             # stops the AI tests when it searches the whole route (a stride is used on longer routes)
 
@@ -2665,6 +2632,10 @@ def ho_init():
         bb_sql("INSERT OR REPLACE INTO halfway_parameter(k, v) VALUES ('reg_early_future', 8)")
         bb_sql("INSERT OR REPLACE INTO halfway_parameter(k, v) VALUES ('min_layover_min', 7)")
         bb_sql("INSERT OR REPLACE INTO halfway_parameter(k, v) VALUES ('mig_v121_welfare', 1)")
+    if not bb_sql("SELECT 1 FROM halfway_parameter WHERE k='mig_v1310_qos'", fetch=True):
+        # V13.10: the 8-min TOTAL hold per BC stopped later trips from being adjusted at all; it is now off by default (per-departure cap only)
+        bb_sql("DELETE FROM halfway_parameter WHERE k='term_total_max' AND v=8")
+        bb_sql("INSERT OR REPLACE INTO halfway_parameter(k, v) VALUES ('mig_v1310_qos', 1)")
     for r in bb_sql("SELECT k, v FROM halfway_parameter", fetch=True):
         if r["k"] in HO["params"]:
             HO["params"][r["k"]] = int(r["v"]) if r["k"] in HO_INT else r["v"]
@@ -5312,7 +5283,8 @@ async def api_ho_recovery(service: str = "", direction: int = 1, ref: str = "", 
                       "min_remaining_pct": P["min_remaining_pct"], "sims": max(100, min(3000, ns)), "bunch_min": BB["params"]["bunch_min"],
                       "balance_trips": nbal, "ewt_gain_min": P["ewt_gain_min"], "ewt_gain_pct": P["ewt_gain_pct"], "ewt_gain_per_km": P["ewt_gain_per_km"],
                       "ewt_adjust_min": P["ewt_adjust_min"], "allow_adjacent_halfway": adj_ok, "term_reg": t_reg,
-                      **{k_: P[k_] for k_ in ("term_hold_max", "term_early_max", "term_tol_pct", "term_zone", "term_total_max")}}}
+                      "term_mode": "pattern" if P.get("term_pattern", 1) else "even", "halfway_regulate": int(P.get("halfway_regulate", 1)), "halfway_adj_max": P.get("halfway_adj_max", -1.0), "win_min": P.get("win_min", 30.0),
+                      **{k_: P[k_] for k_ in ("term_hold_max", "term_early_max", "term_tol_pct", "term_zone", "term_total_max", "qos_over_max")}}}
     if sched_dep:
         ctx["sched_dep"] = sched_dep
     if down_stops:
@@ -5322,7 +5294,7 @@ async def api_ho_recovery(service: str = "", direction: int = 1, ref: str = "", 
     if a_up or a_dn:                                                              # AITP ticked: the EWT is calculated at these stops only
         ctx["aitp_up"], ctx["aitp_dn"] = a_up, a_dn
     ckey = json.dumps([svc, direction, t0, H, lay, lates, mode, veh, ns, scope, now.hour * 60 + now.minute, nbal, sched_dep,
-                       [P[k_] for k_ in ("ewt_gain_min", "ewt_gain_pct", "ewt_gain_per_km", "ewt_adjust_min", "term_hold_max", "term_early_max", "term_tol_pct", "term_zone", "term_total_max")], adj_ok, t_reg, sorted(a_up), sorted(a_dn)], default=str)
+                       [P[k_] for k_ in ("ewt_gain_min", "ewt_gain_pct", "ewt_gain_per_km", "ewt_adjust_min", "term_hold_max", "term_early_max", "term_tol_pct", "term_zone", "term_total_max", "qos_over_max", "term_pattern", "halfway_regulate", "halfway_adj_max", "win_min")], adj_ok, t_reg, sorted(a_up), sorted(a_dn), recovery.MODEL_VERSION], default=str)
     hit = RV_CACHE.get(ckey)
     if hit and time.time() - hit[0] < 300:
         res = json.loads(hit[1])
@@ -6252,24 +6224,6 @@ async def tr_refresh(force=False):
         now = time.time()
         if not force and TR["last"] and now - TR["last"] < P["refresh_s"] * 0.9:
             return
-        try:
-            await asyncio.wait_for(_tr_refresh_body(P, now), timeout=TR_CYCLE_TIMEOUT_S)
-            TR["fail_n"], TR["fail_err"] = 0, None
-        except asyncio.TimeoutError:
-            # V17.3: a feed that hangs no longer blocks every later refresh: the cycle is abandoned, the lock is released and the next cycle retries
-            TR["fail_n"] = TR.get("fail_n", 0) + 1
-            TR["fail_err"] = f"refresh took over {TR_CYCLE_TIMEOUT_S} s - retrying"
-        except Exception as e:
-            TR["fail_n"] = TR.get("fail_n", 0) + 1
-            TR["fail_err"] = f"{type(e).__name__}: {str(e)[:160]}"
-            raise
-
-
-TR_CYCLE_TIMEOUT_S = 180
-
-
-async def _tr_refresh_body(P, now):
-    if True:
         st, bs, inc, rain, (rw, rw_err), _tt = await asyncio.gather(static(), bands_state(), api_incidents(), api_rain(), tr_roadworks(now), tomtom_incidents())     # concurrent: a slow feed no longer holds up the others
         book = TR["book"]
         snap = int(CACHE["bands"][1]) if "bands" in CACHE else None
@@ -6704,6 +6658,13 @@ async def settings_page():
 async def recovery_page():
     """Recovery Decision Engine (formerly Timetable Optimiser). /halfway/timetable keeps working for old bookmarks."""
     return _page("halfway.html")
+
+
+@app.get("/recovery/explain", response_class=HTMLResponse)
+async def recovery_explain_page():
+    """Management view: halfway or continue, shown as one headway per option per trip, the hourly extra waiting and why.
+    Opens with the 15-min example; from the Recovery Decision Engine (?case=1) it shows that run's planned departure gaps."""
+    return _page("recovery_explain.html")
 
 
 # ---- V16.8: hide pages for everyone (Settings > Pages). Saved in the database; HIDDEN_PAGES (comma list, e.g. cameras,running) is the default when nothing is saved,
@@ -11999,7 +11960,7 @@ async def fc_cycle(force=False):
             return FC["state"]
         t0 = time.time()
         try:
-            world, fq = await asyncio.wait_for(fc_world(now), timeout=150)      # V17.3: a hung source cannot freeze the Forecast Centre
+            world, fq = await fc_world(now)
             state = await asyncio.to_thread(forecast.evaluate, world)
             keys = set(state["impacts"].keys())
             dtn = now_sgt()
@@ -12525,71 +12486,42 @@ def fc26_camera_ai_io(cpa):
     return fetch_image,ask_model
 
 
-# ---- V17.4 MRT line status (LTA DataMall Train Service Alerts). Lines shown: env MRT_LINES (default DTL,NEL).
-MRT_LINES = [x.strip().upper() for x in os.getenv("MRT_LINES", "NSL,EWL,NEL,CCL,DTL,TEL,BPL,SKL,PGL").split(",") if x.strip()]
-MRT_NAMES = {"DTL": "Downtown Line", "NEL": "North East Line", "NSL": "North-South Line", "EWL": "East-West Line", "CCL": "Circle Line", "TEL": "Thomson-East Coast Line",
-             "BPL": "Bukit Panjang LRT", "SKL": "Sengkang LRT", "PGL": "Punggol LRT", "CGL": "Changi Airport Branch", "CEL": "Circle Line Extension"}
-# codes LTA may use for the same line (branches / LRT loops) -> the line shown
-MRT_ALIAS = {"EWL": ("EWL", "CGL"), "CCL": ("CCL", "CEL"), "SKL": ("SKL", "SLRT", "SEL", "SWL", "STC"), "PGL": ("PGL", "PLRT", "PEL", "PWL", "PTC"), "BPL": ("BPL", "BPLRT")}
-MRT_WORDS = {"SKL": ("SENGKANG LRT", "SKLRT"), "PGL": ("PUNGGOL LRT", "PGLRT"), "BPL": ("BUKIT PANJANG LRT", "BPLRT"), "TEL": ("THOMSON-EAST COAST", "THOMSON EAST COAST"),
-             "NSL": ("NORTH-SOUTH LINE", "NORTH SOUTH LINE"), "EWL": ("EAST-WEST LINE", "EAST WEST LINE"), "NEL": ("NORTH EAST LINE", "NORTH-EAST LINE"),
-             "CCL": ("CIRCLE LINE",), "DTL": ("DOWNTOWN LINE",)}
-TTL_TRAIN = 60
+CAM_SWAP = {"loaded": False, "info": {}}
 
 
-def mrt_status(raw, lines=None):
-    """LTA TrainServiceAlerts -> one row per watched line. Status 1 = normal, 2 = disrupted. Nothing is guessed: no answer = unknown."""
-    lines = lines or MRT_LINES
-    v = raw.get("value") if isinstance(raw, dict) else None
-    if isinstance(v, list):
-        v = v[0] if v else {}
-    v = v or {}
+def cam_swap_load(cpa):
+    """Checkpoint cameras whose two directions a controller swapped (kept in the database, shared by every viewer)."""
+    if CAM_SWAP["loaded"]:
+        return
+    bb_sql("CREATE TABLE IF NOT EXISTS camera_dir_swap(cam TEXT PRIMARY KEY, swapped INTEGER, who TEXT, ts REAL)")
+    for r in bb_sql("SELECT cam, swapped, who, ts FROM camera_dir_swap", fetch=True) or []:
+        cam = str(r["cam"])
+        (cpa.SWAPPED.add if r["swapped"] else cpa.SWAPPED.discard)(cam)
+        CAM_SWAP["info"][cam] = {"swapped": bool(r["swapped"]), "who": r["who"], "ts": r["ts"]}
+    CAM_SWAP["loaded"] = True
+
+
+@app.post('/api/forecast/centre/camera-ai/swap')
+async def fc26_camera_swap(request: Request):
+    """A controller says a checkpoint camera shows its two directions the wrong way round: swap them (or undo) for everyone."""
+    import checkpoint_ai as cpa
     try:
-        status = int(v.get("Status"))
-    except (TypeError, ValueError):
-        status = None
-    segs = v.get("AffectedSegments") or []
-    msgs = [m for m in (v.get("Message") or []) if isinstance(m, dict) and (m.get("Content") or "").strip()]
-    out = []
-    for ln in lines:
-        name = MRT_NAMES.get(ln, ln)
-        codes = MRT_ALIAS.get(ln, (ln,))
-        mine = [g for g in segs if str(g.get("Line") or "").upper() in codes]
-        words = MRT_WORDS.get(ln, (name.upper(),))
-        notes = [{"text": m["Content"].strip(), "at": m.get("CreatedDate")} for m in msgs
-                 if any(w in m["Content"].upper() for w in words) or any(re.search(r"\b" + c + r"\b", m["Content"].upper()) for c in codes)]
-        if raw.get("_error") and not v:
-            state = "unknown"
-        elif mine:
-            state = "disrupted"
-        else:
-            state = "normal"
-        out.append({"line": ln, "name": name, "state": state,
-                    "segments": [{"direction": (g.get("Direction") or "").strip(), "stations": (g.get("Stations") or "").strip(),
-                                  "free_bus": (g.get("FreePublicBus") or "").strip(), "shuttle": (g.get("FreeMRTShuttle") or "").strip(),
-                                  "shuttle_dir": (g.get("MRTShuttleDirection") or g.get("MrtShuttleDir") or "").strip()} for g in mine],
-                    "messages": notes[:3]})
-    return {"lines": out, "network_status": status, "error": raw.get("_error")}
-
-
-async def api_train_status():
-    async def factory():
-        d = await get_lta("TrainServiceAlerts")
-        return d, TTL_TRAIN, not d.get("_error")
-    raw = await cached("train_alerts", factory)
-    res = mrt_status(raw)
-    res["age_s"] = cache_age("train_alerts")
-    res["source"] = "LTA DataMall Train Service Alerts"
-    return res
-
-
-@app.get('/api/train-status')
-async def train_status_api():
-    try:
-        return await api_train_status()
-    except Exception as e:
-        return {"lines": [{"line": ln, "name": MRT_NAMES.get(ln, ln), "state": "unknown", "segments": [], "messages": []} for ln in MRT_LINES],
-                "error": f"{type(e).__name__}", "source": "LTA DataMall Train Service Alerts"}
+        body = await request.json()
+        cam = str(body.get('id', '')).strip()
+        if cam not in cpa.CHECKPOINT_IDS:
+            raise ValueError('not a checkpoint camera')
+        on = bool(body.get('swapped'))
+    except (ValueError, TypeError, AttributeError):
+        return JSONResponse({'error': 'Pick one of the checkpoint cameras: ' + ', '.join(sorted(cpa.CHECKPOINT_IDS)) + '.'}, status_code=400)
+    cam_swap_load(cpa)
+    user = auth.read(request.cookies.get(auth.COOKIE, '')) if hasattr(auth, 'read') else None
+    identity = (user or {}).get('u') if isinstance(user, dict) else None
+    who = str((identity.get('name') or identity.get('id')) if isinstance(identity, dict) else identity or 'controller')[:80]
+    now = time.time()
+    (cpa.SWAPPED.add if on else cpa.SWAPPED.discard)(cam)
+    bb_sql("INSERT OR REPLACE INTO camera_dir_swap(cam, swapped, who, ts) VALUES (?,?,?,?)", (cam, int(on), who, now))
+    CAM_SWAP["info"][cam] = {"swapped": on, "who": who, "ts": now}
+    return {'ok': True, 'id': cam, 'swapped': on, 'who': who, 'ts': now, 'saved': bool(BB.get('db_ok', True))}
 
 
 @app.get('/api/camera-ai/test')
@@ -12603,12 +12535,13 @@ async def api_camera_ai_test():
     pick=[cams[i] for x in cpa.CROSSINGS for i in x['cams'] if i in cams]
     if not pick:
         return {'ok':False,'key_set':True,'answer':'The checkpoint cameras (2701, 2702, 4703, 4713) are not in the LTA camera feed right now.','camera_error':cs.get('error')}
+    cam_swap_load(cpa)
     fetch_image,ask_model=fc26_camera_ai_io(cpa)
     out=await cpa.analyse(pick,fetch_image,ask_model,None,force=True)
     ok=not out.get('error') and bool(out.get('cameras'))
     return {'ok':ok,'key_set':True,'model':cpa.STATUS.get('model'),'photos_sent':cpa.STATUS.get('images'),
             'answer':'AI camera analytics is working.' if ok else (out.get('error') or 'Claude answered but gave no level for these photos.'),
-            'levels':{k:{x:v.get(x) for x in ('level','to_jb','to_sg')} for k,v in out.get('cameras',{}).items()},
+            'levels':{k:{x:v.get(x) for x in ('level','to_jb','to_sg','sg_where','jb_where','swapped') if v.get(x) is not None} for k,v in out.get('cameras',{}).items()},
             'crossings':out.get('crossings'),'ai_reply':cpa.STATUS.get('reply')}
 
 
@@ -12618,6 +12551,7 @@ async def fc26_camera_ai(ids: str=''):
     crossing time to JB / SG from the Woodlands and Tuas checkpoint cameras. Claude vision when ANTHROPIC_API_KEY is
     set, else TomTom speed at the camera, else nothing. Cached per photo (checkpoint_ai.CACHE_S)."""
     import checkpoint_ai as cpa
+    cam_swap_load(cpa)
     cs=await cameras_state()
     cams={str(c['id']):c for c in (cs.get('cams') or [])}
     want=[i for i in dict.fromkeys([x.strip() for x in ids.split(',') if x.strip()][:6]) if i in cams]
@@ -12643,6 +12577,7 @@ async def fc26_camera_ai(ids: str=''):
         return {'level':cpa.level_from_band(best[0]),'speed':best[1],'free_speed':best[2],'band':best[0],'road':best[3],'source':'LTA speed bands'}
     out=await cpa.analyse(pick,fetch_image if DV_AI_KEY else None,ask_model if DV_AI_KEY else None,flow)
     out['configured']={'ai':bool(DV_AI_KEY),'speed':idx is not None}
+    out['swap_info']={k:v for k,v in CAM_SWAP['info'].items() if v.get('swapped')}
     out['ai_status']={k:cpa.STATUS.get(k) for k in ('ok_at','error','error_at','model')}
     return out
 

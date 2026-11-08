@@ -1,0 +1,457 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<!-- Recovery Decision Engine: management view (built from rde/explain/body.html; the same page is published as a claude.ai artifact) -->
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>Halfway or Continue?</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;700&family=Rajdhani:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: a one-page briefing — the answer first, then what each option does to the gaps, then why, then the arithmetic. HORIZON tokens (the app's own). */
+:root{
+  color-scheme:dark;
+  --bg:#020812; --panel:#071a33; --panel-2:#0b2244; --line:rgba(110,190,255,.16); --line-2:rgba(110,200,255,.30);
+  --text:#e8f4ff; --text-2:#b8cde4; --mut:#8ca6c4; --faint:#5d7898;
+  --cyan:#3fd3ff; --blue:#1f8fff; --ok:#2ee8a0; --warn:#ffb547; --crit:#ff4d61;
+  --o-none:#ff8577; --o-adj:#ffc65c; --o-hw:#46d6ff; --ghost:rgba(184,205,228,.38);
+  --f-brand:"Orbitron","Rajdhani",system-ui,sans-serif;
+  --f-disp:"Rajdhani","IBM Plex Sans",system-ui,sans-serif;
+  --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font:15px/1.5 var(--f-body);
+  background-image:radial-gradient(1200px 500px at 15% -10%,rgba(31,143,255,.16),transparent 60%),radial-gradient(900px 400px at 100% 0,rgba(63,211,255,.08),transparent 60%)}
+.wrap{max-width:1180px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:28px 56px;display:grid;gap:28px}
+h1,h2,h3{font-family:var(--f-disp);font-weight:700;margin:0;text-wrap:balance;letter-spacing:.01em}
+h1{font-size:clamp(34px,5vw,52px);line-height:1}
+h2{font-size:24px;line-height:1.15}
+h3{font-size:20px;line-height:1.15}
+p{margin:0}
+.eyebrow{font:600 12px/1 var(--f-disp);letter-spacing:.18em;text-transform:uppercase;color:var(--cyan)}
+.lead{color:var(--text-2);max-width:68ch;font-size:16px}
+.num{font-variant-numeric:tabular-nums}
+header{display:grid;gap:12px}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{border:1px solid var(--line-2);border-radius:999px;padding:4px 12px;font:600 13px/1.4 var(--f-disp);letter-spacing:.04em;color:var(--text-2);background:rgba(7,26,51,.6)}
+.chip b{color:var(--text);font-weight:700}
+.chip.tag{color:var(--bg);background:var(--cyan);border-color:var(--cyan)}
+.chip.eng{color:var(--bg);background:var(--ok);border-color:var(--ok)}
+.panel{background:linear-gradient(180deg,rgba(11,34,68,.72),rgba(7,26,51,.72));border:1px solid var(--line);border-radius:8px;padding:20px}
+.sec{display:grid;gap:14px}
+.sec-h{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:6px 16px}
+.sec-h p{color:var(--mut);font-size:14px;max-width:70ch}
+
+/* answer */
+.answer{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.25fr);gap:28px;align-items:center}
+.verdict{display:grid;gap:10px}
+.verdict .best{font:700 clamp(28px,3.4vw,38px)/1.05 var(--f-disp)}
+.verdict .best span{color:var(--win,var(--ok))}
+.verdict p{color:var(--text-2)}
+.bars{display:grid;gap:12px}
+.bar{display:grid;grid-template-columns:170px minmax(0,1fr) 92px;grid-template-areas:"nm tr v";gap:12px;align-items:center}
+.bar .nm{grid-area:nm}.bar .tr{grid-area:tr}.bar .v{grid-area:v}
+.bar .nm{font:600 15px/1.2 var(--f-disp);letter-spacing:.02em}
+.bar .tr{height:26px;border-radius:4px;background:rgba(110,190,255,.07);position:relative;overflow:hidden}
+.bar .fl{position:absolute;inset:0 auto 0 0;border-radius:4px;background:var(--c);opacity:.85;transition:width .4s var(--ease,ease)}
+.bar .v{font:700 20px/1 var(--f-brand);text-align:right}
+.bar .v small{display:block;font:500 11px/1.3 var(--f-body);color:var(--mut);margin-top:4px}
+.bar.win .nm::after{content:"BEST";margin-left:8px;font:700 10px/1 var(--f-disp);letter-spacing:.14em;padding:3px 6px;border-radius:3px;color:var(--bg);background:var(--c);vertical-align:2px}
+.unit{color:var(--mut);font-size:13px}
+
+/* option columns */
+.opts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;align-items:start}
+.opt{display:grid;gap:12px;align-content:start;border-top:3px solid var(--c)}
+.opt.win{box-shadow:0 0 0 1px var(--c),0 0 28px -8px var(--c)}
+.opt .rule{font:600 15px/1.35 var(--f-disp);color:var(--c);letter-spacing:.02em}
+.opt .what{color:var(--text-2);font-size:14px;min-height:3em}
+.trip{display:grid;gap:4px;padding-top:10px;border-top:1px solid var(--line)}
+.trip-h{display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:baseline;gap:4px 12px;font:600 14px/1.2 var(--f-disp);letter-spacing:.04em}
+.trip-h .lbl small{display:block;font:500 12px/1.3 var(--f-body);letter-spacing:0;color:var(--mut)}
+.trip-h .hw{color:var(--text-2);font-weight:600}
+.trip-h .hw b{color:var(--c);font:700 16px/1 var(--f-brand)}
+.trip-h .e{color:var(--mut);font:500 13px/1 var(--f-body)}
+.trip-h .e b{color:var(--text);font-weight:600}
+.seg{font:500 12px/1.2 var(--f-body);color:var(--mut)}
+svg.saw{display:block;width:100%;height:auto}
+.foot{display:grid;gap:6px;padding-top:10px;border-top:1px solid var(--line);font-size:13px;color:var(--text-2)}
+.pill{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:2px 10px;font:600 12px/1.6 var(--f-disp);letter-spacing:.06em;border:1px solid}
+.pill.ok{color:var(--ok);border-color:rgba(46,232,160,.5);background:rgba(46,232,160,.08)}
+.pill.bad{color:var(--crit);border-color:rgba(255,77,97,.55);background:rgba(255,77,97,.1)}
+.avgline{display:flex;justify-content:space-between;align-items:baseline;font:600 14px/1.2 var(--f-disp);letter-spacing:.04em}
+.avgline b{font:700 22px/1 var(--f-brand);color:var(--c)}
+
+/* why */
+.why{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:28px;align-items:center}
+.why ol{margin:0;padding-left:20px;display:grid;gap:10px;color:var(--text-2)}
+.why ol b{color:var(--text)}
+.why figure{margin:0;display:grid;gap:8px}
+.why figcaption{font-size:13px;color:var(--mut)}
+.legend{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:13px;color:var(--mut)}
+.legend i{display:inline-block;width:14px;height:10px;border-radius:2px;vertical-align:-1px;margin-right:6px}
+
+/* table */
+.tablewrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;min-width:640px;font-size:14px}
+th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font:600 12px/1.2 var(--f-disp);letter-spacing:.1em;text-transform:uppercase;color:var(--mut)}
+td.r,th.r{text-align:right}
+td .sw{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:8px;background:var(--c)}
+tr.tot td{font-weight:600;color:var(--text);border-bottom:0}
+.formula{font-size:14px;color:var(--text-2);display:grid;gap:4px}
+.formula code{font:500 13px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--text);background:rgba(110,190,255,.08);padding:1px 6px;border-radius:4px}
+
+/* inputs */
+.inputs{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}
+.inputs label{display:grid;gap:5px;font:600 13px/1.25 var(--f-disp);letter-spacing:.04em;color:var(--text-2)}
+.inputs input{width:100%;font:600 16px/1 var(--f-body);color:var(--text);background:var(--bg);border:1px solid var(--line-2);border-radius:6px;padding:9px 10px}
+.inputs input:focus-visible,button:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+.inputs small{font:400 12px/1.3 var(--f-body);color:var(--faint)}
+.btns{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+button{font:600 14px/1 var(--f-disp);letter-spacing:.06em;color:var(--text);background:var(--panel-2);border:1px solid var(--line-2);border-radius:6px;padding:10px 14px;cursor:pointer}
+button:hover{border-color:var(--cyan)}
+.note{font-size:13px;color:var(--mut)}
+.casebar{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;justify-content:space-between;border:1px solid rgba(46,232,160,.4);background:rgba(46,232,160,.06);border-radius:8px;padding:12px 16px;font-size:14px;color:var(--text-2)}
+.casebar b{color:var(--text)}
+
+@media (max-width:980px){.answer,.why{grid-template-columns:1fr}.opts{grid-template-columns:1fr}.opt .what{min-height:0}}
+@media (max-width:520px){.bar{grid-template-columns:minmax(0,1fr) 86px;grid-template-areas:"nm v" "tr v";gap:6px 12px}.bar .v{font-size:17px}h1{font-size:34px}}
+@media (prefers-reduced-motion:reduce){.bar .fl{transition:none}}
+</style>
+
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="eyebrow">HORIZON · Recovery Decision Engine</div>
+    <h1>Halfway or continue?</h1>
+    <p class="lead">One bus runs late. Here are three ways to handle it, and what passengers at a stop see in the hour around the disruption (30&nbsp;min before to 30&nbsp;min after). Each option keeps one headway for every trip, so the numbers stay put.</p>
+    <div class="chips" id="chips"></div>
+  </header>
+
+  <div class="casebar" id="casebar" hidden></div>
+
+  <section class="panel answer" aria-labelledby="ans-h">
+    <div class="verdict">
+      <div class="eyebrow" id="ans-h">Best for passengers</div>
+      <div class="best" id="best"></div>
+      <p id="bestwhy"></p>
+    </div>
+    <div class="bars" id="bars" role="img" aria-label="Extra wait per passenger for each option"></div>
+  </section>
+
+  <section class="sec" aria-labelledby="opt-h">
+    <div class="sec-h">
+      <h2 id="opt-h">What each option does to the gaps between buses</h2>
+      <p>Each picture is one hour at a stop. A triangle is one gap: the taller it is, the longer people wait. The dotted outline is the normal timetable.</p>
+    </div>
+    <div class="opts" id="opts"></div>
+  </section>
+
+  <section class="panel why" aria-labelledby="why-h">
+    <div class="sec">
+      <h2 id="why-h">Why one long gap costs so much</h2>
+      <ol>
+        <li><b>People turn up at random.</b> Someone who arrives just after a bus waits the whole gap; someone who arrives just before waits almost nothing. On the picture, the height at any moment is how long a person arriving then will wait.</li>
+        <li><b>The area of a triangle is the total waiting.</b> Double the gap and the triangle holds four small ones: twice as many people arrive in it, and each waits twice as long.</li>
+        <li><b>So spreading a gap always helps</b>, and getting back to the timetable sooner helps most. Halfway closes the gap at the halfway stop and the timetable is back from the next trip. Adjustment spreads the gap over every trip. No adjustment keeps it for every trip.</li>
+      </ol>
+    </div>
+    <figure>
+      <svg class="saw" id="whysvg" viewBox="0 0 420 210" role="img" aria-label="A gap twice as long holds four times the waiting"></svg>
+      <figcaption id="whycap"></figcaption>
+    </figure>
+  </section>
+
+  <section class="panel sec" aria-labelledby="calc-h">
+    <div class="sec-h">
+      <h2 id="calc-h">How the numbers are worked out</h2>
+      <p>Extra wait (EWT) = average wait in the hour minus the normal wait. Lower is better; 0 means passengers wait no longer than the timetable promises.</p>
+    </div>
+    <div class="formula" id="formula"></div>
+    <div class="tablewrap"><table id="tbl"></table></div>
+  </section>
+
+  <section class="panel sec" aria-labelledby="try-h">
+    <div class="sec-h">
+      <h2 id="try-h">Try other numbers</h2>
+      <p>Change any headway and everything above updates.</p>
+    </div>
+    <form class="inputs" id="form" autocomplete="off">
+      <label for="in-H">Scheduled headway<input id="in-H" type="number" min="3" max="60" step="1" inputmode="decimal"><small>minutes between buses</small></label>
+      <label for="in-G">No adjustment: long gap<input id="in-G" type="number" min="3" max="90" step="1" inputmode="decimal"><small>stays for every trip</small></label>
+      <label for="in-A">Adjustment: headway<input id="in-A" type="number" min="3" max="60" step="0.5" inputmode="decimal"><small>for every trip</small></label>
+      <label for="in-B">Halfway: before halfway stop<input id="in-B" type="number" min="3" max="60" step="0.5" inputmode="decimal"><small>first trip only</small></label>
+      <label for="in-C">Halfway: after halfway stop<input id="in-C" type="number" min="3" max="60" step="0.5" inputmode="decimal"><small>rest of the first trip and every later trip</small></label>
+      <label for="in-N">Balance trips<input id="in-N" type="number" min="1" max="8" step="1" inputmode="numeric"><small>trips counted</small></label>
+      <label for="in-F">Halfway stop position<input id="in-F" type="number" min="5" max="95" step="5" inputmode="numeric"><small>% of the route before it</small></label>
+    </form>
+    <div class="btns"><button type="button" id="reset">Back to the example (15 min, 3 trips)</button><span class="note" id="formnote"></span></div>
+  </section>
+</div>
+
+<script>
+(function(){
+  "use strict";
+  var EX = {H: 15, G: 30, A: 18, B: 20, C: 15, N: 3, F: 50};
+  var OPT = [
+    {k: "none", name: "No adjustment", col: "var(--o-none)", hex: "#ff8577"},
+    {k: "adjust", name: "Adjustment", col: "var(--o-adj)", hex: "#ffc65c"},
+    {k: "halfway", name: "Halfway + adjustment", col: "var(--o-hw)", hex: "#46d6ff"}
+  ];
+  var $ = function(id){ return document.getElementById(id); };
+  var r1 = function(x){ return (Math.round(x * 10) / 10).toString(); };
+  var r2 = function(x){ return (Math.round(x * 100) / 100).toFixed(2); };
+  var esc = function(s){ return String(s == null ? "" : s).replace(/[&<>"']/g, function(c){ return {"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"}[c]; }); };
+  function rep(v, n){ var a = []; for(var i = 0; i < n; i++) a.push(v); return a; }
+
+  /* ---------- the model: a list of gaps (min) per trip, the window = 30 min either side of the middle of the longest gap ---------- */
+  function timeline(gaps, H){                    // bus arrival times, the middle of the gap most off the timetable at 0 (a tie: the longer one)
+    var g = gaps.filter(function(x){ return isFinite(x) && x > 0; });
+    if(!g.length) return null;
+    var off = function(x){ return Math.abs(x - H); }, m = 0;
+    g.forEach(function(x, i){ if(off(x) > off(g[m]) + 1e-9 || (Math.abs(off(x) - off(g[m])) <= 1e-9 && x > g[m] + 1e-9)) m = i; });
+    var t = [0]; g.forEach(function(x){ t.push(t[t.length - 1] + x); });
+    var c = t[m] + g[m] / 2;
+    t = t.map(function(x){ return x - c; });
+    var h0 = g[0], h1 = g[g.length - 1];          // pad with the edge headway so the window is always covered
+    while(t[0] > -40) t.unshift(t[0] - h0);
+    while(t[t.length - 1] < 40) t.push(t[t.length - 1] + h1);
+    return t;
+  }
+  function avgWait(t, a, b){                     // average wait for people arriving evenly between a and b
+    var s = 0;
+    for(var k = 0; k + 1 < t.length; k++){
+      var u = Math.max(a, t[k]), v = Math.min(b, t[k + 1]);
+      if(v > u) s += ((t[k + 1] - u) * (t[k + 1] - u) - (t[k + 1] - v) * (t[k + 1] - v)) / 2;
+    }
+    return s / (b - a);
+  }
+  function hourGaps(t){                          // the gaps that fall in the hour (for the table)
+    var out = [];
+    for(var k = 0; k + 1 < t.length; k++) if(t[k + 1] > -30 + 1e-9 && t[k] < 30 - 1e-9) out.push(Math.round((t[k + 1] - t[k]) * 10) / 10);
+    return out;
+  }
+  function evalList(gaps, H){
+    var t = timeline(gaps, H); if(!t) return null;
+    var aw = avgWait(t, -30, 30);
+    return {t: t, awt: aw, ewt: Math.max(0, aw - H / 2), hour: hourGaps(t), longest: Math.max.apply(null, gaps)};
+  }
+
+  /* ---------- the case: the example / typed numbers, or a case handed over by the engine page ---------- */
+  function simpleCase(v){
+    var N = Math.max(1, Math.min(8, Math.round(v.N)));
+    var pad = function(x){ return rep(x, 12); };
+    var none = [], adj = [], hwl = [];
+    for(var i = 0; i < N; i++){ none.push(rep(v.H, 6).concat([v.G], rep(v.H, 6))); adj.push(pad(v.A)); if(i) hwl.push(pad(v.C)); }
+    return {mode: "simple", H: v.H, f: v.F / 100, trips: Array.from({length: N}, function(_, i){ return "Trip " + (i + 1); }),
+      none: none, adjust: adj, halfway: {before: pad(v.B), after: pad(v.C), later: hwl},
+      head: {none: v.G, adjust: v.A, before: v.B, after: v.C}};
+  }
+  function engineCase(c){
+    var legs = (c.legs && c.legs.length ? c.legs : (c.none || []).map(function(_, i){ return "Trip " + (i + 1); }));
+    var tl = legs.map(function(l, i){ return "Trip " + (i + 1) + " (" + l + ")"; });
+    var hw = c.halfway ? {before: c.halfway.first_before || [], after: c.halfway.first_after && c.halfway.first_after.length ? c.halfway.first_after : rep(c.H, 12), later: c.halfway.later || []} : null;
+    return {mode: "engine", H: +c.H, f: +c.f || 0.5, trips: tl, none: c.none || [], adjust: c.adjust || [], halfway: hw, src: c};
+  }
+
+  function compute(cs){
+    var H = cs.H, res = {};
+    ["none", "adjust"].forEach(function(k){
+      var trips = cs[k].map(function(g){ return evalList(g, H); });
+      res[k] = {trips: trips, avg: trips.reduce(function(s, x){ return s + (x ? x.ewt : 0); }, 0) / Math.max(1, trips.length),
+                longest: Math.max.apply(null, trips.map(function(x){ return x ? x.longest : 0; }))};
+    });
+    if(cs.halfway){
+      var b = evalList(cs.halfway.before, H), a = evalList(cs.halfway.after, H), later = cs.halfway.later.map(function(g){ return evalList(g, H); });
+      var t1 = cs.f * b.ewt + (1 - cs.f) * a.ewt, all = [t1].concat(later.map(function(x){ return x ? x.ewt : 0; }));
+      res.halfway = {before: b, after: a, later: later, t1: t1, avg: all.reduce(function(s, x){ return s + x; }, 0) / all.length,
+                     longest: Math.max.apply(null, [b.longest, a.longest].concat(later.map(function(x){ return x ? x.longest : 0; })))};
+    }
+    return res;
+  }
+
+  /* ---------- drawing ---------- */
+  function sawSVG(t, H, ymax, col, opts){
+    opts = opts || {};
+    var W = 360, Ht = opts.h || 104, L = 8, R = 352, B = Ht - 22, T = 14;
+    var X = function(m){ return L + (m + 30) / 60 * (R - L); }, Y = function(w){ return B - Math.min(w, ymax) / ymax * (B - T); };
+    var clip = function(pts){ return pts; };
+    var path = function(times, stroke, fill, dash, w){
+      var d = "", started = false;
+      for(var k = 0; k + 1 < times.length; k++){
+        var u = Math.max(-30, times[k]), v = Math.min(30, times[k + 1]);
+        if(v <= u) continue;
+        var nx = times[k + 1];
+        d += "M" + X(u).toFixed(1) + " " + B + " L" + X(u).toFixed(1) + " " + Y(nx - u).toFixed(1) + " L" + X(v).toFixed(1) + " " + Y(nx - v).toFixed(1) + " L" + X(v).toFixed(1) + " " + B + " Z ";
+      }
+      return '<path d="' + d + '" fill="' + fill + '" stroke="' + stroke + '" stroke-width="' + (w || 1.5) + '" stroke-linejoin="round"' + (dash ? ' stroke-dasharray="' + dash + '"' : "") + "/>";
+    };
+    var sched = []; for(var s = -60 - H / 2; s < 60; s += H) sched.push(s);
+    var h = '<svg class="saw" viewBox="0 0 ' + W + " " + Ht + '" role="img" aria-label="' + esc(opts.label || "") + '">';
+    h += '<line x1="' + L + '" x2="' + R + '" y1="' + B + '" y2="' + B + '" stroke="var(--line-2)" stroke-width="1"/>';
+    h += path(t, col, col.replace("var(", "var(") , null, 1.5).replace('fill="' + col + '"', 'fill="' + col + '" fill-opacity=".22"');
+    h += path(sched, "var(--ghost)", "none", "3 3", 1);
+    t.forEach(function(x, i){                    // buses on the line, gap labels on the triangles
+      if(x >= -30 - 1e-6 && x <= 30 + 1e-6) h += '<rect x="' + (X(x) - 4).toFixed(1) + '" y="' + (B - 3) + '" width="8" height="6" rx="1.5" fill="' + col + '"/>';
+      if(i + 1 < t.length){
+        var u = Math.max(-30, x), v = Math.min(30, t[i + 1]), g = t[i + 1] - x;
+        if(v - u > 6 && g > 0.5) h += '<text x="' + ((X(u) + X(v)) / 2).toFixed(1) + '" y="' + Math.max(11, Y(t[i + 1] - u) - 4).toFixed(1) + '" text-anchor="middle" font-size="11" font-family="Rajdhani, sans-serif" font-weight="700" fill="var(--text)">' + r1(g) + "</text>";
+      }
+    });
+    h += '<text x="' + L + '" y="' + (Ht - 6) + '" font-size="10" fill="var(--mut)" font-family="IBM Plex Sans, sans-serif">30 min before</text>';
+    h += '<text x="' + R + '" y="' + (Ht - 6) + '" font-size="10" fill="var(--mut)" text-anchor="end" font-family="IBM Plex Sans, sans-serif">30 min after</text>';
+    return h + "</svg>";
+  }
+
+  function whySVG(H){
+    var g = 2 * H, W = 420, B = 176, L = 16, sc = Math.min(324 / (3 * H), 150 / g);   // a normal gap and a double gap on the same scale
+    var x0 = L, h = "";
+    var tri = function(x, w, col, op){ return '<path d="M' + x.toFixed(1) + " " + B + " L" + x.toFixed(1) + " " + (B - w * sc).toFixed(1) + " L" + (x + w * sc).toFixed(1) + " " + B + ' Z" fill="' + col + '" fill-opacity="' + op + '" stroke="' + col + '" stroke-width="1.5" stroke-linejoin="round"/>'; };
+    h += tri(x0, H, "#46d6ff", .25);
+    h += '<text x="' + (x0 + H * sc / 2).toFixed(1) + '" y="' + (B - H * sc - 8).toFixed(1) + '" text-anchor="middle" font-size="13" font-family="Rajdhani, sans-serif" font-weight="700" fill="var(--text)">' + r1(H) + " min</text>";
+    var x1 = x0 + H * sc + 56;
+    h += '<text x="' + (x0 + H * sc + 28).toFixed(1) + '" y="' + (B - 26) + '" text-anchor="middle" font-size="22" font-family="Orbitron, sans-serif" fill="var(--mut)">vs</text>';
+    h += tri(x1, g, "#ff8577", .22);
+    var m = g * sc / 2;                           // the midpoint lines that cut the big triangle into four small ones
+    h += '<path d="M' + x1.toFixed(1) + " " + (B - m).toFixed(1) + " L" + (x1 + m).toFixed(1) + " " + (B - m).toFixed(1) + " L" + (x1 + m).toFixed(1) + " " + B + " M" + x1.toFixed(1) + " " + (B - m).toFixed(1) + " L" + (x1 + m).toFixed(1) + " " + B + '" fill="none" stroke="#ff8577" stroke-width="1.2" stroke-dasharray="4 3"/>';
+    [[x1 + m * .33, B - m * .33], [x1 + m * .33, B - m - m * .33], [x1 + m * 1.33, B - m * .33], [x1 + m * .67, B - m * .67]].forEach(function(p, i){
+      h += '<text x="' + p[0].toFixed(1) + '" y="' + (p[1] + 4).toFixed(1) + '" text-anchor="middle" font-size="12" font-family="Rajdhani, sans-serif" font-weight="700" fill="var(--text-2)">' + (i + 1) + "</text>";
+    });
+    h += '<text x="' + (x1 + g * sc / 2).toFixed(1) + '" y="' + (B - g * sc - 8).toFixed(1) + '" text-anchor="middle" font-size="13" font-family="Rajdhani, sans-serif" font-weight="700" fill="var(--text)">' + r1(g) + " min = 4 × the waiting</text>";
+    h += '<line x1="' + L + '" x2="' + (W - 8) + '" y1="' + B + '" y2="' + B + '" stroke="var(--line-2)"/>';
+    h += '<text x="' + L + '" y="' + (B + 22) + '" font-size="12" fill="var(--mut)" font-family="IBM Plex Sans, sans-serif">height = how long someone arriving then waits</text>';
+    return h;
+  }
+
+  /* ---------- render ---------- */
+  var CASE = null;
+  function render(){
+    var cs = CASE, R = compute(cs), H = cs.H, best = null;
+    var opts = OPT.filter(function(o){ return o.k !== "halfway" || cs.halfway; });
+    opts.forEach(function(o){ if(!best || R[o.k].avg < R[best.k].avg - 1e-9) best = o; });
+    var nT = cs.trips.length, qmax = H + 6;
+
+    // chips + case bar
+    var ch = [];
+    if(cs.mode === "simple") ch.push('<span class="chip tag">Example</span>');
+    ch.push('<span class="chip">Scheduled every <b>' + r1(H) + " min</b></span>");
+    ch.push('<span class="chip"><b>' + nT + "</b> balance trip" + (nT > 1 ? "s" : "") + "</span>");
+    if(cs.halfway) ch.push('<span class="chip">Halfway stop at <b>' + Math.round(cs.f * 100) + "%</b> of the route</span>");
+    ch.push('<span class="chip">Normal wait <b>' + r1(H / 2) + " min</b></span>");
+    $("chips").innerHTML = ch.join("");
+    var cb = $("casebar");
+    if(cs.mode === "engine"){
+      var s = cs.src, eng = {none: "No adjustment", adjust: "Adjustment", halfway: "Halfway + adjustment"}[s.decision] || s.decision;
+      cb.hidden = false;
+      cb.innerHTML = "<span>From the Recovery Decision Engine: <b>Svc " + esc(s.svc || "?") + " Dir " + esc(s.dir || "?") + "</b>" + (s.late && s.late.length ? ", trip " + esc(s.late.join(", ")) + " late" + (s.delay ? " " + r1(s.delay) + " min" : "") : "") + (s.halfway_stop ? ", halfway start at <b>" + esc(s.halfway_stop) + "</b>" : "") + ". Engine recommends <b>" + esc(eng) + "</b>. Gaps shown are the planned departure gaps.</span>"
+        + '<button type="button" id="toex">Show the example instead</button>';
+      $("toex").onclick = function(){ setSimple(EX); };
+    } else cb.hidden = true;
+
+    // answer
+    var maxAvg = Math.max.apply(null, opts.map(function(o){ return R[o.k].avg; })) || 1;
+    $("best").innerHTML = '<span style="--win:' + best.col + '">' + esc(best.name) + "</span>";
+    document.querySelector(".verdict .best span").style.color = best.hex;
+    var words = {
+      none: "Leaving it alone is cheapest here: the other options do not cut the waiting enough.",
+      adjust: "Sharing the gap among the buses around it gives the least extra waiting, without losing any part of a trip.",
+      halfway: "Starting the late bus at the halfway stop closes the gap from there on, and the timetable is back from the next trip."
+    };
+    var others = opts.filter(function(o){ return o !== best; }).map(function(o){ return o.name.toLowerCase() + " " + r2(R[o.k].avg); }).join(" and ");
+    $("bestwhy").textContent = words[best.k] + " Extra wait per passenger, average of " + nT + " trip" + (nT > 1 ? "s" : "") + ": " + r2(R[best.k].avg) + " min, against " + others + " min.";
+    $("bars").innerHTML = opts.map(function(o){
+      var v = R[o.k].avg, w = Math.max(1.5, v / maxAvg * 100);
+      return '<div class="bar' + (o === best ? " win" : "") + '" style="--c:' + o.hex + '"><div class="nm">' + esc(o.name) + '</div><div class="tr"><div class="fl" style="width:' + w.toFixed(1) + '%"></div></div><div class="v num">' + r2(v) + "<small>min extra wait</small></div></div>";
+    }).join("") + '<div class="unit">Per 100 passengers in that hour: ' + opts.map(function(o){ return esc(o.name) + " " + Math.round(R[o.k].avg * 100) + " extra minutes"; }).join(" · ") + ".</div>";
+
+    // option columns
+    var ymax = Math.max(H, R.none.longest, R.adjust.longest, cs.halfway ? R.halfway.longest : 0) * 1.08;
+    var tripBlock = function(o, label, ev, hwLabel, seg){
+      return '<div class="trip"><div class="trip-h"><span class="lbl">' + esc(label) + (seg ? "<small>" + esc(seg) + "</small>" : "") + '</span><span class="hw">' + hwLabel + '</span><span class="e">extra wait <b class="num">' + r2(ev.ewt) + "</b></span></div>"
+        + sawSVG(ev.t, H, ymax, o.hex, {label: label + ": gaps " + ev.hour.join(", ") + " min"}) + "</div>";
+    };
+    var headTxt = function(ev){ var u = ev.hour.filter(function(x, i, a){ return a.indexOf(x) === i; }); return u.length === 1 ? "every <b>" + r1(u[0]) + "</b>" : "longest <b>" + r1(ev.longest) + "</b>"; };
+    var whatTxt = {
+      none: cs.mode === "simple" ? "Nothing is changed. The " + r1(cs.head.none) + "-min gap travels with the late bus on every trip." : "Nothing is changed. The long gap travels with the late bus; it shrinks only as the bus captain shortens the layover.",
+      adjust: cs.mode === "simple" ? "The buses around the gap are held or let go early, so every gap becomes " + r1(cs.head.adjust) + " min, on every trip." : "The buses around the gap are held or let go early; the same spacing is kept on every trip.",
+      halfway: cs.mode === "simple" ? "The late bus skips the first " + Math.round(cs.f * 100) + "% of one trip and starts at the halfway stop on its own slot. Before that stop people wait " + r1(cs.head.before) + " min once; after it, " + r1(cs.head.after) + " min, and the timetable is back from the next trip." : "The late bus skips the first part of one trip and starts at the halfway stop on its own slot; the buses around it are held or let go a little. From the next trip the timetable is back."
+    };
+    $("opts").innerHTML = opts.map(function(o){
+      var r = R[o.k], h = '<article class="panel opt' + (o === best ? " win" : "") + '" style="--c:' + o.hex + '"><h3>' + esc(o.name) + "</h3>";
+      if(o.k === "halfway"){
+        h += '<div class="rule">' + (cs.mode === "simple" ? r1(cs.head.before) + " before the halfway stop, then " + r1(cs.head.after) + " all the way" : "Gap before the halfway stop on trip 1, then the timetable") + "</div>";
+        h += '<p class="what">' + esc(whatTxt[o.k]) + "</p>";
+        h += tripBlock(o, cs.trips[0], r.before, headTxt(r.before), "before halfway stop");
+        h += tripBlock(o, cs.trips[0], r.after, headTxt(r.after), "after halfway stop");
+        r.later.forEach(function(ev, i){ if(ev) h += tripBlock(o, cs.trips[i + 1], ev, headTxt(ev)); });
+        h += '<div class="foot"><div class="avgline"><span>' + esc(cs.trips[0]) + " (" + Math.round(cs.f * 100) + "% / " + Math.round((1 - cs.f) * 100) + "% of stops)</span><b class=\"num\">" + r2(r.t1) + "</b></div>";
+      } else {
+        h += '<div class="rule">' + (cs.mode === "simple" ? (o.k === "none" ? r1(cs.head.none) + "-min gap on every trip" : r1(cs.head.adjust) + " min all the way") : (o.k === "none" ? "Long gap kept on every trip" : "Same adjusted spacing on every trip")) + "</div>";
+        h += '<p class="what">' + esc(whatTxt[o.k]) + "</p>";
+        r.trips.forEach(function(ev, i){ if(ev) h += tripBlock(o, cs.trips[i], ev, headTxt(ev)); });
+        h += '<div class="foot">';
+      }
+      var q = r.longest <= qmax + 1e-9;
+      h += '<div class="avgline"><span>Average of ' + nT + " trip" + (nT > 1 ? "s" : "") + '</span><b class="num">' + r2(r.avg) + "</b></div>";
+      h += '<div><span class="pill ' + (q ? "ok" : "bad") + '">QoS 1.2 ' + (q ? "met" : "not met") + "</span> longest gap " + r1(r.longest) + " min, limit " + r1(qmax) + " (scheduled + 6)</div>";
+      if(o.k === "halfway") h += "<div>Cost: part of one trip is not run" + (cs.mode === "engine" && cs.src.km_lost != null ? " (" + r1(cs.src.km_lost) + " km)" : " (the first " + Math.round(cs.f * 100) + "% of the route)") + ".</div>";
+      if(o.k === "adjust") h += "<div>Cost: buses around the gap leave a few minutes off their timetable on every trip.</div>";
+      if(o.k === "none") h += "<div>Cost: nothing to do, but the gap stays.</div>";
+      return h + "</div></article>";
+    }).join("");
+
+    // why
+    $("whysvg").innerHTML = whySVG(H);
+    $("whycap").textContent = "A " + r1(2 * H) + "-min gap against a normal " + r1(H) + "-min gap: twice the length, four times the waiting.";
+
+    // table
+    var rows = [], line = function(o, label, ev, w){
+      rows.push('<tr style="--c:' + o.hex + '"><td><span class="sw"></span>' + esc(o.name) + "</td><td>" + esc(label) + '</td><td class="num">' + (ev.hour.every(function(x){ return Math.abs(x - ev.hour[0]) < 0.05; }) ? "every " + r1(ev.hour[0]) : ev.hour.map(r1).join(", ")) + '</td><td class="r num">' + r2(ev.awt) + '</td><td class="r num">' + r2(H / 2) + '</td><td class="r num"><b>' + r2(ev.ewt) + "</b></td>" + '<td class="r num">' + (w == null ? "" : w) + "</td></tr>");
+    };
+    opts.forEach(function(o){
+      var r = R[o.k];
+      if(o.k === "halfway"){
+        line(o, cs.trips[0] + ", before halfway stop", r.before, Math.round(cs.f * 100) + "%");
+        line(o, cs.trips[0] + ", after halfway stop", r.after, Math.round((1 - cs.f) * 100) + "%");
+        r.later.forEach(function(ev, i){ if(ev) line(o, cs.trips[i + 1], ev, null); });
+      } else r.trips.forEach(function(ev, i){ if(ev) line(o, cs.trips[i], ev, null); });
+      rows.push('<tr class="tot" style="--c:' + o.hex + '"><td colspan="5">' + esc(o.name) + ": average of " + nT + " trip" + (nT > 1 ? "s" : "") + '</td><td class="r num">' + r2(r.avg) + "</td><td></td></tr>");
+    });
+    $("tbl").innerHTML = '<thead><tr><th>Option</th><th>Trip</th><th>Gaps in the hour (min)</th><th class="r">Average wait</th><th class="r">Normal wait</th><th class="r">Extra wait</th><th class="r">Share of stops</th></tr></thead><tbody>' + rows.join("") + "</tbody>";
+    var ex = R.none.trips[0];
+    $("formula").innerHTML = "<div>Average wait in the hour = <code>sum of (gap × gap) ÷ (2 × sum of gaps)</code>, normal wait = <code>scheduled headway ÷ 2</code>.</div>"
+      + (cs.mode === "simple" ? "<div>Example, no adjustment: <code>(" + ex.hour.map(r1).join("² + ") + "²) ÷ (2 × " + r1(ex.hour.reduce(function(s, x){ return s + x; }, 0)) + ") = " + r2(ex.awt) + "</code>, minus <code>" + r1(H) + " ÷ 2 = " + r2(H / 2) + "</code> gives <b>" + r2(ex.ewt) + " min</b> extra wait.</div>" : "")
+      + (cs.halfway ? "<div>Halfway, " + esc(cs.trips[0]) + ": the stops before the halfway stop get the first figure, the stops after it the second, weighted by their share of the route.</div>" : "");
+  }
+
+  /* ---------- inputs ---------- */
+  var IDS = ["H", "G", "A", "B", "C", "N", "F"];
+  function readForm(){ var v = {}; IDS.forEach(function(k){ var x = parseFloat($("in-" + k).value); v[k] = isFinite(x) ? x : EX[k]; }); return v; }
+  function fillForm(v){ IDS.forEach(function(k){ $("in-" + k).value = v[k]; }); }
+  function check(v){
+    var msg = [];
+    v.H = Math.min(60, Math.max(3, v.H));
+    ["G", "A", "B", "C"].forEach(function(k){ v[k] = Math.min(90, Math.max(1, v[k])); });
+    v.N = Math.min(8, Math.max(1, Math.round(v.N))); v.F = Math.min(95, Math.max(5, v.F));
+    if(v.G < v.H) msg.push("The long gap is shorter than the schedule.");
+    return {v: v, msg: msg.join(" ")};
+  }
+  function setSimple(v){ var c = check(Object.assign({}, v)); fillForm(c.v); $("formnote").textContent = c.msg; CASE = simpleCase(c.v); render(); }
+  $("form").addEventListener("input", function(){ var c = check(readForm()); $("formnote").textContent = c.msg; CASE = simpleCase(c.v); render(); });
+  $("form").addEventListener("submit", function(e){ e.preventDefault(); });
+  $("reset").addEventListener("click", function(){ setSimple(EX); });
+
+  /* a case handed over by the Recovery Decision Engine page (same browser, /recovery/explain?case=1) */
+  var handed = null;
+  try{ if(/[?&]case=1/.test(location.search)) handed = JSON.parse(localStorage.getItem("rde.explain") || "null"); }catch(e){ handed = null; }
+  if(handed && handed.v === 1 && handed.none && handed.none.length){ fillForm(EX); CASE = engineCase(handed); render(); }
+  else setSimple(EX);
+  window.RDE_EXPLAIN = {compute: compute, simpleCase: simpleCase, engineCase: engineCase, evalList: evalList};
+})();
+</script>
+
+</body>
+</html>

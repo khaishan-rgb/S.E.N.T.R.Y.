@@ -77,7 +77,8 @@ PARAMS = {
     "term_total_max": 0.0,       # optional cap on the total artificial hold per BC over the horizon (UP 1 included), min; 0 = off (each departure is capped by term_hold_max)
     "qos_over_max": 6.0,         # QoS 1.2: an adjusted departure headway may be at most this many min longer than the scheduled headway
     "term_pattern": 1,           # 1 = Trip adjustment keeps its adjusted spacing on every later trip; 0 = even spacing at each terminal (former rule)
-    "halfway_regulate": 0,       # 0 = a halfway plan adjusts no other trip (timetable from the 2nd trip); 1 = also hold / release the trips around it
+    "halfway_regulate": 1,       # 1 = a halfway plan also holds / releases the trips around the lost trip (within halfway_adj_max); 0 = no other trip adjusted
+    "halfway_adj_max": -1.0,     # their max hold / release, min; -1 = auto = layover - minimum layover (won back before trip 2, so trip 2 runs the timetable)
     "win_min": 30.0,             # average / max headway window: this many min before and after the long headway
     "allow_adjacent_halfway": 0, # 0 = two back-to-back trips may NOT both be disrupted / start halfway (AI and manual ticks); 1 = allowed. Editable per run on the page      # a departure adjustment replaces "no action" only if it lowers the Average EWT by at least this
 }

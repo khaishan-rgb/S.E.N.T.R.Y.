@@ -68,3 +68,20 @@ Before this fix, the same case gave Trip adjustment 0.33 against No action 0.62,
   * "Halfway also adjusts the trips around it" (0 = new, 1 = former);
   * "Average / max headway window" (30 min).
 * **Tests:** `test_recovery_qos.py` now has 13 tests, including this service 147 case.
+
+---
+
+# Update 3 (30 Oct, 16:30): Halfway + adjustment again (model `recovery-2.3-halfway-adj`)
+
+**Reported:** with trip 5 starting halfway, the plan showed no adjustment. The departure gap at Hougang stayed 24 min (trip 4 → trip 6), which also breaks QoS 1.2.
+
+**Now:**
+* **Halfway holds / releases the trips around the lost trip**, by at most what each bus captain wins back in the layover: scheduled layover − minimum layover = 10 − 7 = **3 min**. Settings: "Halfway: max hold / release of the other trips", −1 = automatic. Because the holds are won back in the layover, **the 2nd trip runs the timetable** (scheduled headway).
+* **The lost trip's gap is judged against the normal scheduled headway:** 24 at Hougang must come down to ≤ 18 (QoS 1.2). Only if that cannot be done within 3 min may the trips move up to the ±8-min limit.
+* **Trip 5 case** (12-min headway, trip 5 arrives 12 min late):
+  * trips 2 / 3 / 4 held 1 / 2 / 3 min, and trips 6 / 7 / 8 released 3 / 2 / 1 min early;
+  * departure gaps at Hougang 12, 13, 13, 13, **18**, 13, 13, 13, 12;
+  * from DOWN 1 every gap is 12 again;
+  * window figures: 1st trip avg 12.4 · max 18.1, then 12 · 12 on every later trip.
+* "Halfway: other trips unchanged" stays available as a setting ("Halfway also adjusts the trips around it" = 0).
+* **Tests:** `test_recovery_qos.py` now has 14 tests.

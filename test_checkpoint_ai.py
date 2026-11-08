@@ -136,5 +136,82 @@ class Analyse(unittest.TestCase):
         self.assertEqual(out["cameras"]["6710"]["level"], "Smooth")
 
 
+TUAS = [{"id": "4703", "link": "https://img/4703.jpg", "lat": 1.3487, "lon": 103.6350, "taken": "t1", "desc": "Tuas Second Link"},
+        {"id": "4713", "link": "https://img/4713.jpg", "lat": 1.3410, "lon": 103.6366, "taken": "t1", "desc": "Tuas Checkpoint"}]
+
+
+class Directions(unittest.TestCase):
+    """30 Oct 2026: camera 4703 showed the lorry queue ENTERING Singapore, but the panel said 'to Johor 60 min, jam'."""
+
+    def setUp(self):
+        cpa._CACHE.clear()
+        cpa.STATUS.update(day=None, calls_today=0)
+        self.swapped = set(cpa.SWAPPED)
+        cpa.SWAPPED.clear()
+
+    def tearDown(self):
+        cpa.SWAPPED.clear()
+        cpa.SWAPPED.update(self.swapped)
+
+    async def fetch(self, url):
+        return b"\xff\xd8\xffjpeg", "image/jpeg"
+
+    def test_prompt_says_which_way_the_traffic_goes(self):
+        text = cpa.prompt(TUAS + CAMS[:1])
+        self.assertIn("Singapore side", text)
+        self.assertIn("LOOKS, not which way the traffic goes", text)              # "(Towards Johor)" is the camera's view, not the traffic
+        line_4703 = next(l for l in text.splitlines() if l.startswith("Image 1:"))
+        self.assertIn("lorries queue", line_4703)
+        self.assertIn("ARRIVING INTO SINGAPORE", line_4703)
+        self.assertIn("to_sg", line_4703)
+        self.assertIn("sg_where", text)
+        self.assertNotIn("Directions at the checkpoints", cpa.prompt(CAMS[2:]))   # ordinary cameras: no border rule
+
+    def test_where_each_direction_was_read_is_kept(self):
+        out = cpa.parse_reply('[{"image":1,"level":"Jam","to_sg":"Jam","sg_where":"lorry queue along the sea, top","to_jb":null,'
+                              '"jb_where":"curved ramp","confidence":0.6}]', 1)
+        self.assertEqual(out[0]["sg_where"], "lorry queue along the sea, top")
+        self.assertNotIn("jb_where", out[0])                                       # no level for Johor -> no 'where' either
+
+    def test_the_4703_photo_reads_as_traffic_into_singapore(self):
+        async def ask(content):
+            self.assertIn("ARRIVING INTO SINGAPORE", content[-1]["text"])
+            return ('[{"image":1,"level":"Jam","to_sg":"Jam","sg_where":"lorry queue along the sea","to_jb":null,"confidence":0.8},'
+                    '{"image":2,"level":"Smooth","to_sg":null,"to_jb":"Smooth","jb_where":"departure lanes","confidence":0.7}]')
+        out = asyncio.run(cpa.analyse(TUAS, self.fetch, ask, now=1793160000))
+        tuas = out["crossings"][0]
+        self.assertEqual(tuas["to_sg"], {"level": "Jam", "minutes": 60})
+        self.assertEqual(tuas["to_jb"], {"level": "Smooth", "minutes": 15})
+        self.assertEqual(out["cameras"]["4703"]["sg_where"], "lorry queue along the sea")
+        self.assertEqual(out["swapped"], [])
+
+    def test_controller_swap_flips_at_once_and_undo_restores(self):
+        async def ask(content):                                        # an AI reading the wrong way round
+            return '[{"image":1,"level":"Jam","to_jb":"Jam","jb_where":"lorry queue","to_sg":null},{"image":2,"level":"Smooth"}]'
+        now = 1793160000
+        out = asyncio.run(cpa.analyse(TUAS, self.fetch, ask, now=now))
+        self.assertEqual(out["crossings"][0]["to_jb"]["level"], "Jam")
+        cpa.SWAPPED.add("4703")
+        out = asyncio.run(cpa.analyse(TUAS, self.fetch, ask, now=now + 60))      # cached reading, no new AI call
+        cam = out["cameras"]["4703"]
+        self.assertEqual((cam["to_sg"], cam["to_jb"], cam["sg_where"], cam.get("jb_where"), cam["swapped"]), ("Jam", None, "lorry queue", None, True))
+        self.assertEqual(out["crossings"][0]["to_sg"], {"level": "Jam", "minutes": 60})
+        self.assertIsNone(out["crossings"][0]["to_jb"])
+        self.assertEqual(out["swapped"], ["4703"])
+        self.assertEqual(cpa._CACHE["4703"][1]["to_jb"], "Jam")                  # the stored reading itself is untouched
+        cpa.SWAPPED.discard("4703")
+        out = asyncio.run(cpa.analyse(TUAS, self.fetch, ask, now=now + 120))
+        self.assertEqual(out["cameras"]["4703"]["to_jb"], "Jam")
+        self.assertNotIn("swapped", out["cameras"]["4703"])
+
+    def test_swap_never_touches_speed_band_readings(self):
+        cpa.SWAPPED.add("4703")
+        async def bands(lat, lon):
+            return {"level": "Medium", "source": "LTA speed bands"}
+        out = asyncio.run(cpa.analyse(TUAS, None, None, bands, now=1000))
+        self.assertNotIn("swapped", out["cameras"]["4703"])
+        self.assertEqual(out["crossings"][0]["any"], {"level": "Medium", "minutes": 30})
+
+
 if __name__ == "__main__":
     unittest.main()

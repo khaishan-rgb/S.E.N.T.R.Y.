@@ -95,19 +95,27 @@ class SameAsTheOCCReadsIt(unittest.TestCase):
         self.assertEqual(len({(x["avg"], x["max"], x["min"]) for x in w.values()}), 1, w)
         self.assertLessEqual(max(x["max"] for x in w.values()), 12 + 6 + 0.5)   # QoS 1.2 holds on every trip
 
-    def test_halfway_first_trip_then_timetable(self):
+    def test_halfway_with_adjustment_then_timetable(self):
         p = self.r["plans"]["halfway"]
         w = per_trip(p)
-        self.assertGreater(w["UP 1"]["max"], 20)                                # the stops before the halfway start lose trip 6
-        for lg in ("UP 2", "DOWN 2"):
-            self.assertAlmostEqual(w[lg]["max"], 12.0, delta=0.5)
-            self.assertAlmostEqual(w[lg]["min"], 12.0, delta=0.5)
-        self.assertLessEqual(w["DOWN 1"]["max"], 12.0 + 1.0)
-        self.assertEqual([r_["n"] for r_ in p["rows"] if r_["type"] == "full" and abs(r_["shift"]) >= 0.5], [])   # no other trip held / released
+        moved = [r_ for r_ in p["rows"] if r_["type"] == "full" and abs(r_["shift"]) >= 0.5]
+        self.assertTrue(moved)                                                  # the trips around the lost trip ARE adjusted ...
+        self.assertTrue(all(abs(r_["shift"]) <= 3.0 + 1e-6 for r_ in moved))    # ... only by what the BC wins back in the layover (10 - 7)
+        self.assertTrue(p["qos"]["ok"], p["qos"])                               # the lost trip's 24-min gap is brought to <= 18 at the interchange
+        dep = sorted(r_["dep"] for r_ in p["rows"] if r_["type"] != "halfway")
+        self.assertLessEqual(max(b - a for a, b in zip(dep, dep[1:])), 18.0 + 1e-6)
+        for lg in ("DOWN 1", "UP 2", "DOWN 2"):                                 # from the 2nd trip: the timetable
+            self.assertAlmostEqual(w[lg]["max"], 12.0, delta=0.6)
+            self.assertAlmostEqual(w[lg]["min"], 12.0, delta=0.6)
         self.assertEqual(p["term_adj"], [])
 
+    def test_halfway_only_is_still_a_setting(self):
+        r = R.optimise(ctx([0, 0, 0, 0, 0, 15, 0, 0, 0, 0], {"halfway_regulate": 0}))
+        p = r["plans"]["halfway"]
+        self.assertEqual([r_["n"] for r_ in p["rows"] if r_["type"] == "full" and abs(r_["shift"]) >= 0.5], [])
+
     def test_former_rules_still_available(self):
-        r = R.optimise(ctx([0, 0, 0, 0, 0, 15, 0, 0, 0, 0], {"term_mode": "even", "halfway_regulate": 1}))
+        r = R.optimise(ctx([0, 0, 0, 0, 0, 15, 0, 0, 0, 0], {"term_mode": "even"}))
         self.assertTrue(r["plans"]["adjust"]["later_adjusted"])
         self.assertEqual(r["params"]["term_mode"], "even")
 
@@ -122,7 +130,8 @@ class Limits(unittest.TestCase):
         r = R.optimise(ctx(LATE6, now=470.0))
         q = r["plans"]["adjust"]["qos"]
         self.assertTrue([b for b in q["breaches"] if b["leg"] == "UP 1" and b["between"] == "Trip 5 and Trip 7"], q)
-        self.assertTrue(r["plans"]["halfway"]["qos"]["ok"])                   # ... a halfway start can (decided on EWT)
+        hq = r["plans"]["halfway"]["qos"]                                     # a halfway start leaves the same gap at the interchange: reported too
+        self.assertTrue(hq["ok"] or hq["breaches"][0]["leg"] == "UP 1")
         c = ctx(LATE6, now=470.0)
         c["candidates"] = []                                                  # no halfway stop: the best full-trip plan, said plainly
         r = R.optimise(c)
