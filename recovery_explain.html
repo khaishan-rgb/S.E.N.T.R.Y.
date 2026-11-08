@@ -89,7 +89,18 @@ svg.saw{display:block;width:100%;height:auto}
 .why ol{margin:0;padding-left:20px;display:grid;gap:10px;color:var(--text-2)}
 .why ol b{color:var(--text)}
 .why figure{margin:0;display:grid;gap:8px}
-.why figcaption{font-size:13px;color:var(--mut)}
+.why figcaption{font-size:14px;color:var(--text-2)}
+.why-lead{color:var(--text-2);margin:0 0 12px;max-width:62ch}.why-lead b{color:var(--text)}
+.rules{margin:0 0 16px;padding-left:22px;display:grid;gap:8px;color:var(--text-2);max-width:80ch}.rules b{color:var(--text)}
+.receipts{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px;margin-bottom:12px}
+.rc{border:1px solid var(--line);border-top:3px solid var(--c);border-radius:10px;padding:14px 16px;background:rgba(4,14,30,.5);display:grid;gap:10px;align-content:start}
+.rc h3{font-size:17px;color:var(--c)}
+.rc ol{margin:0;padding-left:20px;display:grid;gap:8px;font-size:14px;color:var(--text-2)}
+.rc ol b{color:var(--text)}.rc .arrow{color:var(--mut)}
+.rc .tot{display:flex;justify-content:space-between;align-items:baseline;gap:10px;border-top:1px solid var(--line);padding-top:10px;font-size:14px;color:var(--text-2)}
+.rc .tot b{font:700 22px/1 var(--f-brand);color:var(--c)}
+.fulltbl summary{cursor:pointer;color:var(--text-2);font:600 14px/1.3 var(--f-disp);letter-spacing:.04em;padding:6px 0}
+.fulltbl[open] summary{margin-bottom:10px}
 .legend{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:13px;color:var(--mut)}
 .legend i{display:inline-block;width:14px;height:10px;border-radius:2px;vertical-align:-1px;margin-right:6px}
 
@@ -153,15 +164,12 @@ button:hover{border-color:var(--cyan)}
 
   <section class="panel why" aria-labelledby="why-h">
     <div class="sec">
-      <h2 id="why-h">Why one long gap costs so much</h2>
-      <ol>
-        <li><b>People turn up at random.</b> Someone who arrives just after a bus waits the whole gap; someone who arrives just before waits almost nothing. On the picture, the height at any moment is how long a person arriving then will wait.</li>
-        <li><b>The area of a triangle is the total waiting.</b> Double the gap and the triangle holds four small ones: twice as many people arrive in it, and each waits twice as long.</li>
-        <li><b>So spreading a gap always helps</b>, and getting back to the timetable sooner helps most. Halfway closes the gap at the halfway stop and the timetable is back from the next trip. Adjustment spreads the gap over every trip. No adjustment keeps it for every trip.</li>
-      </ol>
+      <h2 id="why-h">Why one long gap hurts so much</h2>
+      <p class="why-lead">Say <b>one passenger reaches the stop every minute</b>. In the picture each bar is one passenger, and its height is how long they wait. The first person after a bus waits the longest; the last one hardly waits.</p>
+      <ol id="whylist"></ol>
     </div>
     <figure>
-      <svg class="saw" id="whysvg" viewBox="0 0 420 210" role="img" aria-label="A gap twice as long holds four times the waiting"></svg>
+      <svg class="saw" id="whysvg" viewBox="0 0 420 236" role="img" aria-label="Passengers waiting in a normal gap and in a gap twice as long"></svg>
       <figcaption id="whycap"></figcaption>
     </figure>
   </section>
@@ -169,10 +177,11 @@ button:hover{border-color:var(--cyan)}
   <section class="panel sec" aria-labelledby="calc-h">
     <div class="sec-h">
       <h2 id="calc-h">How the numbers are worked out</h2>
-      <p>Extra wait (EWT) = average wait in the hour minus the normal wait. Lower is better; 0 means passengers wait no longer than the timetable promises.</p>
+      <p><b>Extra wait</b> = how many minutes longer the average passenger waits than the timetable promises. 0 means no extra wait. Lower is better.</p>
     </div>
-    <div class="formula" id="formula"></div>
-    <div class="tablewrap"><table id="tbl"></table></div>
+    <ol class="rules" id="rules"></ol>
+    <div class="receipts" id="receipts"></div>
+    <details class="fulltbl"><summary>Full table, every trip</summary><div class="formula" id="formula"></div><div class="tablewrap"><table id="tbl"></table></div></details>
   </section>
 
   <section class="panel sec" aria-labelledby="try-h">
@@ -345,23 +354,30 @@ button:hover{border-color:var(--cyan)}
     return h + "</svg>";
   }
 
-  function whySVG(H){
-    var g = 2 * H, W = 420, B = 176, L = 16, sc = Math.min(324 / (3 * H), 150 / g);   // a normal gap and a double gap on the same scale
-    var x0 = L, h = "";
-    var tri = function(x, w, col, op){ return '<path d="M' + x.toFixed(1) + " " + B + " L" + x.toFixed(1) + " " + (B - w * sc).toFixed(1) + " L" + (x + w * sc).toFixed(1) + " " + B + ' Z" fill="' + col + '" fill-opacity="' + op + '" stroke="' + col + '" stroke-width="1.5" stroke-linejoin="round"/>'; };
-    h += tri(x0, H, "#46d6ff", .25);
-    h += '<text x="' + (x0 + H * sc / 2).toFixed(1) + '" y="' + (B - H * sc - 8).toFixed(1) + '" text-anchor="middle" font-size="13" font-family="Rajdhani, sans-serif" font-weight="700" fill="var(--text)">' + r1(H) + " min</text>";
-    var x1 = x0 + H * sc + 56;
-    h += '<text x="' + (x0 + H * sc + 28).toFixed(1) + '" y="' + (B - 26) + '" text-anchor="middle" font-size="22" font-family="Orbitron, sans-serif" fill="var(--mut)">vs</text>';
-    h += tri(x1, g, "#ff8577", .22);
-    var m = g * sc / 2;                           // the midpoint lines that cut the big triangle into four small ones
-    h += '<path d="M' + x1.toFixed(1) + " " + (B - m).toFixed(1) + " L" + (x1 + m).toFixed(1) + " " + (B - m).toFixed(1) + " L" + (x1 + m).toFixed(1) + " " + B + " M" + x1.toFixed(1) + " " + (B - m).toFixed(1) + " L" + (x1 + m).toFixed(1) + " " + B + '" fill="none" stroke="#ff8577" stroke-width="1.2" stroke-dasharray="4 3"/>';
-    [[x1 + m * .33, B - m * .33], [x1 + m * .33, B - m - m * .33], [x1 + m * 1.33, B - m * .33], [x1 + m * .67, B - m * .67]].forEach(function(p, i){
-      h += '<text x="' + p[0].toFixed(1) + '" y="' + (p[1] + 4).toFixed(1) + '" text-anchor="middle" font-size="12" font-family="Rajdhani, sans-serif" font-weight="700" fill="var(--text-2)">' + (i + 1) + "</text>";
-    });
-    h += '<text x="' + (x1 + g * sc / 2).toFixed(1) + '" y="' + (B - g * sc - 8).toFixed(1) + '" text-anchor="middle" font-size="13" font-family="Rajdhani, sans-serif" font-weight="700" fill="var(--text)">' + r1(g) + " min = 4 × the waiting</text>";
-    h += '<line x1="' + L + '" x2="' + (W - 8) + '" y1="' + B + '" y2="' + B + '" stroke="var(--line-2)"/>';
-    h += '<text x="' + L + '" y="' + (B + 22) + '" font-size="12" fill="var(--mut)" font-family="IBM Plex Sans, sans-serif">height = how long someone arriving then waits</text>';
+  function whySVG(H){                            // one bar per passenger (one a minute): a normal gap and a gap twice as long, same scale
+    var G = 2 * H, n1 = Math.max(1, Math.round(H)), n2 = Math.max(2, Math.round(G)), W = 420, L = 14, R = 406, mid = 34;
+    var pitch = (R - L - mid) / (n1 + n2), bw = Math.max(1.6, pitch * .66), B = 168, T = 46, sc = (B - T) / G, h = "";
+    var block = function(x0, n, gap, col, title){
+      var o = "", avg = gap / 2;
+      for(var i = 0; i < n; i++){
+        var w = gap * (n - i - .5) / n, x = x0 + i * pitch + (pitch - bw) / 2, y = B - w * sc;
+        o += '<rect x="' + x.toFixed(1) + '" y="' + y.toFixed(1) + '" width="' + bw.toFixed(1) + '" height="' + (B - y).toFixed(1) + '" rx="1" fill="' + col + '" fill-opacity=".55"/>';
+        o += '<circle cx="' + (x + bw / 2).toFixed(1) + '" cy="' + (y - bw * .9).toFixed(1) + '" r="' + (bw * .55).toFixed(1) + '" fill="' + col + '"/>';
+      }
+      var cx = x0 + n * pitch / 2, ya = B - avg * sc;
+      o += '<line x1="' + x0.toFixed(1) + '" x2="' + (x0 + n * pitch).toFixed(1) + '" y1="' + ya.toFixed(1) + '" y2="' + ya.toFixed(1) + '" stroke="var(--text)" stroke-width="1" stroke-dasharray="4 3"/>';
+      o += '<text x="' + (x0 + n * pitch).toFixed(1) + '" y="' + (ya - 4).toFixed(1) + '" text-anchor="end" font-size="10.5" fill="var(--text)" stroke="var(--panel)" stroke-width="3" paint-order="stroke" font-family="IBM Plex Sans, sans-serif">average ' + r1(avg) + ' min</text>';
+      o += '<text x="' + cx.toFixed(1) + '" y="' + (T - 22) + '" text-anchor="middle" font-size="13" font-weight="700" fill="var(--text)" font-family="Rajdhani, sans-serif">' + title + "</text>";
+      o += '<text x="' + cx.toFixed(1) + '" y="' + (B + 18) + '" text-anchor="middle" font-size="12" fill="var(--text-2)" font-family="IBM Plex Sans, sans-serif">' + n + " people wait</text>";
+      o += '<text x="' + cx.toFixed(1) + '" y="' + (B + 36) + '" text-anchor="middle" font-size="12.5" font-weight="700" fill="' + col + '" font-family="IBM Plex Sans, sans-serif">' + r1(n * avg) + " min in total</text>";
+      return o;
+    };
+    h += block(L, n1, H, "#46d6ff", "Bus every " + r1(H) + " min");
+    h += block(L + n1 * pitch + mid, n2, G, "#ff8577", "One " + r1(G) + "-min gap");
+    h += '<line x1="' + L + '" x2="' + R + '" y1="' + B + '" y2="' + B + '" stroke="var(--line-2)"/>';
+    h += '<text x="' + (L + n1 * pitch + mid / 2).toFixed(1) + '" y="' + (B - 30) + '" text-anchor="middle" font-size="16" font-family="Orbitron, sans-serif" fill="var(--mut)">vs</text>';
+    h += '<text x="' + R + '" y="' + (B + 60) + '" text-anchor="end" font-size="13" font-weight="700" fill="var(--text)" font-family="Rajdhani, sans-serif">' + r1(n2 * G / 2) + " is 4 × " + r1(n1 * H / 2) + "</text>";
+    h += '<text x="' + L + '" y="' + (B + 60) + '" font-size="11" fill="var(--mut)" font-family="IBM Plex Sans, sans-serif">time &#8594; (bus leaves at the left of each group)</text>';
     return h;
   }
 
@@ -447,7 +463,50 @@ button:hover{border-color:var(--cyan)}
 
     // why
     $("whysvg").innerHTML = whySVG(H);
-    $("whycap").textContent = "A " + r1(2 * H) + "-min gap against a normal " + r1(H) + "-min gap: twice the length, four times the waiting.";
+    $("whylist").innerHTML = "<li><b>Normal gap, " + r1(H) + " min:</b> " + Math.round(H) + " people wait, " + r1(H / 2) + " min on average.</li>"
+      + "<li><b>Long gap, " + r1(2 * H) + " min:</b> twice as many people (" + Math.round(2 * H) + ") wait, and each waits twice as long (" + r1(H) + " min on average).</li>"
+      + "<li><b>Twice the people &times; twice the wait = 4 times the waiting.</b> One long gap costs far more than a few small delays, so the best option is the one that brings even gaps back soonest.</li>";
+    $("whycap").textContent = "Same passengers, same scale: the long gap holds 4 times the waiting of a normal one.";
+
+    // how the numbers are worked out: three rules, then a short sum per option
+    var nw = H / 2, same = function(ev){ return ev.hour.every(function(x){ return Math.abs(x - ev.hour[0]) < 0.05; }); };
+    var evens = [H]; if(cs.mode === "simple"){ [cs.head.adjust, cs.head.before].forEach(function(x){ if(evens.indexOf(x) < 0) evens.push(x); }); }
+    $("rules").innerHTML = "<li><b>Even gaps: the average wait is half the gap.</b> " + evens.map(function(x){ return "Every " + r1(x) + " min &rarr; " + r1(x / 2); }).join("; ") + ".</li>"
+      + "<li><b>The timetable promises half of " + r1(H) + " = " + r1(nw) + " min.</b> Extra wait = average wait &minus; " + r1(nw) + ".</li>"
+      + "<li><b>Uneven gaps: count the people.</b> One person arrives every minute, and the people in each gap wait half that gap on average. A long gap counts more because more people are caught in it.</li>";
+    var nm = function(x){ return String(Math.round(x * 100) / 100); };          // 9, 7.5, 11.25
+    var whole = function(ev){ return Math.abs(ev.hour.reduce(function(a, x){ return a + x; }, 0) - 60) < 0.05 && ev.t.some(function(x){ return Math.abs(x + 30) < 1e-6; }); };
+    var sum1 = function(ev){                    // one trip, in words
+      if(same(ev)) return "every <b>" + r1(ev.hour[0]) + "</b> min <span class=\"arrow\">&rarr;</span> average wait " + nm(ev.awt) + " <span class=\"arrow\">&rarr;</span> extra " + nm(ev.awt) + " &minus; " + nm(nw) + " = <b>" + r2(ev.ewt) + "</b>";
+      if(whole(ev)){
+        var tot = ev.hour.reduce(function(a, x){ return a + x * x / 2; }, 0);
+        return "gaps " + ev.hour.map(r1).join(", ") + " min<br>" + ev.hour.map(function(x){ return Math.round(x) + " people wait " + r1(x / 2); }).join(" &middot; ")
+          + "<br>" + r1(tot) + " min of waiting &divide; 60 people = average wait " + nm(ev.awt) + "<br>extra " + nm(ev.awt) + " &minus; " + nm(nw) + " = <b>" + r2(ev.ewt) + "</b>";
+      }
+      return "gaps " + ev.hour.map(r1).join(", ") + " min<br>average wait " + nm(ev.awt) + " (long gaps count more) &rarr; extra " + nm(ev.awt) + " &minus; " + nm(nw) + " = <b>" + r2(ev.ewt) + "</b>";
+    };
+    var lines = function(names, evs){            // trips with the same sum are written once
+      var out = [], i = 0;
+      while(i < evs.length){
+        var j = i; while(j + 1 < evs.length && evs[j + 1] && evs[i] && sum1(evs[j + 1]) === sum1(evs[i])) j++;
+        if(evs[i]) out.push("<li><b>" + (j > i ? (evs.length === j - i + 1 && i === 0 && names[0] === cs.trips[0] ? "Every trip" : esc(names[i]) + " to " + esc(names[j].replace(/^Trip /, ""))) : esc(names[i])) + ":</b> " + sum1(evs[i]) + "</li>");
+        i = j + 1;
+      }
+      return out.join("");
+    };
+    $("receipts").innerHTML = opts.map(function(o){
+      var r = R[o.k], h = '<article class="rc" style="--c:' + o.hex + '"><h3>' + esc(o.name) + "</h3><ol>", ex;
+      if(o.k === "halfway"){
+        h += "<li><b>" + esc(cs.trips[0]) + ", before the halfway stop:</b> " + sum1(r.before) + "</li>";
+        h += "<li><b>" + esc(cs.trips[0]) + ", after it:</b> " + sum1(r.after) + "</li>";
+        h += "<li><b>" + esc(cs.trips[0]) + " overall:</b> " + r2(r.before.ewt) + " &times; " + Math.round(cs.f * 100) + "% of stops + " + r2(r.after.ewt) + " &times; " + Math.round((1 - cs.f) * 100) + "% = <b>" + r2(r.t1) + "</b></li>";
+        h += lines(cs.trips.slice(1), r.later);
+        ex = [r.t1].concat(r.later.map(function(x){ return x ? x.ewt : 0; }));
+      } else { h += lines(cs.trips, r.trips); ex = r.trips.map(function(x){ return x ? x.ewt : 0; }); }
+      h += "</ol>";
+      h += '<div class="tot"><span>Average of ' + nT + " trip" + (nT > 1 ? "s" : "") + (nT > 1 ? ": (" + ex.map(r2).join(" + ") + ") &divide; " + nT : "") + '</span><b class="num">' + r2(r.avg) + "</b></div>";
+      return h + "</article>";
+    }).join("");
 
     // table
     var rows = [], line = function(o, label, ev, w){
