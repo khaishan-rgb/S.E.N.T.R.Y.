@@ -68,7 +68,7 @@ header{display:grid;gap:12px}
 .opt .rule{font:600 15px/1.35 var(--f-disp);color:var(--c);letter-spacing:.02em}
 .opt .what{color:var(--text-2);font-size:14px;min-height:3em}
 .trip{display:grid;gap:4px;padding-top:10px;border-top:1px solid var(--line)}
-.trip-h{display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:baseline;gap:4px 12px;font:600 14px/1.2 var(--f-disp);letter-spacing:.04em}
+.trip-h{display:grid;grid-template-columns:minmax(84px,1fr) auto auto;align-items:baseline;gap:4px 12px;font:600 14px/1.2 var(--f-disp);letter-spacing:.04em}
 .trip-h .lbl small{display:block;font:500 12px/1.3 var(--f-body);letter-spacing:0;color:var(--mut)}
 .trip-h .hw{color:var(--text-2);font-weight:600}
 .trip-h .hw b{color:var(--c);font:700 16px/1 var(--f-brand)}
@@ -76,6 +76,7 @@ header{display:grid;gap:12px}
 .trip-h .e b{color:var(--text);font-weight:600}
 .seg{font:500 12px/1.2 var(--f-body);color:var(--mut)}
 svg.saw{display:block;width:100%;height:auto}
+.splitnote{font-size:12.5px;color:var(--mut)}.splitnote b{color:var(--text);font-weight:600}
 .foot{display:grid;gap:6px;padding-top:10px;border-top:1px solid var(--line);font-size:13px;color:var(--text-2)}
 .pill{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:2px 10px;font:600 12px/1.6 var(--f-disp);letter-spacing:.06em;border:1px solid}
 .pill.ok{color:var(--ok);border-color:rgba(46,232,160,.5);background:rgba(46,232,160,.08)}
@@ -117,7 +118,7 @@ button:hover{border-color:var(--cyan)}
 .casebar b{color:var(--text)}
 
 @media (max-width:980px){.answer,.why{grid-template-columns:1fr}.opts{grid-template-columns:1fr}.opt .what{min-height:0}}
-@media (max-width:520px){.bar{grid-template-columns:minmax(0,1fr) 86px;grid-template-areas:"nm v" "tr v";gap:6px 12px}.bar .v{font-size:17px}h1{font-size:34px}}
+@media (max-width:520px){.trip-h{grid-template-columns:minmax(0,1fr) auto}.trip-h .e{grid-column:1 / -1;justify-self:start}.bar{grid-template-columns:minmax(0,1fr) 86px;grid-template-areas:"nm v" "tr v";gap:6px 12px}.bar .v{font-size:17px}h1{font-size:34px}}
 @media (prefers-reduced-motion:reduce){.bar .fl{transition:none}}
 </style>
 
@@ -145,7 +146,7 @@ button:hover{border-color:var(--cyan)}
   <section class="sec" aria-labelledby="opt-h">
     <div class="sec-h">
       <h2 id="opt-h">What each option does to the gaps between buses</h2>
-      <p>Each picture is one hour at a stop. A triangle is one gap: the taller it is, the longer people wait. The dotted outline is the normal timetable.</p>
+      <p>Each picture is one hour at a stop. A triangle is one gap: the taller it is, the longer people wait. The dotted outline is the normal timetable. For halfway, trip 1 is one picture split at the halfway stop (&#9670;): stops before it on the left, stops after it on the right, each side as wide as its share of the stops.</p>
     </div>
     <div class="opts" id="opts"></div>
   </section>
@@ -306,6 +307,44 @@ button:hover{border-color:var(--cyan)}
     return h + "</svg>";
   }
 
+  /* Halfway, trip 1 in one picture: stops before the halfway stop on the left, stops after it on the right, split at the
+     halfway stop. Each side is one hour at a stop, and its width is that side's share of the stops. */
+  function splitSVG(tb, ta, H, ymax, col, f, opts){
+    opts = opts || {};
+    var W = 360, Ht = 128, L = 8, R = 352, B = Ht - 24, T = 30, fd = Math.min(.82, Math.max(.18, f)), S = L + fd * (R - L), gap = 4;
+    var Y = function(w){ return B - Math.min(w, ymax) / ymax * (B - T); };
+    var side = function(times, x0, x1, fade){
+      var X = function(m){ return x0 + (m + 30) / 60 * (x1 - x0); }, d = "", lab = "", bus = "";
+      for(var k = 0; k + 1 < times.length; k++){
+        var u = Math.max(-30, times[k]), v = Math.min(30, times[k + 1]), g = times[k + 1] - times[k];
+        if(v <= u) continue;
+        d += "M" + X(u).toFixed(1) + " " + B + " L" + X(u).toFixed(1) + " " + Y(times[k + 1] - u).toFixed(1) + " L" + X(v).toFixed(1) + " " + Y(times[k + 1] - v).toFixed(1) + " L" + X(v).toFixed(1) + " " + B + " Z ";
+        if(X(v) - X(u) > 13 && g > 0.5) lab += '<text x="' + ((X(u) + X(v)) / 2).toFixed(1) + '" y="' + Math.max(T - 3, Y(times[k + 1] - u) - 4).toFixed(1) + '" text-anchor="middle" font-size="11" font-family="Rajdhani, sans-serif" font-weight="700" fill="var(--text)">' + r1(g) + "</text>";
+      }
+      times.forEach(function(x){ if(x >= -30 - 1e-6 && x <= 30 + 1e-6) bus += '<rect x="' + (X(x) - 3.5).toFixed(1) + '" y="' + (B - 3) + '" width="7" height="6" rx="1.5" fill="' + col + '"/>'; });
+      var sd = "", sch = []; for(var s0 = -60 - H / 2; s0 < 60; s0 += H) sch.push(s0);
+      for(var j = 0; j + 1 < sch.length; j++){
+        var a = Math.max(-30, sch[j]), b = Math.min(30, sch[j + 1]); if(b <= a) continue;
+        sd += "M" + X(a).toFixed(1) + " " + B + " L" + X(a).toFixed(1) + " " + Y(sch[j + 1] - a).toFixed(1) + " L" + X(b).toFixed(1) + " " + Y(sch[j + 1] - b).toFixed(1) + " L" + X(b).toFixed(1) + " " + B + " Z ";
+      }
+      return '<path d="' + d + '" fill="' + col + '" fill-opacity="' + (fade ? ".30" : ".18") + '" stroke="' + col + '" stroke-width="1.5" stroke-linejoin="round"/>'
+        + '<path d="' + sd + '" fill="none" stroke="var(--ghost)" stroke-width="1" stroke-dasharray="3 3"/>' + bus + lab;
+    };
+    var h = '<svg class="saw split" viewBox="0 0 ' + W + " " + Ht + '" role="img" aria-label="' + esc(opts.label || "") + '">';
+    h += '<rect x="' + L + '" y="' + (T - 8) + '" width="' + (S - gap - L).toFixed(1) + '" height="' + (B - T + 8) + '" rx="3" fill="' + col + '" fill-opacity=".05"/>';
+    h += '<line x1="' + L + '" x2="' + R + '" y1="' + B + '" y2="' + B + '" stroke="var(--line-2)" stroke-width="1"/>';
+    h += side(tb, L, S - gap, true) + side(ta, S + gap, R, false);
+    // the indicator: the halfway stop, where the late bus starts
+    h += '<line x1="' + S.toFixed(1) + '" x2="' + S.toFixed(1) + '" y1="18" y2="' + (B + 4) + '" stroke="var(--text)" stroke-width="1.4" stroke-dasharray="4 3"/>';
+    h += '<rect x="' + (S - 4.5).toFixed(1) + '" y="' + (B - 4.5) + '" width="9" height="9" transform="rotate(45 ' + S.toFixed(1) + " " + B + ')" fill="var(--text)"/>';
+    var lw = 142, lx = Math.min(R - lw, Math.max(L, S - lw / 2));
+    h += '<rect x="' + lx.toFixed(1) + '" y="2" width="' + lw + '" height="16" rx="8" fill="var(--panel)" stroke="var(--text)" stroke-width="1"/>';
+    h += '<text x="' + (lx + lw / 2).toFixed(1) + '" y="13.5" text-anchor="middle" font-size="10" font-weight="600" fill="var(--text)" font-family="IBM Plex Sans, sans-serif">Halfway stop: late bus starts</text>';
+    h += '<text x="' + L + '" y="' + (Ht - 7) + '" font-size="10" fill="var(--mut)" font-family="IBM Plex Sans, sans-serif">&#9664; Stops before · ' + Math.round(f * 100) + '%</text>';
+    h += '<text x="' + R + '" y="' + (Ht - 7) + '" font-size="10" fill="var(--mut)" text-anchor="end" font-family="IBM Plex Sans, sans-serif">Stops after · ' + Math.round((1 - f) * 100) + '% &#9654;</text>';
+    return h + "</svg>";
+  }
+
   function whySVG(H){
     var g = 2 * H, W = 420, B = 176, L = 16, sc = Math.min(324 / (3 * H), 150 / g);   // a normal gap and a double gap on the same scale
     var x0 = L, h = "";
@@ -384,8 +423,11 @@ button:hover{border-color:var(--cyan)}
       if(o.k === "halfway"){
         h += '<div class="rule">' + (cs.mode === "simple" ? r1(cs.head.before) + " before the halfway stop, then " + r1(cs.head.after) + " all the way" : "Gap before the halfway stop on trip 1, then the timetable") + "</div>";
         h += '<p class="what">' + esc(whatTxt[o.k]) + "</p>";
-        h += tripBlock(o, cs.trips[0], r.before, headTxt(r.before), "before halfway stop");
-        h += tripBlock(o, cs.trips[0], r.after, headTxt(r.after), "after halfway stop");
+        var same = function(ev){ return ev.hour.every(function(x){ return Math.abs(x - ev.hour[0]) < 0.05; }); };
+        h += '<div class="trip"><div class="trip-h"><span class="lbl">' + esc(cs.trips[0]) + "<small>split at the halfway stop</small></span>"
+          + '<span class="hw">' + (same(r.before) && same(r.after) ? "every" : "longest") + ' <b>' + r1(same(r.before) ? r.before.hour[0] : r.before.longest) + '</b> &rarr; <b>' + r1(same(r.after) ? r.after.hour[0] : r.after.longest) + '</b></span><span class="e">extra wait <b class="num">' + r2(r.t1) + "</b></span></div>"
+          + splitSVG(r.before.t, r.after.t, H, ymax, o.hex, cs.f, {label: cs.trips[0] + ": before the halfway stop gaps " + r.before.hour.join(", ") + " min; after it " + r.after.hour.join(", ") + " min"})
+          + '<div class="splitnote">Extra wait: before <b class="num">' + r2(r.before.ewt) + "</b> × " + Math.round(cs.f * 100) + "% + after <b class=\"num\">" + r2(r.after.ewt) + "</b> × " + Math.round((1 - cs.f) * 100) + "% = <b class=\"num\">" + r2(r.t1) + "</b></div></div>";
         r.later.forEach(function(ev, i){ if(ev) h += tripBlock(o, cs.trips[i + 1], ev, headTxt(ev)); });
         h += '<div class="foot"><div class="avgline"><span>' + esc(cs.trips[0]) + " (" + Math.round(cs.f * 100) + "% / " + Math.round((1 - cs.f) * 100) + "% of stops)</span><b class=\"num\">" + r2(r.t1) + "</b></div>";
       } else {
