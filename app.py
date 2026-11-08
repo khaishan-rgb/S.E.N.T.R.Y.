@@ -30,7 +30,7 @@ import traffic
 
 VERSION = "V17.3"
 # V16.8: pages hidden for everyone (see Settings > Pages). Defined here because bb_init() reads the saved value while the module loads.
-SITE_PAGE_IDS = ("occlive", "command", "route", "headway", "bunching", "recovery", "halfplan", "trafficaware", "running", "stoprt", "ewt", "cameras", "diversion")     # "settings" can never be hidden
+SITE_PAGE_IDS = ("occlive", "command", "route", "headway", "bunching", "recovery", "halfplan", "trafficaware", "running", "stoprt", "ewt", "cameras", "diversion", "aicentre")     # "settings" can never be hidden
 SITE = {"hidden": [x.strip() for x in os.getenv("HIDDEN_PAGES", "").split(",") if x.strip() in SITE_PAGE_IDS], "block": True}
 LTA = os.getenv("LTA_BASE", "https://datamall2.mytransport.sg/ltaodataservice").rstrip("/")
 KEY = os.getenv("LTA_ACCOUNT_KEY", "")
@@ -6660,6 +6660,21 @@ async def recovery_page():
     return _page("halfway.html")
 
 
+@app.get("/ai-centre", response_class=HTMLResponse)
+async def ai_centre_page():
+    """V18: AI Operations Centre = a copy of the Forecast Centre with the HORIZON AI operations assistant (chat, voice, EN / 中文 / BM)."""
+    return _page("ai_centre.html")
+
+
+@app.get("/assistant.js")
+@app.get("/assistant.css")
+async def assistant_asset(request: Request):
+    from fastapi.responses import Response
+    name = request.url.path.rsplit("/", 1)[-1]
+    return Response((HERE / name).read_text(encoding="utf-8"), media_type="application/javascript" if name.endswith(".js") else "text/css",
+                    headers={"Cache-Control": "no-cache"})
+
+
 @app.get("/recovery/explain", response_class=HTMLResponse)
 async def recovery_explain_page():
     """Management view: halfway or continue, shown as one headway per option per trip, the hourly extra waiting and why.
@@ -8396,6 +8411,122 @@ async def api_dv_ai_review(request: Request):
                 "note": "AI-written review of the computed plan. Advisory only: routes are unchanged and the controller decides."}
     except Exception as e:
         return {"ok": False, "available": True, "error": f"AI service unavailable ({type(e).__name__})"}
+
+
+# ---- V18: HORIZON AI operations assistant (AI Operations Centre page). Answers from the data the controller's page shows,
+# plus cached checkpoint camera readings. Advisory only: it never changes anything. Key: ANTHROPIC_API_KEY (Render Environment).
+ASSIST_MODEL = os.environ.get("ASSISTANT_AI_MODEL", "").strip() or DV_AI_MODEL
+ASSIST_CAP = max(1, int(os.environ.get("ASSISTANT_DAILY_CAP", "400") or 400))          # questions a day, whole platform
+ASSIST_PER_MIN = 8                                                                        # questions a minute, per person
+ASSIST_LANGS = {"en": "English", "zh": "Simplified Chinese (简体中文)", "ms": "Bahasa Melayu (Malay)"}
+ASSIST = {"day": "", "n": 0, "who": {}}
+ASSIST_SYSTEM = (
+    "You are HORIZON AI, the operations assistant in a Singapore bus operations control centre (OCC). A service controller asks you about "
+    "alerts, services, incidents and what to do. Answer ONLY from the LIVE DATA SNAPSHOT in the message (what the controller's Forecast "
+    "Centre shows, plus checkpoint camera readings). Rules:\n"
+    "1. Advisory only. Never say an action has been taken. Anything that changes service (holding, short-working, halfway, extra buses, "
+    "diversions) needs the Service Controller's approval: say so when you recommend it.\n"
+    "2. Use the services, directions, locations, times and numbers in the data. Do not invent buses, causes, stops or figures. If the data "
+    "does not show something, say that plainly and name what to check (cameras, bus captain, OCC Live, Recovery Decision Engine).\n"
+    "3. If mode is 'demo', say once that the data is simulated.\n"
+    "4. Format: one or two sentences that answer the question first; then 'Why:' with 2-4 short bullets from the data; then 'What to do:' "
+    "with 2-4 numbered steps; then 'Expected recovery:' only if the data supports a time. Keep it under 170 words. Plain text with '-' "
+    "bullets and '1.' steps only (no tables, no headings with #), because it is also read aloud.\n"
+    "5. Reply in {language}. Keep service numbers, stop codes and road names as they are.")
+
+
+def assistant_snapshot(ctx):
+    """Clamp what the page sent (it is only what that page already shows) and add the cached checkpoint readings (no new AI calls)."""
+    def clip(v, n):
+        return v[:n] if isinstance(v, list) else []
+    snap = {k: ctx.get(k) for k in ("mode", "updated", "weather", "kpis", "rules", "delay_filter", "selected", "category", "horizon", "sources", "page") if k in ctx}
+    snap["alerts"] = clip(ctx.get("alerts"), 30)
+    snap["recommendations"] = clip(ctx.get("recommendations"), 12)
+    snap["services"] = clip(ctx.get("services"), 40)
+    try:
+        import checkpoint_ai as cpa
+        now = time.time()                                                           # only readings from the last 30 minutes
+        cams = {str(cid): dict(hit[1], age_min=round((now - hit[0]) / 60)) for cid, hit in list(cpa._CACHE.items())
+                if str(cid) in cpa.CHECKPOINT_IDS and isinstance(hit, tuple) and len(hit) > 1 and isinstance(hit[1], dict) and now - hit[0] < 1800}
+        cams = {cid: cpa.swap_dirs(cid, r) for cid, r in cams.items()}
+        if cams:
+            snap["checkpoints"] = {"crossings": cpa.crossings(cams), "cameras": cams}
+    except Exception:
+        pass
+    snap["now_sg"] = datetime.now(SGT).strftime("%Y-%m-%d %H:%M")
+    text = json.dumps(snap, default=str, ensure_ascii=False)
+    while len(text) > 60000 and (snap["services"] or snap["alerts"]):              # keep the request small
+        if snap["services"]:
+            snap["services"] = snap["services"][: len(snap["services"]) // 2]
+        else:
+            snap["alerts"] = snap["alerts"][: len(snap["alerts"]) // 2]
+        text = json.dumps(snap, default=str, ensure_ascii=False)
+    return snap, text
+
+
+@app.get("/api/assistant/status")
+async def assistant_status():
+    day = datetime.now(SGT).strftime("%Y-%m-%d")
+    return {"configured": bool(DV_AI_KEY), "model": ASSIST_MODEL if DV_AI_KEY else None, "languages": ASSIST_LANGS,
+            "daily_cap": ASSIST_CAP, "used_today": ASSIST["n"] if ASSIST["day"] == day else 0}
+
+
+@app.post("/api/assistant/ask")
+async def assistant_ask(request: Request):
+    """One question to HORIZON AI. Body: {q, lang: en|zh|ms, history: [{role, text}], ctx: page snapshot}."""
+    try:
+        body = await request.json()
+        if not isinstance(body, dict):
+            raise ValueError
+    except Exception:
+        return JSONResponse({"ok": False, "error": "Send the question as JSON."}, status_code=400)
+    q = " ".join(str(body.get("q") or "").split())[:600]
+    if not q:
+        return JSONResponse({"ok": False, "error": "Type a question first."}, status_code=400)
+    lang = body.get("lang") if body.get("lang") in ASSIST_LANGS else "en"
+    if not DV_AI_KEY:
+        return {"ok": False, "configured": False, "error": "HORIZON AI is not set up yet: add ANTHROPIC_API_KEY in Render > Environment."}
+    user = auth.read(request.cookies.get(auth.COOKIE, "")) if hasattr(auth, "read") else None
+    u_ = user.get("u") if isinstance(user, dict) else None
+    who = (u_.get("staff_id") or u_.get("display_name") or u_.get("id") or u_.get("name")) if isinstance(u_, dict) else u_
+    who = str(who or (request.client.host if getattr(request, "client", None) else "user"))
+    now, day = time.time(), datetime.now(SGT).strftime("%Y-%m-%d")
+    if ASSIST["day"] != day:
+        ASSIST.update(day=day, n=0, who={})
+    recent = [t for t in ASSIST["who"].get(who, []) if now - t < 60]
+    if len(recent) >= ASSIST_PER_MIN:
+        return JSONResponse({"ok": False, "error": "Too many questions in a minute: wait a moment and ask again."}, status_code=429)
+    if ASSIST["n"] >= ASSIST_CAP:
+        return JSONResponse({"ok": False, "error": f"Today's limit of {ASSIST_CAP} questions is used up (ASSISTANT_DAILY_CAP)."}, status_code=429)
+    ASSIST["who"][who] = recent + [now]
+    ASSIST["n"] += 1
+    ctx = body.get("ctx") if isinstance(body.get("ctx"), dict) else {}
+    snap, snap_text = assistant_snapshot(ctx)
+    msgs = []
+    for m in (body.get("history") or [])[-6:]:
+        if isinstance(m, dict) and m.get("role") in ("user", "assistant") and str(m.get("text") or "").strip():
+            if msgs and msgs[-1]["role"] == m["role"]:
+                continue
+            msgs.append({"role": m["role"], "content": str(m["text"])[:1500]})
+    while msgs and msgs[0]["role"] != "user":
+        msgs.pop(0)
+    if msgs and msgs[-1]["role"] == "user":
+        msgs.pop()
+    msgs.append({"role": "user", "content": "LIVE DATA SNAPSHOT (JSON):\n" + snap_text + "\n\nQUESTION: " + q})
+    t0 = time.time()
+    try:
+        r = await client().post("https://api.anthropic.com/v1/messages", timeout=60,
+                                headers={"x-api-key": DV_AI_KEY, "anthropic-version": "2023-06-01", "content-type": "application/json"},
+                                json={"model": ASSIST_MODEL, "max_tokens": 700, "system": ASSIST_SYSTEM.replace("{language}", ASSIST_LANGS[lang]), "messages": msgs})
+        j = r.json()
+        if r.status_code != 200:
+            return {"ok": False, "error": "AI service: " + str((j.get("error") or {}).get("message") or f"HTTP {r.status_code}")}
+        text = "".join(c.get("text", "") for c in j.get("content", []) if c.get("type") == "text").strip()
+    except Exception as e:
+        return {"ok": False, "error": f"AI service unavailable ({type(e).__name__})"}
+    return {"ok": True, "answer": text or "(no answer)", "lang": lang, "model": ASSIST_MODEL, "ms": int((time.time() - t0) * 1000),
+            "mode": snap.get("mode"), "data_time": snap.get("updated"), "alerts_used": len(snap.get("alerts") or []),
+            "checkpoints": bool(snap.get("checkpoints")), "note": "AI answer from the data on this page. Advisory only: the Service Controller decides."}
 
 
 # ---- 5. plans: save, confirm, share, acknowledge per OCC, update, end, recover (+ OCC Notes & Actions ticket)

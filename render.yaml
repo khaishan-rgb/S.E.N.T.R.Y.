@@ -97,3 +97,9 @@ services:
         sync: false
       - key: FORECAST_TILE_CAP    # optional: most incident tiles a day for the backup (default 3000)
         sync: false
+      - key: ANTHROPIC_API_KEY    # optional: Claude key for camera AI, diversion review and HORIZON AI (AI Operations Centre). Set it in Render only, never in the code
+        sync: false
+      - key: ASSISTANT_AI_MODEL   # optional: model for HORIZON AI answers (default: the same model as the other AI features)
+        sync: false
+      - key: ASSISTANT_DAILY_CAP  # optional: most HORIZON AI questions a day for the whole site (default 400)
+        sync: false
