@@ -386,7 +386,7 @@ input.bad-time{border-color:#ff4d55!important;box-shadow:0 0 0 1px #ff4d55}
     <div class="hdr-right"><div id="clock">&nbsp;</div><div class="live" id="live"><span class="dot"></span><span id="liveText">Connecting&hellip;</span></div></div>
     
   </header>
-  <section class="module-intro"><h2>Recovery Decision Engine</h2><p style="margin:2px 0 6px"><a href="/halfway">&larr; Halfway Planner (live buses)</a></p><p>Detect &rarr; diagnose &rarr; simulate &rarr; recommend &rarr; controller decision.</p></section>
+  <section class="module-intro"><h2>Recovery Decision Engine</h2><p style="margin:2px 0 6px"><a href="/halfway">&larr; Halfway Planner (live buses)</a> &nbsp;&middot;&nbsp; <a href="/recovery/explain" target="_blank" rel="noopener"><b>Halfway or Continue?</b> Management view &#8599;</a></p><p>Detect &rarr; diagnose &rarr; simulate &rarr; recommend &rarr; controller decision.</p></section>
   <section class="ai-shell-card" aria-label="AI Operational Assistant" hidden><div class="ai-shell-icon">✦</div><div><b>AI Operational Assistant</b><span>Context-aware operational interpretation for halfway optimiser; existing calculations remain authoritative.</span></div><div class="ai-shell-badge">AI READY</div></section>
   <div class="tabs" role="tablist"><button role="tab" id="tabOpt" aria-selected="true">Decision Engine</button><button role="tab" id="tabSet" aria-selected="false">Settings</button></div>
 
@@ -451,7 +451,8 @@ input.bad-time{border-color:#ff4d55!important;box-shadow:0 0 0 1px #ff4d55}
         <details class="tech" id="techEwt" open><summary><b>EWT calculation</b><small>how the EWT figures above were worked out</small></summary><div id="stEwtCalc"></div></details>
         <details class="tech" id="techCalc"><summary><b>How was this recommendation calculated?</b><small>every plan &middot; EWT at each point &middot; stress test</small></summary>
     <section class="card hx-row rv" id="rvCard"><header><div><h2>Full comparison &ndash; every plan, EWT and stress test</h2><div class="sub">Every feasible plan is simulated over the selected <b>Balance Trips</b> and 1,000 possible futures. <b>Continue full trip</b> and <b>Halfway + adjustment</b> are compared on Excess Waiting Time (EWT) at every evaluation point, then averaged.</div></div><a class="btn sm" href="/recovery-guide" target="_blank" rel="noopener">How the AI decides</a></header>
-      <div id="rvBody"><div class="ho-msg">Type the lateness of the late trips, then press <b>Compare Recovery Options</b>.</div></div></section>
+      <div id="rvBody"><div class="ho-msg">Type the lateness of the late trips, then press <b>Compare Recovery Options</b>.</div></div>
+      <div class="rvexp"><a href="/recovery/explain" target="_blank" rel="noopener">Halfway or Continue? Management view &#8599;</a><small>Opens the worked example (15-min headway, 3 balance trips). For your own case, press Compare Recovery Options, then use &ldquo;Explain to management&rdquo; in the result.</small></div></section>
         </details>
         <details class="tech" id="techSim"><summary><b>Detailed trip sequence</b><small>simulation map &middot; timeline &middot; all options &middot; heatmap &middot; traffic</small></summary>
       <section class="card" id="hoMapCard"><header style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap"><div><h2>Simulation map &ndash; trips along the route</h2><div class="sub" id="hoMapSub"></div></div>
