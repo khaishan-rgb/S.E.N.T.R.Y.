@@ -752,7 +752,13 @@ function rvExplainCase(r){
   const tj = hw ? (hw.at_j || []).map(x => +x[1]).filter(Number.isFinite).sort((a, b) => a - b) : [];
   const after = tj.slice(1).map((v, i) => Math.round((v - tj[i]) * 10) / 10).filter(x => x > 0);
   const st = (HO.setup && HO.setup.stops) || [], f = row && st.length > 1 ? Math.min(.95, Math.max(.05, row.j / (st.length - 1))) : .5;
-  return {v: 1, svc: HO.svc, dir: HO.dir, H: r.H, legs: (P.none && P.none.chain || []).map(c => c.leg), f, decision: r.decision,
+  const pts = {}, prm = r.params || {};
+  ["none", "adjust", "halfway"].forEach(k => { const L = P[k] && P[k].ewt && P[k].ewt.points; if(L) pts[k] = L.filter(q => q.ewt != null && q.h && q.h.length).map(q => ({i: q.L, t: q.leg, pct: q.pct, s: q.label, e: q.ewt, w: q.swt, h: q.h.map(x => +x[1])})); });
+  const hp = row && P.halfway && P.halfway.ewt ? (P.halfway.ewt.points || []).find(q => q.L === 0 && q.code === row.code) : null;
+  return {v: 2, pts, hw_pct: hp ? hp.pct : f * 100, rule: r.rule, cont: r.ewt && r.ewt.continue_key, qos: prm.qos_over_max, stress: true,
+    gain: {adj_min: prm.ewt_adjust_min, hw_min: prm.ewt_gain_min, hw_pct: prm.ewt_gain_pct != null ? prm.ewt_gain_pct * (r.mode === "headway" ? .5 : 1) : null},
+    km: {halfway: hw && hw.det ? hw.det.km : null}, adj_n: P.adjust ? P.adjust.n_adjusted : null,
+    svc: HO.svc, dir: HO.dir, H: r.H, legs: (P.none && P.none.chain || []).map(c => c.leg), f, decision: r.decision,
     late: r.late_trips || [], delay: r.delay, halfway_stop: row ? row.stop : null, km_lost: hw && hw.det ? hw.det.km : null,
     none: gaps(P.none), adjust: gaps(P.adjust), halfway: hw ? {first_before: gaps(hw)[0] || [], first_after: after, later: gaps(hw).slice(1)} : null};
 }
@@ -2215,6 +2221,9 @@ document.addEventListener("click", function(e){
   .ln-pick h3{font-size:21px}
   .ln-ins li{grid-template-columns:48px minmax(0,1fr)}.ln-ins .kd{display:none}
 }
+.ln-exph{display:flex;justify-content:space-between;align-items:baseline;gap:6px 16px;flex-wrap:wrap;margin-bottom:8px;font-size:12.5px;color:var(--ds-mut,#8aa2bd)}
+.ln-exph a{color:#46d6ff;font-weight:600}
+.ln-expf{display:block;width:100%;height:1200px;border:0;border-radius:12px;background:#020812}
 @media (prefers-reduced-motion:reduce){.ln-bar i{transition:none}}
 </style>
 <script>
@@ -2242,7 +2251,8 @@ document.addEventListener("click", function(e){
     + '<div class="ln-act" id="lnAct"></div>'
     + '<details class="ln-more" id="lnMore"><summary>More settings <small>balance trips, priority, AITP stops, layover, halfway rules</small></summary></details></section>'
     + '<section class="ln-step" id="lnCompare"><div class="ln-hd"><span class="n">2</span><div class="t"><b>Compare on EWT &mdash; lower is better</b><small>Excess Wait Time: the extra minutes the average passenger waits beyond the timetable because buses are uneven.</small></div></div><div class="ln-res" id="lnCmp"></div></section>'
-    + '<section class="ln-step" id="lnDecide"><div class="ln-hd"><span class="n">3</span><div class="t"><b>Decide</b><small>The recommended recovery, what to tell the bus captains, and your decision.</small></div></div><div class="ln-res" id="lnDec"></div></section>';
+    + '<section class="ln-step" id="lnDecide"><div class="ln-hd"><span class="n">3</span><div class="t"><b>Decide</b><small>The recommended recovery, what to tell the bus captains, and your decision.</small></div></div><div class="ln-res" id="lnDec"></div></section>'
+    + '<section class="ln-step" id="lnExplain"><div class="ln-hd"><span class="n">4</span><div class="t"><b>Explain the decision</b><small>Halfway or continue? The gaps each option leaves, why one long gap hurts, and the sums behind every number. Same figures as step 2.</small></div></div><div class="ln-res" id="lnExp"></div></section>';
   opt.insertBefore(lean, opt.firstChild);
   var full = document.createElement("details"); full.className = "ln-full"; full.id = "lnFull";
   full.innerHTML = '<summary>Full analysis <small>how EWT is worked out &middot; off-service route &middot; all tables</small></summary><div class="ln-fbody">'
@@ -2457,7 +2467,7 @@ document.addEventListener("click", function(e){
   function offGap(q, H){ var g = null; (q.h || []).forEach(function(x){ if(g == null || Math.abs(x[1] - H) > Math.abs(g - H) + 1e-9 || (Math.abs(Math.abs(x[1] - H) - Math.abs(g - H)) <= 1e-9 && x[1] > g)) g = x[1]; }); return g; }   // the headway most off schedule
   function winOf(q, H){                                            // headways from 30 min before the long headway(s) to 30 min after: average / max / shortest
     if(q && q.win) return q.win; var g = ((q && q.h) || []).map(function(x){ return +x[1]; }); if(!g.length) return null;
-    var t = [0]; g.forEach(function(x){ t.push(t[t.length - 1] + x); }); var bad = []; g.forEach(function(x, k){ if(Math.abs(x - H) > 1 + 1e-9) bad.push(k); }), a, b;
+    var t = [0]; g.forEach(function(x){ t.push(t[t.length - 1] + x); }); var bad = [], a, b; g.forEach(function(x, k){ if(Math.abs(x - H) > 1 + 1e-9) bad.push(k); });
     if(bad.length){ a = t[bad[0]] - 30; b = t[bad[bad.length - 1] + 1] + 30; } else { var m = 0; g.forEach(function(x, k){ if(x > g[m]) m = k; }); a = t[m] - 30; b = t[m + 1] + 30; }
     var W = g.filter(function(x, k){ return t[k] >= a - 1e-9 && t[k + 1] <= b + 1e-9; }); if(!W.length) return null;
     return {avg: Math.round(W.reduce(function(p, x){ return p + x; }, 0) / W.length * 10) / 10, max: Math.max.apply(null, W), min: Math.min.apply(null, W), n: W.length};
@@ -2543,6 +2553,26 @@ document.addEventListener("click", function(e){
     el.innerHTML = '<h3>How EWT is worked out</h3><p class="ln-hp">At each AITP: <b>EWT = average wait with the real gaps between buses &minus; average wait the timetable promises</b> (half the headway when buses are evenly spaced). A long gap counts more because more passengers turn up during it and all of them wait longer. Step 1 below is one AITP; step 2 is the average over every AITP on every trip &ndash; the number used in the comparison.</p>' + calc;
   }
 
+  /* ---------- step 4: the explanation engine (/recovery/explain, embedded with this result) */
+  var EXPK = null;
+  function expRender(r){
+    var el = $("lnExp"); if(!el) return;
+    if(!r || !r.ok || !r.plans || !r.plans.none || HO.recStale){
+      EXPK = null;
+      el.innerHTML = '<div class="ln-empty">' + (r && HO.recStale ? "Press <b>Compare options</b> again to explain the new result." : "Appears after <b>Compare options</b>: the recommended decision explained in pictures and plain sums, for controllers and management.") + ' <a href="/recovery/explain" target="_blank" rel="noopener">See the worked example &#8599;</a></div>';
+      return;
+    }
+    var key = runKey(r); if(key === EXPK && $("lnExpF")) return;
+    EXPK = key;
+    try{ rvExplainSave(r); }catch(e){}
+    el.innerHTML = '<div class="ln-exph"><span>Explained with this result: Svc ' + esc(HO.svc) + ' Dir ' + esc(HO.dir) + '</span><a href="/recovery/explain?case=1" target="_blank" rel="noopener">Open as a page to share &#8599;</a></div>'
+      + '<iframe id="lnExpF" class="ln-expf" title="Explanation of the recommended recovery" loading="lazy" src="/recovery/explain?case=1&embed=1&t=' + Date.now() + '"></iframe>';
+  }
+  addEventListener("message", function(e){
+    var f = $("lnExpF"); if(!f || e.origin !== location.origin || !e.data || !e.data.rdeExplainH || e.source !== f.contentWindow) return;
+    f.style.height = Math.min(20000, Math.max(300, +e.data.rdeExplainH)) + "px";
+  });
+
   /* ---------- keep the steps in step with the page */
   var LOADING = null, lastRec = null;
   function render(){
@@ -2552,7 +2582,7 @@ document.addEventListener("click", function(e){
     var st = r && HO.recStale ? '<div class="ln-stale">Inputs changed since this result &ndash; press <b>Compare options</b> to update it.</div>' : "";
     if(LOADING && r === LOADING.prev){ return; }
     LOADING = null;
-    cmpRender(r); decRender(r); howRender(r); aitpTxt();
+    cmpRender(r); decRender(r); howRender(r); aitpTxt(); expRender(r);
     $("lnRouteSec").hidden = !(r && r.ok && r.decision === "halfway");
     if(st){ $("lnCmp").insertAdjacentHTML("afterbegin", st); }
     if(r && r !== lastRec && r.ok){ lastRec = r; setTimeout(function(){ var c = $("lnCompare"), b = c.getBoundingClientRect(); if(b.top < 0 || b.top > innerHeight * .6) c.scrollIntoView({behavior:"smooth", block:"start"}); }, 60); }

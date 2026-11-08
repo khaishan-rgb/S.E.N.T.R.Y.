@@ -30,8 +30,6 @@
      desc:"2BB / 3BB / 4BB and long-gap exception console"},
     {id:"recovery", name:"Recovery Decision Engine", short:"Recovery", icon:"engine",  route:"/recovery",     group:"RECOVERY",  permission:"view", shortcut:true,  mobile:"recovery", enabled:true,
      aliases:["/halfway/timetable"], desc:"Continue, regulate, adjust or halfway — compared on EWT"},
-    {id:"halfexplain", name:"Halfway or Continue?",   short:"Halfway?", icon:"half",    route:"/recovery/explain", group:"RECOVERY", permission:"view", shortcut:true, mobile:"more", enabled:true,
-     desc:"Management view: Halfway + adjustment vs Adjustment vs No adjustment, with the gaps and the hourly EWT"},
     {id:"halfplan", name:"Halfway Planner",          short:"Halfway",  icon:"half",    route:"/halfway",      group:"RECOVERY",  permission:"view", shortcut:true,  mobile:"more",     enabled:true,
      aliases:["/halfway/os"], desc:"Where, when and how a halfway recovery happens, incl. off-service route"},
     {id:"diversion", name:"Diversion Maps",           short:"Diversion", icon:"divert", route:"/diversion",   group:"RECOVERY",  permission:"view", shortcut:true,  mobile:"more",     enabled:true,

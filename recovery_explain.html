@@ -99,6 +99,13 @@ svg.saw{display:block;width:100%;height:auto}
 .rc ol b{color:var(--text)}.rc .arrow{color:var(--mut)}
 .rc .tot{display:flex;justify-content:space-between;align-items:baseline;gap:10px;border-top:1px solid var(--line);padding-top:10px;font-size:14px;color:var(--text-2)}
 .rc .tot b{font:700 22px/1 var(--f-brand);color:var(--c)}
+body.embed .wrap{padding-block:4px 12px;gap:20px;max-width:none;padding-left:0;padding-right:0}
+.bars.eng .bar.win .nm::after{content:"RECOMMENDED"}
+body.embed .wrap>header,body.embed #casebar,body.embed section[aria-labelledby="try-h"]{display:none!important}
+.decrule{display:grid;gap:6px;margin-top:4px;font-size:13.5px;color:var(--text-2)}
+.decrule div{display:grid;grid-template-columns:18px minmax(0,1fr);gap:6px}.decrule i{font-style:normal;font-weight:700}
+.decrule .y i{color:var(--ok)}.decrule .n i{color:#ff8577}
+.tripcap{font-size:12px;color:var(--mut)}
 .fulltbl summary{cursor:pointer;color:var(--text-2);font:600 14px/1.3 var(--f-disp);letter-spacing:.04em;padding:6px 0}
 .fulltbl[open] summary{margin-bottom:10px}
 .legend{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:13px;color:var(--mut)}
@@ -383,7 +390,124 @@ button:hover{border-color:var(--cyan)}
 
   /* ---------- render ---------- */
   var CASE = null;
+  /* ---------- engine mode (v2): the Recovery Decision Engine's own numbers, every AITP check of every balance trip ---------- */
+  var ENAME = {none: "No action", adjust: "Trip adjustment", halfway: "Halfway deployment"};
+  var mean = function(a){ return a.length ? a.reduce(function(s, x){ return s + x; }, 0) / a.length : 0; };
+  var worstOf = function(P){ return P.reduce(function(w, q){ return !w || q.e > w.e + 1e-9 ? q : w; }, null); };
+  function engineR(cs){
+    var R = {};
+    ["none", "adjust", "halfway"].forEach(function(k){
+      var P = (cs.pts[k] || []).filter(function(q){ return isFinite(q.e) && q.h && q.h.length; }); if(!P.length) return;
+      var by = []; P.forEach(function(q){ (by[q.i] = by[q.i] || {i: q.i, name: q.t, pts: []}).pts.push(q); });
+      var trips = by.filter(Boolean).map(function(tr){ tr.ewt = mean(tr.pts.map(function(q){ return q.e; })); tr.worst = worstOf(tr.pts); tr.ev = evalList(tr.worst.h, cs.H); return tr; });
+      var sum = P.reduce(function(s, q){ return s + q.e; }, 0), longest = Math.max.apply(null, P.map(function(q){ return Math.max.apply(null, q.h); }));
+      R[k] = {trips: trips, avg: sum / P.length, sum: sum, n: P.length, longest: longest};
+      if(k === "halfway" && trips[0] && cs.hw_pct != null){
+        var t0 = trips[0], b = t0.pts.filter(function(q){ return q.pct < cs.hw_pct - 1e-9; }), a = t0.pts.filter(function(q){ return q.pct >= cs.hw_pct - 1e-9; });
+        if(b.length && a.length){
+          var side = function(L){ var w = worstOf(L); return {pts: L, ewt: mean(L.map(function(q){ return q.e; })), worst: w, ev: evalList(w.h, cs.H)}; };
+          t0.split = {b: side(b), a: side(a), fb: b.length / t0.pts.length};
+        }
+      }
+    });
+    return R;
+  }
+  function renderEngine(){
+    var cs = CASE, R = engineR(cs), H = cs.H, keys = ["none", "adjust", "halfway"].filter(function(k){ return R[k]; });
+    var nT = Math.max.apply(null, keys.map(function(k){ return R[k].trips.length; })), dec = R[cs.decision] ? cs.decision : keys[0];
+    var hex = {none: "#ff8577", adjust: "#ffc65c", halfway: "#46d6ff"}, nAitp = R[dec].n, qmax = H + (cs.qos || 6);
+    var lowest = keys.reduce(function(b, k){ return R[k].avg < R[b].avg - 1e-9 ? k : b; }, keys[0]);
+    var nmx = function(x){ return String(Math.round(x * 100) / 100); };
+
+    $("chips").innerHTML = '<span class="chip">Scheduled every <b>' + r1(H) + ' min</b></span><span class="chip"><b>' + nT + "</b> balance trip" + (nT > 1 ? "s" : "") + '</span><span class="chip"><b>' + nAitp + "</b> AITP checks per option</span>"
+      + (cs.halfway_stop ? '<span class="chip">Halfway stop <b>' + esc(cs.halfway_stop) + "</b></span>" : "");
+    var cb = $("casebar"); cb.hidden = false;
+    cb.innerHTML = "<span>From the Recovery Decision Engine: <b>Svc " + esc(cs.svc || "?") + " Dir " + esc(cs.dir || "?") + "</b>" + (cs.late && cs.late.length ? ", trip " + esc(cs.late.join(", ")) + " late" + (cs.delay ? " " + r1(cs.delay) + " min" : "") : "") + ". Same numbers as the engine page.</span>"
+      + '<button type="button" id="toex">Show the example instead</button>';
+    $("toex").onclick = function(){ setSimple(EX); };
+
+    // the answer: the engine's decision, and why when it is not simply the lowest
+    $("ans-h").textContent = "The engine recommends";
+    $("best").innerHTML = '<span style="color:' + hex[dec] + '">' + esc(ENAME[dec]) + "</span>";
+    var words = {
+      none: "Leaving the departures alone: the other options do not cut the waiting enough to be worth it.",
+      adjust: "Holding or releasing the buses around the gap spreads it evenly, without losing any part of a trip.",
+      halfway: "Starting the late bus at the halfway stop closes the gap from there on, and the timetable is back from the next trip."
+    };
+    var why = words[dec] + " Average extra wait per passenger over " + nAitp + " AITP checks: " + r2(R[dec].avg) + " min, against " + keys.filter(function(k){ return k !== dec; }).map(function(k){ return ENAME[k].toLowerCase() + " " + r2(R[k].avg); }).join(" and ") + " min.";
+    var g = cs.gain || {}, rl = [];
+    if(R.adjust && R.none){ var d1 = R.none.avg - R.adjust.avg, m1 = g.adj_min != null ? g.adj_min : 0.05;
+      rl.push('<div class="' + (d1 >= m1 - 1e-9 ? "y" : "n") + '"><i>' + (d1 >= m1 - 1e-9 ? "&#10003;" : "&#10007;") + "</i><span><b>Trip adjustment</b> beats no action only if it cuts extra wait by at least <b>" + r2(m1) + " min</b>: it cuts " + r2(d1) + ".</span></div>"); }
+    if(R.halfway){ var ck = cs.cont && R[cs.cont] ? cs.cont : (R.adjust ? "adjust" : "none"), d2 = R[ck].avg - R.halfway.avg, p2 = R[ck].avg > 0.005 ? 100 * d2 / R[ck].avg : 0, m2 = g.hw_min != null ? g.hw_min : 0.1, q2 = g.hw_pct != null ? g.hw_pct : 5;
+      var ok2 = d2 >= m2 - 1e-9 && p2 >= q2 - 1e-9;
+      rl.push('<div class="' + (cs.decision === "halfway" ? "y" : ok2 ? "n" : "n") + '"><i>' + (cs.decision === "halfway" ? "&#10003;" : "&#10007;") + "</i><span><b>Halfway deployment</b> beats " + esc(ENAME[ck].toLowerCase()) + " only if it cuts a further <b>" + r2(m2) + " min</b> and <b>" + r1(q2) + "%</b>" + (cs.stress ? " and holds in the stress test" : "") + ": it cuts " + r2(d2) + " (" + r1(Math.max(0, p2)) + "%)" + (ok2 && cs.decision !== "halfway" ? ", but it failed the stress test or a hard rule" : "") + ".</span></div>"); }
+    if(lowest !== dec) why += " " + ENAME[lowest] + " is lower, but not by enough to pass the rule below.";
+    $("bestwhy").innerHTML = esc(why) + (rl.length ? '<div class="decrule">' + rl.join("") + "</div>" : "");
+    var maxAvg = Math.max.apply(null, keys.map(function(k){ return R[k].avg; })) || 1;
+    $("bars").classList.add("eng");
+    $("bars").innerHTML = keys.map(function(k){ var v = R[k].avg, w = Math.max(1.5, v / maxAvg * 100);
+      return '<div class="bar' + (k === dec ? " win" : "") + '" style="--c:' + hex[k] + '"><div class="nm">' + esc(ENAME[k]) + '</div><div class="tr"><div class="fl" style="width:' + w.toFixed(1) + '%"></div></div><div class="v num">' + r2(v) + "<small>min extra wait</small></div></div>";
+    }).join("") + '<div class="unit">Average over every AITP check of every balance trip, the same figures as step 2 of the engine.</div>';
+
+    // the options: one picture per trip, at the AITP that trip hits hardest
+    var ymax = Math.max(H, Math.max.apply(null, keys.map(function(k){ return R[k].trips.reduce(function(m, t){ return Math.max(m, t.ev ? t.ev.longest : 0, t.split ? Math.max(t.split.b.ev.longest, t.split.a.ev.longest) : 0); }, 0); }))) * 1.08;
+    var hd = function(ev){ var u = ev.hour.filter(function(x, i, a){ return a.indexOf(x) === i; }); return u.length === 1 ? "every <b>" + r1(u[0]) + "</b>" : "longest <b>" + r1(ev.longest) + "</b>"; };
+    var at = function(q){ return esc(q.s) + (q.pct != null ? " (" + Math.round(q.pct) + "% along)" : ""); };
+    var rule = {none: "Long gap kept on every trip", adjust: (cs.adj_n ? cs.adj_n + " departure" + (cs.adj_n > 1 ? "s" : "") + " held or released" : "Departures held or released") + ", every trip in full",
+      halfway: "Late bus starts at " + (cs.halfway_stop ? esc(cs.halfway_stop) : "the halfway stop") + ", timetable back from the next trip"};
+    $("opts").innerHTML = keys.map(function(k){
+      var r = R[k], h = '<article class="panel opt' + (k === dec ? " win" : "") + '" style="--c:' + hex[k] + '"><h3>' + esc(ENAME[k]) + (k === dec ? " &#10003;" : "") + '</h3><div class="rule">' + rule[k] + "</div>";
+      r.trips.forEach(function(tr, i){
+        if(tr.split){
+          var S = tr.split;
+          h += '<div class="trip"><div class="trip-h"><span class="lbl">' + esc(tr.name) + '<small>split at the halfway stop</small></span><span class="hw">longest <b>' + r1(S.b.ev.longest) + "</b> &rarr; <b>" + r1(S.a.ev.longest) + '</b></span><span class="e">extra wait <b class="num">' + r2(tr.ewt) + "</b></span></div>"
+            + splitSVG(S.b.ev.t, S.a.ev.t, H, ymax, hex[k], S.fb, {label: tr.name + " split at the halfway stop"})
+            + '<div class="splitnote">Before: ' + S.b.pts.length + " AITPs, average <b>" + r2(S.b.ewt) + "</b> &middot; after: " + S.a.pts.length + " AITPs, average <b>" + r2(S.a.ewt) + "</b> &rarr; whole trip <b>" + r2(tr.ewt) + "</b></div>"
+            + '<div class="tripcap">Gaps at ' + at(S.b.worst) + " and " + at(S.a.worst) + ", the hardest-hit AITPs on each side.</div></div>";
+        } else {
+          h += '<div class="trip"><div class="trip-h"><span class="lbl">' + esc(tr.name) + "<small>" + tr.pts.length + ' AITP checks</small></span><span class="hw">' + hd(tr.ev) + '</span><span class="e">extra wait <b class="num">' + r2(tr.ewt) + "</b></span></div>"
+            + sawSVG(tr.ev.t, H, ymax, hex[k], {label: tr.name + ": gaps at " + tr.worst.s + " " + tr.ev.hour.join(", ") + " min"})
+            + '<div class="tripcap">Gaps at ' + at(tr.worst) + ", the hardest-hit AITP on this trip.</div></div>";
+        }
+      });
+      var q = r.longest <= qmax + 1e-9;
+      h += '<div class="foot"><div class="avgline"><span>Average of ' + r.n + ' AITP checks</span><b class="num">' + r2(r.avg) + "</b></div>"
+        + '<div><span class="pill ' + (q ? "ok" : "bad") + '">QoS 1.2 ' + (q ? "met" : "not met") + "</span> longest gap " + r1(r.longest) + " min, limit " + r1(qmax) + " (scheduled + " + r1(qmax - H) + ")</div>"
+        + "<div>" + (k === "halfway" ? "Cost: part of one trip is not run" + (cs.km && cs.km.halfway ? " (" + r1(cs.km.halfway) + " km)" : "") + "." : k === "adjust" ? "Cost: buses around the gap leave a few minutes off their timetable." : "Cost: nothing to do, but the gap stays.") + "</div></div>";
+      return h + "</article>";
+    }).join("");
+
+    // why one long gap hurts: same as the example, at this service's headway
+    $("whysvg").innerHTML = whySVG(H);
+    $("whylist").innerHTML = "<li><b>Normal gap, " + r1(H) + " min:</b> " + Math.round(H) + " people wait, " + r1(H / 2) + " min on average.</li>"
+      + "<li><b>Long gap, " + r1(2 * H) + " min:</b> twice as many people (" + Math.round(2 * H) + ") wait, and each waits twice as long (" + r1(H) + " min on average).</li>"
+      + "<li><b>Twice the people &times; twice the wait = 4 times the waiting.</b> That is why the engine compares options on extra wait, not on minutes of delay.</li>";
+    $("whycap").textContent = "Same passengers, same scale: the long gap holds 4 times the waiting of a normal one.";
+
+    // how the numbers are worked out, with the engine's own checks
+    $("rules").innerHTML = "<li><b>At each AITP, count the people.</b> One person arrives every minute; the people in each gap wait half that gap on average.</li>"
+      + "<li><b>Extra wait at an AITP = average wait &minus; the wait the timetable promises there</b> (half of " + r1(H) + " = " + r1(H / 2) + " min when buses are on time).</li>"
+      + "<li><b>An option's figure is the average of every AITP check</b> on every balance trip (" + nAitp + " checks). These are the numbers in step 2.</li>";
+    var ex1 = function(q){ var sh = q.h.reduce(function(s, x){ return s + x; }, 0), w = q.h.reduce(function(s, x){ return s + x * x; }, 0) / 2;
+      return "hardest hit " + esc(q.s) + ": " + Math.round(sh) + " people wait " + Math.round(w) + " min in total &rarr; average " + nmx(w / sh) + " &minus; " + nmx(q.w != null ? q.w : H / 2) + " = <b>" + r2(q.e) + "</b>"; };
+    $("receipts").innerHTML = keys.map(function(k){
+      var r = R[k], h = '<article class="rc" style="--c:' + hex[k] + '"><h3>' + esc(ENAME[k]) + "</h3><ol>";
+      r.trips.forEach(function(tr){ h += "<li><b>" + esc(tr.name) + ":</b> " + tr.pts.length + " AITP checks, average <b>" + r2(tr.ewt) + "</b><br><span class=\"arrow\">" + ex1(tr.worst) + "</span></li>"; });
+      h += '</ol><div class="tot"><span>Average: ' + r.sum.toFixed(2) + " &divide; " + r.n + ' checks</span><b class="num">' + r2(r.avg) + "</b></div>";
+      return h + "</article>";
+    }).join("");
+    $("formula").innerHTML = "<div>Average wait at an AITP = <code>sum of (gap &times; gap) &divide; (2 &times; sum of gaps)</code> over the buses checked there; extra wait = average wait &minus; the timetable's own figure.</div>";
+    var rows = [];
+    keys.forEach(function(k){ R[k].trips.forEach(function(tr){ rows.push('<tr style="--c:' + hex[k] + '"><td><span class="sw"></span>' + esc(ENAME[k]) + "</td><td>" + esc(tr.name) + '</td><td class="r num">' + tr.pts.length + "</td><td>" + at(tr.worst) + '</td><td class="r num">' + r2(tr.worst.e) + '</td><td class="r num"><b>' + r2(tr.ewt) + "</b></td></tr>"); });
+      rows.push('<tr class="tot" style="--c:' + hex[k] + '"><td colspan="5">' + esc(ENAME[k]) + ": average of " + R[k].n + ' AITP checks</td><td class="r num">' + r2(R[k].avg) + "</td></tr>"); });
+    $("tbl").innerHTML = '<thead><tr><th>Option</th><th>Trip</th><th class="r">AITP checks</th><th>Hardest-hit AITP</th><th class="r">Its extra wait</th><th class="r">Trip average</th></tr></thead><tbody>' + rows.join("") + "</tbody>";
+    sendHeight();
+  }
+
   function render(){
+    if(CASE && CASE.mode === "engine2"){ renderEngine(); return; }
+    $("bars").classList.remove("eng");
+    $("ans-h").textContent = "Best for passengers";
     var cs = CASE, R = compute(cs), H = cs.H, best = null;
     var opts = OPT.filter(function(o){ return o.k !== "halfway" || cs.halfway; });
     opts.forEach(function(o){ if(!best || R[o.k].avg < R[best.k].avg - 1e-9) best = o; });
@@ -526,7 +650,17 @@ button:hover{border-color:var(--cyan)}
     $("formula").innerHTML = "<div>Average wait in the hour = <code>sum of (gap × gap) ÷ (2 × sum of gaps)</code>, normal wait = <code>scheduled headway ÷ 2</code>.</div>"
       + (cs.mode === "simple" ? "<div>Example, no adjustment: <code>(" + ex.hour.map(r1).join("² + ") + "²) ÷ (2 × " + r1(ex.hour.reduce(function(s, x){ return s + x; }, 0)) + ") = " + r2(ex.awt) + "</code>, minus <code>" + r1(H) + " ÷ 2 = " + r2(H / 2) + "</code> gives <b>" + r2(ex.ewt) + " min</b> extra wait.</div>" : "")
       + (cs.halfway ? "<div>Halfway, " + esc(cs.trips[0]) + ": the stops before the halfway stop get the first figure, the stops after it the second, weighted by their share of the route.</div>" : "");
+    sendHeight();
   }
+  /* embedded in the engine page (?embed=1): tell it how tall the page is */
+  var EMBED = /[?&]embed=1/.test(location.search);
+  if(EMBED) document.body.classList.add("embed");
+  function sendHeight(){
+    if(!EMBED || !window.parent || window.parent === window) return;
+    requestAnimationFrame(function(){ try{ window.parent.postMessage({rdeExplainH: Math.ceil(document.documentElement.scrollHeight)}, location.origin); }catch(e){} });
+  }
+  addEventListener("resize", sendHeight);
+  document.addEventListener("toggle", sendHeight, true);
 
   /* ---------- inputs ---------- */
   var IDS = ["H", "G", "A", "B", "C", "N", "F"];
@@ -548,7 +682,8 @@ button:hover{border-color:var(--cyan)}
   /* a case handed over by the Recovery Decision Engine page (same browser, /recovery/explain?case=1) */
   var handed = null;
   try{ if(/[?&]case=1/.test(location.search)) handed = JSON.parse(localStorage.getItem("rde.explain") || "null"); }catch(e){ handed = null; }
-  if(handed && handed.v === 1 && handed.none && handed.none.length){ fillForm(EX); CASE = engineCase(handed); render(); }
+  if(handed && handed.v === 2 && handed.pts && handed.pts.none && handed.pts.none.length){ fillForm(EX); CASE = Object.assign({mode: "engine2"}, handed); render(); }
+  else if(handed && handed.v === 1 && handed.none && handed.none.length){ fillForm(EX); CASE = engineCase(handed); render(); }
   else setSimple(EX);
   window.RDE_EXPLAIN = {compute: compute, simpleCase: simpleCase, engineCase: engineCase, evalList: evalList};
 })();
