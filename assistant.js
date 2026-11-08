@@ -13,7 +13,7 @@
          micNo: "Voice input works in Chrome or Edge", listen: "Listening…", speaking: "Speaking", idle: "Ready", think: "Checking the live data…",
          faces: {agent: "Officer", orb: "Orb", photo: "Photo"}, replay: "Replay", mute: "Mute voice", unmute: "Voice on", stop: "Stop",
          min: "Minimise", big: "Bigger", small: "Smaller", you: "You", hello: "Hello, I'm HORIZON AI. Ask me about any alert, service or incident on this page and I'll explain why it happened and what to do.",
-         foot: "Advisory only · answers from this page's data · the Service Controller decides", choose: "Choose photo", photoNote: "Use a picture you have permission to use. It stays in this browser only.",
+         foot: "Advisory only · answers from this page and live service checks · the Service Controller decides", choose: "Choose photo", photoNote: "Use a picture you have permission to use. It stays in this browser only.",
          noPhoto: "No photo yet", fab: "Ask HORIZON AI", noVoice: "No voice for this language on this computer: showing text only.", idVoice: "No Malay voice on this computer: using an Indonesian voice.",
          cats: {loading: "heavily loaded", traffic: "delayed by traffic", bunching: "bunching", gap: "running with a long gap"},
          why: "Why is {svc} {cat} at {loc}?", now: "Which services need action now?", sum: "Summarise the network in 3 lines.", cp: "Are the checkpoints jammed?",
@@ -22,7 +22,7 @@
          micNo: "语音输入请使用 Chrome 或 Edge", listen: "正在聆听…", speaking: "正在说话", idle: "就绪", think: "正在查看实时数据…",
          faces: {agent: "职员", orb: "光环", photo: "照片"}, replay: "重播", mute: "关闭语音", unmute: "开启语音", stop: "停止",
          min: "最小化", big: "放大", small: "缩小", you: "你", hello: "您好，我是 HORIZON AI。请问我本页上的任何警报、巴士服务或事故，我会解释原因和处理方法。",
-         foot: "仅供参考 · 根据本页数据回答 · 由服务控制员决定", choose: "选择照片", photoNote: "请使用您有权使用的照片。照片只保存在此浏览器中。",
+         foot: "仅供参考 · 根据本页数据和实时服务检查回答 · 由服务控制员决定", choose: "选择照片", photoNote: "请使用您有权使用的照片。照片只保存在此浏览器中。",
          noPhoto: "尚未选择照片", fab: "询问 HORIZON AI", noVoice: "此电脑没有中文语音：只显示文字。", idVoice: "",
          cats: {loading: "载客量高", traffic: "因交通延误", bunching: "串车（车距过近）", gap: "班距过大"},
          why: "{svc} 号为什么在 {loc} {cat}？", now: "现在哪些巴士服务需要处理？", sum: "用三句话总结目前的网络状况。", cp: "关卡现在拥堵吗？",
@@ -31,7 +31,7 @@
          micNo: "Input suara berfungsi dalam Chrome atau Edge", listen: "Sedang mendengar…", speaking: "Sedang bercakap", idle: "Sedia", think: "Sedang menyemak data langsung…",
          faces: {agent: "Pegawai", orb: "Orb", photo: "Foto"}, replay: "Main semula", mute: "Senyapkan suara", unmute: "Suara dihidupkan", stop: "Henti",
          min: "Kecilkan", big: "Besarkan", small: "Kecilkan saiz", you: "Anda", hello: "Helo, saya HORIZON AI. Tanya saya tentang sebarang amaran, perkhidmatan atau insiden di halaman ini, dan saya akan terangkan sebabnya dan apa yang perlu dibuat.",
-         foot: "Nasihat sahaja · jawapan daripada data halaman ini · Pengawal Perkhidmatan yang memutuskan", choose: "Pilih foto", photoNote: "Gunakan gambar yang anda dibenarkan guna. Ia disimpan dalam pelayar ini sahaja.",
+         foot: "Nasihat sahaja · jawapan daripada halaman ini dan semakan perkhidmatan langsung · Pengawal Perkhidmatan yang memutuskan", choose: "Pilih foto", photoNote: "Gunakan gambar yang anda dibenarkan guna. Ia disimpan dalam pelayar ini sahaja.",
          noPhoto: "Belum ada foto", fab: "Tanya HORIZON AI", noVoice: "Tiada suara Bahasa Melayu pada komputer ini: teks sahaja.", idVoice: "Tiada suara Bahasa Melayu pada komputer ini: menggunakan suara Bahasa Indonesia.",
          cats: {loading: "penuh sesak", traffic: "lewat kerana trafik", bunching: "berkelompok", gap: "jurang panjang"},
          why: "Kenapa perkhidmatan {svc} {cat} di {loc}?", now: "Perkhidmatan mana perlu tindakan sekarang?", sum: "Ringkaskan rangkaian dalam 3 ayat.", cp: "Adakah pusat pemeriksaan sesak?",
@@ -50,119 +50,108 @@
   var clock = function(){ return new Date().toLocaleTimeString("en-SG", {hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Asia/Singapore"}); };
 
   /* ---------------- faces ---------------- */
-  /* Agent: an original drawn male operations officer in a white shirt with purple collar and shoulders and an orange
-     stripe (the SBS Transit uniform colours). He breathes, blinks, glances, raises his hand while he talks, and his
-     mouth takes the shape of the letters being spoken. k = id suffix for extra copies; mini = head only. */
-  function mouthD(o, w, r){        // o = open, w = wide, r = round (0..1) -> lip and mouth paths
-    var cx = 120, cy = 137.2, hw = 11.4 * (1 + .2 * w - .36 * r), h = .5 + 8.6 * o, s = 1.5 * (1 - o) * (1 - r);
-    var L = (cx - hw).toFixed(2) + " " + (cy - s).toFixed(2), R = (cx + hw).toFixed(2) + " " + (cy - s).toFixed(2), f = function(v){ return v.toFixed(2); };
-    var top = cy - h * .32, bot = cy + h * .68;
+  /* Officer: an original drawn young Chinese man in a white shirt with purple collar and shoulders and an orange
+     stripe (the SBS Transit uniform colours). He breathes, blinks, glances, nods and lifts his brows while he talks,
+     and his mouth takes the shape of the letters being spoken. k = id suffix for extra copies; mini = face only. */
+  function mouthD(o, w, r){        // o = open, w = wide, r = round (0..1) -> mouth, teeth, tongue and lip paths
+    var cx = 150, cy = 191.5, hw = 12.6 * (1 + .18 * w - .34 * r), h = .4 + 11 * o, s = 2.4 * (1 - o) * (1 - r) + .5;
+    var f = function(v){ return v.toFixed(2); }, L = f(cx - hw) + " " + f(cy - s), R = f(cx + hw) + " " + f(cy - s);
+    var top = cy - h * .3, bot = cy + h * .7, th = Math.min(2.8, h * .4);
     return {
-      cav: "M" + L + "Q" + cx + " " + f(top - .6) + " " + R + "Q" + cx + " " + f(bot + .8) + " " + L + "Z",
-      teeth: "M" + f(cx - hw * .72) + " " + f(top - .4) + "H" + f(cx + hw * .72) + "V" + f(top + Math.min(2.6, h * .42)) + "Q" + cx + " " + f(top + Math.min(3.2, h * .5)) + " " + f(cx - hw * .72) + " " + f(top + Math.min(2.6, h * .42)) + "Z",
-      up: "M" + L + "C" + f(cx - hw * .62) + " " + f(top - 3.6) + " " + f(cx - 2.2) + " " + f(top - 3.4) + " " + cx + " " + f(top - 2.5) + "C" + f(cx + 2.2) + " " + f(top - 3.4) + " " + f(cx + hw * .62) + " " + f(top - 3.6) + " " + R
-        + "Q" + cx + " " + f(top - .2) + " " + L + "Z",
-      lo: "M" + L + "Q" + cx + " " + f(bot + .9) + " " + R + "C" + f(cx + hw * .55) + " " + f(bot + 4.6) + " " + f(cx - hw * .55) + " " + f(bot + 4.6) + " " + L + "Z"
+      cav: "M" + L + "Q" + cx + " " + f(top - .8) + " " + R + "Q" + cx + " " + f(bot + 1) + " " + L + "Z",
+      teeth: "M" + f(cx - hw * .8) + " " + f(top - 1) + "H" + f(cx + hw * .8) + "V" + f(top + th) + "Q" + cx + " " + f(top + th + .8) + " " + f(cx - hw * .8) + " " + f(top + th) + "Z",
+      tg: "M" + f(cx - hw * .55) + " " + f(bot + 1) + "Q" + cx + " " + f(bot - h * .45) + " " + f(cx + hw * .55) + " " + f(bot + 1) + "Z",
+      up: "M" + L + "C" + f(cx - hw * .55) + " " + f(top - 2.6) + " " + f(cx - 2.4) + " " + f(top - 2.5) + " " + cx + " " + f(top - 1.7) + "C" + f(cx + 2.4) + " " + f(top - 2.5) + " " + f(cx + hw * .55) + " " + f(top - 2.6) + " " + R
+        + "Q" + cx + " " + f(top + .2) + " " + L + "Z",
+      lo: "M" + L + "Q" + cx + " " + f(bot + .9) + " " + R + "C" + f(cx + hw * .5) + " " + f(bot + 4.4) + " " + f(cx - hw * .5) + " " + f(bot + 4.4) + " " + L + "Z"
     };
   }
   function agentSVG(k, mini){
     k = k || "";
     var id = function(n){ return ' id="hai' + n + k + '"'; }, u = function(n){ return "url(#hai" + n + k + ")"; }, m = mouthD(0, 0, 0);
-    var SK = "#e9b893", SKD = "#c98f6c", LINE = "#a8714f";
-    return '<svg class="hai-agent' + (mini ? " mini" : "") + '" viewBox="' + (mini ? "76 40 88 88" : "16 20 208 277") + '" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><defs>'
-      + '<radialGradient' + id("Bg") + ' cx="50%" cy="30%" r="80%"><stop offset="0" stop-color="#3b3f97"/><stop offset=".42" stop-color="#16205a"/><stop offset="1" stop-color="#050b1f"/></radialGradient>'
-      + '<radialGradient' + id("Glow") + ' cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#3fd3ff" stop-opacity=".32"/><stop offset="1" stop-color="#3fd3ff" stop-opacity="0"/></radialGradient>'
-      + '<radialGradient' + id("Skin") + ' cx="44%" cy="38%" r="70%"><stop offset="0" stop-color="#f7d6b8"/><stop offset=".62" stop-color="' + SK + '"/><stop offset="1" stop-color="' + SKD + '"/></radialGradient>'
-      + '<linearGradient' + id("Neck") + ' x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#b87b5a"/><stop offset=".55" stop-color="#d9a17e"/><stop offset="1" stop-color="#e3ad89"/></linearGradient>'
-      + '<linearGradient' + id("Arm") + ' x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#cf966f"/><stop offset=".5" stop-color="#ebbb96"/><stop offset="1" stop-color="#cf966f"/></linearGradient>'
-      + '<linearGradient' + id("Hair") + ' x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2f3445"/><stop offset="1" stop-color="#11131b"/></linearGradient>'
-      + '<linearGradient' + id("Shirt") + ' x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#b9bdcb"/><stop offset=".3" stop-color="#eef0f5"/><stop offset=".62" stop-color="#f8f9fc"/><stop offset="1" stop-color="#b5b9c8"/></linearGradient>'
-      + '<linearGradient' + id("Purple") + ' x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5a2a72"/><stop offset="1" stop-color="#3a1850"/></linearGradient>'
-      + '<clipPath' + id("EyeL") + '><path d="M96.6 98.4C100 94.6 109 94.1 113.4 97.9C109.2 101.2 100.8 101.5 96.6 98.4Z"/></clipPath>'
-      + '<clipPath' + id("EyeR") + '><path d="M143.4 98.4C140 94.6 131 94.1 126.6 97.9C130.8 101.2 139.2 101.5 143.4 98.4Z"/></clipPath>'
+    var mir = function(d){ return d.replace(/(-?\d+(?:\.\d+)?)\s+(-?\d+(?:\.\d+)?)/g, function(_, x, y){ return (300 - +x).toFixed(1).replace(/\.0$/, "") + " " + y; }); };
+    var LINE = "#b87c60", HAIR = "#191c24";
+    var eye = function(side){              // side -1 = his right (viewer left), +1 = his left (viewer right)
+      var lids = '<path d="M115.4 143.4C119.4 136 132.8 134.8 140.6 141" fill="none" stroke="#1a1310" stroke-width="2.3" stroke-linecap="round"/>'
+        + '<path d="M118.6 145.4C124 147.6 133 147.2 137.8 144.2" fill="none" stroke="#cf9a7e" stroke-width=".9" opacity=".7"/>'
+        + '<path d="M120.6 136.4C126.6 134 135 134.4 139.8 137.8" fill="none" stroke="#c98f73" stroke-width=".8" opacity=".4"/>';
+      var white = '<path d="M116.4 143C120 137 132.4 136 139.8 141.4C135.2 145.6 122.4 146.6 116.4 143Z" fill="#fbf8f4"/>';
+      var ix = side < 0 ? 128.6 : 171.4;     // light comes from the upper left on both eyes
+      var iris = '<g clip-path="' + u(side < 0 ? "EyeL" : "EyeR") + '"><g class="iris"><circle cx="' + ix + '" cy="141.4" r="5.2" fill="' + u("Iris") + '"/><circle cx="' + ix + '" cy="141.4" r="2.5" fill="#0b0807"/>'
+        + '<circle cx="' + (ix + 1.9).toFixed(1) + '" cy="139.3" r="1.5" fill="#fff"/><circle cx="' + (ix - 1.8).toFixed(1) + '" cy="143.4" r=".7" fill="#fff" opacity=".7"/></g></g>';
+      return side < 0 ? white + iris + lids : mir(white) + iris + mir(lids);
+    };
+    var ear = '<path d="M102 132C93 126 86.6 134 88.4 146C90 157 96 165 104.4 163Z" fill="#e9b493"/><path d="M99.6 137C94.6 136 92.4 142 94 149C95 154 98 157 101 157" fill="none" stroke="' + LINE + '" stroke-width="1.2" stroke-linecap="round" opacity=".6"/>';
+    var shirtL = '<path d="M131 242C116 250 92 256 70 262C44 270 28 290 22 318L16 372C24 374 30 374 36 372C44 320 80 282 136 258Z" fill="' + u("Purple") + '"/>';
+    var collarL = '<path d="M128.6 234C121 243 112.6 249.6 105.6 253.6L130.6 283L146.6 260.4C138.6 258 131.6 249 128.6 234Z" fill="' + u("Purple") + '"/>';
+    return '<svg class="hai-agent' + (mini ? " mini" : "") + '" viewBox="' + (mini ? "93 64 114 114" : "15 14 270 360") + '" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><defs>'
+      + '<radialGradient' + id("Bg") + ' cx="50%" cy="34%" r="78%"><stop offset="0" stop-color="#2d4390"/><stop offset=".45" stop-color="#132457"/><stop offset="1" stop-color="#050c20"/></radialGradient>'
+      + '<radialGradient' + id("Glow") + ' cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#63dcff" stop-opacity=".30"/><stop offset="1" stop-color="#63dcff" stop-opacity="0"/></radialGradient>'
+      + '<radialGradient' + id("Skin") + ' cx="42%" cy="36%" r="72%"><stop offset="0" stop-color="#fde3cd"/><stop offset=".55" stop-color="#f5cfb2"/><stop offset="1" stop-color="#e3aa89"/></radialGradient>'
+      + '<linearGradient' + id("Neck") + ' x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#d79a7a"/><stop offset=".6" stop-color="#ebb998"/><stop offset="1" stop-color="#f0c3a4"/></linearGradient>'
+      + '<radialGradient' + id("Iris") + ' cx="50%" cy="40%" r="60%"><stop offset="0" stop-color="#5b3a24"/><stop offset="1" stop-color="#21150d"/></radialGradient>'
+      + '<linearGradient' + id("Hair") + ' x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#2c3242"/><stop offset=".5" stop-color="' + HAIR + '"/><stop offset="1" stop-color="#0e1016"/></linearGradient>'
+      + '<linearGradient' + id("Shirt") + ' x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#c3c7d4"/><stop offset=".28" stop-color="#eff1f6"/><stop offset=".65" stop-color="#f9fafc"/><stop offset="1" stop-color="#bfc3d1"/></linearGradient>'
+      + '<linearGradient' + id("Purple") + ' x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5e2c78"/><stop offset="1" stop-color="#3b1852"/></linearGradient>'
+      + '<clipPath' + id("EyeL") + '><path d="M116.4 143C120 137 132.4 136 139.8 141.4C135.2 145.6 122.4 146.6 116.4 143Z"/></clipPath>'
+      + '<clipPath' + id("EyeR") + '><path d="' + mir("M116.4 143C120 137 132.4 136 139.8 141.4C135.2 145.6 122.4 146.6 116.4 143Z") + '"/></clipPath>'
+      + '<clipPath' + id("FaceClip") + '><path d="M100 136C100 96 122 74 150 74C178 74 200 96 200 136C200 166 195 186 185 200C174 215 162 222 150 222C138 222 126 215 115 200C105 186 100 166 100 136Z"/></clipPath>'
+      + '<radialGradient' + id("Blush") + ' cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#f19a88" stop-opacity=".32"/><stop offset="1" stop-color="#f19a88" stop-opacity="0"/></radialGradient>'
       + '<clipPath' + id("Cav") + '><path' + id("CavClip") + ' d="' + m.cav + '"/></clipPath>'
       + "</defs>"
-      + '<rect width="240" height="320" fill="' + u("Bg") + '"/>'
-      + '<circle cx="120" cy="104" r="96" fill="' + u("Glow") + '"/>'
+      + '<rect width="300" height="400" fill="' + u("Bg") + '"/>'
+      + '<circle cx="150" cy="150" r="128" fill="' + u("Glow") + '"/>'
       + '<g class="breathe">'
-      // arms (skin below the sleeves)
-      + '<path d="M26 258C22 280 20 300 20 320H52C52 300 54 282 58 262Z" fill="' + u("Arm") + '"/>'
-      + '<path d="M214 258C218 280 220 300 220 320H188C188 300 186 282 182 262Z" fill="' + u("Arm") + '"/>'
-      // shirt with sleeves
-      + '<path d="M104 170C92 176 74 181 58 186C40 192 30 206 26 226L22 263C34 267 48 268 58 265L60 252C61 276 62 300 62 320H178C178 300 179 276 180 252L182 265C192 268 206 267 218 263L214 226C210 206 200 192 182 186C166 181 148 176 136 170C130 177 110 177 104 170Z" fill="' + u("Shirt") + '"/>'
-      + '<path d="M60 252C59 240 58 228 56 216M180 252C181 240 182 228 184 216" fill="none" stroke="#a3a8ba" stroke-width="1.1" opacity=".8"/>'
-      + '<path d="M22 263C34 267 48 268 58 265M182 265C192 268 206 267 218 263" fill="none" stroke="#8f95aa" stroke-width="1.3"/>'
-      + '<path d="M70 280C72 296 72 308 70 320M170 280C168 296 168 308 170 320" fill="none" stroke="#b4b9c8" stroke-width="1" opacity=".7"/>'
-      // purple raglan shoulders, orange stripe from collar to sleeve
-      + '<path d="M104 170C92 176 74 181 58 186C40 192 30 206 26 226L22 263C28 265 33 266 38 266C44 236 64 204 108 184Z" fill="' + u("Purple") + '"/>'
-      + '<path d="M136 170C148 176 166 181 182 186C200 192 210 206 214 226L218 263C212 265 207 266 202 266C196 236 176 204 132 184Z" fill="' + u("Purple") + '"/>'
-      + '<path d="M108 184C64 204 44 236 38 266M132 184C176 204 196 236 202 266" fill="none" stroke="#f28a1e" stroke-width="3.4" stroke-linecap="round"/>'
-      + '<path d="M60 190C76 186 92 180 102 174" fill="none" stroke="#7b4a96" stroke-width="1.2" opacity=".55"/><path d="M180 190C164 186 148 180 138 174" fill="none" stroke="#7b4a96" stroke-width="1.2" opacity=".55"/>'
+      // shirt
+      + '<g transform="translate(0 -7)">'
+      + '<path d="M131 242C116 250 92 256 70 262C44 270 28 290 22 318L14 400H286L278 318C272 290 256 270 230 262C208 256 184 250 169 242C162 252 138 252 131 242Z" fill="' + u("Shirt") + '"/>'
+      + '<path d="M66 330C70 356 70 380 68 400M234 330C230 356 230 380 232 400" fill="none" stroke="#aeb3c3" stroke-width="1.2" opacity=".7"/>'
+      + shirtL + mir(shirtL)
+      + '<path d="M136 258C80 282 44 320 36 372M164 258C220 282 256 320 264 372" fill="none" stroke="#f28a1e" stroke-width="4" stroke-linecap="round"/>'
+      + '<path d="M74 266C94 260 114 254 128 246M226 266C206 260 186 254 172 246" fill="none" stroke="#83519e" stroke-width="1.4" opacity=".5"/>'
+      + "</g>"
       // neck
-      + '<path d="M105 132V172C110 181 130 181 135 172V132Z" fill="' + u("Neck") + '"/>'
-      + '<path d="M105 148C112 158 128 158 135 148V136H105Z" fill="#9e6446" opacity=".32"/>'
-      + '<path d="M135 140V170M184 187C201 193 211 207 214.6 228" fill="none" stroke="#7fe0ff" stroke-width="1.2" opacity=".3"/>'
-      // collar and placket
-      + '<path d="M103 166C97 172 91 177 86 181L104 202L118 185C111 184 106 176 103 166Z" fill="' + u("Purple") + '"/>'
-      + '<path d="M137 166C143 172 149 177 154 181L136 202L122 185C129 184 134 176 137 166Z" fill="' + u("Purple") + '"/>'
-      + '<path d="M104 202L118 185M136 202L122 185" fill="none" stroke="#24102f" stroke-width=".9" opacity=".6"/>'
-      + '<path d="M115.5 185H124.5V228H115.5Z" fill="#e6e8ef" stroke="#c5c9d6" stroke-width=".8"/>'
-      + '<circle cx="120" cy="196" r="1.5" fill="#9aa0b4"/><circle cx="120" cy="212" r="1.5" fill="#9aa0b4"/>'
-      // name badge
-      + '<rect x="131" y="222" width="30" height="10" rx="2" fill="#0c1a36"/><rect x="133" y="224.6" width="4.6" height="4.6" rx="1" fill="#3fd3ff"/>'
-      + '<text x="140" y="229.4" font-family="Rajdhani,Arial,sans-serif" font-size="5.6" font-weight="700" fill="#e8f4ff" textLength="19" lengthAdjust="spacingAndGlyphs">HORIZON</text>'
+      + '<path d="M124 192V240C134 250 166 250 176 240V192Z" fill="' + u("Neck") + '"/>'
+      + '<path d="M124 206C136 226 164 226 176 206V196H124Z" fill="#b97558" opacity=".35"/>'
+      + '<path d="M134 242L150 255L166 242" fill="#f3f4f8"/>'
+      + '<g transform="translate(0 -7)">'
+      + collarL + mir(collarL)
+      + '<path d="M130.6 283L146.6 260.4M169.4 283L153.4 260.4" fill="none" stroke="#25102f" stroke-width="1" opacity=".5"/>'
+      + '<path d="M144.6 260.4H155.4V318H144.6Z" fill="#e7e9f0" stroke="#c6cad7" stroke-width="1"/>'
+      + '<circle cx="150" cy="275" r="1.9" fill="#9da3b6"/><circle cx="150" cy="296" r="1.9" fill="#9da3b6"/>'
+      + '<rect x="176" y="300" width="40" height="13" rx="2.6" fill="#0c1a36"/><rect x="179" y="303.4" width="6" height="6" rx="1.3" fill="#3fd3ff"/>'
+      + '<text x="188.4" y="309.6" font-family="Rajdhani,Arial,sans-serif" font-size="7.4" font-weight="700" fill="#e8f4ff" textLength="24.6" lengthAdjust="spacingAndGlyphs">HORIZON</text>'
+      + "</g>"
       // head
       + '<g class="head">'
-      + '<path d="M85 101C77 96 72 104 74 113C76 122 82 126 88 123Z" fill="' + SKD + '"/><path d="M84 105C80 104 78 110 80 115" fill="none" stroke="' + LINE + '" stroke-width="1" opacity=".7"/>'
-      + '<path d="M155 101C163 96 168 104 166 113C164 122 158 126 152 123Z" fill="' + SKD + '"/><path d="M156 105C160 104 162 110 160 115" fill="none" stroke="' + LINE + '" stroke-width="1" opacity=".7"/>'
-      + '<path d="M84 94C84 66 99 50 120 50C141 50 156 66 156 94C156 116 152 131 143 142C135 151 127 155.5 120 155.5C113 155.5 105 151 97 142C88 131 84 116 84 94Z" fill="' + u("Skin") + '"/>'
-      + '<path d="M90 126C96 142 108 152 120 152.5C132 152 144 142 150 126C146 146 134 156 120 156C106 156 94 146 90 126Z" fill="#b98063" opacity=".35"/>'
-      + '<path d="M84.6 96C85 116 90 132 99 143C92 128 88.6 112 89.6 96Z" fill="#a8694a" opacity=".22"/><path d="M155.4 96C155 116 150 132 141 143C148 128 151.4 112 150.4 96Z" fill="#a8694a" opacity=".22"/>'
-      + '<path d="M101 106C104 108 109 108.6 112 107.6M139 106C136 108 131 108.6 128 107.6" fill="none" stroke="#b87a5a" stroke-width=".8" opacity=".2"/>'
-      + '<ellipse cx="108" cy="76" rx="13" ry="5" fill="#fff" opacity=".1"/>'
-      // hair: short cut, side part, swept to one side
-      + '<path d="M86 100C82 84 83 66 92 54C100 44 112 39 124 39.5C140 40 152 47 157 60C161 72 160 88 156 100L153.6 99C153 90 152 82 149.4 76.6C146 70 139 65.6 129 64.6C118 63.8 107 65 99.6 69C94 72.6 91 79 90 86.6L88.6 100Z" fill="' + u("Hair") + '"/>'
-      + '<path d="M91 84C93 70 101 60 113 55C127 50 145 52 153 61C157.6 66.6 158.6 73 157.6 81C152.6 71 143.6 64.6 130 63.6C117 62.8 105 65.4 98 70.6C94.6 73.4 92.4 78 91 84Z" fill="#283044"/>'
-      + '<path d="M104 47C116 42.6 133 43 145 49.6C150 52.4 154 56.6 156 62C150 55 140 50.6 128 49.6C118 48.8 110 49.6 104 52Z" fill="#4a5470" opacity=".55"/>'
-      + '<path d="M100 51C108 47 122 46 134 48.6M97 58C108 52.6 124 51.4 140 54.6M104 63C116 58.6 132 58.4 148 62.6M94 70C102 64 112 61 122 60.4" fill="none" stroke="#6a7592" stroke-width="1.1" stroke-linecap="round" opacity=".45"/>'
-      + '<path d="M101.6 47.6C99.4 52 98.4 57 98.8 62" fill="none" stroke="#0a0c12" stroke-width="1.1" opacity=".7"/>'
-      + '<path d="M86.6 96L88.6 108L90.2 107.4L89.6 95ZM153.4 96L151.4 108L149.8 107.4L150.4 95Z" fill="#1b1e29" opacity=".85"/>'
+      + ear + mir(ear)
+      + '<path d="M100 136C100 96 122 74 150 74C178 74 200 96 200 136C200 166 195 186 185 200C174 215 162 222 150 222C138 222 126 215 115 200C105 186 100 166 100 136Z" fill="' + u("Skin") + '"/>'
+      + '<g clip-path="' + u("FaceClip") + '">'
+      + '<path d="M100 168C104 192 120 214 146 224L100 224ZM200 168C196 192 180 214 154 224L200 224Z" fill="#d69474" opacity=".28"/>'
+      + '<path d="M101.4 140C97 120 97 100 103 86C106 78 110 72 116 67C118 62 124 58 130 57C136 52 146 51 154 53C162 51 172 53 178 57C186 59 192 64 196 70C202 78 205 90 205 104C205 114 203 122 200.4 128L199 116.4C192.6 108.4 181 104.4 169 104.8C158 105.4 147 110.6 140.6 118.4C138.6 115.4 137.8 112.6 137.8 110C127.6 113.2 120.6 118.6 117.6 124.4C116.6 120.6 116.6 117.6 117.4 114.6C110.4 119.4 104.4 128 101.4 140Z" transform="translate(1.5 4.5)" fill="#b67256" opacity=".34"/>'
+      + '<ellipse cx="121" cy="168" rx="13" ry="7.5" fill="' + u("Blush") + '"/><ellipse cx="179" cy="168" rx="13" ry="7.5" fill="' + u("Blush") + '"/>'
+      + "</g>"
+      // hair: short textured cut, fringe swept across the forehead
+      + '<path d="M101.4 140C97 120 97 100 103 86C106 78 110 72 116 67C118 62 124 58 130 57C136 52 146 51 154 53C162 51 172 53 178 57C186 59 192 64 196 70C202 78 205 90 205 104C205 114 203 122 200.4 128L199 116.4C192.6 108.4 181 104.4 169 104.8C158 105.4 147 110.6 140.6 118.4C138.6 115.4 137.8 112.6 137.8 110C127.6 113.2 120.6 118.6 117.6 124.4C116.6 120.6 116.6 117.6 117.4 114.6C110.4 119.4 104.4 128 101.4 140Z" fill="' + u("Hair") + '"/>'
+      + '<path d="M197 104C188 94 172 90 156 92M188 98C174 90 156 90 140 96M172 100C154 100 136 106 124 116M154 104C140 108 128 114 120 122M190 72C176 62 154 60 134 66M198 88C184 76 162 72 142 76M112 92C120 80 132 74 146 72" fill="none" stroke="#56627e" stroke-width="1.5" stroke-linecap="round" opacity=".5"/>'
+      + '<path d="M134 62C150 56 168 57 182 64" fill="none" stroke="#6f7c9c" stroke-width="3" stroke-linecap="round" opacity=".34"/>'
       // brows
-      + '<g class="brows"><path d="M95.5 88.6C100.5 84.2 108 83.4 114 85.6L113.6 89.2C107.8 87.6 101.6 88.4 96.6 91.2Z" fill="#1d1a20"/>'
-      + '<path d="M144.5 88.6C139.5 84.2 132 83.4 126 85.6L126.4 89.2C132.2 87.6 138.4 88.4 143.4 91.2Z" fill="#1d1a20"/></g>'
+      + '<g class="brows"' + id("Brows") + '><path d="M112.4 128.6C119 123.6 130.6 122 141.4 124.8C142.6 125.2 142.6 128.8 141 129.4C131 127.6 121.4 127.6 113.8 130.2C112.8 130.4 112 129.4 112.4 128.6Z" fill="#241d1b"/>'
+      + '<path d="' + mir("M112.4 128.6C119 123.6 130.6 122 141.4 124.8C142.6 125.2 142.6 128.8 141 129.4C131 127.6 121.4 127.6 113.8 130.2C112.8 130.4 112 129.4 112.4 128.6Z") + '" fill="#241d1b"/></g>'
       // eyes
-      + '<g class="blink">'
-      + '<path d="M96.6 98.4C100 94.6 109 94.1 113.4 97.9C109.2 101.2 100.8 101.5 96.6 98.4Z" fill="#f3efea"/>'
-      + '<g clip-path="' + u("EyeL") + '"><g class="iris"><circle cx="105.2" cy="97.8" r="3.9" fill="#4a2f1d"/><circle cx="105.2" cy="97.8" r="2.1" fill="#120c09"/><circle cx="106.6" cy="96.5" r=".95" fill="#fff"/></g></g>'
-      + '<path d="M96 98.6C99.6 93.8 109.2 93.2 114 97.6" fill="none" stroke="#1e1612" stroke-width="1.6" stroke-linecap="round"/>'
-      + '<path d="M98.6 100.4C102.4 101.6 108.6 101.4 112 99.6" fill="none" stroke="' + LINE + '" stroke-width=".7" opacity=".7"/>'
-      + '<path d="M143.4 98.4C140 94.6 131 94.1 126.6 97.9C130.8 101.2 139.2 101.5 143.4 98.4Z" fill="#f3efea"/>'
-      + '<g clip-path="' + u("EyeR") + '"><g class="iris"><circle cx="134.8" cy="97.8" r="3.9" fill="#4a2f1d"/><circle cx="134.8" cy="97.8" r="2.1" fill="#120c09"/><circle cx="136.2" cy="96.5" r=".95" fill="#fff"/></g></g>'
-      + '<path d="M144 98.6C140.4 93.8 130.8 93.2 126 97.6" fill="none" stroke="#1e1612" stroke-width="1.6" stroke-linecap="round"/>'
-      + '<path d="M141.4 100.4C137.6 101.6 131.4 101.4 128 99.6" fill="none" stroke="' + LINE + '" stroke-width=".7" opacity=".7"/>'
-      + "</g>"
-      + '<path d="M97 92.6C101 91 108 90.8 112 92.2M143 92.6C139 91 132 90.8 128 92.2" fill="none" stroke="' + LINE + '" stroke-width=".7" opacity=".45"/>'
+      + '<g class="blink">' + eye(-1) + eye(1) + "</g>"
       // nose
-      + '<path d="M118 100C117 108 115.4 115 113.6 120.6" fill="none" stroke="' + LINE + '" stroke-width="1.1" opacity=".45" stroke-linecap="round"/>'
-      + '<path d="M112.6 121.6C114.6 125.6 125.4 125.6 127.4 121.6" fill="none" stroke="' + LINE + '" stroke-width="1.3" stroke-linecap="round"/>'
-      + '<ellipse cx="116" cy="123.2" rx="1.9" ry="1" fill="#8f5a40" opacity=".55"/><ellipse cx="124" cy="123.2" rx="1.9" ry="1" fill="#8f5a40" opacity=".55"/>'
-      + '<ellipse cx="121" cy="117" rx="2.2" ry="3" fill="#fff" opacity=".14"/>'
-      + '<ellipse cx="100" cy="117" rx="7" ry="4" fill="#e28d77" opacity=".14"/><ellipse cx="140" cy="117" rx="7" ry="4" fill="#e28d77" opacity=".14"/>'
+      + '<path d="M146.4 148C145.6 156 144.6 162 143.2 166" fill="none" stroke="#dba487" stroke-width="1.4" stroke-linecap="round" opacity=".55"/>'
+      + '<path d="M141.6 170.2C144.4 174.6 155.6 174.6 158.4 170.2" fill="none" stroke="#c4846a" stroke-width="1.9" stroke-linecap="round"/>'
+      + '<ellipse cx="145.8" cy="171" rx="2.1" ry="1.1" fill="#a86a52" opacity=".45"/><ellipse cx="154.2" cy="171" rx="2.1" ry="1.1" fill="#a86a52" opacity=".45"/>'
+      + '<ellipse cx="150.6" cy="165" rx="2.6" ry="2.2" fill="#fff" opacity=".28"/>'
+      // cheeks
       // mouth
-      + '<g' + id("Mouth") + ' data-open="0"><path' + id("Open") + ' d="' + m.cav + '" fill="#4a1a22"/>'
-      + '<path' + id("Teeth") + ' d="' + m.teeth + '" fill="#f4efe8" clip-path="' + u("Cav") + '"/>'
-      + '<path' + id("LipU") + ' d="' + m.up + '" fill="#b06a5a"/><path' + id("LipL") + ' d="' + m.lo + '" fill="#c07d6b"/>'
-      + '<path d="M115 143.6C118 145 122 145 125 143.6" fill="none" stroke="#fff" stroke-width=".8" opacity=".22"/></g>'
-      + '<path d="M113 130.2C116 131 124 131 127 130.2" fill="none" stroke="' + LINE + '" stroke-width=".7" opacity=".35"/>'
+      + '<g' + id("Mouth") + ' data-open="0"><path' + id("Open") + ' d="' + m.cav + '" fill="#62262c"/>'
+      + '<path' + id("Tongue") + ' d="' + m.tg + '" fill="#c4646a" clip-path="' + u("Cav") + '"/>'
+      + '<path' + id("Teeth") + ' d="' + m.teeth + '" fill="#f7f3ee" clip-path="' + u("Cav") + '"/>'
+      + '<path' + id("LipU") + ' d="' + m.up + '" fill="#bf7564"/><path' + id("LipL") + ' d="' + m.lo + '" fill="#d6907c"/></g>'
       + "</g>"
-      // gesturing forearm and hand (rotates up from the elbow while he talks)
-      + '<g class="fore">'
-      + '<path d="M34 306C46 286 62 264 77 245L95 255C83 273 69 295 59 314Z" fill="' + u("Arm") + '"/><path d="M59 314C69 295 83 273 95 255" fill="none" stroke="#b97e5c" stroke-width="1" opacity=".5"/>'
-      + '<g transform="rotate(-14 94 246)">'
-      + '<path d="M80 246C82 236 84 226 87 218C88 214 92 214 92.6 218L92 230L95 214C96 209.6 100.4 210 100.6 214.4L99 232L102.6 217C103.8 213 108 213.8 107.6 218L104.6 236L107.6 225C108.8 221.6 112.6 222.6 112.2 226L108.4 246C107 254 100 260 92 258L84 254C80 252 78 250 80 246Z" fill="#ebbb96" stroke="' + LINE + '" stroke-width=".8"/>'
-      + '<path d="M80 246C76 240 72 234 71 229C70 225 74 223 77 226L84 236" fill="#e2ad87" stroke="' + LINE + '" stroke-width=".8"/>'
-      + '<path d="M92 230L91.6 238M99 232L98.2 240M104.6 236L103 242" fill="none" stroke="' + LINE + '" stroke-width=".7" opacity=".6"/>'
-      + "</g></g>"
       + "</g></svg>";
   }
   function orbSVG(){
@@ -245,7 +234,12 @@
       if((m = l.match(/^[-•*]\s+(.*)$/))){ if(list !== "ul"){ if(list) out.push("</" + list + ">"); out.push("<ul>"); list = "ul"; } out.push("<li>" + inl(m[1]) + "</li>"); return; }
       if((m = l.match(/^\d+[.)]\s+(.*)$/))){ if(list !== "ol"){ if(list) out.push("</" + list + ">"); out.push("<ol>"); list = "ol"; } out.push("<li>" + inl(m[1]) + "</li>"); return; }
       if(list){ out.push("</" + list + ">"); list = null; }
-      if(l) out.push("<p>" + inl(l) + "</p>");
+      if(!l) return;
+      if(!out.length && l.length < 90 && !/[:：]\s*\S/.test(l)) out.push('<p class="hai-head">' + inl(l) + "</p>");                 // "Service 147 - ..." status line
+      else if(/^(data confidence|数据可信度|数据置信度|keyakinan data)\s*[:：]/i.test(l)) out.push('<p class="hai-conf">' + inl(l) + "</p>");
+      else if((m = l.match(/^([^:：]{2,24})([:：])\s*(.*)$/)) && /^(assessment|key findings|action|评估|主要发现|行动|penilaian|penemuan utama|tindakan)$/i.test(m[1].trim()))
+        out.push('<p><span class="hai-lbl">' + esc(m[1].trim()) + m[2] + "</span> " + inl(m[3]) + "</p>");
+      else out.push("<p>" + inl(l) + "</p>");
     });
     if(list) out.push("</" + list + ">");
     return out.join("");
@@ -263,7 +257,13 @@
 
   /* ---------------- what the page shows (sent with each question) ---------------- */
   function pageData(){ var s = window.SENTRY2026 && window.SENTRY2026.state; return s && s.data ? s : null; }
-  function snapshot(){
+  // the service numbers in a question, exact (147 is not 147A); the server checks them against the LTA list
+  function named(q){
+    var out = [], re = /(^|[^A-Za-z0-9.:\/])([A-Za-z]{0,2}\d{1,3}[A-Za-z]{0,2})(?![A-Za-z0-9.:\/%])/g, m;
+    while((m = re.exec(String(q || ""))) && out.length < 6){ var t = m[2].toUpperCase(); if(out.indexOf(t) < 0) out.push(t); }
+    return out;
+  }
+  function snapshot(q){
     var s = pageData(); if(!s) return {page: "AI Operations Centre", note: "Forecast Centre data not loaded yet"};
     var d = s.data, pick = function(o, keys){ var r = {}; keys.forEach(function(k){ if(o && o[k] !== undefined && o[k] !== null && o[k] !== "") r[k] = o[k]; }); return r; };
     var alerts = (d.alerts || []).slice().sort(function(a, b){ return (b.score || 0) - (a.score || 0); }).slice(0, 30)
@@ -275,7 +275,22 @@
     return {page: "AI Operations Centre", mode: d.mode, updated: d.updated ? new Date(d.updated * 1000).toISOString() : null, weather: d.weather && d.weather.text,
       kpis: d.kpis, rules: d.rules, delay_filter: d.delay_filter, selected: s.services || [], category: s.category, horizon: d.horizon,
       sources: (d.sources || []).map(function(x){ return {name: x.name, status: x.status, detail: String(x.detail || "").slice(0, 160)}; }),
-      alerts: alerts, recommendations: recs, services: services};
+      alerts: alerts, recommendations: recs, services: services,
+      coverage: {alerts_total: (d.alerts || []).length, alerts_included: alerts.length, services_total: (d.services || []).length, services_included: services.length,
+        what: "Forecast Centre alerts and services with forecast risk only, after the page filters. A service not listed here is not evidence of anything."},
+      focus: focusOn(d, named(q), pick)};
+  }
+  function focusOn(d, svcs, pick){          // every Forecast Centre row for the services named in the question, not only the top ones
+    var f = {};
+    svcs.forEach(function(v){
+      var same = function(x){ return String(x.svc || "").toUpperCase() === v; };
+      var a = (d.alerts || []).filter(same).slice(0, 20).map(function(x){ return pick(x, ["category", "dir", "location", "impact", "onset", "cause", "confidence", "status", "delay", "evidence"]); });
+      var sv = (d.services || []).filter(same).map(function(x){ return pick(x, ["dir", "operator", "location", "delay", "occupancy", "heavy_buses", "three", "two", "gaps", "headway", "scheduled"]); });
+      var r = (d.recommendations || []).filter(same).slice(0, 4).map(function(x){ return pick(x, ["action", "reason", "approval", "constraints"]); });
+      if(a.length || sv.length || r.length) f[v] = {alerts: a, services: sv, recommendations: r};
+      else f[v] = {alerts: [], services: [], recommendations: [], note: "Not on the Forecast Centre page (it lists services with forecast risk only)."};
+    });
+    return f;
   }
   function suggestions(){
     var g = $("haiSugg"); if(!g) return;
@@ -309,7 +324,7 @@
     };
     if(window.HAI_DEMO){ setTimeout(function(){ done(true, DEMO[S.lang], "DEMO answer (simulated data)"); }, 900); return; }
     fetch("/api/assistant/ask", {method: "POST", headers: {"content-type": "application/json"}, credentials: "same-origin",
-      body: JSON.stringify({q: q, lang: S.lang, history: hist, ctx: snapshot()})})
+      body: JSON.stringify({q: q, lang: S.lang, history: hist, ctx: snapshot(q)})})
       .then(function(r){ return r.json().catch(function(){ return {ok: false, error: "HTTP " + r.status}; }); })
       .then(function(j){
         if(j && j.configured === false){ S.configured = false; status(); }
@@ -318,10 +333,10 @@
       })
       .catch(function(e){ done(false, "network (" + (e && e.message || e) + ")"); });
   }
-  var DEMO = {
-    en: "Service 156 Dir 1 is about 10 min late near Clementi Ave 2 because of a jam on the same road, in the same direction (simulated data).\nWhy:\n- The jam overlaps the route in the direction of travel, so every 156 bus there is slowed.\n- The gap behind the delayed bus is growing, so the next stops will see a long wait.\nWhat to do:\n1. Check the Clementi Ave 2 camera or ask the bus captain to confirm the jam.\n2. If it lasts, hold the following 156 for 2 to 3 min at the interchange to keep the spacing (Service Controller approval).\n3. Open the Recovery Decision Engine if the delay passes 15 min.\nExpected recovery: about 15 min after the jam clears.",
-    zh: "156 号（方向 1）在 Clementi Ave 2 附近延误约 10 分钟，原因是同一道路、同一方向发生交通堵塞（模拟数据）。\n原因：\n- 堵塞路段与路线方向重叠，所有经过的 156 号都会被拖慢。\n- 延误巴士后方的间隔正在拉大，后面的车站会等更久。\n处理方法：\n1. 查看 Clementi Ave 2 的交通摄像头，或请车长确认堵塞情况。\n2. 如果持续，在转换站让下一辆 156 号多停 2 至 3 分钟，保持间隔（需服务控制员批准）。\n3. 若延误超过 15 分钟，打开恢复决策引擎。\n预计恢复：堵塞解除后约 15 分钟。",
-    ms: "Perkhidmatan 156 Arah 1 lewat kira-kira 10 minit berhampiran Clementi Ave 2 kerana kesesakan di jalan yang sama, arah yang sama (data simulasi).\nSebab:\n- Kesesakan bertindih dengan laluan dalam arah perjalanan, jadi setiap bas 156 di situ diperlahankan.\n- Jurang di belakang bas yang lewat semakin besar, jadi hentian seterusnya akan menunggu lebih lama.\nApa perlu dibuat:\n1. Semak kamera Clementi Ave 2 atau minta kapten bas mengesahkan kesesakan.\n2. Jika berterusan, tahan bas 156 berikutnya 2 hingga 3 minit di pertukaran untuk menjaga jarak (kelulusan Pengawal Perkhidmatan).\n3. Buka Enjin Keputusan Pemulihan jika kelewatan melebihi 15 minit.\nJangkaan pemulihan: kira-kira 15 minit selepas kesesakan reda."
+  var DEMO = {                                     // preview only (window.HAI_DEMO): one sample answer in the HORIZON answer format
+    en: "Service 156 - Operating with Abnormalities\nAssessment: Dir 1 is about 10 min late near Clementi Ave 2, inside a same-direction jam (simulated data).\nKey findings:\n- Dir 1: traffic delay +10 min at Clementi Ave 2, still building.\n- 3 stops affected, Blk 431 to Aft Clementi Ave 2.\n- Dir 2: no bunching or long-headway alert on this page.\nAction: Monitor the gap behind the delayed bus. Assess whether holding the next 156 at the interchange is feasible (Service Controller approval).\nData confidence: Partial - demo page, simulated data.",
+    zh: "156 号服务 - 运行中，有异常\n评估：方向 1 在 Clementi Ave 2 附近因同向交通堵塞延误约 10 分钟（模拟数据）。\n主要发现：\n- 方向 1：Clementi Ave 2 交通延误 +10 分钟，仍在加剧。\n- 受影响 3 个车站：Blk 431 至 Aft Clementi Ave 2。\n- 方向 2：本页面没有串车或长间隔警报。\n行动：监控延误巴士后方的间隔；评估在转换站让下一辆 156 号多停是否可行（需服务控制员批准）。\n数据可信度：部分 - 演示页面，模拟数据。",
+    ms: "Perkhidmatan 156 - Beroperasi dengan Keabnormalan\nPenilaian: Arah 1 lewat kira-kira 10 minit berhampiran Clementi Ave 2 akibat kesesakan sehala (data simulasi).\nPenemuan utama:\n- Arah 1: kelewatan trafik +10 minit di Clementi Ave 2, masih meningkat.\n- 3 hentian terjejas, Blk 431 hingga Aft Clementi Ave 2.\n- Arah 2: tiada amaran bas berkelompok atau sela panjang di halaman ini.\nTindakan: Pantau jurang di belakang bas yang lewat. Nilai sama ada menahan bas 156 berikutnya di pertukaran boleh dilaksanakan (kelulusan Pengawal Perkhidmatan).\nKeyakinan data: Separa - halaman demo, data simulasi."
   };
 
   /* ---------------- voice out ---------------- */
@@ -413,6 +428,8 @@
       var d = mouthD(S.mo, S.mw, S.mr);
       $("haiOpen").setAttribute("d", d.cav); $("haiCavClip").setAttribute("d", d.cav); $("haiTeeth").setAttribute("d", d.teeth);
       $("haiLipU").setAttribute("d", d.up); $("haiLipL").setAttribute("d", d.lo); mo.setAttribute("data-open", S.mo.toFixed(2));
+      if($("haiTongue")) $("haiTongue").setAttribute("d", d.tg);
+      if($("haiBrows")) $("haiBrows").setAttribute("transform", "translate(0 " + (-(S.mo || 0) * 1.8).toFixed(2) + ")");
     }
     var c = $("haiCoreC"), w = $("haiWave"); if(c){ c.setAttribute("r", (34 + lv * 10).toFixed(1)); } if(w){ w.setAttribute("r", (44 + lv * 26).toFixed(1)); w.setAttribute("opacity", (lv * .8).toFixed(2)); }
     var bars = document.querySelectorAll("#haiSay .hai-bars i");

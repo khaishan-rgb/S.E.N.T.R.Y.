@@ -1,4 +1,4 @@
-# AI Operations Centre (HORIZON AI) - 08 Nov 2026 (officer face updated 13:50)
+# AI Operations Centre (HORIZON AI) - 08 Nov 2026 (officer face redrawn 15:00)
 
 A new page, **/ai-centre** (menu: COMMAND > AI Operations Centre). It is a copy of the Forecast Centre with a
 talking assistant, **HORIZON AI**, docked on the right. Controllers ask about any alert, service or incident and get
@@ -14,10 +14,10 @@ The Forecast Centre page (/command, /forecast) is unchanged apart from one new t
 - **Advisory only.** It never changes anything. Anything that changes service is marked "Service Controller approval".
   In demo mode it says the data is simulated.
 - **Three faces**, picked in the panel:
-  - **Officer** (default): a drawn male operations officer, head to waist, in the SBS uniform colours (white shirt,
-    purple collar and shoulders, orange stripe). He breathes, blinks and glances around. When he talks his hand comes
-    up and his mouth takes the shape of the letters being spoken. He uses a male voice where the browser has one:
-    Edge on Windows has Wayne (English, Singapore), Yunxi (Mandarin) and Osman (Malay); Chrome has a male English
+  - **Officer** (default): a drawn young Chinese man, head and shoulders, in the SBS uniform colours (white shirt,
+    purple collar and shoulders, orange stripe). He breathes, blinks and glances around. When he talks he nods, his
+    brows lift and his mouth takes the shape of the letters being spoken. He uses a male voice where the browser has
+    one: Edge on Windows has Wayne (English, Singapore), Yunxi (Mandarin) and Osman (Malay); Chrome has a male English
     voice only.
   - **Orb**: an abstract AI core. The rings turn and the core pulses with the voice.
   - **Photo**: a picture chosen in the panel (Choose photo). Only use a picture you have permission to use.
@@ -30,6 +30,27 @@ The Forecast Centre page (/command, /forecast) is unchanged apart from one new t
   natural Malay voice.
 - **Voice in** (microphone button) works in Chrome and Edge. Press it, speak, and the question is sent when you stop.
 - Mute, replay, stop, bigger/smaller, minimise, and drag the panel by its header. The panel remembers these per browser.
+
+## How HORIZON AI thinks (updated 08 Nov, 15:20)
+
+- **Your rules:** `horizon_ai_prompt.md` holds the OCC's HORIZON AI rules (role, never treat a missing alert or a missing service
+  as "normal" or "not running", the answer format, data confidence). Edit that file and upload it to change how it answers.
+  The app adds a short data guide after it that says what each piece of data means and what is not connected (CFMS, duty records,
+  OTA, official EWT, departure logs).
+- **Services you name are checked, not guessed.** For "How was 147?", "147A bunching?", "147号怎么样", "bas 147 hari ini":
+  - live: buses on the route per direction, estimated spacing between buses, scheduled headway and its source, bunching and gaps
+    (measured on demand by the bunching collector from LTA arrival data, then kept on watch for 45 minutes);
+  - history: bunching and long-headway events logged in the window, and how many minutes that direction was actually monitored,
+    so "no events" is never mistaken for "normal";
+  - running time: measured trips against the scheduled and usual running time;
+  - every Forecast Centre alert, service row and recommendation for that service (not only the top ones).
+- **Time window:** "now" = live plus the last hour; "today", "last 3 hours", "yesterday" (history only, no live check).
+- **Thresholds** are the ones in Bunching settings (bunching below 3 min, long headway at scheduled + 10 min, 15 stops to confirm,
+  unless you changed them). HORIZON AI does not invent others.
+- **Answer format:** "Service 147 - status", Assessment, Key findings, Action (only when needed), Data confidence
+  (Verified / Partial / Insufficient / Stale). Under 120 words.
+- On a DEMO page it does not take live measurements (no LTA calls); the rules prompt is cached, so the long rules cost little after
+  the first question.
 
 ## Setup
 
@@ -59,7 +80,8 @@ Settings > Pages can hide the AI Operations Centre like any other page (`aicentr
 | `app_shell.js` | changed | Menu entry "AI Operations Centre" with a new spark icon |
 | `forecast.html` | changed | Top link "AI OPERATIONS" |
 | `render.yaml` | changed | Lists `ANTHROPIC_API_KEY`, `ASSISTANT_AI_MODEL`, `ASSISTANT_DAILY_CAP` (values stay in Render) |
-| `test_ai_assistant.py` | new | Offline tests: no key, bad input, languages, data trimming, checkpoint readings, limits, AI errors |
+| `test_ai_assistant.py` | new | Offline tests: no key, bad input, languages, data trimming, checkpoint readings, limits, AI errors, service numbers, time windows, live / history checks |
+| `horizon_ai_prompt.md` | new | The OCC's HORIZON AI rules (edit to change how it answers) |
 
 ## Keep in step
 

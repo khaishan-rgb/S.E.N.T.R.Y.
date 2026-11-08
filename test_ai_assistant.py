@@ -6,6 +6,7 @@ import os
 import tempfile
 import time
 import unittest
+from datetime import datetime
 
 _TMP = tempfile.mkdtemp()
 os.environ.setdefault("BUNCHING_DB", os.path.join(_TMP, "t_ai_assistant.db"))
@@ -117,18 +118,21 @@ class Assistant(unittest.TestCase):
         self.assertEqual(call["url"], "https://api.anthropic.com/v1/messages")
         self.assertEqual(call["headers"]["x-api-key"], "test-key")
         sent = call["json"]
-        self.assertIn("Bahasa Melayu", sent["system"])
-        self.assertIn("Advisory only", sent["system"])
+        system = sent["system"][0]["text"]
+        self.assertEqual(sent["system"][0]["cache_control"], {"type": "ephemeral"})             # same rules every time: cached
+        self.assertIn("Advisory only", system)
         self.assertEqual(sent["max_tokens"], 700)
         roles = [m["role"] for m in sent["messages"]]
         self.assertEqual(roles[0], "user")
         self.assertEqual(roles[-1], "user")
         self.assertTrue(all(a != b for a, b in zip(roles, roles[1:])), roles)       # alternating, as the API needs
         last = sent["messages"][-1]["content"]
-        self.assertTrue(last.startswith("LIVE DATA SNAPSHOT (JSON):"))
+        self.assertTrue(last.startswith("Answer language: Bahasa Melayu"))
         q = last.split("QUESTION: ", 1)[1]
         self.assertLessEqual(len(q), 600)
-        snap = json.loads(last.split("\n", 1)[1].split("\n\nQUESTION:", 1)[0])
+        data = json.loads(last.split("DATA (JSON):\n", 1)[1].split("\n\nQUESTION:", 1)[0])
+        snap = data["page"]
+        self.assertIn("thresholds", data)
         self.assertEqual((len(snap["alerts"]), len(snap["recommendations"]), len(snap["services"])), (30, 12, 40))
         self.assertNotIn("routes", snap)
         self.assertNotIn("secret_field", snap)
@@ -141,7 +145,7 @@ class Assistant(unittest.TestCase):
             fake = app._client = FakeClient()
             st, d = self.ask({"q": "status?", "lang": lang})
             self.assertTrue(d["ok"], lang)
-            self.assertIn(word, fake.calls[0]["json"]["system"], lang)
+            self.assertIn(word, fake.calls[0]["json"]["messages"][-1]["content"].split("\n", 1)[0], lang)
 
     def test_big_snapshot_is_trimmed(self):
         ctx = {"mode": "live", "alerts": [{"t": "a" * 3000}] * 30, "services": [{"t": "s" * 3000}] * 40}
@@ -156,7 +160,7 @@ class Assistant(unittest.TestCase):
         cpa._CACHE[other] = (time.time() - 7200, {"level": "Super Jam", "to_jb": "Super Jam", "to_sg": None})
         cpa._CACHE["6710"] = (time.time(), {"level": "Jam"})                  # not a checkpoint camera
         snap, _ = app.assistant_snapshot({})
-        cams = snap["checkpoints"]["cameras"]
+        cams = snap["checkpoints"]["cameras"]  # noqa
         self.assertEqual(list(cams), [cid])
         self.assertEqual(cams[cid]["age_min"], 2)
         self.assertTrue(snap["checkpoints"]["crossings"])
@@ -190,6 +194,142 @@ class Assistant(unittest.TestCase):
         st, d = self.ask({"q": "hi again"})
         self.assertFalse(d["ok"])
         self.assertIn("TimeoutError", d["error"])
+
+
+# ---------------------------------------------------------------- HORIZON rules and per-service checks
+def fake_row(svc, d, at):
+    return {"service": svc, "direction": d, "key": f"{svc}:{d}", "risk": "red" if d == 1 else "green", "score": 70, "n_buses": 6, "sched_hw": 10.0,
+            "hw_src": "Service Headway Master (Weekday 06:00-20:00)", "issue": "Headway Gap" if d == 1 else "Normal", "note": None,
+            "groups": [], "gaps": [], "seq": [], "bb": None, "trend": "widening" if d == 1 else "stable", "location": "Opp Blk 123",
+            "gap": {"now": 21.0, "max_hw": 23.0, "ratio": 2.3, "state": "confirmed", "trend": "widening", "since_stop": "Blk 101 (12345)",
+                    "cur_stop": "Opp Blk 123 (12399)", "stops": 17, "active": True} if d == 1 else None,
+            "traffic": {"text": "No prolonged slow traffic within 3 km ahead of the leading bus."}, "dist": {"now": [9.0, 21.0, 8.0, 7.0, 10.0] if d == 1 else [10.0, 11.0, 9.0], "pred": []},
+            "counts": {"gaps": 1 if d == 1 else 0, "bb": 0, "bb2": 0, "bb3": 0, "bb4": 0, "early": 0}, "stops": 52, "route_km": 21.4, "at": at}
+
+
+class HorizonRules(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        app.bb_init()
+        app.rt_init()
+
+    def setUp(self):
+        self.saved = {k: getattr(app, k) for k in ("DV_AI_KEY", "_client", "static", "freq_table", "bb_run")}
+        self.rows, self.watch, self.master = dict(app.BB["rows"]), dict(app.BB["watch"]), list(app.BB["master"])
+        app.ASSIST.update(day="", n=0, who={})
+        app.DV_AI_KEY = "test-key"
+        self.fake = app._client = FakeClient()
+        self.runs = []
+
+        async def static():
+            return {"dirs": {"147": [1, 2], "147A": [1], "182M": [1], "2": [1, 2], "3": [1, 2]}}
+
+        async def freq_table():
+            return {"freqs": {}}
+
+        async def bb_run(keys):
+            self.runs.append(list(keys))
+            for svc, d in keys:
+                app.BB["rows"][f"{svc}:{d}"] = fake_row(svc, d, time.time())
+        app.static, app.freq_table, app.bb_run = static, freq_table, bb_run
+        for svc in ("147", "147A"):
+            app.bb_sql("DELETE FROM bunching_event WHERE service=?", (svc,))
+            app.bb_sql("DELETE FROM gap_event WHERE service=?", (svc,))
+            app.bb_sql("DELETE FROM bb_cov WHERE service=?", (svc,))
+            app.bb_sql("DELETE FROM rt_trip WHERE service=?", (svc,))
+            app.BB["rows"].pop(f"{svc}:1", None)
+            app.BB["rows"].pop(f"{svc}:2", None)
+
+    def tearDown(self):
+        for k, v in self.saved.items():
+            setattr(app, k, v)
+        app.BB["rows"], app.BB["watch"], app.BB["master"] = self.rows, self.watch, self.master
+
+    def sent(self):
+        last = self.fake.calls[-1]["json"]["messages"][-1]["content"]
+        return json.loads(last.split("DATA (JSON):\n", 1)[1].split("\n\nQUESTION:", 1)[0])
+
+    def test_the_occ_rules_are_the_system_prompt(self):
+        txt = app.assistant_system()
+        self.assertIn("The absence of an alert is NOT evidence that a service is operating normally.", txt)   # from horizon_ai_prompt.md
+        self.assertIn("Data confidence:", txt)
+        self.assertIn("observed_min", txt)                                     # the data guide for this deployment
+        self.assertIn("Not connected to you: CFMS", txt)
+
+    def test_service_numbers_in_questions(self):
+        known = {"147", "147A", "182", "182M", "2", "3", "156"}
+        T = app.assistant_targets
+        self.assertEqual(T("How was svc 147?", known), ["147"])
+        self.assertEqual(T("How is 147A doing", known), ["147A"])
+        self.assertEqual(T("Any problem with 182M and 182?", known), ["182M", "182"])
+        self.assertEqual(T("147号怎么样？", known), ["147"])
+        self.assertEqual(T("Bagaimana bas 147 hari ini?", known), ["147"])
+        self.assertEqual(T("hold 3 min at Dir 2 for 2 buses", known), [])          # times, directions and counts are not services
+        self.assertEqual(T("How is svc 999?", known), ["999"])                       # named as a service, so it is checked (and reported unknown)
+        self.assertEqual(T("Status on 2026-11-08 at 14:51", known), [])
+
+    def test_time_windows(self):
+        now = datetime(2026, 11, 8, 14, 51, tzinfo=app.SGT).timestamp()
+        W = lambda q: app.assistant_window(q, now)
+        self.assertEqual((W("How was 147 yesterday?")["name"], W("How was 147 yesterday?")["live"]), ("yesterday", False))
+        self.assertEqual(W("147 昨天怎么样")["name"], "yesterday")
+        self.assertEqual(W("How is 147 today?")["name"], "today")
+        self.assertEqual(W("147 in the last 3 hours")["name"], "last 3 h")
+        w = W("How was 147?")
+        self.assertTrue(w["live"])
+        self.assertEqual(round((w["end"] - w["start"]) / 60), 60)
+
+    def test_how_was_147_is_measured_not_guessed(self):
+        now = time.time()
+        app.bb_sql("INSERT INTO gap_event(service,direction,start_ts,end_ts,buses,max_hw,max_ratio,sched_hw,location,start_stop,end_stop,stops,alerts) "
+                   "VALUES ('147',1,?,?,'a,b',24,2.4,10,'Opp Blk 123','Blk 101','Opp Blk 123',18,1)", (now - 1500, now - 900))
+        app.bb_sql("INSERT INTO bb_cov(hour_ts, service, direction, n, sec) VALUES (?,?,?,?,?)", (int((now - 1800) // 3600) * 3600, "147", 1, 90, 2700))
+        app.bb_sql("INSERT INTO rt_trip(service,direction,day_type,date,start_ts,end_ts,rt_min,cover,n_obs,marks) VALUES ('147',1,'Weekday','x',?,?,62.5,0.95,40,'')",
+                   (now - 3000, now - 300))
+        st, d = run(app.assistant_ask(FakeReq({"q": "How was svc 147?", "lang": "en", "ctx": {"mode": "live", "alerts": [{"svc": "27"}],
+                                                                                                    "focus": {"147": {"alerts": [], "services": [], "note": "Not on the Forecast Centre page"}}}})))
+        self.assertTrue(d["ok"])
+        self.assertEqual(d["services_checked"], ["147"])
+        self.assertEqual(sorted(k for r in self.runs for k in r), [("147", 1), ("147", 2)])      # measured on demand
+        self.assertIn(("147", 1), app.BB["watch"])                                                # and kept on watch for follow-ups
+        data = self.sent()
+        c = data["service_checks"][0]
+        self.assertTrue(c["known_service"] and c["live_checks"])
+        d1, d2 = c["directions"]
+        self.assertEqual((d1["live"]["status"], d1["live"]["level"], d1["live"]["buses_tracked"]), ("Headway Gap", "Critical", 6))
+        self.assertEqual(d1["live"]["est_headways_min"], [9.0, 21.0, 8.0, 7.0, 10.0])
+        self.assertEqual(d1["live"]["worst_gap"]["since_stop"], "Blk 101 (12345)")
+        e = d1["live"]["ewt_estimate"]                                                            # (81+441+64+49+100)/(2*55) - 5
+        self.assertAlmostEqual(e["ewt_min"], round((81 + 441 + 64 + 49 + 100) / 110 - 5, 1))
+        self.assertEqual((d1["events"]["long_headway"], d1["events"]["bunching"]), (1, 0))
+        self.assertEqual(d1["events"]["observed_min"], 45)
+        self.assertEqual(d2["events"]["observed_min"], 0)                                          # not watched: no evidence either way
+        self.assertEqual((d2["live"]["status"], d2["live"]["level"]), ("Normal", "Normal"))
+        self.assertEqual(d1["running_time"]["trips_measured"], 1)
+        self.assertEqual(c["forecast_centre"]["note"], "Not on the Forecast Centre page")
+        self.assertEqual(data["thresholds"]["bunch_min"], app.BB["params"]["bunch_min"])
+
+    def test_unknown_service_and_demo_and_yesterday(self):
+        run(app.assistant_ask(FakeReq({"q": "How is svc 999?", "ctx": {"mode": "live"}})))
+        self.assertEqual(self.sent()["service_checks"][0], {**self.sent()["service_checks"][0], "known_service": False})
+        run(app.assistant_ask(FakeReq({"q": "How is 147?", "ctx": {"mode": "demo"}})))
+        c = self.sent()["service_checks"][0]
+        self.assertFalse(c["live_checks"])
+        self.assertNotIn("live", c["directions"][0])
+        self.assertEqual(self.runs, [])                                                           # demo page: no live LTA calls
+        run(app.assistant_ask(FakeReq({"q": "How was 147 yesterday?", "ctx": {"mode": "live"}})))
+        c = self.sent()["service_checks"][0]
+        self.assertEqual((c["window"], c["live_checks"]), ("yesterday", False))
+        self.assertEqual(self.runs, [])
+
+    def test_feed_error_is_reported_as_no_data(self):
+        async def bb_run(keys):
+            for svc, d in keys:
+                app.BB["rows"][f"{svc}:{d}"] = {"service": svc, "direction": d, "key": f"{svc}:{d}", "error": "LTA DataMall: HTTP 503"}
+        app.bb_run = bb_run
+        run(app.assistant_ask(FakeReq({"q": "147 bunching?", "ctx": {"mode": "live"}})))
+        live = self.sent()["service_checks"][0]["directions"][0]["live"]
+        self.assertEqual(live, {"status": "No data", "error": "LTA DataMall: HTTP 503"})
 
 
 if __name__ == "__main__":
