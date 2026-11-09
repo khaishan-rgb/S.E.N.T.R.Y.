@@ -1,6 +1,8 @@
 """Recovery Decision Engine V13.10-V13.11 (30 Oct 2026): No action adjusts no trip; Trip adjustment keeps its adjusted spacing on every later
 trip; Halfway leaves the other trips alone (timetable from the 2nd trip); QoS 1.2 (adjusted departure headway <= scheduled + 6 min);
-average / max headway 30 min either side of the long headway. Run: python3 -m unittest test_recovery_qos"""
+average / max headway 30 min either side of the long headway. V13.14-15 (9 Nov 2026): one steady headway (option), run order kept
+(no trip leaves before the trip in front of it; the +/-8 limit counts from the time it must wait behind a late trip).
+Run: python3 -m unittest test_recovery_qos"""
 import unittest
 
 import recovery as R
@@ -46,7 +48,8 @@ class Scenarios(unittest.TestCase):
         self.assertTrue(adj["later_adjusted"])
         self.assertTrue(any(a["L"] >= 1 for a in adj["term_adj"]))            # instructions on DOWN 1 / UP 2 / DOWN 2 too
         self.assertTrue(all(abs(a["shift"]) <= 8.0 + 1e-6 for a in adj["term_adj"]))
-        self.assertTrue(any(i.get("later") for i in self.r["instructions"]))
+        if self.r["decision"] == "adjust":
+            self.assertTrue(any(i.get("later") for i in self.r["instructions"]))
 
     def test_adjustment_beats_no_action_once_both_are_consistent(self):
         n, a = self.r["plans"]["none"]["ewt"]["avg"], self.r["plans"]["adjust"]["ewt"]["avg"]
@@ -61,7 +64,7 @@ class Scenarios(unittest.TestCase):
         self.assertLessEqual(q_a["max_over"], 6.0 + 1e-6)
         for row in self.r["plans"]["adjust"]["rows"]:                        # and still inside the per-trip limits
             if row["type"] == "full":
-                self.assertLessEqual(abs(row["shift"]), 8.0 + 1e-6)
+                self.assertLessEqual(abs(row["shift"] - row["wait"]), 8.0 + 1e-6)      # +/-8 from when it may leave (run order)
                 self.assertGreaterEqual(row["layover"], 7.0 - 1e-6)
         self.assertTrue(any("QoS 1.2 met" in w for w in self.r["why"]))
 
@@ -129,21 +132,21 @@ class Limits(unittest.TestCase):
         # trips 1-5 have already left (live, 07:50): holding cannot close the gap in front of the late trip 6 ...
         r = R.optimise(ctx(LATE6, now=470.0))
         q = r["plans"]["adjust"]["qos"]
-        self.assertTrue([b for b in q["breaches"] if b["leg"] == "UP 1" and b["between"] == "Trip 5 and Trip 7"], q)
+        self.assertTrue([b for b in q["breaches"] if b["leg"] == "UP 1" and b["between"] == "Trip 5 and Trip 6"], q)      # run order: Trip 7 may not fill it
         hq = r["plans"]["halfway"]["qos"]                                     # a halfway start leaves the same gap at the interchange: reported too
         self.assertTrue(hq["ok"] or hq["breaches"][0]["leg"] == "UP 1")
         c = ctx(LATE6, now=470.0)
         c["candidates"] = []                                                  # no halfway stop: the best full-trip plan, said plainly
         r = R.optimise(c)
         self.assertEqual(r["decision"], "adjust")
-        self.assertTrue(any("cannot be fully met" in w and "Trip 5 and Trip 7" in w for w in r["why"]), r["why"])
+        self.assertTrue(any("cannot be fully met" in w and "Trip 5 and Trip 6" in w for w in r["why"]), r["why"])
 
     def test_old_total_hold_cap_still_works_when_switched_on(self):
         r = R.optimise(ctx(LATE6, {"term_total_max": 8.0}))
         holds = {}
         for row in r["plans"]["adjust"]["rows"]:
-            if row["type"] == "full" and row["shift"] > 0:
-                holds[row["n"]] = holds.get(row["n"], 0) + row["shift"]
+            if row["type"] == "full" and row["shift"] - row["wait"] > 0:
+                holds[row["n"]] = holds.get(row["n"], 0) + row["shift"] - row["wait"]
         for a in r["plans"]["adjust"]["term_adj"]:
             if a["shift"] > 0:
                 holds[a["n"]] = holds.get(a["n"], 0) + a["shift"]
@@ -152,6 +155,43 @@ class Limits(unittest.TestCase):
     def test_no_late_trip_means_nothing_to_do(self):
         r = R.optimise(ctx([0] * 10))
         self.assertEqual(r["decision"], "none")
+
+
+
+class RunOrder(unittest.TestCase):
+    def test_no_trip_leaves_before_the_trip_in_front(self):
+        for late in (LATE6, [0, 0, 0, 0, 0, 25, 14, 3, 0, 0], [0, 0, 0, 0, 30, 0, 0, 0, 0, 0]):
+            for style in ("least_wait", "steady"):
+                r = R.optimise(ctx(late, {"adjust_style": style}))
+                for k in ("adjust", "halfway"):
+                    p = r["plans"].get(k)
+                    if not p:
+                        continue
+                    full = sorted([x for x in p["rows"] if x["type"] != "halfway"], key=lambda x: (x["dep"], x["n"]))
+                    self.assertEqual([x["n"] for x in full], sorted(x["n"] for x in full), (late, style, k))
+                    for c in p["chain"]:
+                        ids = [b for b, _ in c["dep_hw"] if 1 <= b <= 10]
+                        self.assertEqual(ids, sorted(ids), (late, style, k, c["leg"]))
+
+    def test_bunched_late_trips_leave_in_run_order(self):
+        r = R.optimise(ctx([0, 0, 0, 0, 0, 25, 14, 3, 0, 0]))                  # trips 6, 7, 8 ready together
+        d = {x["n"]: x["dep"] for x in r["plans"]["adjust"]["rows"]}
+        self.assertTrue(d[6] < d[7] < d[8], d)
+        self.assertTrue(any("waits for Trip" in i.get("sub", "") for i in r["instructions"]) or r["decision"] == "halfway")
+
+    def test_no_action_unchanged(self):
+        r = R.optimise(ctx([0, 0, 0, 0, 0, 25, 0, 0, 0, 0]))
+        rows = {x["n"]: x for x in r["plans"]["none"]["rows"]}
+        self.assertEqual(rows[7]["shift"], 0)                                  # nobody steps in: trip 7 leaves when it is ready
+        self.assertLess(rows[7]["dep"], rows[6]["dep"])
+
+    def test_steady_headway_option(self):
+        r = R.optimise(ctx(LATE6, {"adjust_style": "steady"}))
+        st = r["plans"]["adjust"]["steady"]
+        g = [round(x["dep"]) for x in sorted(r["plans"]["adjust"]["rows"], key=lambda x: x["n"])]
+        self.assertEqual({b - a for a, b in zip(g[1:], g[2:])}, {st["h"]})      # trips 2-10: one headway
+        self.assertEqual(r["adjust_style"], "steady")
+        self.assertEqual(R.optimise(ctx(LATE6))["adjust_style"], "least_wait")
 
 
 if __name__ == "__main__":
