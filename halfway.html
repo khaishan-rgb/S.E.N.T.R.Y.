@@ -557,7 +557,7 @@ async function hoLoad0(){
   $("hoHw").value = j.sched_hw != null ? j.sched_hw : ""; $("hoHw").placeholder = j.sched_hw != null ? "" : "enter it";
   $("hoLay").value = j.params.layover_min; $("hoDelay").value = j.params.start_delay_min;
   HO.n = j.params.n_trips; hoBuildTrips();
-  HO.aitpDir = +HO.dir; aitpRender();
+  aitpAuto(); HO.aitpDir = +HO.dir; aitpRender();
   if(LS.get("ho.treg", null) == null){ $("hoTreg").checked = j.params.term_reg == null ? true : !!j.params.term_reg; }
   if(LS.get("ho.adj2", null) == null){ $("hoAdj2").checked = !!j.params.allow_adjacent_halfway; }
   if(LS.get("ho.bal", null) == null && j.params.balance_trips){ $("hoBal").value = j.params.balance_trips; hoBalSync(); }      // the Settings default until the user picks a value
@@ -910,7 +910,22 @@ function aitpRender(){
     .map(([s, k]) => `<label class="aitpr"><input type="checkbox" value="${esc(s[0])}" ${sel.has(s[0]) ? "checked" : ""}><span class="sq">${k + 1}</span><b>${esc(s[0])}</b><span class="nm">${esc(s[1])}${k === 0 ? " (first)" : k === list.length - 1 ? " (last)" : ""}</span></label>`).join("") || `<div class="ho-note">No stop matches.</div>`;
   $("aitpList").querySelectorAll("input").forEach(x => x.onchange = () => { const cur = new Set(aitpSel(d)); x.checked ? cur.add(x.value) : cur.delete(x.value); aitpSet(d, Array.from(cur)); aitpChanged(); });
 }
-function aitpChanged(){ aitpSummary(); $("aitpTabs").querySelectorAll("button").forEach(bt => { const s_ = bt.querySelector("small"); if(s_) s_.textContent = s_.textContent.replace(/\d+$/, aitpSel(+bt.dataset.d).length); });
+/* ---- AITP default: one every N bus stops (N = 5 unless changed) in both directions, so Dir 1 and Dir 2 are checked alike.
+   Ticking stops by hand (below) switches that service to your own list until "Use one every N stops" is pressed. */
+function aitpEvery(){ const n = Math.round(+LS.get("ho.aitp.every", 5)); return n >= 1 && n <= 30 ? n : 5; }
+function aitpEveryIdx(n, N){ const o = []; for(let i = 0; i < n - 1; i += N) o.push(i); return o; }      // the first stop, then every Nth; never the last (no one boards there)
+function aitpCustomKey(){ return "ho.aitp.custom." + (HO.svc || ""); }
+function aitpIsCustom(){ return !!LS.get(aitpCustomKey(), false); }
+function aitpAuto(){
+  const j = HO.setup; if(!j || j.error || !HO.svc || aitpIsCustom()) return false;
+  const up = j.stops || [], dn = j.ret_stops || [], N = aitpEvery(), ret = j.ret_dir || (+HO.dir === 1 ? 2 : 1);
+  if(up.length < 2 || dn.length < 2) return false;                // a loop or no return route: the engine keeps its own points
+  const a = aitpEveryIdx(up.length, N).map(i => up[i][0]), b = aitpEveryIdx(dn.length, N).map(i => dn[i][0]);
+  const same = (x, y) => x.length === y.length && x.every((c, k) => c === y[k]);
+  if(same(aitpSel(+HO.dir), a) && same(aitpSel(ret), b)) return false;
+  aitpSet(+HO.dir, a); aitpSet(ret, b); return true;
+}
+function aitpChanged(){ LS.set(aitpCustomKey(), true); aitpSummary(); $("aitpTabs").querySelectorAll("button").forEach(bt => { const s_ = bt.querySelector("small"); if(s_) s_.textContent = s_.textContent.replace(/\d+$/, aitpSel(+bt.dataset.d).length); });
   clearTimeout(HO.aitpT); HO.aitpT = setTimeout(() => { HO.ewtSel = null; if(HO.rec && HO.rec.ok && HO.svc && HO.setup && !HO.setup.error){ hoMsg("AITP changed: recalculating the EWT at the ticked stops\u2026"); hoRun(); } }, 900); }
 $("aitpQ").oninput = () => aitpRender();
 $("aitpAll").onclick = () => { const d = HO.aitpDir || +HO.dir, q = ($("aitpQ").value || "").trim().toLowerCase(); const vis = aitpList(d).filter(s => !q || s[0].includes(q) || String(s[1]).toLowerCase().includes(q)).map(s => s[0]); aitpSet(d, aitpSel(d).concat(vis)); aitpRender(); aitpChanged(); };
@@ -2244,7 +2259,7 @@ document.addEventListener("click", function(e){
   var lean = document.createElement("section"); lean.id = "lean"; lean.setAttribute("aria-label", "Recovery decision in three steps");
   lean.innerHTML =
     '<section class="ln-step" id="lnEnter"><div class="ln-hd"><span class="n">1</span><div class="t"><b>Enter the late trips</b><small>Service, direction and how many minutes late each trip arrives at the first stop. Everything else has a default.</small></div></div>'
-    + '<div class="ln-in"><div id="lnSvcF"></div><div id="lnDirF"></div><div id="lnBalF"></div><div class="fld" id="lnAitpF"><label for="lnAitpN">AITPs per direction</label><input id="lnAitpN" class="sel" type="number" min="1" max="40" step="1" inputmode="numeric" placeholder="every stop" aria-describedby="lnAitpTxt"></div><div class="ln-facts" id="lnFacts">Enter a service to load its route.</div></div>'
+    + '<div class="ln-in"><div id="lnSvcF"></div><div id="lnDirF"></div><div id="lnBalF"></div><div class="fld" id="lnAitpF"><label for="lnAitpN">1 AITP every … stops</label><input id="lnAitpN" class="sel" type="number" min="1" max="30" step="1" inputmode="numeric" placeholder="5" aria-describedby="lnAitpTxt"></div><div class="ln-facts" id="lnFacts">Enter a service to load its route.</div></div>'
     + '<div class="ln-aitp" id="lnAitpTxt"></div>'
     + '<div class="ln-trips-h"><span>Type how many minutes late each bus arrives at <b id="lnFirst">the first stop</b> in the <b>Lateness</b> column (0 = on time). After <b>Compare options</b> the green columns show the recommended plan.</span></div>'
     + '<div id="lnTripTbl"></div>'
@@ -2295,29 +2310,36 @@ document.addEventListener("click", function(e){
     $("lnFirst").textContent = j.first;
   }
 
-  /* ---------- step 1: AITPs per direction = that many stops, evenly spaced from the first stop (never the last), in both directions.
+  /* ---------- step 1: one AITP every N bus stops (default 5), in both directions, from each direction's own stop list.
      It writes the page's own AITP ticks (More settings), so the engine gets aitp_up / aitp_dn exactly as before. */
-  function evenIdx(n, k){ var s = {}; for(var i = 0; i < k; i++) s[Math.floor(i * (n - 1) / k + 0.5)] = 1; return Object.keys(s).map(Number).sort(function(a, b){ return a - b; }); }
   function retDir(){ return (HO.setup && HO.setup.ret_dir) || (+HO.dir === 1 ? 2 : 1); }
   function aitpTxt(){
     var j = HO.setup, el = $("lnAitpTxt"), f = $("lnAitpN"); if(!el) return;
     if(!j || j.error){ el.innerHTML = ""; return; }
+    var custom = typeof aitpIsCustom === "function" && aitpIsCustom(), N = typeof aitpEvery === "function" ? aitpEvery() : 5;
     var up = typeof aitpSel === "function" ? aitpSel(+HO.dir) : [], dn = typeof aitpSel === "function" ? aitpSel(retDir()) : [];
-    if(document.activeElement !== f) f.value = up.length ? String(up.length) : "";
-    if(!up.length && !dn.length){ el.innerHTML = "EWT is checked at <b>every stop</b>. Type a number of AITPs to check only those (evenly spaced along the route, both directions)."; return; }
-    var nm = {}; (j.stops || []).forEach(function(s){ nm[s[0]] = s[1]; });
-    var names = up.slice().sort(function(a, b){ return (j.stops || []).findIndex(function(s){ return s[0] === a; }) - (j.stops || []).findIndex(function(s){ return s[0] === b; }); }).map(function(c){ return nm[c] || c; });
-    el.innerHTML = "EWT is checked at <b>" + up.length + " AITP" + (up.length !== 1 ? "s" : "") + "</b> in Dir " + HO.dir + (dn.length ? " and <b>" + dn.length + "</b> in Dir " + retDir() : "") + ": " + esc(names.slice(0, 6).join(" · ")) + (names.length > 6 ? " · +" + (names.length - 6) + " more" : "") + ' <a href="#" id="lnAitpEdit" style="color:#9cc4ff">choose stops</a>';
+    if(document.activeElement !== f){ f.value = custom ? "" : String(N); f.placeholder = custom ? "own" : "5"; }
+    var edit = ' <a href="#" id="lnAitpEdit" style="color:#9cc4ff">choose stops</a>';
+    if(custom){
+      el.innerHTML = (up.length || dn.length ? "EWT is checked at <b>your own AITP stops</b>: " + up.length + " in Dir " + HO.dir + " and " + dn.length + " in Dir " + retDir() + "."
+        : "No AITP ticked: EWT at the engine's own evaluation points.") + edit + ' &middot; <a href="#" id="lnAitpBack" style="color:#9cc4ff">use 1 every ' + N + " stops</a>";
+    } else if(!(j.ret_stops || []).length){
+      el.innerHTML = "No return route for this service: the engine checks its own points along the route." + edit;
+    } else {
+      el.innerHTML = "EWT is checked at <b>1 AITP every " + N + " stop" + (N > 1 ? "s" : "") + "</b>: <b>" + up.length + "</b> in Dir " + HO.dir + " (" + (j.stops || []).length + " stops) and <b>" + dn.length + "</b> in Dir " + retDir()
+        + " (" + (j.ret_stops || []).length + " stops). The first stop, then every " + (N > 1 ? N + "th" : "") + " stop; the last stop is not counted." + edit;
+    }
     var a = $("lnAitpEdit"); if(a) a.onclick = function(e){ e.preventDefault(); $("lnMore").open = true; var b = $("aitpBox"); if(b){ b.open = true; b.scrollIntoView({behavior:"smooth", block:"center"}); } };
+    var bk = $("lnAitpBack"); if(bk) bk.onclick = function(e){ e.preventDefault(); aitpApply(); };
   }
   var aitpT = null;
   function aitpApply(){
-    var j = HO.setup; if(!j || j.error || typeof aitpSet !== "function") return;
-    var v = $("lnAitpN").value.trim(), k = v === "" ? 0 : Math.max(0, Math.min(40, Math.round(+v) || 0));
-    var up = j.stops || [], dn = j.ret_stops || [];
-    aitpSet(+HO.dir, k && up.length > 1 ? evenIdx(up.length, Math.min(k, up.length - 1)).map(function(i){ return up[i][0]; }) : []);
-    aitpSet(retDir(), k && dn.length > 1 ? evenIdx(dn.length, Math.min(k, dn.length - 1)).map(function(i){ return dn[i][0]; }) : []);
+    var j = HO.setup; if(!j || j.error || typeof aitpAuto !== "function") return;
+    var v = $("lnAitpN").value.trim(), N = v === "" ? aitpEvery() : Math.max(1, Math.min(30, Math.round(+v) || 5));
+    LS.set("ho.aitp.every", N); LS.set(aitpCustomKey(), false);
+    var changed = aitpAuto();
     HO.aitpDir = +HO.dir; if(typeof aitpRender === "function") aitpRender(); aitpTxt();
+    if(!changed) return;
     if(HO.rec && HO.rec.ok) $("hoRun").click(); else if(HO.rec){ HO.recStale = true; render(); }
   }
   $("lnAitpN").addEventListener("input", function(){ clearTimeout(aitpT); aitpT = setTimeout(aitpApply, 700); });
