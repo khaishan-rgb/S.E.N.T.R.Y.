@@ -1052,11 +1052,13 @@ class Optimiser:
         sch = np.sort(np.asarray(C.S, float))
         H0 = float(np.median(np.diff(sch)))
         h = max(1, int(math.floor(H0 + 0.5)))
-        lo = {}
+        lo, bind = {}, None
         for k in range(k0 + 1, len(seq)):
             b = seq[k]
             lo[b] = max(float(C.ready[b]), float(C.nat[b]) - P["adj_max"])
-            h = max(h, int(math.ceil((lo[b] - t0) / (k - k0) - 1e-6)))
+            need = int(math.ceil((lo[b] - t0) / (k - k0) - 1e-6))
+            if need > h or (bind is None and need >= h):
+                h, bind = max(h, need), (b, k - k0)
         dep = {}
         for k in range(k0 + 1, len(seq)):
             b = seq[k]
@@ -1071,7 +1073,13 @@ class Optimiser:
         cap = float(P.get("steady_hold_max") or 0.0)
         info = {"h": h, "H": _r(H0, 1), "from_trip": int(seq[k0 + 1]) if k0 + 1 < len(seq) else None, "start_trip": int(seq[k0]), "start": _r(t0, 1), "start_clock": hm(t0),
                 "order": [int(b) for b in seq[k0 + 1:]], "hold_max": _r(max(holds, default=0.0), 0), "n_over_cap": sum(1 for v in over if v > P["adj_max"] + 0.49),
-                "next_trip": C.n + 1, "next_hold": _r(end - float(C.S[-1]), 0), "next_clock": hm(end), "next_sch": hm(C.S[-1])}
+                "next_trip": C.n + 1, "next_hold": _r(end - float(C.S[-1]), 0), "next_clock": hm(end), "next_sch": hm(C.S[-1]),
+                # WHY this number: the trip that sets it, and every trip's earliest time, so the page can test any other headway
+                "bind": None if bind is None else {"trip": int(bind[0]), "k": int(bind[1]), "earliest": _r(lo[bind[0]], 1), "earliest_clock": hm(lo[bind[0]]),
+                                                   "arr_clock": hm(C.act_arr[bind[0]]), "late": _r(C.late[bind[0] - 1], 1), "min_layover": _r(C.ml, 1),
+                                                   "span": _r(lo[bind[0]] - t0, 1), "exact": _r((lo[bind[0]] - t0) / bind[1], 2)},
+                "need": [[int(seq[k]), k - k0, _r(lo[seq[k]], 2), _r(float(C.nat[seq[k]]), 2), hm(C.act_arr[seq[k]])] for k in range(k0 + 1, len(seq))],
+                "next_sch_min": _r(float(C.S[-1]), 2), "min_layover": _r(C.ml, 1)}
         if h > H0 + float(P.get("qos_over_max") or 0.0) + EPS and float(P.get("qos_over_max") or 0.0) > 0:
             self.steady_why = f"one steady headway would be {h} min, over QoS 1.2 ({H0:g} + {float(P['qos_over_max']):g})"
             return None
