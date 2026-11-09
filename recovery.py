@@ -40,6 +40,8 @@ V13.10 (30 Oct 2026) - consistent scenarios + QoS 1.2
     are only kept when nothing within the limits can meet it, and every plan reports its QoS 1.2 result.
 
 V13.11 (30 Oct 2026) - each option behaves the way the OCC reads it
+  * TRIP ADJUSTMENT (V13.13, 9 Nov 2026) first evens out the UP 1 departures (least squares: every gap as close to scheduled as the limits allow,
+    up to `even_side` trips either side of the late trip) when that is at least as good for passengers, then
   * TRIP ADJUSTMENT keeps its adjusted pattern on every later trip: each bus leaves at its UP 1 slot + the scheduled cycle (term_mode
     "pattern"), when ready, within hold <= 8 / early <= 3 min per departure - so the spacing (average / max headway) is the same on every trip.
     term_mode "even" = the former even-spacing regulation at each terminal.
@@ -56,7 +58,7 @@ Pure computation (numpy), no I/O. Decision support only.
 import math
 import numpy as np
 
-MODEL_VERSION = "recovery-2.3-halfway-adj"
+MODEL_VERSION = "recovery-2.4-even-adjust"
 EPS = 1e-6
 
 PARAMS = {
@@ -84,6 +86,8 @@ PARAMS = {
     "term_mode": "pattern",       # later trips of an adjusted plan: "pattern" = every bus keeps its adjusted UP 1 slot (same spacing every trip); "even" = even spacing at each terminal
     "halfway_regulate": 1,        # 1 = a halfway plan also holds / releases the trips around the lost trip (within halfway_adj_max); 0 = no other trip adjusted
     "halfway_adj_max": -1.0,      # max hold / release of those trips; -1 = auto = scheduled layover - minimum layover (what the BC wins back before trip 2)
+    "adjust_even": 1,             # 1 = Trip adjustment evens out the gaps (every interchange headway as close to scheduled as the limits allow) when that is at least as good for passengers; 0 = the cost search only
+    "even_side": 6,               # ... moving up to this many trips either side of the late trip(s)
     "win_min": 30.0,              # window for the average / max headway: this many min before and after the longest headway at each AITP          # QoS 1.2 (HARD): an adjusted departure headway may be at most this many min longer than the scheduled headway
     "w_qos": 40.0,                # search cost per minute a departure headway is over the QoS 1.2 limit  # 0 = two back-to-back trips (e.g. T3 + T4) may NOT both start halfway; 1 = allowed       # a departure adjustment is used (instead of no action) only if it cuts the Average EWT by at least this
     "down_run_factor": 1.0,       # DOWN running time = UP running time x this
@@ -930,6 +934,53 @@ class Optimiser:
         return out
 
     # -------------------------------------------------- local search (coordinate descent, batched)
+    def even_plan(self):
+        """Trip adjustment, evened out: departure times that make every interchange gap as close to its scheduled headway as the limits allow
+        (least squares, solved bus by bus). The late bus leaves when it is ready, the buses ahead are held a little more each, and the buses
+        behind are spaced out too - within +/-adj_max, the 7-min minimum layover, no overtaking, departed trips untouched. -> plan or None."""
+        C, P = self.C, self.P
+        if not self.lateb:
+            return None
+        s_ = int(P.get("even_side", 6))
+        lo_b, hi_b = max(1, min(self.lateb) - s_), min(C.n, max(self.lateb) + s_)
+        seq = sorted(range(C.n + 2), key=lambda b: (C.nat[b], b))
+        slots = sorted(float(v) for v in C.S)
+        g = [slots[k + 1] - slots[k] for k in range(len(slots) - 1)]          # the k-th scheduled gap
+        x = [float(C.nat[b]) for b in seq]
+        x[0], x[-1] = float(C.S[seq[0]]), float(C.S[seq[-1]])
+        mov, box = [], {}
+        for k in range(1, len(seq) - 1):
+            b = seq[k]
+            if lo_b <= b <= hi_b and not C.locked[b]:
+                lo, hi = self._bounds(b)
+                if lo <= hi:
+                    mov.append(k)
+                    box[k] = (float(lo), float(hi))
+        if not mov:
+            return None
+        gap = float(P["min_dep_gap"])
+        for _ in range(600):
+            moved = 0.0
+            for k in mov:
+                lo, hi = box[k]
+                want = ((x[k - 1] + g[k - 1]) + (x[k + 1] - g[k])) / 2.0
+                lo2, hi2 = max(lo, x[k - 1] + gap), min(hi, x[k + 1] - gap)
+                if lo2 > hi2:
+                    lo2 = hi2 = min(max(want, lo), hi)
+                nx = min(max(want, lo2), hi2)
+                moved, x[k] = max(moved, abs(nx - x[k])), nx
+            if moved < 1e-4:
+                break
+        dep = {}
+        for k in mov:
+            b, lo, hi = seq[k], box[k][0], box[k][1]
+            v = float(min(max(round(x[k]), lo), hi))
+            if abs(v - C.nat[b]) > 0.49:
+                dep[b] = v
+        if not dep or self._check(dep, []) or not self._qos_ok(dep):
+            return None
+        return {"dep": dep, "hw": [], "fam": "Even out the gaps (least squares)", "reg": True}
+
     def refine(self, plan, objective="cost", sweeps=3):
         C, P = self.C, self.P
         hwb = {h[0] for h in plan["hw"]}
@@ -1182,6 +1233,14 @@ class Optimiser:
             r, c = self.refine(s)
             if c < ca:
                 best_a, ca = r, c
+        # ---- Trip adjustment evened out: used when it is at least as good for passengers (EWT) and leaves no longer gap
+        self.even_used = False
+        if P.get("adjust_even", 1) and best_a is not None:
+            ev = self.even_plan()
+            if ev is not None:
+                me, mb = self._eval([ev]), self._eval([best_a])
+                if me["ewt_avg"][0] <= mb["ewt_avg"][0] + 0.02 + EPS and me["max"][0] <= mb["max"][0] + 0.5 + EPS:
+                    best_a, ca, self.even_used = ev, float(me["cost"][0]), True
         best_h, ch = None, 1e18
         for s in sorted(hbest, key=lambda p: p["_cost"])[:4]:
             r, c = self.refine(s)
