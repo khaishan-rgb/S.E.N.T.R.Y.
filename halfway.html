@@ -417,6 +417,7 @@ input.bad-time{border-color:#ff4d55!important;box-shadow:0 0 0 1px #ff4d55}
         <h3>Recovery priority</h3>
         <div class="hopref" id="hoPref"><label><input type="radio" name="hopref" value="balanced" checked> Balanced</label><label><input type="radio" name="hopref" value="recovery"> Headway focus — Halfway &gt; Adjustment</label><label><input type="radio" name="hopref" value="mileage"> Mileage focus — Adjustment &gt; Halfway</label></div>
         <label class="hx-chk"><input type="checkbox" id="hoTreg" checked> AI also regulates the later trips at the terminals <small>(even spacing, hold &le; 8 &middot; early &le; 3 min, same rule for both scenarios)</small></label>
+        <label class="hx-chk"><input type="checkbox" id="hoSteady"> Trip adjustment: <b>one steady headway</b> <small>(every trip from trip 2 leaves the same whole minutes apart and keeps it on later trips; holds can pass 8 min &ndash; off = least waiting)</small></label>
         <label class="hx-chk"><input type="checkbox" id="hoAdj2"> Allow two back-to-back halfway trips <small>(e.g. T3 + T4 both disrupted; off = never two consecutive trips)</small></label>
         <label class="hx-chk"><input type="checkbox" id="hoReg" checked> AI regulates headway <small>(hold / release trips, re-time the replacement)</small></label>
         <h3>Halfway deployment</h3>
@@ -526,6 +527,7 @@ const hm = m => { m = ((Math.round(m) % 1440) + 1440) % 1440; return String(Math
 const hoF = x => x == null ? "\u2013" : f1(x);
 const hoPct = x => x == null ? "\u2013" : f1(x) + "%";
 const sg = x => (x > 0 ? "+" : "") + f1(x);
+const sgm = x => (x > 0 ? "+" : x < 0 ? "\u2212" : "") + Math.abs(Math.round(x));      // whole minutes (departure table)
 const okey = o => o.kind + ":" + (o.code || "");
 const isR = id => typeof id === "string" && id[0] === "R";                    // the halfway (replacement) buses: R, or R5 / R6 when several trips are disrupted
 const hasPlan = r => !!(r && r.ok && (r.disrupted != null || r.mode === "continue"));
@@ -586,19 +588,19 @@ function hoRenderTrips(){
   let prev = null;
   r.trips.forEach(t => { const tr = document.querySelector(`#hoTrips tr[data-i="${t.n}"]`); if(!tr) return; tr.className = t.disrupted ? "dis" : "";
     tr.querySelector(".sa").textContent = hm(t.sch_arr); tr.querySelector(".aa").textContent = hm(t.act_arr); tr.querySelector(".sd").textContent = hm(t.sch_dep);
-    tr.querySelector(".ad").innerHTML = t.disrupted ? "<b>Disrupted</b>" : hm(t.act_dep) + (t.dep_late >= .5 ? ` <small>(+${f1(t.dep_late)})</small>` : "");
-    const dh = tr.querySelector(".dh"); dh.textContent = t.dep_hw == null ? "\u2014" : f1(t.dep_hw); dh.className = "dh" + (t.dep_hw != null && t.dep_hw >= 2 * H - 1e-9 ? " wr" : t.dep_hw != null && t.dep_hw >= 1.5 * H - 1e-9 ? " wl" : "");
+    tr.querySelector(".ad").innerHTML = t.disrupted ? "<b>Disrupted</b>" : hm(t.act_dep) + (t.dep_late >= .5 ? ` <small>(+${Math.round(t.dep_late)})</small>` : "");
+    const dh = tr.querySelector(".dh"); dh.textContent = t.dep_hw == null ? "\u2014" : String(Math.round(t.dep_hw)); dh.className = "dh" + (t.dep_hw != null && t.dep_hw >= 2 * H - 1e-9 ? " wr" : t.dep_hw != null && t.dep_hw >= 1.5 * H - 1e-9 ? " wl" : "");
     const rd = tr.querySelector(".rd"), rh = tr.querySelector(".rh");
     if(t.disrupted){ const rp = o && o.j != null ? (o.repl || []).find(x => x.trip === t.n) : null; rd.innerHTML = rp ? `<b>Starts at ${esc(o.name)} ${hm(rp.start_time)}</b>${Math.abs(rp.late_start) >= .5 ? ` <small>(${sg(rp.late_start)})</small>` : ""}` : (o && o.j != null ? "no halfway bus" : "\u2014"); rh.textContent = "\u2014"; return; }
     const x = dep[t.n];
     if(!o || !o.regulated || !x){ rd.textContent = "\u2014"; rh.textContent = "\u2014"; prev = o && x ? x.dep : t.act_dep; return; }
-    rd.innerHTML = hm(x.dep) + (Math.abs(x.shift) >= .5 ? ` <small>(${sg(x.shift)})</small>` : "");
-    rh.textContent = prev == null ? "\u2014" : f1(x.dep - prev); prev = x.dep; });
+    rd.innerHTML = hm(x.dep) + (Math.abs(x.shift) >= .5 ? ` <small>(${sgm(x.shift)})</small>` : "");
+    rh.textContent = prev == null ? "\u2014" : String(Math.round(x.dep - prev)); prev = x.dep; });
   const rp = !HO.dirty ? rvRows() : null;
   if(rp) r.trips.forEach(t => { const tr = document.querySelector(`#hoTrips tr[data-i="${t.n}"]`); if(!tr) return; const x = rp[t.n], rd = tr.querySelector(".rd"), rh = tr.querySelector(".rh"); if(!x) return;
-    if(x.type === "halfway"){ rd.innerHTML = `<b>Starts at ${esc(x.stop)} ${esc(x.start_clock)}</b>${Math.abs(x.shift) >= .5 ? ` <small>(${sg(x.shift)} vs slot)</small>` : ""}`; rh.textContent = "\u2014"; return; }
-    rd.innerHTML = esc(x.dep_clock) + (Math.abs(x.shift) >= .5 ? ` <small>(${sg(x.shift)})</small>` : "") + (x.type === "locked" ? ` <small>departed</small>` : "") + (x.overtaken_by && x.overtaken_by.length ? ` <small>after T${x.overtaken_by.join(",T")}</small>` : "");
-    rh.textContent = x.hw == null ? "\u2014" : f1(x.hw); rh.className = "ai rh" + (x.hw != null && x.hw >= 2 * r.sched_hw - 1e-9 ? " wr" : x.hw != null && (x.hw >= 1.5 * r.sched_hw - 1e-9 || x.hw < (r.bunch_min || 3)) ? " wl" : ""); });
+    if(x.type === "halfway"){ rd.innerHTML = `<b>Starts at ${esc(x.stop)} ${esc(x.start_clock)}</b>${Math.abs(x.shift) >= .5 ? ` <small>(${sgm(x.shift)} vs slot)</small>` : ""}`; rh.textContent = "\u2014"; return; }
+    rd.innerHTML = esc(x.dep_clock) + (Math.abs(x.shift) >= .5 ? ` <small>(${sgm(x.shift)})</small>` : "") + (x.type === "locked" ? ` <small>departed</small>` : "") + (x.overtaken_by && x.overtaken_by.length ? ` <small>after T${x.overtaken_by.join(",T")}</small>` : "");
+    rh.textContent = x.hw == null ? "\u2014" : String(Math.round(x.hw)); rh.className = "ai rh" + (x.hw != null && x.hw >= 2 * r.sched_hw - 1e-9 ? " wr" : x.hw != null && (x.hw >= 1.5 * r.sched_hw - 1e-9 || x.hw < (r.bunch_min || 3)) ? " wl" : ""); });
   const ai = fresh && HO.res.ai ? HO.res.ai : null;
   if(rp && HO.rec){ $("hoDisMsg").innerHTML = HO.rec.decision === "halfway" ? `Recovery Decision Engine: trip <b>${HO.rec.plans.halfway.rows.filter(x => x.type === "halfway").map(x => x.n).join(", ")}</b> starts halfway; every other trip runs in full and is regulated` : HO.rec.decision === "adjust" ? "Recovery Decision Engine: every trip runs in full \u2013 departures adjusted (no halfway)" : "Recovery Decision Engine: no intervention needed"; return; }
   $("hoDisMsg").innerHTML = ai ? (ai.suggest.length ? `AI ticked trip <b>${ai.suggest.join(", ")}</b> (halfway); the other trips keep running and are adjusted` : ai.decision === "adjust" ? "AI ticked nothing: adjust the trips and continue service" : "AI ticked nothing: continue service as it is")
@@ -657,7 +659,7 @@ function hoRender(){ hoRenderTrips(); hoRenderRecovery(); hoRenderRec(); hoRende
 const RV_MODE = {balanced:"balanced", recovery:"headway", mileage:"mileage"};
 function rvUrl(){
   const hw = $("hoHw").value.trim(), std = HO.setup && HO.setup.sched_hw != null && Math.abs(+hw - HO.setup.sched_hw) < 1e-9, pref = (document.querySelector("input[name=hopref]:checked") || {}).value || "balanced";
-  return "/api/halfway/recovery?" + new URLSearchParams({aitp_up:aitpSel(HO.dir).join(","), aitp_dn:aitpSel(HO.setup && HO.setup.ret_dir ? HO.setup.ret_dir : (HO.dir === 1 ? 2 : 1)).join(","), treg:$("hoTreg").checked ? "1" : "0", adj2:hoAdj2() ? "1" : "0", balance:String(hoBal() || ""), service:HO.svc, direction:HO.dir, ref:$("hoRef").value.trim(), hw:std ? "" : hw, layover:$("hoLay").value.trim(), late:HO.late.join(","), mode:RV_MODE[pref] || "balanced", veh:HO.veh, scope:HO.scope === "approved" ? "approved" : "all", sims:"1000", bus:HO.bus, vh:$("hoVh").value.trim(), vw:$("hoVw").value.trim(), vt:$("hoVt").value.trim()});
+  return "/api/halfway/recovery?" + new URLSearchParams({aitp_up:aitpSel(HO.dir).join(","), aitp_dn:aitpSel(HO.setup && HO.setup.ret_dir ? HO.setup.ret_dir : (HO.dir === 1 ? 2 : 1)).join(","), treg:$("hoTreg").checked ? "1" : "0", steady:hoSteady() ? "1" : "0", adj2:hoAdj2() ? "1" : "0", balance:String(hoBal() || ""), service:HO.svc, direction:HO.dir, ref:$("hoRef").value.trim(), hw:std ? "" : hw, layover:$("hoLay").value.trim(), late:HO.late.join(","), mode:RV_MODE[pref] || "balanced", veh:HO.veh, scope:HO.scope === "approved" ? "approved" : "all", sims:"1000", bus:HO.bus, vh:$("hoVh").value.trim(), vw:$("hoVw").value.trim(), vt:$("hoVt").value.trim()});
 }
 function rvChosen(){ const r = HO.rec; return r && r.ok && r.plans && r.plans[r.decision] ? r.plans[r.decision] : null; }
 function rvRows(){                                 // {trip: row of the chosen plan} with the interchange headway in departure order
@@ -934,6 +936,10 @@ $("aitpClrAll").onclick = () => { LS.set(aitpKey(), {}); aitpRender(); aitpChang
 /* ---- later-trip terminal regulation: on by default (Settings), chosen per run */
 $("hoTreg").checked = LS.get("ho.treg", true);
 $("hoTreg").onchange = () => { LS.set("ho.treg", $("hoTreg").checked); hoTouch(); };
+/* ---- Trip adjustment style: least waiting (default) or one steady headway, chosen per browser */
+function hoSteady(){ return !!($("hoSteady") && $("hoSteady").checked); }
+$("hoSteady").checked = !!LS.get("ho.steady", false);
+$("hoSteady").onchange = () => { LS.set("ho.steady", $("hoSteady").checked); hoTouch(); };
 /* ---- two back-to-back halfway trips: off by default (Settings), chosen per run */
 function hoAdj2(){ return !!($("hoAdj2") && $("hoAdj2").checked); }
 $("hoAdj2").checked = !!LS.get("ho.adj2", false);
@@ -995,7 +1001,8 @@ function laterTxt(r){
   if(!p.term_reg) return "not adjusted in any option (every bus leaves at max(schedule, arrival + layover)).";
   const lim = `hold \u2264 ${f1(p.term_hold_max)}, early \u2264 ${f1(p.term_early_max)} min per departure, \u2265 ${f1(p.min_layover_min)} min layover${+p.term_total_max > 0 ? `, \u2264 ${f1(p.term_total_max)} min total hold per BC` : ""}`;
   return "No action: no trip adjusted (the gap carries on, shrinking only by the layover above the minimum). "
-    + (p.term_mode === "pattern" ? `Trip adjustment: every bus keeps its adjusted UP 1 slot on every later trip (same spacing, same average / max), ${lim}. `
+    + (r.adjust_style === "steady" && r.steady_alt ? `Trip adjustment: one steady headway of ${r.steady_alt.h} min from trip ${r.steady_alt.from_trip}, kept on every later trip (each bus = its UP 1 time + the cycle, later only when it is not ready). `
+     : p.term_mode === "pattern" ? `Trip adjustment: every bus keeps its adjusted UP 1 slot on every later trip (same spacing, same average / max), ${lim}. `
                                  : `Trip adjustment: even spacing at each terminal, ${lim}. `)
     + (p.halfway_regulate ? `Halfway: the trips around the lost trip are held / released by at most ${f1(+p.halfway_adj_max >= 0 ? Math.min(+p.halfway_adj_max, +p.adj_max) : Math.max(0, (+p.layover_min || 10) - (+p.min_layover_min || 7)))} min (won back in the layover), so the departure gap meets QoS 1.2 and from the 2nd trip the timetable runs.`
                           : "Halfway: no other trip adjusted; from the 2nd trip the timetable runs.");
@@ -2074,6 +2081,8 @@ document.addEventListener("click", function(e){
 .ln-stale{margin:0 0 12px;padding:9px 12px;border-radius:9px;border:1px solid rgba(255,181,71,.5);background:rgba(255,181,71,.08);color:#ffe0ad;font-size:13px}
 #lean.stale .ln-res{opacity:.5}
 .ln-what{font-size:12.5px;color:var(--ds-mut,#8aa2bd);margin:-4px 0 14px;line-height:1.5}
+.ln-style{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;margin:4px 0 14px;padding:9px 12px;border:1px solid rgba(0,200,255,.22);border-radius:10px;background:rgba(0,200,255,.05);font-size:12.5px;line-height:1.5;color:var(--ds-text-2,#b6c8dd)}
+.ln-style .ds-segm button{height:28px;font-size:12px;padding:0 10px}.ln-style span{flex:1 1 260px}.ln-style b{color:#fff}
 .ln-what a{color:#9cc4ff}
 .ln-bars{display:grid;gap:10px}
 .ln-row{display:grid;grid-template-columns:minmax(190px,260px) minmax(0,1fr) 168px;grid-template-areas:"name bar val" "name g g";gap:4px 16px;align-items:center;padding:12px 14px;border-radius:12px;border:1px solid var(--ds-line,rgba(126,178,230,.14));background:rgba(6,16,30,.55)}
@@ -2236,6 +2245,18 @@ document.addEventListener("click", function(e){
   .ln-pick h3{font-size:21px}
   .ln-ins li{grid-template-columns:48px minmax(0,1fr)}.ln-ins .kd{display:none}
 }
+/* phones: many AITPs per trip would squeeze the squares until "12" shows as "1". The trip name goes on its own line, the squares get the
+   full width (at least 22 px each, wrapping to a second line when needed) and the avg / max box sits under them. */
+@media (max-width:600px){
+  .ln-sqr,.ln-sqr.ln-fin{grid-template-columns:minmax(0,1fr);gap:4px}
+  .ln-sqr>span{white-space:normal}.ln-sqr>span em{display:inline;margin-left:4px}
+  .ln-sqhd{display:none}
+  .ln-sqc{grid-template-columns:repeat(auto-fill,minmax(22px,1fr))!important;max-width:none!important}
+  .ln-sqc i{font-size:10px!important;letter-spacing:0}
+  .ln-sqc b.avg,.ln-sqc .fl{grid-column:1 / -1!important;margin-left:0!important}
+  .ln-sqc b.avg{min-height:30px;justify-items:start;padding:0 10px}
+  .ln-sqc b.avg.wn{flex-direction:row;align-items:center;justify-content:flex-start;gap:16px;min-height:30px;padding:4px 10px}
+}
 .ln-exph{display:flex;justify-content:space-between;align-items:baseline;gap:6px 16px;flex-wrap:wrap;margin-bottom:8px;font-size:12.5px;color:var(--ds-mut,#8aa2bd)}
 .ln-exph a{color:#46d6ff;font-weight:600}
 .ln-expf{display:block;width:100%;height:1200px;border:0;border-radius:12px;background:#020812}
@@ -2249,6 +2270,7 @@ document.addEventListener("click", function(e){
   var f2 = function(x){ return x == null || isNaN(x) ? "–" : (+x).toFixed(2); };
   var f0 = function(x){ return x == null || isNaN(x) ? "–" : String(Math.round(x)); };
   var f1 = function(x){ return x == null || isNaN(x) ? "–" : (Math.abs(x - Math.round(x)) < .05 ? String(Math.round(x)) : (+x).toFixed(1)); };
+  var f0 = function(x){ return x == null || isNaN(x) ? "–" : String(Math.round(+x)); };          // headways: whole minutes
   var hm = function(m){ m = ((Math.round(m) % 1440) + 1440) % 1440; return String(Math.floor(m / 60)).padStart(2, "0") + ":" + String(m % 60).padStart(2, "0"); };
   var opt = $("opt"), inp = $("stIn"), story = $("story"), sc = document.querySelector("#stIn .hx-sc"); if(!opt || !inp || !story || !sc || typeof HO === "undefined") return;
 
@@ -2362,6 +2384,7 @@ document.addEventListener("click", function(e){
   function planDesc(k, p, r){
     var rows = p.rows || [], hw = rows.filter(function(x){ return x.type === "halfway"; }), adj = p.n_adjusted || rows.filter(function(x){ return x.type === "full" && Math.abs(x.shift || 0) >= .5; }).length;
     if(k === "none") return "Every bus leaves when it is ready. Nothing held, no km lost.";
+    if(k === "adjust" && p.steady){ var st = p.steady; return "One steady headway: every trip from Trip " + st.from_trip + " leaves <span style=\"color:#fff;font-weight:700\">" + st.h + " min</span> apart (timetable " + f0(st.H) + "), the same on every later trip. Largest hold +" + f0(st.hold_max) + " min" + (st.n_over_cap ? " (over the " + f0((r.params || {}).adj_max || 8) + "-min limit)" : "") + ((st.next_hold || 0) >= .5 ? "; Trip " + st.next_trip + " held +" + f0(st.next_hold) + " min" : "") + "."; }
     if(k === "adjust") return adj ? "Hold or release " + adj + " departure" + (adj > 1 ? "s" : "") + "; every trip runs the full route." : "Every trip runs the full route; no departure needs to move.";
     var where = hw.map(function(x){ return "Trip " + x.n + " starts at " + esc(x.stop); }).join("; ");
     return where + (adj ? "; " + adj + " other departure" + (adj > 1 ? "s" : "") + " adjusted." : ".") + (r.needs_standby ? " Needs a standby bus." : "");
@@ -2393,6 +2416,16 @@ document.addEventListener("click", function(e){
     var before = hw.length ? pts(p).filter(function(q){ return q.L === 0 && band(q.ewt) === "r" && r.pts_up && hw.some(function(x){ return r.pts_up[q.p] < x.j; }); }).length : 0;
     return '<div class="ln-note">' + NAME[k] + ' still has <b>' + rk + ' red squares</b> against ' + red(o) + ' with ' + NAME[o].toLowerCase() + (before ? ': ' + before + ' of them are AITPs on UP 1 before ' + esc(hw.map(function(x){ return x.stop; }).join(" / ")) + ', which Trip ' + hw.map(function(x){ return x.n; }).join(" / ") + ' skips' : '') + '. Its average EWT is still the lowest because more AITPs turn green elsewhere &ndash; the average decides.</div>';
   }
+  /* ---------- Trip adjustment style: least waiting (default) or one steady headway; the other one's cost in one line */
+  function styleLine(r){
+    var sa = r.steady_alt; if(!sa || !r.plans || !r.plans.adjust) return "";
+    var on = r.adjust_style === "steady", am = f0((r.params || {}).adj_max || 8);
+    var nxt = (sa.next_hold || 0) >= .5 ? ", Trip " + sa.next_trip + " held +" + f0(sa.next_hold) + " min" : "";
+    var txt = on
+      ? 'Trip adjustment uses <b>one steady headway of ' + sa.h + ' min</b> from Trip ' + sa.from_trip + ' (timetable ' + f0(sa.H) + '): EWT ' + f2(sa.ewt) + ' min, largest hold +' + f0(sa.hold_max) + ' min' + nxt + '. <b>Least waiting</b> would give EWT ' + f2(sa.least_wait_ewt) + ' min with no bus held more than ' + am + ' min.'
+      : '<b>One steady headway instead?</b> Every trip from Trip ' + sa.from_trip + ' ' + sa.h + ' min apart (timetable ' + f0(sa.H) + '): EWT ' + f2(sa.ewt) + ' min instead of ' + f2(sa.least_wait_ewt) + ', largest hold +' + f0(sa.hold_max) + ' min' + (sa.n_over_cap ? ' (over the ' + am + '-min limit)' : '') + nxt + '.';
+    return '<div class="ln-style"><div class="ds-segm" role="group" aria-label="Trip adjustment style"><button type="button" data-st="0" aria-pressed="' + (!on) + '">Least waiting</button><button type="button" data-st="1" aria-pressed="' + on + '">One steady headway</button></div><span>' + txt + '</span></div>';
+  }
   function cmpRender(r){
     var el = $("lnCmp");
     if(!r){ el.innerHTML = '<div class="ln-empty">' + (HO.svc ? "Type how late each trip is, then press <b>Compare options</b>. No action, Trip adjustment and Halfway deployment are simulated over the next trips and ranked by EWT." : "Enter a service first.") + '</div>'; return; }
@@ -2409,17 +2442,19 @@ document.addEventListener("click", function(e){
       var p = P[k];
       if(!p || !p.ewt){ h += '<div class="ln-row off" role="listitem"><div class="ln-name"><b>' + NAME[k] + '</b><small>' + (k === "halfway" ? "Not possible: no halfway stop can be reached in time." : "Not simulated in this run.") + '</small></div><div class="ln-bar"></div><div class="ln-val">&ndash;</div></div>'; return; }
       var v = avgE(p), rec = r.decision === k, d = base != null && k !== "none" ? v - base : null, pct = d != null && base > 0.005 ? Math.round(100 * -d / base) : null;
-      var tip = NAME[k] + ": average EWT " + f2(v) + " min · hourly average headway (worst hour) " + f1(p.det.hr_hw) + " min" + (p.det.hr_buses ? ", " + p.det.hr_buses + " buses in that hour" : "") + (p.det.hr_where ? " at " + p.det.hr_where : "") + " · " + ((p.det.km || 0) > 0 ? f1(p.det.km) + " km not run" : "no km lost") + (p.mc && p.mc.ewt_p85 != null ? " · stress test P85 " + f2(p.mc.ewt_p85) + " min" : "");
+      var tip = NAME[k] + ": average EWT " + f2(v) + " min · hourly average headway (worst hour) " + f0(p.det.hr_hw) + " min" + (p.det.hr_buses ? ", " + p.det.hr_buses + " buses in that hour" : "") + (p.det.hr_where ? " at " + p.det.hr_where : "") + " · " + ((p.det.km || 0) > 0 ? f1(p.det.km) + " km not run" : "no km lost") + (p.mc && p.mc.ewt_p85 != null ? " · stress test P85 " + f2(p.mc.ewt_p85) + " min" : "");
       h += '<div class="ln-row' + (rec ? " rec" : "") + '" role="listitem" data-k="' + k + '" title="' + esc(tip) + '"><div class="ln-name"><b>' + NAME[k] + (rec ? ' <span class="ln-chip rec">RECOMMENDED</span>' : '') + (k === best && keys.length > 1 ? ' <span class="ln-chip">LOWEST EWT</span>' : '') + '</b><small>' + planDesc(k, p, r) + '</small></div>'
         + '<div class="ln-bar" aria-hidden="true"><i style="width:' + Math.max(0.6, 100 * Math.max(0, v) / mx).toFixed(1) + '%"></i></div>'
         + '<div class="ln-val"><b>' + f2(v) + '</b>min' + (function(){ var L = pts(p), sm = L.reduce(function(a, q){ return a + q.ewt; }, 0); return L.length ? '<em class="fx">= &Sigma; ' + sm.toFixed(2) + ' &divide; ' + L.length + '</em>' : ""; })() + (d != null ? '<em class="' + (d < -0.005 ? "dn" : d > 0.005 ? "up" : "") + '">' + (d < -0.005 ? "▼ " + f2(-d) + " min" + (pct != null ? " (" + pct + "%)" : "") + " vs no action" : d > 0.005 ? "▲ " + f2(d) + " min vs no action" : "same as no action") + '</em>' : '<em>the baseline</em>') + '</div>'
-        + '<div class="ln-g"><span>Hourly avg headway ' + f1(p.det.hr_hw) + ' min</span><span>' + ((p.det.km || 0) > 0 ? f1(p.det.km) + ' km not run' : 'no km lost') + '</span></div></div>';
+        + '<div class="ln-g"><span>Hourly avg headway ' + f0(p.det.hr_hw) + ' min</span><span>' + ((p.det.km || 0) > 0 ? f1(p.det.km) + ' km not run' : 'no km lost') + '</span></div></div>';
     });
     h += '</div><div class="ln-axis" aria-hidden="true"><span></span><div><span>0</span><span>' + f2(mx) + ' min</span></div><span></span></div>';
-    h += squares(r) + redNote(r);
+    h += styleLine(r) + squares(r) + redNote(r);
     h += ruleBox(r);
     el.innerHTML = h;
     var a = $("lnHowEwt"); if(a) a.onclick = function(e){ e.preventDefault(); openFull("lnHow"); };
+    el.querySelectorAll(".ln-style [data-st]").forEach(function(b){ b.onclick = function(){ var v = b.dataset.st === "1", c = $("hoSteady"); if(!c || v === (r.adjust_style === "steady")) return;
+      c.checked = v; if(c.onchange) c.onchange(); $("hoRun").click(); }; });
     sqWire();
   }
 
@@ -2453,7 +2488,7 @@ document.addEventListener("click", function(e){
     var P = r.plans, k = r.decision, p = P[k], N = P.none, base = N.ewt ? avgE(N) : null, v = p.ewt ? avgE(p) : null;
     var hw = (p.rows || []).filter(function(x){ return x.type === "halfway"; }), adj = p.n_adjusted || 0;
     var head = k === "halfway" ? hw.map(function(x){ return "Start Trip " + x.n + " halfway at " + esc(x.stop) + (x.code ? " (" + esc(x.code) + ")" : "") + " at " + esc(x.start_clock); }).join("<br>")
-      : k === "adjust" ? "Keep every trip in full; hold or release " + adj + " departure" + (adj !== 1 ? "s" : "") : "Keep the natural departures &ndash; no change needed";
+      : k === "adjust" ? (p.steady ? "Keep every trip in full; every trip from Trip " + p.steady.from_trip + " leaves " + p.steady.h + " min apart" : "Keep every trip in full; hold or release " + adj + " departure" + (adj !== 1 ? "s" : "")) : "Keep the natural departures &ndash; no change needed";
     var sub = k === "halfway" ? hw.map(function(x){ return (x.leave_clock ? "Bus leaves off-service at " + esc(x.leave_clock) + " · " : "") + f1(x.km_lost) + " km not run"; }).join("; ") + (r.needs_standby ? " · needs a standby bus at the stop (the late bus cannot get there in time)" : "") + (adj ? " · " + adj + " other departure" + (adj > 1 ? "s" : "") + " adjusted" : "")
       : k === "adjust" ? "No km lost" : "";
     var cmpTo = k === "halfway" ? P[r.full_choice] : N, cv = cmpTo && cmpTo.ewt ? avgE(cmpTo) : null;
@@ -2467,7 +2502,7 @@ document.addEventListener("click", function(e){
       + '<p style="margin-top:10px">' + why + '</p>'
       + '<div class="ln-kpis">' + kpi("EWT vs no action", f2(base) + " &rarr; " + f2(v) + " min", pct != null && pct > 0 ? "▼ " + pct + "% less waiting" : "no change", pct > 0 ? "" : "n")
       + kpi("Red AITPs", counts(pts(N)).r + " &rarr; " + counts(pts(p)).r, "of " + pts(p).length + " checks", "n")
-      + kpi("Hourly avg headway", f1(N.det.hr_hw) + " &rarr; " + f1(p.det.hr_hw) + " min", "worst hour" + (p.det.hr_where ? " · " + esc(p.det.hr_where) : "") + " · scheduled " + f1(r.H) + " min", "n") + kpi("Mileage", (p.det.km || 0) > 0 ? f1(p.det.km) + " km not run" : "none lost", "", "") + '</div>'
+      + kpi("Hourly avg headway", f0(N.det.hr_hw) + " &rarr; " + f0(p.det.hr_hw) + " min", "worst hour" + (p.det.hr_where ? " · " + esc(p.det.hr_where) : "") + " · scheduled " + f0(r.H) + " min", "n") + kpi("Mileage", (p.det.km || 0) > 0 ? f1(p.det.km) + " km not run" : "none lost", "", "") + '</div>'
       + '<div class="ln-btns"><button class="ds-btn pri" type="button" data-dec="' + k + '">Accept recommendation</button>'
       + others.map(function(x){ return '<button class="ds-btn sm ghost" type="button" data-dec="' + x + '">Choose ' + esc(NAME[x].toLowerCase()) + '</button>'; }).join("")
       + (k === "halfway" ? '<button class="ds-btn sm" type="button" id="lnRoute">Off-service route</button>' : '') + '</div>'
@@ -2495,7 +2530,7 @@ document.addEventListener("click", function(e){
     return {avg: Math.round(W.reduce(function(p, x){ return p + x; }, 0) / W.length * 10) / 10, max: Math.max.apply(null, W), min: Math.min.apply(null, W), n: W.length};
   }
   function winAgg(ws){ ws = ws.filter(Boolean); if(!ws.length) return null; return {avg: ws.reduce(function(p, w){ return p + w.avg; }, 0) / ws.length, max: Math.max.apply(null, ws.map(function(w){ return w.max; })), min: Math.min.apply(null, ws.map(function(w){ return w.min; }))}; }
-  function winTxt(w, H){ return w ? '<span class="wv"><small>avg</small> ' + f1(w.avg) + '</span><span class="wv ' + hwCls(w.max, H) + '"><small>max</small> ' + f1(w.max) + '</span>' : "–"; }
+  function winTxt(w, H){ return w ? '<span class="wv"><small>avg</small> ' + f0(w.avg) + '</span><span class="wv ' + hwCls(w.max, H) + '"><small>max</small> ' + f0(w.max) + '</span>' : "–"; }
   function legList(r, P, keys){ var E = r.ewt || {}, nb = E.balance_trips || r.balance_trips || 0, legs = [];
     for(var L = 0; L < nb; L++) legs.push(typeof legNm === "function" ? legNm(L) : (L % 2 ? "DOWN " : "UP ") + (Math.floor(L / 2) + 1));
     keys.forEach(function(k){ (P[k].ewt.points || []).forEach(function(q){ if(legs.indexOf(q.leg) < 0) legs.push(q.leg); }); }); return legs; }
@@ -2506,8 +2541,8 @@ document.addEventListener("click", function(e){
     var P = r.plans, p = P[k], H = r.H || 10, L = pts(p), sm = L.reduce(function(a, q){ return a + q.ewt; }, 0), q = ptAt(p, SEL);
     var h = '<div class="ln-pc">';
     if(SQV === "hw"){
-      if(q){ var o = offGap(q, H); h += '<div><b>' + esc(q.leg) + ' &middot; ' + esc(cleanLbl(q.label)) + '</b> &ndash; headway of each bus (min):</div><div class="ln-gaps">' + (q.h || []).map(function(x){ return '<i class="' + hwCls(x[1], H) + '" title="' + esc((x[0] === 0 ? "bus before the block" : x[0] > ((r.trips || []).length || 10) ? "next bus" : "T" + x[0]) + ": " + f1(x[1]) + " min") + '">' + f1(x[1]) + '</i>'; }).join("") + '</div>'
-        + (function(){ var w = winOf(q, H); return w ? '<div>30 min before &rarr; 30 min after the long headway (' + w.n + ' headways): average <b>' + f1(w.avg) + ' min</b>, max <b>' + f1(w.max) + ' min</b> (the number in the square), shortest <b>' + f1(w.min) + ' min</b>' + (w.min < 3 ? ' &ndash; two buses running together' : '') + '.</div>' : ''; })(); }
+      if(q){ var o = offGap(q, H); h += '<div><b>' + esc(q.leg) + ' &middot; ' + esc(cleanLbl(q.label)) + '</b> &ndash; headway of each bus (min):</div><div class="ln-gaps">' + (q.h || []).map(function(x){ return '<i class="' + hwCls(x[1], H) + '" title="' + esc((x[0] === 0 ? "bus before the block" : x[0] > ((r.trips || []).length || 10) ? "next bus" : "T" + x[0]) + ": " + f0(x[1]) + " min") + '">' + f0(x[1]) + '</i>'; }).join("") + '</div>'
+        + (function(){ var w = winOf(q, H); return w ? '<div>30 min before &rarr; 30 min after the long headway (' + w.n + ' headways): average <b>' + f0(w.avg) + ' min</b>, max <b>' + f0(w.max) + ' min</b> (the number in the square), shortest <b>' + f0(w.min) + ' min</b>' + (w.min < 3 ? ' &ndash; two buses running together' : '') + '.</div>' : ''; })(); }
     } else {
       if(q) h += '<div><b>' + esc(q.leg) + ' &middot; ' + esc(cleanLbl(q.label)) + '</b>: ' + (q.ewt == null ? "fewer than 2 gaps, no EWT" : 'AWT ' + q.sum_h2 + ' &divide; (2 &times; ' + q.sum_h + ') = ' + f2(q.awt) + ' &minus; SWT ' + f2(q.swt) + ' = <b>EWT ' + f2(q.ewt) + ' min</b>') + '</div>';
     }
@@ -2526,13 +2561,13 @@ document.addEventListener("click", function(e){
       : '<span><i class="r"></i>red &gt; ' + f2(BAND.r) + ' min, about a missed bus</span> <span><i class="y"></i>yellow ' + f2(BAND.g) + '&ndash;' + f2(BAND.r) + '</span> <span><i class="g"></i>green &le; ' + f2(BAND.g) + ', close to timetable</span>';
     var h = '<div class="ln-sqb" id="lnSq"><div class="ln-sqh"><h4>Every AITP, trip by trip &middot; ' + nb + ' balance trip' + (nb !== 1 ? "s" : "") + ' (' + esc(typeof balSpan === "function" ? balSpan(nb) : "") + ')</h4>'
       + '<div class="ds-segm" id="lnSqv" role="group" aria-label="What the squares show"><button type="button" data-v="ewt" aria-pressed="' + (!hw) + '">EWT</button><button type="button" data-v="hw" aria-pressed="' + hw + '">Headway</button></div></div>'
-      + '<div class="sub">One square = one AITP on one trip; ' + (hw ? 'the number is the <b>longest headway</b> there, from 30 min before the long headway to 30 min after it (min, scheduled ' + f1(H) + '); a dot = two buses within 3 min of each other. Each trip ends with its <b>average and max headway</b> over that window' : 'the number is its <b>EWT</b> (min of extra wait)') + (nums ? "" : " &ndash; hover a square to see it") + '. Tap a square to see its numbers under each option. <span class="ln-ac" style="display:inline-flex;margin:0">' + leg + '</span></div>'
+      + '<div class="sub">One square = one AITP on one trip; ' + (hw ? 'the number is the <b>longest headway</b> there, from 30 min before the long headway to 30 min after it (min, scheduled ' + f0(H) + '); a dot = two buses within 3 min of each other. Each trip ends with its <b>average and max headway</b> over that window' : 'the number is its <b>EWT</b> (min of extra wait)') + (nums ? "" : " &ndash; hover a square to see it") + '. Tap a square to see its numbers under each option. <span class="ln-ac" style="display:inline-flex;margin:0">' + leg + '</span></div>'
       + '<div class="ln-dirs"><span><b>Dir ' + d1 + ' →</b> ' + esc(first) + ' to ' + esc(last) + '</span><span><b>Dir ' + d2 + ' ←</b> ' + esc(last) + ' back to ' + esc(first) + '</span><span>Squares run in the direction of travel: left = where that trip starts.</span></div><div class="ln-wps' + (side ? "" : " wide") + '">';
     keys.forEach(function(k){ var all = P[k].ewt.points || [], c;
       if(hw){ c = {bs:0, ls:0, ok:0, rl:0, dl:0}; all.forEach(function(q){ var w_ = winOf(q, H), cl = hwCls(w_ ? w_.max : null, H); if(cl !== "x") c[cl]++; }); }
       else c = counts(pts(P[k]));
       var cnt = hw ? '<span><i class="dl"></i><b>' + (c.dl + c.rl) + '</b> longer</span> <span><i class="ok"></i><b>' + c.ok + '</b> on time</span> <span><i class="bs"></i><b>' + (c.bs + c.ls) + '</b> shorter</span>' : cntTxt(c);
-      var qq = P[k].qos; if(qq) cnt += ' <span class="ln-qos ' + (qq.ok ? "ok" : "bad") + '" title="' + esc(qq.rule || "") + '">QoS 1.2 ' + (qq.ok ? "&#10003; met" : "&#10007; " + qq.n_breaches + " over, worst +" + f1(qq.max_over)) + '</span>';
+      var qq = P[k].qos; if(qq) cnt += ' <span class="ln-qos ' + (qq.ok ? "ok" : "bad") + '" title="' + esc(qq.rule || "") + '">QoS 1.2 ' + (qq.ok ? "&#10003; met" : "&#10007; " + qq.n_breaches + " over, worst +" + f0(qq.max_over)) + '</span>';
       h += '<div class="ln-wp' + (r.decision === k ? " rec" : "") + '" data-k="' + k + '"><div class="ln-wh"><b>' + NAME[k] + (r.decision === k ? ' <span class="ln-chip rec">RECOMMENDED</span>' : '') + '</b><span class="ln-ac" style="margin:0">' + cnt + '</span></div><div class="ln-sqg">';
       // headway view: each square shows the headway most off schedule; the averages are MINUTES OFF SCHEDULE (|h - H|), so a short gap
       // (bunching) counts as badly as a long one instead of cancelling it out
@@ -2546,14 +2581,14 @@ document.addEventListener("click", function(e){
         var ws = row.map(function(q){ return winOf(q, H); }), wr = winAgg(ws); allW = allW.concat(ws.filter(Boolean));
         h += '<div class="ln-sqr">' + lab + '<div class="ln-sqc' + (nums ? fcls : " sm") + (mx > 6 ? " many" : "") + '" style="' + gcols + '">'
           + row.map(function(q){ var key = q.L + "|" + q.p, cl, txt, tip;
-            if(hw){ var w = winOf(q, H), g = w ? w.max : null; cl = hwCls(g, H); txt = g == null ? "–" : (f1(g) === String(Math.round(g)) ? f1(g) : '<span class="d">' + f1(g) + '</span><span class="n0">' + Math.round(g) + '</span>') + (w && w.min < 3 - 1e-9 ? '<em class="bn"></em>' : ''); tip = g == null ? "no headway" : "30 min either side of the long headway: average " + f1(w.avg) + ", max " + f1(w.max) + ", shortest " + f1(w.min) + " min (scheduled " + f1(H) + ")" + (w.min < 3 ? " - buses running together" : ""); }
+            if(hw){ var w = winOf(q, H), g = w ? w.max : null; cl = hwCls(g, H); txt = g == null ? "–" : f0(g) + (w && w.min < 3 - 1e-9 ? '<em class="bn"></em>' : ''); tip = g == null ? "no headway" : "30 min either side of the long headway: average " + f0(w.avg) + ", max " + f0(w.max) + ", shortest " + f0(w.min) + " min (scheduled " + f0(H) + ")" + (w.min < 3 ? " - buses running together" : ""); }
             else { var b = q.ewt == null ? null : band(q.ewt); cl = b || "n"; txt = ewtTxt(q.ewt); tip = q.ewt == null ? "not enough buses for an EWT" : f2(q.ewt) + " min extra wait (" + BNAME[b] + ")"; }
             return '<i class="' + cl + (SEL === key ? " sqon" : "") + '" data-s="' + key + '" tabindex="0" title="' + esc(lg + " · Dir " + dirOf(lg) + " · " + cleanLbl(q.label) + ": " + tip + " – tap for the numbers") + '">' + (nums ? txt : "") + '</i>'; }).join("")
-          + (hw ? '<b class="avg wn ' + hwCls(wr ? wr.max : null, H) + '" style="grid-column:' + (mx + 1) + '" title="' + esc(lg + ": average headway " + (wr ? f1(wr.avg) : "–") + " min, max " + (wr ? f1(wr.max) : "–") + " min, shortest " + (wr ? f1(wr.min) : "–") + " min, 30 min either side of the long headway at every AITP") + '">' + winTxt(wr, H) + '</b>'
+          + (hw ? '<b class="avg wn ' + hwCls(wr ? wr.max : null, H) + '" style="grid-column:' + (mx + 1) + '" title="' + esc(lg + ": average headway " + (wr ? f0(wr.avg) : "–") + " min, max " + (wr ? f0(wr.max) : "–") + " min, shortest " + (wr ? f0(wr.min) : "–") + " min, 30 min either side of the long headway at every AITP") + '">' + winTxt(wr, H) + '</b>'
              : '<b class="avg ' + clOf(av) + '" style="grid-column:' + (mx + 1) + '" title="' + esc(lg + " average EWT: " + (av == null ? "–" : f2(av) + " min = Σ " + vs.reduce(function(a, v){ return a + v; }, 0).toFixed(2) + " ÷ " + vs.length)) + '">' + fmtV(av) + '</b>') + '</div></div>'; });
       var fin = allV.length ? allV.reduce(function(a, v){ return a + v; }, 0) / allV.length : null;
       var wa = winAgg(allW);
-      if(hw) h += '<div class="ln-sqr ln-fin"><span>All trips</span><div class="ln-sqc" style="' + gcols + '"><span class="fl" style="grid-column:1 / span ' + mx + '">30 min before &rarr; 30 min after the long headway, every AITP of every trip (scheduled ' + f1(H) + ')' + (wa ? ' &middot; shortest ' + f1(wa.min) + ' min' + (wa.min < 3 ? ' (buses running together)' : '') : '') + ' &rarr;</span><b class="avg big wn ' + hwCls(wa ? wa.max : null, H) + '" style="grid-column:' + (mx + 1) + '">' + winTxt(wa, H) + '</b></div></div>';
+      if(hw) h += '<div class="ln-sqr ln-fin"><span>All trips</span><div class="ln-sqc" style="' + gcols + '"><span class="fl" style="grid-column:1 / span ' + mx + '">30 min before &rarr; 30 min after the long headway, every AITP of every trip (scheduled ' + f0(H) + ')' + (wa ? ' &middot; shortest ' + f0(wa.min) + ' min' + (wa.min < 3 ? ' (buses running together)' : '') : '') + ' &rarr;</span><b class="avg big wn ' + hwCls(wa ? wa.max : null, H) + '" style="grid-column:' + (mx + 1) + '">' + winTxt(wa, H) + '</b></div></div>';
       else h += '<div class="ln-sqr ln-fin"><span>Final EWT</span><div class="ln-sqc" style="' + gcols + '"><span class="fl" style="grid-column:1 / span ' + mx + '">average of all ' + allV.length + ' squares = &Sigma; ' + allV.reduce(function(a, v){ return a + v; }, 0).toFixed(2) + ' &divide; ' + allV.length + ' &rarr;</span><b class="avg big ' + clOf(fin) + '" style="grid-column:' + (mx + 1) + '">' + (fin == null ? "–" : f2(fin)) + '</b></div></div>';
       h += '</div><div class="ln-pcw" data-k="' + k + '">' + panelCalc(r, k) + '</div></div>'; });
     h += '</div>';

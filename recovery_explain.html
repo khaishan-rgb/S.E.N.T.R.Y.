@@ -220,6 +220,7 @@ button:hover{border-color:var(--cyan)}
   ];
   var $ = function(id){ return document.getElementById(id); };
   var r1 = function(x){ return (Math.round(x * 10) / 10).toString(); };
+  var r0 = function(x){ return String(Math.round(+x)); };                 // headways: whole minutes
   var r2 = function(x){ return (Math.round(x * 100) / 100).toFixed(2); };
   var esc = function(s){ return String(s == null ? "" : s).replace(/[&<>"']/g, function(c){ return {"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"}[c]; }); };
   function rep(v, n){ var a = []; for(var i = 0; i < n; i++) a.push(v); return a; }
@@ -315,7 +316,7 @@ button:hover{border-color:var(--cyan)}
       if(x >= -30 - 1e-6 && x <= 30 + 1e-6) h += '<rect x="' + (X(x) - 4).toFixed(1) + '" y="' + (B - 3) + '" width="8" height="6" rx="1.5" fill="' + col + '"/>';
       if(i + 1 < t.length){
         var u = Math.max(-30, x), v = Math.min(30, t[i + 1]), g = t[i + 1] - x;
-        if(v - u > 6 && g > 0.5) h += '<text x="' + ((X(u) + X(v)) / 2).toFixed(1) + '" y="' + Math.max(11, Y(t[i + 1] - u) - 4).toFixed(1) + '" text-anchor="middle" font-size="11" font-family="Rajdhani, sans-serif" font-weight="700" fill="var(--text)">' + r1(g) + "</text>";
+        if(v - u > 6 && g > 0.5) h += '<text x="' + ((X(u) + X(v)) / 2).toFixed(1) + '" y="' + Math.max(11, Y(t[i + 1] - u) - 4).toFixed(1) + '" text-anchor="middle" font-size="11" font-family="Rajdhani, sans-serif" font-weight="700" fill="var(--text)">' + r0(g) + "</text>";
       }
     });
     h += '<text x="' + L + '" y="' + (Ht - 6) + '" font-size="10" fill="var(--mut)" font-family="IBM Plex Sans, sans-serif">30 min before</text>';
@@ -335,7 +336,7 @@ button:hover{border-color:var(--cyan)}
         var u = Math.max(-30, times[k]), v = Math.min(30, times[k + 1]), g = times[k + 1] - times[k];
         if(v <= u) continue;
         d += "M" + X(u).toFixed(1) + " " + B + " L" + X(u).toFixed(1) + " " + Y(times[k + 1] - u).toFixed(1) + " L" + X(v).toFixed(1) + " " + Y(times[k + 1] - v).toFixed(1) + " L" + X(v).toFixed(1) + " " + B + " Z ";
-        if(X(v) - X(u) > 13 && g > 0.5) lab += '<text x="' + ((X(u) + X(v)) / 2).toFixed(1) + '" y="' + Math.max(T - 3, Y(times[k + 1] - u) - 4).toFixed(1) + '" text-anchor="middle" font-size="11" font-family="Rajdhani, sans-serif" font-weight="700" fill="var(--text)">' + r1(g) + "</text>";
+        if(X(v) - X(u) > 13 && g > 0.5) lab += '<text x="' + ((X(u) + X(v)) / 2).toFixed(1) + '" y="' + Math.max(T - 3, Y(times[k + 1] - u) - 4).toFixed(1) + '" text-anchor="middle" font-size="11" font-family="Rajdhani, sans-serif" font-weight="700" fill="var(--text)">' + r0(g) + "</text>";
       }
       times.forEach(function(x){ if(x >= -30 - 1e-6 && x <= 30 + 1e-6) bus += '<rect x="' + (X(x) - 3.5).toFixed(1) + '" y="' + (B - 3) + '" width="7" height="6" rx="1.5" fill="' + col + '"/>'; });
       var sd = "", sch = []; for(var s0 = -60 - H / 2; s0 < 60; s0 += H) sch.push(s0);
@@ -379,8 +380,8 @@ button:hover{border-color:var(--cyan)}
       o += '<text x="' + cx.toFixed(1) + '" y="' + (B + 36) + '" text-anchor="middle" font-size="12.5" font-weight="700" fill="' + col + '" font-family="IBM Plex Sans, sans-serif">' + r1(n * avg) + " min in total</text>";
       return o;
     };
-    h += block(L, n1, H, "#46d6ff", "Bus every " + r1(H) + " min");
-    h += block(L + n1 * pitch + mid, n2, G, "#ff8577", "One " + r1(G) + "-min gap");
+    h += block(L, n1, H, "#46d6ff", "Bus every " + r0(H) + " min");
+    h += block(L + n1 * pitch + mid, n2, G, "#ff8577", "One " + r0(G) + "-min gap");
     h += '<line x1="' + L + '" x2="' + R + '" y1="' + B + '" y2="' + B + '" stroke="var(--line-2)"/>';
     h += '<text x="' + (L + n1 * pitch + mid / 2).toFixed(1) + '" y="' + (B - 30) + '" text-anchor="middle" font-size="16" font-family="Orbitron, sans-serif" fill="var(--mut)">vs</text>';
     h += '<text x="' + R + '" y="' + (B + 60) + '" text-anchor="end" font-size="13" font-weight="700" fill="var(--text)" font-family="Rajdhani, sans-serif">' + r1(n2 * G / 2) + " is 4 × " + r1(n1 * H / 2) + "</text>";
@@ -419,7 +420,7 @@ button:hover{border-color:var(--cyan)}
     var lowest = keys.reduce(function(b, k){ return R[k].avg < R[b].avg - 1e-9 ? k : b; }, keys[0]);
     var nmx = function(x){ return String(Math.round(x * 100) / 100); };
 
-    $("chips").innerHTML = '<span class="chip">Scheduled every <b>' + r1(H) + ' min</b></span><span class="chip"><b>' + nT + "</b> balance trip" + (nT > 1 ? "s" : "") + '</span><span class="chip"><b>' + nAitp + "</b> AITP checks per option</span>"
+    $("chips").innerHTML = '<span class="chip">Scheduled every <b>' + r0(H) + ' min</b></span><span class="chip"><b>' + nT + "</b> balance trip" + (nT > 1 ? "s" : "") + '</span><span class="chip"><b>' + nAitp + "</b> AITP checks per option</span>"
       + (cs.halfway_stop ? '<span class="chip">Halfway stop <b>' + esc(cs.halfway_stop) + "</b></span>" : "");
     var cb = $("casebar"); cb.hidden = false;
     cb.innerHTML = "<span>From the Recovery Decision Engine: <b>Svc " + esc(cs.svc || "?") + " Dir " + esc(cs.dir || "?") + "</b>" + (cs.late && cs.late.length ? ", trip " + esc(cs.late.join(", ")) + " late" + (cs.delay ? " " + r1(cs.delay) + " min" : "") : "") + ". Same numbers as the engine page.</span>"
@@ -451,7 +452,7 @@ button:hover{border-color:var(--cyan)}
 
     // the options: one picture per trip, at the AITP that trip hits hardest
     var ymax = Math.max(H, Math.max.apply(null, keys.map(function(k){ return R[k].trips.reduce(function(m, t){ return Math.max(m, t.ev ? t.ev.longest : 0, t.split ? Math.max(t.split.b.ev.longest, t.split.a.ev.longest) : 0); }, 0); }))) * 1.08;
-    var hd = function(ev){ var u = ev.hour.filter(function(x, i, a){ return a.indexOf(x) === i; }); return u.length === 1 ? "every <b>" + r1(u[0]) + "</b>" : "longest <b>" + r1(ev.longest) + "</b>"; };
+    var hd = function(ev){ var u = ev.hour.filter(function(x, i, a){ return a.indexOf(x) === i; }); return u.length === 1 ? "every <b>" + r0(u[0]) + "</b>" : "longest <b>" + r0(ev.longest) + "</b>"; };
     var at = function(q){ return esc(q.s) + (q.pct != null ? " (" + Math.round(q.pct) + "% along)" : ""); };
     var rule = {none: "Long gap kept on every trip", adjust: (cs.adj_n ? cs.adj_n + " departure" + (cs.adj_n > 1 ? "s" : "") + " held or released" : "Departures held or released") + ", every trip in full",
       halfway: "Late bus starts at " + (cs.halfway_stop ? esc(cs.halfway_stop) : "the halfway stop") + ", timetable back from the next trip"};
@@ -460,7 +461,7 @@ button:hover{border-color:var(--cyan)}
       r.trips.forEach(function(tr, i){
         if(tr.split){
           var S = tr.split;
-          h += '<div class="trip"><div class="trip-h"><span class="lbl">' + esc(tr.name) + '<small>split at the halfway stop</small></span><span class="hw">longest <b>' + r1(S.b.ev.longest) + "</b> &rarr; <b>" + r1(S.a.ev.longest) + '</b></span><span class="e">extra wait <b class="num">' + r2(tr.ewt) + "</b></span></div>"
+          h += '<div class="trip"><div class="trip-h"><span class="lbl">' + esc(tr.name) + '<small>split at the halfway stop</small></span><span class="hw">longest <b>' + r0(S.b.ev.longest) + "</b> &rarr; <b>" + r0(S.a.ev.longest) + '</b></span><span class="e">extra wait <b class="num">' + r2(tr.ewt) + "</b></span></div>"
             + splitSVG(S.b.ev.t, S.a.ev.t, H, ymax, hex[k], S.fb, {label: tr.name + " split at the halfway stop"})
             + '<div class="splitnote">Before: ' + S.b.pts.length + " AITPs, average <b>" + r2(S.b.ewt) + "</b> &middot; after: " + S.a.pts.length + " AITPs, average <b>" + r2(S.a.ewt) + "</b> &rarr; whole trip <b>" + r2(tr.ewt) + "</b></div>"
             + '<div class="tripcap">Gaps at ' + at(S.b.worst) + " and " + at(S.a.worst) + ", the hardest-hit AITPs on each side.</div></div>";
@@ -472,21 +473,21 @@ button:hover{border-color:var(--cyan)}
       });
       var q = r.longest <= qmax + 1e-9;
       h += '<div class="foot"><div class="avgline"><span>Average of ' + r.n + ' AITP checks</span><b class="num">' + r2(r.avg) + "</b></div>"
-        + '<div><span class="pill ' + (q ? "ok" : "bad") + '">QoS 1.2 ' + (q ? "met" : "not met") + "</span> longest gap " + r1(r.longest) + " min, limit " + r1(qmax) + " (scheduled + " + r1(qmax - H) + ")</div>"
+        + '<div><span class="pill ' + (q ? "ok" : "bad") + '">QoS 1.2 ' + (q ? "met" : "not met") + "</span> longest gap " + r0(r.longest) + " min, limit " + r0(qmax) + " (scheduled + " + r0(qmax - H) + ")</div>"
         + "<div>" + (k === "halfway" ? "Cost: part of one trip is not run" + (cs.km && cs.km.halfway ? " (" + r1(cs.km.halfway) + " km)" : "") + "." : k === "adjust" ? "Cost: buses around the gap leave a few minutes off their timetable." : "Cost: nothing to do, but the gap stays.") + "</div></div>";
       return h + "</article>";
     }).join("");
 
     // why one long gap hurts: same as the example, at this service's headway
     $("whysvg").innerHTML = whySVG(H);
-    $("whylist").innerHTML = "<li><b>Normal gap, " + r1(H) + " min:</b> " + Math.round(H) + " people wait, " + r1(H / 2) + " min on average.</li>"
-      + "<li><b>Long gap, " + r1(2 * H) + " min:</b> twice as many people (" + Math.round(2 * H) + ") wait, and each waits twice as long (" + r1(H) + " min on average).</li>"
+    $("whylist").innerHTML = "<li><b>Normal gap, " + r0(H) + " min:</b> " + Math.round(H) + " people wait, " + r1(H / 2) + " min on average.</li>"
+      + "<li><b>Long gap, " + r0(2 * H) + " min:</b> twice as many people (" + Math.round(2 * H) + ") wait, and each waits twice as long (" + r0(H) + " min on average).</li>"
       + "<li><b>Twice the people &times; twice the wait = 4 times the waiting.</b> That is why the engine compares options on extra wait, not on minutes of delay.</li>";
     $("whycap").textContent = "Same passengers, same scale: the long gap holds 4 times the waiting of a normal one.";
 
     // how the numbers are worked out, with the engine's own checks
     $("rules").innerHTML = "<li><b>At each AITP, count the people.</b> One person arrives every minute; the people in each gap wait half that gap on average.</li>"
-      + "<li><b>Extra wait at an AITP = average wait &minus; the wait the timetable promises there</b> (half of " + r1(H) + " = " + r1(H / 2) + " min when buses are on time).</li>"
+      + "<li><b>Extra wait at an AITP = average wait &minus; the wait the timetable promises there</b> (half of " + r0(H) + " = " + r1(H / 2) + " min when buses are on time).</li>"
       + "<li><b>An option's figure is the average of every AITP check</b> on every balance trip (" + nAitp + " checks). These are the numbers in step 2.</li>";
     var ex1 = function(q){ var sh = q.h.reduce(function(s, x){ return s + x; }, 0), w = q.h.reduce(function(s, x){ return s + x * x; }, 0) / 2;
       return "hardest hit " + esc(q.s) + ": " + Math.round(sh) + " people wait " + Math.round(w) + " min in total &rarr; average " + nmx(w / sh) + " &minus; " + nmx(q.w != null ? q.w : H / 2) + " = <b>" + r2(q.e) + "</b>"; };
@@ -516,7 +517,7 @@ button:hover{border-color:var(--cyan)}
     // chips + case bar
     var ch = [];
     if(cs.mode === "simple") ch.push('<span class="chip tag">Example</span>');
-    ch.push('<span class="chip">Scheduled every <b>' + r1(H) + " min</b></span>");
+    ch.push('<span class="chip">Scheduled every <b>' + r0(H) + " min</b></span>");
     ch.push('<span class="chip"><b>' + nT + "</b> balance trip" + (nT > 1 ? "s" : "") + "</span>");
     if(cs.halfway) ch.push('<span class="chip">Halfway stop at <b>' + Math.round(cs.f * 100) + "%</b> of the route</span>");
     ch.push('<span class="chip">Normal wait <b>' + r1(H / 2) + " min</b></span>");
@@ -552,33 +553,33 @@ button:hover{border-color:var(--cyan)}
       return '<div class="trip"><div class="trip-h"><span class="lbl">' + esc(label) + (seg ? "<small>" + esc(seg) + "</small>" : "") + '</span><span class="hw">' + hwLabel + '</span><span class="e">extra wait <b class="num">' + r2(ev.ewt) + "</b></span></div>"
         + sawSVG(ev.t, H, ymax, o.hex, {label: label + ": gaps " + ev.hour.join(", ") + " min"}) + "</div>";
     };
-    var headTxt = function(ev){ var u = ev.hour.filter(function(x, i, a){ return a.indexOf(x) === i; }); return u.length === 1 ? "every <b>" + r1(u[0]) + "</b>" : "longest <b>" + r1(ev.longest) + "</b>"; };
+    var headTxt = function(ev){ var u = ev.hour.filter(function(x, i, a){ return a.indexOf(x) === i; }); return u.length === 1 ? "every <b>" + r0(u[0]) + "</b>" : "longest <b>" + r0(ev.longest) + "</b>"; };
     var whatTxt = {
-      none: cs.mode === "simple" ? "Nothing is changed. The " + r1(cs.head.none) + "-min gap travels with the late bus on every trip." : "Nothing is changed. The long gap travels with the late bus; it shrinks only as the bus captain shortens the layover.",
-      adjust: cs.mode === "simple" ? "The buses around the gap are held or let go early, so every gap becomes " + r1(cs.head.adjust) + " min, on every trip." : "The buses around the gap are held or let go early; the same spacing is kept on every trip.",
-      halfway: cs.mode === "simple" ? "The late bus skips the first " + Math.round(cs.f * 100) + "% of one trip and starts at the halfway stop on its own slot. Before that stop people wait " + r1(cs.head.before) + " min once; after it, " + r1(cs.head.after) + " min, and the timetable is back from the next trip." : "The late bus skips the first part of one trip and starts at the halfway stop on its own slot; the buses around it are held or let go a little. From the next trip the timetable is back."
+      none: cs.mode === "simple" ? "Nothing is changed. The " + r0(cs.head.none) + "-min gap travels with the late bus on every trip." : "Nothing is changed. The long gap travels with the late bus; it shrinks only as the bus captain shortens the layover.",
+      adjust: cs.mode === "simple" ? "The buses around the gap are held or let go early, so every gap becomes " + r0(cs.head.adjust) + " min, on every trip." : "The buses around the gap are held or let go early; the same spacing is kept on every trip.",
+      halfway: cs.mode === "simple" ? "The late bus skips the first " + Math.round(cs.f * 100) + "% of one trip and starts at the halfway stop on its own slot. Before that stop people wait " + r0(cs.head.before) + " min once; after it, " + r0(cs.head.after) + " min, and the timetable is back from the next trip." : "The late bus skips the first part of one trip and starts at the halfway stop on its own slot; the buses around it are held or let go a little. From the next trip the timetable is back."
     };
     $("opts").innerHTML = opts.map(function(o){
       var r = R[o.k], h = '<article class="panel opt' + (o === best ? " win" : "") + '" style="--c:' + o.hex + '"><h3>' + esc(o.name) + "</h3>";
       if(o.k === "halfway"){
-        h += '<div class="rule">' + (cs.mode === "simple" ? r1(cs.head.before) + " before the halfway stop, then " + r1(cs.head.after) + " all the way" : "Gap before the halfway stop on trip 1, then the timetable") + "</div>";
+        h += '<div class="rule">' + (cs.mode === "simple" ? r0(cs.head.before) + " before the halfway stop, then " + r0(cs.head.after) + " all the way" : "Gap before the halfway stop on trip 1, then the timetable") + "</div>";
         h += '<p class="what">' + esc(whatTxt[o.k]) + "</p>";
         var same = function(ev){ return ev.hour.every(function(x){ return Math.abs(x - ev.hour[0]) < 0.05; }); };
         h += '<div class="trip"><div class="trip-h"><span class="lbl">' + esc(cs.trips[0]) + "<small>split at the halfway stop</small></span>"
-          + '<span class="hw">' + (same(r.before) && same(r.after) ? "every" : "longest") + ' <b>' + r1(same(r.before) ? r.before.hour[0] : r.before.longest) + '</b> &rarr; <b>' + r1(same(r.after) ? r.after.hour[0] : r.after.longest) + '</b></span><span class="e">extra wait <b class="num">' + r2(r.t1) + "</b></span></div>"
+          + '<span class="hw">' + (same(r.before) && same(r.after) ? "every" : "longest") + ' <b>' + r0(same(r.before) ? r.before.hour[0] : r.before.longest) + '</b> &rarr; <b>' + r0(same(r.after) ? r.after.hour[0] : r.after.longest) + '</b></span><span class="e">extra wait <b class="num">' + r2(r.t1) + "</b></span></div>"
           + splitSVG(r.before.t, r.after.t, H, ymax, o.hex, cs.f, {label: cs.trips[0] + ": before the halfway stop gaps " + r.before.hour.join(", ") + " min; after it " + r.after.hour.join(", ") + " min"})
           + '<div class="splitnote">Extra wait: before <b class="num">' + r2(r.before.ewt) + "</b> × " + Math.round(cs.f * 100) + "% + after <b class=\"num\">" + r2(r.after.ewt) + "</b> × " + Math.round((1 - cs.f) * 100) + "% = <b class=\"num\">" + r2(r.t1) + "</b></div></div>";
         r.later.forEach(function(ev, i){ if(ev) h += tripBlock(o, cs.trips[i + 1], ev, headTxt(ev)); });
         h += '<div class="foot"><div class="avgline"><span>' + esc(cs.trips[0]) + " (" + Math.round(cs.f * 100) + "% / " + Math.round((1 - cs.f) * 100) + "% of stops)</span><b class=\"num\">" + r2(r.t1) + "</b></div>";
       } else {
-        h += '<div class="rule">' + (cs.mode === "simple" ? (o.k === "none" ? r1(cs.head.none) + "-min gap on every trip" : r1(cs.head.adjust) + " min all the way") : (o.k === "none" ? "Long gap kept on every trip" : "Same adjusted spacing on every trip")) + "</div>";
+        h += '<div class="rule">' + (cs.mode === "simple" ? (o.k === "none" ? r0(cs.head.none) + "-min gap on every trip" : r0(cs.head.adjust) + " min all the way") : (o.k === "none" ? "Long gap kept on every trip" : "Same adjusted spacing on every trip")) + "</div>";
         h += '<p class="what">' + esc(whatTxt[o.k]) + "</p>";
         r.trips.forEach(function(ev, i){ if(ev) h += tripBlock(o, cs.trips[i], ev, headTxt(ev)); });
         h += '<div class="foot">';
       }
       var q = r.longest <= qmax + 1e-9;
       h += '<div class="avgline"><span>Average of ' + nT + " trip" + (nT > 1 ? "s" : "") + '</span><b class="num">' + r2(r.avg) + "</b></div>";
-      h += '<div><span class="pill ' + (q ? "ok" : "bad") + '">QoS 1.2 ' + (q ? "met" : "not met") + "</span> longest gap " + r1(r.longest) + " min, limit " + r1(qmax) + " (scheduled + 6)</div>";
+      h += '<div><span class="pill ' + (q ? "ok" : "bad") + '">QoS 1.2 ' + (q ? "met" : "not met") + "</span> longest gap " + r0(r.longest) + " min, limit " + r0(qmax) + " (scheduled + 6)</div>";
       if(o.k === "halfway") h += "<div>Cost: part of one trip is not run" + (cs.mode === "engine" && cs.src.km_lost != null ? " (" + r1(cs.src.km_lost) + " km)" : " (the first " + Math.round(cs.f * 100) + "% of the route)") + ".</div>";
       if(o.k === "adjust") h += "<div>Cost: buses around the gap leave a few minutes off their timetable on every trip.</div>";
       if(o.k === "none") h += "<div>Cost: nothing to do, but the gap stays.</div>";
@@ -587,27 +588,27 @@ button:hover{border-color:var(--cyan)}
 
     // why
     $("whysvg").innerHTML = whySVG(H);
-    $("whylist").innerHTML = "<li><b>Normal gap, " + r1(H) + " min:</b> " + Math.round(H) + " people wait, " + r1(H / 2) + " min on average.</li>"
-      + "<li><b>Long gap, " + r1(2 * H) + " min:</b> twice as many people (" + Math.round(2 * H) + ") wait, and each waits twice as long (" + r1(H) + " min on average).</li>"
+    $("whylist").innerHTML = "<li><b>Normal gap, " + r0(H) + " min:</b> " + Math.round(H) + " people wait, " + r1(H / 2) + " min on average.</li>"
+      + "<li><b>Long gap, " + r0(2 * H) + " min:</b> twice as many people (" + Math.round(2 * H) + ") wait, and each waits twice as long (" + r0(H) + " min on average).</li>"
       + "<li><b>Twice the people &times; twice the wait = 4 times the waiting.</b> One long gap costs far more than a few small delays, so the best option is the one that brings even gaps back soonest.</li>";
     $("whycap").textContent = "Same passengers, same scale: the long gap holds 4 times the waiting of a normal one.";
 
     // how the numbers are worked out: three rules, then a short sum per option
     var nw = H / 2, same = function(ev){ return ev.hour.every(function(x){ return Math.abs(x - ev.hour[0]) < 0.05; }); };
     var evens = [H]; if(cs.mode === "simple"){ [cs.head.adjust, cs.head.before].forEach(function(x){ if(evens.indexOf(x) < 0) evens.push(x); }); }
-    $("rules").innerHTML = "<li><b>Even gaps: the average wait is half the gap.</b> " + evens.map(function(x){ return "Every " + r1(x) + " min &rarr; " + r1(x / 2); }).join("; ") + ".</li>"
-      + "<li><b>The timetable promises half of " + r1(H) + " = " + r1(nw) + " min.</b> Extra wait = average wait &minus; " + r1(nw) + ".</li>"
+    $("rules").innerHTML = "<li><b>Even gaps: the average wait is half the gap.</b> " + evens.map(function(x){ return "Every " + r0(x) + " min &rarr; " + r1(x / 2); }).join("; ") + ".</li>"
+      + "<li><b>The timetable promises half of " + r0(H) + " = " + r1(nw) + " min.</b> Extra wait = average wait &minus; " + r1(nw) + ".</li>"
       + "<li><b>Uneven gaps: count the people.</b> One person arrives every minute, and the people in each gap wait half that gap on average. A long gap counts more because more people are caught in it.</li>";
     var nm = function(x){ return String(Math.round(x * 100) / 100); };          // 9, 7.5, 11.25
     var whole = function(ev){ return Math.abs(ev.hour.reduce(function(a, x){ return a + x; }, 0) - 60) < 0.05 && ev.t.some(function(x){ return Math.abs(x + 30) < 1e-6; }); };
     var sum1 = function(ev){                    // one trip, in words
-      if(same(ev)) return "every <b>" + r1(ev.hour[0]) + "</b> min <span class=\"arrow\">&rarr;</span> average wait " + nm(ev.awt) + " <span class=\"arrow\">&rarr;</span> extra " + nm(ev.awt) + " &minus; " + nm(nw) + " = <b>" + r2(ev.ewt) + "</b>";
+      if(same(ev)) return "every <b>" + r0(ev.hour[0]) + "</b> min <span class=\"arrow\">&rarr;</span> average wait " + nm(ev.awt) + " <span class=\"arrow\">&rarr;</span> extra " + nm(ev.awt) + " &minus; " + nm(nw) + " = <b>" + r2(ev.ewt) + "</b>";
       if(whole(ev)){
         var tot = ev.hour.reduce(function(a, x){ return a + x * x / 2; }, 0);
-        return "gaps " + ev.hour.map(r1).join(", ") + " min<br>" + ev.hour.map(function(x){ return Math.round(x) + " people wait " + r1(x / 2); }).join(" &middot; ")
+        return "gaps " + ev.hour.map(r0).join(", ") + " min<br>" + ev.hour.map(function(x){ return Math.round(x) + " people wait " + r1(x / 2); }).join(" &middot; ")
           + "<br>" + r1(tot) + " min of waiting &divide; 60 people = average wait " + nm(ev.awt) + "<br>extra " + nm(ev.awt) + " &minus; " + nm(nw) + " = <b>" + r2(ev.ewt) + "</b>";
       }
-      return "gaps " + ev.hour.map(r1).join(", ") + " min<br>average wait " + nm(ev.awt) + " (long gaps count more) &rarr; extra " + nm(ev.awt) + " &minus; " + nm(nw) + " = <b>" + r2(ev.ewt) + "</b>";
+      return "gaps " + ev.hour.map(r0).join(", ") + " min<br>average wait " + nm(ev.awt) + " (long gaps count more) &rarr; extra " + nm(ev.awt) + " &minus; " + nm(nw) + " = <b>" + r2(ev.ewt) + "</b>";
     };
     var lines = function(names, evs){            // trips with the same sum are written once
       var out = [], i = 0;
@@ -634,7 +635,7 @@ button:hover{border-color:var(--cyan)}
 
     // table
     var rows = [], line = function(o, label, ev, w){
-      rows.push('<tr style="--c:' + o.hex + '"><td><span class="sw"></span>' + esc(o.name) + "</td><td>" + esc(label) + '</td><td class="num">' + (ev.hour.every(function(x){ return Math.abs(x - ev.hour[0]) < 0.05; }) ? "every " + r1(ev.hour[0]) : ev.hour.map(r1).join(", ")) + '</td><td class="r num">' + r2(ev.awt) + '</td><td class="r num">' + r2(H / 2) + '</td><td class="r num"><b>' + r2(ev.ewt) + "</b></td>" + '<td class="r num">' + (w == null ? "" : w) + "</td></tr>");
+      rows.push('<tr style="--c:' + o.hex + '"><td><span class="sw"></span>' + esc(o.name) + "</td><td>" + esc(label) + '</td><td class="num">' + (ev.hour.every(function(x){ return Math.abs(x - ev.hour[0]) < 0.05; }) ? "every " + r0(ev.hour[0]) : ev.hour.map(r0).join(", ")) + '</td><td class="r num">' + r2(ev.awt) + '</td><td class="r num">' + r2(H / 2) + '</td><td class="r num"><b>' + r2(ev.ewt) + "</b></td>" + '<td class="r num">' + (w == null ? "" : w) + "</td></tr>");
     };
     opts.forEach(function(o){
       var r = R[o.k];
@@ -648,7 +649,7 @@ button:hover{border-color:var(--cyan)}
     $("tbl").innerHTML = '<thead><tr><th>Option</th><th>Trip</th><th>Gaps in the hour (min)</th><th class="r">Average wait</th><th class="r">Normal wait</th><th class="r">Extra wait</th><th class="r">Share of stops</th></tr></thead><tbody>' + rows.join("") + "</tbody>";
     var ex = R.none.trips[0];
     $("formula").innerHTML = "<div>Average wait in the hour = <code>sum of (gap × gap) ÷ (2 × sum of gaps)</code>, normal wait = <code>scheduled headway ÷ 2</code>.</div>"
-      + (cs.mode === "simple" ? "<div>Example, no adjustment: <code>(" + ex.hour.map(r1).join("² + ") + "²) ÷ (2 × " + r1(ex.hour.reduce(function(s, x){ return s + x; }, 0)) + ") = " + r2(ex.awt) + "</code>, minus <code>" + r1(H) + " ÷ 2 = " + r2(H / 2) + "</code> gives <b>" + r2(ex.ewt) + " min</b> extra wait.</div>" : "")
+      + (cs.mode === "simple" ? "<div>Example, no adjustment: <code>(" + ex.hour.map(r0).join("² + ") + "²) ÷ (2 × " + r1(ex.hour.reduce(function(s, x){ return s + x; }, 0)) + ") = " + r2(ex.awt) + "</code>, minus <code>" + r0(H) + " ÷ 2 = " + r2(H / 2) + "</code> gives <b>" + r2(ex.ewt) + " min</b> extra wait.</div>" : "")
       + (cs.halfway ? "<div>Halfway, " + esc(cs.trips[0]) + ": the stops before the halfway stop get the first figure, the stops after it the second, weighted by their share of the route.</div>" : "");
     sendHeight();
   }
