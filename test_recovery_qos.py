@@ -185,18 +185,27 @@ class RunOrder(unittest.TestCase):
         self.assertEqual(rows[7]["shift"], 0)                                  # nobody steps in: trip 7 leaves when it is ready
         self.assertLess(rows[7]["dep"], rows[6]["dep"])
 
-    def test_steady_headway_option(self):
-        r = R.optimise(ctx(LATE6, {"adjust_style": "steady"}))
-        st = r["plans"]["adjust"]["steady"]
-        g = [round(x["dep"]) for x in sorted(r["plans"]["adjust"]["rows"], key=lambda x: x["n"])]
-        gaps = [b - a for a, b in zip(g, g[1:])]                                  # trips 2-10: one even headway, give or take 1 min
-        self.assertTrue(all(st["h"] - 1 <= x <= st["h"] + 1 for x in gaps), (st["h"], gaps))
-        self.assertEqual(st["tol"], 1.0)
-        exact = R.optimise(ctx(LATE6, {"adjust_style": "steady", "steady_tol": 0}))["plans"]["adjust"]
-        self.assertEqual({round(x["dep"] - y["dep"]) for x, y in zip(sorted(exact["rows"], key=lambda x: x["n"])[1:], sorted(exact["rows"], key=lambda x: x["n"]))}, {exact["steady"]["h"]})
-        self.assertLessEqual(st["hold_max"], exact["steady"]["hold_max"])         # the band never needs longer holds than one exact number
+    def test_even_headway_two_duties_above_and_below(self):
+        late = [0, 0, 0, 0, 10, 0, 0, 0, 0, 0]                                    # trip 5 leaves 7 min late
+        r = R.optimise(ctx(late, {"adjust_style": "steady"}))
+        A, st = r["plans"]["adjust"], r["plans"]["adjust"]["steady"]
+        self.assertEqual((st["side"], st["first"], st["last"], st["after"]), (2, 3, 7, 8))
+        moved = [x["n"] for x in A["rows"] if abs(x["shift"]) >= 0.5]
+        self.assertTrue(set(moved) <= {3, 4, 6, 7}, moved)                        # only 2 duties above and 2 below move; trip 5 leaves when ready
+        for g in st["segments"]:
+            self.assertLessEqual(max(g["gaps"]) - min(g["gaps"]), 1.0, g)          # even on each side: at most 1 min apart
+        self.assertTrue(all(abs(x["shift"]) <= 8.0 + 1e-6 for x in A["rows"]))
+        self.assertLess(A["ewt"]["avg"], r["plans"]["none"]["ewt"]["avg"])
+        o = {x["side"]: x for x in r["steady_alt"]["options"]}
+        self.assertEqual(sorted(o), [1, 2, 3, 4, 5])
+        self.assertLessEqual(o[3]["ewt"], o[1]["ewt"])                             # more duties share the delay more thinly
+        r3 = R.optimise(ctx(late, {"adjust_style": "steady", "steady_side": 3}))
+        self.assertEqual((r3["plans"]["adjust"]["steady"]["first"], r3["plans"]["adjust"]["steady"]["last"]), (2, 8))
         self.assertEqual(r["adjust_style"], "steady")
-        self.assertEqual(R.optimise(ctx(LATE6))["adjust_style"], "least_wait")
+        self.assertEqual(R.optimise(ctx(late))["adjust_style"], "least_wait")
+        up1 = [round(g) for _, g in A["chain"][0]["dep_hw"]]
+        for c in A["chain"][1:]:                                                    # later trips keep the same gaps (give or take a minute of running time)
+            self.assertTrue(all(abs(round(g) - u) <= 1 for (_, g), u in zip(c["dep_hw"], up1)), (c["leg"], c["dep_hw"], up1))
 
 
 if __name__ == "__main__":
