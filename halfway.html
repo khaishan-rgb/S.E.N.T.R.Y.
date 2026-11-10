@@ -418,7 +418,7 @@ input.bad-time{border-color:#ff4d55!important;box-shadow:0 0 0 1px #ff4d55}
         <h3>Recovery priority</h3>
         <div class="hopref" id="hoPref"><label><input type="radio" name="hopref" value="balanced" checked> Balanced</label><label><input type="radio" name="hopref" value="recovery"> Headway focus — Halfway &gt; Adjustment</label><label><input type="radio" name="hopref" value="mileage"> Mileage focus — Adjustment &gt; Halfway</label></div>
         <label class="hx-chk"><input type="checkbox" id="hoTreg" checked> AI also regulates the later trips at the terminals <small>(even spacing, hold &le; 8 &middot; early &le; 3 min, same rule for both scenarios)</small></label>
-        <label class="hx-chk"><input type="checkbox" id="hoSteady"> Trip adjustment: <b>one steady headway</b> <small>(every trip from trip 2 leaves the same whole minutes apart and keeps it on later trips; holds can pass 8 min &ndash; off = least waiting)</small></label>
+        <label class="hx-chk"><input type="checkbox" id="hoSteady"> Trip adjustment: <b>even headway</b> <small>(every trip from trip 2 leaves about the same minutes apart, &plusmn;1 min &ndash; e.g. 15 = 14 to 16 &ndash; and keeps it on later trips; holds can pass 8 min &ndash; off = least waiting)</small></label>
         <label class="hx-chk"><input type="checkbox" id="hoAdj2"> Allow two back-to-back halfway trips <small>(e.g. T3 + T4 both disrupted; off = never two consecutive trips)</small></label>
         <label class="hx-chk"><input type="checkbox" id="hoReg" checked> AI regulates headway <small>(hold / release trips, re-time the replacement)</small></label>
         <h3>Halfway deployment</h3>
@@ -619,7 +619,7 @@ function hoRenderTrips(){
     rd.innerHTML = esc(x.dep_clock) + (Math.abs(x.shift) >= .5 ? ` <small>(${sgm(x.shift)})</small>` : "") + (x.type === "locked" ? ` <small>departed</small>` : "") + (x.overtaken_by && x.overtaken_by.length ? ` <small>after T${x.overtaken_by.join(",T")}</small>` : "");
     rh.textContent = x.hw == null ? "\u2014" : String(Math.round(x.hw)); rh.className = "ai rh" + (x.hw != null && x.hw >= 2 * r.sched_hw - 1e-9 ? " wr" : x.hw != null && (x.hw >= 1.5 * r.sched_hw - 1e-9 || x.hw < (r.bunch_min || 3)) ? " wl" : ""); });
   const ai = fresh && HO.res.ai ? HO.res.ai : null;
-  if(rp && HO.rec && tk !== HO.rec.decision){ $("hoDisMsg").innerHTML = `Showing <b>${TBL_NAME[tk]}</b> in the table (recommended: ${TBL_NAME[HO.rec.decision]})` + (tk === "adjust" && HO.rec.plans.adjust.steady ? ` \u2013 every trip from Trip ${HO.rec.plans.adjust.steady.from_trip} ${HO.rec.plans.adjust.steady.h} min apart` : ""); return; }
+  if(rp && HO.rec && tk !== HO.rec.decision){ $("hoDisMsg").innerHTML = `Showing <b>${TBL_NAME[tk]}</b> in the table (recommended: ${TBL_NAME[HO.rec.decision]})` + (tk === "adjust" && HO.rec.plans.adjust.steady ? ` \u2013 even headway: every trip from Trip ${HO.rec.plans.adjust.steady.from_trip} ${evenBand(HO.rec.plans.adjust.steady)} min apart` : ""); return; }
   if(rp && HO.rec){ $("hoDisMsg").innerHTML = HO.rec.decision === "halfway" ? `Recovery Decision Engine: trip <b>${HO.rec.plans.halfway.rows.filter(x => x.type === "halfway").map(x => x.n).join(", ")}</b> starts halfway; every other trip runs in full and is regulated` : HO.rec.decision === "adjust" ? "Recovery Decision Engine: every trip runs in full \u2013 departures adjusted (no halfway)" : "Recovery Decision Engine: no intervention needed"; return; }
   $("hoDisMsg").innerHTML = ai ? (ai.suggest.length ? `AI ticked trip <b>${ai.suggest.join(", ")}</b> (halfway); the other trips keep running and are adjusted` : ai.decision === "adjust" ? "AI ticked nothing: adjust the trips and continue service" : "AI ticked nothing: continue service as it is")
     : HO.auto ? "The AI will decide which trips to tick when you press Run" : `Manual: ${HO.dis.length ? "trip " + HO.dis.join(", ") + " ticked" : "no trip ticked"} - press Run`;
@@ -681,6 +681,7 @@ function rvUrl(){
 }
 function rvChosen(){ const r = HO.rec; return r && r.ok && r.plans && r.plans[r.decision] ? r.plans[r.decision] : null; }
 const TBL_NAME = {none:"No action", adjust:"Trip adjustment", halfway:"Halfway deployment"};
+function evenBand(st){ return st.gap_min != null && st.gap_min !== st.gap_max ? st.gap_min + "\u2013" + st.gap_max : String(st.h); }      // "16–18" (even headway 17, +/-1)
 function rvTableKey(){ const r = HO.rec; if(!r || !r.ok || !r.plans || !r.plans[r.decision]) return null; return HO.tblK && r.plans[HO.tblK] ? HO.tblK : r.decision; }   // the option shown in the table's green columns
 function rvShowInTable(k, scroll){ HO.tblK = k; hoRenderTrips(); if(scroll){ const t = $("hoTrips"); if(t) t.scrollIntoView({behavior:"smooth", block:"start"}); } }
 function rvRows(){                                 // {trip: row of the plan shown in the table} with the interchange headway in departure order
@@ -957,7 +958,7 @@ $("aitpClrAll").onclick = () => { LS.set(aitpKey(), {}); aitpRender(); aitpChang
 /* ---- later-trip terminal regulation: on by default (Settings), chosen per run */
 $("hoTreg").checked = LS.get("ho.treg", true);
 $("hoTreg").onchange = () => { LS.set("ho.treg", $("hoTreg").checked); hoTouch(); };
-/* ---- Trip adjustment style: least waiting (default) or one steady headway, chosen per browser */
+/* ---- Trip adjustment style: least waiting (default) or even headway (one headway, +/-1 min), chosen per browser */
 function hoSteady(){ return !!($("hoSteady") && $("hoSteady").checked); }
 $("hoSteady").checked = !!LS.get("ho.steady", false);
 $("hoSteady").onchange = () => { LS.set("ho.steady", $("hoSteady").checked); hoTouch(); };
@@ -1022,7 +1023,7 @@ function laterTxt(r){
   if(!p.term_reg) return "not adjusted in any option (every bus leaves at max(schedule, arrival + layover)).";
   const lim = `hold \u2264 ${f1(p.term_hold_max)}, early \u2264 ${f1(p.term_early_max)} min per departure, \u2265 ${f1(p.min_layover_min)} min layover${+p.term_total_max > 0 ? `, \u2264 ${f1(p.term_total_max)} min total hold per BC` : ""}`;
   return "No action: no trip adjusted (the gap carries on, shrinking only by the layover above the minimum). "
-    + (r.adjust_style === "steady" && r.steady_alt ? `Trip adjustment: one steady headway of ${r.steady_alt.h} min from trip ${r.steady_alt.from_trip}, kept on every later trip (each bus = its UP 1 time + the cycle, later only when it is not ready). `
+    + (r.adjust_style === "steady" && r.steady_alt ? `Trip adjustment: even headway of ${r.steady_alt.h} min (${evenBand(r.steady_alt)} min) from trip ${r.steady_alt.from_trip}, kept on every later trip (each bus = its UP 1 time + the cycle, later only when it is not ready). `
      : p.term_mode === "pattern" ? `Trip adjustment: every bus keeps its adjusted UP 1 slot on every later trip (same spacing, same average / max), ${lim}. `
                                  : `Trip adjustment: even spacing at each terminal, ${lim}. `)
     + (p.halfway_regulate ? `Halfway: the trips around the lost trip are held / released by at most ${f1(+p.halfway_adj_max >= 0 ? Math.min(+p.halfway_adj_max, +p.adj_max) : Math.max(0, (+p.layover_min || 10) - (+p.min_layover_min || 7)))} min (won back in the layover), so the departure gap meets QoS 1.2 and from the 2nd trip the timetable runs.`
@@ -2409,7 +2410,7 @@ document.addEventListener("click", function(e){
   function planDesc(k, p, r){
     var rows = p.rows || [], hw = rows.filter(function(x){ return x.type === "halfway"; }), adj = p.n_adjusted || rows.filter(function(x){ return x.type === "full" && Math.abs(x.shift || 0) >= .5; }).length;
     if(k === "none") return "Every bus leaves when it is ready. Nothing held, no km lost.";
-    if(k === "adjust" && p.steady){ var st = p.steady; return "One steady headway: every trip from Trip " + st.from_trip + " leaves <span style=\"color:#fff;font-weight:700\">" + st.h + " min</span> apart (timetable " + f0(st.H) + "), the same on every later trip. Largest hold +" + f0(st.hold_max) + " min" + (st.n_over_cap ? " (over the " + f0((r.params || {}).adj_max || 8) + "-min limit)" : "") + ((st.next_hold || 0) >= .5 ? "; Trip " + st.next_trip + " held +" + f0(st.next_hold) + " min" : "") + "."; }
+    if(k === "adjust" && p.steady){ var st = p.steady; return "Even headway " + st.h + ": every trip from Trip " + st.from_trip + " leaves <span style=\"color:#fff;font-weight:700\">" + evenBand(st) + " min</span> apart (timetable " + f0(st.H) + "), the same on every later trip. Largest hold +" + f0(st.hold_max) + " min" + (st.n_over_cap ? " (over the " + f0((r.params || {}).adj_max || 8) + "-min limit)" : "") + ((st.next_hold || 0) >= .5 ? "; Trip " + st.next_trip + " held +" + f0(st.next_hold) + " min" : "") + "."; }
     if(k === "adjust") return adj ? "Hold or release " + adj + " departure" + (adj > 1 ? "s" : "") + "; every trip runs the full route." : "Every trip runs the full route; no departure needs to move.";
     var where = hw.map(function(x){ return "Trip " + x.n + " starts at " + esc(x.stop); }).join("; ");
     return where + (adj ? "; " + adj + " other departure" + (adj > 1 ? "s" : "") + " adjusted." : ".") + (r.needs_standby ? " Needs a standby bus." : "");
@@ -2441,30 +2442,39 @@ document.addEventListener("click", function(e){
     var before = hw.length ? pts(p).filter(function(q){ return q.L === 0 && band(q.ewt) === "r" && r.pts_up && hw.some(function(x){ return r.pts_up[q.p] < x.j; }); }).length : 0;
     return '<div class="ln-note">' + NAME[k] + ' still has <b>' + rk + ' red squares</b> against ' + red(o) + ' with ' + NAME[o].toLowerCase() + (before ? ': ' + before + ' of them are AITPs on UP 1 before ' + esc(hw.map(function(x){ return x.stop; }).join(" / ")) + ', which Trip ' + hw.map(function(x){ return x.n; }).join(" / ") + ' skips' : '') + '. Its average EWT is still the lowest because more AITPs turn green elsewhere &ndash; the average decides.</div>';
   }
-  /* ---------- Trip adjustment style: least waiting (default) or one steady headway; the other one's cost in one line */
+  /* ---------- Trip adjustment style: least waiting (default) or even headway (one headway +/-1 min); the other one's cost in one line */
   function styleLine(r){
     var sa = r.steady_alt; if(!r.plans || !r.plans.adjust) return "";
+    var seg = function(on){ return '<div class="ds-segm" role="group" aria-label="Trip adjustment style"><button type="button" data-st="0" aria-pressed="' + (!on) + '">Least waiting</button><button type="button" data-st="1" aria-pressed="' + on + '">Even headway</button></div>'; };
     if(!sa){ if(r.adjust_style_asked !== "steady") return "";
-      return '<div class="ln-style"><div class="ds-segm" role="group" aria-label="Trip adjustment style"><button type="button" data-st="0" aria-pressed="false">Least waiting</button><button type="button" data-st="1" aria-pressed="true">One steady headway</button></div><span>One steady headway is not possible here' + (r.steady_why ? ' (' + esc(r.steady_why) + ')' : '') + ', so Trip adjustment uses <b>least waiting</b>.</span></div>'; }
-    var on = r.adjust_style === "steady", am = f0((r.params || {}).adj_max || 8);
+      return '<div class="ln-style">' + seg(true) + '<span>An even headway is not possible here' + (r.steady_why ? ' (' + esc(r.steady_why) + ')' : '') + ', so Trip adjustment uses <b>least waiting</b>.</span></div>'; }
+    var on = r.adjust_style === "steady", am = f0((r.params || {}).adj_max || 8), tol = sa.tol != null ? sa.tol : 1;
     var nxt = (sa.next_hold || 0) >= .5 ? ", Trip " + sa.next_trip + " held +" + f0(sa.next_hold) + " min" : "";
+    var head = '<b>even headway of ' + sa.h + ' min</b> (each gap ' + (sa.h - tol) + '&ndash;' + (sa.h + tol) + ' min)';
     var txt = on
-      ? 'Trip adjustment uses <b>one steady headway of ' + sa.h + ' min</b> from Trip ' + sa.from_trip + ' (timetable ' + f0(sa.H) + '): EWT ' + f2(sa.ewt) + ' min, largest hold +' + f0(sa.hold_max) + ' min' + nxt + '. <b>Least waiting</b> would give EWT ' + f2(sa.least_wait_ewt) + ' min, holding no bus more than ' + am + ' min beyond the time it may leave.'
-      : '<b>One steady headway instead?</b> Every trip from Trip ' + sa.from_trip + ' ' + sa.h + ' min apart (timetable ' + f0(sa.H) + '): EWT ' + f2(sa.ewt) + ' min instead of ' + f2(sa.least_wait_ewt) + ', largest hold +' + f0(sa.hold_max) + ' min' + (sa.n_over_cap ? ' (over the ' + am + '-min limit)' : '') + nxt + '.';
-    var B = sa.bind, why = B ? '<details class="ln-why"><summary>Why ' + sa.h + ' min and not less? Try another number</summary><p>Trip ' + B.trip + '&rsquo;s bus arrives at ' + esc(B.arr_clock) + ' and needs the ' + f0(B.min_layover) + '-min minimum layover, so it can leave at <b>' + esc(B.earliest_clock) + '</b> at the earliest. Trip ' + sa.start_trip + ' left at ' + esc(sa.start_clock) + ', and Trip ' + B.trip + ' is ' + B.k + ' bus' + (B.k > 1 ? 'es' : '') + ' after it: ' + esc(B.earliest_clock) + ' &minus; ' + esc(sa.start_clock) + ' = ' + f0(B.span) + ' min &divide; ' + B.k + ' = ' + B.exact + ' &rarr; <b>' + sa.h + ' min</b> (whole minutes, rounded up). Any less and Trip ' + B.trip + ' would have to leave before its bus is ready.</p>'
-      + '<label class="ln-try">Try a headway <input type="number" min="1" max="60" step="1" value="' + Math.max(1, sa.h - 3) + '" inputmode="numeric" aria-label="Headway to try, in minutes"> min</label><div class="ln-tryr" aria-live="polite"></div></details>' : '';
-    return '<div class="ln-style"><div class="ds-segm" role="group" aria-label="Trip adjustment style"><button type="button" data-st="0" aria-pressed="' + (!on) + '">Least waiting</button><button type="button" data-st="1" aria-pressed="' + on + '">One steady headway</button></div><span>' + txt + '</span>' + why + '</div>';
+      ? 'Trip adjustment uses an ' + head + ' from Trip ' + sa.from_trip + ' (timetable ' + f0(sa.H) + '): EWT ' + f2(sa.ewt) + ' min, largest hold +' + f0(sa.hold_max) + ' min' + nxt + '. <b>Least waiting</b> would give EWT ' + f2(sa.least_wait_ewt) + ' min, holding no bus more than ' + am + ' min beyond the time it may leave.'
+      : '<b>Even headway instead?</b> Every trip from Trip ' + sa.from_trip + ' ' + evenBand(sa) + ' min apart (even headway ' + sa.h + ', timetable ' + f0(sa.H) + '): EWT ' + f2(sa.ewt) + ' min instead of ' + f2(sa.least_wait_ewt) + ', largest hold +' + f0(sa.hold_max) + ' min' + (sa.n_over_cap ? ' (over the ' + am + '-min limit)' : '') + nxt + '.';
+    var B = sa.bind, why = B ? '<details class="ln-why"><summary>Why ' + sa.h + ' min and not less? Try another number</summary><p>Trip ' + B.trip + '&rsquo;s bus arrives at ' + esc(B.arr_clock) + ' and needs the ' + f0(B.min_layover) + '-min minimum layover, so it can leave at <b>' + esc(B.earliest_clock) + '</b> at the earliest. Trip ' + sa.start_trip + ' left at ' + esc(sa.start_clock) + ', and Trip ' + B.trip + ' is ' + B.k + ' bus' + (B.k > 1 ? 'es' : '') + ' after it: ' + esc(B.earliest_clock) + ' &minus; ' + esc(sa.start_clock) + ' = ' + f0(B.span) + ' min &divide; ' + B.k + ' = <b>' + B.exact + ' min per gap</b>.'
+        + (tol > 0 ? ' Each gap may be ' + tol + ' min longer than the even headway, so ' + B.exact + ' &minus; ' + tol + ' = ' + (Math.round((B.exact - tol) * 100) / 100) + ' &rarr; <b>' + sa.h + ' min</b> (gaps up to ' + (sa.h + tol) + ') is enough. With ' + (sa.h - 1) + ', even ' + (sa.h - 1 + tol) + '-min gaps get Trip ' + B.trip + ' away only at ' + hm(sa.start + B.k * (sa.h - 1 + tol)) + ', before its bus is ready.'
+                   : ' &rarr; <b>' + sa.h + ' min</b> (whole minutes, rounded up). Any less and Trip ' + B.trip + ' would have to leave before its bus is ready.') + '</p>'
+      + '<label class="ln-try">Try an even headway <input type="number" min="1" max="60" step="1" value="' + Math.max(1, sa.h - 2) + '" inputmode="numeric" aria-label="Even headway to try, in minutes"> min</label><div class="ln-tryr" aria-live="polite"></div></details>' : '';
+    return '<div class="ln-style">' + seg(on) + '<span>' + txt + '</span>' + why + '</div>';
   }
-  /* one steady headway of h min: possible? which trip cannot keep up, or the holds it needs (the engine's own numbers per trip) */
+  /* an even headway of h min (each gap h-tol .. h+tol): possible? which trip cannot keep up, or the departures, gaps and holds it needs.
+     Same rule as the engine: each bus leaves as early as the band allows, but late enough for the buses after it to keep up. */
   function tryHeadway(sa, h, r){
     if(!h || h < 1) return "";
-    var am = (r.params || {}).adj_max || 8, bad = null, hold = 0, K = (sa.need || []).length;
-    (sa.need || []).forEach(function(n){ var slot = sa.start + n[1] * h; if(!bad && slot < n[2] - 1e-6) bad = {trip:n[0], k:n[1], slot:slot, lo:n[2], nat:n[3], arr:n[4]}; hold = Math.max(hold, slot - n[3]); });
-    if(bad){ var early = bad.lo > bad.nat - am + 1e-6;     // limited by the bus arriving (layover), or by leaving more than the limit before its timetable
-      return '<b class="no">' + h + ' min: not possible.</b> Trip ' + bad.trip + ' would have to leave at <b>' + hm(bad.slot) + '</b> (' + esc(sa.start_clock) + ' + ' + bad.k + ' &times; ' + h + ' min), '
+    var am = (r.params || {}).adj_max || 8, tol = sa.tol != null ? sa.tol : 1, N = sa.need || [], lo = h - tol, hi = h + tol, bad = null;
+    N.forEach(function(n){ var t = sa.start + n[1] * hi; if(!bad && t < n[2] - 1e-6) bad = {trip:n[0], k:n[1], t:t, lo:n[2], nat:n[3], arr:n[4]}; });
+    var band = (h - tol) + "&ndash;" + (h + tol) + " min gaps";
+    if(bad){ var early = bad.lo > bad.nat - am + 1e-6;
+      return '<b class="no">' + h + ' min (' + band + '): not possible.</b> Even with every gap at ' + hi + ' min, Trip ' + bad.trip + ' would leave at <b>' + hm(bad.t) + '</b> (' + esc(sa.start_clock) + ' + ' + bad.k + ' &times; ' + hi + ' min), '
         + (early ? 'but its bus only arrives at ' + esc(bad.arr) + ' and needs ' + f0(sa.min_layover || 7) + ' min: ' + hm(bad.lo) + ' at the earliest.' : 'more than ' + f0(am) + ' min before its timetable.'); }
-    var nx = Math.max(0, sa.start + (K + 1) * h - sa.next_sch_min);
-    return '<b class="ok">' + h + ' min: possible' + (h === sa.h ? ' &ndash; the smallest that works (the one used)' : '') + '.</b> Every trip from Trip ' + sa.from_trip + ' leaves ' + h + ' min apart; largest hold +' + f0(hold) + ' min' + (nx >= .5 ? '; Trip ' + sa.next_trip + ' held +' + f0(nx) + ' min' : '') + '.';
+    var L = N.map(function(n){ return n[2]; }); for(var i = N.length - 2; i >= 0; i--) L[i] = Math.max(L[i], L[i + 1] - hi);
+    var prev = sa.start, hold = 0, gaps = [];
+    N.forEach(function(n, i){ var v = Math.ceil(Math.max(prev + lo, L[i]) - 1e-6); gaps.push(v - prev); hold = Math.max(hold, v - n[3]); prev = v; });
+    var nx = Math.max(0, prev + lo - sa.next_sch_min), g0 = Math.min.apply(null, gaps), g1 = Math.max.apply(null, gaps);
+    return '<b class="ok">' + h + ' min (' + band + '): possible' + (h === sa.h ? ' &ndash; the smallest that works (the one used)' : '') + '.</b> Gaps from Trip ' + sa.from_trip + ': ' + gaps.join(", ") + ' min; largest hold +' + f0(hold) + ' min' + (nx >= .5 ? '; Trip ' + sa.next_trip + ' held +' + f0(nx) + ' min' : '') + '.';
   }
   function cmpRender(r){
     var el = $("lnCmp");
@@ -2532,7 +2542,7 @@ document.addEventListener("click", function(e){
     var P = r.plans, k = r.decision, p = P[k], N = P.none, base = N.ewt ? avgE(N) : null, v = p.ewt ? avgE(p) : null;
     var hw = (p.rows || []).filter(function(x){ return x.type === "halfway"; }), adj = p.n_adjusted || 0;
     var head = k === "halfway" ? hw.map(function(x){ return "Start Trip " + x.n + " halfway at " + esc(x.stop) + (x.code ? " (" + esc(x.code) + ")" : "") + " at " + esc(x.start_clock); }).join("<br>")
-      : k === "adjust" ? (p.steady ? "Keep every trip in full; every trip from Trip " + p.steady.from_trip + " leaves " + p.steady.h + " min apart" : "Keep every trip in full; hold or release " + adj + " departure" + (adj !== 1 ? "s" : "")) : "Keep the natural departures &ndash; no change needed";
+      : k === "adjust" ? (p.steady ? "Keep every trip in full; every trip from Trip " + p.steady.from_trip + " leaves " + evenBand(p.steady) + " min apart (even headway " + p.steady.h + ")" : "Keep every trip in full; hold or release " + adj + " departure" + (adj !== 1 ? "s" : "")) : "Keep the natural departures &ndash; no change needed";
     var sub = k === "halfway" ? hw.map(function(x){ return (x.leave_clock ? "Bus leaves off-service at " + esc(x.leave_clock) + " · " : "") + f1(x.km_lost) + " km not run"; }).join("; ") + (r.needs_standby ? " · needs a standby bus at the stop (the late bus cannot get there in time)" : "") + (adj ? " · " + adj + " other departure" + (adj > 1 ? "s" : "") + " adjusted" : "")
       : k === "adjust" ? "No km lost" : "";
     var cmpTo = k === "halfway" ? P[r.full_choice] : N, cv = cmpTo && cmpTo.ewt ? avgE(cmpTo) : null;

@@ -189,7 +189,12 @@ class RunOrder(unittest.TestCase):
         r = R.optimise(ctx(LATE6, {"adjust_style": "steady"}))
         st = r["plans"]["adjust"]["steady"]
         g = [round(x["dep"]) for x in sorted(r["plans"]["adjust"]["rows"], key=lambda x: x["n"])]
-        self.assertEqual({b - a for a, b in zip(g[1:], g[2:])}, {st["h"]})      # trips 2-10: one headway
+        gaps = [b - a for a, b in zip(g, g[1:])]                                  # trips 2-10: one even headway, give or take 1 min
+        self.assertTrue(all(st["h"] - 1 <= x <= st["h"] + 1 for x in gaps), (st["h"], gaps))
+        self.assertEqual(st["tol"], 1.0)
+        exact = R.optimise(ctx(LATE6, {"adjust_style": "steady", "steady_tol": 0}))["plans"]["adjust"]
+        self.assertEqual({round(x["dep"] - y["dep"]) for x, y in zip(sorted(exact["rows"], key=lambda x: x["n"])[1:], sorted(exact["rows"], key=lambda x: x["n"]))}, {exact["steady"]["h"]})
+        self.assertLessEqual(st["hold_max"], exact["steady"]["hold_max"])         # the band never needs longer holds than one exact number
         self.assertEqual(r["adjust_style"], "steady")
         self.assertEqual(R.optimise(ctx(LATE6))["adjust_style"], "least_wait")
 
