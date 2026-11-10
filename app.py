@@ -5210,7 +5210,7 @@ async def api_os_records(service: str = "", limit: int = 30):
 @app.get("/api/halfway/recovery")
 async def api_ho_recovery(service: str = "", direction: int = 1, ref: str = "", hw: str = "", layover: str = "", late: str = "", mode: str = "balanced",
                           veh: str = "own", sims: str = "", scope: str = "all", bus: str = "dd", vh: str = "", vw: str = "", vt: str = "",
-                          balance: str = "", sched: str = "", adj2: str = "", treg: str = "", aitp_up: str = "", aitp_dn: str = "", steady: str = "", side: str = ""):
+                          balance: str = "", sched: str = "", adj2: str = "", treg: str = "", aitp_up: str = "", aitp_dn: str = "", steady: str = "", side: str = "", step: str = ""):
     """Continue full trip (+ adjustment) vs halfway deployment (+ adjustment), decided on EWT over the selected BALANCE TRIPS, with stress test.
     balance = number of subsequent trips assessed (1..16, default the Settings value, 6); sched = optional comma list of HH:MM scheduled departures
     of trips 1..n (individual scheduled headways for SWT; otherwise the constant headway). Decision support only."""
@@ -5245,6 +5245,10 @@ async def api_ho_recovery(service: str = "", direction: int = 1, ref: str = "", 
         e_side = max(1, min(6, int(float(side)))) if side.strip() else 2                                                    # even headway: duties above and below the late trip
     except ValueError:
         e_side = 2
+    try:
+        e_step = max(1, min(6, int(float(step)))) if step.strip() else 2                                                    # even headway: largest change between neighbouring gaps
+    except ValueError:
+        e_step = 2
     n = int(P["n_trips"])
     lates = (lates + [0.0] * n)[:n]
     sched_dep = None
@@ -5287,7 +5291,7 @@ async def api_ho_recovery(service: str = "", direction: int = 1, ref: str = "", 
                       "start_early_max": P["start_early_max"], "start_late_max": P["start_late_max"], "max_mileage_km": P["max_mileage_km"],
                       "min_remaining_pct": P["min_remaining_pct"], "sims": max(100, min(3000, ns)), "bunch_min": BB["params"]["bunch_min"],
                       "balance_trips": nbal, "ewt_gain_min": P["ewt_gain_min"], "ewt_gain_pct": P["ewt_gain_pct"], "ewt_gain_per_km": P["ewt_gain_per_km"],
-                      "ewt_adjust_min": P["ewt_adjust_min"], "allow_adjacent_halfway": adj_ok, "term_reg": t_reg, "adjust_style": a_style, "steady_side": e_side,
+                      "ewt_adjust_min": P["ewt_adjust_min"], "allow_adjacent_halfway": adj_ok, "term_reg": t_reg, "adjust_style": a_style, "steady_side": e_side, "even_step": e_step,
                       "term_mode": "pattern" if P.get("term_pattern", 1) else "even", "halfway_regulate": int(P.get("halfway_regulate", 1)), "halfway_adj_max": P.get("halfway_adj_max", -1.0), "win_min": P.get("win_min", 30.0),
                       **{k_: P[k_] for k_ in ("term_hold_max", "term_early_max", "term_tol_pct", "term_zone", "term_total_max", "qos_over_max")}}}
     if sched_dep:
@@ -5299,7 +5303,7 @@ async def api_ho_recovery(service: str = "", direction: int = 1, ref: str = "", 
     if a_up or a_dn:                                                              # AITP ticked: the EWT is calculated at these stops only
         ctx["aitp_up"], ctx["aitp_dn"] = a_up, a_dn
     ckey = json.dumps([svc, direction, t0, H, lay, lates, mode, veh, ns, scope, now.hour * 60 + now.minute, nbal, sched_dep,
-                       [P[k_] for k_ in ("ewt_gain_min", "ewt_gain_pct", "ewt_gain_per_km", "ewt_adjust_min", "term_hold_max", "term_early_max", "term_tol_pct", "term_zone", "term_total_max", "qos_over_max", "term_pattern", "halfway_regulate", "halfway_adj_max", "win_min")], adj_ok, t_reg, a_style, e_side, sorted(a_up), sorted(a_dn), recovery.MODEL_VERSION], default=str)
+                       [P[k_] for k_ in ("ewt_gain_min", "ewt_gain_pct", "ewt_gain_per_km", "ewt_adjust_min", "term_hold_max", "term_early_max", "term_tol_pct", "term_zone", "term_total_max", "qos_over_max", "term_pattern", "halfway_regulate", "halfway_adj_max", "win_min")], adj_ok, t_reg, a_style, e_side, e_step, sorted(a_up), sorted(a_dn), recovery.MODEL_VERSION], default=str)
     hit = RV_CACHE.get(ckey)
     if hit and time.time() - hit[0] < 300:
         res = json.loads(hit[1])

@@ -75,6 +75,14 @@ V13.17 (10 Nov 2026) - EVEN HEADWAY over 2 duties above and 2 below (steady_side
     when it may leave), 7-min layover, run order. Later trips keep the same gaps.
   * The page also gets 1..5 duties each side with their EWT and largest hold (more duties = lower EWT, more buses held).
 
+V13.18 (10 Nov 2026) - EVEN HEADWAY with no big jumps (even_step)
+  * Every departure gap differs from the gap before it by at most even_step (2) min - 16, 14, 12 is fine, 16, 21, 6 is not - from the
+    timetable gap before the first trip to the timetable gap after the next trip (Trip n+1 keeps its time). Inside that, the lowest
+    waiting: sum of (gap - scheduled)^2 is the least, then the least holding. Solved exactly in whole minutes (dynamic programming over
+    each trip's departure time and its gap). Every bus: not before arrival + 7 min, at most adj_max early, at most even_hold_max late,
+    run order. When the trips simulated are too few for even_step, the smallest step that works is used and the page says so.
+  * The page shows steps 1..6 with their EWT and largest hold.
+
 V13.15 (9 Nov 2026) - run order kept (no_overtake)
   * Trip adjustment, halfway regulation and the steady headway never let a trip leave before the trip in front of it: T6, T7, T8 in that
     order, never T7, T8 and then the late T6. A bus that is ready before the late bus in front of it waits and leaves min_dep_gap (2 min)
@@ -86,7 +94,7 @@ Pure computation (numpy), no I/O. Decision support only.
 import math
 import numpy as np
 
-MODEL_VERSION = "recovery-2.8-even-window"
+MODEL_VERSION = "recovery-2.9-even-smooth"
 EPS = 1e-6
 
 PARAMS = {
@@ -121,7 +129,10 @@ PARAMS = {
     "no_overtake": 1,             # V13.15 HARD: the AI's plans keep the run order - no trip leaves before the trip in front of it (T6, T7, T8 - never T7, T8, then T6).
                                   # A bus that has to wait behind a late bus leaves min_dep_gap after it; that wait may pass adj_max. No action is not changed.
     "steady_tol": 1.0,            # V13.16 (former one-number even headway, kept for steady_plan_all): each gap h +/- this many min
-    "steady_side": 2,             # V13.17 EVEN HEADWAY: the trips evened out = this many duties above and below the late trip(s); the rest keep the timetable
+    "steady_side": 2,             # V13.17 (former window version, kept for steady_plan_window): duties above and below the late trip(s)
+    "even_step": 2,               # V13.18 EVEN HEADWAY: a departure gap may differ from the gap before it by at most this many min (16 -> 14 -> 12); when the
+                                  # trips simulated are too few for that, the smallest step that works is used (and said)
+    "even_hold_max": 20.0,        # ... a bus may be held up to this many min for it (past adj_max: the page says so)
     "steady_hold_max": 0.0,       # optional cap on a steady-headway hold (min); 0 = no cap. Over the cap -> the least-waiting plan is used instead
     "win_min": 30.0,              # window for the average / max headway: this many min before and after the longest headway at each AITP          # QoS 1.2 (HARD): an adjusted departure headway may be at most this many min longer than the scheduled headway
     "w_qos": 40.0,                # search cost per minute a departure headway is over the QoS 1.2 limit  # 0 = two back-to-back trips (e.g. T3 + T4) may NOT both start halfway; 1 = allowed       # a departure adjustment is used (instead of no action) only if it cuts the Average EWT by at least this
@@ -1049,8 +1060,104 @@ class Optimiser:
         return out
 
     # -------------------------------------------------- even headway over a small window (V13.17)
-    def steady_plan(self, side=None):
-        """Trip adjustment with an EVEN HEADWAY over a small window: the late trip(s) and `steady_side` (2) duties above and below move, the
+    def steady_plan(self, step=None, exact=False):
+        """Trip adjustment with an EVEN HEADWAY and no big jumps: each departure gap differs from the gap before it by at most `even_step`
+        (2) min, from the timetable gap before the first trip to the timetable gap after the next trip; inside that, the lowest waiting
+        (least sum of (gap - scheduled gap)^2), then the least holding. Exact, in whole minutes (dynamic programming). When `even_step`
+        cannot be met with the trips simulated, the smallest step that can is used (exact=True: that step or nothing). -> plan or None."""
+        C, P = self.C, self.P
+        self.steady_why = None
+        if not self.lateb:
+            return None
+        ask = int(P.get("even_step", 2) if step is None else step)
+        res = None
+        for st in ([ask] if exact else range(max(1, ask), 13)):
+            res = self._smooth_dp(st)
+            if res is not None:
+                break
+        if res is None:
+            self.steady_why = f"no even headway fits the {C.n} trips simulated" + ("" if exact else " with gaps changing by up to 12 min")
+            return None
+        xs, used = res
+        dep = {b: float(xs[b]) for b in range(1, C.n + 1) if not C.locked[b] and abs(xs[b] - C.nat[b]) > 0.49}
+        if not dep:
+            self.steady_why = "no departure needs to move"
+            return None
+        why = self._check(dep, [], cap=False)
+        if why:
+            self.steady_why = "; ".join(why)
+            return None
+        Si = [int(round(float(v))) for v in C.S]
+        gaps = [int(xs[b] - xs[b - 1]) for b in range(1, C.n + 2)]
+        moved = sorted(dep)
+        first, last = moved[0], moved[-1]
+        qn = self._queue()
+        holds = {b: xs[b] - float(C.nat[b]) for b in dep}
+        over = [b for b in dep if xs[b] > max(float(C.nat[b]), qn.get(b, float(C.nat[b]))) + P["adj_max"] + 0.49]
+        lateb = [b for b in self.lateb if 1 <= b <= C.n]
+        L0 = lateb[0] if lateb else first
+        info = {"mode": "smooth", "step": used, "step_asked": ask, "first": int(first), "last": int(last), "before": int(first - 1), "after": int(last + 1),
+                "after_clock": hm(xs[last + 1]), "gaps": gaps, "gaps_from": int(first - 1),                 # gaps[k] = trip k -> trip k+1 (k = 0 is the bus before trip 1)
+                "show": [int(g) for g in gaps[first - 1:last + 1]],                                        # the gaps that change: trip first-1 -> ... -> trip last+1
+                "gap_min": min(gaps[first - 1:last + 1]), "gap_max": max(gaps[first - 1:last + 1]),
+                "late": [{"trip": int(b), "arr_clock": hm(C.act_arr[b]), "earliest_clock": hm(xs[b]), "late": _r(xs[b] - Si[b], 0)} for b in lateb],
+                "H": _r(float(np.median(np.diff(np.sort(np.asarray(C.S, float))))), 1), "hold_max": _r(max(holds.values(), default=0.0), 0),
+                "release_max": _r(-min(holds.values(), default=0.0), 0), "n_moved": len(dep), "n_over_cap": len(over), "over": [int(b) for b in over],
+                "adj_max": P["adj_max"], "hold_limit": P.get("even_hold_max", 20.0), "n_trips": C.n, "from_trip": int(first), "start_trip": int(first - 1),
+                "next_trip": C.n + 1, "next_hold": 0, "min_layover": _r(C.ml, 1), "late_trip": int(L0)}
+        return {"dep": dep, "hw": [], "fam": "Even headway", "reg": True, "steady": info, "end": None}
+
+    def _smooth_dp(self, step):
+        """Whole-minute departures x_1..x_n (bus 0 and n+1 on their timetable times) with |d_k - d_(k-1)| <= step, d = gap - scheduled gap,
+        d = 0 before bus 0 and after bus n+1; least sum d^2, then least holding. Departed trips are fixed.
+        -> ({b: x}, step) or None."""
+        C, P = self.C, self.P
+        n = C.n
+        Si = [int(round(float(v))) for v in C.S]
+        hmax, rel, gmin = float(P.get("even_hold_max", 20.0)), float(P["adj_max"]), int(math.ceil(float(P["min_dep_gap"])))
+        box = {0: (Si[0], Si[0]), n + 1: (Si[n + 1], Si[n + 1])}
+        for b in range(1, n + 1):
+            if C.locked[b]:
+                v = int(round(float(C.nat[b])))
+                box[b] = (v, v)
+            else:
+                lo = int(math.ceil(max(float(C.ready[b]), float(C.nat[b]) - rel) - 1e-6))
+                hi = int(math.floor(float(C.nat[b]) + hmax + 1e-6))
+                if lo > hi:
+                    return None
+                box[b] = (lo, hi)
+        cur = {(Si[0], 0): (0.0, None)}
+        hist = []
+        for k in range(1, n + 2):
+            gs = Si[k] - Si[k - 1]
+            lo, hi = box[k]
+            new = {}
+            for (x, d), (c, _) in cur.items():
+                rng = range(d - step, d + step + 1)                       # also next to a departed trip: no jump from the gap it already made
+                for d2 in rng:
+                    x2 = x + gs + d2
+                    if x2 < lo or x2 > hi or gs + d2 < gmin:
+                        continue
+                    c2 = c + d2 * d2 + 0.01 * abs(x2 - float(C.nat[k]))
+                    key = (x2, d2)
+                    if key not in new or c2 < new[key][0] - 1e-12:
+                        new[key] = (c2, (x, d))
+            if not new:
+                return None
+            hist.append(new)
+            cur = new
+        fin = [(v[0], key) for key, v in cur.items() if abs(key[1]) <= step]
+        if not fin:
+            return None
+        _, key = min(fin)
+        xs = {n + 1: key[0]}
+        for k in range(n + 1, 0, -1):
+            key = hist[k - 1][key][1]
+            xs[k - 1] = key[0]
+        return xs, step
+
+    def steady_plan_window(self, side=None):
+        """V13.17 (not used by the page): Trip adjustment with an EVEN HEADWAY over a small window: the late trip(s) and `steady_side` (2) duties above and below move, the
         trip before and the trip after the window keep the timetable. Inside, each side of the late trip gets even gaps (least squares,
         whole minutes: they differ by at most 1 min), within +/-adj_max, the 7-min layover and the run order. -> plan or None (steady_why)."""
         C, P = self.C, self.P
@@ -1097,22 +1204,23 @@ class Optimiser:
                 "n_over_cap": 0, "next_trip": C.n + 1, "next_hold": 0, "min_layover": _r(C.ml, 1)}
         return {"dep": dep, "hw": [], "fam": "Even headway", "reg": True, "steady": info, "end": None}
 
-    def steady_options(self, sides=(1, 2, 3, 4, 5)):
-        """The even headway with 1..5 duties each side: deterministic EWT, largest hold and the gaps, for the page's comparison."""
+    def steady_options(self, steps=(1, 2, 3, 4, 5, 6)):
+        """The even headway with each largest change between neighbouring gaps: deterministic EWT, largest hold and the gaps (page table)."""
         out, plans = [], []
-        for s_ in sides:
-            pl = self.steady_plan(s_)
-            if pl is not None:
-                plans.append((s_, pl))
+        for st in steps:
+            pl = self.steady_plan(st, exact=True)
+            if pl is None:
+                out.append({"step": st, "ok": False})
+            else:
+                plans.append((st, pl))
         self.steady_why = None
         if plans:
             m = self._eval([pl for _, pl in plans])
-            for i, (s_, pl) in enumerate(plans):
-                st = pl["steady"]
-                out.append({"side": s_, "ewt": _r(float(m["ewt_avg"][i]), 3), "hold_max": st["hold_max"], "release_max": st["release_max"], "n_moved": st["n_moved"],
-                            "first": st["first"], "last": st["last"], "gap_min": st["gap_min"], "gap_max": st["gap_max"],
-                            "segments": [{"from": g["from"], "to": g["to"], "gaps": g["gaps"]} for g in st["segments"]]})
-        return out
+            for i, (st, pl) in enumerate(plans):
+                x = pl["steady"]
+                out.append({"step": st, "ok": True, "ewt": _r(float(m["ewt_avg"][i]), 3), "hold_max": x["hold_max"], "n_over_cap": x["n_over_cap"], "first": x["first"],
+                            "last": x["last"], "show": x["show"], "gap_min": x["gap_min"], "gap_max": x["gap_max"]})
+        return sorted(out, key=lambda o: o["step"])
 
     # -------------------------------------------------- former one-number even headway (V13.14, V13.16; not used by the page)
     def steady_plan_all(self, h_try=None):
@@ -1672,7 +1780,7 @@ class Optimiser:
                     behind = f" | After Trip {fr['n']}"
             if ch.get("steady"):
                 qd_ = self._queue(tuple(q["n"] for q in ch["rows"] if q["type"] == "halfway"))
-                sub += f" \u00b7 even headway, Trips {ch['steady']['first']}-{ch['steady']['last']}" + (f" (over the \u00b1{P['adj_max']:g} limit)" if r["dep"] > max(float(C.nat[r["n"]]), qd_.get(r["n"], 0.0)) + P["adj_max"] + 0.49 else "")
+                sub += " \u00b7 even headway" + (f" (over the \u00b1{P['adj_max']:g} limit)" if r["dep"] > max(float(C.nat[r["n"]]), qd_.get(r["n"], 0.0)) + P["adj_max"] + 0.49 else "")
             instr.append({"n": r["n"], "kind": "hold" if sh >= 0.5 else ("release" if sh <= -0.5 else "full"), "time": r["dep_clock"],
                           "text": f"Trip {r['n']} \u2014 Full trip | {act}Depart {r['dep_clock']}{behind}", "sub": sub})
         st = ch.get("steady")
@@ -1706,7 +1814,7 @@ class Optimiser:
                 "generated": self._gen_info(), "live": C.live, "veh": self.veh, "needs_standby": self.needs_standby, "not_recovered_min": _r(C.chain_len, 0), "now": _r(C.now, 1), "now_clock": hm(C.now) if C.now is not None else None,
                 "locked": [b for b in range(1, C.n + 1) if C.locked[b]], "first_stop": C.names[0], "pts_up": C.pts_up, "pts_km": [_r(C.stop_s[j], 3) for j in C.pts_up], "prep_min": P["prep_min"], "disp_j": disp_j, "disp_name": C.names[disp_j] if disp_j is not None else None,
                 "trips": [{"n": b, "sch": hm(C.S[b]), "act_arr": hm(C.act_arr[b]), "late": C.late[b - 1], "ready": hm(C.ready[b]), "nat": hm(C.nat[b])} for b in range(1, C.n + 1)],
-                "qos": {k: res[k].get("qos") for k in res}, "params": {k: P[k] for k in ("adjust_style", "steady_side", "even_side", "steady_tol", "steady_hold_max", "qos_over_max", "term_mode", "halfway_regulate", "halfway_adj_max", "win_min", "layover_min", "bunch_min", "adj_max", "min_layover_min", "balance_trips", "horizon_side", "sims", "halfway_min_late", "offsvc_factor", "prep_min",
+                "qos": {k: res[k].get("qos") for k in res}, "params": {k: P[k] for k in ("adjust_style", "even_step", "even_hold_max", "steady_side", "even_side", "steady_tol", "steady_hold_max", "qos_over_max", "term_mode", "halfway_regulate", "halfway_adj_max", "win_min", "layover_min", "bunch_min", "adj_max", "min_layover_min", "balance_trips", "horizon_side", "sims", "halfway_min_late", "offsvc_factor", "prep_min",
                                                    "ewt_gain_min", "ewt_gain_pct", "ewt_gain_per_km", "ewt_adjust_min", "allow_adjacent_halfway",
                                                    "term_reg", "term_hold_max", "term_early_max", "term_min_adj", "term_tol_pct", "term_zone", "term_total_max")}}
 
@@ -1811,13 +1919,13 @@ class Optimiser:
         if sa:
             lim_txt = f" (over the ±{self.P['adj_max']:g}-min limit)" if sa.get("n_over_cap") else ""
             nxt = f", and Trip {sa['next_trip']} must be held +{sa['next_hold']:.0f} min too" if (sa.get("next_hold") or 0) >= 0.5 else ""
-            parts = "; ".join(f"Trip {g['from']} to Trip {g['to']}: {', '.join(str(int(x)) for x in g['gaps'])} min" for g in sa["segments"])
+            gl = ", ".join(str(int(x)) for x in sa["show"])
+            stp = f"gaps change by at most {sa['step']} min from one bus to the next" + (f" ({sa['step_asked']} is not possible with {sa['n_trips']} trips)" if sa["step"] > sa["step_asked"] else "")
             if self.steady_used:
-                out.append(f"Trip adjustment uses an EVEN HEADWAY over {sa['side']} duties above and {sa['side']} below the late trip (Trips {sa['first']}-{sa['last']}); "
-                           f"Trip {sa['after']} is back on the timetable. Gaps: {parts}. Largest hold +{sa['hold_max']:.0f} min. "
-                           f"Average EWT {sa['ewt']:.2f} min, against {sa['least_wait_ewt']:.2f} min with the least-waiting spacing.")
+                out.append(f"Trip adjustment uses an EVEN HEADWAY: {stp}. Trips {sa['first']}-{sa['last']} move; gaps from Trip {sa['before']} to Trip {sa['after']}: {gl} min. "
+                           f"Largest hold +{sa['hold_max']:.0f} min{lim_txt}. Average EWT {sa['ewt']:.2f} min, against {sa['least_wait_ewt']:.2f} min with the least-waiting spacing.")
             else:
-                out.append(f"An even headway over {sa['side']} duties above and below (Trips {sa['first']}-{sa['last']}) would give gaps {parts}; largest hold +{sa['hold_max']:.0f} min; "
+                out.append(f"An even headway ({stp}) would move Trips {sa['first']}-{sa['last']} with gaps {gl} min; largest hold +{sa['hold_max']:.0f} min{lim_txt}; "
                            f"Average EWT {sa['ewt']:.2f} min against {sa['least_wait_ewt']:.2f} min with the least-waiting spacing used here.")
         q = res[ch].get("qos") or {}
         if q and not q.get("ok"):

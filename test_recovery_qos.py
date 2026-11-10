@@ -185,27 +185,30 @@ class RunOrder(unittest.TestCase):
         self.assertEqual(rows[7]["shift"], 0)                                  # nobody steps in: trip 7 leaves when it is ready
         self.assertLess(rows[7]["dep"], rows[6]["dep"])
 
-    def test_even_headway_two_duties_above_and_below(self):
-        late = [0, 0, 0, 0, 10, 0, 0, 0, 0, 0]                                    # trip 5 leaves 7 min late
-        r = R.optimise(ctx(late, {"adjust_style": "steady"}))
-        A, st = r["plans"]["adjust"], r["plans"]["adjust"]["steady"]
-        self.assertEqual((st["side"], st["first"], st["last"], st["after"]), (2, 3, 7, 8))
-        moved = [x["n"] for x in A["rows"] if abs(x["shift"]) >= 0.5]
-        self.assertTrue(set(moved) <= {3, 4, 6, 7}, moved)                        # only 2 duties above and 2 below move; trip 5 leaves when ready
-        for g in st["segments"]:
-            self.assertLessEqual(max(g["gaps"]) - min(g["gaps"]), 1.0, g)          # even on each side: at most 1 min apart
-        self.assertTrue(all(abs(x["shift"]) <= 8.0 + 1e-6 for x in A["rows"]))
-        self.assertLess(A["ewt"]["avg"], r["plans"]["none"]["ewt"]["avg"])
-        o = {x["side"]: x for x in r["steady_alt"]["options"]}
-        self.assertEqual(sorted(o), [1, 2, 3, 4, 5])
-        self.assertLessEqual(o[3]["ewt"], o[1]["ewt"])                             # more duties share the delay more thinly
-        r3 = R.optimise(ctx(late, {"adjust_style": "steady", "steady_side": 3}))
-        self.assertEqual((r3["plans"]["adjust"]["steady"]["first"], r3["plans"]["adjust"]["steady"]["last"]), (2, 8))
-        self.assertEqual(r["adjust_style"], "steady")
-        self.assertEqual(R.optimise(ctx(late))["adjust_style"], "least_wait")
-        up1 = [round(g) for _, g in A["chain"][0]["dep_hw"]]
-        for c in A["chain"][1:]:                                                    # later trips keep the same gaps (give or take a minute of running time)
-            self.assertTrue(all(abs(round(g) - u) <= 1 for (_, g), u in zip(c["dep_hw"], up1)), (c["leg"], c["dep_hw"], up1))
+    def test_even_headway_no_big_jumps(self):
+        for late, n_tr in (([0, 0, 0, 0, 10, 0, 0, 0, 0, 0], 10), ([0, 0, 0, 0, 0, 20, 0, 0, 0, 0], 10), ([0, 0, 0, 0, 0, 20, 0, 0, 0, 0, 0, 0], 12)):
+            r = R.optimise(ctx(late, {"adjust_style": "steady", "n_trips": n_tr}))
+            A, st = r["plans"]["adjust"], r["plans"]["adjust"]["steady"]
+            g = [12] + st["gaps"] + [12]                                            # the timetable gap before bus 0 and after the next trip
+            self.assertTrue(all(abs(b - a) <= st["step"] for a, b in zip(g, g[1:])), (late, st["step"], g))
+            self.assertEqual(st["step_asked"], 2)
+            d = {x["n"]: x["dep"] for x in A["rows"]}
+            self.assertTrue(all(d[k] < d[k + 1] for k in range(1, n_tr)), d)        # run order
+            self.assertTrue(all(x["shift"] <= 20.0 + 1e-6 for x in A["rows"]))       # even_hold_max
+            self.assertLess(A["ewt"]["avg"], r["plans"]["none"]["ewt"]["avg"])
+            opts = {o["step"]: o for o in r["steady_alt"]["options"]}
+            self.assertEqual(sorted(opts), [1, 2, 3, 4, 5, 6])
+            self.assertTrue(opts[st["step"]]["ok"] and all(not opts[k]["ok"] for k in opts if k < st["step"]))
+            up1 = [round(x) for _, x in A["chain"][0]["dep_hw"]]
+            for c in A["chain"][1:]:                                                    # later trips keep the same gaps
+                self.assertTrue(all(abs(round(x) - u) <= 1 for (_, x), u in zip(c["dep_hw"], up1)), (c["leg"], c["dep_hw"], up1))
+            if late[4] == 10:
+                self.assertEqual(st["step"], 2)
+            elif n_tr == 10:
+                self.assertEqual(st["step"], 3)                                        # 17 min late: 2-min steps need more than 10 trips ...
+            else:
+                self.assertEqual(st["step"], 2)                                        # ... and fit in 12
+        self.assertEqual(R.optimise(ctx([0, 0, 0, 0, 10, 0, 0, 0, 0, 0]))["adjust_style"], "least_wait")
 
 
 if __name__ == "__main__":
