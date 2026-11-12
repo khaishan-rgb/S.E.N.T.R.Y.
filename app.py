@@ -1678,7 +1678,7 @@ async def design_system_css():
 
 
 # ---- HORIZON brand: logo cut-outs, ring mark (favicon) and the portable design tokens (CSS / JSON) for other systems.
-_BRAND_TYPES = {".webp": "image/webp", ".svg": "image/svg+xml", ".png": "image/png"}
+_BRAND_TYPES = {".webp": "image/webp", ".svg": "image/svg+xml", ".png": "image/png", ".glb": "model/gltf-binary"}   # .glb: the HORIZON AI Officer 3D model
 
 
 _BRAND_EMBEDDED = {   # built-in copies of the HORIZON logos: served when the brand files are missing on the server
@@ -1713,7 +1713,7 @@ async def brand_status():
 @app.get("/brand/{name}")
 async def brand_asset(name: str):
     from fastapi.responses import Response
-    if not re.fullmatch(r"[a-z0-9-]+\.(webp|svg|png)", name):
+    if not re.fullmatch(r"[a-z0-9-]+\.(webp|svg|png|glb)", name):
         return Response(status_code=404)
     data, _ = _brand_bytes(name)
     if data is None:

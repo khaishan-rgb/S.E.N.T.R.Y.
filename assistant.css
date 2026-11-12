@@ -73,23 +73,18 @@
   font:700 14px/1 var(--hz-font-display,"Rajdhani",sans-serif);letter-spacing:.08em;cursor:pointer;box-shadow:0 0 26px -8px rgba(63,211,255,.7)}
 .hai-fab .mini{width:44px;height:44px;border-radius:50%;overflow:hidden;background:#0a2346}
 .hai-fab .mini svg,.hai-fab .mini img{width:100%;height:100%;display:block;object-fit:cover}
-.hai-agent .blink{transform-origin:center;transform-box:fill-box;animation:hai-blink 5.2s infinite}
+.hai-officer,.hai-officer-img{position:absolute;inset:0;display:block;width:100%;height:100%;object-fit:cover}
+.hai-face.tall:not(.holo){box-shadow:0 0 0 1px rgba(63,211,255,.45),0 0 calc(10px + var(--lv,0)*26px) rgba(63,211,255,calc(.25 + var(--lv,0)*.5))}
+.hai-offmini{display:block;width:100%;height:100%;background-size:140% auto;background-position:49% 5%;background-repeat:no-repeat}
+.hai-face.holo{background:radial-gradient(circle at 50% 36%,#0d2c56,#030a18 78%);box-shadow:0 0 0 1px rgba(63,211,255,.45),inset 0 -30px 40px -20px rgba(63,211,255,.22),0 0 calc(12px + var(--lv,0)*30px) rgba(63,211,255,calc(.28 + var(--lv,0)*.5))}
+.hai-face.holo::after{content:"";position:absolute;left:8%;right:8%;bottom:5px;height:9px;border-radius:50%;background:radial-gradient(closest-side,rgba(63,211,255,.75),transparent);filter:blur(2px);pointer-events:none}
+.hai-holo{display:block;width:100%;height:100%;filter:drop-shadow(0 0 5px rgba(63,211,255,.55))}
 .hai-face.tall{width:150px;height:200px;border-radius:14px}
 .hai.big .hai-face.tall{width:210px;height:280px}
-.hai-agent .breathe{transform-box:view-box;transform-origin:150px 400px;animation:hai-breathe 4.6s ease-in-out infinite}
-@keyframes hai-breathe{50%{transform:translateY(-1.4px) scale(1.006)}}
-.hai-agent .head{transform-box:view-box;transform-origin:150px 225px;animation:hai-head 9s ease-in-out infinite}
-@keyframes hai-head{0%,100%{transform:rotate(0)}30%{transform:rotate(-1.4deg)}65%{transform:rotate(1.1deg) translateY(.4px)}}
-.hai-agent.talk .head{animation:hai-nod 2.8s ease-in-out infinite}
-@keyframes hai-nod{0%,100%{transform:rotate(0) translateY(0)}22%{transform:rotate(-1.3deg) translateY(.8px)}48%{transform:rotate(.5deg) translateY(1.6px)}74%{transform:rotate(1.1deg) translateY(.4px)}}
-.hai-agent .iris{animation:hai-look 11s steps(1) infinite}
-.hai-agent.talk .iris{animation:none}
-@keyframes hai-look{0%{transform:translate(0,0)}28%{transform:translate(-1.2px,.2px)}34%{transform:translate(0,0)}61%{transform:translate(1.3px,0)}66%{transform:translate(0,0)}}
-@keyframes hai-blink{0%,93%,100%{transform:scaleY(1)}95.5%{transform:scaleY(.1)}}
 .hai-orb .ring{transform-origin:100px 100px;transform-box:view-box}
 .hai-orb .r1{animation:hai-spin 14s linear infinite}.hai-orb .r2{animation:hai-spin 9s linear infinite reverse}
 @keyframes hai-spin{to{transform:rotate(360deg)}}
 @media (max-width:640px){.hai{left:8px;right:8px;width:auto;top:auto;bottom:8px;height:min(78vh,640px)}.hai.big{height:calc(100vh - 16px)}
   .hai-stage{grid-template-columns:96px minmax(0,1fr)}.hai-face{width:96px;height:96px}.hai.big .hai-face{width:96px;height:96px}.hai.big .hai-stage{grid-template-columns:96px minmax(0,1fr)}
   .hai-face.tall,.hai.big .hai-face.tall{width:96px;height:128px}}
-@media (prefers-reduced-motion:reduce){.hai-agent .blink,.hai-orb .ring,.hai-typing i,.hai-in .mic.on,.hai-agent .breathe,.hai-agent .head,.hai-agent.talk .head,.hai-agent .iris{animation:none}}
+@media (prefers-reduced-motion:reduce){.hai-orb .ring,.hai-typing i,.hai-in .mic.on{animation:none}}
