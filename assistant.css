@@ -1,90 +1,173 @@
-/* HORIZON AI operations assistant panel (AI Operations Centre). HORIZON tokens; works on its own with the fallbacks. */
-.hai{--hai-bg:var(--hz-panel,#071a33);--hai-deep:var(--hz-deep,#041022);--hai-line:var(--hz-line-2,rgba(110,200,255,.30));
-  --hai-text:var(--hz-text,#e8f4ff);--hai-text2:var(--hz-text-2,#b8cde4);--hai-mut:var(--hz-mut,#8ca6c4);--hai-cyan:var(--hz-cyan,#3fd3ff);
-  --hai-blue:var(--hz-blue,#1f8fff);--hai-ai:var(--hz-ai,#a07bff);--hai-ok:var(--hz-ok,#2ee8a0);--hai-crit:var(--hz-crit,#ff4d61);
-  position:fixed;z-index:1200;right:max(18px,env(safe-area-inset-right,0px));top:96px;width:400px;max-width:calc(100vw - 24px);
-  height:min(720px,calc(100vh - 120px));display:flex;flex-direction:column;border-radius:12px;overflow:hidden;color:var(--hai-text);
-  background:linear-gradient(180deg,rgba(9,30,60,.97),rgba(4,16,34,.97));border:1px solid var(--hai-line);
-  box-shadow:0 0 0 1px rgba(63,211,255,.08),0 24px 60px -18px rgba(0,0,0,.8),0 0 40px -12px rgba(63,211,255,.35);
-  font:14px/1.45 var(--hz-font-body,"IBM Plex Sans",system-ui,sans-serif);backdrop-filter:blur(10px)}
+/* HORIZON AI operations assistant panel (AI Operations Centre), redesigned 12 Nov 2026.
+   Layout: header, then a full-width stage (the avatar, with status, language and voice controls laid over it and a
+   horizon line along the bottom that glows with the voice), then the chat, suggestions and the question bar.
+   HORIZON tokens with fallbacks, so the panel also works on pages without horizon-tokens.css. */
+.hai{--navy:var(--hz-deep,#041022);--panel:#071a35;--line:rgba(110,200,255,.22);--text:var(--hz-text,#e8f4ff);--text2:var(--hz-text-2,#b8cde4);
+  --mut:var(--hz-mut,#8ca6c4);--cyan:var(--hz-cyan,#3fd3ff);--blue:var(--hz-blue,#1f8fff);--violet:var(--hz-ai,#a07bff);--ok:var(--hz-ok,#2ee8a0);
+  --crit:var(--hz-crit,#ff4d61);--display:var(--hz-font-display,"Rajdhani",sans-serif);--body:var(--hz-font-body,"IBM Plex Sans",system-ui,sans-serif);
+  position:fixed;z-index:1200;right:max(18px,env(safe-area-inset-right,0px));top:96px;width:420px;max-width:calc(100vw - 24px);
+  height:min(780px,calc(100vh - 116px));display:flex;flex-direction:column;border-radius:16px;overflow:hidden;color:var(--text);
+  font:14px/1.5 var(--body);border:1px solid transparent;
+  background:linear-gradient(180deg,rgba(9,28,58,.97),rgba(4,14,32,.98)) padding-box,
+    linear-gradient(150deg,rgba(63,211,255,.7),rgba(160,123,255,.35) 38%,rgba(63,211,255,.06) 68%,rgba(160,123,255,.55)) border-box;
+  box-shadow:0 28px 70px -24px rgba(0,0,0,.85),0 0 46px -14px rgba(63,211,255,.38);backdrop-filter:blur(14px)}
 .hai[hidden],.hai-fab[hidden]{display:none!important}
-.hai.big{width:560px;height:min(860px,calc(100vh - 60px))}
+.hai.big{width:600px;height:min(900px,calc(100vh - 40px))}
 .hai *{box-sizing:border-box}
-.hai-h{display:flex;align-items:center;gap:8px;padding:9px 10px 9px 14px;border-bottom:1px solid rgba(110,200,255,.18);cursor:grab;user-select:none;touch-action:none;
-  background:linear-gradient(90deg,rgba(63,211,255,.12),transparent 70%)}
+.hai-i{width:18px;height:18px;display:block}
+
+/* header */
+.hai-h{display:flex;align-items:center;gap:10px;padding:10px 10px 10px 12px;cursor:grab;user-select:none;touch-action:none}
 .hai-h:active{cursor:grabbing}
-.hai-h b{font:700 16px/1 var(--hz-font-display,"Rajdhani",sans-serif);letter-spacing:.08em;white-space:nowrap}
-.hai-h small{font:600 12px/1 var(--hz-font-display,"Rajdhani",sans-serif);letter-spacing:.06em;color:var(--hai-mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
-.hai-st{display:inline-flex;align-items:center;gap:5px;font:600 11px/1 var(--hz-font-display,"Rajdhani",sans-serif);letter-spacing:.08em;color:var(--hai-ok);margin-left:auto;white-space:nowrap}
+.hai-logo{display:grid;place-items:center;width:32px;height:32px;border-radius:10px;color:#eafcff;flex:none;
+  background:radial-gradient(circle at 30% 25%,rgba(63,211,255,.55),rgba(31,143,255,.25) 55%,rgba(160,123,255,.35));box-shadow:0 0 18px -4px rgba(63,211,255,.8)}
+.hai-logo .hai-i{width:19px;height:19px}
+.hai-title{display:flex;flex-direction:column;min-width:0;line-height:1.1}
+.hai-title b{font:700 17px/1 var(--display);letter-spacing:.14em;
+  background:linear-gradient(90deg,#fff,#bfefff 55%,#d9ccff);-webkit-background-clip:text;background-clip:text;color:transparent}
+.hai-title small{font-size:12px;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:3px}
+.hai-st{display:inline-flex;align-items:center;gap:6px;margin-left:auto;padding:4px 9px;border-radius:999px;font-size:11.5px;color:var(--ok);
+  background:rgba(46,232,160,.08);border:1px solid rgba(46,232,160,.3);white-space:nowrap}
 .hai-st i{width:7px;height:7px;border-radius:50%;background:currentColor;box-shadow:0 0 8px currentColor}
-.hai-st.off{color:var(--hai-crit)}
-.hai-h select,.hai-btn{font:600 12px/1 var(--hz-font-display,"Rajdhani",sans-serif);letter-spacing:.05em;color:var(--hai-text);background:var(--hai-deep);
-  border:1px solid var(--hai-line);border-radius:6px;padding:5px 7px;cursor:pointer}
-.hai-btn{display:inline-grid;place-items:center;min-width:28px;height:28px;padding:0 7px}
-.hai-btn:hover,.hai-h select:hover{border-color:var(--hai-cyan)}
-.hai-btn:focus-visible,.hai select:focus-visible,.hai-in input:focus-visible,.hai-chip:focus-visible{outline:2px solid var(--hai-cyan);outline-offset:2px}
-.hai-btn[aria-pressed="true"]{background:rgba(63,211,255,.18);border-color:var(--hai-cyan)}
-.hai-stage{position:relative;display:grid;grid-template-columns:150px minmax(0,1fr);gap:12px;align-items:center;padding:12px 14px;border-bottom:1px solid rgba(110,200,255,.14);
-  background:radial-gradient(260px 160px at 22% 50%,rgba(63,211,255,.14),transparent 70%)}
-.hai.big .hai-stage{grid-template-columns:210px minmax(0,1fr)}
-.hai-face{position:relative;width:150px;height:150px;border-radius:50%;overflow:hidden;background:radial-gradient(circle at 50% 40%,#0f2f5a,#051428 70%);
-  box-shadow:0 0 0 2px rgba(63,211,255,.35),0 0 calc(10px + var(--lv,0)*26px) rgba(63,211,255,calc(.25 + var(--lv,0)*.5));transition:box-shadow .08s linear}
-.hai.big .hai-face{width:210px;height:210px}
-.hai-face svg{display:block;width:100%;height:100%}
-.hai-face img{display:block;width:100%;height:100%;object-fit:cover}
-.hai-side{display:grid;gap:8px;min-width:0}
-.hai-say{display:inline-flex;align-items:center;gap:8px;font:700 12px/1 var(--hz-font-display,"Rajdhani",sans-serif);letter-spacing:.1em;text-transform:uppercase;color:var(--hai-mut)}
-.hai-say.on{color:var(--hai-cyan)}
-.hai-bars{display:inline-flex;align-items:flex-end;gap:2px;height:14px}
-.hai-bars i{width:3px;border-radius:1px;background:currentColor;height:3px;transition:height .08s linear}
-.hai-faces{display:flex;flex-wrap:wrap;gap:6px}
-.hai-faces .hai-btn{height:26px;font-size:11.5px}
-.hai-ctl{display:flex;flex-wrap:wrap;gap:6px}
-.hai-note{font-size:11.5px;color:var(--hai-mut);line-height:1.35}
-.hai-log{flex:1;min-height:0;overflow-y:auto;padding:12px 14px;display:flex;flex-direction:column;gap:10px;scroll-behavior:smooth}
-.hai-m{max-width:92%;padding:9px 12px;border-radius:10px;font-size:13.5px;line-height:1.5;white-space:normal;overflow-wrap:anywhere}
-.hai-m.u{align-self:flex-end;background:linear-gradient(180deg,rgba(31,143,255,.35),rgba(31,143,255,.22));border:1px solid rgba(63,211,255,.35)}
-.hai-m.a{align-self:flex-start;background:linear-gradient(180deg,rgba(110,72,220,.38),rgba(64,40,150,.28));border:1px solid rgba(160,123,255,.4)}
-.hai-m.e{align-self:flex-start;background:rgba(255,77,97,.1);border:1px solid rgba(255,77,97,.45);color:#ffd6db}
-.hai-m.sys{align-self:center;background:none;border:0;color:var(--hai-mut);font-size:12px;text-align:center;padding:2px}
-.hai-m time{display:block;margin-top:5px;font-size:11px;color:rgba(232,244,255,.6)}
+.hai-st.off{color:var(--crit);background:rgba(255,77,97,.08);border-color:rgba(255,77,97,.35)}
+.hai-ib{display:inline-grid;place-items:center;width:32px;height:32px;padding:0;border-radius:10px;color:var(--text2);cursor:pointer;
+  background:rgba(4,16,34,.55);border:1px solid var(--line);transition:color .15s,border-color .15s,background .15s}
+.hai-ib:hover{color:#fff;border-color:var(--cyan);background:rgba(63,211,255,.12)}
+.hai-ib[aria-pressed="true"],.hai-ib[aria-expanded="true"]{color:#fff;border-color:var(--cyan);background:rgba(63,211,255,.18)}
+.hai-ib:disabled{opacity:.4;cursor:not-allowed}
+.hai button:focus-visible,.hai select:focus-visible,.hai input:focus-visible,.hai label:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+
+/* stage: the avatar fills it; everything else floats over it */
+.hai-stage{--lv:0;--glow:63,211,255;position:relative;flex:none;height:250px;margin:0 12px;border-radius:14px;overflow:hidden;isolation:isolate;
+  background:radial-gradient(120% 90% at 50% 32%,#0e2c5c 0%,#071733 55%,#030a18 100%);
+  box-shadow:inset 0 0 0 1px rgba(110,200,255,.22),inset 0 -40px 60px -40px rgba(var(--glow),.35)}
+.hai.big .hai-stage{height:340px}
+.hai-stage[data-mode="thinking"]{--glow:160,123,255}
+.hai-stage[data-mode="listen"]{--glow:46,232,160}
+.hai-stage::before{content:"";position:absolute;inset:0;z-index:0;pointer-events:none;opacity:.5;
+  background:linear-gradient(rgba(110,200,255,.06) 1px,transparent 1px) 0 0/100% 22px,linear-gradient(90deg,rgba(110,200,255,.05) 1px,transparent 1px) 0 0/22px 100%;
+  -webkit-mask:radial-gradient(80% 70% at 50% 40%,transparent 35%,#000 90%);mask:radial-gradient(80% 70% at 50% 40%,transparent 35%,#000 90%)}
+.hai-face{position:absolute;inset:0;z-index:1}
+.hai-face svg,.hai-face canvas{display:block;width:100%;height:100%}
+.hai-face img{display:block;width:100%;height:100%;object-fit:cover;object-position:50% 30%}
+.hai-officer,.hai-officer-img{position:absolute;inset:0;display:block;width:100%;height:100%;object-fit:cover;object-position:50% 30%}
+.hai-holo{display:block;width:100%;height:100%;filter:drop-shadow(0 0 5px rgba(63,211,255,.55))}
+.hai-nophoto{display:grid;place-items:center;width:100%;height:100%;color:var(--mut);font-size:12.5px;text-align:center;padding:16px}
+.hai-hud{position:absolute;inset:8px;z-index:2;pointer-events:none}
+.hai-hud i{position:absolute;width:16px;height:16px;border:0 solid rgba(var(--glow),.75)}
+.hai-hud i:nth-child(1){left:0;top:0;border-width:2px 0 0 2px;border-top-left-radius:6px}
+.hai-hud i:nth-child(2){right:0;top:0;border-width:2px 2px 0 0;border-top-right-radius:6px}
+.hai-hud i:nth-child(3){left:0;bottom:0;border-width:0 0 2px 2px;border-bottom-left-radius:6px}
+.hai-hud i:nth-child(4){right:0;bottom:0;border-width:0 2px 2px 0;border-bottom-right-radius:6px}
+/* the horizon: a line of light along the bottom of the stage that swells with the voice */
+.hai-horizon{position:absolute;left:0;right:0;bottom:0;height:2px;z-index:3;pointer-events:none;
+  background:linear-gradient(90deg,transparent,rgba(var(--glow),.9) 30%,#fff 50%,rgba(var(--glow),.9) 70%,transparent);
+  box-shadow:0 0 calc(8px + var(--lv)*22px) rgba(var(--glow),.9);opacity:calc(.55 + var(--lv)*.45)}
+.hai-horizon::before{content:"";position:absolute;left:12%;right:12%;bottom:0;height:calc(10px + var(--lv)*46px);
+  background:radial-gradient(50% 100% at 50% 100%,rgba(var(--glow),calc(.18 + var(--lv)*.4)),transparent);transition:height .08s linear}
+.hai-say{position:absolute;left:14px;top:14px;z-index:4;display:inline-flex;align-items:center;gap:8px;padding:5px 11px 5px 9px;border-radius:999px;
+  font-size:12px;font-weight:600;color:var(--text2);background:rgba(3,10,24,.62);border:1px solid rgba(110,200,255,.28);backdrop-filter:blur(6px)}
+.hai-say.on{color:#fff;border-color:rgba(var(--glow),.7);box-shadow:0 0 16px -4px rgba(var(--glow),.8)}
+.hai-bars{display:inline-flex;align-items:center;gap:2px;height:14px;color:rgb(var(--glow))}
+.hai-bars i{width:3px;height:3px;border-radius:2px;background:currentColor;transition:height .08s linear}
+.hai-stage[data-mode="thinking"] .hai-bars i,.hai-stage[data-mode="listen"] .hai-bars i{animation:hai-bar 1s ease-in-out infinite}
+.hai-bars i:nth-child(2){animation-delay:.12s}.hai-bars i:nth-child(3){animation-delay:.24s}.hai-bars i:nth-child(4){animation-delay:.36s}.hai-bars i:nth-child(5){animation-delay:.48s}
+@keyframes hai-bar{50%{height:12px}}
+.hai-stage select{position:absolute;right:14px;top:14px;z-index:4;font:600 12px/1 var(--body);color:#fff;cursor:pointer;
+  padding:6px 26px 6px 11px;border-radius:999px;border:1px solid rgba(110,200,255,.3);appearance:none;-webkit-appearance:none;
+  background:rgba(3,10,24,.62) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%238ca6c4' stroke-width='1.5'/%3E%3C/svg%3E") no-repeat right 10px center/10px 6px;backdrop-filter:blur(6px)}
+.hai-stage select:hover{border-color:var(--cyan)}
+.hai-stage select option{background:#071a35;color:#fff}
+.hai-mark{position:absolute;left:16px;bottom:14px;z-index:4;font:700 13px/1 var(--display);letter-spacing:.32em;color:rgba(232,244,255,.82);
+  text-shadow:0 0 12px rgba(var(--glow),.7)}
+.hai-ctl{position:absolute;right:12px;bottom:12px;z-index:4;display:flex;gap:6px}
+.hai-ctl .hai-ib{width:30px;height:30px;border-radius:50%;background:rgba(3,10,24,.62);backdrop-filter:blur(6px)}
+.hai-ctl .hai-i{width:16px;height:16px}
+.hai-faces{position:absolute;right:12px;bottom:50px;z-index:5;display:grid;gap:4px;min-width:150px;padding:6px;border-radius:12px;
+  background:rgba(5,16,36,.96);border:1px solid rgba(110,200,255,.35);box-shadow:0 14px 32px -10px rgba(0,0,0,.8)}
+.hai-faces[hidden]{display:none}
+.hai-opt{display:block;width:100%;text-align:left;padding:7px 10px;border-radius:8px;border:0;background:none;color:var(--text2);font:500 13px/1.2 var(--body);cursor:pointer}
+.hai-opt:hover{background:rgba(63,211,255,.12);color:#fff}
+.hai-opt[aria-pressed="true"]{color:#fff;background:rgba(63,211,255,.18);box-shadow:inset 2px 0 0 var(--cyan)}
+.hai-faces small{display:block;padding:4px 10px 2px;font-size:11px;color:var(--mut);line-height:1.35;max-width:190px}
+.hai-note{position:absolute;left:50%;bottom:48px;transform:translateX(-50%);z-index:4;max-width:84%;padding:4px 10px;border-radius:8px;font-size:11.5px;
+  color:var(--text2);background:rgba(3,10,24,.72);text-align:center}
+.hai-note:empty{display:none}
+
+/* chat */
+.hai-log{flex:1;min-height:0;overflow-y:auto;padding:14px 14px 6px;display:flex;flex-direction:column;gap:12px;scroll-behavior:smooth;scrollbar-width:thin;scrollbar-color:rgba(110,200,255,.25) transparent}
+.hai-row{display:flex;flex-direction:column;gap:4px;max-width:90%}
+.hai-row.u{align-self:flex-end;align-items:flex-end}
+.hai-row.a,.hai-row.e{align-self:flex-start}
+.hai-row.new{animation:hai-in .28s ease-out}
+@keyframes hai-in{from{opacity:0;transform:translateY(6px)}}
+.hai-who{display:flex;align-items:baseline;gap:8px;font-size:11.5px;color:var(--mut);padding:0 4px}
+.hai-who b{font:700 12.5px/1 var(--display);letter-spacing:.06em;color:#cdbcff}
+.hai-row.u .hai-who b{color:#9fe6ff}
+.hai-m{padding:10px 13px;font-size:13.5px;line-height:1.55;overflow-wrap:anywhere;border:1px solid transparent}
+.hai-m.u{border-radius:14px 14px 4px 14px;background:linear-gradient(135deg,rgba(63,211,255,.32),rgba(31,143,255,.2));border-color:rgba(63,211,255,.45)}
+.hai-m.a{border-radius:14px 14px 14px 4px;background:linear-gradient(160deg,rgba(124,88,255,.5),rgba(62,36,160,.38));border-color:rgba(170,140,255,.5);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 10px 26px -14px rgba(124,88,255,.75)}
+.hai-m.e{border-radius:14px 14px 14px 4px;background:rgba(255,77,97,.1);border-color:rgba(255,77,97,.45);color:#ffd6db}
+.hai-m.sys{align-self:center;max-width:92%;padding:2px;background:none;border:0;color:var(--mut);font-size:12px;text-align:center}
 .hai-m b{color:#fff}
 .hai-m ul,.hai-m ol{margin:4px 0;padding-left:18px}
 .hai-m p{margin:0 0 6px}.hai-m p:last-child{margin-bottom:0}
-.hai-m .hai-head{font:700 15px/1.3 var(--hz-font-display,"Rajdhani",sans-serif);letter-spacing:.03em;color:#fff}
-.hai-m .hai-lbl{font-weight:600;color:var(--hai-cyan)}
-.hai-m .hai-conf{margin-top:6px;padding-top:6px;border-top:1px solid rgba(160,123,255,.35);font-size:12.5px;color:var(--hai-text2)}
-.hai-typing{display:inline-flex;gap:4px}.hai-typing i{width:6px;height:6px;border-radius:50%;background:var(--hai-ai);animation:hai-dot 1s infinite}
+.hai-m .hai-head{font:700 15.5px/1.3 var(--display);letter-spacing:.03em;color:#fff}
+.hai-m .hai-lbl{font-weight:600;color:#8fe4ff}
+.hai-m .hai-conf{margin-top:8px;padding-top:7px;border-top:1px solid rgba(190,165,255,.35);font-size:12.5px;color:var(--text2)}
+.hai-typing{display:inline-flex;gap:4px;vertical-align:middle}.hai-typing i{width:6px;height:6px;border-radius:50%;background:#d6c8ff;animation:hai-dot 1s infinite}
 .hai-typing i:nth-child(2){animation-delay:.15s}.hai-typing i:nth-child(3){animation-delay:.3s}
 @keyframes hai-dot{0%,80%,100%{opacity:.25;transform:translateY(0)}40%{opacity:1;transform:translateY(-3px)}}
-.hai-sugg{display:flex;gap:6px;overflow-x:auto;padding:0 14px 8px;scrollbar-width:thin}
-.hai-chip{flex:none;max-width:260px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font:500 12px/1 var(--hz-font-body,"IBM Plex Sans",sans-serif);color:var(--hai-text2);
-  background:rgba(63,211,255,.08);border:1px solid rgba(63,211,255,.35);border-radius:999px;padding:7px 11px;cursor:pointer}
-.hai-chip:hover{color:#fff;border-color:var(--hai-cyan)}
-.hai-in{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:6px;padding:10px 12px;border-top:1px solid rgba(110,200,255,.18);background:rgba(2,8,18,.5)}
-.hai-in input{width:100%;font:14px/1.2 var(--hz-font-body,"IBM Plex Sans",sans-serif);color:var(--hai-text);background:var(--hai-deep);border:1px solid var(--hai-line);border-radius:8px;padding:10px 11px}
-.hai-in .hai-btn{height:38px;min-width:40px;border-radius:8px}
-.hai-in .send{background:linear-gradient(180deg,var(--hai-cyan),var(--hai-blue));color:#021022;border-color:transparent;font-size:13px}
-.hai-in .mic.on{background:rgba(255,77,97,.2);border-color:var(--hai-crit);color:#ffd6db;animation:hai-pulse 1.2s infinite}
-@keyframes hai-pulse{50%{box-shadow:0 0 0 5px rgba(255,77,97,.18)}}
-.hai-foot{padding:0 12px 9px;font-size:11px;color:var(--hai-mut);background:rgba(2,8,18,.5)}
+
+/* suggestions */
+.hai-sugg{display:flex;align-items:center;gap:6px;padding:6px 14px 8px;overflow-x:auto;scrollbar-width:none;
+  -webkit-mask:linear-gradient(90deg,#000 88%,transparent);mask:linear-gradient(90deg,#000 88%,transparent)}
+.hai-sugg::-webkit-scrollbar{display:none}
+.hai-bulb{display:grid;place-items:center;width:26px;height:26px;border-radius:50%;color:#ffd77a;background:rgba(255,200,90,.1);flex:none}
+.hai-bulb .hai-i{width:15px;height:15px}
+.hai-chip{flex:none;max-width:280px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font:500 12px/1 var(--body);color:#bfefff;cursor:pointer;
+  padding:7px 12px;border-radius:999px;background:rgba(63,211,255,.07);border:1px solid rgba(63,211,255,.4);transition:background .15s,border-color .15s,color .15s}
+.hai-chip:hover{color:#fff;background:rgba(63,211,255,.16);border-color:var(--cyan);box-shadow:0 0 14px -4px rgba(63,211,255,.7)}
+
+/* question bar */
+.hai-in{display:flex;align-items:center;gap:8px;padding:8px 12px 6px}
+.hai-field{flex:1;min-width:0;display:flex;align-items:center;gap:4px;padding:4px 4px 4px 14px;border-radius:999px;
+  background:rgba(2,9,22,.75);border:1px solid rgba(110,200,255,.28);transition:border-color .15s,box-shadow .15s}
+.hai-field:focus-within{border-color:var(--cyan);box-shadow:0 0 0 3px rgba(63,211,255,.15)}
+.hai-field input{flex:1;min-width:0;height:34px;border:0;background:none;color:var(--text);font:14px/1.2 var(--body)}
+.hai-field input::placeholder{color:#7f97b6}
+.hai-field input:focus-visible{outline:none}
+.hai-field .hai-ib{border:0;border-radius:50%;background:none}
+.hai-field .mic.on{color:#fff;background:rgba(255,77,97,.25);animation:hai-pulse 1.2s infinite}
+@keyframes hai-pulse{50%{box-shadow:0 0 0 6px rgba(255,77,97,.18)}}
+.hai-send{display:grid;place-items:center;flex:none;width:42px;height:42px;border-radius:50%;border:0;cursor:pointer;color:#03203a;
+  background:linear-gradient(140deg,#7fe6ff,var(--cyan) 45%,var(--blue));box-shadow:0 6px 18px -6px rgba(63,211,255,.9)}
+.hai-send:hover{filter:brightness(1.1)}
+.hai-send .hai-i{width:19px;height:19px;transform:translateX(-1px)}
+.hai-foot{padding:0 14px 10px;font-size:11px;color:#7690b0;line-height:1.35}
+
+/* minimised button */
 .hai-fab{position:fixed;z-index:1199;right:max(18px,env(safe-area-inset-right,0px));bottom:max(18px,env(safe-area-inset-bottom,0px));display:inline-flex;align-items:center;gap:10px;
-  padding:6px 16px 6px 6px;border-radius:999px;border:1px solid rgba(63,211,255,.55);background:linear-gradient(180deg,rgba(9,30,60,.96),rgba(4,16,34,.96));color:#e8f4ff;
+  padding:6px 18px 6px 6px;border-radius:999px;border:1px solid rgba(63,211,255,.55);background:linear-gradient(180deg,rgba(9,30,60,.96),rgba(4,16,34,.96));color:#e8f4ff;
   font:700 14px/1 var(--hz-font-display,"Rajdhani",sans-serif);letter-spacing:.08em;cursor:pointer;box-shadow:0 0 26px -8px rgba(63,211,255,.7)}
-.hai-fab .mini{width:44px;height:44px;border-radius:50%;overflow:hidden;background:#0a2346}
+.hai-fab .mini{width:44px;height:44px;border-radius:50%;overflow:hidden;background:#0a2346;box-shadow:0 0 0 2px rgba(63,211,255,.45)}
 .hai-fab .mini svg,.hai-fab .mini img{width:100%;height:100%;display:block;object-fit:cover}
-.hai-officer,.hai-officer-img{position:absolute;inset:0;display:block;width:100%;height:100%;object-fit:cover}
-.hai-face.tall:not(.holo){box-shadow:0 0 0 1px rgba(63,211,255,.45),0 0 calc(10px + var(--lv,0)*26px) rgba(63,211,255,calc(.25 + var(--lv,0)*.5))}
 .hai-offmini{display:block;width:100%;height:100%;background-size:140% auto;background-position:50% 9%;background-repeat:no-repeat}
-.hai-face.holo{background:radial-gradient(circle at 50% 36%,#0d2c56,#030a18 78%);box-shadow:0 0 0 1px rgba(63,211,255,.45),inset 0 -30px 40px -20px rgba(63,211,255,.22),0 0 calc(12px + var(--lv,0)*30px) rgba(63,211,255,calc(.28 + var(--lv,0)*.5))}
-.hai-face.holo::after{content:"";position:absolute;left:8%;right:8%;bottom:5px;height:9px;border-radius:50%;background:radial-gradient(closest-side,rgba(63,211,255,.75),transparent);filter:blur(2px);pointer-events:none}
-.hai-holo{display:block;width:100%;height:100%;filter:drop-shadow(0 0 5px rgba(63,211,255,.55))}
-.hai-face.tall{width:150px;height:200px;border-radius:14px}
-.hai.big .hai-face.tall{width:210px;height:280px}
+
+/* faces that draw themselves in SVG */
 .hai-orb .ring{transform-origin:100px 100px;transform-box:view-box}
 .hai-orb .r1{animation:hai-spin 14s linear infinite}.hai-orb .r2{animation:hai-spin 9s linear infinite reverse}
 @keyframes hai-spin{to{transform:rotate(360deg)}}
-@media (max-width:640px){.hai{left:8px;right:8px;width:auto;top:auto;bottom:8px;height:min(78vh,640px)}.hai.big{height:calc(100vh - 16px)}
-  .hai-stage{grid-template-columns:96px minmax(0,1fr)}.hai-face{width:96px;height:96px}.hai.big .hai-face{width:96px;height:96px}.hai.big .hai-stage{grid-template-columns:96px minmax(0,1fr)}
-  .hai-face.tall,.hai.big .hai-face.tall{width:96px;height:128px}}
-@media (prefers-reduced-motion:reduce){.hai-orb .ring,.hai-typing i,.hai-in .mic.on{animation:none}}
+
+@media (max-width:640px){
+  .hai{left:8px;right:8px;width:auto;top:auto;bottom:8px;height:min(84vh,680px);border-radius:14px}
+  .hai.big{height:calc(100vh - 16px)}
+  .hai-stage,.hai.big .hai-stage{height:190px;margin:0 10px}
+  .hai-title small{display:none}
+  .hai-mark{display:none}
+}
+@media (prefers-reduced-motion:reduce){
+  .hai-orb .ring,.hai-typing i,.hai-field .mic.on,.hai-bars i,.hai-row.new{animation:none}
+  .hai-horizon::before{transition:none}
+}

@@ -11,8 +11,8 @@
 
   /* ---------------- words in three languages ---------------- */
   var T = {
-    en: {sub: "Operations Assistant", on: "online", off: "not set up", ph: "Ask about an alert, service or incident", send: "Send", mic: "Speak your question",
-         micNo: "Voice input works in Chrome or Edge", listen: "Listening…", speaking: "Speaking", idle: "Ready", think: "Checking the live data…",
+    en: {sub: "AI operations assistant", thinking: "Thinking", faceBtn: "Change face", on: "online", off: "not set up", ph: "Ask about an alert, service or incident", send: "Send", mic: "Speak your question",
+         micNo: "Voice input works in Chrome or Edge", listen: "Listening", speaking: "Speaking", idle: "Ready", think: "Checking the live data…",
          faces: {holo: "AI", agent: "Officer", orb: "Orb", photo: "Photo"}, replay: "Replay", mute: "Mute voice", unmute: "Voice on", stop: "Stop",
          min: "Minimise", big: "Bigger", small: "Smaller", you: "You", hello: "Hello, I'm HORIZON AI. Ask me about any alert, service or incident on this page and I'll explain why it happened and what to do.",
          foot: "Advisory only · answers from this page and live service checks · the Service Controller decides", choose: "Choose photo", photoNote: "Use a picture you have permission to use. It stays in this browser only.",
@@ -20,8 +20,8 @@
          cats: {loading: "heavily loaded", traffic: "delayed by traffic", bunching: "bunching", gap: "running with a long gap"},
          why: "Why is {svc} {cat} at {loc}?", now: "Which services need action now?", sum: "Summarise the network in 3 lines.", cp: "Are the checkpoints jammed?",
          err: "Could not get an answer", offMsg: "HORIZON AI is not set up yet: add ANTHROPIC_API_KEY in Render > Environment."},
-    zh: {sub: "运营助理", on: "在线", off: "未设置", ph: "询问警报、巴士服务或事故", send: "发送", mic: "说出你的问题",
-         micNo: "语音输入请使用 Chrome 或 Edge", listen: "正在聆听…", speaking: "正在说话", idle: "就绪", think: "正在查看实时数据…",
+    zh: {sub: "AI 运营助理", thinking: "正在思考", faceBtn: "更换形象", on: "在线", off: "未设置", ph: "询问警报、巴士服务或事故", send: "发送", mic: "说出你的问题",
+         micNo: "语音输入请使用 Chrome 或 Edge", listen: "正在聆听", speaking: "正在说话", idle: "就绪", think: "正在查看实时数据…",
          faces: {holo: "AI", agent: "职员", orb: "光环", photo: "照片"}, replay: "重播", mute: "关闭语音", unmute: "开启语音", stop: "停止",
          min: "最小化", big: "放大", small: "缩小", you: "你", hello: "您好，我是 HORIZON AI。请问我本页上的任何警报、巴士服务或事故，我会解释原因和处理方法。",
          foot: "仅供参考 · 根据本页数据和实时服务检查回答 · 由服务控制员决定", choose: "选择照片", photoNote: "请使用您有权使用的照片。照片只保存在此浏览器中。",
@@ -29,8 +29,8 @@
          cats: {loading: "载客量高", traffic: "因交通延误", bunching: "串车（车距过近）", gap: "班距过大"},
          why: "{svc} 号为什么在 {loc} {cat}？", now: "现在哪些巴士服务需要处理？", sum: "用三句话总结目前的网络状况。", cp: "关卡现在拥堵吗？",
          err: "无法取得回答", offMsg: "HORIZON AI 尚未设置：请在 Render > Environment 加入 ANTHROPIC_API_KEY。"},
-    ms: {sub: "Pembantu Operasi", on: "dalam talian", off: "belum disediakan", ph: "Tanya tentang amaran, perkhidmatan atau insiden", send: "Hantar", mic: "Sebut soalan anda",
-         micNo: "Input suara berfungsi dalam Chrome atau Edge", listen: "Sedang mendengar…", speaking: "Sedang bercakap", idle: "Sedia", think: "Sedang menyemak data langsung…",
+    ms: {sub: "Pembantu operasi AI", thinking: "Sedang berfikir", faceBtn: "Tukar wajah", on: "dalam talian", off: "belum disediakan", ph: "Tanya tentang amaran, perkhidmatan atau insiden", send: "Hantar", mic: "Sebut soalan anda",
+         micNo: "Input suara berfungsi dalam Chrome atau Edge", listen: "Sedang mendengar", speaking: "Sedang bercakap", idle: "Sedia", think: "Sedang menyemak data langsung…",
          faces: {holo: "AI", agent: "Pegawai", orb: "Orb", photo: "Foto"}, replay: "Main semula", mute: "Senyapkan suara", unmute: "Suara dihidupkan", stop: "Henti",
          min: "Kecilkan", big: "Besarkan", small: "Kecilkan saiz", you: "Anda", hello: "Helo, saya HORIZON AI. Tanya saya tentang sebarang amaran, perkhidmatan atau insiden di halaman ini, dan saya akan terangkan sebabnya dan apa yang perlu dibuat.",
          foot: "Nasihat sahaja · jawapan daripada halaman ini dan semakan perkhidmatan langsung · Pengawal Perkhidmatan yang memutuskan", choose: "Pilih foto", photoNote: "Gunakan gambar yang anda dibenarkan guna. Ia disimpan dalam pelayar ini sahaja.",
@@ -61,7 +61,7 @@
   var OFFICER_IMG = "/brand/assistant-officer.webp?v=" + OFFICER_V;
   var OFF_PTS = {W: 320, H: 427, eyeL: [128.1, 138.2, 15.1, 3.7], eyeR: [187.5, 138.4, 14.3, 4.0],  // centre x, y, half width, half height
     mouth: [157.3, 198.0, 25.1, 3.4], chin: 234.4, brow: 123.2, pivot: [160.4, 265.2]};          // centre x, lip line y at centre, half width, smile lift at corners
-  var OFF_VS = "attribute vec2 aP;varying vec2 vUv;void main(){vUv=vec2(aP.x*.5+.5,.5-aP.y*.5);gl_Position=vec4(aP,0.,1.);}";
+  var OFF_VS = "attribute vec2 aP;uniform vec4 uFit;varying vec2 vUv;void main(){vUv=vec2(uFit.z+aP.x*.5*uFit.x,uFit.w-aP.y*.5*uFit.y);gl_Position=vec4(aP,0.,1.);}";   // uFit: part of the picture shown (cover fit)
   var OFF_FS = "precision mediump float;varying vec2 vUv;uniform sampler2D uT;uniform vec4 uM;uniform vec4 uA;uniform vec2 uB;"   // uM open, wide, round, level; uA time, head angle, nod, breathe; uB blink, unused
     + "uniform vec4 uE1,uE2,uMo;uniform vec3 uK;"            // eyes; mouth; chin, brow, pivot y
     + "const vec2 SZ=vec2(" + OFF_PTS.W.toFixed(1) + "," + OFF_PTS.H.toFixed(1) + ");"
@@ -116,7 +116,7 @@
       var U = function(n){ return gl.getUniformLocation(p, n); }, P = OFF_PTS;
       gl.uniform4f(U("uE1"), P.eyeL[0], P.eyeL[1], P.eyeL[2], P.eyeL[3]); gl.uniform4f(U("uE2"), P.eyeR[0], P.eyeR[1], P.eyeR[2], P.eyeR[3]);
       gl.uniform4f(U("uMo"), P.mouth[0], P.mouth[1], P.mouth[2], P.mouth[3]); gl.uniform3f(U("uK"), P.chin, P.brow, P.pivot[1]);
-      var uM = U("uM"), uA = U("uA"), uB = U("uB"), t0 = performance.now(), blinkAt = 1.8, nod = 0;
+      var uM = U("uM"), uA = U("uA"), uB = U("uB"), uFit = U("uFit"), t0 = performance.now(), blinkAt = 1.8, nod = 0;
       box.appendChild(cv); img.style.visibility = "hidden";
       function draw(now){
         raf = 0; if(dead) return;
@@ -125,7 +125,11 @@
         if(!cv.offsetParent || document.hidden) return;
         var dpr = Math.min(2, window.devicePixelRatio || 1), w = Math.round(cv.clientWidth * dpr), h = Math.round(cv.clientHeight * dpr);
         if(!w || !h) return;
-        if(cv.width !== w || cv.height !== h){ cv.width = w; cv.height = h; }
+        if(cv.width !== w || cv.height !== h){
+          cv.width = w; cv.height = h;
+          var ia = P.W / P.H, ca = w / h, sx = ca > ia ? 1 : ca / ia, sy = ca > ia ? ia / ca : 1;   // cover: crop the long side, keep the face (upper part) in view
+          gl.uniform4f(uFit, sx, sy, .5, Math.min(1 - sy / 2, Math.max(sy / 2, .4)));
+        }
         var s = get() || {}, t = (now - t0) / 1000, mv = still ? 0 : 1, talk = s.mode === 1 ? 1 : 0;
         if(t > blinkAt + .2) blinkAt = t + 2.4 + 3.6 * Math.random() - (Math.random() < .15 ? 2 : 0);   // now and then a double blink
         var bl = mv * Math.max(0, 1 - Math.abs((t - blinkAt - .09) / .09));
@@ -257,9 +261,9 @@
         var yaw = mv * (.05 * Math.sin(t * .31) + .02 * Math.sin(t * .83) + talk * .025 * Math.sin(t * 1.7) + (s.mode === 2 ? .06 * Math.sin(t * 1.1) : 0));
         var pitch = mv * (.012 * Math.sin(t * .47) + .035 * nod) + (s.mode === 3 ? -.03 : 0);
         // camera: head and shoulders, a little above eye level, perspective
-        var asp = w / h, fy = 1 / Math.tan(.19), L = O3.look, dist = O3.frameH * fy * (asp < .7 ? .7 / asp : 1);
-        var ex = L[0], ey = L[1] + .03, ez = L[2] + dist, f = fy, nr = .1, fr = 10, A = (fr + nr) / (nr - fr), Bp = 2 * fr * nr / (nr - fr);
-        var dy = L[1] - ey, dz = L[2] - ez, ln = Math.hypot(dy, dz), cy = -dz / ln, sy = dy / ln;   // small downward look
+        var asp = w / h, fy = 1 / Math.tan(.19), L = O3.look, wide = asp > 1, ly = L[1] + (wide ? .022 : 0), dist = O3.frameH * (wide ? .78 : 1) * fy * (asp < .7 ? .7 / asp : 1);   // wide stage: closer, on the face
+        var ex = L[0], ey = ly + .03, ez = L[2] + dist, f = fy, nr = .1, fr = 10, A = (fr + nr) / (nr - fr), Bp = 2 * fr * nr / (nr - fr);
+        var dy = ly - ey, dz = L[2] - ez, ln = Math.hypot(dy, dz), cy = -dz / ln, sy = dy / ln;   // small downward look
         // view = rotX(pitch toward target) * translate(-eye); proj = perspective
         var V = [1, 0, 0, 0, 0, cy, -sy, 0, 0, sy, cy, 0, -ex, -(cy * ey + sy * ez), -(-sy * ey + cy * ez), 1];
         var Pm = [f / asp, 0, 0, 0, 0, f, 0, 0, 0, 0, A, -1, 0, 0, Bp, 0], VP = new Float32Array(16), r, c2, j;
@@ -448,7 +452,7 @@
   }
   function orbSVG(){
     return '<svg class="hai-orb" viewBox="0 0 200 200" aria-hidden="true"><defs><radialGradient id="haiCore" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#eef9ff"/><stop offset=".35" stop-color="#3fd3ff"/><stop offset="1" stop-color="#1f8fff" stop-opacity="0"/></radialGradient></defs>'
-      + '<rect width="200" height="200" fill="#051428"/>'
+      + '<rect width="200" height="200" fill="none"/>'
       + '<circle class="ring r1" cx="100" cy="100" r="74" fill="none" stroke="#3fd3ff" stroke-width="2" stroke-dasharray="6 10" opacity=".7"/>'
       + '<circle class="ring r2" cx="100" cy="100" r="60" fill="none" stroke="#a07bff" stroke-width="2" stroke-dasharray="30 14" opacity=".75"/>'
       + '<circle id="haiCoreC" cx="100" cy="100" r="34" fill="url(#haiCore)"/>'
@@ -459,6 +463,23 @@
     return src ? '<img id="haiImg" alt="" src="' + esc(src) + '">' : '<div class="hai-nophoto">' + esc(t("noPhoto")) + "</div>";
   }
   function faceHTML(mini){ return S.face === "orb" ? orbSVG() : S.face === "photo" ? photoHTML() : S.face === "holo" ? (mini ? holoMini() : "") : mini ? '<span class="hai-offmini" style="background-image:url(' + OFFICER_IMG + ')"></span>' : ""; }
+
+  /* ---------------- icons ---------------- */
+  var ICON = (function(){
+    var i = function(d, extra){ return '<svg class="hai-i" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"' + (extra || "") + ">" + d + "</svg>"; };
+    return {
+      spark: i('<path d="M12 2.5c.6 4.6 2.9 6.9 7.5 7.5-4.6.6-6.9 2.9-7.5 7.5-.6-4.6-2.9-6.9-7.5-7.5 4.6-.6 6.9-2.9 7.5-7.5Z" fill="currentColor" stroke="none"/><path d="M19 15.5c.25 1.9 1.1 2.75 3 3-1.9.25-2.75 1.1-3 3-.25-1.9-1.1-2.75-3-3 1.9-.25 2.75-1.1 3-3Z" fill="currentColor" stroke="none" opacity=".7"/>'),
+      min: i('<path d="M6 12h12"/>'), grow: i('<path d="M14 4h6v6M10 20H4v-6M20 4l-7 7M4 20l7-7"/>'), shrink: i('<path d="M20 10h-6V4M4 14h6v6M14 10l7-7M10 14l-7 7"/>'),
+      replay: i('<path d="M3.5 12a8.5 8.5 0 1 0 2.6-6.1"/><path d="M3.5 4v4.5H8"/>'),
+      vol: i('<path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path d="M15.5 9a4.2 4.2 0 0 1 0 6M18.3 6.5a8 8 0 0 1 0 11"/>'),
+      mute: i('<path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path d="M16 9.5l5 5M21 9.5l-5 5"/>'),
+      stop: i('<rect x="6.5" y="6.5" width="11" height="11" rx="2" fill="currentColor" stroke="none"/>'),
+      face: i('<circle cx="12" cy="9" r="3.6"/><path d="M5.5 19.5c1.2-3.3 3.6-5 6.5-5s5.3 1.7 6.5 5"/>'),
+      mic: i('<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/>'),
+      send: i('<path d="M4 12 20 4l-4.5 16-3.8-6.7L4 12Z" fill="currentColor" stroke="none"/><path d="m11.7 13.3 4-4" stroke="#03203a"/>'),
+      bulb: i('<path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.6 10.8c.7.6 1.1 1.3 1.1 2.2h5c0-.9.4-1.6 1.1-2.2A6 6 0 0 0 12 3Z"/>')
+    };
+  })();
 
   /* ---------------- panel ---------------- */
   var css = document.createElement("style");
@@ -472,36 +493,44 @@
 
   function frame(){
     el.classList.toggle("big", S.big);
-    el.innerHTML = '<header class="hai-h" id="haiDrag"><b>HORIZON AI</b><small id="haiSub"></small><span class="hai-st" id="haiSt"><i></i><span></span></span>'
+    el.innerHTML = '<header class="hai-h" id="haiDrag"><span class="hai-logo">' + ICON.spark + '</span>'
+      + '<span class="hai-title"><b>HORIZON AI</b><small id="haiSub"></small></span><span class="hai-st" id="haiSt"><i></i><span></span></span>'
+      + '<button type="button" class="hai-ib" id="haiBig"></button><button type="button" class="hai-ib" id="haiMin"></button></header>'
+      + '<div class="hai-stage" id="haiStage" data-mode="idle"><div class="hai-face" id="haiFace"></div>'
+      + '<span class="hai-hud" aria-hidden="true"><i></i><i></i><i></i><i></i></span>'
+      + '<div class="hai-say" id="haiSay" role="status"><span class="hai-bars" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span><span></span></div>'
       + '<select id="haiLang" aria-label="Language">' + LANGS.map(function(l){ return '<option value="' + l[0] + '">' + l[1] + "</option>"; }).join("") + "</select>"
-      + '<button type="button" class="hai-btn" id="haiBig"></button><button type="button" class="hai-btn" id="haiMin">–</button></header>'
-      + '<div class="hai-stage"><div class="hai-face" id="haiFace"></div><div class="hai-side">'
-      + '<div class="hai-say" id="haiSay"><span class="hai-bars" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span><span></span></div>'
-      + '<div class="hai-faces" id="haiFaces" role="group" aria-label="Face"></div>'
-      + '<div class="hai-ctl"><button type="button" class="hai-btn" id="haiReplay"></button><button type="button" class="hai-btn" id="haiMute"></button><button type="button" class="hai-btn" id="haiStop"></button></div>'
-      + '<div class="hai-note" id="haiNote"></div></div></div>'
-      + '<div class="hai-log" id="haiLog" aria-live="polite"></div><div class="hai-sugg" id="haiSugg"></div>'
-      + '<form class="hai-in" id="haiForm" autocomplete="off"><input id="haiQ" maxlength="600"><button type="button" class="hai-btn mic" id="haiMic">🎙</button><button type="submit" class="hai-btn send" id="haiSend"></button></form>'
+      + '<span class="hai-mark" aria-hidden="true">HORIZON</span>'
+      + '<div class="hai-ctl"><button type="button" class="hai-ib" id="haiReplay"></button><button type="button" class="hai-ib" id="haiMute"></button>'
+      + '<button type="button" class="hai-ib" id="haiStop"></button><button type="button" class="hai-ib" id="haiFaceBtn" aria-expanded="false" aria-controls="haiFaces"></button></div>'
+      + '<div class="hai-faces" id="haiFaces" role="group" hidden></div>'
+      + '<div class="hai-note" id="haiNote"></div><span class="hai-horizon" aria-hidden="true"></span></div>'
+      + '<div class="hai-log" id="haiLog" aria-live="polite"></div>'
+      + '<div class="hai-sugg" id="haiSugg"></div>'
+      + '<form class="hai-in" id="haiForm" autocomplete="off"><div class="hai-field"><input id="haiQ" maxlength="600">'
+      + '<button type="button" class="hai-ib mic" id="haiMic"></button></div><button type="submit" class="hai-send" id="haiSend"></button></form>'
       + '<div class="hai-foot" id="haiFoot"></div>';
     $("haiLang").value = S.lang;
     wire(); words(); drawFace(); renderLog(); suggestions(); status();
   }
   function $(id){ return document.getElementById(id); }
   function words(){
+    var ib = function(id, icon, label, pressed){ var x = $(id); x.innerHTML = icon; x.title = label; x.setAttribute("aria-label", label); if(pressed != null) x.setAttribute("aria-pressed", pressed ? "true" : "false"); };
     $("haiSub").textContent = t("sub");
-    $("haiQ").placeholder = t("ph");
-    $("haiSend").textContent = t("send");
-    $("haiMic").title = SR ? t("mic") : t("micNo"); $("haiMic").setAttribute("aria-label", $("haiMic").title); $("haiMic").disabled = !SR;
-    $("haiReplay").textContent = "↻ " + t("replay");
-    $("haiMute").textContent = S.mute ? "🔇" : "🔊"; $("haiMute").title = S.mute ? t("unmute") : t("mute"); $("haiMute").setAttribute("aria-pressed", S.mute ? "true" : "false");
-    $("haiStop").textContent = "■"; $("haiStop").title = t("stop");
-    $("haiMin").title = t("min"); $("haiMin").setAttribute("aria-label", t("min"));
-    $("haiBig").textContent = S.big ? "⤡" : "⤢"; $("haiBig").title = S.big ? t("small") : t("big");
+    $("haiQ").placeholder = t("ph"); $("haiQ").setAttribute("aria-label", t("ph"));
+    ib("haiSend", ICON.send, t("send"));
+    ib("haiMic", ICON.mic, SR ? t("mic") : t("micNo")); $("haiMic").disabled = !SR;
+    ib("haiReplay", ICON.replay, t("replay"));
+    ib("haiMute", S.mute ? ICON.mute : ICON.vol, S.mute ? t("unmute") : t("mute"), S.mute);
+    ib("haiStop", ICON.stop, t("stop"));
+    ib("haiFaceBtn", ICON.face, t("faceBtn"));
+    ib("haiMin", ICON.min, t("min"));
+    ib("haiBig", S.big ? ICON.shrink : ICON.grow, S.big ? t("small") : t("big"));
     $("haiFoot").textContent = t("foot");
-    $("haiFaces").innerHTML = ["agent", "holo", "orb", "photo"].map(function(f){ return '<button type="button" class="hai-btn" data-face="' + f + '" aria-pressed="' + (S.face === f) + '">' + esc(t("faces")[f]) + "</button>"; }).join("")
-      + (S.face === "photo" ? '<label class="hai-btn" for="haiFile" style="cursor:pointer">' + esc(t("choose")) + '</label><input type="file" id="haiFile" accept="image/*" hidden>' : "");
-    $("haiNote").textContent = S.face === "photo" ? t("photoNote") : (S.voiceNote || "");
-    say(S.speaking);
+    $("haiFaces").innerHTML = ["agent", "holo", "orb", "photo"].map(function(f){ return '<button type="button" class="hai-opt" data-face="' + f + '" aria-pressed="' + (S.face === f) + '">' + esc(t("faces")[f]) + "</button>"; }).join("")
+      + (S.face === "photo" ? '<label class="hai-opt" for="haiFile">' + esc(t("choose")) + '</label><input type="file" id="haiFile" accept="image/*" hidden><small>' + esc(t("photoNote")) + "</small>" : "");
+    $("haiNote").textContent = S.voiceNote || "";
+    say();
     fab.innerHTML = '<span class="mini">' + faceHTML(true) + "</span>" + esc(t("fab"));
     fab.hidden = S.open; el.hidden = !S.open;
   }
@@ -517,9 +546,11 @@
       if(!holo){ f.innerHTML = orbSVG(); f.classList.remove("tall", "holo"); }             // no WebGL on this computer: show the Orb
     }
   }
-  function say(on){
-    var s = $("haiSay"); if(!s) return;
-    s.classList.toggle("on", !!on); s.lastChild.textContent = S.listening ? t("listen") : on ? t("speaking") : t("idle");
+  function say(){
+    var s = $("haiSay"), st = $("haiStage"); if(!s) return;
+    var mode = S.listening ? "listen" : S.speaking ? "speaking" : busy ? "thinking" : "idle";
+    s.classList.toggle("on", mode !== "idle"); s.lastChild.textContent = t(mode);
+    if(st) st.dataset.mode = mode;
   }
   function status(){
     var st = $("haiSt"); if(!st) return;
@@ -553,7 +584,11 @@
   function renderLog(){
     var g = $("haiLog"); if(!g) return;
     if(!LOG.length) LOG.push({kind: "a", html: md(t("hello")), time: clock(), hello: true});
-    g.innerHTML = LOG.map(function(m){ return '<div class="hai-m ' + m.kind + '">' + m.html + (m.kind === "sys" ? "" : "<time>" + esc(m.time) + "</time>") + "</div>"; }).join("");
+    g.innerHTML = LOG.map(function(m, i){
+      if(m.kind === "sys") return '<div class="hai-m sys">' + m.html + "</div>";
+      return '<div class="hai-row ' + m.kind + (i === LOG.length - 1 && !m.hello ? " new" : "") + '"><div class="hai-who"><b>' + (m.kind === "u" ? esc(t("you")) : "HORIZON AI") + "</b><time>" + esc(m.time) + "</time></div>"
+        + '<div class="hai-m ' + m.kind + '">' + m.html + "</div></div>";
+    }).join("");
     g.scrollTop = g.scrollHeight;
   }
 
@@ -603,7 +638,7 @@
       });
     } else if(window.HAI_DEMO){ q.push(t("why").replace("{svc}", "156").replace("{cat}", c.traffic).replace("{loc}", "Clementi Ave 2")); }
     q.push(t("now"), t("sum"), t("cp"));
-    g.innerHTML = q.map(function(x){ return '<button type="button" class="hai-chip" title="' + esc(x) + '">' + esc(x) + "</button>"; }).join("");
+    g.innerHTML = '<span class="hai-bulb">' + ICON.bulb + "</span>" + q.map(function(x){ return '<button type="button" class="hai-chip" title="' + esc(x) + '">' + esc(x) + "</button>"; }).join("");
   }
 
   /* ---------------- asking ---------------- */
@@ -611,13 +646,13 @@
   function ask(q){
     q = String(q || "").trim(); if(!q || busy) return;
     stopSpeaking();
-    busy = true; $("haiQ").value = "";
+    busy = true; $("haiQ").value = ""; say();
     addMsg("u", "<p>" + esc(q) + "</p>");
     var hist = S.history.slice(-6);
     LOG.push({kind: "a", html: '<span class="hai-typing" aria-label="' + esc(t("think")) + '"><i></i><i></i><i></i></span> ' + esc(t("think")), time: clock(), wait: true}); renderLog();
     var done = function(ok, text, meta){
       LOG = LOG.filter(function(m){ return !m.wait; });
-      busy = false;
+      busy = false; say();
       if(!ok){ addMsg("e", "<p><b>" + esc(t("err")) + ":</b> " + esc(text) + "</p>"); return; }
       S.history.push({role: "user", text: q}, {role: "assistant", text: text}); S.history = S.history.slice(-12);
       S.lastAnswer = text;
@@ -670,7 +705,7 @@
   function speak(text){
     if(!synth || S.mute) return;
     stopSpeaking();
-    var v = pickVoice(); if($("haiNote") && S.face !== "photo") $("haiNote").textContent = S.voiceNote || "";
+    var v = pickVoice(); if($("haiNote")) $("haiNote").textContent = S.voiceNote || "";
     if(!v && synth.getVoices().length) return;
     // Chrome stops long utterances after ~15 s, so speak sentence by sentence
     queue = plain(text).split(/(?<=[.!?。！？])\s+|\n+/).map(function(x){ return x.trim(); }).filter(Boolean);
@@ -689,7 +724,7 @@
   }
   function stopSpeaking(){ queue = []; if(synth){ try{ synth.cancel(); }catch(e){} } setSpeaking(false); }
   function setSpeaking(on){
-    S.speaking = on; say(on);
+    S.speaking = on; say();
     if(on && !anim) anim = requestAnimationFrame(tick);
   }
   function tick(ts){
@@ -720,7 +755,7 @@
     return [.04, 0, 0];
   }
   function render(lv){
-    var f = $("haiFace"); if(f) f.style.setProperty("--lv", lv.toFixed(3));
+    var f = $("haiStage"); if(f) f.style.setProperty("--lv", lv.toFixed(3));
     var v = viseme(lv), now = performance.now(), dt = Math.min(250, now - (S.mt || now)), a1 = 1 - Math.exp(-dt / 45), a2 = 1 - Math.exp(-dt / 60);
     S.mt = now;                                                     // smoothing by time, so a slow PC shows the same shapes
     S.mo = (S.mo || 0) + (v[0] - (S.mo || 0)) * a1; S.mw = (S.mw || 0) + (v[1] - (S.mw || 0)) * a2; S.mr = (S.mr || 0) + (v[2] - (S.mr || 0)) * a2;
@@ -740,9 +775,9 @@
     rec = new SR(); rec.lang = STT[S.lang]; rec.interimResults = true; rec.maxAlternatives = 1;
     var final = "";
     rec.onresult = function(e){ var txt = ""; for(var i = e.resultIndex; i < e.results.length; i++){ txt += e.results[i][0].transcript; if(e.results[i].isFinal) final += e.results[i][0].transcript; } $("haiQ").value = final || txt; };
-    rec.onstart = function(){ S.listening = true; $("haiMic").classList.add("on"); say(false); };
-    rec.onend = function(){ S.listening = false; var m = $("haiMic"); if(m) m.classList.remove("on"); say(false); if(final.trim()) ask(final); };
-    rec.onerror = function(){ S.listening = false; };
+    rec.onstart = function(){ S.listening = true; $("haiMic").classList.add("on"); say(); };
+    rec.onend = function(){ S.listening = false; var m = $("haiMic"); if(m) m.classList.remove("on"); say(); if(final.trim()) ask(final); };
+    rec.onerror = function(){ S.listening = false; say(); };
     try{ rec.start(); }catch(e){ S.listening = false; }
   }
 
@@ -768,8 +803,11 @@
     $("haiForm").addEventListener("submit", function(e){ e.preventDefault(); ask($("haiQ").value); });
     $("haiMic").addEventListener("click", listen);
     $("haiSugg").addEventListener("click", function(e){ var b = e.target.closest(".hai-chip"); if(b) ask(b.textContent); });
-    $("haiLang").addEventListener("change", function(){ S.lang = this.value; store("lang", S.lang); stopSpeaking(); LOG = LOG.filter(function(m){ return !m.hello; }); words(); renderLog(); suggestions(); pickVoice(); if($("haiNote") && S.face !== "photo") $("haiNote").textContent = S.voiceNote || ""; status(); });
-    $("haiFaces").addEventListener("click", function(e){ var b = e.target.closest("[data-face]"); if(!b) return; S.face = b.dataset.face; store("face", S.face); drawFace(); words(); });
+    $("haiLang").addEventListener("change", function(){ S.lang = this.value; store("lang", S.lang); stopSpeaking(); LOG = LOG.filter(function(m){ return !m.hello; }); words(); renderLog(); suggestions(); pickVoice(); if($("haiNote")) $("haiNote").textContent = S.voiceNote || ""; status(); });
+    var menu = function(open){ $("haiFaces").hidden = !open; $("haiFaceBtn").setAttribute("aria-expanded", open ? "true" : "false"); };
+    $("haiFaceBtn").addEventListener("click", function(e){ e.stopPropagation(); menu($("haiFaces").hidden); });
+    el.addEventListener("click", function(e){ if(!e.target.closest("#haiFaces,#haiFaceBtn")) menu(false); });
+    $("haiFaces").addEventListener("click", function(e){ var b = e.target.closest("[data-face]"); if(!b) return; S.face = b.dataset.face; store("face", S.face); drawFace(); words(); menu(S.face === "photo"); });
     $("haiFaces").addEventListener("change", function(e){ if(e.target.id === "haiFile") setPhoto(e.target.files && e.target.files[0]); });
     $("haiReplay").addEventListener("click", function(){ if(S.lastAnswer){ var m = S.mute; S.mute = false; speak(S.lastAnswer); S.mute = m; } });
     $("haiMute").addEventListener("click", function(){ S.mute = !S.mute; store("mute", S.mute ? "1" : "0"); if(S.mute) stopSpeaking(); words(); });
@@ -786,7 +824,7 @@
     if(p && innerWidth >= 640 && p.l >= 0 && p.l < innerWidth - 120 && p.t >= 0 && p.t < innerHeight - 80){ el.style.left = Math.min(p.l, innerWidth - el.offsetWidth - 4) + "px"; el.style.top = p.t + "px"; el.style.right = "auto"; }
   }
   fab.addEventListener("click", function(){ S.open = true; store("open", "1"); words(); var q = $("haiQ"); if(q) q.focus(); });
-  addEventListener("keydown", function(e){ if(e.key === "Escape" && S.speaking) stopSpeaking(); });
+  addEventListener("keydown", function(e){ if(e.key !== "Escape") return; var m = $("haiFaces"); if(m && !m.hidden){ m.hidden = true; $("haiFaceBtn").setAttribute("aria-expanded", "false"); $("haiFaceBtn").focus(); } else if(S.speaking) stopSpeaking(); });
 
   frame(); place();
   if(!window.HAI_DEMO) fetch("/api/assistant/status", {credentials: "same-origin"}).then(function(r){ return r.json(); }).then(function(j){ S.configured = !!j.configured; status(); if(!j.configured) addMsg("sys", esc(t("offMsg"))); }).catch(function(){});

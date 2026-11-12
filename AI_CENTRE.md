@@ -45,6 +45,11 @@ The Forecast Centre page (/command, /forecast) is unchanged apart from one new t
   Malay voice: the panel then uses the Indonesian voice, which is close, and says so. Edge on Windows usually has a
   natural Malay voice.
 - **Voice in** (microphone button) works in Chrome and Edge. Press it, speak, and the question is sent when you stop.
+- **Panel layout (redesigned 12 Nov):** a header (HORIZON AI, online status, bigger/smaller, minimise), then a wide stage
+  with the face. Over the stage: the status (Ready / Thinking / Speaking / Listening), the language, and round buttons for
+  replay, mute, stop and the face menu (Officer / AI / Orb / Photo). Along the bottom of the stage a line of light glows
+  with the voice: cyan when speaking, violet while thinking, green while listening. Below: the chat, with "You" and
+  "HORIZON AI" above each message, one row of suggested questions, and the question bar with the microphone and send.
 - Mute, replay, stop, bigger/smaller, minimise, and drag the panel by its header. The panel remembers these per browser.
 
 ## How HORIZON AI thinks (updated 08 Nov, 15:20)
