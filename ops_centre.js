@@ -43,13 +43,60 @@
     + panel("opsAlerts", "alerts", "Alerts", '<small id="opsAlertSub"></small>', '<div class="ops-filter" id="opsFilter" role="group" aria-label="Alert type"></div><div class="ops-body ops-list" id="opsList"></div>')
     + panel("opsAna", "analysis", "Alert analysis", '<div class="ops-period" role="group" aria-label="Period"><button type="button" data-days="7">7 days</button><button type="button" data-days="30" aria-pressed="true">30 days</button></div>',
         '<div class="ops-ana" id="opsAnaBody"><p class="ops-mut">Loading…</p></div>')
-    + '<div class="ops-slot" id="opsCamSlot" style="grid-area:cctv"></div>';
+    + '<div class="ops-slot" id="opsCamSlot" style="grid-area:cctv"></div>'
+    + '<div class="ops-aislot" id="opsAiSlot" style="grid-area:ai" aria-hidden="true"></div>'
+    + '<div class="ops-ticker" id="opsTicker" style="grid-area:ticker" role="marquee" aria-label="Latest alerts"><span class="ops-tk-l">Latest alerts</span><div class="ops-tk-w"><div class="ops-tk-r" id="opsTickerRow"></div></div></div>';
   main.insertBefore(ops, main.firstChild);
   $("opsMapSlot").appendChild(map);
-  if(mrt) $("opsRight").appendChild(mrt);
+  if(mrt) $("opsCamSlot").appendChild(mrt);
   if(cam){ $("opsCamSlot").appendChild(cam); var h2 = cam.querySelector(".panel-head h2"); if(h2) h2.textContent = "Live CCTV"; }
+  var HICON = {opsNow: '<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>', opsWx: CAT.wet.icon,
+    opsAlerts: '<path d="M7 18v-6a5 5 0 0 1 10 0v6"/><path d="M5 21h14M12 3v2M4.2 7.2l1.4 1.4M19.8 7.2l-1.4 1.4"/>', opsAna: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
+    mrtPanel: '<rect x="5" y="3" width="14" height="14" rx="3"/><path d="M5 11h14M8 21l2-4M16 21l-2-4"/><circle cx="9" cy="14" r=".6"/><circle cx="15" cy="14" r=".6"/>',
+    cam: '<path d="M3 7h12v10H3z"/><path d="m15 11 6-3v8l-6-3"/>'};
+  Object.keys(HICON).forEach(function(id){
+    var p = id === "cam" ? cam : $(id), h = p && p.querySelector(".panel-head h2");
+    if(h && !h.querySelector(".ops-hi")) h.insertAdjacentHTML("afterbegin", '<span class="ops-hi">' + svg(HICON[id]) + "</span>");
+  });
   function fit(){ ops.style.setProperty("--ops-top", Math.round(ops.getBoundingClientRect().top + window.scrollY) + "px"); }
   addEventListener("resize", fit); setTimeout(fit, 0); setTimeout(fit, 1500);
+
+  /* ---------------- TV mode (?present=1): STEE-style wall layout ---------------- */
+  var head = document.querySelector("header.topbar"), clock = head && head.querySelector(".clock"), tvBox = document.createElement("div");
+  tvBox.className = "ops-tvtools";
+  var homes = {};
+  function park(id, into){ var x = $(id); if(!x) return; if(!homes[id]) homes[id] = {parent: x.parentNode, next: x.nextSibling}; into.appendChild(x); }
+  function unpark(id){ var x = $(id), h = homes[id]; if(x && h && x.parentNode !== h.parent) h.parent.insertBefore(x, h.next && h.next.parentNode === h.parent ? h.next : null); }
+  function dockAI(){
+    var hai = $("hai"), slot = $("opsAiSlot"); if(!hai) return;
+    var tv = document.body.classList.contains("tv");
+    hai.classList.toggle("docked", tv);
+    if(!tv){ ["--ai-l", "--ai-t", "--ai-w", "--ai-h"].forEach(function(v){ hai.style.removeProperty(v); }); return; }
+    var r = slot.getBoundingClientRect();
+    hai.style.setProperty("--ai-l", r.left + "px"); hai.style.setProperty("--ai-t", r.top + "px");
+    hai.style.setProperty("--ai-w", r.width + "px"); hai.style.setProperty("--ai-h", r.height + "px");
+  }
+  function aiState(){
+    var hai = $("hai"), min = !hai || hai.hidden;
+    if(document.documentElement.classList.contains("ops-ai-min") !== min){
+      document.documentElement.classList.toggle("ops-ai-min", min);
+      setTimeout(function(){ dockAI(); dispatchEvent(new Event("resize")); }, 60);
+    }
+  }
+  function tvMode(){
+    var tv = document.body.classList.contains("tv");
+    document.documentElement.classList.toggle("ops-tv", tv);
+    if(head && clock){
+      if(tv){ if(!tvBox.parentNode) $("opsTicker").appendChild(tvBox); park("systemStatus", tvBox); park("exitTV", tvBox); }
+      else { unpark("systemStatus"); unpark("exitTV"); if(tvBox.parentNode) tvBox.parentNode.removeChild(tvBox); }
+    }
+    fit(); [60, 400, 1200, 3000].forEach(function(ms){ setTimeout(function(){ fit(); dockAI(); if(ms === 60) dispatchEvent(new Event("resize")); }, ms); });
+  }
+  new MutationObserver(tvMode).observe(document.body, {attributes: true, attributeFilter: ["class"]});
+  addEventListener("resize", function(){ setTimeout(dockAI, 30); });
+  setInterval(function(){ if(document.body.classList.contains("tv")) dockAI(); }, 2000);        // the header or fonts may settle late
+  var waitAI = setInterval(function(){ if($("hai")){ clearInterval(waitAI); new MutationObserver(aiState).observe($("hai"), {attributes: true, attributeFilter: ["hidden"]}); aiState(); tvMode(); } }, 300);
+  setTimeout(function(){ clearInterval(waitAI); }, 20000);
   setTimeout(function(){ dispatchEvent(new Event("resize")); }, 1200);              // let the map re-measure its new box
 
   /* ---------------- live alerts (from the page's own data) ---------------- */
@@ -95,6 +142,10 @@
       return '<button type="button" class="ops-tile' + (n ? " on" : "") + '" data-cat="' + c + '" style="--c:' + CAT[c].color + '"><span class="ops-tile-i">' + svg(CAT[c].icon) + "</span><span class=\"ops-tile-n\">" + (avail ? n : "—")
         + '</span><span class="ops-tile-l">' + (CAT[c].tile || CAT[c].name) + "</span></button>";
     }).join("");
+    var tk = all.slice(0, 14).map(function(a){ var c = CAT[a.cat];
+      return '<span class="ops-tk" style="--c:' + c.color + '">' + svg(c.icon) + "<b>" + esc(a.kind && KIND_TXT[a.kind] ? KIND_TXT[a.kind] : c.name) + "</b>" + esc(a.svc) + " D" + esc(a.dir) + " \u00b7 " + esc(a.where) + (a.impact ? " \u00b7 " + esc(a.impact) : "") + "</span>"; }).join("");
+    $("opsTickerRow").innerHTML = tk ? tk + tk : '<span class="ops-tk" style="--c:#39e4a2"><b>All clear</b>No active alerts</span>';
+    $("opsTickerRow").classList.toggle("run", !!tk);
     var svcs = {}; all.forEach(function(a){ svcs[a.svc] = 1; });
     $("opsNowSub").textContent = all.length + " alerts · " + Object.keys(svcs).length + " services";
   }
@@ -142,7 +193,7 @@
   function paintInsights(j){
     var ins = j.insights || [], st = j.storage || {};
     $("opsAiSub").textContent = (st.persistent ? "from stored alerts" : "temporary storage") + " · " + hm(j.generated);
-    $("opsAiBody").innerHTML = ins.length ? ins.slice(0, 6).map(function(i){
+    $("opsAiBody").innerHTML = ins.length ? ins.slice(0, 12).map(function(i){
       var c = CAT[LOG_CAT[i.category] || i.category] || {color: "#a07bff", icon: ""};
       return '<article class="ops-in lv-' + i.level + '" style="--c:' + c.color + '"><div class="ops-in-t"><span class="ops-in-b">' + (i.kind === "likely" ? i.likelihood + "%" : LVL[i.level] || "") + "</span><b>" + esc(i.title) + "</b></div>"
         + "<p>" + esc(i.detail) + "</p><small>" + esc(i.basis || "") + (i.kind === "likely" || i.kind === "rain_now" ? ' · <button type="button" class="ops-ask" data-q="' + esc(i.title + ". " + i.detail + " What should the OCC prepare?") + '">Ask AI</button>' : "") + "</small></article>";
@@ -174,6 +225,14 @@
     }).join("") : '<p class="ops-mut">None yet.</p>') + "</div>";
     $("opsAnaBody").innerHTML = mix + hours + top + places;
   }
+
+  /* on the wall nobody scrolls: the insights move on by one card every 8 s, then start again */
+  setInterval(function(){
+    var b = $("opsAiBody"); if(!document.body.classList.contains("tv") || !b || b.matches(":hover") || b.scrollHeight <= b.clientHeight + 4) return;
+    var cards = b.querySelectorAll(".ops-in"), top = b.scrollTop, next = null;
+    for(var i = 0; i < cards.length; i++){ if(cards[i].offsetTop - b.offsetTop > top + 4){ next = cards[i]; break; } }
+    b.scrollTo({top: next && top + b.clientHeight < b.scrollHeight - 4 ? next.offsetTop - b.offsetTop : 0, behavior: "smooth"});
+  }, 8000);
 
   /* ---------------- refresh ---------------- */
   setInterval(function(){ var d = pageData(); if(d !== lastData){ lastData = d; paintAlerts(); } }, 1500);

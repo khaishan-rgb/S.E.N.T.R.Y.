@@ -8960,7 +8960,7 @@ def assistant_snapshot(ctx):
     try:                                                                       # 12 Nov: patterns found in the stored alerts (AI Operations Centre insights)
         hit = EVLOG.get("ins")
         if hit and time.time() - hit[1] < 900:
-            snap["predictive_insights"] = [{k: i.get(k) for k in ("title", "detail", "basis", "likelihood")} for i in hit[2]["insights"][:6]]
+            snap["predictive_insights"] = [{k: i.get(k) for k in ("title", "detail", "basis", "likelihood")} for i in hit[2]["insights"][:10]]
     except Exception:
         pass
     snap["now_sg"] = datetime.now(SGT).strftime("%Y-%m-%d %H:%M")

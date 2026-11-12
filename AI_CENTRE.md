@@ -21,6 +21,13 @@ The Forecast Centre page (/command, /forecast) is unchanged apart from one new t
 | Bottom middle | **Alert analysis**: which alert, which hour, which services, where (7 or 30 days) | stored alerts |
 | Bottom right | **Live CCTV** (the camera panel, as before) | |
 
+**TV mode** (TV mode button, or `?present=1`), STEE-style wall: the filter rows are hidden; HORIZON AI is docked open in its own
+column between the left panels and the map (large avatar, cannot be minimised); panel titles have icons and glowing frames; Live CCTV shows
+one large camera with two beside it; HORIZON AI can be minimised (its column folds away and the map and alert analysis widen; the
+round "Ask HORIZON AI" button docks it again); the AI predictive insights fill the top right (up to 12, scrolling by one card every 8 s
+on the wall) with MRT / LRT status above Live CCTV; a "Latest alerts" strip runs along the bottom with the status and the Exit TV button at its right end.
+On a 4K screen at 100% scaling the new panels are drawn at 1.8x. Leaving TV mode puts everything back.
+
 How an insight is made: for the next 2 hours, a service (bunching, long headway) or a place (traffic, rain) is "likely" when it had an
 alert in the same hours on at least 3 days and on at least 30% of the same kind of day (weekday / weekend) in the last 28 days. Each
 insight shows its basis (for example "17/20 weekdays"). With under 3 days of history it says it is still learning. HORIZON AI also

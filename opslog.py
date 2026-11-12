@@ -310,7 +310,7 @@ def insights(events, now, since=None, wx_rows=None, wx_live=None, lookback=28, w
             if hits >= 3 and share >= 0.3:
                 cand.append((share * min(hits, 10), cat, key, hits, share, g))
         win = f"{h0:02d}:00–{(h0 + window_h) % 24:02d}:00"
-        for _, cat, key, hits, share, g in sorted(cand, key=lambda x: -x[0])[:5]:
+        for _, cat, key, hits, share, g in sorted(cand, key=lambda x: -x[0])[:8]:
             pk = statistics.median(g["peaks"]) if g["peaks"] else None
             if cat in ("bunching", "long_headway"):
                 s_, _, d_ = key.partition(":")
