@@ -107,5 +107,9 @@ services:
         sync: false
       - key: ASSISTANT_AI_MODEL   # optional: model for HORIZON AI answers (default: the same model as the other AI features)
         sync: false
+      - key: AI_BRIEFING_MINUTES  # optional: minutes between AI briefings on the AI Operations Centre (default 20)
+        sync: false
+      - key: AI_BRIEFING_DAILY_CAP # optional: most AI briefings a day (default 72)
+        sync: false
       - key: ASSISTANT_DAILY_CAP  # optional: most HORIZON AI questions a day for the whole site (default 400)
         sync: false

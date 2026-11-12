@@ -6593,6 +6593,88 @@ async def api_events_insights(days: int = 30):
     return out
 
 
+AIB_EVERY = max(5, int(os.getenv("AI_BRIEFING_MINUTES", "20") or 20)) * 60           # a new AI briefing at most this often
+AIB_CAP = max(1, int(os.getenv("AI_BRIEFING_DAILY_CAP", "72") or 72))                  # most AI briefings a day (about one cost each of a HORIZON AI question)
+AIB = {"day": "", "n": 0, "last": None, "busy": False}
+AIB_SYSTEM = """You are HORIZON AI, the predictive-insight engine of a Singapore bus Operations Control Centre (OCC).
+You receive: patterns found by counting the OCC's stored alert history (bunching = 3+ buses converging, long headway, traffic and
+incidents, wet weather, heavy loading), a summary of the last 30 days, the alerts ongoing now, rain now with the minutes rain adds
+to each service, and the time. Write the OCC's predictive briefing for the next 2 hours.
+
+Rules:
+- Use only the data given. Never invent services, places, times, numbers or causes. If history is short, say so.
+- Combine signals where the data supports it (e.g. rain now + a service that usually bunches at this hour + traffic on its road),
+  rank by operational risk, and say what the controller should prepare. Advisory only: holding, short-working, halfway or
+  extra buses need the Service Controller's approval and a feasibility check.
+- A pattern is a likelihood from history, not an observation: say "likely" / "usually", never "is happening", unless it is in the
+  ongoing alerts.
+- Reply with JSON only, no other text: {"summary": "<one sentence, under 30 words>", "items": [{"level": "high|medium|low",
+  "title": "<under 12 words>", "why": "<1-2 sentences with the evidence numbers>", "action": "<one short practical step, or empty>",
+  "services": ["147:1", ...], "when": "<e.g. 18:00-20:00 or now>"}]}. 3 to 6 items, most important first. Plain English."""
+
+
+async def ai_briefing(force=False):
+    now = time.time()
+    last = AIB["last"]
+    if last and not force and now - last["generated"] < AIB_EVERY:
+        return last
+    if not DV_AI_KEY:
+        return {"ok": False, "configured": False, "error": "Add ANTHROPIC_API_KEY in Render > Environment to turn on AI briefings."}
+    day = now_sgt().strftime("%Y-%m-%d")
+    if AIB["day"] != day:
+        AIB.update(day=day, n=0)
+    if AIB["n"] >= AIB_CAP:
+        return last or {"ok": False, "configured": True, "error": f"Today's {AIB_CAP} AI briefings are used up (AI_BRIEFING_DAILY_CAP)."}
+    if AIB["busy"]:
+        return last or {"ok": False, "configured": True, "pending": True, "error": "Writing the first AI briefing..."}
+    AIB["busy"] = True
+    try:
+        ins = await api_events_insights(30)
+        a = ins.get("analysis") or {}
+        ongoing = evlog_query("", "", now - 6 * 3600, now + 60, "", 400)
+        ongoing = [{"type": e["category"], "kind": e["kind"], "services": e["services"][:6], "where": (e["location"] or "")[:80], "peak": e["peak"],
+                    "unit": e["peak_unit"], "since": _hm(e["start_ts"])} for e in ongoing if e["ongoing"]][:40]
+        wn = wx_now()
+        data = {"now_sg": now_sgt().strftime("%A %Y-%m-%d %H:%M"), "history_days": round((now - (EVLOG["since"] or now)) / 86400, 1),
+                "patterns": [{k: i.get(k) for k in ("kind", "category", "title", "detail", "likelihood", "basis")} for i in ins.get("insights", [])],
+                "last_30_days": {"by_type": a.get("by_category"), "peak_hour": a.get("peak_hour"), "top_services": [
+                    {k: v for k, v in s_.items() if v} for s_ in (a.get("top_services") or [])[:8]], "top_places": [
+                    {"place": p_["place"], "total": p_["total"]} for p_ in (a.get("top_places") or [])[:6]]},
+                "ongoing_alerts": ongoing,
+                "rain_now": {"areas": [{"name": x["name"], "level": x["level"], "mm": x["max_mm"]} for x in wn["areas"][:6]],
+                             "services": [{"svc": f"{x['service']}:{x['dir']}", "adds_min": x["expected_min"]} for x in wn["services"][:20]]}}
+        t0 = time.time()
+        r = await client().post("https://api.anthropic.com/v1/messages", timeout=60,
+                                headers={"x-api-key": DV_AI_KEY, "anthropic-version": "2023-06-01", "content-type": "application/json"},
+                                json={"model": ASSIST_MODEL, "max_tokens": 1200, "system": AIB_SYSTEM,
+                                      "messages": [{"role": "user", "content": "DATA (JSON):\n" + json.dumps(data, default=str, ensure_ascii=False)}]})
+        j = r.json()
+        if r.status_code != 200:
+            return last or {"ok": False, "configured": True, "error": "AI service: " + str((j.get("error") or {}).get("message") or f"HTTP {r.status_code}")}
+        AIB["n"] += 1
+        text = "".join(c.get("text", "") for c in j.get("content", []) if c.get("type") == "text").strip()
+        m = re.search(r"\{.*\}", text, re.S)
+        out = json.loads(m.group(0)) if m else {}
+        items = [{k: str(it.get(k) or "")[:400] if k != "services" else [str(x)[:8] for x in (it.get("services") or [])][:8]
+                  for k in ("level", "title", "why", "action", "services", "when")} for it in (out.get("items") or []) if isinstance(it, dict)][:6]
+        if not items:
+            return last or {"ok": False, "configured": True, "error": "The AI answer could not be read; trying again at the next refresh."}
+        AIB["last"] = {"ok": True, "configured": True, "summary": str(out.get("summary") or "")[:300], "items": items, "generated": now,
+                       "model": ASSIST_MODEL, "ms": int((time.time() - t0) * 1000), "next_in_s": AIB_EVERY, "used_today": AIB["n"], "cap": AIB_CAP}
+        return AIB["last"]
+    except Exception as e:
+        return last or {"ok": False, "configured": True, "error": f"AI service unavailable ({type(e).__name__})"}
+    finally:
+        AIB["busy"] = False
+
+
+@app.get("/api/events/ai-briefing")
+async def api_ai_briefing():
+    """HORIZON AI (Claude) reads the stored alert patterns, the 30-day summary, ongoing alerts and rain now, and writes the predictive
+    briefing for the next 2 hours. One AI call every AI_BRIEFING_MINUTES (default 20) at most, AI_BRIEFING_DAILY_CAP a day."""
+    return await ai_briefing()
+
+
 @app.get("/api/events/export.xlsx")
 async def api_events_export(cat: str = "", service: str = "", days: int = 30, d_from: str = "", d_to: str = "", q: str = ""):
     from fastapi.responses import Response
@@ -8995,6 +9077,8 @@ def assistant_snapshot(ctx):
         hit = EVLOG.get("ins")
         if hit and time.time() - hit[1] < 900:
             snap["predictive_insights"] = [{k: i.get(k) for k in ("title", "detail", "basis", "likelihood")} for i in hit[2]["insights"][:10]]
+        if AIB.get("last"):
+            snap["ai_briefing"] = {k: AIB["last"].get(k) for k in ("summary", "items")}
     except Exception:
         pass
     snap["now_sg"] = datetime.now(SGT).strftime("%Y-%m-%d %H:%M")

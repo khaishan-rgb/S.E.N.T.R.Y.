@@ -28,6 +28,13 @@ round "Ask HORIZON AI" button docks it again); the AI predictive insights fill t
 on the wall) with MRT / LRT status above Live CCTV; a "Latest alerts" strip runs along the bottom with the status and the Exit TV button at its right end.
 On a 4K screen at 100% scaling the new panels are drawn at 1.8x. Leaving TV mode puts everything back.
 
+**AI briefing (real AI, 12 Nov):** at the top of the insights panel, HORIZON AI (Claude, the same `ANTHROPIC_API_KEY` and
+`ASSISTANT_AI_MODEL`) reads the patterns below, the 30-day summary, the alerts ongoing now and rain now, and writes a ranked briefing
+for the next 2 hours: what is likely, why (with the evidence numbers) and what to prepare. It is told to use only that data and to say
+"likely" for history. One AI call every `AI_BRIEFING_MINUTES` (default 20) at most, `AI_BRIEFING_DAILY_CAP` (default 72) a day, shared by
+every screen; about the cost of one HORIZON AI question each. Without the key the panel says so and shows the statistics only.
+The cards under "Patterns in the stored alerts" are counted statistics, not AI: they are the evidence the AI reads.
+
 How an insight is made: for the next 2 hours, a service (bunching, long headway) or a place (traffic, rain) is "likely" when it had an
 alert in the same hours on at least 3 days and on at least 30% of the same kind of day (weekday / weekend) in the last 28 days. Each
 insight shows its basis (for example "17/20 weekdays"). With under 3 days of history it says it is still learning. HORIZON AI also

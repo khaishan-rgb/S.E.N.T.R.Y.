@@ -238,3 +238,20 @@ html.ops-tv .ops-sv{grid-template-columns:58px minmax(0,1fr) 30px}
   .ops>[style*="grid-area:left"],.ops>[style*="grid-area:right"]{height:560px}
   #opsMapSlot{height:520px}#opsAlerts,#opsAna{height:520px}#opsCamSlot{height:560px}}
 @media(max-width:1399px){.ops .panel-head h2{font-size:17px;letter-spacing:.05em}.ops-h small{font-size:11.5px}}
+
+/* AI briefing (HORIZON AI) on top of the counted patterns */
+.ops-brief-sum{margin:2px 0 8px;padding:8px 10px;border-radius:8px;font-size:13px;line-height:1.45;color:#fff;
+  background:linear-gradient(135deg,rgba(124,88,255,.35),rgba(63,211,255,.12));border:1px solid rgba(170,140,255,.45)}
+.ops-ai-it{position:relative;padding:8px 10px 8px 12px;margin-bottom:7px;border-radius:9px;border:1px solid rgba(170,140,255,.4);
+  background:linear-gradient(135deg,rgba(124,88,255,.28),rgba(6,21,36,.7) 75%);box-shadow:0 8px 22px -14px rgba(124,88,255,.9)}
+.ops-ai-it:before{content:"";position:absolute;left:0;top:8px;bottom:8px;width:3px;border-radius:2px;background:var(--c)}
+.ops-ai-it p{margin:4px 0;font-size:12.5px;line-height:1.45;color:#d6e4f5}
+.ops-ai-it small{display:flex;flex-wrap:wrap;align-items:center;gap:6px;font-size:11.5px;color:#9fb9d4}
+.ops-ai-act{display:flex;gap:7px;align-items:baseline}
+.ops-ai-act span{flex:none;padding:0 6px;border-radius:4px;font-size:10.5px;font-weight:700;color:#04121f;background:#2ee8a0}
+.ops-brief-note{margin:2px 0 10px;font-size:11px;color:#7f97b6;line-height:1.4}
+.ops-brief-off{display:flex;gap:9px;align-items:flex-start;padding:9px 10px;margin-bottom:8px;border-radius:8px;border:1px dashed rgba(170,140,255,.5);color:#cdbcff;font-size:12.5px}
+.ops-brief-off .ops-i{flex:none;width:18px;height:18px}.ops-brief-off p{margin:0;line-height:1.4}
+.ops-stat-h{margin:6px 0 7px;padding-top:8px;border-top:1px solid #173a52;font:700 11.5px/1.2 inherit;letter-spacing:.06em;text-transform:uppercase;color:#8fe4ff}
+.ops-stat-h small{text-transform:none;letter-spacing:0;color:#7f97b6;font-weight:500}
+@media(min-width:2600px){html.ops-tv #opsAiScroll{zoom:var(--z)}}

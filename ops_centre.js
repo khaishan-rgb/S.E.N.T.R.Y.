@@ -38,7 +38,7 @@
     + '<div class="ops-slot" id="opsMapSlot" style="grid-area:map"></div>'
     + '<div class="ops-col" style="grid-area:right" id="opsRight">'
       + panel("opsAi", "auto", '<span class="ops-spark">' + svg('<path d="M12 2.5c.6 4.6 2.9 6.9 7.5 7.5-4.6.6-6.9 2.9-7.5 7.5-.6-4.6-2.9-6.9-7.5-7.5 4.6-.6 6.9-2.9 7.5-7.5Z" fill="currentColor" stroke="none"/>') + "</span>AI predictive insights",
-        '<small id="opsAiSub">from stored alerts</small>', '<div class="ops-body" id="opsAiBody"><p class="ops-mut">Loading…</p></div>')
+        '<small id="opsAiSub">HORIZON AI</small>', '<div class="ops-body" id="opsAiScroll"><div id="opsBrief"><p class="ops-mut">HORIZON AI is reading the alert history…</p></div><h3 class="ops-stat-h">Patterns in the stored alerts <small>statistics the AI reads</small></h3><div id="opsAiBody"><p class="ops-mut">Loading…</p></div></div>')
     + "</div>"
     + panel("opsAlerts", "alerts", "Alerts", '<small id="opsAlertSub"></small>', '<div class="ops-filter" id="opsFilter" role="group" aria-label="Alert type"></div><div class="ops-body ops-list" id="opsList"></div>')
     + panel("opsAna", "analysis", "Alert analysis", '<div class="ops-period" role="group" aria-label="Period"><button type="button" data-days="7">7 days</button><button type="button" data-days="30" aria-pressed="true">30 days</button></div>',
@@ -188,7 +188,7 @@
   }
   function paintInsights(j){
     var ins = j.insights || [], st = j.storage || {};
-    $("opsAiSub").textContent = (st.persistent ? "from stored alerts" : "temporary storage") + " · " + hm(j.generated);
+    if(!st.persistent) $("opsAiSub").textContent = "HORIZON AI · temporary storage";
     $("opsAiBody").innerHTML = ins.length ? ins.slice(0, 12).map(function(i){
       var c = CAT[LOG_CAT[i.category] || i.category] || {color: "#a07bff", icon: ""};
       return '<article class="ops-in lv-' + i.level + '" style="--c:' + c.color + '"><div class="ops-in-t"><span class="ops-in-b">' + (i.kind === "likely" ? i.likelihood + "%" : LVL[i.level] || "") + "</span><b>" + esc(i.title) + "</b></div>"
@@ -269,10 +269,29 @@
     var c = e.target.closest("[data-acat]"); if(c && ANA){ anaCat = anaCat === c.dataset.acat ? "" : c.dataset.acat; paintAnalysis(ANA, {}); }
   });
 
+  /* AI briefing: HORIZON AI (Claude) writes it from the patterns below, the 30-day summary, ongoing alerts and rain now */
+  var LV = {high: "High", medium: "Watch", low: "Low"}, LVC = {high: "#ff5a6e", medium: "#ffb64a", low: "#3fd3ff"};
+  function loadBrief(){
+    return fetch("/api/events/ai-briefing", {credentials: "same-origin"}).then(function(r){ return r.ok ? r.json() : null; }).then(function(j){
+      var b = $("opsBrief");
+      if(!j){ b.innerHTML = '<p class="ops-mut">The AI briefing could not be loaded.</p>'; return; }
+      if(!j.ok){ b.innerHTML = '<div class="ops-brief-off">' + svg('<path d="M12 2.5c.6 4.6 2.9 6.9 7.5 7.5-4.6.6-6.9 2.9-7.5 7.5-.6-4.6-2.9-6.9-7.5-7.5 4.6-.6 6.9-2.9 7.5-7.5Z" fill="currentColor" stroke="none"/>') + "<p>" + esc(j.error) + "</p></div>"; if(j.pending) setTimeout(loadBrief, 15000); return; }
+      $("opsAiSub").textContent = "HORIZON AI \u00b7 " + hm(j.generated);
+      b.innerHTML = (j.summary ? '<p class="ops-brief-sum">' + esc(j.summary) + "</p>" : "") + j.items.map(function(i){
+        var c = LVC[i.level] || "#a07bff";
+        return '<article class="ops-ai-it" style="--c:' + c + '"><div class="ops-in-t"><span class="ops-in-b">' + (LV[i.level] || "AI") + "</span><b>" + esc(i.title) + "</b></div>"
+          + "<p>" + esc(i.why) + "</p>" + (i.action ? '<p class="ops-ai-act"><span>Prepare</span>' + esc(i.action) + "</p>" : "")
+          + "<small>" + (i.when ? esc(i.when) + " \u00b7 " : "") + (i.services || []).map(function(k){ var x = k.split(":"); return esc(x[0]) + (x[1] ? " D" + esc(x[1]) : ""); }).join(", ")
+          + ' <button type="button" class="ops-ask" data-q="' + esc(i.title + ". " + i.why + " Tell me more and what to do.") + '">Ask AI</button></small></article>';
+      }).join("") + '<p class="ops-brief-note">Written by HORIZON AI (' + esc(j.model) + ') from the stored alerts and live data \u00b7 advisory only, the Service Controller decides.</p>';
+    }).catch(function(){});
+  }
+  loadBrief(); setInterval(function(){ if(!document.hidden) loadBrief(); }, 5 * 60000);
+
   /* on the wall nobody scrolls: the insights move on by one card every 8 s, then start again */
   setInterval(function(){
-    var b = $("opsAiBody"); if(!document.body.classList.contains("tv") || !b || b.matches(":hover") || b.scrollHeight <= b.clientHeight + 4) return;
-    var cards = b.querySelectorAll(".ops-in"), top = b.scrollTop, next = null;
+    var b = $("opsAiScroll"); if(!document.body.classList.contains("tv") || !b || b.matches(":hover") || b.scrollHeight <= b.clientHeight + 4) return;
+    var cards = b.querySelectorAll(".ops-ai-it,.ops-in"), top = b.scrollTop, next = null;
     for(var i = 0; i < cards.length; i++){ if(cards[i].offsetTop - b.offsetTop > top + 4){ next = cards[i]; break; } }
     b.scrollTo({top: next && top + b.clientHeight < b.scrollHeight - 4 ? next.offsetTop - b.offsetTop : 0, behavior: "smooth"});
   }, 8000);
