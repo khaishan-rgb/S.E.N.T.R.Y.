@@ -166,3 +166,17 @@ def test_insights_rain_now_first():
     live = {"areas": [{"name": "Clementi"}], "services": [{"service": "147", "dir": 1, "expected_min": 6.0}, {"service": "156", "dir": 2, "expected_min": None}]}
     ins = opslog.insights(_history(now_dt), now_dt.timestamp(), None, None, live)
     assert ins[0]["kind"] == "rain_now" and "147 D1 +6.0 min" in ins[0]["detail"]
+
+
+def test_heavy_loading_insight():
+    now_dt = datetime(2026, 11, 12, 16, 50, tzinfo=TZ)
+    ev = []
+    for back in range(1, 29):
+        d = now_dt - timedelta(days=back)
+        if d.weekday() < 5:
+            ev.append({"category": "heavy_loading", "kind": "heavy_loading", "start_ts": d.replace(hour=17, minute=5).timestamp(), "services": ["43:1"],
+                       "location": "Punggol Int", "peak": 96.0})
+    ins = [i for i in opslog.insights(ev, now_dt.timestamp(), (now_dt - timedelta(days=28)).timestamp()) if i["kind"] == "likely"]
+    assert ins and ins[0]["title"].startswith("Service 43 Dir 1: heavy loading likely") and "96% full" in ins[0]["detail"]
+    a = opslog.analysis(ev, now_dt.timestamp(), 30)
+    assert a["by_category"]["heavy_loading"] == 20 and a["by_hour"]["heavy_loading"][17] == 20

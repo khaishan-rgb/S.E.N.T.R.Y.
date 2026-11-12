@@ -20,7 +20,7 @@
     wet: {name: "Wet weather", short: "Rain", color: "#7cc4ff", icon: '<path d="M7 15a4.5 4.5 0 0 1 .5-9 6 6 0 0 1 11.3 2A3.5 3.5 0 0 1 18 15H7Z"/><path d="M8 18l-1 2.5M12.5 18l-1 2.5M17 18l-1 2.5"/>'},
     loading: {name: "Heavy loading", short: "Load", color: "#ffb64a", icon: '<circle cx="8" cy="7" r="2.5"/><circle cx="16" cy="7" r="2.5"/><path d="M4 20v-5a4 4 0 0 1 8 0v5M12 20v-5a4 4 0 0 1 8 0v5"/>'}
   };
-  var LOG_CAT = {bunching: "bunching", long_headway: "gap", traffic: "traffic", wet_weather: "wet"};      // stored log -> live names
+  var LOG_CAT = {bunching: "bunching", long_headway: "gap", traffic: "traffic", wet_weather: "wet", heavy_loading: "loading"};      // stored log -> live names
   var svg = function(p, c){ return '<svg viewBox="0 0 24 24" class="' + (c || "ops-i") + '" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + p + "</svg>"; };
   var esc = function(s){ return String(s == null ? "" : s).replace(/[&<>"']/g, function(c){ return {"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"}[c]; }); };
   var hm = function(t){ return new Date(t * 1000).toLocaleTimeString("en-SG", {hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Asia/Singapore"}); };
@@ -69,7 +69,7 @@
   function unpark(id){ var x = $(id), h = homes[id]; if(x && h && x.parentNode !== h.parent) h.parent.insertBefore(x, h.next && h.next.parentNode === h.parent ? h.next : null); }
   function dockAI(){
     var hai = $("hai"), slot = $("opsAiSlot"); if(!hai) return;
-    var tv = document.body.classList.contains("tv");
+    var tv = document.body.classList.contains("tv") && slot.offsetWidth > 0;
     hai.classList.toggle("docked", tv);
     if(!tv){ ["--ai-l", "--ai-t", "--ai-w", "--ai-h"].forEach(function(v){ hai.style.removeProperty(v); }); return; }
     var r = slot.getBoundingClientRect();
@@ -86,10 +86,6 @@
   function tvMode(){
     var tv = document.body.classList.contains("tv");
     document.documentElement.classList.toggle("ops-tv", tv);
-    if(head && clock){
-      if(tv){ if(!tvBox.parentNode) $("opsTicker").appendChild(tvBox); park("systemStatus", tvBox); park("exitTV", tvBox); }
-      else { unpark("systemStatus"); unpark("exitTV"); if(tvBox.parentNode) tvBox.parentNode.removeChild(tvBox); }
-    }
     fit(); [60, 400, 1200, 3000].forEach(function(ms){ setTimeout(function(){ fit(); dockAI(); if(ms === 60) dispatchEvent(new Event("resize")); }, ms); });
   }
   new MutationObserver(tvMode).observe(document.body, {attributes: true, attributeFilter: ["class"]});
@@ -199,32 +195,79 @@
         + "<p>" + esc(i.detail) + "</p><small>" + esc(i.basis || "") + (i.kind === "likely" || i.kind === "rain_now" ? ' · <button type="button" class="ops-ask" data-q="' + esc(i.title + ". " + i.detail + " What should the OCC prepare?") + '">Ask AI</button>' : "") + "</small></article>";
     }).join("") : '<p class="ops-mut">No recurring patterns yet. Insights appear as alerts are stored.</p>';
   }
-  function paintAnalysis(a, st){
-    var bc = a.by_category || {}, keys = ["bunching", "long_headway", "traffic", "wet_weather"], tot = a.total || 0;
-    if(!tot){ $("opsAnaBody").innerHTML = '<p class="ops-mut">No alerts stored in the last ' + days + " days" + (st.persistent === false ? " (temporary storage: history resets when the server restarts)" : "") + ".</p>"; return; }
-    var max = Math.max.apply(null, keys.map(function(k){ return bc[k] || 0; })) || 1;
-    var mix = '<div class="ops-a-box"><h3>Which alert</h3>' + keys.slice().sort(function(x, y){ return (bc[y] || 0) - (bc[x] || 0); }).map(function(k){
-      var c = CAT[LOG_CAT[k]], n = bc[k] || 0;
-      return '<div class="ops-bar" style="--c:' + c.color + '"><span>' + c.name + '</span><i><em style="width:' + (n / max * 100).toFixed(1) + '%"></em></i><b>' + n + "</b></div>";
-    }).join("") + "</div>";
-    var bh = a.by_hour || {}, col = [], hmax = 1, h;
-    for(h = 0; h < 24; h++){ var s = 0; keys.forEach(function(k){ s += (bh[k] || [])[h] || 0; }); col.push(s); hmax = Math.max(hmax, s); }
-    var hours = '<div class="ops-a-box ops-a-hours"><h3>Which hour' + (a.peak_hour != null ? ' <small>peak ' + String(a.peak_hour).padStart(2, "0") + ":00</small>" : "") + '</h3><div class="ops-hist" role="img" aria-label="Alerts by hour of day">'
-      + col.map(function(v, i){
-        var segs = keys.map(function(k){ var n = (bh[k] || [])[i] || 0; return n ? '<em style="height:' + (n / hmax * 100).toFixed(1) + "%;background:" + CAT[LOG_CAT[k]].color + '"></em>' : ""; }).join("");
-        return '<span title="' + String(i).padStart(2, "0") + ":00 · " + v + ' alerts"' + (i === a.peak_hour ? ' class="pk"' : "") + ">" + segs + "</span>";
-      }).join("") + '</div><div class="ops-hist-x"><span>00</span><span>06</span><span>12</span><span>18</span><span>23</span></div></div>';
-    var svcs = (a.top_services || []).slice(0, 6), smax = svcs.length ? svcs[0].total : 1;
-    var top = '<div class="ops-a-box"><h3>Which services</h3>' + (svcs.length ? svcs.map(function(s){
-      var x = s.key.split(":"), seg = keys.map(function(k){ var n = s[k] || 0; return n ? '<em style="width:' + (n / smax * 100).toFixed(1) + "%;background:" + CAT[LOG_CAT[k]].color + '"></em>' : ""; }).join("");
-      return '<div class="ops-bar ops-sv"><span><span class="ops-svc">' + esc(x[0]) + "<i>D" + esc(x[1]) + "</i></span></span><i class=\"stk\">" + seg + "</i><b>" + s.total + "</b></div>";
-    }).join("") : '<p class="ops-mut">None yet.</p>') + "</div>";
-    var pl = (a.top_places || []).slice(0, 5);
-    var places = '<div class="ops-a-box"><h3>Where</h3>' + (pl.length ? pl.map(function(p){
-      return '<div class="ops-place" style="--c:' + CAT[LOG_CAT[p.category]].color + '"><span>' + esc(p.place) + "</span><b>" + p.total + "</b></div>";
-    }).join("") : '<p class="ops-mut">None yet.</p>') + "</div>";
-    $("opsAnaBody").innerHTML = mix + hours + top + places;
+  var ANA = null, anaCat = "", KEYS = ["bunching", "long_headway", "traffic", "wet_weather", "heavy_loading"];
+  var NAMES = {bunching: "3-bus bunching", long_headway: "Long headway", traffic: "Traffic & incidents", wet_weather: "Wet weather", heavy_loading: "Heavy loading"};
+  var col = function(k){ return CAT[LOG_CAT[k]].color; };
+  var EXP = '<button type="button" class="ops-exp" data-exp="{k}" title="Show larger, with counts" aria-label="Show larger">' + svg('<path d="M14 4h6v6M10 20H4v-6M20 4l-7 7M4 20l7-7"/>') + "</button>";
+  function boxHours(a, big){
+    var bh = a.by_hour || {}, keys = anaCat ? [anaCat] : KEYS, vals = [], hmax = 1, h;
+    for(h = 0; h < 24; h++){ var s = 0; keys.forEach(function(k){ s += (bh[k] || [])[h] || 0; }); vals.push(s); hmax = Math.max(hmax, s); }
+    var peak = vals.indexOf(Math.max.apply(null, vals));
+    return '<div class="ops-hist' + (big ? " big" : "") + '" role="img" aria-label="Alerts by hour of day">' + vals.map(function(v, i){
+      var segs = keys.map(function(k){ var n = (bh[k] || [])[i] || 0; return n ? '<em style="height:' + (n / hmax * 100).toFixed(1) + "%;background:" + col(k) + '"></em>' : ""; }).join("");
+      return '<span title="' + String(i).padStart(2, "0") + ":00 · " + v + ' alerts"' + (v && i === peak ? ' class="pk"' : "") + ">" + (big && v ? "<b>" + v + "</b>" : "") + segs + "</span>";
+    }).join("") + '</div><div class="ops-hist-x' + (big ? " big" : "") + '">' + (big ? vals.map(function(_, i){ return "<span>" + String(i).padStart(2, "0") + "</span>"; }).join("")
+      : "<span>00</span><span>06</span><span>12</span><span>18</span><span>23</span>") + "</div>";
   }
+  function boxServices(a, n){
+    var keys = anaCat ? [anaCat] : KEYS, list = (a.top_services || []).map(function(s){ var t = 0; keys.forEach(function(k){ t += s[k] || 0; }); return {s: s, t: t}; })
+      .filter(function(x){ return x.t; }).sort(function(x, y){ return y.t - x.t; }).slice(0, n), smax = list.length ? list[0].t : 1;
+    return list.length ? list.map(function(x){
+      var k = x.s.key.split(":"), seg = keys.map(function(c){ var v = x.s[c] || 0; return v ? '<em style="width:' + (v / smax * 100).toFixed(1) + "%;background:" + col(c) + '" title="' + NAMES[c] + ": " + v + '"></em>' : ""; }).join("");
+      return '<div class="ops-bar ops-sv"><span><span class="ops-svc">' + esc(k[0]) + "<i>D" + esc(k[1]) + '</i></span></span><i class="stk">' + seg + "</i><b>" + x.t + "</b></div>";
+    }).join("") : '<p class="ops-mut">None in this period.</p>';
+  }
+  function boxPlaces(a, n){
+    var keys = anaCat ? [anaCat] : KEYS, list = (a.top_places || []).map(function(p){ var t = 0; keys.forEach(function(k){ t += p[k] || 0; }); return {p: p, t: t}; })
+      .filter(function(x){ return x.t; }).sort(function(x, y){ return y.t - x.t; }).slice(0, n);
+    return list.length ? list.map(function(x){ return '<div class="ops-place" style="--c:' + col(anaCat || x.p.category) + '"><span>' + esc(x.p.place) + "</span><b>" + x.t + "</b></div>"; }).join("")
+      : '<p class="ops-mut">None in this period.</p>';
+  }
+  function paintAnalysis(a, st){
+    ANA = a;
+    var bc = a.by_category || {}, tot = a.total || 0;
+    if(!tot){ $("opsAnaBody").innerHTML = '<p class="ops-mut">No alerts stored in the last ' + days + " days" + (st.persistent === false ? " (temporary storage: history resets when the server restarts)" : "") + ".</p>"; return; }
+    var max = Math.max.apply(null, KEYS.map(function(k){ return bc[k] || 0; })) || 1;
+    var mix = '<div class="ops-a-box"><h3>Which alert <small>' + (anaCat ? 'showing ' + NAMES[anaCat].toLowerCase() + ' · <button type="button" class="ops-link" data-acat="">show all</button>' : "press one to filter") + "</small></h3>"
+      + KEYS.slice().sort(function(x, y){ return (bc[y] || 0) - (bc[x] || 0); }).map(function(k){
+        var n = bc[k] || 0;
+        return '<button type="button" class="ops-bar ops-pick' + (anaCat === k ? " on" : anaCat ? " dim" : "") + '" data-acat="' + k + '" aria-pressed="' + (anaCat === k) + '" style="--c:' + col(k) + '"><span>' + NAMES[k]
+          + '</span><i><em style="width:' + (n / max * 100).toFixed(1) + '%"></em></i><b>' + n + "</b></button>";
+      }).join("") + "</div>";
+    var hours = '<div class="ops-a-box ops-a-hours"><h3>Which hour' + (anaCat ? " <small>" + NAMES[anaCat].toLowerCase() + "</small>" : a.peak_hour != null ? ' <small>peak ' + String(a.peak_hour).padStart(2, "0") + ":00</small>" : "")
+      + EXP.replace("{k}", "hours") + "</h3>" + boxHours(a) + "</div>";
+    var svcBox = '<div class="ops-a-box"><h3>Which services' + EXP.replace("{k}", "services") + "</h3>" + boxServices(a, 10) + "</div>";
+    var places = '<div class="ops-a-box"><h3>Where' + EXP.replace("{k}", "places") + "</h3>" + boxPlaces(a, 8) + "</div>";
+    $("opsAnaBody").innerHTML = mix + hours + svcBox + places;
+  }
+  /* larger view with every count */
+  var modal = document.createElement("div");
+  modal.className = "ops-modal"; modal.hidden = true; modal.setAttribute("role", "dialog"); modal.setAttribute("aria-modal", "true");
+  document.body.appendChild(modal);
+  function openBig(k){
+    if(!ANA) return;
+    var t = {hours: "Alerts by hour of day", services: "Alerts by service", places: "Alerts by place"}[k], body = "";
+    if(k === "hours"){
+      var bh = ANA.by_hour || {}, keys = anaCat ? [anaCat] : KEYS;
+      body = boxHours(ANA, true) + '<table class="ops-tbl"><thead><tr><th>Hour</th>' + keys.map(function(c){ return '<th style="color:' + col(c) + '">' + NAMES[c] + "</th>"; }).join("") + "<th>Total</th></tr></thead><tbody>"
+        + Array.apply(null, {length: 24}).map(function(_, h){ var tt = 0, cells = keys.map(function(c){ var v = (bh[c] || [])[h] || 0; tt += v; return "<td>" + (v || "") + "</td>"; }).join("");
+          return tt ? "<tr><td>" + String(h).padStart(2, "0") + ":00</td>" + cells + "<td><b>" + tt + "</b></td></tr>" : ""; }).join("") + "</tbody></table>";
+    } else if(k === "services"){
+      body = '<table class="ops-tbl"><thead><tr><th>Service</th>' + KEYS.map(function(c){ return '<th style="color:' + col(c) + '">' + NAMES[c] + "</th>"; }).join("") + "<th>Total</th></tr></thead><tbody>"
+        + (ANA.top_services || []).map(function(s){ var x = s.key.split(":"); return '<tr><td><span class="ops-svc">' + esc(x[0]) + "<i>D" + esc(x[1]) + "</i></span></td>" + KEYS.map(function(c){ return "<td>" + (s[c] || "") + "</td>"; }).join("") + "<td><b>" + s.total + "</b></td></tr>"; }).join("") + "</tbody></table>";
+    } else {
+      body = '<table class="ops-tbl"><thead><tr><th>Place</th>' + KEYS.map(function(c){ return '<th style="color:' + col(c) + '">' + NAMES[c] + "</th>"; }).join("") + "<th>Total</th></tr></thead><tbody>"
+        + (ANA.top_places || []).map(function(p){ return "<tr><td>" + esc(p.place) + "</td>" + KEYS.map(function(c){ return "<td>" + (p[c] || "") + "</td>"; }).join("") + "<td><b>" + p.total + "</b></td></tr>"; }).join("") + "</tbody></table>";
+    }
+    modal.innerHTML = '<section class="ops-modal-c"><header><h2>' + t + " <small>last " + days + " days" + (anaCat && k === "hours" ? " · " + NAMES[anaCat].toLowerCase() : "") + '</small></h2><button type="button" class="ops-x" aria-label="Close">×</button></header><div class="ops-modal-b">' + body + "</div></section>";
+    modal.hidden = false; modal.querySelector(".ops-x").focus();
+  }
+  modal.addEventListener("click", function(e){ if(e.target === modal || e.target.closest(".ops-x")) modal.hidden = true; });
+  addEventListener("keydown", function(e){ if(e.key === "Escape" && !modal.hidden) modal.hidden = true; });
+  ops.addEventListener("click", function(e){
+    var x = e.target.closest("[data-exp]"); if(x){ openBig(x.dataset.exp); return; }
+    var c = e.target.closest("[data-acat]"); if(c && ANA){ anaCat = anaCat === c.dataset.acat ? "" : c.dataset.acat; paintAnalysis(ANA, {}); }
+  });
 
   /* on the wall nobody scrolls: the insights move on by one card every 8 s, then start again */
   setInterval(function(){

@@ -6366,7 +6366,7 @@ def evlog_init():
 
 def evlog_tidy():
     """Remove log rows below the limits (rows saved before the limits existed, or after a limit is raised)."""
-    bb_sql("DELETE FROM ops_event WHERE category IN ('traffic', 'wet_weather') AND ongoing = 0 AND COALESCE(end_ts, last_ts, start_ts) - start_ts < ?", (EVLOG_MIN_MIN * 60,))
+    bb_sql("DELETE FROM ops_event WHERE category IN ('traffic', 'wet_weather', 'heavy_loading') AND ongoing = 0 AND COALESCE(end_ts, last_ts, start_ts) - start_ts < ?", (EVLOG_MIN_MIN * 60,))
     bb_sql("DELETE FROM ops_event WHERE category IN ('bunching', 'long_headway') AND CAST(json_extract(detail, '$.stops') AS INTEGER) < ?", (EVLOG_MIN_STOPS,))
 
 
@@ -6436,6 +6436,40 @@ async def evlog_sync(now):
         EVLOG["at"], EVLOG["err"] = now, None
     except Exception as e:
         EVLOG["err"] = f"{type(e).__name__}: {e}"[:200]
+
+
+def evlog_loading(alerts, now):
+    """Heavy passenger loading from the Forecast Centre's live data (LTA bus load bands) -> log episodes per service-direction.
+    An episode stays open while the service keeps showing heavy loading (gaps under 10 min are bridged); it is stored once it has lasted
+    EVLOG_MIN_MIN minutes. The Forecast Centre only builds live data while a Forecast Centre / AI Operations Centre page is open."""
+    try:
+        ep = EVLOG.setdefault("load", {})
+        for a in alerts or []:
+            if a.get("category") != "loading" or not a.get("svc"):
+                continue
+            k = opslog.svc_key(a["svc"], a.get("dir") or 1)
+            occ = a.get("occupancy")
+            e = ep.get(k)
+            if e is None or now - e["last"] > 600:
+                e = ep[k] = {"start": now, "last": now, "peak": None, "where": a.get("location") or "", "impact": a.get("impact") or ""}
+            e["last"] = now
+            if isinstance(occ, (int, float)):
+                e["peak"] = max(e["peak"] or 0, float(occ))
+            if a.get("location"):
+                e["where"] = a["location"]
+        rows = []
+        for k, e in list(ep.items()):
+            ended = now - e["last"] > 600
+            if e["last"] - e["start"] >= EVLOG_MIN_MIN * 60:
+                rows.append({"key": f"LD:{k}:{int(e['start'])}", "category": "heavy_loading", "kind": "heavy_loading", "start_ts": e["start"],
+                             "end_ts": e["last"] if ended else None, "last_ts": e["last"], "ongoing": 0 if ended else 1, "location": e["where"],
+                             "services": [k], "peak": round(e["peak"], 0) if e["peak"] is not None else None, "peak_unit": "% full",
+                             "level": e["impact"][:40] or None, "detail": {"impact": e["impact"]}, "source": "LTA bus load bands"})
+            if ended:
+                del ep[k]
+        evlog_put(rows)
+    except Exception as e:
+        EVLOG["err"] = f"loading: {type(e).__name__}: {e}"[:200]
 
 
 def evlog_query(cat="", service="", d0=None, d1=None, q="", limit=1000):
@@ -13071,6 +13105,8 @@ async def fc26_centre(request: Request, mode: str='live', horizon: int=0, scenar
         raw,samples = await asyncio.to_thread(fc26_enrich_context,raw,samples)
     # Synchronise the full namespace before applying user filters. Filters cannot resolve alerts.
     data = await asyncio.to_thread(fc26.build_centre,mode,horizon,scenario,max(0,tick),raw,samples,delay_min=0)
+    if mode=='live' and horizon==0:
+        evlog_loading(data.get('alerts'), time.time())          # 12 Nov: heavy loading joins the operations event log
     ns=f'{mode}:{scenario if mode=="demo" else "network"}:{horizon}'
     journal_rows={}
     try:

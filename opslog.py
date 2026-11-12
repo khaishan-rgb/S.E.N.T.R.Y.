@@ -21,7 +21,7 @@ SGT = timezone(timedelta(hours=8))
 WET_MM = 0.2          # rain along the route during the trip: at or above this the trip counts as wet (same rule as Running Time Analytics)
 HEAVY_MM = 2.0        # heavy rain along the route during the trip
 PERIODS = (("am_peak", "Morning peak", 6, 9), ("midday", "Daytime", 9, 16), ("pm_peak", "Evening peak", 16, 20), ("night", "Night", 20, 30))
-CATEGORIES = {"bunching": "Bus bunching", "long_headway": "Long headway", "traffic": "Traffic", "wet_weather": "Wet weather"}
+CATEGORIES = {"bunching": "Bus bunching", "long_headway": "Long headway", "traffic": "Traffic", "wet_weather": "Wet weather", "heavy_loading": "Heavy loading"}
 
 
 # --------------------------------------------------------------------------------------------- helpers
@@ -290,7 +290,7 @@ def insights(events, now, since=None, wx_rows=None, wx_live=None, lookback=28, w
             s = sgt(e["start_ts"])
             if s.date() >= t.date() or _day_type(s) != dt or s.hour not in hours:
                 continue
-            if e["category"] in ("bunching", "long_headway"):
+            if e["category"] in ("bunching", "long_headway", "heavy_loading"):
                 keys = [(e["category"], k) for k in (e.get("services") or [])]
             else:
                 keys = [(e["category"], e.get("location") or "")] if e.get("location") else []
@@ -312,12 +312,13 @@ def insights(events, now, since=None, wx_rows=None, wx_live=None, lookback=28, w
         win = f"{h0:02d}:00–{(h0 + window_h) % 24:02d}:00"
         for _, cat, key, hits, share, g in sorted(cand, key=lambda x: -x[0])[:8]:
             pk = statistics.median(g["peaks"]) if g["peaks"] else None
-            if cat in ("bunching", "long_headway"):
+            if cat in ("bunching", "long_headway", "heavy_loading"):
                 s_, _, d_ = key.partition(":")
                 where = max(g["places"], key=g["places"].get) if g["places"] else ""
                 title = f"Service {s_} Dir {d_}: {CATEGORIES[cat].lower()} likely {win}"
-                detail = (f"Happened on {hits} of the last {n_days} {dt}s in this window" + (f", mostly {where}" if where else "")
-                          + (f"; typical {'closest headway' if cat == 'bunching' else 'longest headway'} {pk:.1f} min" if pk is not None else "") + ".")
+                typ = ({"bunching": f"; typical closest headway {pk:.1f} min", "long_headway": f"; typical longest headway {pk:.1f} min",
+                        "heavy_loading": f"; typically {pk:.0f}% full"}[cat] if pk is not None else "")
+                detail = f"Happened on {hits} of the last {n_days} {dt}s in this window" + (f", mostly {where}" if where else "") + typ + "."
                 svcs = [key]
             else:
                 top = sorted(g["services"], key=lambda k: -g["services"][k])[:6]

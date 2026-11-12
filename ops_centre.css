@@ -3,7 +3,7 @@ html[data-layout="ops"] #riskCards,html[data-layout="ops"] .main-grid,html[data-
 html[data-layout="ops"] main.console{display:block!important;height:auto!important;min-height:0!important;padding:0!important;overflow:visible!important}
 .ops{--g:12px;display:grid;gap:var(--g);padding:var(--g);box-sizing:border-box;
   grid-template-columns:minmax(270px,21%) minmax(0,1fr) minmax(320px,25%);grid-template-rows:minmax(0,1.25fr) minmax(0,1fr);
-  grid-template-areas:"left map right" "alerts analysis cctv";height:max(760px,calc(100dvh - var(--ops-top,170px)))}
+  grid-template-areas:"left map right" "alerts analysis cctv";height:max(860px,calc(100dvh - var(--ops-top,170px)))}
 .ops *,.ops *:before,.ops *:after{box-sizing:border-box}
 .ops-col{display:flex;flex-direction:column;gap:var(--g);min-height:0;min-width:0}
 .ops-slot{display:flex;min-height:0;min-width:0}
@@ -94,9 +94,9 @@ html[data-layout="ops"] main.console{display:block!important;height:auto!importa
 .ops-period{display:flex;gap:3px;margin-left:auto;padding:2px;border:1px solid #2c5069;border-radius:8px}
 .ops-period button{height:24px;padding:0 9px;border:0;border-radius:6px;background:none;color:#9fb9d4;font:600 11.5px/1 inherit;cursor:pointer}
 .ops-period button[aria-pressed="true"]{color:#fff;background:rgba(63,211,255,.18)}
-.ops-ana{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.25fr);grid-template-rows:minmax(0,1fr) minmax(0,1fr);gap:10px;padding:0 12px 12px;overflow:hidden}
+.ops-ana{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.25fr);grid-template-rows:minmax(150px,1fr) minmax(150px,1fr);gap:10px;padding:0 12px 12px;overflow:auto;scrollbar-width:thin}
 .ops-ana>.ops-mut{grid-column:1 / -1}
-.ops-a-box{min-height:0;min-width:0;overflow:hidden;padding:8px 10px;border-radius:8px;border:1px solid #173a52;background:#061524}
+.ops-a-box{min-height:0;min-width:0;overflow:auto;scrollbar-width:thin;scrollbar-color:#2c5069 transparent;padding:8px 10px;border-radius:8px;border:1px solid #173a52;background:#061524}
 .ops-a-box h3{margin:0 0 7px;font:700 11.5px/1 inherit;letter-spacing:.06em;text-transform:uppercase;color:#8fe4ff;display:flex;gap:6px;align-items:baseline}
 .ops-a-box h3 small{color:#8ca6c4;text-transform:none;letter-spacing:0;font-weight:600}
 .ops-bar{display:grid;grid-template-columns:minmax(0,108px) minmax(0,1fr) 34px;align-items:center;gap:8px;font-size:12px;color:#b8cde4;margin-bottom:5px}
@@ -116,7 +116,7 @@ html[data-layout="ops"] main.console{display:block!important;height:auto!importa
 .ops-place b{color:#fff}
 
 /* live CCTV (the existing camera panel, moved) */
-#opsCamSlot .camera-grid{flex:1;min-height:0;overflow:hidden;grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:repeat(2,minmax(0,1fr))}
+#opsCamSlot .camera-grid{flex:1;min-height:0;overflow:auto;grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:repeat(2,minmax(0,1fr))}
 #opsCamSlot .camera{display:flex;flex-direction:column;min-height:0}
 #opsCamSlot .camera img{flex:1 1 auto;height:auto!important;min-height:60px;object-fit:cover}
 #opsCamSlot .camera-grid:has(.camera-message),#opsCamSlot .camera-grid:has(.camera-diagnostics){grid-template-rows:none;overflow:auto}
@@ -135,9 +135,12 @@ html[data-layout="ops"] main.console{display:block!important;height:auto!importa
 }
 
 /* ---------------- TV mode (?present=1): STEE-style wall ---------------- */
-html.ops-tv .controlbar,html.ops-tv .filterbar{display:none!important}
+/* the whole page scrolls, in TV mode too (the Forecast Centre's TV mode pins the page to the screen) */
+html[data-layout="ops"]:has(body.tv){height:auto!important;overflow:auto!important}
+html[data-layout="ops"] body.tv{position:static!important;height:auto!important;min-height:100dvh;overflow:visible!important;display:block!important}
+html[data-layout="ops"] body{overflow-y:auto}
 html.ops-tv .ops{grid-template-columns:minmax(300px,18%) minmax(380px,21%) minmax(0,1fr) minmax(360px,23%);
-  grid-template-rows:minmax(0,1.2fr) minmax(0,1fr) 38px;grid-template-areas:"left ai map right" "alerts ai analysis cctv" "ticker ticker ticker ticker";height:calc(100dvh - var(--ops-top,90px))}
+  grid-template-rows:minmax(0,1.2fr) minmax(0,1fr) 38px;grid-template-areas:"left ai map right" "alerts ai analysis cctv" "ticker ticker ticker ticker";height:max(900px,calc(100dvh - var(--ops-top,90px)))}
 html.ops-tv .ops-aislot{display:block;min-height:0}
 html.ops-tv .ops-p,html.ops-tv #opsMapSlot>.panel,html.ops-tv #opsCamSlot>.panel,html.ops-tv #mrtPanel{
   border-color:rgba(63,211,255,.45)!important;box-shadow:inset 0 0 0 1px rgba(63,211,255,.08),0 0 22px -10px rgba(63,211,255,.75),inset 0 1px 0 rgba(255,255,255,.06)!important;
@@ -187,3 +190,51 @@ html.ops-tv .ops-sv{grid-template-columns:58px minmax(0,1fr) 30px}
 }
 #opsCamSlot .camera-grid>.camera:not(:first-child) img{min-height:0!important}
 #opsCamSlot .camera-grid>.camera{overflow:hidden}
+
+/* every panel scrolls (also over the Forecast Centre's TV rules) */
+.ops .ops-body,.ops .ops-list,.ops .ops-a-box,.ops #opsCamSlot .camera-grid,.ops #mrtPanel .mrt{overflow:auto!important;scrollbar-width:thin}
+#opsCamSlot>.cam-panel{min-height:240px}
+#opsCamSlot .crossings{flex:none}
+/* alert analysis: press a type to filter; expand a graph to see every count */
+.ops-pick{width:100%;padding:3px 4px;margin:0 0 3px;border:1px solid transparent;border-radius:6px;background:none;cursor:pointer;font:inherit;text-align:left}
+.ops-pick:hover{border-color:color-mix(in srgb,var(--c) 50%,transparent);background:color-mix(in srgb,var(--c) 8%,transparent)}
+.ops-pick.on{border-color:var(--c);background:color-mix(in srgb,var(--c) 14%,transparent)}
+.ops-pick.dim{opacity:.45}
+.ops-link{padding:0;border:0;background:none;color:#8fe4ff;font:inherit;text-decoration:underline;cursor:pointer}
+.ops-a-box h3{position:relative;padding-right:30px}
+.ops-exp{position:absolute;right:0;top:-4px;display:grid;place-items:center;width:26px;height:26px;padding:0;border-radius:7px;border:1px solid #2c5069;background:#0a2033;color:#9fd6ff;cursor:pointer}
+.ops-exp:hover{color:#fff;border-color:#3fd3ff}
+.ops-exp .ops-i{width:14px;height:14px}
+.ops-modal{position:fixed;inset:0;z-index:3000;display:grid;place-items:center;padding:24px;background:rgba(2,8,18,.72);backdrop-filter:blur(4px)}
+.ops-modal[hidden]{display:none}
+.ops-modal-c{width:min(1100px,100%);max-height:calc(100dvh - 48px);display:flex;flex-direction:column;border-radius:14px;border:1px solid rgba(63,211,255,.5);
+  background:linear-gradient(180deg,#0b2244,#05122a);box-shadow:0 30px 80px -20px #000,0 0 40px -10px rgba(63,211,255,.5)}
+.ops-modal-c header{display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid #173a52}
+.ops-modal-c h2{margin:0;flex:1;font:700 18px/1.2 inherit;color:#fff;letter-spacing:.04em}
+.ops-modal-c h2 small{font-size:13px;color:#8ca6c4;font-weight:500;letter-spacing:0}
+.ops-x{width:34px;height:34px;border-radius:9px;border:1px solid #2c5069;background:#0a2033;color:#fff;font-size:22px;line-height:1;cursor:pointer}
+.ops-modal-b{overflow:auto;padding:16px 18px 18px}
+.ops-hist.big{height:300px;gap:4px}
+.ops-hist.big span{position:relative}
+.ops-hist.big span b{position:absolute;left:50%;bottom:calc(100% + 2px);transform:translateX(-50%);font-size:12px;color:#fff;font-variant-numeric:tabular-nums}
+.ops-hist.big{margin-top:22px}
+.ops-hist-x.big{display:grid;grid-template-columns:repeat(24,minmax(0,1fr));gap:4px;text-align:center;font-size:11px}
+.ops-tbl{width:100%;margin-top:16px;border-collapse:collapse;font-size:13px;color:#cfe3f7}
+.ops-tbl th{position:sticky;top:-16px;background:#0b2244;text-align:right;padding:7px 8px;border-bottom:1px solid #2c5069;font-size:12px;white-space:nowrap}
+.ops-tbl th:first-child,.ops-tbl td:first-child{text-align:left}
+.ops-tbl td{text-align:right;padding:6px 8px;border-bottom:1px solid #12304a;font-variant-numeric:tabular-nums}
+.ops-tbl b{color:#fff}
+/* TV mode on a tablet or narrow screen: no separate AI column (HORIZON AI floats as usual) */
+@media(max-width:1399px){
+  html.ops-tv .ops{grid-template-columns:minmax(250px,22%) minmax(0,1fr) minmax(300px,27%);grid-template-rows:560px 540px 38px;
+    grid-template-areas:"left map right" "alerts analysis cctv" "ticker ticker ticker";height:auto}
+  html.ops-tv .ops-aislot{display:none}
+}
+@media(max-width:1199px){html.ops-tv .ops{grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-rows:none;grid-template-areas:"map map" "left right" "alerts analysis" "cctv cctv" "ticker ticker"}}
+@media(max-width:760px){html.ops-tv .ops{grid-template-columns:minmax(0,1fr);grid-template-areas:"map" "left" "alerts" "right" "analysis" "cctv" "ticker"}}
+
+/* fixed row heights below 1200 px wide too: panels scroll inside instead of stretching the page */
+@media(max-width:1199px){.ops,html.ops-tv .ops{grid-auto-rows:auto}
+  .ops>[style*="grid-area:left"],.ops>[style*="grid-area:right"]{height:560px}
+  #opsMapSlot{height:520px}#opsAlerts,#opsAna{height:520px}#opsCamSlot{height:560px}}
+@media(max-width:1399px){.ops .panel-head h2{font-size:17px;letter-spacing:.05em}.ops-h small{font-size:11.5px}}
