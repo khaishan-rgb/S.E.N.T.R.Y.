@@ -6366,7 +6366,7 @@ def evlog_init():
 
 def evlog_tidy():
     """Remove log rows below the limits (rows saved before the limits existed, or after a limit is raised)."""
-    bb_sql("DELETE FROM ops_event WHERE category IN ('traffic', 'wet_weather', 'heavy_loading') AND ongoing = 0 AND COALESCE(end_ts, last_ts, start_ts) - start_ts < ?", (EVLOG_MIN_MIN * 60,))
+    bb_sql("DELETE FROM ops_event WHERE category IN ('traffic', 'wet_weather') AND ongoing = 0 AND COALESCE(end_ts, last_ts, start_ts) - start_ts < ?", (EVLOG_MIN_MIN * 60,))
     bb_sql("DELETE FROM ops_event WHERE category IN ('bunching', 'long_headway') AND CAST(json_extract(detail, '$.stops') AS INTEGER) < ?", (EVLOG_MIN_STOPS,))
 
 
@@ -6440,8 +6440,8 @@ async def evlog_sync(now):
 
 def evlog_loading(alerts, now):
     """Heavy passenger loading from the Forecast Centre's live data (LTA bus load bands) -> log episodes per service-direction.
-    An episode stays open while the service keeps showing heavy loading (gaps under 10 min are bridged); it is stored once it has lasted
-    EVLOG_MIN_MIN minutes. The Forecast Centre only builds live data while a Forecast Centre / AI Operations Centre page is open."""
+    Stored from the first reading (no minimum duration or stop count). Readings of the same service-direction less than 10 min apart are
+    one episode, so the log is not filled with copies. The Forecast Centre only builds live data while a Forecast Centre / AI Operations Centre page is open."""
     try:
         ep = EVLOG.setdefault("load", {})
         for a in alerts or []:
@@ -6460,7 +6460,7 @@ def evlog_loading(alerts, now):
         rows = []
         for k, e in list(ep.items()):
             ended = now - e["last"] > 600
-            if e["last"] - e["start"] >= EVLOG_MIN_MIN * 60:
+            if True:
                 rows.append({"key": f"LD:{k}:{int(e['start'])}", "category": "heavy_loading", "kind": "heavy_loading", "start_ts": e["start"],
                              "end_ts": e["last"] if ended else None, "last_ts": e["last"], "ongoing": 0 if ended else 1, "location": e["where"],
                              "services": [k], "peak": round(e["peak"], 0) if e["peak"] is not None else None, "peak_unit": "% full",

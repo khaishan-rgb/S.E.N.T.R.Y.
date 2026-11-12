@@ -26,6 +26,8 @@ What is stored (so short, repeating alerts do not fill the log):
 - **Traffic, road works and wet weather:** only those that lasted **15 minutes or more** (`EVENTLOG_MIN_MINUTES`). One that is
   still going is stored when it reaches 15 minutes; one that clears sooner is never stored.
 - **Bus bunching and long headway:** only those that ran over **10 bus stops or more** (`EVENTLOG_MIN_STOPS`).
+- **Heavy loading:** every reading is stored, with no time or stop rule (readings of the same service and direction less than 10 min
+  apart count as one event).
 - Raising a limit later also removes stored rows below it.
 
 Peaks:
