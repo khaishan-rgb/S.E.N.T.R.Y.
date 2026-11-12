@@ -12848,6 +12848,73 @@ async def api_forecast_recovery(svc: str = "", dir: int = 1, extra: float = 0.0,
     return forecast.recovery_options(svc.strip().upper(), int(dir), extra, hw or None, None if layover < 0 else layover)
 
 
+# ---- V17.4 MRT line status (restored 12 Nov 2026: it had been dropped by a later update) (LTA DataMall Train Service Alerts). Lines shown: env MRT_LINES (default DTL,NEL).
+MRT_LINES = [x.strip().upper() for x in os.getenv("MRT_LINES", "NSL,EWL,NEL,CCL,DTL,TEL,BPL,SKL,PGL").split(",") if x.strip()]
+MRT_NAMES = {"DTL": "Downtown Line", "NEL": "North East Line", "NSL": "North-South Line", "EWL": "East-West Line", "CCL": "Circle Line", "TEL": "Thomson-East Coast Line",
+             "BPL": "Bukit Panjang LRT", "SKL": "Sengkang LRT", "PGL": "Punggol LRT", "CGL": "Changi Airport Branch", "CEL": "Circle Line Extension"}
+# codes LTA may use for the same line (branches / LRT loops) -> the line shown
+MRT_ALIAS = {"EWL": ("EWL", "CGL"), "CCL": ("CCL", "CEL"), "SKL": ("SKL", "SLRT", "SEL", "SWL", "STC"), "PGL": ("PGL", "PLRT", "PEL", "PWL", "PTC"), "BPL": ("BPL", "BPLRT")}
+MRT_WORDS = {"SKL": ("SENGKANG LRT", "SKLRT"), "PGL": ("PUNGGOL LRT", "PGLRT"), "BPL": ("BUKIT PANJANG LRT", "BPLRT"), "TEL": ("THOMSON-EAST COAST", "THOMSON EAST COAST"),
+             "NSL": ("NORTH-SOUTH LINE", "NORTH SOUTH LINE"), "EWL": ("EAST-WEST LINE", "EAST WEST LINE"), "NEL": ("NORTH EAST LINE", "NORTH-EAST LINE"),
+             "CCL": ("CIRCLE LINE",), "DTL": ("DOWNTOWN LINE",)}
+TTL_TRAIN = 60
+
+
+def mrt_status(raw, lines=None):
+    """LTA TrainServiceAlerts -> one row per watched line. Status 1 = normal, 2 = disrupted. Nothing is guessed: no answer = unknown."""
+    lines = lines or MRT_LINES
+    v = raw.get("value") if isinstance(raw, dict) else None
+    if isinstance(v, list):
+        v = v[0] if v else {}
+    v = v or {}
+    try:
+        status = int(v.get("Status"))
+    except (TypeError, ValueError):
+        status = None
+    segs = v.get("AffectedSegments") or []
+    msgs = [m for m in (v.get("Message") or []) if isinstance(m, dict) and (m.get("Content") or "").strip()]
+    out = []
+    for ln in lines:
+        name = MRT_NAMES.get(ln, ln)
+        codes = MRT_ALIAS.get(ln, (ln,))
+        mine = [g for g in segs if str(g.get("Line") or "").upper() in codes]
+        words = MRT_WORDS.get(ln, (name.upper(),))
+        notes = [{"text": m["Content"].strip(), "at": m.get("CreatedDate")} for m in msgs
+                 if any(w in m["Content"].upper() for w in words) or any(re.search(r"\b" + c + r"\b", m["Content"].upper()) for c in codes)]
+        if raw.get("_error") and not v:
+            state = "unknown"
+        elif mine:
+            state = "disrupted"
+        else:
+            state = "normal"
+        out.append({"line": ln, "name": name, "state": state,
+                    "segments": [{"direction": (g.get("Direction") or "").strip(), "stations": (g.get("Stations") or "").strip(),
+                                  "free_bus": (g.get("FreePublicBus") or "").strip(), "shuttle": (g.get("FreeMRTShuttle") or "").strip(),
+                                  "shuttle_dir": (g.get("MRTShuttleDirection") or g.get("MrtShuttleDir") or "").strip()} for g in mine],
+                    "messages": notes[:3]})
+    return {"lines": out, "network_status": status, "error": raw.get("_error")}
+
+
+async def api_train_status():
+    async def factory():
+        d = await get_lta("TrainServiceAlerts")
+        return d, TTL_TRAIN, not d.get("_error")
+    raw = await cached("train_alerts", factory)
+    res = mrt_status(raw)
+    res["age_s"] = cache_age("train_alerts")
+    res["source"] = "LTA DataMall Train Service Alerts"
+    return res
+
+
+@app.get('/api/train-status')
+async def train_status_api():
+    try:
+        return await api_train_status()
+    except Exception as e:
+        return {"lines": [{"line": ln, "name": MRT_NAMES.get(ln, ln), "state": "unknown", "segments": [], "messages": []} for ln in MRT_LINES],
+                "error": f"{type(e).__name__}", "source": "LTA DataMall Train Service Alerts"}
+
+
 @app.get("/api/forecast/health")
 async def api_forecast_health():
     fc_store()

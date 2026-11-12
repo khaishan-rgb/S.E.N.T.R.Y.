@@ -361,3 +361,26 @@ body>.modal{z-index:2147482500}
 .topnav>a:hover svg{border-color:#77daff}
 .topnav>a:focus-visible{outline:2px solid #77daff;outline-offset:3px;border-radius:8px}
 .topnav>a.active svg{border-color:#77daff;background:rgba(65,182,250,.14)}
+
+/* V17.5 MRT / LRT status: its own panel above the cameras, 3 x 3 tiles (MRT 2 rows, LRT 1 row) */
+body .right-rail.cameras-only{grid-template-rows:auto minmax(0,1fr)}
+.mrt-panel .panel-head small.bad{color:#ff8a8f;font-weight:700}
+.mrt{display:grid;gap:5px;padding:0 10px 9px}
+.mrt-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px}
+.mrt-tile{display:flex;align-items:center;gap:5px;min-width:0;padding:4px 6px;border:1px solid #1f4a60;border-radius:5px;background:#041a29}
+.mrt-tile em{font-style:normal;font:700 11px/1 Rajdhani,'IBM Plex Sans',sans-serif;letter-spacing:.03em;text-transform:uppercase;color:#7dffb0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mrt-tile.is-disrupted{border-color:#ff5a5f;background:linear-gradient(90deg,#3a0d14,#1c0a10);animation:mrtPulse 2.4s ease-in-out infinite}
+.mrt-tile.is-disrupted em{color:#ff8a8f}
+.mrt-tile.is-unknown em{color:#8fb8cc}
+@keyframes mrtPulse{50%{box-shadow:0 0 14px -2px #ff5a5f}}
+.mrt-line{flex:none;min-width:34px;text-align:center;padding:3px 4px;border-radius:4px;font:700 11px/1 Orbitron,'IBM Plex Sans',sans-serif;font-style:normal;color:#fff;background:#748477}
+.mrt-DTL{background:#005ec4}.mrt-NEL{background:#9900aa}.mrt-NSL{background:#d42e12}.mrt-EWL{background:#009645}.mrt-CCL{background:#fa9e0d;color:#1a1200}.mrt-TEL{background:#9d5b25}
+.mrt-detail{margin:0;padding:5px 8px;border-left:3px solid #ff5a5f;background:#2a0b12;border-radius:4px;font-size:11px;line-height:1.3;color:#f3c4c6;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.mrt-detail b{color:#fff}
+.tv .mrt{padding:0 8px 6px}.tv .mrt-tile{padding:3px 5px}
+@media (prefers-reduced-motion:reduce){.mrt-tile.is-disrupted{animation:none}}
+@media(max-width:1699px) and (min-width:601px){.mrt-tile{padding:4px 4px;gap:4px}.mrt-tile em{letter-spacing:0;font-size:10.5px}.mrt-line{min-width:31px;font-size:10px}}
+/* restored 12 Nov 2026: MRT / LRT panel above the cameras in the right column */
+body .right-rail.cameras-only:has(#mrtPanel:not([hidden])){grid-template-rows:auto minmax(0,1fr)}
+@media(max-width:1199px){body .right-rail.cameras-only:has(#mrtPanel:not([hidden])){grid-template-rows:auto auto}}
+.mrt-panel .mrt{padding-top:2px}
