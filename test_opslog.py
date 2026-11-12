@@ -103,3 +103,13 @@ def test_workbook_opens():
     assert wb.sheetnames == ["Events", "Wet weather impact", "About"]
     assert wb["Events"]["A2"].value == "Bus bunching" and wb["Events"]["E2"].value == 12
     assert wb["Wet weather impact"]["A2"].value == "147"
+
+
+def test_short_traffic_events_not_logged():
+    base = {"kind": "incident", "status": "active", "cur": {"type": "Accident"}, "peak": {}, "match": {"147|1": {}}}
+    short = dict(base, id="INCIDENT-A-001", first_seen=ts(12, 8), last_seen=ts(12, 8, 10))                  # 10 min so far: not yet
+    long_ = dict(base, id="INCIDENT-B-001", first_seen=ts(12, 8), last_seen=ts(12, 8, 15))                  # 15 min: logged
+    gone = dict(base, id="WEATHER-C-001", kind="weather", status="cleared", first_seen=ts(12, 8), last_seen=ts(12, 8, 9), cleared_time=ts(12, 8, 12),
+                cur={"name": "C", "level": "moderate", "max_mm": 0.5})                                       # rain that lasted 12 min: never
+    rows = opslog.traffic_rows([short, long_, gone], ts(12, 8, 15), lambda e: e["id"], lambda e, m: None, 15)
+    assert [r["key"].split(":")[1] for r in rows] == ["INCIDENT-B-001"]

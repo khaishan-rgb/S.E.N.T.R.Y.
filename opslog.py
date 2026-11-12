@@ -126,12 +126,16 @@ def network_summary(stats):
 
 
 # --------------------------------------------------------------------------------------------- event log rows
-def traffic_rows(events, now, location_fn, delay_fn):
+def traffic_rows(events, now, location_fn, delay_fn, min_min=15):
     """Traffic-engine events (congestion / incident / roadworks / weather) that touch at least one bus route -> log rows.
-    location_fn(ev) -> text; delay_fn(ev, match) -> estimated delay minutes or None."""
+    Only events that have lasted min_min minutes or more are logged (short, flickering alerts are not), so one that is still going
+    appears once it reaches min_min. location_fn(ev) -> text; delay_fn(ev, match) -> estimated delay minutes or None."""
     rows = []
     for e in events:
         if e.get("status") not in ("active", "cleared") or str(e.get("id", "")).startswith("CAND-") or not e.get("match"):
+            continue
+        end_ = (e.get("cleared_time") if e["status"] == "cleared" else None) or e.get("last_seen") or now
+        if end_ - (e.get("first_seen") or now) < min_min * 60:
             continue
         c = e.get("cur") or {}
         keys, delays = [], []

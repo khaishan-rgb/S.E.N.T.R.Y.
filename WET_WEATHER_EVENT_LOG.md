@@ -19,8 +19,16 @@ of them. Refreshes every minute.
   shows "no measured trips"; nothing is guessed.
 - Choose the last 30, 60 or 120 days.
 
-**Event history.** Every bus bunching event, long headway, traffic alert and rain area that touched a bus route, with when it
-started and ended, the services and directions, where, and its peak:
+**Event history.** Bus bunching events, long headways, traffic alerts (congestion, incidents, road works) and rain areas that
+touched a bus route, with when they started and ended, the services and directions, where, and their peak.
+
+What is stored (so short, repeating alerts do not fill the log):
+- **Traffic, road works and wet weather:** only those that lasted **15 minutes or more** (`EVENTLOG_MIN_MINUTES`). One that is
+  still going is stored when it reaches 15 minutes; one that clears sooner is never stored.
+- **Bus bunching and long headway:** only those that ran over **10 bus stops or more** (`EVENTLOG_MIN_STOPS`).
+- Raising a limit later also removes stored rows below it.
+
+Peaks:
 - Bus bunching (2BB / 3BB...): closest headway. From the bunching collector, logged once it lasted the configured stops.
 - Long headway: largest headway and how many times the scheduled headway.
 - Traffic (congestion, incidents, road works): estimated extra minutes through the congested stretch.
@@ -48,6 +56,8 @@ Everything is in the SQLite file `BUNCHING_DB`. `render.yaml` now sets:
 | BUNCHING_DB | /var/data/bunching.db | the database file on that disk |
 | BUNCHING_ALWAYS_ON | 1 | keeps bunching and long-headway collection going with nobody watching |
 | EVENTLOG_KEEP_DAYS | optional, default 365 | how long the event log is kept |
+| EVENTLOG_MIN_MINUTES | optional, default 15 | traffic, road works and wet weather shorter than this are not stored |
+| EVENTLOG_MIN_STOPS | optional, default 10 | bus bunching and long headway over fewer stops are not stored |
 
 If your Render service was **not** created from this Blueprint, make the same changes by hand in the Render dashboard:
 Settings > Instance type: Starter; Disks > Add disk: mount path `/var/data`, 1 GB; Environment: `BUNCHING_DB=/var/data/bunching.db`

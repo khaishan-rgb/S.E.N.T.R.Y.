@@ -39,6 +39,10 @@ services:
         value: /var/data/bunching.db
       - key: EVENTLOG_KEEP_DAYS   # optional: days the event log (bunching, long headway, traffic, wet weather) is kept (default 365)
         sync: false
+      - key: EVENTLOG_MIN_MINUTES # optional: traffic, road works and wet weather are stored once they last this many minutes (default 15)
+        sync: false
+      - key: EVENTLOG_MIN_STOPS   # optional: bus bunching and long headway are stored when they ran over this many bus stops or more (default 10)
+        sync: false
       - key: BUNCHING_PERSISTENT  # optional: the dashboard guesses whether history survives an upload (a mounted disk); 1 / 0 overrides the guess
         sync: false
       - key: BUNCHING_KEEP_DAYS   # optional: days of bunching analytics kept (default 62 = 30 days + the 30 days before)

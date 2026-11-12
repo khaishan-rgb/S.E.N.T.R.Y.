@@ -6346,6 +6346,8 @@ async def tr_loop():
 import opslog  # noqa: E402
 
 EVLOG_KEEP_DAYS = max(30, int(os.getenv("EVENTLOG_KEEP_DAYS", "365") or 365))
+EVLOG_MIN_MIN = max(0.0, float(os.getenv("EVENTLOG_MIN_MINUTES", "15") or 15))      # traffic, road works, wet weather: logged once they last this long
+EVLOG_MIN_STOPS = max(0, int(os.getenv("EVENTLOG_MIN_STOPS", "10") or 10))          # bus bunching, long headway: logged when they ran over this many stops or more
 EVLOG = {"bb_id": 0, "gap_id": 0, "purged": 0.0, "err": None, "at": 0.0, "since": None, "wx": None, "wx_at": 0.0, "wx_days": None}
 
 
@@ -6357,8 +6359,15 @@ def evlog_init():
     for kind in ("BB", "GAP"):
         r = bb_sql("SELECT MAX(CAST(SUBSTR(key, ?) AS INTEGER)) n FROM ops_event WHERE key LIKE ?", (len(kind) + 2, kind + ":%"), fetch=True)
         EVLOG["bb_id" if kind == "BB" else "gap_id"] = int((r[0]["n"] if r else 0) or 0)
+    evlog_tidy()
     r = bb_sql("SELECT MIN(start_ts) t FROM ops_event", fetch=True)
     EVLOG["since"] = r[0]["t"] if r and r[0]["t"] else None
+
+
+def evlog_tidy():
+    """Remove log rows below the limits (rows saved before the limits existed, or after a limit is raised)."""
+    bb_sql("DELETE FROM ops_event WHERE category IN ('traffic', 'wet_weather') AND ongoing = 0 AND COALESCE(end_ts, last_ts, start_ts) - start_ts < ?", (EVLOG_MIN_MIN * 60,))
+    bb_sql("DELETE FROM ops_event WHERE category IN ('bunching', 'long_headway') AND CAST(json_extract(detail, '$.stops') AS INTEGER) < ?", (EVLOG_MIN_STOPS,))
 
 
 def evlog_put(rows):
@@ -6394,9 +6403,12 @@ async def evlog_sync(now):
         def delay(e, m):
             c = e.get("cur") or {}
             return traffic.estimate_delay_min(m.get("overlap_km") or 0, c.get("avg_kmh"), c.get("ref_kmh")) if e["kind"] == "congestion" else None
-        rows = opslog.traffic_rows(list(TR["book"]["events"].values()), now, traffic.location_text, delay)
+        rows = opslog.traffic_rows(list(TR["book"]["events"].values()), now, traffic.location_text, delay, EVLOG_MIN_MIN)
         st = await static()
         for r in bb_sql("SELECT * FROM bunching_event WHERE id > ? ORDER BY id LIMIT 500", (EVLOG["bb_id"],), fetch=True) or []:
+            EVLOG["bb_id"] = max(EVLOG["bb_id"], r["id"])
+            if (r.get("stops") or 0) < EVLOG_MIN_STOPS:
+                continue
             lvl = r.get("max_level")
             rows.append({"key": f"BB:{r['id']}", "category": "bunching", "kind": f"{lvl}BB" if lvl else "bunching", "start_ts": r["start_ts"],
                          "end_ts": r["end_ts"], "last_ts": r["end_ts"] or r["start_ts"], "ongoing": 0,
@@ -6404,21 +6416,23 @@ async def evlog_sync(now):
                          "services": [opslog.svc_key(r["service"], r["direction"])], "peak": r.get("min_hw"), "peak_unit": "min headway",
                          "level": f"{lvl} buses" if lvl else None, "source": "bunching collector",
                          "detail": {"stops": r.get("stops"), "buses": r.get("bus_group"), "from_stop": r.get("start_stop"), "to_stop": r.get("end_stop")}})
-            EVLOG["bb_id"] = max(EVLOG["bb_id"], r["id"])
         for r in bb_sql("SELECT * FROM gap_event WHERE id > ? ORDER BY id LIMIT 500", (EVLOG["gap_id"],), fetch=True) or []:
+            EVLOG["gap_id"] = max(EVLOG["gap_id"], r["id"])
+            if (r.get("stops") or 0) < EVLOG_MIN_STOPS:
+                continue
             ratio = r.get("max_ratio")
             loc = " → ".join(x for x in (_stop_nm(st, r.get("start_stop")), _stop_nm(st, r.get("end_stop"))) if x) or (r.get("location") or "")
             rows.append({"key": f"GAP:{r['id']}", "category": "long_headway", "kind": "long_headway", "start_ts": r["start_ts"], "end_ts": r["end_ts"],
                          "last_ts": r["end_ts"] or r["start_ts"], "ongoing": 0, "location": loc, "services": [opslog.svc_key(r["service"], r["direction"])],
                          "peak": r.get("max_hw"), "peak_unit": "min", "level": f"{ratio:.1f}x scheduled" if ratio else None, "source": "bunching collector",
                          "detail": {"scheduled_hw": r.get("sched_hw"), "ratio": ratio, "stops": r.get("stops"), "buses": r.get("buses")}})
-            EVLOG["gap_id"] = max(EVLOG["gap_id"], r["id"])
         evlog_put(rows)
         # an event the traffic engine no longer holds (e.g. after a restart) is closed at the last time it was seen
         bb_sql("UPDATE ops_event SET ongoing=0, end_ts=last_ts WHERE ongoing=1 AND last_ts < ?", (now - 1800,))
         if now - EVLOG["purged"] > 86400:
             EVLOG["purged"] = now
             bb_sql("DELETE FROM ops_event WHERE start_ts < ?", (now - EVLOG_KEEP_DAYS * 86400,))
+            evlog_tidy()
         EVLOG["at"], EVLOG["err"] = now, None
     except Exception as e:
         EVLOG["err"] = f"{type(e).__name__}: {e}"[:200]
@@ -6460,7 +6474,7 @@ def _evlog_range(days, d_from, d_to):
 
 
 def evlog_storage():
-    return {"persistent": bool(BB_PERSIST), "keep_days": EVLOG_KEEP_DAYS, "since": EVLOG["since"], "last_sync": EVLOG["at"] or None, "error": EVLOG["err"],
+    return {"persistent": bool(BB_PERSIST), "keep_days": EVLOG_KEEP_DAYS, "min_minutes": EVLOG_MIN_MIN, "min_stops": EVLOG_MIN_STOPS, "since": EVLOG["since"], "last_sync": EVLOG["at"] or None, "error": EVLOG["err"],
             "db": "persistent disk" if BB_PERSIST else "temporary (Render free plan: cleared on every restart)"}
 
 
@@ -6537,8 +6551,8 @@ async def api_events_export(cat: str = "", service: str = "", days: int = 30, d_
     note = (f"HORIZON operations event log, exported {now_sgt().strftime('%Y-%m-%d %H:%M')} SGT\n"
             f"Period: {opslog.sgt(d0).strftime('%Y-%m-%d %H:%M')} to {opslog.sgt(min(d1, time.time())).strftime('%Y-%m-%d %H:%M')}\n"
             "Traffic and wet weather: from the traffic engine (LTA speed bands, incidents, road works, TomTom / Waze when set, NEA rain gauges); "
-            "only events that touched a bus route. Traffic peak = estimated extra minutes through the congested stretch.\n"
-            "Bus bunching and long headway: from the bunching collector (LTA bus arrival data), logged once they lasted the configured number of stops.\n"
+            f"only events that touched a bus route and lasted {EVLOG_MIN_MIN:g} min or more. Traffic peak = estimated extra minutes through the congested stretch.\n"
+            f"Bus bunching and long headway: from the bunching collector (LTA bus arrival data), only those that ran over {EVLOG_MIN_STOPS} bus stops or more.\n"
             f"Wet weather impact: last 60 days of measured trips; a trip is wet at {opslog.WET_MM} mm of rain near the route, heavy at {opslog.HEAVY_MM} mm; "
             "compared with dry trips of the same service, direction and day type within 1 hour.")
     data = opslog.workbook(ev, stats, note)
