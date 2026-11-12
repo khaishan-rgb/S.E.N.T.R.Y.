@@ -220,3 +220,147 @@ def workbook(events, impact_rows, title_note=""):
     buf = io.BytesIO()
     wb.save(buf)
     return buf.getvalue()
+
+
+# --------------------------------------------------------------------------------------------- alert analysis + predictive insights
+def _day_type(dt):
+    return "weekend" if dt.weekday() >= 5 else "weekday"
+
+
+def analysis(events, now, days):
+    """Stored events over the last `days` -> counts by type, by hour of day (per type), top services and top places."""
+    cut = now - days * 86400
+    ev = [e for e in events if e["start_ts"] >= cut]
+    cats = list(CATEGORIES)
+    by_cat = {c: 0 for c in cats}
+    by_hour = {c: [0] * 24 for c in cats}
+    svc, place = {}, {}
+    for e in ev:
+        c = e["category"]
+        if c not in by_cat:
+            continue
+        by_cat[c] += 1
+        by_hour[c][sgt(e["start_ts"]).hour] += 1
+        for k in e.get("services") or []:
+            s = svc.setdefault(k, {"key": k, "total": 0, **{x: 0 for x in cats}})
+            s["total"] += 1
+            s[c] += 1
+        loc = (e.get("location") or "").strip()
+        if loc:
+            p = place.setdefault(loc, {"place": loc, "total": 0, "category": c, **{x: 0 for x in cats}})
+            p["total"] += 1
+            p[c] += 1
+    tot_h = [sum(by_hour[c][h] for c in cats) for h in range(24)]
+    peak = max(range(24), key=lambda h: tot_h[h]) if any(tot_h) else None
+    top_cat = max(by_cat, key=by_cat.get) if any(by_cat.values()) else None
+    days_seen = len({sgt(e["start_ts"]).date() for e in ev})
+    return {"days": days, "total": len(ev), "by_category": by_cat, "by_hour": by_hour, "peak_hour": peak, "top_category": top_cat,
+            "top_services": sorted(svc.values(), key=lambda x: (-x["total"], _svc_sort(x["key"])))[:10],
+            "top_places": sorted(place.values(), key=lambda x: -x["total"])[:8], "days_with_events": days_seen}
+
+
+def insights(events, now, since=None, wx_rows=None, wx_live=None, lookback=28, window_h=2):
+    """Patterns in the stored alerts -> short predictive insights. Every insight says what it is based on; nothing is invented.
+    1. likely in the next window_h hours: the same service (bunching / long headway) or place (traffic / wet weather) had an alert in this
+       time window on at least 3 days, and on at least 30% of the same-type days (weekday / weekend) recorded;
+    2. week-on-week change by type; 3. busiest hour; 4. rain now / services most slowed by rain."""
+    t = sgt(now)
+    dt = _day_type(t)
+    h0 = t.hour
+    hours = {(h0 + i) % 24 for i in range(window_h)}
+    first = since or min((e["start_ts"] for e in events), default=now)
+    cut = max(first, now - lookback * 86400)
+    # same-type days recorded in the look-back (today excluded: it is still happening)
+    n_days, d = 0, sgt(cut).date()
+    while d < t.date():
+        if _day_type(datetime(d.year, d.month, d.day, tzinfo=SGT)) == dt:
+            n_days += 1
+        d += timedelta(days=1)
+    out = []
+    span_days = (now - first) / 86400
+    if span_days < 3 or n_days < 3:
+        out.append({"kind": "learning", "level": "info", "title": "Still learning the patterns",
+                    "detail": f"{max(0, round(span_days, 1))} days of alerts stored. Predictions appear once at least 3 {dt}s are recorded.",
+                    "basis": "stored alert history"})
+    else:
+        groups = {}
+        for e in events:
+            if e["start_ts"] < cut or e["start_ts"] >= now - 60:
+                continue
+            s = sgt(e["start_ts"])
+            if s.date() >= t.date() or _day_type(s) != dt or s.hour not in hours:
+                continue
+            if e["category"] in ("bunching", "long_headway"):
+                keys = [(e["category"], k) for k in (e.get("services") or [])]
+            else:
+                keys = [(e["category"], e.get("location") or "")] if e.get("location") else []
+            for key in keys:
+                g = groups.setdefault(key, {"dates": set(), "places": {}, "services": {}, "peaks": []})
+                g["dates"].add(s.date())
+                if e.get("location"):
+                    g["places"][e["location"]] = g["places"].get(e["location"], 0) + 1
+                for k in e.get("services") or []:
+                    g["services"][k] = g["services"].get(k, 0) + 1
+                if e.get("peak") is not None:
+                    g["peaks"].append(e["peak"])
+        cand = []
+        for (cat, key), g in groups.items():
+            hits = len(g["dates"])
+            share = hits / n_days
+            if hits >= 3 and share >= 0.3:
+                cand.append((share * min(hits, 10), cat, key, hits, share, g))
+        win = f"{h0:02d}:00–{(h0 + window_h) % 24:02d}:00"
+        for _, cat, key, hits, share, g in sorted(cand, key=lambda x: -x[0])[:5]:
+            pk = statistics.median(g["peaks"]) if g["peaks"] else None
+            if cat in ("bunching", "long_headway"):
+                s_, _, d_ = key.partition(":")
+                where = max(g["places"], key=g["places"].get) if g["places"] else ""
+                title = f"Service {s_} Dir {d_}: {CATEGORIES[cat].lower()} likely {win}"
+                detail = (f"Happened on {hits} of the last {n_days} {dt}s in this window" + (f", mostly {where}" if where else "")
+                          + (f"; typical {'closest headway' if cat == 'bunching' else 'longest headway'} {pk:.1f} min" if pk is not None else "") + ".")
+                svcs = [key]
+            else:
+                top = sorted(g["services"], key=lambda k: -g["services"][k])[:6]
+                title = f"{'Rain' if cat == 'wet_weather' else 'Traffic'} likely {win}: {key[:70]}"
+                detail = (f"On {hits} of the last {n_days} {dt}s in this window"
+                          + (f"; usually +{pk:.1f} min delay" if pk is not None and cat == "traffic" else f"; up to {pk:.1f} mm" if pk is not None else "")
+                          + (f". Affects {', '.join(x.replace(':', ' D') for x in top)}" if top else "") + ".")
+                svcs = top
+            out.append({"kind": "likely", "level": "high" if share >= 0.6 else "medium", "category": cat, "title": title, "detail": detail,
+                        "likelihood": round(share * 100), "services": svcs, "basis": f"{hits}/{n_days} {dt}s, last {lookback} days"})
+        # week on week
+        a = [e for e in events if now - 7 * 86400 <= e["start_ts"] < now]
+        b = [e for e in events if now - 14 * 86400 <= e["start_ts"] < now - 7 * 86400]
+        if span_days >= 14:
+            for cat, name in CATEGORIES.items():
+                x, y = sum(1 for e in a if e["category"] == cat), sum(1 for e in b if e["category"] == cat)
+                if y >= 5 and x >= y * 1.3:
+                    out.append({"kind": "trend", "level": "medium", "category": cat, "title": f"{name} up {round(100 * (x - y) / y)}% this week",
+                                "detail": f"{x} in the last 7 days against {y} the week before.", "basis": "last 14 days"})
+                elif y >= 5 and x <= y * 0.7:
+                    out.append({"kind": "trend", "level": "info", "category": cat, "title": f"{name} down {round(100 * (y - x) / y)}% this week",
+                                "detail": f"{x} in the last 7 days against {y} the week before.", "basis": "last 14 days"})
+        # busiest hour per type
+        rec = [e for e in events if e["start_ts"] >= cut]
+        for cat, name in CATEGORIES.items():
+            hs = [sgt(e["start_ts"]).hour for e in rec if e["category"] == cat]
+            if len(hs) >= 10:
+                h = max(range(24), key=hs.count)
+                out.append({"kind": "peak", "level": "info", "category": cat, "title": f"{name} peaks {h:02d}:00–{(h + 1) % 24:02d}:00",
+                            "detail": f"{hs.count(h)} of {len(hs)} ({round(100 * hs.count(h) / len(hs))}%) in the last {lookback} days started in that hour.",
+                            "basis": f"last {lookback} days"})
+    # rain
+    if wx_live and wx_live.get("services"):
+        sv = [s for s in wx_live["services"] if s.get("expected_min") is not None][:4]
+        areas = ", ".join(a["name"] for a in (wx_live.get("areas") or [])[:3])
+        out.insert(0, {"kind": "rain_now", "level": "high", "category": "wet_weather", "title": f"Raining on bus routes now: {areas}",
+                       "detail": (f"{len(wx_live['services'])} services in rain. " + ("Usually adds " + ", ".join(f"{s['service']} D{s['dir']} +{s['expected_min']:.1f} min" for s in sv) + "."
+                                  if sv else "No measured wet trips yet for these services.")),
+                       "services": [f"{s['service']}:{s['dir']}" for s in wx_live["services"][:8]], "basis": "NEA rain gauges + measured trips"})
+    elif wx_rows:
+        top = [r for r in wx_rows if r.get("added_min") is not None and r["added_min"] >= 1][:3]
+        if top:
+            out.append({"kind": "rain_impact", "level": "info", "category": "wet_weather", "title": "If it rains: services most slowed",
+                        "detail": ", ".join(f"{r['service']} D{r['dir']} +{r['added_min']:.1f} min" for r in top) + " (median of wet vs dry trips).",
+                        "services": [f"{r['service']}:{r['dir']}" for r in top], "basis": "measured trips, last 60 days"})
+    return out

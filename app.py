@@ -6542,6 +6542,23 @@ async def api_events_log(cat: str = "", service: str = "", days: int = 7, d_from
     return {"events": ev, "counts": counts, "from": d0, "to": d1, "categories": opslog.CATEGORIES, "storage": evlog_storage()}
 
 
+@app.get("/api/events/insights")
+async def api_events_insights(days: int = 30):
+    """Alert analysis (by type, hour, service, place) and predictive insights from the stored event log. Cached 5 minutes."""
+    days = max(1, min(90, int(days or 30)))
+    now = time.time()
+    hit = EVLOG.get("ins")
+    if hit and hit[0] == days and now - hit[1] < 300:
+        return hit[2]
+    ev = evlog_query("", "", now - max(days, 28) * 86400, now + 60, "", 50000)
+    stats = wx_stats()
+    rows = sorted(stats.values(), key=lambda x: -(x["added_min"] if x["added_min"] is not None else -99))
+    out = {"analysis": opslog.analysis(ev, now, days), "insights": opslog.insights(ev, now, EVLOG["since"], rows, wx_now(stats)),
+           "generated": now, "storage": evlog_storage()}
+    EVLOG["ins"] = (days, now, out)
+    return out
+
+
 @app.get("/api/events/export.xlsx")
 async def api_events_export(cat: str = "", service: str = "", days: int = 30, d_from: str = "", d_to: str = "", q: str = ""):
     from fastapi.responses import Response
@@ -6907,9 +6924,11 @@ async def ai_centre_page():
 
 @app.get("/assistant.js")
 @app.get("/assistant.css")
+@app.get("/ops-centre.js")
+@app.get("/ops-centre.css")
 async def assistant_asset(request: Request):
     from fastapi.responses import Response
-    name = request.url.path.rsplit("/", 1)[-1]
+    name = request.url.path.rsplit("/", 1)[-1].replace("ops-centre", "ops_centre")       # 12 Nov: AI Operations Centre layout (ops_centre.js / .css)
     return Response((HERE / name).read_text(encoding="utf-8"), media_type="application/javascript" if name.endswith(".js") else "text/css",
                     headers={"Cache-Control": "no-cache"})
 
@@ -8699,6 +8718,8 @@ Each question arrives with a JSON message. Use only what is in it. Sources that 
    usually adds to that direction's running time (median of wet trips minus comparable dry trips, same day type, within 1 hour), with its basis.
    added_min null = not enough measured wet trips: say the impact is not measured yet; never guess a number.
    directions[].wet_weather gives the same for a named service: in_rain_now, added_min_expected, added_min_heavy, wet_trips, confidence.
+9. predictive_insights: patterns found in the stored alert history (e.g. a service that had bunching in this time window on most recent
+   weekdays). They are likelihoods from history, not live observations: say "likely" / "on N of the last M weekdays", never "is happening".
 8. event_log (in service_checks): the stored history of bus bunching, long headway, traffic alerts and rain areas for that service in the window
    (counts by category and the latest few). Use it for "what happened" questions. An empty log over a short or unmonitored period is not proof of normal.
 
@@ -8934,6 +8955,12 @@ def assistant_snapshot(ctx):
         snap["wet_weather_now"] = {"rain_areas": [{"name": a["name"], "level": a["level"], "max_mm": a["max_mm"], "services": a["services"]} for a in wn["areas"][:8]],
                                    "services_in_rain": [{"svc": x["service"], "dir": x["dir"], "area": x["area"], "level": x["level"], "added_min": x["expected_min"], "basis": x["basis"]}
                                                         for x in wn["services"][:40]], "feed_ok": wn["feed_ok"]}
+    except Exception:
+        pass
+    try:                                                                       # 12 Nov: patterns found in the stored alerts (AI Operations Centre insights)
+        hit = EVLOG.get("ins")
+        if hit and time.time() - hit[1] < 900:
+            snap["predictive_insights"] = [{k: i.get(k) for k in ("title", "detail", "basis", "likelihood")} for i in hit[2]["insights"][:6]]
     except Exception:
         pass
     snap["now_sg"] = datetime.now(SGT).strftime("%Y-%m-%d %H:%M")

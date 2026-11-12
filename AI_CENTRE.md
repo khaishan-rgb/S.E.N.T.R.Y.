@@ -6,6 +6,26 @@ an answer in English, 中文 or Bahasa Melayu, on screen and read aloud.
 
 The Forecast Centre page (/command, /forecast) is unchanged apart from one new top link, "AI OPERATIONS".
 
+## Layout (redesigned 12 Nov 2026)
+
+`/ai-centre` has its own layout (`ops_centre.js` / `ops_centre.css`, loaded only on this page; the Forecast Centre is unchanged):
+
+| Where | Panel | From |
+|---|---|---|
+| Left top | **Alerts now**: counts of 3BB bunching, long headway, traffic, wet weather, heavy loading (tap to filter the list) | the page's live data |
+| Left | **Wet weather now**: rain areas and the services in them, with the minutes rain usually adds | `/api/weather/impact` |
+| Centre | Map (as before) | |
+| Right top | **AI predictive insights**: what is likely in the next 2 hours, week-on-week changes, busiest hours, rain now | stored alerts, `/api/events/insights` (every 5 min) |
+| Right | MRT / LRT status (as before) | |
+| Bottom left | **Alerts**: one list for bunching, long headway, traffic and incidents, rain (and heavy loading), each with "Ask AI" | live data |
+| Bottom middle | **Alert analysis**: which alert, which hour, which services, where (7 or 30 days) | stored alerts |
+| Bottom right | **Live CCTV** (the camera panel, as before) | |
+
+How an insight is made: for the next 2 hours, a service (bunching, long headway) or a place (traffic, rain) is "likely" when it had an
+alert in the same hours on at least 3 days and on at least 30% of the same kind of day (weekday / weekend) in the last 28 days. Each
+insight shows its basis (for example "17/20 weekdays"). With under 3 days of history it says it is still learning. HORIZON AI also
+receives these insights. The history only lasts on a persistent disk (see WET_WEATHER_EVENT_LOG.md).
+
 ## What it does
 
 - **Answers from the page.** Each question sends what the page already shows (top 30 alerts, 12 recommendations,

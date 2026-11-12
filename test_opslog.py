@@ -113,3 +113,56 @@ def test_short_traffic_events_not_logged():
                 cur={"name": "C", "level": "moderate", "max_mm": 0.5})                                       # rain that lasted 12 min: never
     rows = opslog.traffic_rows([short, long_, gone], ts(12, 8, 15), lambda e: e["id"], lambda e, m: None, 15)
     assert [r["key"].split(":")[1] for r in rows] == ["INCIDENT-B-001"]
+
+
+def _history(now_dt):
+    """4 weeks: 147 D1 bunching most weekdays 17:10, PIE congestion on weekdays 17:30, scattered gaps."""
+    ev, n = [], 0
+    for back in range(1, 29):
+        d = now_dt - timedelta(days=back)
+        if d.weekday() < 5:
+            if back % 5 != 0:
+                ev.append({"category": "bunching", "kind": "3BB", "start_ts": d.replace(hour=17, minute=10).timestamp(), "services": ["147:1"],
+                           "location": "Clementi Int → Blk 431", "peak": 0.9})
+            if back % 2 == 0:
+                ev.append({"category": "traffic", "kind": "congestion", "start_ts": d.replace(hour=17, minute=30).timestamp(), "services": ["147:1", "174:1"],
+                           "location": "PIE (Clementi Ave 6 → Toh Guan Rd)", "peak": 6.0})
+        ev.append({"category": "long_headway", "kind": "long_headway", "start_ts": d.replace(hour=8, minute=5).timestamp(), "services": [f"{65 + back % 3}:2"],
+                   "location": "Orchard", "peak": 22.0})
+    return ev
+
+
+from datetime import timedelta  # noqa: E402
+
+
+def test_analysis_counts():
+    now_dt = datetime(2026, 11, 12, 16, 50, tzinfo=TZ)            # a Thursday
+    a = opslog.analysis(_history(now_dt), now_dt.timestamp(), 30)
+    assert a["by_category"]["bunching"] > 10 and a["by_category"]["long_headway"] == 28
+    assert a["by_hour"]["bunching"][17] == a["by_category"]["bunching"] and a["by_hour"]["long_headway"][8] == 28
+    assert a["top_services"][0]["key"] == "147:1"
+    assert a["top_places"][0]["place"].startswith("Long") is False
+
+
+def test_insights_predict_the_pattern():
+    now_dt = datetime(2026, 11, 12, 16, 50, tzinfo=TZ)
+    ins = opslog.insights(_history(now_dt), now_dt.timestamp(), (now_dt - timedelta(days=28)).timestamp())
+    likely = [i for i in ins if i["kind"] == "likely"]
+    assert likely and likely[0]["title"].startswith("Service 147 Dir 1: bus bunching likely 16:00")
+    assert likely[0]["likelihood"] >= 60 and "of the last" in likely[0]["detail"]
+    assert any(i["category"] == "traffic" and "PIE" in i["title"] for i in likely)
+    assert any(i["kind"] == "peak" for i in ins)
+
+
+def test_insights_say_when_history_is_short():
+    now_dt = datetime(2026, 11, 12, 16, 50, tzinfo=TZ)
+    ev = [e for e in _history(now_dt) if e["start_ts"] > (now_dt - timedelta(days=2)).timestamp()]
+    ins = opslog.insights(ev, now_dt.timestamp(), (now_dt - timedelta(days=2)).timestamp())
+    assert ins[0]["kind"] == "learning"
+
+
+def test_insights_rain_now_first():
+    now_dt = datetime(2026, 11, 12, 16, 50, tzinfo=TZ)
+    live = {"areas": [{"name": "Clementi"}], "services": [{"service": "147", "dir": 1, "expected_min": 6.0}, {"service": "156", "dir": 2, "expected_min": None}]}
+    ins = opslog.insights(_history(now_dt), now_dt.timestamp(), None, None, live)
+    assert ins[0]["kind"] == "rain_now" and "147 D1 +6.0 min" in ins[0]["detail"]
