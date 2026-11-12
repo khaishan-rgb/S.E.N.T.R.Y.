@@ -4,7 +4,8 @@ import {boardModel,loadingCard,trafficCard,headwayCard,emptyState,paginate} from
 const $=id=>document.getElementById(id),query=new URLSearchParams(location.search);
 const initial=initialView(query,{mode:document.documentElement.dataset.defaultMode||'live',horizon:document.documentElement.dataset.defaultHorizon||0});
 if(initial.h===120)initial.h=60;   // old links to the retired NEXT 2H view open the 60-minute view
-const state={...initial,scenario:query.get('scenario')||'combined',tick:0,services:[],exclude:false,category:'all',tv:query.get('present')==='1',tab:'active',page:0,playing:false,search:'',catalog:[],operator:'',headwayScope:'network',headwayDirection:'all',headwayInterval:60,analysis:'headway',delayMin:5,data:null};
+initial.h=0;   // 12 Nov: forecast horizons (NEXT 15/30/60) removed; the page always shows NOW
+const state={...initial,scenario:query.get('scenario')||'combined',tick:0,services:[],exclude:false,category:'all',tv:query.get('present')==='1',tab:'active',page:0,playing:false,search:'',catalog:[],operator:'',headwayScope:'network',headwayDirection:'all',headwayInterval:60,analysis:'headway',delayMin:15,data:null};
 let requestId=0,controller=null,playTimer=null,lastFocus=null,modalFocus=null,cameraTime=0,cameraPoint=null,cameraRows=[],cameraMeta={},cameraRequest=0,headwayData=null; 
 const spotlight={enabled:query.get('tour')!=='0',current:null,step:-1,cursor:0,deck:[],nextAt:0,pausedUntil:0,baseAnalysis:'headway',baseHeadway:{scope:'network',direction:'all'}};
 const networkMap=new ForecastMap($('networkMap'),(svc,point)=>point?loadCameras(point):selectService(svc));
@@ -21,7 +22,7 @@ function updateStatus(){let d=state.data,miss=missingSources(d),q=quality(d.mode
  $('systemStatus').title=(d.error?'Data error: '+d.error+'\n':'')+(miss.length?'No data at this time for:\n· '+miss.join('\n· '):'All four data sources available');let age=Math.max(0,Math.round(Date.now()/1000-d.updated));$('mapFreshness').textContent=(d.mode==='demo'?'SIMULATED · ':age>150?'DELAYED · ':'OBSERVED · ')+timeString(d.updated)+' SGT';}
 function controls(){
  networkMap.setSelection(state.services);
- $('timeline').innerHTML=HORIZONS.filter(h=>h!==120).map(h=>`<button data-h="${h}" aria-pressed="${state.h===h}">${h===0?'NOW':h===120?'NEXT 2H':'NEXT '+h+'M'}</button>`).join('');
+ $('timeline').innerHTML='';$('timeline').hidden=true;
  document.querySelectorAll('[data-mode]').forEach(b=>{b.classList.toggle('active',b.dataset.mode===state.mode);b.setAttribute('aria-pressed',b.dataset.mode===state.mode);});
  document.querySelectorAll('[data-category]').forEach(b=>{b.classList.toggle('active',b.dataset.category===state.category);b.setAttribute('aria-pressed',b.dataset.category===state.category);});
  $('demoControls').hidden=state.mode!=='demo';$('scenario').value=state.scenario;$('excludeCBS').checked=state.exclude;
@@ -163,6 +164,9 @@ function paintMRT(){const box=$('mrtStatus'),panel=$('mrtPanel');if(!box||!panel
  const detail=l=>{const seg=(l.segments||[])[0],msg=(l.messages||[])[0];const t=seg?[seg.direction&&('Towards '+seg.direction),seg.stations&&('Stations '+seg.stations.replace(/,/g,', ')),seg.free_bus&&('Free bus: '+seg.free_bus),seg.shuttle&&('MRT shuttle: '+seg.shuttle)].filter(Boolean).join(' · '):(msg?msg.text:'');
   return `<p class="mrt-detail" title="${tip(l)}"><b>${esc(l.line)}</b> ${esc(l.name)}${t?' · '+esc(t):''}</p>`;};
  box.innerHTML=`<div class="mrt-grid">${L.map(tile).join('')}</div>`+bad.map(detail).join('');}
+/* 12 Nov: the map legend can be minimised; the choice is remembered in this browser */
+(function(){const b=$('mapKeyToggle'),k=$('mapKey');if(!b||!k)return;const set=open=>{k.classList.toggle('collapsed',!open);b.setAttribute('aria-expanded',open?'true':'false');try{localStorage.setItem('fc.legend',open?'1':'0');}catch(e){}};
+ let open=true;try{open=localStorage.getItem('fc.legend')!=='0';}catch(e){}set(open);b.onclick=()=>set(k.classList.contains('collapsed'));})();
 function paintCameraAI(){const box=$('crossings');const ai=state.mode==='demo'?null:cameraAI;
  document.querySelectorAll('[data-cam-level]').forEach(el=>{const r=ai?.cameras?.[el.dataset.camLevel];el.hidden=!r?.level;if(r?.level){el.className='cam-level '+(LEVEL_CLASS[r.level]||'');el.textContent=(r.source==='AI camera analytics'?'AI · ':'')+r.level.toUpperCase();el.title=r.source+(r.speed!=null?` · ${r.speed}–${r.free_speed} km/h`:'')+(r.confidence!=null?` · confidence ${Math.round(r.confidence*100)}%`:'');}});
  if(!box)return;const rows=ai?.crossings||[];box.hidden=!ai;if(!ai)return;if(!rows.length){box.innerHTML=`<div class="xing-off">${esc(cameraAIStatus(ai))}</div>`;return;}
