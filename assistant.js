@@ -57,7 +57,8 @@
      The picture is warped, not redrawn: he breathes, sways a little and blinks, and when he talks his jaw drops, the lips part
      (teeth and mouth inside are painted in) and they widen or round with the letters. Face points below are in the picture's
      own pixels (320 x 427, head-and-shoulders crop). If the picture or WebGL is missing, the plain picture is shown. */
-  var OFFICER_IMG = "/brand/assistant-officer.webp";
+  var OFFICER_V = "2026-11-12c";   // change this whenever assistant-officer.glb or .webp is replaced: browsers keep /brand/ files for a day
+  var OFFICER_IMG = "/brand/assistant-officer.webp?v=" + OFFICER_V;
   var OFF_PTS = {W: 320, H: 427, eyeL: [128.1, 138.2, 15.1, 3.7], eyeR: [187.5, 138.4, 14.3, 4.0],  // centre x, y, half width, half height
     mouth: [157.3, 198.0, 25.1, 3.4], chin: 234.4, brow: 123.2, pivot: [160.4, 265.2]};          // centre x, lip line y at centre, half width, smile lift at corners
   var OFF_VS = "attribute vec2 aP;varying vec2 vUv;void main(){vUv=vec2(aP.x*.5+.5,.5-aP.y*.5);gl_Position=vec4(aP,0.,1.);}";
@@ -147,7 +148,7 @@
      turns and nods his head, blinks, and when he talks his jaw drops and his lips part, widen or round with the letters.
      The face points below are in the model's own metres (Y up, Z towards the viewer). The animated portrait shows while the
      model loads (about 4 MB, then cached), and stays if the model or WebGL cannot be used. */
-  var OFFICER_GLB = "/brand/assistant-officer.glb", O3GLB = null;
+  var OFFICER_GLB = "/brand/assistant-officer.glb?v=" + OFFICER_V, O3GLB = null;
   var O3 = {mouth: [-0.0128, 1.0504, 0.0170, 0.0023],        // centre x, lip line y at the centre, half width, how much higher the corners are
     chin: 1.0254, neck: [-0.0107, 1.0002, -0.0211], brow: 1.101,   // chin y; neck centre (head turns about it); brow y
     eyeL: [-0.0328, 1.0911, 0.0103, 0.0025], eyeR: [0.0078, 1.091, 0.0098, 0.0027], lid: [0.76, 0.57, 0.48],   // eye centre x, y, half width, half height; eyelid colour

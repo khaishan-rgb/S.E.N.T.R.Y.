@@ -29,6 +29,8 @@ The Forecast Centre page (/command, /forecast) is unchanged apart from one new t
     To use a different 3D model, it must be one mesh with Y up and the face towards +Z; then update the eye, mouth,
     chin, brow and neck positions in `O3` at the top of the "Officer in 3D" code in `assistant.js`, and remake the still
     picture and its points (`OFF_PTS`). A rigged model (skeleton and face shapes) would need a different player.
+    Browsers keep `/brand/` files for a day, so after replacing `assistant-officer.glb` or `.webp`, change `OFFICER_V`
+    at the top of the Officer code in `assistant.js`; every browser then loads the new files straight away.
     Every browser switches to the Officer once; anyone can switch to another face.
   - **AI**: a holographic head made of slices of light, like the AI in films, drawn live in the browser (WebGL). It turns
     its head, blinks, and its jaw and lips follow the words. It glows with the voice, turns violet while it checks the data
