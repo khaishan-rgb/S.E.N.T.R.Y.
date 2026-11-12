@@ -75,7 +75,7 @@
 .hai-fab .mini svg,.hai-fab .mini img{width:100%;height:100%;display:block;object-fit:cover}
 .hai-officer,.hai-officer-img{position:absolute;inset:0;display:block;width:100%;height:100%;object-fit:cover}
 .hai-face.tall:not(.holo){box-shadow:0 0 0 1px rgba(63,211,255,.45),0 0 calc(10px + var(--lv,0)*26px) rgba(63,211,255,calc(.25 + var(--lv,0)*.5))}
-.hai-offmini{display:block;width:100%;height:100%;background-size:140% auto;background-position:49% 5%;background-repeat:no-repeat}
+.hai-offmini{display:block;width:100%;height:100%;background-size:140% auto;background-position:50% 9%;background-repeat:no-repeat}
 .hai-face.holo{background:radial-gradient(circle at 50% 36%,#0d2c56,#030a18 78%);box-shadow:0 0 0 1px rgba(63,211,255,.45),inset 0 -30px 40px -20px rgba(63,211,255,.22),0 0 calc(12px + var(--lv,0)*30px) rgba(63,211,255,calc(.28 + var(--lv,0)*.5))}
 .hai-face.holo::after{content:"";position:absolute;left:8%;right:8%;bottom:5px;height:9px;border-radius:50%;background:radial-gradient(closest-side,rgba(63,211,255,.75),transparent);filter:blur(2px);pointer-events:none}
 .hai-holo{display:block;width:100%;height:100%;filter:drop-shadow(0 0 5px rgba(63,211,255,.55))}

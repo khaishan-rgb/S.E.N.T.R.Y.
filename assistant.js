@@ -53,13 +53,13 @@
   var clock = function(){ return new Date().toLocaleTimeString("en-SG", {hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Asia/Singapore"}); };
 
   /* ---------------- faces ---------------- */
-  /* Officer: the portrait assistant-officer.webp (served as /brand/assistant-officer.webp), brought to life in WebGL.
+  /* Officer: the portrait assistant-officer.webp (served as /brand/assistant-officer.webp; a still of the 3D model, same camera), brought to life in WebGL.
      The picture is warped, not redrawn: he breathes, sways a little and blinks, and when he talks his jaw drops, the lips part
      (teeth and mouth inside are painted in) and they widen or round with the letters. Face points below are in the picture's
      own pixels (320 x 427, head-and-shoulders crop). If the picture or WebGL is missing, the plain picture is shown. */
   var OFFICER_IMG = "/brand/assistant-officer.webp";
-  var OFF_PTS = {W: 320, H: 427, eyeL: [131.5, 128.7, 13.5, 3.9], eyeR: [186, 128.4, 12, 3.9],      // centre x, y, half width, half height
-    mouth: [159, 181.3, 21.75, 2.6], chin: 218, brow: 114, pivot: [159, 238]};                    // centre x, lip line y at centre, half width, smile lift at corners
+  var OFF_PTS = {W: 320, H: 427, eyeL: [128.1, 138.2, 15.1, 3.7], eyeR: [187.5, 138.4, 14.3, 4.0],  // centre x, y, half width, half height
+    mouth: [157.3, 198.0, 25.1, 3.4], chin: 234.4, brow: 123.2, pivot: [160.4, 265.2]};          // centre x, lip line y at centre, half width, smile lift at corners
   var OFF_VS = "attribute vec2 aP;varying vec2 vUv;void main(){vUv=vec2(aP.x*.5+.5,.5-aP.y*.5);gl_Position=vec4(aP,0.,1.);}";
   var OFF_FS = "precision mediump float;varying vec2 vUv;uniform sampler2D uT;uniform vec4 uM;uniform vec4 uA;uniform vec2 uB;"   // uM open, wide, round, level; uA time, head angle, nod, breathe; uB blink, unused
     + "uniform vec4 uE1,uE2,uMo;uniform vec3 uK;"            // eyes; mouth; chin, brow, pivot y
@@ -148,23 +148,23 @@
      The face points below are in the model's own metres (Y up, Z towards the viewer). The animated portrait shows while the
      model loads (about 4 MB, then cached), and stays if the model or WebGL cannot be used. */
   var OFFICER_GLB = "/brand/assistant-officer.glb", O3GLB = null;
-  var O3 = {mouth: [-0.0124, 1.0517, 0.0186, 0.0019],        // centre x, lip line y at the centre, half width, how much higher the corners are
-    chin: 1.025, neck: [-0.0088, 0.9996, -0.0333],            // chin y; neck centre (head turns about it)
-    eyeL: [-0.032, 1.0932, 0.0098, 0.0031], eyeR: [0.0064, 1.093, 0.008, 0.0033], lid: [0.67, 0.47, 0.39],   // eye centre x, y, half width, half height; eyelid colour
-    look: [-0.009, 1.005, 0.0], frameH: 0.205};                  // camera aims here; half the height shown (m)
-  var O3_VS = "attribute vec3 aP,aN;attribute vec2 aU;uniform vec4 uQ;uniform mat4 uVP;uniform vec4 uM,uH,uMo,uK;"
+  var O3 = {mouth: [-0.0128, 1.0504, 0.0170, 0.0023],        // centre x, lip line y at the centre, half width, how much higher the corners are
+    chin: 1.0254, neck: [-0.0107, 1.0002, -0.0211], brow: 1.101,   // chin y; neck centre (head turns about it); brow y
+    eyeL: [-0.0328, 1.0911, 0.0103, 0.0025], eyeR: [0.0078, 1.091, 0.0098, 0.0027], lid: [0.76, 0.57, 0.48],   // eye centre x, y, half width, half height; eyelid colour
+    look: [-0.011, 1.038, 0.0], frameH: 0.155};                  // camera aims here; half the height shown (m)
+  var O3_VS = "attribute vec4 aP;attribute vec3 aN;attribute vec2 aU;uniform vec4 uQ;uniform mat4 uVP;uniform vec4 uM,uH,uMo,uK;uniform float uBr;"
     + "varying vec2 vU;varying vec3 vN,vW,vM;varying float vG,vL;"
     + "float g(float v,float s){return exp(-v*v/(2.*s*s));}"
     + "mat3 rY(float a){float c=cos(a),s=sin(a);return mat3(c,0.,-s,0.,1.,0.,s,0.,c);}mat3 rX(float a){float c=cos(a),s=sin(a);return mat3(1.,0.,0.,0.,c,s,0.,-s,c);}"
-    + "void main(){vec3 p=aP*uQ.w+uQ.xyz,n=aN;vM=p;"
-    + "float front=smoothstep(uK.w+.02,uK.w+.05,p.z);float near=front*step(abs(p.x-uMo.x),.07);"
+    + "void main(){vec3 p=aP.xyz*uQ.w+uQ.xyz,n=aN;vM=p;float flex=1.-clamp(aP.w/32767.,0.,1.);"
+    + "float front=smoothstep(uK.w+.02,uK.w+.05,p.z);float near=front*step(abs(p.x-uMo.x),.07)*flex;"
     + "float hw=uMo.z*(1.+.12*uM.y-.22*uM.z);float dx=(p.x-uMo.x)/hw;float ln=pow(max(0.,1.-dx*dx),1.15);float lw=g(p.x-uMo.x,.028);"
     + "float dd=(p.x-uMo.x)/uMo.z;float dl=uMo.y+uMo.w*min(dd*dd,1.)-p.y;float below=step(0.,dl);"
     // jaw drops below the lip line (lips first, the chin with them), upper lip lifts a little, lips widen or round
     + "float D=uM.x*.0072*mix(ln,lw,smoothstep(0.,.012,dl))*smoothstep(uK.x-.02,uK.x-.004,p.y)*below*near;p.y-=D;p.z-=D*.25;"
     + "p.y+=(1.-below)*near*uM.x*.0013*ln*g(dl,.004);"
     + "float mm=near*g(dl,.006)*g(p.x-uMo.x,.022);p.x=uMo.x+(p.x-uMo.x)*(1.+(.08*uM.y-.14*uM.z)*mm);p.z+=uM.z*.002*mm;"
-    + "p.y+=uM.w*.0007*g(p.y-1.105,.004)*near;"                                   // brows lift with the voice
+    + "p.y+=uM.w*.0007*g(p.y-uBr,.004)*near;"                                   // brows lift with the voice
     + "vG=below;vL=ln*near;"
     // breathing, then the head turns and nods about the neck (not the raised hand), then the whole body sways
     + "p.y+=uH.z*.0012*smoothstep(.7,.98,p.y);p.z+=uH.z*.0015*g(p.y-.88,.06)*step(uK.w,p.z);"
@@ -177,7 +177,7 @@
     + "vec3 lid(vec3 c,vec4 E){vec2 e=(vM.xy-E.xy)/E.zw;if(uB<=0.||abs(e.x)>=1.||vM.z<.02)return c;float h=sqrt(1.-e.x*e.x),yt=h*1.05,ed=mix(yt,-.85*h,uB);"
     + "if(e.y>yt+.6||e.y<ed-.05)return c;vec3 l=mix(uLid,uLid*.3,smoothstep(.22,0.,e.y-ed)*.85);"
     + "return mix(c,l,smoothstep(yt+.6,yt,e.y)*smoothstep(ed-.05,ed+.03,e.y)*smoothstep(1.,.8,abs(e.x)));}"
-    + "void main(){vec3 c=texture2D(uT,vU).rgb;c=lid(c,uE1);c=lid(c,uE2);"
+    + "void main(){vec3 c=texture2D(uT,vU,-.6).rgb;c=lid(c,uE1);c=lid(c,uE2);"
     + "vec3 n=normalize(vN),v=normalize(uCam-vW);if(dot(n,v)<0.)n=-n;"
     + "float key=max(dot(n,normalize(vec3(-.45,.55,.7))),0.),fill=max(dot(n,normalize(vec3(.7,.1,.5))),0.),rim=pow(1.-max(dot(n,v),0.),3.);"
     + "vec3 col=c*(.5+.42*key+.14*fill)+uRim*rim*(.22+.3*uM.w);"
@@ -195,9 +195,11 @@
       var att = function(k){ var a = J.accessors[pr.attributes[k]], v = bv(a.bufferView); return {data: v.data, stride: v.stride, type: a.componentType, norm: !!a.normalized, size: {VEC2: 2, VEC3: 3}[a.type], off: a.byteOffset || 0}; };
       var ia = J.accessors[pr.indices], ib = bv(ia.bufferView), img = J.images[J.textures[J.materials[pr.material || 0].pbrMetallicRoughness.baseColorTexture.index].source];
       var t = node.translation || [0, 0, 0], s = (node.scale || [1, 1, 1])[0];
+      var hz = (J.meshes[0].extras || {}).horizon || {};
       return new Promise(function(ok, bad){
         var im = new Image(), url = URL.createObjectURL(new Blob([bv(img.bufferView).data], {type: img.mimeType}));
-        im.onload = function(){ URL.revokeObjectURL(url); ok({P: att("POSITION"), N: att("NORMAL"), U: att("TEXCOORD_0"), I: {data: ib.data, type: ia.componentType, count: ia.count}, img: im, q: [t[0], t[1], t[2], s]}); };
+        im.onload = function(){ URL.revokeObjectURL(url); var pos = att("POSITION"); if(hz.positionW && pos.stride >= 8) pos.size = 4;
+          ok({P: pos, N: att("NORMAL"), U: att("TEXCOORD_0"), I: {data: ib.data, type: ia.componentType, count: ia.count}, img: im, q: [t[0], t[1], t[2], s]}); };
         im.onerror = function(){ bad(new Error("texture")); };
         im.src = url;
       });
@@ -233,7 +235,7 @@
       gl.uniform4f(U("uQ"), M.q[0], M.q[1], M.q[2], M.q[3]);
       gl.uniform4f(U("uMo"), O3.mouth[0], O3.mouth[1], O3.mouth[2], O3.mouth[3]); gl.uniform4f(U("uK"), O3.chin, O3.neck[0], O3.neck[1], O3.neck[2]);
       gl.uniform4f(U("uE1"), O3.eyeL[0], O3.eyeL[1], O3.eyeL[2], O3.eyeL[3]); gl.uniform4f(U("uE2"), O3.eyeR[0], O3.eyeR[1], O3.eyeR[2], O3.eyeR[3]);
-      gl.uniform3f(U("uLid"), O3.lid[0], O3.lid[1], O3.lid[2]);
+      gl.uniform3f(U("uLid"), O3.lid[0], O3.lid[1], O3.lid[2]); gl.uniform1f(U("uBr"), O3.brow);
       var n = M.I.count, t0 = performance.now(), last = 0, blinkAt = 1.6, nod = 0, shown = false;
       box.appendChild(cv);
       function draw(now){

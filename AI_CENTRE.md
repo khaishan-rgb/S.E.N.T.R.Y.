@@ -14,18 +14,21 @@ The Forecast Centre page (/command, /forecast) is unchanged apart from one new t
 - **Advisory only.** It never changes anything. Anything that changes service is marked "Service Controller approval".
   In demo mode it says the data is simulated.
 - **Four faces**, picked in the panel:
-  - **Officer** (default, 3D since 12 Nov): a 3D model of a young Chinese man in the SBS Transit uniform,
-    `assistant-officer.glb` (3.7 MB, served as `/brand/assistant-officer.glb` and cached by the browser). It was made from
-    the 65 MB model supplied (216088.glb): reduced to about 150,000 triangles away from the face (the face keeps full
-    detail) and a 2048 px texture. It is drawn in the browser (WebGL, no library, no outside service, no cost). The model
-    has no skeleton or face rig, so the movement is added here: he breathes, sways, turns and nods his head, blinks, and
-    when he talks his jaw drops and his lips part, widen or round with the letters. His arms and hands stay still.
-    While the model loads, and on a computer that cannot draw it, the animated portrait `assistant-officer.webp` shows
-    instead (it blinks and talks too). He uses a male voice where the browser has one: Edge on Windows has Wayne
-    (English, Singapore), Yunxi (Mandarin) and Osman (Malay); Chrome has a male English voice only.
+  - **Officer** (default, 3D since 12 Nov): a 3D head-and-shoulders model of a young Chinese man in the SBS Transit
+    uniform, wearing an operator headset. File `assistant-officer.glb` (5.4 MB, served as `/brand/assistant-officer.glb`
+    and cached by the browser), made from the 80 MB model supplied on 12 Nov (216106.glb): scaled so his face matches the
+    player's face points, the hidden inside of the shirt shell and parts never seen from the front removed, reduced to
+    about 160,000 triangles (the eyes and mouth keep every point), with the full 4096 px texture. It is drawn in the
+    browser (WebGL, no library, no outside service, no cost). The model has no skeleton or face rig, so the movement is
+    added here: he breathes, sways, turns and nods his head, blinks, and when he talks his jaw drops and his lips part,
+    widen or round with the letters. The headset microphone is marked in the file so it stays still when the jaw moves.
+    His arms stay still.
+    While the model loads, and on a computer that cannot draw it, `assistant-officer.webp` shows instead: a still picture of
+    the same model from the same camera, which also blinks and talks. He uses a male voice where the browser has one: Edge
+    on Windows has Wayne (English, Singapore), Yunxi (Mandarin) and Osman (Malay); Chrome has a male English voice only.
     To use a different 3D model, it must be one mesh with Y up and the face towards +Z; then update the eye, mouth,
-    chin and neck positions in `O3` at the top of the "Officer in 3D" code in `assistant.js`. A rigged model (skeleton
-    and face shapes) would need a different player.
+    chin, brow and neck positions in `O3` at the top of the "Officer in 3D" code in `assistant.js`, and remake the still
+    picture and its points (`OFF_PTS`). A rigged model (skeleton and face shapes) would need a different player.
     Every browser switches to the Officer once; anyone can switch to another face.
   - **AI**: a holographic head made of slices of light, like the AI in films, drawn live in the browser (WebGL). It turns
     its head, blinks, and its jaw and lips follow the words. It glows with the voice, turns violet while it checks the data
@@ -86,8 +89,8 @@ Settings > Pages can hide the AI Operations Centre like any other page (`aicentr
 |---|---|---|
 | `ai_centre.html` | new | The page: a copy of `forecast.html` plus the assistant |
 | `assistant.js` | new, changed 12 Nov | The HORIZON AI panel: faces (Officer portrait, AI hologram, Orb, Photo), languages, voice, chat |
-| `assistant-officer.glb` | new 12 Nov | The Officer 3D model (reduced from the 65 MB original) |
-| `assistant-officer.webp` | new 12 Nov | The Officer portrait: shown while the 3D model loads, and if it cannot be drawn |
+| `assistant-officer.glb` | new 12 Nov | The Officer 3D model (head and shoulders, with headset; reduced from the 80 MB original) |
+| `assistant-officer.webp` | new 12 Nov | A still of the 3D Officer: shown while the model loads, and if it cannot be drawn |
 | `assistant.css` | new, changed 12 Nov | Panel styles (HORIZON navy and cyan) |
 | `app.py` | changed (12 Nov: `/brand/` also serves `.glb`) | `/ai-centre`, `/assistant.js`, `/assistant.css`, `GET /api/assistant/status`, `POST /api/assistant/ask`; `aicentre` added to the pages Settings can hide |
 | `app_shell.js` | changed | Menu entry "AI Operations Centre" with a new spark icon |
