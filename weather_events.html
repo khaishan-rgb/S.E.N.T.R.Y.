@@ -1,0 +1,284 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#040a14">
+<title>Wet weather &amp; event log · HORIZON</title>
+<link rel="stylesheet" href="/design-system.css">
+<script src="/app-shell.js" data-module="wxlog"></script>
+<style>
+/* 12 Nov 2026: wet weather impact (which services are in rain now, how many minutes rain adds) + the stored event log
+   (bus bunching, long headway, traffic, wet weather). Data: /api/weather/impact, /api/events/log, /api/events/export.xlsx */
+.wx{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px;padding:12px;box-sizing:border-box}
+.wx *,.wx *:before,.wx *:after{box-sizing:border-box}
+.wx-card{background:var(--ds-panel,rgba(8,20,38,.86));border:1px solid var(--ds-line);border-radius:14px;padding:16px;min-width:0}
+.wx-top{grid-column:1 / -1;display:flex;align-items:center;gap:10px 14px;flex-wrap:wrap;padding:12px 16px}
+.wx-top .sp{flex:1}
+.wx-store{display:inline-flex;align-items:center;gap:7px;height:28px;padding:0 11px;border-radius:999px;font-size:12.5px;border:1px solid;white-space:nowrap}
+.wx-store i{width:7px;height:7px;border-radius:50%;background:currentColor}
+.wx-store.ok{color:#5ef0b4;border-color:rgba(46,232,160,.4);background:rgba(46,232,160,.07)}
+.wx-store.temp{color:#ffc56b;border-color:rgba(255,190,90,.45);background:rgba(255,190,90,.08)}
+a.ds-btn{text-decoration:none}
+.wx h2{margin:0;font:700 17px var(--ds-display,var(--ds-font));color:#fff}
+.wx-sub{margin:4px 0 0;font-size:13px;color:var(--ds-mut);line-height:1.45}
+.wx-hd{display:flex;align-items:flex-start;gap:12px;margin-bottom:12px}
+.wx-hd > div{flex:1;min-width:0}
+/* raining now */
+.wx-now{position:relative;overflow:hidden}
+.wx-now:before{content:"";position:absolute;inset:0;pointer-events:none;opacity:.55;
+  background:repeating-linear-gradient(105deg,transparent 0 22px,rgba(124,196,255,.05) 22px 23px)}
+.wx-now > *{position:relative}
+.wx-big{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;margin:2px 0 12px}
+.wx-big b{font:700 40px/1 var(--ds-display,var(--ds-font));color:#9fd6ff;font-variant-numeric:tabular-nums}
+.wx-big span{font-size:14px;color:var(--ds-text-2)}
+.wx-dry{display:flex;align-items:center;gap:12px;padding:14px;border:1px dashed var(--ds-line-2);border-radius:12px;color:var(--ds-text-2);font-size:13.5px;line-height:1.45}
+.wx-dry b{color:#fff}
+.wx-areas{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
+.wx-area{display:inline-flex;align-items:center;gap:7px;padding:5px 10px;border-radius:8px;font-size:12.5px;color:#d9eeff;background:rgba(124,196,255,.08);border:1px solid rgba(124,196,255,.3)}
+.wx-area.heavy{background:rgba(90,140,255,.16);border-color:rgba(120,160,255,.6);color:#fff}
+.wx-area small{color:var(--ds-mut)}
+/* tables */
+.wx-scroll{overflow:auto;max-height:420px;scrollbar-width:thin;border:1px solid var(--ds-line);border-radius:10px}
+table.wx-t{width:100%;border-collapse:collapse;font-size:13px}
+.wx-t th{position:sticky;top:0;z-index:1;background:#081628;text-align:left;font:600 11.5px var(--ds-font);color:var(--ds-mut);padding:9px 10px;border-bottom:1px solid var(--ds-line-2);white-space:nowrap}
+.wx-t td{padding:9px 10px;border-bottom:1px solid var(--ds-line);vertical-align:top;color:var(--ds-text-2)}
+.wx-t tbody tr:hover td{background:rgba(56,214,255,.04)}
+.wx-t .num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.wx-t td.min b{color:#fff;font-size:14px}
+.wx-t small{display:block;color:var(--ds-mut);font-size:11.5px;margin-top:2px}
+.sv{display:inline-block;margin:0 4px 3px 0;padding:2px 7px;border-radius:6px;background:#0b1a2e;border:1px solid var(--ds-line-2);color:#e8f4ff;font:700 12px var(--ds-font);white-space:nowrap}
+.sv em{font-style:normal;color:var(--ds-mut);font-weight:600;margin-left:3px}
+.conf{font-size:11.5px;white-space:nowrap}.conf.good{color:#5ef0b4}.conf.limited{color:#ffc56b}.conf.insufficient{color:var(--ds-mut)}
+/* what rain adds: one bar per service-direction */
+.wx-net{display:flex;gap:18px;flex-wrap:wrap;margin:0 0 12px;font-size:13px;color:var(--ds-text-2)}
+.wx-net b{display:block;font:700 22px/1.1 var(--ds-display,var(--ds-font));color:#fff;font-variant-numeric:tabular-nums}
+.wx-bars{display:flex;flex-direction:column;gap:7px;max-height:420px;overflow:auto;scrollbar-width:thin;padding-right:4px}
+.wx-bar{display:grid;grid-template-columns:74px minmax(0,1fr) 128px;align-items:center;gap:10px;font-size:13px}
+.wx-bar .lb{color:#fff;font-weight:700;white-space:nowrap}
+.wx-bar .lb em{font-style:normal;color:var(--ds-mut);font-weight:600;margin-left:4px}
+.wx-bar .tr{position:relative;height:12px;border-radius:6px;background:rgba(124,196,255,.08)}
+.wx-bar .fl{position:absolute;left:0;top:0;bottom:0;border-radius:6px;background:linear-gradient(90deg,#3d8bff,#7cc4ff)}
+.wx-bar .fl.hv{background:linear-gradient(90deg,#5b6dff,#a07bff)}
+.wx-bar .vl{color:var(--ds-text-2);font-variant-numeric:tabular-nums;white-space:nowrap}
+.wx-bar .vl b{color:#fff}
+.wx-bar .vl small{display:block;font-size:11.5px;color:var(--ds-mut);line-height:1.2}
+.wx-bar.na .vl{color:var(--ds-mut)}
+.wx-note{margin:12px 0 0;font-size:12px;color:var(--ds-mut);line-height:1.5}
+/* event log */
+.wx-log{grid-column:1 / -1}
+.wx-tabs{display:flex;flex-wrap:wrap;gap:4px;padding:3px;border:1px solid var(--ds-line-2);border-radius:11px;background:#06111f}
+.wx-tabs button{display:inline-flex;align-items:center;gap:7px;height:34px;padding:0 12px;border-radius:8px;border:0;background:none;color:var(--ds-text-2);font:600 13px var(--ds-font);cursor:pointer}
+.wx-tabs button:hover{color:#fff;background:rgba(255,255,255,.04)}
+.wx-tabs button[aria-pressed="true"]{color:#fff;background:rgba(56,214,255,.14);box-shadow:inset 0 0 0 1px rgba(56,214,255,.35)}
+.wx-tabs .n{min-width:20px;padding:1px 6px;border-radius:9px;background:rgba(255,255,255,.07);font-size:11.5px;text-align:center;font-variant-numeric:tabular-nums}
+.dot{width:8px;height:8px;border-radius:50%;flex:none;display:inline-block}
+.c-bunching{--c:#ff5fa2}.c-long_headway{--c:#4fa8ff}.c-traffic{--c:#ff8a3d}.c-wet_weather{--c:#7cc4ff}
+.dot{background:var(--c,#8ca6c4)}
+.wx-f{display:flex;flex-wrap:wrap;align-items:flex-end;gap:8px 10px;margin:12px 0}
+.wx-f label{display:flex;flex-direction:column;gap:4px;font:600 11px var(--ds-font);color:var(--ds-mut);min-width:0}
+.wx-f .ds-input{height:36px;font-size:13.5px;color-scheme:dark}
+.wx-f .w-d{width:150px}.wx-f .w-s{width:110px}.wx-f .w-q{width:220px}
+.kind{display:inline-flex;align-items:center;gap:7px;white-space:nowrap;color:#fff;font-weight:600}
+.kind small{display:inline;margin:0;color:var(--ds-mut);font-weight:500}
+.live{display:inline-block;margin-left:6px;padding:1px 7px;border-radius:999px;font-size:11px;color:#ff8a96;border:1px solid currentColor}
+.wx-empty{padding:26px 16px;color:var(--ds-mut);font-size:13.5px;line-height:1.5;text-align:center}
+.wx-err{color:#ff8a96;font-size:13px}
+.wx-err:empty{display:none}
+@media (max-width:1099px){.wx{grid-template-columns:minmax(0,1fr)}}
+@media (max-width:640px){
+  .wx{padding:8px}.wx-card{padding:12px}
+  .wx-bar{grid-template-columns:62px minmax(0,1fr) 112px}
+  .wx-now .wx-t td small{white-space:normal}
+  .wx-f label{flex:1 1 140px}.wx-f .w-d,.wx-f .w-s,.wx-f .w-q{width:100%}
+  .wx-log .wx-t thead{display:none}
+  .wx-log .wx-t,.wx-log .wx-t tbody,.wx-log .wx-t tr,.wx-log .wx-t td{display:block;width:100%}
+  .wx-log .wx-t tr{padding:10px 12px;border-bottom:1px solid var(--ds-line)}
+  .wx-log .wx-t td{padding:2px 0;border:0;text-align:left}
+}
+</style>
+</head>
+<body>
+<main class="ds-main wx" id="main">
+  <section class="wx-card wx-top" aria-label="Page">
+    <h1 class="hz-page-title">Wet weather &amp; event log</h1>
+    <span class="sp"></span>
+    <span class="wx-store" id="store" hidden><i></i><span></span></span>
+    <a class="ds-btn" id="xls" href="/api/events/export.xlsx?days=30" download>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12m-5-5 5 5 5-5M5 21h14"/></svg>Export to Excel</a>
+  </section>
+
+  <section class="wx-card wx-now" aria-labelledby="hNow">
+    <div class="wx-hd"><div><h2 id="hNow">Raining now</h2>
+      <p class="wx-sub" id="nowSub">Services inside a rain area right now (NEA rain gauges, moderate or heavier), and the minutes rain usually adds to them.</p></div></div>
+    <div id="nowBody"><p class="wx-sub">Loading…</p></div>
+  </section>
+
+  <section class="wx-card" aria-labelledby="hAdd">
+    <div class="wx-hd"><div><h2 id="hAdd">What rain adds</h2>
+      <p class="wx-sub" id="addSub">Extra running time on wet trips compared with dry trips of the same service, direction and day type, within an hour.</p></div>
+      <label class="wx-f" style="margin:0"><span class="sr-only" style="position:absolute;left:-9999px">Period</span>
+        <select class="ds-select" id="days" style="height:34px;width:auto" aria-label="Measured over"><option value="30">Last 30 days</option><option value="60" selected>Last 60 days</option><option value="120">Last 120 days</option></select></label></div>
+    <div id="addBody"><p class="wx-sub">Loading…</p></div>
+  </section>
+
+  <section class="wx-card wx-log" aria-labelledby="hLog">
+    <div class="wx-hd"><div><h2 id="hLog">Event history</h2>
+      <p class="wx-sub">Every bus bunching event, long headway, traffic alert and rain area that touched a bus route, kept for <span id="keep">365</span> days.</p></div></div>
+    <div class="wx-tabs" id="tabs" role="group" aria-label="Type of event"></div>
+    <form class="wx-f" id="f" autocomplete="off">
+      <label>From<input type="date" class="ds-input w-d" id="fFrom"></label>
+      <label>To<input type="date" class="ds-input w-d" id="fTo"></label>
+      <label>Service<input type="search" class="ds-input w-s" id="fSvc" placeholder="e.g. 147"></label>
+      <label>Place<input type="search" class="ds-input w-q" id="fQ" placeholder="Road, stop or area"></label>
+      <button type="submit" class="ds-btn pri">Search</button>
+      <button type="button" class="ds-btn ghost" id="fClear">Clear</button>
+    </form>
+    <p class="wx-err" id="err" role="alert"></p>
+    <div class="wx-scroll" style="max-height:none">
+      <table class="wx-t" id="tbl">
+        <thead><tr><th scope="col">When</th><th scope="col">Type</th><th scope="col">Services</th><th scope="col">Where</th><th scope="col" class="num">Peak</th><th scope="col" class="num">Lasted</th></tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+      <div class="wx-empty" id="none" hidden></div>
+    </div>
+  </section>
+</main>
+<script>
+(function(){
+  "use strict";
+  var $ = function(id){ return document.getElementById(id); };
+  var esc = function(s){ return String(s == null ? "" : s).replace(/[&<>"']/g, function(c){ return {"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"}[c]; }); };
+  var TZ = {timeZone: "Asia/Singapore"};
+  var hm = function(t){ return new Date(t * 1000).toLocaleTimeString("en-SG", Object.assign({hour: "2-digit", minute: "2-digit", hour12: false}, TZ)); };
+  var dm = function(t){ return new Date(t * 1000).toLocaleDateString("en-SG", Object.assign({day: "numeric", month: "short"}, TZ)); };
+  var ymd = function(d){ return new Date(d.getTime() + 8 * 3600e3).toISOString().slice(0, 10); };
+  var mins = function(v, signed){ if(v == null) return "—"; var r = Math.round(v * 10) / 10; return (signed && r > 0 ? "+" : "") + r + " min"; };
+  var dirTxt = function(d){ return "Dir " + d; };
+  var NAMES = {bunching: "Bus bunching", long_headway: "Long headway", traffic: "Traffic", wet_weather: "Wet weather"};
+  var KIND = {congestion: "congestion", incident: "incident", roadworks: "road works", rain: "", long_headway: ""};
+  var state = {cat: "", counts: {}};
+
+  /* ---------------- storage chip ---------------- */
+  function storage(s){
+    if(!s) return;
+    var el = $("store"); el.hidden = false;
+    el.className = "wx-store " + (s.persistent ? "ok" : "temp");
+    el.lastChild.textContent = s.persistent ? "Saved on disk · kept " + s.keep_days + " days" : "Temporary storage · cleared when the server restarts";
+    el.title = s.persistent ? "History is kept on the persistent disk" + (s.since ? " since " + dm(s.since) : "") : "Add a Render disk and set BUNCHING_DB=/var/data/bunching.db to keep history";
+    $("keep").textContent = s.keep_days;
+  }
+
+  /* ---------------- raining now + what rain adds ---------------- */
+  function loadImpact(){
+    return fetch("/api/weather/impact?days=" + $("days").value, {credentials: "same-origin"}).then(function(r){ return r.json(); }).then(function(j){
+      storage(j.storage);
+      drawNow(j.now || {}, j);
+      drawAdds(j);
+    }).catch(function(){ $("nowBody").innerHTML = '<p class="wx-err">Could not load the wet weather data. It refreshes every minute.</p>'; });
+  }
+  function drawNow(n, j){
+    var b = $("nowBody"), sv = n.services || [], ar = n.areas || [];
+    if(n.feed_ok === false){ b.innerHTML = '<div class="wx-dry">NEA rainfall is not reachable right now (' + esc(n.feed_error || "no data") + '). Rain areas show again when it returns.</div>'; return; }
+    if(!ar.length){
+      var r30 = j.rain_events_30d || {};
+      b.innerHTML = '<div class="wx-dry"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#7cc4ff" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M7 17a4.5 4.5 0 0 1 .5-9 6 6 0 0 1 11.3 2A3.5 3.5 0 0 1 18 17H7Z"/></svg>'
+        + "<div><b>No rain on any bus route</b><br>Nothing above moderate rain at the NEA gauges" + (n.as_of ? " at " + hm(n.as_of) : "") + ". "
+        + (r30.areas ? r30.areas + " rain areas touched bus routes in the last 30 days (" + r30.heavy + " heavy)." : "") + "</div></div>";
+      return;
+    }
+    var known = sv.filter(function(s){ return s.expected_min != null; });
+    var avg = known.length ? known.reduce(function(a, s){ return a + s.expected_min; }, 0) / known.length : null;
+    b.innerHTML = '<div class="wx-big"><b>' + sv.length + "</b><span>services in rain" + (avg != null ? ", usually <b style=\"font:inherit;color:#fff\">" + mins(avg, true) + "</b> each where measured" : "") + "</span></div>"
+      + '<div class="wx-areas">' + ar.map(function(a){ return '<span class="wx-area' + (a.level === "heavy" ? " heavy" : "") + '">' + esc(a.name) + " <small>" + (a.level === "heavy" ? "heavy" : "moderate")
+        + " · " + (a.max_mm != null ? a.max_mm + " mm" : "") + " · since " + hm(a.since) + "</small></span>"; }).join("") + "</div>"
+      + '<div class="wx-scroll"><table class="wx-t"><thead><tr><th scope="col">Service</th><th scope="col">Rain area</th><th scope="col" class="num">Rain adds</th></tr></thead><tbody>'
+      + sv.map(function(s){ return "<tr><td><span class=\"sv\">" + esc(s.service) + "<em>" + dirTxt(s.dir) + "</em></span></td><td>" + esc(s.area) + "<small>" + (s.level === "heavy" ? "heavy" : "moderate")
+        + (s.route_pct != null ? " · " + Math.round(s.route_pct) + "% of the route" : "") + "</small></td><td class=\"num min\">" + (s.expected_min != null ? "<b>" + mins(s.expected_min, true) + "</b>" : "—")
+        + "<small>" + esc(s.basis) + "</small></td></tr>"; }).join("") + "</tbody></table></div>";
+  }
+  function drawAdds(j){
+    var b = $("addBody"), rows = j.services || [], s = j.summary || {};
+    if(!rows.length){
+      b.innerHTML = '<div class="wx-dry"><div><b>No measured trips yet</b><br>Rain impact comes from trips measured on Running Time Analytics (up to 8 services round the clock). Add services there; '
+        + "each wet trip is then compared with dry trips of the same service.</div></div>";
+      return;
+    }
+    var withFig = rows.filter(function(r){ return r.added_min != null; });
+    var top = Math.max(5, Math.max.apply(null, withFig.map(function(r){ return Math.max(r.added_min || 0, r.added_heavy_min || 0); }).concat([0])));
+    b.innerHTML = '<div class="wx-net"><div><b>' + (s.median_added_min != null ? mins(s.median_added_min, true) : "—") + "</b>typical across services</div>"
+      + "<div><b>" + (s.slower || 0) + " of " + (s.with_figure || 0) + "</b>services a minute or more slower</div>"
+      + "<div><b>" + (s.max_added_min != null ? mins(s.max_added_min, true) : "—") + "</b>most affected</div></div>"
+      + '<div class="wx-bars">' + rows.map(function(r){
+        var v = r.added_min, w = v != null ? Math.max(0, v) / top * 100 : 0, hv = r.added_heavy_min != null ? Math.max(0, r.added_heavy_min) / top * 100 : 0;
+        return '<div class="wx-bar' + (v == null ? " na" : "") + '" title="' + esc(r.n_wet + " wet trips, " + r.n_dry + " dry trips; typical dry running time " + (r.dry_min != null ? r.dry_min + " min" : "unknown")) + '">'
+          + '<span class="lb">' + esc(r.service) + "<em>D" + r.dir + "</em></span>"
+          + '<span class="tr" aria-hidden="true">' + (hv > w ? '<span class="fl hv" style="width:' + hv.toFixed(1) + '%;opacity:.45"></span>' : "") + '<span class="fl" style="width:' + w.toFixed(1) + '%"></span></span>'
+          + '<span class="vl">' + (v != null ? (v < .5 ? "<b>no change</b>" : "<b>" + mins(v, true) + "</b>") + (r.added_heavy_min != null && r.added_heavy_min >= .5 ? "<small>heavy rain " + mins(r.added_heavy_min, true) + "</small>" : "") : r.n_wet + " wet trips")
+          + ' <span class="conf ' + r.confidence + '">' + (r.confidence === "good" ? "" : r.confidence === "limited" ? "few trips" : "") + "</span></span></div>";
+      }).join("") + "</div>"
+      + '<p class="wx-note">Wet = ' + j.rules.wet_mm + " mm or more of rain near the route during the trip; heavy = " + j.rules.heavy_mm + " mm (violet). "
+      + "A figure needs at least 3 wet trips; “few trips” means under 8. Measured from live bus positions, not the timetable.</p>";
+  }
+
+  /* ---------------- event history ---------------- */
+  function tabs(){
+    var c = state.counts, all = Object.keys(NAMES).reduce(function(a, k){ return a + (c[k] || 0); }, 0);
+    $("tabs").innerHTML = [["", "All", all]].concat(Object.keys(NAMES).map(function(k){ return [k, NAMES[k], c[k] || 0]; })).map(function(t){
+      return '<button type="button" class="c-' + (t[0] || "all") + '" data-cat="' + t[0] + '" aria-pressed="' + (state.cat === t[0]) + '">' + (t[0] ? '<span class="dot"></span>' : "") + esc(t[1]) + '<span class="n">' + t[2] + "</span></button>";
+    }).join("");
+  }
+  function query(){
+    var p = new URLSearchParams();
+    if(state.cat) p.set("cat", state.cat);
+    if($("fFrom").value) p.set("d_from", $("fFrom").value);
+    if($("fTo").value) p.set("d_to", $("fTo").value);
+    if(!$("fFrom").value) p.set("days", "7");
+    if($("fSvc").value.trim()) p.set("service", $("fSvc").value.trim());
+    if($("fQ").value.trim()) p.set("q", $("fQ").value.trim());
+    return p;
+  }
+  function peakTxt(e){
+    if(e.peak == null) return "—";
+    if(e.category === "wet_weather") return e.peak + " mm";
+    if(e.category === "bunching") return mins(e.peak) + "<small>closest headway</small>";
+    if(e.category === "long_headway") return mins(e.peak) + "<small>" + esc(e.level || "") + "</small>";
+    return mins(e.peak, true) + "<small>est. delay</small>";
+  }
+  function loadLog(){
+    var p = query();
+    $("xls").href = "/api/events/export.xlsx?" + p.toString().replace("days=7", "days=30");
+    $("err").textContent = "";
+    return fetch("/api/events/log?" + p.toString(), {credentials: "same-origin"}).then(function(r){ return r.json(); }).then(function(j){
+      storage(j.storage);
+      state.counts = j.counts || {}; tabs();
+      var ev = j.events || [];
+      $("none").hidden = !!ev.length;
+      $("none").textContent = j.storage && !j.storage.persistent && !ev.length
+        ? "Nothing stored yet. On temporary storage the history starts again after every restart."
+        : "No events match these filters.";
+      $("rows").innerHTML = ev.map(function(e){
+        var end = e.end_ts || e.last_ts || e.start_ts, dur = Math.max(0, Math.round((end - e.start_ts) / 60));
+        return '<tr class="c-' + e.category + '"><td><b style="color:#fff">' + hm(e.start_ts) + "</b><small>" + dm(e.start_ts) + "</small></td>"
+          + '<td><span class="kind"><span class="dot"></span>' + esc(NAMES[e.category] || e.category) + (e.category === "bunching" ? " <small>" + esc(e.kind) + "</small>" : KIND[e.kind] ? " <small>" + esc(KIND[e.kind]) + "</small>" : "")
+          + (e.ongoing ? '<span class="live">now</span>' : "") + "</span></td>"
+          + "<td>" + (e.services || []).slice(0, 12).map(function(k){ var x = k.split(":"); return '<span class="sv">' + esc(x[0]) + "<em>D" + esc(x[1]) + "</em></span>"; }).join("")
+          + ((e.services || []).length > 12 ? '<small>+' + (e.services.length - 12) + " more</small>" : "") + "</td>"
+          + "<td>" + esc(e.location || "") + "</td>"
+          + '<td class="num">' + peakTxt(e) + "</td>"
+          + '<td class="num">' + dur + " min" + (e.ongoing ? "<small>so far</small>" : "") + "</td></tr>";
+      }).join("");
+    }).catch(function(){ $("err").textContent = "Could not load the event history. Check the connection and search again."; });
+  }
+
+  $("tabs").addEventListener("click", function(e){ var b = e.target.closest("[data-cat]"); if(!b) return; state.cat = b.dataset.cat; tabs(); loadLog(); });
+  $("f").addEventListener("submit", function(e){ e.preventDefault(); loadLog(); });
+  $("fClear").addEventListener("click", function(){ ["fFrom", "fTo", "fSvc", "fQ"].forEach(function(id){ $(id).value = ""; }); state.cat = ""; loadLog(); });
+  $("days").addEventListener("change", loadImpact);
+  $("fTo").max = $("fFrom").max = ymd(new Date());
+  tabs(); loadImpact(); loadLog();
+  setInterval(loadImpact, 60000);
+})();
+</script>
+</body>
+</html>

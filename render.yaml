@@ -2,11 +2,11 @@ services:
   - type: web
     name: sg-transport-pulse
     runtime: python
-    plan: free                    # free = bunching history is deleted on every upload, restart and 15-min sleep. To keep it: change to 0.5c-512mb (US$7/month)
-    # disk:                       # ... and un-comment these 4 lines (US$0.25 per GB a month), then set BUNCHING_DB=/var/data/bunching.db and BUNCHING_ALWAYS_ON=1
-    #   name: bunching-data
-    #   mountPath: /var/data
-    #   sizeGB: 1
+    plan: starter                 # 12 Nov 2026: paid (about US$7/month) so the history survives uploads, restarts and sleep. "free" deletes it every time.
+    disk:                         # persistent disk for the SQLite history (US$0.25 per GB a month): bunching, long headway, traffic, wet weather, running times
+      name: bunching-data
+      mountPath: /var/data
+      sizeGB: 1
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn app:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /api/health
@@ -33,9 +33,11 @@ services:
         sync: false
       - key: BUNCHING_SERVICES    # optional: default watch list, e.g. 32,145,65
         sync: false
-      - key: BUNCHING_ALWAYS_ON   # optional: 1 = keep collecting when nobody has the page open (needed for an unattended event log; uses more LTA quota)
-        sync: false
-      - key: BUNCHING_DB          # optional: SQLite file for bunching settings, event log and analytics, e.g. /var/data/bunching.db on a persistent disk (paid instance)
+      - key: BUNCHING_ALWAYS_ON   # 1 = keep collecting when nobody has the page open (needed for an unattended event log; uses more LTA quota)
+        value: "1"
+      - key: BUNCHING_DB          # SQLite file for bunching settings, the event log and analytics: on the persistent disk above
+        value: /var/data/bunching.db
+      - key: EVENTLOG_KEEP_DAYS   # optional: days the event log (bunching, long headway, traffic, wet weather) is kept (default 365)
         sync: false
       - key: BUNCHING_PERSISTENT  # optional: the dashboard guesses whether history survives an upload (a mounted disk); 1 / 0 overrides the guess
         sync: false

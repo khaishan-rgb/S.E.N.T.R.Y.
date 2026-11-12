@@ -42,6 +42,8 @@
      desc:"Measured running time between every pair of stops, by time of day \u2014 Excel / CSV download"},
     {id:"ewt",      name:"EWT / Performance Analytics", short:"EWT",   icon:"chart",   route:"/performance",  group:"ANALYTICS", permission:"view", shortcut:true,  mobile:"more",     enabled:false,
      desc:"Not yet available — no EWT history store exists in this build"},
+    {id:"wxlog",    name:"Wet Weather & Event Log",  short:"Weather",  icon:"rain",    route:"/weather-events", group:"ANALYTICS", permission:"view", shortcut:true, mobile:"more", enabled:true,
+     desc:"Which services are in rain now and how many minutes rain adds; stored bunching, long headway, traffic and wet weather history \u2014 Excel export"},
     {id:"cameras",  name:"Traffic Cameras",          short:"Cameras",  icon:"camera",  route:"/cameras",      group:"ANALYTICS", permission:"view", shortcut:true,  mobile:"more",     enabled:true,
      desc:"LTA camera wall by expressway"},
     {id:"settings", name:"Settings",                 short:"Settings", icon:"gear",    route:"/settings",     group:"SYSTEM",    permission:"view", shortcut:false, mobile:"more",     enabled:true,
@@ -52,6 +54,7 @@
 
   /* ------------------------------------------------------------------ icons (stroke, 24 grid) */
   var P = {
+    rain:'<path d="M7 15a4.5 4.5 0 0 1 .5-9 6 6 0 0 1 11.3 2A3.5 3.5 0 0 1 18 15H7Z"/><path d="M8 18l-1 2.5M12.5 18l-1 2.5M17 18l-1 2.5"/>',
     home:'<path d="M4 11.5 12 5l8 6.5V20a1 1 0 0 1-1 1h-4.5v-6h-5v6H5a1 1 0 0 1-1-1z"/>',
     route:'<circle cx="6" cy="18" r="2.2"/><circle cx="18" cy="6" r="2.2"/><path d="M8 18h6.5a3.5 3.5 0 0 0 0-7h-5a3.5 3.5 0 0 1 0-7H16"/>',
     headway:'<path d="M3 12h18"/><path d="m7 8-4 4 4 4"/><path d="m17 8 4 4-4 4"/><path d="M12 7v10"/>',

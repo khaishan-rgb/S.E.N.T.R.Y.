@@ -30,7 +30,7 @@ import traffic
 
 VERSION = "V17.3"
 # V16.8: pages hidden for everyone (see Settings > Pages). Defined here because bb_init() reads the saved value while the module loads.
-SITE_PAGE_IDS = ("occlive", "command", "route", "headway", "bunching", "recovery", "halfplan", "trafficaware", "running", "stoprt", "ewt", "cameras", "diversion", "aicentre")     # "settings" can never be hidden
+SITE_PAGE_IDS = ("occlive", "command", "route", "headway", "bunching", "recovery", "halfplan", "trafficaware", "running", "stoprt", "ewt", "cameras", "diversion", "aicentre", "wxlog")     # "settings" can never be hidden
 SITE = {"hidden": [x.strip() for x in os.getenv("HIDDEN_PAGES", "").split(",") if x.strip() in SITE_PAGE_IDS], "block": True}
 LTA = os.getenv("LTA_BASE", "https://datamall2.mytransport.sg/ltaodataservice").rstrip("/")
 KEY = os.getenv("LTA_ACCOUNT_KEY", "")
@@ -1225,6 +1225,7 @@ def bb_init():
     os_init()
     in_init()
     rt_init()
+    evlog_init()
     tr_init()
 
 
@@ -6307,6 +6308,7 @@ async def tr_refresh(force=False):
             await asyncio.to_thread(traffic.refresh_matches, book, TR["ridx"], P, TR.get("roads"))
         TR["last"], TR["feeds"] = now, feeds
         tr_save()
+        await evlog_sync(now)                       # 12 Nov: the operations event log (traffic, rain, bunching, long headway)
 
 
 async def tr_ensure_fresh(force):
@@ -6335,6 +6337,220 @@ async def tr_loop():
         except Exception:
             pass
         await asyncio.sleep(max(15, TR["params"]["refresh_s"]))
+
+
+# ---- 12 Nov 2026: operations event log + wet-weather impact (see opslog.py). One table, ops_event, keeps every bus bunching event,
+# long-headway gap, traffic alert (congestion, incident, road works) and rain area that touched a bus route, EVENTLOG_KEEP_DAYS days
+# (default 365). Filled from data the platform already collects; nothing is invented. It lives in the same SQLite file as the bunching
+# history (BUNCHING_DB), so it only survives restarts on a persistent disk.
+import opslog  # noqa: E402
+
+EVLOG_KEEP_DAYS = max(30, int(os.getenv("EVENTLOG_KEEP_DAYS", "365") or 365))
+EVLOG = {"bb_id": 0, "gap_id": 0, "purged": 0.0, "err": None, "at": 0.0, "since": None, "wx": None, "wx_at": 0.0, "wx_days": None}
+
+
+def evlog_init():
+    bb_sql("CREATE TABLE IF NOT EXISTS ops_event(key TEXT PRIMARY KEY, category TEXT, kind TEXT, start_ts REAL, end_ts REAL, last_ts REAL, ongoing INTEGER, "
+           "location TEXT, services TEXT, n_services INTEGER, peak REAL, peak_unit TEXT, level TEXT, detail TEXT, source TEXT)")
+    bb_sql("CREATE INDEX IF NOT EXISTS ops_event_t ON ops_event(start_ts)")
+    bb_sql("CREATE INDEX IF NOT EXISTS ops_event_c ON ops_event(category, start_ts)")
+    for kind in ("BB", "GAP"):
+        r = bb_sql("SELECT MAX(CAST(SUBSTR(key, ?) AS INTEGER)) n FROM ops_event WHERE key LIKE ?", (len(kind) + 2, kind + ":%"), fetch=True)
+        EVLOG["bb_id" if kind == "BB" else "gap_id"] = int((r[0]["n"] if r else 0) or 0)
+    r = bb_sql("SELECT MIN(start_ts) t FROM ops_event", fetch=True)
+    EVLOG["since"] = r[0]["t"] if r and r[0]["t"] else None
+
+
+def evlog_put(rows):
+    """Upsert log rows; an event seen again keeps its first start, gathers every service it touched and its highest peak."""
+    if not rows:
+        return
+    keys = [r["key"] for r in rows]
+    old = {}
+    for i in range(0, len(keys), 400):
+        part = keys[i:i + 400]
+        for o in bb_sql(f"SELECT key, start_ts, services, peak FROM ops_event WHERE key IN ({','.join('?' * len(part))})", tuple(part), fetch=True) or []:
+            old[o["key"]] = {"start_ts": o["start_ts"], "services": opslog.svc_list(o["services"]), "peak": o["peak"]}
+    out = []
+    for r in rows:
+        m = opslog.merge(old.get(r["key"]), r)
+        out.append((m["key"], m["category"], m["kind"], m["start_ts"], m.get("end_ts"), m.get("last_ts"), m.get("ongoing", 0), m.get("location") or "",
+                    opslog.svc_text(m["services"]), len(m["services"]), m.get("peak"), m.get("peak_unit"), m.get("level"),
+                    json.dumps(m.get("detail") or {}, ensure_ascii=False, default=str)[:4000], m.get("source") or ""))
+    bb_sql_many("INSERT OR REPLACE INTO ops_event(key, category, kind, start_ts, end_ts, last_ts, ongoing, location, services, n_services, peak, peak_unit, level, detail, source) "
+                "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", out)
+    if EVLOG["since"] is None:
+        EVLOG["since"] = min(r["start_ts"] for r in rows)
+
+
+def _stop_nm(st, code):
+    s_ = (st.get("stops") or {}).get(str(code or "")) or {}
+    return s_.get("name") or (str(code) if code else "")
+
+
+async def evlog_sync(now):
+    """Called after every traffic cycle (about once a minute, round the clock)."""
+    try:
+        def delay(e, m):
+            c = e.get("cur") or {}
+            return traffic.estimate_delay_min(m.get("overlap_km") or 0, c.get("avg_kmh"), c.get("ref_kmh")) if e["kind"] == "congestion" else None
+        rows = opslog.traffic_rows(list(TR["book"]["events"].values()), now, traffic.location_text, delay)
+        st = await static()
+        for r in bb_sql("SELECT * FROM bunching_event WHERE id > ? ORDER BY id LIMIT 500", (EVLOG["bb_id"],), fetch=True) or []:
+            lvl = r.get("max_level")
+            rows.append({"key": f"BB:{r['id']}", "category": "bunching", "kind": f"{lvl}BB" if lvl else "bunching", "start_ts": r["start_ts"],
+                         "end_ts": r["end_ts"], "last_ts": r["end_ts"] or r["start_ts"], "ongoing": 0,
+                         "location": " → ".join(x for x in (_stop_nm(st, r.get("start_stop")), _stop_nm(st, r.get("end_stop"))) if x),
+                         "services": [opslog.svc_key(r["service"], r["direction"])], "peak": r.get("min_hw"), "peak_unit": "min headway",
+                         "level": f"{lvl} buses" if lvl else None, "source": "bunching collector",
+                         "detail": {"stops": r.get("stops"), "buses": r.get("bus_group"), "from_stop": r.get("start_stop"), "to_stop": r.get("end_stop")}})
+            EVLOG["bb_id"] = max(EVLOG["bb_id"], r["id"])
+        for r in bb_sql("SELECT * FROM gap_event WHERE id > ? ORDER BY id LIMIT 500", (EVLOG["gap_id"],), fetch=True) or []:
+            ratio = r.get("max_ratio")
+            loc = " → ".join(x for x in (_stop_nm(st, r.get("start_stop")), _stop_nm(st, r.get("end_stop"))) if x) or (r.get("location") or "")
+            rows.append({"key": f"GAP:{r['id']}", "category": "long_headway", "kind": "long_headway", "start_ts": r["start_ts"], "end_ts": r["end_ts"],
+                         "last_ts": r["end_ts"] or r["start_ts"], "ongoing": 0, "location": loc, "services": [opslog.svc_key(r["service"], r["direction"])],
+                         "peak": r.get("max_hw"), "peak_unit": "min", "level": f"{ratio:.1f}x scheduled" if ratio else None, "source": "bunching collector",
+                         "detail": {"scheduled_hw": r.get("sched_hw"), "ratio": ratio, "stops": r.get("stops"), "buses": r.get("buses")}})
+            EVLOG["gap_id"] = max(EVLOG["gap_id"], r["id"])
+        evlog_put(rows)
+        # an event the traffic engine no longer holds (e.g. after a restart) is closed at the last time it was seen
+        bb_sql("UPDATE ops_event SET ongoing=0, end_ts=last_ts WHERE ongoing=1 AND last_ts < ?", (now - 1800,))
+        if now - EVLOG["purged"] > 86400:
+            EVLOG["purged"] = now
+            bb_sql("DELETE FROM ops_event WHERE start_ts < ?", (now - EVLOG_KEEP_DAYS * 86400,))
+        EVLOG["at"], EVLOG["err"] = now, None
+    except Exception as e:
+        EVLOG["err"] = f"{type(e).__name__}: {e}"[:200]
+
+
+def evlog_query(cat="", service="", d0=None, d1=None, q="", limit=1000):
+    sql, a = "SELECT * FROM ops_event WHERE start_ts >= ? AND start_ts < ?", [d0, d1]
+    if cat in opslog.CATEGORIES:
+        sql += " AND category = ?"
+        a.append(cat)
+    svc = re.sub(r"[^A-Za-z0-9]", "", service or "").upper()[:5]
+    if svc:
+        sql += " AND services LIKE ?"
+        a.append(f"%,{svc}:%")
+    if q:
+        sql += " AND (location LIKE ? OR detail LIKE ?)"
+        a += [f"%{q[:60]}%", f"%{q[:60]}%"]
+    rows = bb_sql(sql + " ORDER BY start_ts DESC LIMIT ?", tuple(a + [int(limit)]), fetch=True) or []
+    out = []
+    for r in rows:
+        try:
+            det = json.loads(r["detail"] or "{}")
+        except ValueError:
+            det = {}
+        out.append({"key": r["key"], "category": r["category"], "kind": r["kind"], "start_ts": r["start_ts"], "end_ts": r["end_ts"], "last_ts": r["last_ts"],
+                    "ongoing": bool(r["ongoing"]), "location": r["location"], "services": opslog.svc_list(r["services"]), "peak": r["peak"],
+                    "peak_unit": r["peak_unit"], "level": r["level"], "detail": det, "source": r["source"]})
+    return out
+
+
+def _evlog_range(days, d_from, d_to):
+    now = time.time()
+    try:
+        d0 = datetime.strptime(d_from, "%Y-%m-%d").replace(tzinfo=SGT).timestamp() if d_from else now - max(1, min(366, days)) * 86400
+        d1 = (datetime.strptime(d_to, "%Y-%m-%d").replace(tzinfo=SGT) + timedelta(days=1)).timestamp() if d_to else now + 60
+    except ValueError:
+        d0, d1 = now - 7 * 86400, now + 60
+    return d0, d1
+
+
+def evlog_storage():
+    return {"persistent": bool(BB_PERSIST), "keep_days": EVLOG_KEEP_DAYS, "since": EVLOG["since"], "last_sync": EVLOG["at"] or None, "error": EVLOG["err"],
+            "db": "persistent disk" if BB_PERSIST else "temporary (Render free plan: cleared on every restart)"}
+
+
+def wx_stats(days=60):
+    """Wet vs dry running time per measured service-direction (cached 10 min)."""
+    now = time.time()
+    if EVLOG["wx"] is not None and EVLOG["wx_days"] == days and now - EVLOG["wx_at"] < 600:
+        return EVLOG["wx"]
+    rows = bb_sql("SELECT t.service, t.direction, t.day_type, t.start_ts, t.rt_min, c.rain_mm FROM rt_trip t JOIN rt_cond c ON c.trip_id = t.id "
+                  "WHERE c.rain_done = 1 AND t.cover >= 0.8 AND t.start_ts > ?", (now - days * 86400,), fetch=True) or []
+    stats = opslog.wet_impact(rows)
+    EVLOG["wx"], EVLOG["wx_at"], EVLOG["wx_days"] = stats, now, days
+    return stats
+
+
+def wx_now(stats=None):
+    """Rain areas active now (moderate or heavier, NEA gauges) and every service-direction inside them, with the minutes rain usually adds."""
+    stats = stats if stats is not None else wx_stats()
+    h = now_sgt().hour
+    areas, svcs = [], {}
+    for e in TR["book"]["events"].values():
+        if e["kind"] != "weather" or e["status"] != "active" or not e.get("match"):
+            continue
+        c = e["cur"]
+        heavy = c.get("level") == "heavy"
+        keys = sorted({k for k in e["match"]}, key=lambda k: opslog._svc_sort(k.replace("|", ":")))
+        areas.append({"id": e["id"], "name": c.get("name"), "level": c.get("level"), "max_mm": c.get("max_mm"), "since": e.get("first_seen"),
+                      "lat": c.get("lat"), "lon": c.get("lon"), "radius_km": c.get("radius_km"), "services": len({k.split("|")[0] for k in keys})})
+        for k in keys:
+            s_, _, d = k.partition("|")
+            kk = (s_.upper(), int(d or 1))
+            mins, basis = opslog.expected_now(stats.get(kk), h, heavy)
+            pct = (e["match"][k] or {}).get("pct")
+            cur = svcs.get(kk)
+            if cur is None or (mins or -1) > (cur["expected_min"] or -1):
+                svcs[kk] = {"service": kk[0], "dir": kk[1], "area": c.get("name"), "level": c.get("level"), "max_mm": c.get("max_mm"),
+                            "route_pct": pct, "expected_min": mins, "basis": basis, "confidence": (stats.get(kk) or {}).get("confidence", "insufficient")}
+    rows = sorted(svcs.values(), key=lambda x: (-(x["expected_min"] if x["expected_min"] is not None else -99), opslog._svc_sort(f"{x['service']}:{x['dir']}")))
+    feed = (TR.get("feeds") or {}).get("rain") or {}
+    return {"areas": sorted(areas, key=lambda a: -(a["max_mm"] or 0)), "services": rows, "feed_ok": feed.get("ok"), "feed_error": feed.get("error"),
+            "as_of": TR["last"] or None}
+
+
+@app.get("/api/weather/impact")
+async def api_weather_impact(days: int = 60):
+    days = max(7, min(180, int(days or 60)))
+    stats = wx_stats(days)
+    rows = sorted(stats.values(), key=lambda s_: (-(s_["added_min"] if s_["added_min"] is not None else -99), opslog._svc_sort(f"{s_['service']}:{s_['dir']}")))
+    now = time.time()
+    hist = bb_sql("SELECT COUNT(*) n, COALESCE(SUM(CASE WHEN level='heavy' THEN 1 ELSE 0 END), 0) heavy FROM ops_event WHERE category='wet_weather' AND start_ts > ?",
+                  (now - 30 * 86400,), fetch=True) or [{"n": 0, "heavy": 0}]
+    return {"now": wx_now(stats), "summary": opslog.network_summary(stats), "services": rows, "days": days,
+            "rules": {"wet_mm": opslog.WET_MM, "heavy_mm": opslog.HEAVY_MM, "matching": "same service, direction and day type, started within 1 hour",
+                      "source": "measured trips (live bus positions) + NEA rainfall near the route"},
+            "rain_events_30d": {"areas": hist[0]["n"], "heavy": hist[0]["heavy"]}, "storage": evlog_storage()}
+
+
+@app.get("/api/events/log")
+async def api_events_log(cat: str = "", service: str = "", days: int = 7, d_from: str = "", d_to: str = "", q: str = "", limit: int = 1000):
+    d0, d1 = _evlog_range(days, d_from, d_to)
+    ev = evlog_query(cat, service, d0, d1, q, max(1, min(5000, limit)))
+    counts = {c: 0 for c in opslog.CATEGORIES}
+    for r in bb_sql("SELECT category, COUNT(*) n FROM ops_event WHERE start_ts >= ? AND start_ts < ? GROUP BY category", (d0, d1), fetch=True) or []:
+        counts[r["category"]] = r["n"]
+    return {"events": ev, "counts": counts, "from": d0, "to": d1, "categories": opslog.CATEGORIES, "storage": evlog_storage()}
+
+
+@app.get("/api/events/export.xlsx")
+async def api_events_export(cat: str = "", service: str = "", days: int = 30, d_from: str = "", d_to: str = "", q: str = ""):
+    from fastapi.responses import Response
+    d0, d1 = _evlog_range(days, d_from, d_to)
+    ev = evlog_query(cat, service, d0, d1, q, 20000)
+    stats = sorted(wx_stats(60).values(), key=lambda s_: opslog._svc_sort(f"{s_['service']}:{s_['dir']}"))
+    note = (f"HORIZON operations event log, exported {now_sgt().strftime('%Y-%m-%d %H:%M')} SGT\n"
+            f"Period: {opslog.sgt(d0).strftime('%Y-%m-%d %H:%M')} to {opslog.sgt(min(d1, time.time())).strftime('%Y-%m-%d %H:%M')}\n"
+            "Traffic and wet weather: from the traffic engine (LTA speed bands, incidents, road works, TomTom / Waze when set, NEA rain gauges); "
+            "only events that touched a bus route. Traffic peak = estimated extra minutes through the congested stretch.\n"
+            "Bus bunching and long headway: from the bunching collector (LTA bus arrival data), logged once they lasted the configured number of stops.\n"
+            f"Wet weather impact: last 60 days of measured trips; a trip is wet at {opslog.WET_MM} mm of rain near the route, heavy at {opslog.HEAVY_MM} mm; "
+            "compared with dry trips of the same service, direction and day type within 1 hour.")
+    data = opslog.workbook(ev, stats, note)
+    name = f"horizon-events-{now_sgt().strftime('%Y%m%d-%H%M')}.xlsx"
+    return Response(data, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    headers={"Content-Disposition": f'attachment; filename="{name}"', "Cache-Control": "no-store"})
+
+
+@app.get("/weather-events", response_class=HTMLResponse)
+async def weather_events_page():
+    """Wet weather impact + the stored event log (bunching, long headway, traffic, wet weather)."""
+    return _page("weather_events.html")
 
 
 def tr_event_public(e, now):
@@ -8465,6 +8681,12 @@ Each question arrives with a JSON message. Use only what is in it. Sources that 
 4. Not connected to you: CFMS, duty or vehicle assignment records, OTA, official EWT, departure logs. If asked, say it is not connected.
 5. checkpoints: AI camera readings at the Woodlands and Tuas checkpoints from the last 30 minutes, when any exist.
 6. page.mode "demo" means the page data is simulated: say so once.
+7. wet_weather_now: rain areas on bus routes now (NEA gauges, moderate or heavier) and the service-directions inside them. added_min = the minutes rain
+   usually adds to that direction's running time (median of wet trips minus comparable dry trips, same day type, within 1 hour), with its basis.
+   added_min null = not enough measured wet trips: say the impact is not measured yet; never guess a number.
+   directions[].wet_weather gives the same for a named service: in_rain_now, added_min_expected, added_min_heavy, wet_trips, confidence.
+8. event_log (in service_checks): the stored history of bus bunching, long headway, traffic alerts and rain areas for that service in the window
+   (counts by category and the latest few). Use it for "what happened" questions. An empty log over a short or unmonitored period is not proof of normal.
 
 DATA CONFIDENCE (pick one):
 - Verified: live measurement for every direction, under 2 minutes old, at least 2 buses, scheduled headway known.
@@ -8649,9 +8871,29 @@ async def assistant_service_check(svc, win, live_ok, focus=None):
             D["live"] = assistant_live(BB["rows"].get(f"{svc}:{d}"), time.time())
         D["events"] = assistant_events(svc, d, win["start"], win["end"], time.time())
         D["running_time"] = assistant_rt(svc, d, win["start"], win["end"])
+        try:                                                                   # 12 Nov: what rain usually adds to this direction, and whether it is in rain now
+            ws_ = wx_stats().get((svc.upper(), int(d)))
+            wn_ = next((x for x in wx_now()["services"] if x["service"] == svc.upper() and x["dir"] == int(d)), None)
+            mins_, basis_ = opslog.expected_now(ws_, now_sgt().hour, bool(wn_ and wn_.get("level") == "heavy"))
+            D["wet_weather"] = {"in_rain_now": bool(wn_), "rain_area": (wn_ or {}).get("area"), "rain_level": (wn_ or {}).get("level"),
+                                "added_min_expected": mins_, "basis": basis_, "added_min_all_hours": (ws_ or {}).get("added_min"),
+                                "added_min_heavy": (ws_ or {}).get("added_heavy_min"), "wet_trips": (ws_ or {}).get("n_wet", 0),
+                                "dry_trips": (ws_ or {}).get("n_dry", 0), "confidence": (ws_ or {}).get("confidence", "insufficient")}
+        except Exception:
+            pass
         out["directions"].append(D)
     if focus:
         out["forecast_centre"] = focus
+    try:                                                                       # 12 Nov: the stored event log for this service in the window
+        evs = evlog_query("", svc, win["start"], win["end"] + 60, "", 40)
+        if evs:
+            cnt = {}
+            for e in evs:
+                cnt[e["category"]] = cnt.get(e["category"], 0) + 1
+            out["event_log"] = {"counts": cnt, "latest": [{"category": e["category"], "kind": e["kind"], "from": _hm(e["start_ts"]), "to": _hm(e["end_ts"]) if e["end_ts"] else "ongoing",
+                                                           "where": (e["location"] or "")[:90], "peak": e["peak"], "unit": e["peak_unit"]} for e in evs[:6]]}
+    except Exception:
+        pass
     return out
 
 
@@ -8671,6 +8913,13 @@ def assistant_snapshot(ctx):
         cams = {cid: cpa.swap_dirs(cid, r) for cid, r in cams.items()}
         if cams:
             snap["checkpoints"] = {"crossings": cpa.crossings(cams), "cameras": cams}
+    except Exception:
+        pass
+    try:                                                                       # 12 Nov: rain on bus routes now, with the minutes rain usually adds
+        wn = wx_now()
+        snap["wet_weather_now"] = {"rain_areas": [{"name": a["name"], "level": a["level"], "max_mm": a["max_mm"], "services": a["services"]} for a in wn["areas"][:8]],
+                                   "services_in_rain": [{"svc": x["service"], "dir": x["dir"], "area": x["area"], "level": x["level"], "added_min": x["expected_min"], "basis": x["basis"]}
+                                                        for x in wn["services"][:40]], "feed_ok": wn["feed_ok"]}
     except Exception:
         pass
     snap["now_sg"] = datetime.now(SGT).strftime("%Y-%m-%d %H:%M")
