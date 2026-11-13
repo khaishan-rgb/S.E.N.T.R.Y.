@@ -684,7 +684,20 @@ const TBL_NAME = {none:"No action", adjust:"Trip adjustment", halfway:"Halfway d
 function evenBand(st){ return st.gap_min != null && st.gap_min !== st.gap_max ? st.gap_min + "\u2013" + st.gap_max : String(st.gap_min != null ? st.gap_min : st.h); }
 function evenWin(st){ return st.first === st.last ? "Trip " + st.first : "Trips " + st.first + "\u2013" + st.last; }                                       // "Trips 3–7"
 function evenSegs(st){ return st.show ? "Trip " + st.before + " \u2192 " + st.after + ": " + st.show.map(x => Math.round(x)).join(", ") + " min" : (st.segments || []).map(g => "Trip " + g.from + " \u2192 " + g.to + ": " + g.gaps.map(x => Math.round(x)).join(", ")).join(" \u00b7 ") + " min"; }
-function evenStep(st){ return st.step != null ? "gaps change by at most " + st.step + " min from one bus to the next" + (st.step > st.step_asked ? " (" + st.step_asked + " does not fit in the " + st.n_trips + " trips simulated)" : "") : ""; }
+function ladderWhy(sa, r){
+  const L = (sa.late || [])[0], sp = Math.round(sa.split || 10);
+  const rows = (sa.rows || []).slice().sort((a, b) => a.trip - b.trip).map(x => "Trip " + x.trip + " (" + (x.side === "above" ? "above" : "below") + ") held " + x.hold + " min" + (x.waits ? " \u2192 " + Math.round(x.applied) + " (it cannot leave before the bus in front)" : ""));
+  return '<details class="ln-why"><summary>How the even headway is worked out</summary><p>'
+    + (L ? 'Trip ' + L.trip + '&rsquo;s bus arrives at ' + esc(L.arr_clock) + ' and needs the ' + f0(sa.min_layover || 7) + '-min minimum layover, so it leaves at <b>' + esc(L.earliest_clock) + '</b> (+' + f0(L.late) + '). ' : '')
+    + 'The duties around it are held in steps, alternately above (+, the buses in front) and below (&minus;, the buses behind): late under ' + sp + ' min &rarr; ' + f0(sa.step_small || 1) + '-min steps (+1 &minus;1 +2 &minus;2 +3 &hellip;), late ' + sp + ' min or more &rarr; ' + f0(sa.step_big || 2) + '-min steps (+2 &minus;2 +4 &minus;4 &hellip;). '
+    + 'The ladder stops at the first step that reaches half the delay, and the biggest hold is next to the late trip.</p>'
+    + '<p><b>' + esc(ladderText(sa)) + '</b><br>' + esc(rows.join(" \u00b7 ")) + '</p>'
+    + '<p>Gaps ' + esc(evenSegs(sa)) + '. Trip ' + sa.after + ' and the trips after it run as normal.</p></details>';
+}
+function ladderSeq(l){ const a = l.above.slice().reverse(), b = l.below.slice().reverse(), o = []; for(let i = 0; i < a.length; i++){ o.push("+" + a[i]); if(i < b.length) o.push("\u2212" + b[i]); } return o.join(" "); }   // "+1 −1 +2 −2 +3"
+function ladderText(st){ return (st.ladder || []).map(l => "Trip " + l.trip + " " + Math.round(l.late) + " min late \u2192 " + l.step + "-min steps: " + ladderSeq(l)).join("; "); }
+function evenStep(st){ if(st.mode === "ladder") return "duties above (+) and below (\u2212) the late trip held in steps (" + ladderText(st) + ")";
+  return st.step != null ? "gaps change by at most " + st.step + " min from one bus to the next" + (st.step > st.step_asked ? " (" + st.step_asked + " does not fit in the " + st.n_trips + " trips simulated)" : "") : ""; }
 function rvTableKey(){ const r = HO.rec; if(!r || !r.ok || !r.plans || !r.plans[r.decision]) return null; return HO.tblK && r.plans[HO.tblK] ? HO.tblK : r.decision; }   // the option shown in the table's green columns
 function rvShowInTable(k, scroll){ HO.tblK = k; hoRenderTrips(); if(scroll){ const t = $("hoTrips"); if(t) t.scrollIntoView({behavior:"smooth", block:"start"}); } }
 function rvRows(){                                 // {trip: row of the plan shown in the table} with the interchange headway in departure order
@@ -2464,7 +2477,7 @@ document.addEventListener("click", function(e){
       : '<b>Even headway instead?</b> ' + esc(evenStep(sa)) + ': ' + gaps + ' &ndash; EWT ' + f2(sa.ewt) + ' min instead of ' + f2(sa.least_wait_ewt) + ', ' + hold + '.';
     var L = (sa.late || [])[0], up = [], dn = [], sh = sa.show || [], li = L ? L.trip - sa.before : -1;
     sh.forEach(function(g, i){ (i < li ? up : dn).push(f0(g)); });
-    var why = '<details class="ln-why"><summary>How these gaps are worked out &middot; smoother or not?</summary><p>'
+    var why = sa.mode === "ladder" ? ladderWhy(sa, r) : '<details class="ln-why"><summary>How these gaps are worked out &middot; smoother or not?</summary><p>'
       + (L ? 'Trip ' + L.trip + '&rsquo;s bus arrives at ' + esc(L.arr_clock) + ' and needs the ' + f0(sa.min_layover || 7) + '-min minimum layover, so it leaves at <b>' + esc(L.earliest_clock) + '</b> (+' + f0(L.late) + '). ' : '')
       + 'Instead of one long gap and buses bunched behind it, each gap may differ from the gap before it by at most <b>' + sa.step + ' min</b>: the buses ahead are held a little more each'
       + (up.length ? ' (' + up.join(' &rarr; ') + ')' : '') + ', the buses behind catch up a little at a time' + (dn.length ? ' (' + dn.join(' &rarr; ') + ')' : '') + ', and Trip ' + sa.after + ' is back on the timetable (' + esc(sa.after_clock) + '). '
@@ -2549,7 +2562,7 @@ document.addEventListener("click", function(e){
     var P = r.plans, k = r.decision, p = P[k], N = P.none, base = N.ewt ? avgE(N) : null, v = p.ewt ? avgE(p) : null;
     var hw = (p.rows || []).filter(function(x){ return x.type === "halfway"; }), adj = p.n_adjusted || 0;
     var head = k === "halfway" ? hw.map(function(x){ return "Start Trip " + x.n + " halfway at " + esc(x.stop) + (x.code ? " (" + esc(x.code) + ")" : "") + " at " + esc(x.start_clock); }).join("<br>")
-      : k === "adjust" ? (p.steady ? "Keep every trip in full; even headway over " + evenWin(p.steady) + " (gaps change by at most " + p.steady.step + " min)" : "Keep every trip in full; hold or release " + adj + " departure" + (adj !== 1 ? "s" : "")) : "Keep the natural departures &ndash; no change needed";
+      : k === "adjust" ? (p.steady ? "Keep every trip in full; even headway over " + evenWin(p.steady) + (p.steady.mode === "ladder" ? " (" + ladderText(p.steady) + ")" : " (gaps change by at most " + p.steady.step + " min)") : "Keep every trip in full; hold or release " + adj + " departure" + (adj !== 1 ? "s" : "")) : "Keep the natural departures &ndash; no change needed";
     var sub = k === "halfway" ? hw.map(function(x){ return (x.leave_clock ? "Bus leaves off-service at " + esc(x.leave_clock) + " · " : "") + f1(x.km_lost) + " km not run"; }).join("; ") + (r.needs_standby ? " · needs a standby bus at the stop (the late bus cannot get there in time)" : "") + (adj ? " · " + adj + " other departure" + (adj > 1 ? "s" : "") + " adjusted" : "")
       : k === "adjust" ? "No km lost" : "";
     var cmpTo = k === "halfway" ? P[r.full_choice] : N, cv = cmpTo && cmpTo.ewt ? avgE(cmpTo) : null;

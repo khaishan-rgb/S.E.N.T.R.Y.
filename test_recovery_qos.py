@@ -185,9 +185,26 @@ class RunOrder(unittest.TestCase):
         self.assertEqual(rows[7]["shift"], 0)                                  # nobody steps in: trip 7 leaves when it is ready
         self.assertLess(rows[7]["dep"], rows[6]["dep"])
 
+    def test_even_headway_ladder_rule(self):
+        """V13.19: late < 10 min -> +1 -1 +2 -2 +3 ...; late >= 10 min -> +2 -2 +4 -4 ...; stops at half the delay."""
+        LH = R.ladder_holds if hasattr(R, "ladder_holds") else next(getattr(R, k) for k in dir(R) if hasattr(getattr(R, k), "ladder_holds")).ladder_holds
+        self.assertEqual(LH(5, 1), ([3, 2, 1], [2, 1]))
+        self.assertEqual(LH(14, 2), ([8, 6, 4, 2], [6, 4, 2]))
+        for late in ([0, 0, 0, 0, 0, 10, 0, 0, 0, 0], [0, 0, 0, 0, 0, 20, 0, 0, 0, 0]):
+            r = R.optimise(ctx(late, {"adjust_style": "steady", "n_trips": 10}))
+            st = r["plans"]["adjust"]["steady"]
+            self.assertEqual(st["mode"], "ladder")
+            lad = st["ladder"][0]
+            self.assertEqual(lad["step"], 2 if lad["late"] >= 10 else 1)
+            self.assertEqual((lad["above"], lad["below"]), LH(lad["late"], lad["step"]))
+            d = {x["n"]: x["dep"] for x in r["plans"]["adjust"]["rows"]}
+            self.assertTrue(all(d[k] < d[k + 1] for k in range(1, 10)), d)          # run order
+            for row in st["rows"]:
+                self.assertGreaterEqual(row["applied"], row["hold"])                 # each duty gets at least its ladder hold
+
     def test_even_headway_no_big_jumps(self):
         for late, n_tr in (([0, 0, 0, 0, 10, 0, 0, 0, 0, 0], 10), ([0, 0, 0, 0, 0, 20, 0, 0, 0, 0], 10), ([0, 0, 0, 0, 0, 20, 0, 0, 0, 0, 0, 0], 12)):
-            r = R.optimise(ctx(late, {"adjust_style": "steady", "n_trips": n_tr}))
+            r = R.optimise(ctx(late, {"adjust_style": "steady", "even_rule": "smooth", "n_trips": n_tr}))
             A, st = r["plans"]["adjust"], r["plans"]["adjust"]["steady"]
             g = [12] + st["gaps"] + [12]                                            # the timetable gap before bus 0 and after the next trip
             self.assertTrue(all(abs(b - a) <= st["step"] for a, b in zip(g, g[1:])), (late, st["step"], g))
