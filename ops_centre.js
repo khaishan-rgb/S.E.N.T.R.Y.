@@ -84,24 +84,49 @@
     var fab = $("haiFab"); if(fab) fab.style.zoom = z < 1 ? Math.max(.6, z) : "";
   }
   /* the docked AI panel's width, as a share of the map column: drag its right edge, or press expand (remembered on this screen) */
-  var aiFrac = .44; try{ var f0 = parseFloat(localStorage.getItem("ops.aiw")); if(f0 >= .2 && f0 <= 1) aiFrac = f0; }catch(e){}
-  function setFrac(f, save){ aiFrac = Math.max(.2, Math.min(1, f)); if(save){ try{ localStorage.setItem("ops.aiw", aiFrac.toFixed(3)); }catch(e){} } dockAI(); }
+  var aiFrac = .44, aiHFrac = 1;
+  try{ var f0 = parseFloat(localStorage.getItem("ops.aiw")); if(f0 >= .2 && f0 <= 1) aiFrac = f0;
+       var h0 = parseFloat(localStorage.getItem("ops.aih")); if(h0 >= .3 && h0 <= 1) aiHFrac = h0; }catch(e){}
+  function saveSize(){ try{ localStorage.setItem("ops.aiw", aiFrac.toFixed(3)); localStorage.setItem("ops.aih", aiHFrac.toFixed(3)); }catch(e){} }
+  function setSize(fw, fh, save){
+    if(fw != null) aiFrac = Math.max(.2, Math.min(1, fw));
+    if(fh != null) aiHFrac = Math.max(.3, Math.min(1, fh));
+    if(save) saveSize(); dockAI();
+  }
+  function setFrac(f, save){ setSize(f, null, save); }
+  function areaRects(){ return { m: $("opsMapSlot").getBoundingClientRect(), n: $("opsAna").getBoundingClientRect() }; }
   function grip(){
     var hai = $("hai"); if(!hai || $("opsGrip")) return;
-    var g = document.createElement("div");
-    g.id = "opsGrip"; g.className = "ops-grip"; g.setAttribute("role", "separator"); g.setAttribute("aria-orientation", "vertical");
-    g.setAttribute("aria-label", "Drag to make HORIZON AI wider or narrower"); g.tabIndex = 0; g.title = "Drag to resize";
-    hai.appendChild(g);
-    g.addEventListener("pointerdown", function(e){
-      e.preventDefault(); g.setPointerCapture(e.pointerId); hai.classList.add("resizing");
-      var move = function(ev){ var m = $("opsMapSlot").getBoundingClientRect(); setFrac((ev.clientX - m.left) / m.width, false); };
-      var up = function(){ hai.classList.remove("resizing"); g.removeEventListener("pointermove", move); g.removeEventListener("pointerup", up); setFrac(aiFrac, true); };
-      g.addEventListener("pointermove", move); g.addEventListener("pointerup", up);
+    [["opsGrip", "x", "ops-grip", "Drag to make HORIZON AI wider or narrower"],
+     ["opsGripY", "y", "ops-grip ops-grip-y", "Drag to make HORIZON AI taller or shorter"],
+     ["opsGripXY", "xy", "ops-grip ops-grip-xy", "Drag to resize HORIZON AI"]].forEach(function(d){
+      var g = document.createElement("div");
+      g.id = d[0]; g.className = d[2]; g.setAttribute("role", "separator");
+      if(d[1] !== "xy") g.setAttribute("aria-orientation", d[1] === "x" ? "vertical" : "horizontal");
+      g.setAttribute("aria-label", d[3]); g.tabIndex = 0; g.title = d[3];
+      hai.appendChild(g);
+      g.addEventListener("pointerdown", function(e){
+        e.preventDefault(); g.setPointerCapture(e.pointerId); hai.classList.add("resizing");
+        var move = function(ev){
+          var r = areaRects(), full = r.n.bottom - r.m.top;
+          setSize(d[1] !== "y" ? (ev.clientX - r.m.left) / r.m.width : null,
+                  d[1] !== "x" ? (ev.clientY - r.m.top) / full : null, false);
+        };
+        var up = function(){ hai.classList.remove("resizing"); g.removeEventListener("pointermove", move); g.removeEventListener("pointerup", up); g.removeEventListener("pointercancel", up); saveSize(); };
+        g.addEventListener("pointermove", move); g.addEventListener("pointerup", up); g.addEventListener("pointercancel", up);
+      });
+      g.addEventListener("keydown", function(e){
+        var k = e.key, st = .05;
+        if(d[1] !== "y" && k === "ArrowLeft"){ setSize(aiFrac - st, null, true); e.preventDefault(); }
+        if(d[1] !== "y" && k === "ArrowRight"){ setSize(aiFrac + st, null, true); e.preventDefault(); }
+        if(d[1] !== "x" && k === "ArrowUp"){ setSize(null, aiHFrac - st, true); e.preventDefault(); }
+        if(d[1] !== "x" && k === "ArrowDown"){ setSize(null, aiHFrac + st, true); e.preventDefault(); }
+      });
     });
-    g.addEventListener("keydown", function(e){ if(e.key === "ArrowLeft"){ setFrac(aiFrac - .05, true); e.preventDefault(); } if(e.key === "ArrowRight"){ setFrac(aiFrac + .05, true); e.preventDefault(); } });
     $("haiBig").addEventListener("click", function(e){
       if(!hai.classList.contains("docked")) return;
-      e.stopImmediatePropagation(); setFrac(aiFrac > .7 ? .44 : 1, true);
+      e.stopImmediatePropagation();
+      if(aiFrac > .7 && aiHFrac > .9) setSize(.44, 1, true); else setSize(1, 1, true);
     }, true);
   }
   function dockAI(){
@@ -115,7 +140,8 @@
     var w = Math.min(Math.max(m.width * aiFrac, 300 * z), m.width - 20 * z);       // AURA-style: floats over the left of the centre column
     hai.style.zoom = z;
     hai.style.setProperty("--ai-l", (m.left + 10 * z) / z + "px"); hai.style.setProperty("--ai-t", (m.top + 10 * z) / z + "px");
-    hai.style.setProperty("--ai-w", w / z + "px"); hai.style.setProperty("--ai-h", (n.bottom - m.top - 20 * z) / z + "px");
+    hai.style.setProperty("--ai-w", w / z + "px"); var hFull = n.bottom - m.top - 20 * z, h = Math.max(Math.min(hFull * aiHFrac, hFull), Math.min(320 * z, hFull));
+    hai.style.setProperty("--ai-h", h / z + "px");
   }
   function aiState(){
     var hai = $("hai"), min = !hai || hai.hidden;

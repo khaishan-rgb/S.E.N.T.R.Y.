@@ -288,5 +288,12 @@ html.ops-fit.ops-tv:not(.ops-ai-min) .hai-fab{display:none!important}
 .hai.docked .ops-grip{display:block;position:absolute;top:0;right:0;bottom:0;width:16px;cursor:ew-resize;z-index:6;touch-action:none}
 .hai.docked .ops-grip:after{content:"";position:absolute;top:50%;left:9px;width:4px;height:56px;margin-top:-28px;border-radius:3px;background:rgba(63,211,255,.55);box-shadow:0 0 10px rgba(63,211,255,.8)}
 .hai.docked .ops-grip:hover:after,.hai.docked .ops-grip:focus-visible:after,.hai.resizing .ops-grip:after{background:#3fd3ff;height:90px;margin-top:-45px}
+.hai.docked .ops-grip-y{top:auto;left:0;right:16px;bottom:0;width:auto;height:16px;cursor:ns-resize}
+.hai.docked .ops-grip-y:after{top:9px;left:50%;width:56px;height:4px;margin:0 0 0 -28px}
+.hai.docked .ops-grip-y:hover:after,.hai.docked .ops-grip-y:focus-visible:after,.hai.resizing .ops-grip-y:after{width:90px;height:4px;margin:0 0 0 -45px}
+.hai.docked .ops-grip-xy{top:auto;left:auto;right:0;bottom:0;width:22px;height:22px;cursor:nwse-resize;z-index:7}
+.hai.docked .ops-grip-xy:after{top:auto;left:auto;right:4px;bottom:4px;width:10px;height:10px;margin:0;border-radius:0 0 3px 0;background:none;border-right:3px solid #3fd3ff;border-bottom:3px solid #3fd3ff;box-shadow:none}
+.hai.docked .ops-grip-xy:hover:after,.hai.docked .ops-grip-xy:focus-visible:after,.hai.resizing .ops-grip-xy:after{width:14px;height:14px;margin:0;background:none}
+.hai.docked .ops-grip:not(.ops-grip-y):not(.ops-grip-xy){bottom:22px}
 .hai.resizing{user-select:none;transition:none!important}
 .hai.docked #haiBig{display:inline-grid}
