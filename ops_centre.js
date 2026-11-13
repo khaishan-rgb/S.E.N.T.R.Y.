@@ -94,6 +94,8 @@
     if(save) saveSize(); dockAI();
   }
   function setFrac(f, save){ setSize(f, null, save); }
+  var prevSize = null; try{ var p0 = (localStorage.getItem("ops.aiprev") || "").split(",").map(parseFloat); if(p0.length === 2 && p0[0] > 0) prevSize = p0; }catch(e){}
+  function isMax(){ return aiFrac > .98 && aiHFrac > .98; }
   function areaRects(){ return { m: $("opsMapSlot").getBoundingClientRect(), n: $("opsAna").getBoundingClientRect() }; }
   function grip(){
     var hai = $("hai"); if(!hai || $("opsGrip")) return;
@@ -126,13 +128,15 @@
     $("haiBig").addEventListener("click", function(e){
       if(!hai.classList.contains("docked")) return;
       e.stopImmediatePropagation();
-      if(aiFrac > .7 && aiHFrac > .9) setSize(.44, 1, true); else setSize(1, 1, true);
+      if(isMax()){ var pv = prevSize || [.44, 1]; prevSize = null; setSize(pv[0], pv[1], true); }
+      else { prevSize = [aiFrac, aiHFrac]; try{ localStorage.setItem("ops.aiprev", prevSize.join(",")); }catch(e){} setSize(1, 1, true); }
     }, true);
   }
   function dockAI(){
     var hai = $("hai"); if(!hai) return;
     var tv = document.body.classList.contains("tv") && (fitZ < 1 || innerWidth >= 1200);
     hai.classList.toggle("docked", tv);
+    if(window.HORIZON_AI && HORIZON_AI.maxState) HORIZON_AI.maxState(tv ? isMax() : null);
     if(!tv){ hai.style.zoom = ""; ["--ai-l", "--ai-t", "--ai-w", "--ai-h"].forEach(function(v){ hai.style.removeProperty(v); }); return; }
     var z = fitZ < 1 ? fitZ : innerWidth >= 2600 ? 1.8 : 1;                       // the AI panel is scaled like the wall around it
     var m = $("opsMapSlot").getBoundingClientRect(), n = $("opsAna").getBoundingClientRect();

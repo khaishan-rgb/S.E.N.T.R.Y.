@@ -14,7 +14,7 @@
     en: {sub: "AI operations assistant", thinking: "Thinking", faceBtn: "Change face", on: "online", off: "not set up", ph: "Ask about an alert, service or incident", send: "Send", mic: "Speak your question",
          micNo: "Voice input works in Chrome or Edge", listen: "Listening", speaking: "Speaking", idle: "Ready", think: "Checking the live data…",
          faces: {holo: "AI", agent: "Officer", orb: "Orb", photo: "Photo"}, replay: "Replay", mute: "Mute voice", unmute: "Voice on", stop: "Stop",
-         min: "Minimise", big: "Bigger", small: "Smaller", you: "You", hello: "Hello, I'm HORIZON AI. Ask me about any alert, service or incident on this page and I'll explain why it happened and what to do.",
+         min: "Minimise", big: "Maximise", small: "Restore down", close: "Close and clear chat", you: "You", hello: "Hello, I'm HORIZON AI. Ask me about any alert, service or incident on this page and I'll explain why it happened and what to do.",
          foot: "Advisory only · answers from this page and live service checks · the Service Controller decides", choose: "Choose photo", photoNote: "Use a picture you have permission to use. It stays in this browser only.",
          noPhoto: "No photo yet", fab: "Ask HORIZON AI", noVoice: "No voice for this language on this computer: showing text only.", idVoice: "No Malay voice on this computer: using an Indonesian voice.",
          cats: {loading: "heavily loaded", traffic: "delayed by traffic", bunching: "bunching", gap: "running with a long gap"},
@@ -23,7 +23,7 @@
     zh: {sub: "AI 运营助理", thinking: "正在思考", faceBtn: "更换形象", on: "在线", off: "未设置", ph: "询问警报、巴士服务或事故", send: "发送", mic: "说出你的问题",
          micNo: "语音输入请使用 Chrome 或 Edge", listen: "正在聆听", speaking: "正在说话", idle: "就绪", think: "正在查看实时数据…",
          faces: {holo: "AI", agent: "职员", orb: "光环", photo: "照片"}, replay: "重播", mute: "关闭语音", unmute: "开启语音", stop: "停止",
-         min: "最小化", big: "放大", small: "缩小", you: "你", hello: "您好，我是 HORIZON AI。请问我本页上的任何警报、巴士服务或事故，我会解释原因和处理方法。",
+         min: "最小化", big: "最大化", small: "还原", close: "关闭并清除对话", you: "你", hello: "您好，我是 HORIZON AI。请问我本页上的任何警报、巴士服务或事故，我会解释原因和处理方法。",
          foot: "仅供参考 · 根据本页数据和实时服务检查回答 · 由服务控制员决定", choose: "选择照片", photoNote: "请使用您有权使用的照片。照片只保存在此浏览器中。",
          noPhoto: "尚未选择照片", fab: "询问 HORIZON AI", noVoice: "此电脑没有中文语音：只显示文字。", idVoice: "",
          cats: {loading: "载客量高", traffic: "因交通延误", bunching: "串车（车距过近）", gap: "班距过大"},
@@ -32,7 +32,7 @@
     ms: {sub: "Pembantu operasi AI", thinking: "Sedang berfikir", faceBtn: "Tukar wajah", on: "dalam talian", off: "belum disediakan", ph: "Tanya tentang amaran, perkhidmatan atau insiden", send: "Hantar", mic: "Sebut soalan anda",
          micNo: "Input suara berfungsi dalam Chrome atau Edge", listen: "Sedang mendengar", speaking: "Sedang bercakap", idle: "Sedia", think: "Sedang menyemak data langsung…",
          faces: {holo: "AI", agent: "Pegawai", orb: "Orb", photo: "Foto"}, replay: "Main semula", mute: "Senyapkan suara", unmute: "Suara dihidupkan", stop: "Henti",
-         min: "Kecilkan", big: "Besarkan", small: "Kecilkan saiz", you: "Anda", hello: "Helo, saya HORIZON AI. Tanya saya tentang sebarang amaran, perkhidmatan atau insiden di halaman ini, dan saya akan terangkan sebabnya dan apa yang perlu dibuat.",
+         min: "Kecilkan", big: "Maksimumkan", small: "Pulihkan saiz", close: "Tutup dan kosongkan sembang", you: "Anda", hello: "Helo, saya HORIZON AI. Tanya saya tentang sebarang amaran, perkhidmatan atau insiden di halaman ini, dan saya akan terangkan sebabnya dan apa yang perlu dibuat.",
          foot: "Nasihat sahaja · jawapan daripada halaman ini dan semakan perkhidmatan langsung · Pengawal Perkhidmatan yang memutuskan", choose: "Pilih foto", photoNote: "Gunakan gambar yang anda dibenarkan guna. Ia disimpan dalam pelayar ini sahaja.",
          noPhoto: "Belum ada foto", fab: "Tanya HORIZON AI", noVoice: "Tiada suara Bahasa Melayu pada komputer ini: teks sahaja.", idVoice: "Tiada suara Bahasa Melayu pada komputer ini: menggunakan suara Bahasa Indonesia.",
          cats: {loading: "penuh sesak", traffic: "lewat kerana trafik", bunching: "berkelompok", gap: "jurang panjang"},
@@ -470,6 +470,8 @@
     return {
       spark: i('<path d="M12 2.5c.6 4.6 2.9 6.9 7.5 7.5-4.6.6-6.9 2.9-7.5 7.5-.6-4.6-2.9-6.9-7.5-7.5 4.6-.6 6.9-2.9 7.5-7.5Z" fill="currentColor" stroke="none"/><path d="M19 15.5c.25 1.9 1.1 2.75 3 3-1.9.25-2.75 1.1-3 3-.25-1.9-1.1-2.75-3-3 1.9-.25 2.75-1.1 3-3Z" fill="currentColor" stroke="none" opacity=".7"/>'),
       min: i('<path d="M6 12h12"/>'), grow: i('<path d="M14 4h6v6M10 20H4v-6M20 4l-7 7M4 20l7-7"/>'), shrink: i('<path d="M20 10h-6V4M4 14h6v6M14 10l7-7M10 14l-7 7"/>'),
+      max: i('<rect x="5" y="5" width="14" height="14" rx="1.5"/>'), restore: i('<rect x="4.5" y="8.5" width="11" height="11" rx="1.5"/><path d="M8.5 8.5V5.8c0-.7.6-1.3 1.3-1.3h8.4c.7 0 1.3.6 1.3 1.3v8.4c0 .7-.6 1.3-1.3 1.3h-2.7"/>'),
+      x: i('<path d="M6 6l12 12M18 6L6 18"/>'),
       replay: i('<path d="M3.5 12a8.5 8.5 0 1 0 2.6-6.1"/><path d="M3.5 4v4.5H8"/>'),
       vol: i('<path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path d="M15.5 9a4.2 4.2 0 0 1 0 6M18.3 6.5a8 8 0 0 1 0 11"/>'),
       mute: i('<path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path d="M16 9.5l5 5M21 9.5l-5 5"/>'),
@@ -495,7 +497,7 @@
     el.classList.toggle("big", S.big);
     el.innerHTML = '<header class="hai-h" id="haiDrag"><span class="hai-logo">' + ICON.spark + '</span>'
       + '<span class="hai-title"><b>HORIZON AI</b><small id="haiSub"></small></span><span class="hai-st" id="haiSt"><i></i><span></span></span>'
-      + '<button type="button" class="hai-ib" id="haiBig"></button><button type="button" class="hai-ib" id="haiMin"></button></header>'
+      + '<span class="hai-win"><button type="button" class="hai-ib" id="haiMin"></button><button type="button" class="hai-ib" id="haiBig"></button><button type="button" class="hai-ib close" id="haiClose"></button></span></header>'
       + '<div class="hai-stage" id="haiStage" data-mode="idle"><div class="hai-face" id="haiFace"></div>'
       + '<span class="hai-hud" aria-hidden="true"><i></i><i></i><i></i><i></i></span>'
       + '<div class="hai-say" id="haiSay" role="status"><span class="hai-bars" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span><span></span></div>'
@@ -525,7 +527,9 @@
     ib("haiStop", ICON.stop, t("stop"));
     ib("haiFaceBtn", ICON.face, t("faceBtn"));
     ib("haiMin", ICON.min, t("min"));
-    ib("haiBig", S.big ? ICON.shrink : ICON.grow, S.big ? t("small") : t("big"));
+    var maxed = S.maxed != null ? S.maxed : S.big;
+    ib("haiBig", maxed ? ICON.restore : ICON.max, maxed ? t("small") : t("big"));
+    ib("haiClose", ICON.x, t("close"));
     $("haiFoot").textContent = t("foot");
     $("haiFaces").innerHTML = ["agent", "holo", "orb", "photo"].map(function(f){ return '<button type="button" class="hai-opt" data-face="' + f + '" aria-pressed="' + (S.face === f) + '">' + esc(t("faces")[f]) + "</button>"; }).join("")
       + (S.face === "photo" ? '<label class="hai-opt" for="haiFile">' + esc(t("choose")) + '</label><input type="file" id="haiFile" accept="image/*" hidden><small>' + esc(t("photoNote")) + "</small>" : "");
@@ -813,6 +817,10 @@
     $("haiMute").addEventListener("click", function(){ S.mute = !S.mute; store("mute", S.mute ? "1" : "0"); if(S.mute) stopSpeaking(); words(); });
     $("haiStop").addEventListener("click", stopSpeaking);
     $("haiMin").addEventListener("click", function(){ S.open = false; store("open", "0"); stopSpeaking(); words(); fab.focus(); });
+    $("haiClose").addEventListener("click", function(){
+      stopSpeaking(); LOG.length = 0; S.history = []; S.lastAnswer = ""; renderLog();
+      S.open = false; store("open", "0"); words(); fab.focus();
+    });
     $("haiBig").addEventListener("click", function(){ S.big = !S.big; store("big", S.big ? "1" : "0"); el.classList.toggle("big", S.big); words(); place(); });
     var h = $("haiDrag"), sx, sy, ox, oy, drag = false;
     h.addEventListener("pointerdown", function(e){ if(e.target.closest("select,button") || innerWidth < 640) return; drag = true; h.setPointerCapture(e.pointerId); var r = el.getBoundingClientRect(); sx = e.clientX; sy = e.clientY; ox = r.left; oy = r.top; });
@@ -831,7 +839,7 @@
   var sugWait = setInterval(function(){ if(pageData()){ suggestions(); clearInterval(sugWait); } }, 1500);   // first data from the Forecast Centre
   setTimeout(function(){ clearInterval(sugWait); }, 60000);
   setInterval(suggestions, 30000);
-  window.HORIZON_AI = {ask: ask, speak: speak, stop: stopSpeaking, state: S, snapshot: snapshot, setFace: function(f){ S.face = f; store("face", f); drawFace(); words(); }, setLang: function(l){ $("haiLang").value = l; $("haiLang").dispatchEvent(new Event("change")); },
+  window.HORIZON_AI = {maxState: function(on){ var v = on == null ? null : !!on; if(v === S.maxed) return; S.maxed = v; if($("haiBig")) words(); }, ask: ask, speak: speak, stop: stopSpeaking, state: S, snapshot: snapshot, setFace: function(f){ S.face = f; store("face", f); drawFace(); words(); }, setLang: function(l){ $("haiLang").value = l; $("haiLang").dispatchEvent(new Event("change")); },
     voiceFor: function(lang, face){ return chooseVoice(lang, face || S.face); },
     faceSVG: function(f){ return f === "orb" ? orbSVG() : f === "holo" ? holoMini() : ""; }, setPhoto: setPhoto,
     open: function(on){ S.open = on !== false; store("open", S.open ? "1" : "0"); words(); }};

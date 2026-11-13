@@ -171,3 +171,7 @@
   .hai-orb .ring,.hai-typing i,.hai-field .mic.on,.hai-bars i,.hai-row.new{animation:none}
   .hai-horizon::before{transition:none}
 }
+
+/* Windows-style window controls: minimise, maximise/restore, close */
+.hai-win{display:inline-flex;gap:4px;margin-left:2px}
+.hai-ib.close:hover{color:#fff;border-color:#ff5a6e;background:rgba(232,17,35,.85)}
