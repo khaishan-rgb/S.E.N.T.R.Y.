@@ -12,7 +12,7 @@
     linear-gradient(150deg,rgba(63,211,255,.7),rgba(160,123,255,.35) 38%,rgba(63,211,255,.06) 68%,rgba(160,123,255,.55)) border-box;
   box-shadow:0 28px 70px -24px rgba(0,0,0,.85),0 0 46px -14px rgba(63,211,255,.38);backdrop-filter:blur(14px)}
 .hai[hidden],.hai-fab[hidden]{display:none!important}
-.hai.big{width:600px;height:min(900px,calc(100vh - 40px))}
+.hai.big{width:min(900px,calc(100vw - 40px));height:calc(100vh - 40px)}
 .hai *{box-sizing:border-box}
 .hai-i{width:18px;height:18px;display:block}
 
@@ -175,3 +175,18 @@
 /* Windows-style window controls: minimise, maximise/restore, close */
 .hai-win{display:inline-flex;gap:4px;margin-left:2px}
 .hai-ib.close:hover{color:#fff;border-color:#ff5a6e;background:rgba(232,17,35,.85)}
+
+/* resize handles on the floating panel */
+.hai-rs{position:absolute;z-index:8;touch-action:none}
+.hai-rs-l{left:0;top:60px;bottom:18px;width:10px;cursor:ew-resize}
+.hai-rs-r{right:0;top:60px;bottom:18px;width:10px;cursor:ew-resize}
+.hai-rs-b{left:18px;right:18px;bottom:0;height:10px;cursor:ns-resize}
+.hai-rs-bl{left:0;bottom:0;width:18px;height:18px;cursor:nesw-resize}
+.hai-rs-br{right:0;bottom:0;width:18px;height:18px;cursor:nwse-resize}
+.hai-rs-br:after,.hai-rs-bl:after{content:"";position:absolute;bottom:4px;width:8px;height:8px;border-bottom:2px solid rgba(63,211,255,.6)}
+.hai-rs-br:after{right:4px;border-right:2px solid rgba(63,211,255,.6);border-bottom-right-radius:3px}
+.hai-rs-bl:after{left:4px;border-left:2px solid rgba(63,211,255,.6);border-bottom-left-radius:3px}
+.hai-rs:hover:after{border-color:#3fd3ff}
+.hai.resizing{user-select:none}
+.hai.docked .hai-rs{display:none}
+@media (max-width:640px){.hai-rs{display:none}}

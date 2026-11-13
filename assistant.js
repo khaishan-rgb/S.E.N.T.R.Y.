@@ -513,7 +513,7 @@
       + '<button type="button" class="hai-ib mic" id="haiMic"></button></div><button type="submit" class="hai-send" id="haiSend"></button></form>'
       + '<div class="hai-foot" id="haiFoot"></div>';
     $("haiLang").value = S.lang;
-    wire(); words(); drawFace(); renderLog(); suggestions(); status();
+    wire(); words(); drawFace(); renderLog(); suggestions(); status(); resizers();
   }
   function $(id){ return document.getElementById(id); }
   function words(){
@@ -828,8 +828,42 @@
     h.addEventListener("pointerup", function(){ if(!drag) return; drag = false; store("pos", JSON.stringify({l: parseInt(el.style.left, 10), t: parseInt(el.style.top, 10)})); });
   }
   function place(){
+    var z = null; try{ z = JSON.parse(store("size") || "null"); }catch(e){}
+    if(z && innerWidth >= 640 && !S.big){ el.style.width = Math.min(z.w, innerWidth - 16) + "px"; el.style.height = Math.min(z.h, innerHeight - 16) + "px"; }
+    else { el.style.width = ""; el.style.height = ""; }
     var p = null; try{ p = JSON.parse(store("pos") || "null"); }catch(e){}
-    if(p && innerWidth >= 640 && p.l >= 0 && p.l < innerWidth - 120 && p.t >= 0 && p.t < innerHeight - 80){ el.style.left = Math.min(p.l, innerWidth - el.offsetWidth - 4) + "px"; el.style.top = p.t + "px"; el.style.right = "auto"; }
+    if(p && innerWidth >= 640 && p.l >= 0 && p.l < innerWidth - 120 && p.t >= 0 && p.t < innerHeight - 80){ el.style.left = Math.max(4, Math.min(p.l, innerWidth - el.offsetWidth - 4)) + "px"; el.style.top = p.t + "px"; el.style.right = "auto"; }
+    if(S.big && innerWidth >= 640){
+      var hd = document.querySelector("#dsCmd,.ds-cmd,body > header"), top = 20;
+      if(hd){ var hb = hd.getBoundingClientRect(); if(hb.bottom > 0 && hb.bottom < innerHeight / 3 && getComputedStyle(hd).position !== "static") top = Math.round(hb.bottom) + 8; }
+      el.style.top = top + "px"; el.style.height = (innerHeight - top - 16) + "px"; el.style.left = Math.max(4, Math.min(el.getBoundingClientRect().left, innerWidth - el.offsetWidth - 20)) + "px"; el.style.right = "auto"; }
+    else if(!(p && innerWidth >= 640)){ el.style.top = ""; }
+  }
+  /* free resizing of the floating panel: drag any side or bottom corner (the TV wall docks the panel and has its own handles) */
+  function resizers(){
+    if(el.querySelector(".hai-rs")) return;
+    ["l", "r", "b", "bl", "br"].forEach(function(k){
+      var g = document.createElement("div"); g.className = "hai-rs hai-rs-" + k; g.setAttribute("aria-hidden", "true"); el.appendChild(g);
+      g.addEventListener("pointerdown", function(e){
+        if(innerWidth < 640 || el.classList.contains("docked")) return;
+        e.preventDefault(); e.stopPropagation(); g.setPointerCapture(e.pointerId);
+        var r = el.getBoundingClientRect(), sx = e.clientX, sy = e.clientY, MINW = 320, MINH = 360;
+        el.style.left = r.left + "px"; el.style.top = r.top + "px"; el.style.right = "auto"; el.classList.add("resizing");
+        var mv = function(ev){
+          var dx = ev.clientX - sx, dy = ev.clientY - sy, l = r.left, w = r.width, h = r.height;
+          if(k.indexOf("r") >= 0) w = Math.min(Math.max(r.width + dx, MINW), innerWidth - r.left - 4);
+          if(k.indexOf("l") >= 0){ w = Math.min(Math.max(r.width - dx, MINW), r.right - 4); l = r.right - w; }
+          if(k.indexOf("b") >= 0) h = Math.min(Math.max(r.height + dy, MINH), innerHeight - r.top - 4);
+          el.style.left = l + "px"; el.style.width = w + "px"; el.style.height = h + "px";
+        };
+        var up = function(){
+          el.classList.remove("resizing"); g.removeEventListener("pointermove", mv); g.removeEventListener("pointerup", up); g.removeEventListener("pointercancel", up);
+          var b = el.getBoundingClientRect(); S.big = false; store("big", "0"); el.classList.remove("big");
+          store("size", JSON.stringify({w: Math.round(b.width), h: Math.round(b.height)})); store("pos", JSON.stringify({l: Math.round(b.left), t: Math.round(b.top)})); words();
+        };
+        g.addEventListener("pointermove", mv); g.addEventListener("pointerup", up); g.addEventListener("pointercancel", up);
+      });
+    });
   }
   fab.addEventListener("click", function(){ S.open = true; store("open", "1"); words(); var q = $("haiQ"); if(q) q.focus(); });
   addEventListener("keydown", function(e){ if(e.key !== "Escape") return; var m = $("haiFaces"); if(m && !m.hidden){ m.hidden = true; $("haiFaceBtn").setAttribute("aria-expanded", "false"); $("haiFaceBtn").focus(); } else if(S.speaking) stopSpeaking(); });
