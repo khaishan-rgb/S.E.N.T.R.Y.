@@ -83,6 +83,27 @@
     } else { ops.style.zoom = ""; ops.style.height = ""; }
     var fab = $("haiFab"); if(fab) fab.style.zoom = z < 1 ? Math.max(.6, z) : "";
   }
+  /* the docked AI panel's width, as a share of the map column: drag its right edge, or press expand (remembered on this screen) */
+  var aiFrac = .44; try{ var f0 = parseFloat(localStorage.getItem("ops.aiw")); if(f0 >= .2 && f0 <= 1) aiFrac = f0; }catch(e){}
+  function setFrac(f, save){ aiFrac = Math.max(.2, Math.min(1, f)); if(save){ try{ localStorage.setItem("ops.aiw", aiFrac.toFixed(3)); }catch(e){} } dockAI(); }
+  function grip(){
+    var hai = $("hai"); if(!hai || $("opsGrip")) return;
+    var g = document.createElement("div");
+    g.id = "opsGrip"; g.className = "ops-grip"; g.setAttribute("role", "separator"); g.setAttribute("aria-orientation", "vertical");
+    g.setAttribute("aria-label", "Drag to make HORIZON AI wider or narrower"); g.tabIndex = 0; g.title = "Drag to resize";
+    hai.appendChild(g);
+    g.addEventListener("pointerdown", function(e){
+      e.preventDefault(); g.setPointerCapture(e.pointerId); hai.classList.add("resizing");
+      var move = function(ev){ var m = $("opsMapSlot").getBoundingClientRect(); setFrac((ev.clientX - m.left) / m.width, false); };
+      var up = function(){ hai.classList.remove("resizing"); g.removeEventListener("pointermove", move); g.removeEventListener("pointerup", up); setFrac(aiFrac, true); };
+      g.addEventListener("pointermove", move); g.addEventListener("pointerup", up);
+    });
+    g.addEventListener("keydown", function(e){ if(e.key === "ArrowLeft"){ setFrac(aiFrac - .05, true); e.preventDefault(); } if(e.key === "ArrowRight"){ setFrac(aiFrac + .05, true); e.preventDefault(); } });
+    $("haiBig").addEventListener("click", function(e){
+      if(!hai.classList.contains("docked")) return;
+      e.stopImmediatePropagation(); setFrac(aiFrac > .7 ? .44 : 1, true);
+    }, true);
+  }
   function dockAI(){
     var hai = $("hai"); if(!hai) return;
     var tv = document.body.classList.contains("tv") && (fitZ < 1 || innerWidth >= 1200);
@@ -90,7 +111,8 @@
     if(!tv){ hai.style.zoom = ""; ["--ai-l", "--ai-t", "--ai-w", "--ai-h"].forEach(function(v){ hai.style.removeProperty(v); }); return; }
     var z = fitZ < 1 ? fitZ : innerWidth >= 2600 ? 1.8 : 1;                       // the AI panel is scaled like the wall around it
     var m = $("opsMapSlot").getBoundingClientRect(), n = $("opsAna").getBoundingClientRect();
-    var w = Math.min(Math.max(m.width * .44, 360 * z), m.width - 20 * z);          // AURA-style: floats over the left of the centre column
+    grip();
+    var w = Math.min(Math.max(m.width * aiFrac, 300 * z), m.width - 20 * z);       // AURA-style: floats over the left of the centre column
     hai.style.zoom = z;
     hai.style.setProperty("--ai-l", (m.left + 10 * z) / z + "px"); hai.style.setProperty("--ai-t", (m.top + 10 * z) / z + "px");
     hai.style.setProperty("--ai-w", w / z + "px"); hai.style.setProperty("--ai-h", (n.bottom - m.top - 20 * z) / z + "px");

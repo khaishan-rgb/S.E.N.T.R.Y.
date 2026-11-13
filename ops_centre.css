@@ -153,7 +153,7 @@ html.ops-tv .panel-head h2{text-shadow:0 0 14px rgba(63,211,255,.45)}
 .ops-tvtools .tv-exit:hover,.ops-tvtools .tv-exit:focus-visible{opacity:1}
 /* HORIZON AI docked in its own column */
 .hai.docked{left:var(--ai-l)!important;top:var(--ai-t)!important;width:var(--ai-w)!important;height:var(--ai-h)!important;right:auto!important;bottom:auto!important;max-width:none!important;z-index:900}
-.hai.docked #haiBig{display:none}
+
 .hai.docked .hai-h{cursor:default}
 .hai.docked .hai-stage{height:min(46%,440px)!important}
 html.ops-tv:not(.ops-ai-min) .hai-fab{display:none!important}
@@ -282,3 +282,11 @@ html.ops-fit #opsMapSlot,html.ops-fit #opsAlerts,html.ops-fit #opsAna,html.ops-f
 html.ops-fit .ops>[style*="grid-area:left"],html.ops-fit .ops>[style*="grid-area:right"]{height:auto!important}
 html.ops-fit.ops-tv .hai-fab{display:inline-flex!important}
 html.ops-fit.ops-tv:not(.ops-ai-min) .hai-fab{display:none!important}
+
+/* drag the docked AI panel's right edge to resize it */
+.ops-grip{display:none}
+.hai.docked .ops-grip{display:block;position:absolute;top:0;right:0;bottom:0;width:16px;cursor:ew-resize;z-index:6;touch-action:none}
+.hai.docked .ops-grip:after{content:"";position:absolute;top:50%;left:9px;width:4px;height:56px;margin-top:-28px;border-radius:3px;background:rgba(63,211,255,.55);box-shadow:0 0 10px rgba(63,211,255,.8)}
+.hai.docked .ops-grip:hover:after,.hai.docked .ops-grip:focus-visible:after,.hai.resizing .ops-grip:after{background:#3fd3ff;height:90px;margin-top:-45px}
+.hai.resizing{user-select:none;transition:none!important}
+.hai.docked #haiBig{display:inline-grid}
