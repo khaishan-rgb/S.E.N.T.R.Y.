@@ -158,7 +158,7 @@ html.ops-tv .panel-head h2{text-shadow:0 0 14px rgba(63,211,255,.45)}
 .hai.docked .hai-stage{height:min(46%,440px)!important}
 html.ops-tv:not(.ops-ai-min) .hai-fab{display:none!important}
 /* AI minimised on the wall: its column folds away and the map and alert analysis widen; the round button brings it back */
-html.ops-tv.ops-ai-min .ops{grid-template-columns:minmax(300px,19%) minmax(0,1fr) minmax(360px,25%);grid-template-areas:"left map right" "alerts analysis cctv" "ticker ticker ticker"}
+@media(min-width:1400px){html.ops-tv.ops-ai-min .ops{grid-template-columns:minmax(300px,19%) minmax(0,1fr) minmax(360px,25%);grid-template-areas:"left map right" "alerts analysis cctv" "ticker ticker ticker"}}
 html.ops-tv.ops-ai-min .ops-aislot{display:none}
 html.ops-tv.ops-ai-min .hai-fab{bottom:58px}
 /* latest-alerts strip */
@@ -255,3 +255,9 @@ html.ops-tv .ops-sv{grid-template-columns:58px minmax(0,1fr) 30px}
 .ops-stat-h{margin:6px 0 7px;padding-top:8px;border-top:1px solid #173a52;font:700 11.5px/1.2 inherit;letter-spacing:.06em;text-transform:uppercase;color:#8fe4ff}
 .ops-stat-h small{text-transform:none;letter-spacing:0;color:#7f97b6;font-weight:500}
 @media(min-width:2600px){html.ops-tv #opsAiScroll{zoom:var(--z)}}
+
+/* narrow screens in TV mode: the same stacked layout whether HORIZON AI is open or minimised */
+@media(max-width:1199px){html.ops-tv .ops,html.ops-tv.ops-ai-min .ops{grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-rows:none;
+  grid-template-areas:"map map" "left right" "alerts analysis" "cctv cctv" "ticker ticker"}}
+@media(max-width:760px){html.ops-tv .ops,html.ops-tv.ops-ai-min .ops{grid-template-columns:minmax(0,1fr);grid-template-areas:"map" "left" "alerts" "right" "analysis" "cctv" "ticker"}}
+html[data-layout="ops"] body.tv .service-picker{display:block!important}

@@ -12,6 +12,8 @@
   var main = document.querySelector("main.console"), map = document.querySelector(".map-panel"), mrt = $("mrtPanel"), cam = document.querySelector(".cam-panel");
   if(!main || !map) return;
   document.documentElement.dataset.layout = "ops";
+  /* the service, operator and Exclude CBS filters stay usable in TV mode on this page (the Forecast Centre hides them on its wall) */
+  [].forEach.call(document.querySelectorAll(".controller-only"), function(x){ x.classList.remove("controller-only"); x.classList.add("ops-keep"); });
 
   var CAT = {
     bunching: {name: "3-bus bunching", tile: "3BB bunching", short: "3BB", color: "#f755b5", icon: '<rect x="3" y="9" width="5" height="6" rx="1.2"/><rect x="9.5" y="9" width="5" height="6" rx="1.2"/><rect x="16" y="9" width="5" height="6" rx="1.2"/>'},
