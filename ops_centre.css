@@ -186,7 +186,6 @@ html.ops-tv .ops-sv{grid-template-columns:58px minmax(0,1fr) 30px}
 @media(min-width:2600px){
   html.ops-tv .ops{--z:1.8;grid-template-rows:minmax(0,1.2fr) minmax(0,1fr) 64px}
   html.ops-tv #mrtPanel .mrt,html.ops-tv #opsMapSlot .map-key,html.ops-tv #opsMapSlot .map-top,html.ops-tv #opsCamSlot .camera-grid figcaption,html.ops-tv .ops-tiles,html.ops-tv .ops-body,html.ops-tv .ops-filter,html.ops-tv .ops-ana,html.ops-tv .ops-period,html.ops-tv .ops-h>small,html.ops-tv .ops-ticker>*{zoom:var(--z)}
-  html.ops-tv .hai.docked{zoom:1.8;left:calc(var(--ai-l) / 1.8)!important;top:calc(var(--ai-t) / 1.8)!important;width:calc(var(--ai-w) / 1.8)!important;height:calc(var(--ai-h) / 1.8)!important}
 }
 #opsCamSlot .camera-grid>.camera:not(:first-child) img{min-height:0!important}
 #opsCamSlot .camera-grid>.camera{overflow:hidden}
@@ -274,3 +273,12 @@ html[data-layout="ops"] body.tv .service-picker{display:block!important}
 }
 @media(min-width:2600px){html.ops-tv .ops{grid-template-rows:minmax(0,1.2fr) minmax(0,1fr) 64px!important}}
 .hai.docked{position:fixed!important;box-shadow:0 30px 70px -20px #000,0 0 50px -12px rgba(63,211,255,.7)!important}
+
+/* TV wall scaled to fit a narrower screen (ops_centre.js sets zoom and height): always 25 : 50 : 25 */
+html.ops-fit .ops{grid-template-columns:minmax(0,1fr) minmax(0,2fr) minmax(0,1fr)!important;
+  grid-template-areas:"left map right" "alerts analysis cctv" "ticker ticker ticker"!important;grid-template-rows:minmax(0,1.2fr) minmax(0,1fr) 38px!important}
+html.ops-fit .ops-aislot{display:none!important}
+html.ops-fit #opsMapSlot,html.ops-fit #opsAlerts,html.ops-fit #opsAna,html.ops-fit #opsCamSlot,
+html.ops-fit .ops>[style*="grid-area:left"],html.ops-fit .ops>[style*="grid-area:right"]{height:auto!important}
+html.ops-fit.ops-tv .hai-fab{display:inline-flex!important}
+html.ops-fit.ops-tv:not(.ops-ai-min) .hai-fab{display:none!important}

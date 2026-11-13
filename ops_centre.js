@@ -69,15 +69,31 @@
   var homes = {};
   function park(id, into){ var x = $(id); if(!x) return; if(!homes[id]) homes[id] = {parent: x.parentNode, next: x.nextSibling}; into.appendChild(x); }
   function unpark(id){ var x = $(id), h = homes[id]; if(x && h && x.parentNode !== h.parent) h.parent.insertBefore(x, h.next && h.next.parentNode === h.parent ? h.next : null); }
+  /* TV mode always uses the 25 : 50 : 25 wall. On a screen narrower than the wall design (1600 px) the wall is scaled down to fit,
+     like a TV picture, instead of switching to the stacked tablet layout. */
+  var WALL = 1600, fitZ = 1;
+  function fitWall(){
+    var tv = document.body.classList.contains("tv"), z = tv && innerWidth < WALL ? innerWidth / WALL : 1;
+    fitZ = z;
+    document.documentElement.classList.toggle("ops-fit", z < 1);
+    if(z < 1){
+      ops.style.zoom = z;
+      var top = ops.getBoundingClientRect().top;
+      ops.style.height = Math.max(900, (innerHeight - Math.max(0, top) - 4) / z) + "px";
+    } else { ops.style.zoom = ""; ops.style.height = ""; }
+    var fab = $("haiFab"); if(fab) fab.style.zoom = z < 1 ? Math.max(.6, z) : "";
+  }
   function dockAI(){
-    var hai = $("hai"), slot = $("opsAiSlot"); if(!hai) return;
-    var tv = document.body.classList.contains("tv") && innerWidth >= 1200;
+    var hai = $("hai"); if(!hai) return;
+    var tv = document.body.classList.contains("tv") && (fitZ < 1 || innerWidth >= 1200);
     hai.classList.toggle("docked", tv);
-    if(!tv){ ["--ai-l", "--ai-t", "--ai-w", "--ai-h"].forEach(function(v){ hai.style.removeProperty(v); }); return; }
-    var m = $("opsMapSlot").getBoundingClientRect(), n = $("opsAna").getBoundingClientRect(), z = innerWidth >= 2600 ? 1.8 : 1;
-    var w = Math.min(Math.max(m.width * .44, 360 * z), m.width - 40);              // AURA-style: floats over the left of the centre column
-    hai.style.setProperty("--ai-l", (m.left + 10) + "px"); hai.style.setProperty("--ai-t", (m.top + 10) + "px");
-    hai.style.setProperty("--ai-w", w + "px"); hai.style.setProperty("--ai-h", (n.bottom - m.top - 20) + "px");
+    if(!tv){ hai.style.zoom = ""; ["--ai-l", "--ai-t", "--ai-w", "--ai-h"].forEach(function(v){ hai.style.removeProperty(v); }); return; }
+    var z = fitZ < 1 ? fitZ : innerWidth >= 2600 ? 1.8 : 1;                       // the AI panel is scaled like the wall around it
+    var m = $("opsMapSlot").getBoundingClientRect(), n = $("opsAna").getBoundingClientRect();
+    var w = Math.min(Math.max(m.width * .44, 360 * z), m.width - 20 * z);          // AURA-style: floats over the left of the centre column
+    hai.style.zoom = z;
+    hai.style.setProperty("--ai-l", (m.left + 10 * z) / z + "px"); hai.style.setProperty("--ai-t", (m.top + 10 * z) / z + "px");
+    hai.style.setProperty("--ai-w", w / z + "px"); hai.style.setProperty("--ai-h", (n.bottom - m.top - 20 * z) / z + "px");
   }
   function aiState(){
     var hai = $("hai"), min = !hai || hai.hidden;
@@ -89,10 +105,10 @@
   function tvMode(){
     var tv = document.body.classList.contains("tv");
     document.documentElement.classList.toggle("ops-tv", tv);
-    fit(); [60, 400, 1200, 3000].forEach(function(ms){ setTimeout(function(){ fit(); dockAI(); if(ms === 60) dispatchEvent(new Event("resize")); }, ms); });
+    fitWall(); fit(); [60, 400, 1200, 3000].forEach(function(ms){ setTimeout(function(){ fitWall(); fit(); dockAI(); if(ms === 60) dispatchEvent(new Event("resize")); }, ms); });
   }
   new MutationObserver(tvMode).observe(document.body, {attributes: true, attributeFilter: ["class"]});
-  addEventListener("resize", function(){ setTimeout(dockAI, 30); });
+  addEventListener("resize", function(){ setTimeout(function(){ fitWall(); dockAI(); }, 30); });
   addEventListener("scroll", function(){ if(document.body.classList.contains("tv")) dockAI(); }, {passive: true});
   setInterval(function(){ if(document.body.classList.contains("tv")) dockAI(); }, 2000);        // the header or fonts may settle late
   var waitAI = setInterval(function(){ if($("hai")){ clearInterval(waitAI); new MutationObserver(aiState).observe($("hai"), {attributes: true, attributeFilter: ["hidden"]}); aiState(); tvMode(); } }, 300);
