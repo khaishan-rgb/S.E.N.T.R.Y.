@@ -261,3 +261,16 @@ html.ops-tv .ops-sv{grid-template-columns:58px minmax(0,1fr) 30px}
   grid-template-areas:"map map" "left right" "alerts analysis" "cctv cctv" "ticker ticker"}}
 @media(max-width:760px){html.ops-tv .ops,html.ops-tv.ops-ai-min .ops{grid-template-columns:minmax(0,1fr);grid-template-areas:"map" "left" "alerts" "right" "analysis" "cctv" "ticker"}}
 html[data-layout="ops"] body.tv .service-picker{display:block!important}
+
+/* 13 Nov: 25 : 50 : 25 (AURA format). HORIZON AI floats over the left of the centre column in TV mode; minimise it to see the whole map */
+@media(min-width:1200px){
+  .ops,html.ops-tv .ops,html.ops-tv.ops-ai-min .ops{grid-template-columns:minmax(0,1fr) minmax(0,2fr) minmax(0,1fr)!important}
+  .ops{grid-template-areas:"left map right" "alerts analysis cctv"!important}
+  html.ops-tv .ops,html.ops-tv.ops-ai-min .ops{grid-template-areas:"left map right" "alerts analysis cctv" "ticker ticker ticker"!important;
+    grid-template-rows:minmax(0,1.2fr) minmax(0,1fr) 38px!important;height:max(900px,calc(100dvh - var(--ops-top,90px)))!important}
+  html.ops-tv .ops-aislot{display:none!important}
+  html.ops-tv .hai-fab{display:inline-flex!important}
+  html.ops-tv:not(.ops-ai-min) .hai-fab{display:none!important}
+}
+@media(min-width:2600px){html.ops-tv .ops{grid-template-rows:minmax(0,1.2fr) minmax(0,1fr) 64px!important}}
+.hai.docked{position:fixed!important;box-shadow:0 30px 70px -20px #000,0 0 50px -12px rgba(63,211,255,.7)!important}

@@ -71,12 +71,13 @@
   function unpark(id){ var x = $(id), h = homes[id]; if(x && h && x.parentNode !== h.parent) h.parent.insertBefore(x, h.next && h.next.parentNode === h.parent ? h.next : null); }
   function dockAI(){
     var hai = $("hai"), slot = $("opsAiSlot"); if(!hai) return;
-    var tv = document.body.classList.contains("tv") && slot.offsetWidth > 0;
+    var tv = document.body.classList.contains("tv") && innerWidth >= 1200;
     hai.classList.toggle("docked", tv);
     if(!tv){ ["--ai-l", "--ai-t", "--ai-w", "--ai-h"].forEach(function(v){ hai.style.removeProperty(v); }); return; }
-    var r = slot.getBoundingClientRect();
-    hai.style.setProperty("--ai-l", r.left + "px"); hai.style.setProperty("--ai-t", r.top + "px");
-    hai.style.setProperty("--ai-w", r.width + "px"); hai.style.setProperty("--ai-h", r.height + "px");
+    var m = $("opsMapSlot").getBoundingClientRect(), n = $("opsAna").getBoundingClientRect(), z = innerWidth >= 2600 ? 1.8 : 1;
+    var w = Math.min(Math.max(m.width * .44, 360 * z), m.width - 40);              // AURA-style: floats over the left of the centre column
+    hai.style.setProperty("--ai-l", (m.left + 10) + "px"); hai.style.setProperty("--ai-t", (m.top + 10) + "px");
+    hai.style.setProperty("--ai-w", w + "px"); hai.style.setProperty("--ai-h", (n.bottom - m.top - 20) + "px");
   }
   function aiState(){
     var hai = $("hai"), min = !hai || hai.hidden;
@@ -92,6 +93,7 @@
   }
   new MutationObserver(tvMode).observe(document.body, {attributes: true, attributeFilter: ["class"]});
   addEventListener("resize", function(){ setTimeout(dockAI, 30); });
+  addEventListener("scroll", function(){ if(document.body.classList.contains("tv")) dockAI(); }, {passive: true});
   setInterval(function(){ if(document.body.classList.contains("tv")) dockAI(); }, 2000);        // the header or fonts may settle late
   var waitAI = setInterval(function(){ if($("hai")){ clearInterval(waitAI); new MutationObserver(aiState).observe($("hai"), {attributes: true, attributeFilter: ["hidden"]}); aiState(); tvMode(); } }, 300);
   setTimeout(function(){ clearInterval(waitAI); }, 20000);

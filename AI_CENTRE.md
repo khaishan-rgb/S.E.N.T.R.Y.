@@ -21,7 +21,7 @@ The Forecast Centre page (/command, /forecast) is unchanged apart from one new t
 | Bottom middle | **Alert analysis**: which alert, which hour, which services, where (7 or 30 days) | stored alerts |
 | Bottom right | **Live CCTV** (the camera panel, as before) | |
 
-**TV mode** (TV mode button, or `?present=1`), STEE-style wall: the filter rows are hidden; HORIZON AI is docked open in its own
+**Columns 25 : 50 : 25** (13 Nov, screens 1200 px and wider), like AURA. **TV mode** (TV mode button, or `?present=1`), STEE-style wall: HORIZON AI floats over the left of the centre column (map and alert analysis) and can be minimised to show the whole map; the filter rows are hidden; HORIZON AI is docked open in its own
 column between the left panels and the map (large avatar, cannot be minimised); panel titles have icons and glowing frames; Live CCTV shows
 one large camera with two beside it; HORIZON AI can be minimised (its column folds away and the map and alert analysis widen; the
 round "Ask HORIZON AI" button docks it again); the AI predictive insights fill the top right (up to 12, scrolling by one card every 8 s
