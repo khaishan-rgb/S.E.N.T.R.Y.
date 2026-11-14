@@ -186,25 +186,23 @@ class RunOrder(unittest.TestCase):
         self.assertLess(rows[7]["dep"], rows[6]["dep"])
 
     def test_even_headway_ladder_rule(self):
-        """V13.20 controller's method: no halfway +1 +1 +2 +2 +3 +3 +4 +4 +5 +5; halfway +1 -1 +2 -2."""
-        LH = R.Optimiser.ladder_holds
-        self.assertEqual(LH("full"), ([5, 4, 3, 2, 1], [5, 4, 3, 2, 1]))
-        self.assertEqual(LH("halfway"), ([2, 1], [-2, -1]))
+        """V13.21 controller's method: step 1 (late <= 10) / 2 (late > 10); duties = late / step, half each side, at most 5 each side."""
+        LH, SQ = R.Optimiser.ladder_holds, R.Optimiser._seq
+        self.assertEqual(SQ(*LH("halfway", None, 8)), "+1 -1 +2 -2 +3 -3 +4 -4")
+        self.assertEqual(SQ(*LH("halfway", None, 12)), "+2 -2 +4 -4 +6 -6")
+        self.assertEqual(SQ(*LH("halfway", None, 30)), "+2 -2 +4 -4 +6 -6 +8 -8 +10 -10")
+        self.assertEqual(SQ(*LH("full", None, 8)), "+1 +1 +2 +2 +3 +3 +4 +4")
+        self.assertEqual(LH("full", None, 12), ([6, 4, 2], [6, 4, 2]))
         r = R.optimise(ctx([0, 0, 0, 0, 0, 20, 0, 0, 0, 0, 0, 0, 0, 0], {"adjust_style": "steady", "n_trips": 14}))
         A = r["plans"]["adjust"]
-        self.assertEqual(A["steady"]["seq"], "+1 +1 +2 +2 +3 +3 +4 +4 +5 +5")
         d = {x["n"]: x["dep"] for x in A["rows"]}
         self.assertTrue(all(d[k] < d[k + 1] for k in range(1, 14)), d)                 # run order
         for row in A["steady"]["rows"]:
             self.assertGreaterEqual(row["applied"], row["hold"])                      # each duty at least its ladder hold
         H = r["plans"].get("halfway")
         if H and H.get("ladder"):
-            self.assertEqual(H["ladder"]["seq"], "+1 -1 +2 -2")
             for row in H["ladder"]["rows"]:
-                if row["hold"] > 0:
-                    self.assertGreaterEqual(row["applied"], row["hold"])
-                else:
-                    self.assertGreaterEqual(row["applied"], row["hold"] - 0.01)       # leaves earlier, never more than asked
+                self.assertGreaterEqual(row["applied"], row["hold"] - 0.01)
 
     def test_even_headway_no_big_jumps(self):
         for late, n_tr in (([0, 0, 0, 0, 10, 0, 0, 0, 0, 0], 10), ([0, 0, 0, 0, 0, 20, 0, 0, 0, 0], 10), ([0, 0, 0, 0, 0, 20, 0, 0, 0, 0, 0, 0], 12)):

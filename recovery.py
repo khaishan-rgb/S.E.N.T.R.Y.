@@ -83,6 +83,14 @@ V13.18 (10 Nov 2026) - EVEN HEADWAY with no big jumps (even_step)
     run order. When the trips simulated are too few for even_step, the smallest step that works is used and the page says so.
   * The page shows steps 1..6 with their EWT and largest hold.
 
+V13.21 (15 Nov 2026) - the controller's method follows the lateness
+  * Step: late up to ladder_split (10) min -> 1 min (1, 2, 3, 4, 5); more than 10 min -> 2 min (2, 4, 6, 8, 10).
+  * Duties: lateness / step, half in front and half behind (at most ladder_max_side = 5 each side), biggest next to the late trip.
+    Late 8 min -> 4 in front + 4 behind: +1 -1 +2 -2 +3 -3 +4 -4.  Late 12 min -> 3 + 3: +2 -2 +4 -4 +6 -6.
+  * Halfway: in front held (+), behind leave earlier (-). Continue service (no halfway): in front and behind both held (+).
+  * The ladder is the controller's instruction: it may go past adj_max (8) and term_early_max (3); never before arrival + minimum layover,
+    never before the bus in front.
+
 V13.20 (14 Nov 2026) - the controller's method (even_rule "ladder", the default; the page's "Controller method" box)
   * NO HALFWAY (Trip adjustment): +1 +1 +2 +2 +3 +3 +4 +4 +5 +5. The 5 duties above (in front of) the late trip and the 5 below (behind) it
     are all held: +5 next to the late trip, then +4, +3, +2, +1 going outwards (ladder_full).
@@ -112,7 +120,7 @@ Pure computation (numpy), no I/O. Decision support only.
 import math
 import numpy as np
 
-MODEL_VERSION = "recovery-3.1-controller-ladder"
+MODEL_VERSION = "recovery-3.2-ladder-by-lateness"
 EPS = 1e-6
 
 PARAMS = {
@@ -149,10 +157,11 @@ PARAMS = {
     "steady_tol": 1.0,            # V13.16 (former one-number even headway, kept for steady_plan_all): each gap h +/- this many min
     "steady_side": 2,             # V13.17 (former window version, kept for steady_plan_window): duties above and below the late trip(s)
     "even_rule": "ladder",        # V13.20 EVEN HEADWAY = the controller's ladder (below); "smooth" = V13.18 (gaps change by at most even_step, least waiting)
-    "ladder_full": [1, 2, 3, 4, 5],   # V13.20 no halfway: +1 +1 +2 +2 +3 +3 +4 +4 +5 +5 - the duties above AND below the late trip are held,
-                                      # 5 min next to it, then 4, 3, 2, 1 going outwards (5 duties each side)
-    "ladder_halfway": [1, 2],         # V13.20 halfway: +1 -1 +2 -2 - the duties above are held (+2 next to the halfway trip, then +1) and the duties
-                                      # below leave earlier (-2, then -1) to close up the hole the halfway trip leaves
+    "ladder_split": 10.0,         # V13.21 controller's method: late up to this many min -> 1-min steps (1 2 3 4 5); more -> 2-min steps (2 4 6 8 10)
+    "ladder_max_side": 5,         # ... at most this many duties in front and this many behind the late / halfway trip
+                                  # duties = lateness / step, half in front and half behind: late 8 -> 4 + 4 (+1 -1 +2 -2 +3 -3 +4 -4),
+                                  # late 12 -> 3 + 3 (+2 -2 +4 -4 +6 -6). Halfway: in front held (+), behind leave earlier (-);
+                                  # no halfway (continue service): in front and behind both held (+). The ladder may go past adj_max / term_early_max.
     "even_step": 2,               # V13.18 EVEN HEADWAY: a departure gap may differ from the gap before it by at most this many min (16 -> 14 -> 12); when the
                                   # trips simulated are too few for that, the smallest step that works is used (and said)
     "even_hold_max": 20.0,        # ... a bus may be held up to this many min for it (past adj_max: the page says so)
@@ -1052,6 +1061,7 @@ class Optimiser:
             regs = [{}]
             if lad:                                                       # V13.20 controller's method: +1 -1 +2 -2 around the halfway trip
                 ld_dep, ld_rows, _ = self._ladder_dep(list(combo), "halfway", skip=combo)
+                ld_seq = self.ladder_seq()
                 regs = [ld_dep]
             elif hreg:
                 regs += [self._project(d, combo, hl) for d in self._spreads(focus, combo)[:12]]
@@ -1075,7 +1085,7 @@ class Optimiser:
                     hw = [(b, j, starts[k][min(s_idx, len(starts[k]) - 1)]) for k, b in enumerate(combo)]
                     for rg in regs:
                         dep = self._order_fix({b: x for b, x in rg.items() if b not in combo}, combo)
-                        why = self._check(dep, hw)
+                        why = self._check(dep, hw, cap=not lad)                  # the controller's ladder may go past +/-adj_max
                         fam = ("Halfway one trip + regulate the others" if len(combo) == 1 and dep else
                                "Halfway one trip, others run full trips" if len(combo) == 1 else "Two halfway starts + regulation")
                         self._count(fam, why)
@@ -1089,8 +1099,8 @@ class Optimiser:
                             lst.append({"dep": {}, "hw": hw, "fam": "Halfway one trip, others run full trips", "reg": False, "lim": hl})
                 for pl_ in lst:
                     if lad and pl_["dep"]:
-                        pl_["fam"] = "Halfway + controller ladder (" + self.ladder_seq("halfway") + ")"
-                        pl_["ladder"] = {"kind": "halfway", "seq": self.ladder_seq("halfway"), "rows": ld_rows}
+                        pl_["fam"] = "Halfway + controller ladder (" + ld_seq + ")"
+                        pl_["ladder"] = {"kind": "halfway", "seq": ld_seq, "rows": ld_rows}
                 if lst:
                     out[key] = lst
         return out
@@ -1146,13 +1156,19 @@ class Optimiser:
         return {"dep": dep, "hw": [], "fam": "Even headway", "reg": True, "steady": info, "end": None}
 
     @staticmethod
-    def ladder_holds(kind="full", P=None):
-        """The controller's ladder -> (above, below): minutes for the duties in front of the late trip and behind it, nearest first
-        (+ = held, - = leaves earlier). full (no halfway): [5, 4, 3, 2, 1], [5, 4, 3, 2, 1]  = +1 +1 +2 +2 +3 +3 +4 +4 +5 +5;
-        halfway: [2, 1], [-2, -1]  = +1 -1 +2 -2."""
+    def ladder_holds(kind="full", P=None, late=0.0):
+        """The controller's ladder for a trip `late` min late -> (above, below): minutes for the duties in front of it and behind it,
+        nearest first (+ = held, - = leaves earlier). Step 1 min (late <= ladder_split) or 2 min (later); duties = late / step, half each side.
+        late 8:  full [4, 3, 2, 1], [4, 3, 2, 1];   halfway [4, 3, 2, 1], [-4, -3, -2, -1]   (+1 -1 +2 -2 +3 -3 +4 -4)
+        late 12: full [6, 4, 2], [6, 4, 2];         halfway [6, 4, 2], [-6, -4, -2]           (+2 -2 +4 -4 +6 -6)"""
         P = P or PARAMS
-        vals = [int(v) for v in (P.get("ladder_halfway", [1, 2]) if kind == "halfway" else P.get("ladder_full", [1, 2, 3, 4, 5]))]
-        near = sorted(vals, reverse=True)
+        late = float(late or 0.0)
+        if late < 0.5:
+            return [], []
+        step = 2 if late > float(P.get("ladder_split", 10.0)) + 1e-9 else 1
+        k = int(math.ceil(late / step / 2.0 - 1e-9))
+        k = max(1, min(int(P.get("ladder_max_side", 5)), k))
+        near = [step * i for i in range(k, 0, -1)]
         return list(near), [(-v if kind == "halfway" else v) for v in near]
 
     def _ladder_dep(self, centres, kind, skip=()):
@@ -1160,9 +1176,11 @@ class Optimiser:
         never before arrival + minimum layover or more than term_early_max early; run order kept; departed trips kept."""
         C, P = self.C, self.P
         n, gmin = C.n, float(P["min_dep_gap"])
-        above, below = self.ladder_holds(kind, P)
-        want, rows = {}, []
+        want, rows, seqs = {}, [], []
         for b in centres:
+            late = float(C.nat[b] - C.S[b])
+            above, below = self.ladder_holds(kind, P, late)
+            seqs.append({"trip": int(b), "late": _r(late, 0), "above": above, "below": below, "seq": self._seq(above, below)})
             for side, lst, d in (("above", above, -1), ("below", below, 1)):
                 for i, v in enumerate(lst):
                     t = b + d * (i + 1)
@@ -1180,7 +1198,7 @@ class Optimiser:
                 if v >= 0:
                     x = max(float(C.nat[b]), float(C.S[b]) + v)
                 else:
-                    x = max(float(C.ready[b]), float(C.nat[b]) - float(P["term_early_max"]), float(C.S[b]) + v)
+                    x = max(float(C.ready[b]), float(C.S[b]) + v)              # the controller's release: never before arrival + minimum layover
             else:
                 x = float(C.nat[b])
             if b not in skip and not C.locked[b]:
@@ -1194,6 +1212,7 @@ class Optimiser:
         for r_ in rows:
             r_["applied"] = _r(xs[r_["trip"]] - float(C.S[r_["trip"]]), 0)
             r_["waits"] = bool(r_["applied"] > r_["hold"] + 0.49)          # more than the ladder: its own lateness or the bus in front
+        self._lad_seqs = seqs
         return dep, rows, xs
 
     def ladder_plan(self, step=None):
@@ -1218,10 +1237,10 @@ class Optimiser:
         moved = sorted(set(dep) | set(lateb))
         first, last = moved[0], moved[-1]
         holds = {b: xs[b] - float(C.nat[b]) for b in dep}
-        above, below = self.ladder_holds("full", P)
-        info = {"mode": "ladder", "kind": "full", "seq": self.ladder_seq("full"), "above": above, "below": below, "rows": rows,
-                "ladder": [{"trip": int(b), "late": _r(float(C.nat[b] - C.S[b]), 0), "above": above, "below": below} for b in lateb],
-                "step": 1, "step_asked": 1, "first": int(first), "last": int(last), "before": int(first - 1), "after": int(last + 1),
+        seqs = list(self._lad_seqs)
+        info = {"mode": "ladder", "kind": "full", "seq": "; ".join(q["seq"] for q in seqs), "above": seqs[0]["above"], "below": seqs[0]["below"], "rows": rows,
+                "ladder": seqs, "step": (2 if seqs[0]["late"] > float(P.get("ladder_split", 10.0)) else 1),
+                "step_asked": None, "first": int(first), "last": int(last), "before": int(first - 1), "after": int(last + 1),
                 "after_clock": hm(xs[last + 1]), "gaps": gaps, "gaps_from": int(first - 1), "show": [int(g) for g in gaps[first - 1:last + 1]],
                 "gap_min": min(gaps[first - 1:last + 1]), "gap_max": max(gaps[first - 1:last + 1]),
                 "late": [{"trip": int(b), "arr_clock": hm(C.act_arr[b]), "earliest_clock": hm(xs[b]), "late": _r(xs[b] - Si[b], 0)} for b in lateb],
@@ -1231,13 +1250,16 @@ class Optimiser:
                 "next_trip": n + 1, "next_hold": 0, "min_layover": _r(C.ml, 1), "late_trip": int(lateb[0])}
         return {"dep": dep, "hw": [], "fam": "Even headway", "reg": True, "steady": info, "end": None}
 
-    def ladder_seq(self, kind):
-        """'+1 +1 +2 +2 ...' / '+1 -1 +2 -2' as the controller writes it (outermost first)."""
-        a, b = self.ladder_holds(kind, self.P)
+    @staticmethod
+    def _seq(above, below):
+        """'+1 -1 +2 -2' / '+1 +1 +2 +2' as the controller writes it (outermost first)."""
         out = []
-        for x, y in zip(reversed(a), reversed(b)):
+        for x, y in zip(reversed(above), reversed(below)):
             out += ["%+d" % x, "%+d" % y]
         return " ".join(out)
+
+    def ladder_seq(self, kind=None):
+        return "; ".join(q["seq"] for q in getattr(self, "_lad_seqs", [])) or ""
 
     def _smooth_dp(self, step):
         """Whole-minute departures x_1..x_n (bus 0 and n+1 on their timetable times) with |d_k - d_(k-1)| <= step, d = gap - scheduled gap,
@@ -2054,7 +2076,10 @@ class Optimiser:
             lim_txt = f" (over the ±{self.P['adj_max']:g}-min limit)" if sa.get("n_over_cap") else ""
             nxt = f", and Trip {sa['next_trip']} must be held +{sa['next_hold']:.0f} min too" if (sa.get("next_hold") or 0) >= 0.5 else ""
             gl = ", ".join(str(int(x)) for x in sa["show"])
-            stp = f"gaps change by at most {sa['step']} min from one bus to the next" + (f" ({sa['step_asked']} is not possible with {sa['n_trips']} trips)" if sa["step"] > sa["step_asked"] else "")
+            if sa.get("mode") == "ladder":
+                stp = f"controller method {sa.get('seq', '')}"
+            else:
+                stp = f"gaps change by at most {sa['step']} min from one bus to the next" + (f" ({sa['step_asked']} is not possible with {sa['n_trips']} trips)" if sa["step"] > (sa.get("step_asked") or 0) else "")
             if self.steady_used:
                 out.append(f"Trip adjustment uses an EVEN HEADWAY: {stp}. Trips {sa['first']}-{sa['last']} move; gaps from Trip {sa['before']} to Trip {sa['after']}: {gl} min. "
                            f"Largest hold +{sa['hold_max']:.0f} min{lim_txt}. Average EWT {sa['ewt']:.2f} min, against {sa['least_wait_ewt']:.2f} min with the least-waiting spacing.")

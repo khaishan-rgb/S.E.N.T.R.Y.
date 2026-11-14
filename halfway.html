@@ -418,7 +418,7 @@ input.bad-time{border-color:#ff4d55!important;box-shadow:0 0 0 1px #ff4d55}
         <h3>Recovery priority</h3>
         <div class="hopref" id="hoPref"><label><input type="radio" name="hopref" value="balanced" checked> Balanced</label><label><input type="radio" name="hopref" value="recovery"> Headway focus — Halfway &gt; Adjustment</label><label><input type="radio" name="hopref" value="mileage"> Mileage focus — Adjustment &gt; Halfway</label></div>
         <label class="hx-chk"><input type="checkbox" id="hoTreg" checked> AI also regulates the later trips at the terminals <small>(even spacing, hold &le; 8 &middot; early &le; 3 min, same rule for both scenarios)</small></label>
-        <label class="hx-chk"><input type="checkbox" id="hoSteady"> <b>Controller method</b> <small>(no halfway: +1 +1 +2 +2 +3 +3 +4 +4 +5 +5 &ndash; the 5 duties in front of and behind the late trip are held, 5 min next to it down to 1 min; halfway: +1 &minus;1 +2 &minus;2 &ndash; the 2 in front are held, the 2 behind leave earlier; off = AI least-waiting plan)</small></label>
+        <label class="hx-chk"><input type="checkbox" id="hoSteady"> <b>Controller method</b> <small>(by lateness: up to 10 min late &rarr; 1-min steps, over 10 min &rarr; 2-min steps; duties = lateness &divide; step, half in front, half behind, up to 5 each side. Late 8: +1 &minus;1 +2 &minus;2 +3 &minus;3 +4 &minus;4; late 12: +2 &minus;2 +4 &minus;4 +6 &minus;6. Halfway: in front held (+), behind leave earlier (&minus;); continue service: both held (+). Off = AI least-waiting plan)</small></label>
         <label class="hx-chk"><input type="checkbox" id="hoAdj2"> Allow two back-to-back halfway trips <small>(e.g. T3 + T4 both disrupted; off = never two consecutive trips)</small></label>
         <label class="hx-chk"><input type="checkbox" id="hoReg" checked> AI regulates headway <small>(hold / release trips, re-time the replacement)</small></label>
         <h3>Halfway deployment</h3>
@@ -685,15 +685,17 @@ function evenBand(st){ return st.gap_min != null && st.gap_min !== st.gap_max ? 
 function evenWin(st){ return st.first === st.last ? "Trip " + st.first : "Trips " + st.first + "\u2013" + st.last; }                                       // "Trips 3–7"
 function evenSegs(st){ return st.show ? "Trip " + st.before + " \u2192 " + st.after + ": " + st.show.map(x => Math.round(x)).join(", ") + " min" : (st.segments || []).map(g => "Trip " + g.from + " \u2192 " + g.to + ": " + g.gaps.map(x => Math.round(x)).join(", ")).join(" \u00b7 ") + " min"; }
 function ladderRow(x){ return "Trip " + x.trip + " " + (x.hold >= 0 ? "held " + x.hold : "leaves " + (-x.hold) + " min earlier") + (x.hold >= 0 ? " min" : "")
-  + (x.waits ? " \u2192 +" + Math.round(x.applied) + " (it cannot leave before the bus in front)" : ""); }
+  + (x.waits ? (x.hold < 0 ? " \u2192 " + (x.applied < 0 ? Math.round(-x.applied) + " min earlier" : "on time") + " (its bus is not ready earlier: arrival + minimum layover)"
+                           : " \u2192 +" + Math.round(x.applied) + " (it cannot leave before the bus in front)") : ""); }
 function ladderWhy(sa, r){
   const f0 = x => x == null || isNaN(x) ? "\u2013" : String(Math.round(+x));
   const L = (sa.late || [])[0], hl = r && r.plans && r.plans.halfway && r.plans.halfway.ladder;
   const rows = (sa.rows || []).slice().sort((a, b) => a.trip - b.trip).map(ladderRow);
   return '<details class="ln-why"><summary>How the controller method is worked out</summary><p>'
     + (L ? 'Trip ' + L.trip + '&rsquo;s bus arrives at ' + esc(L.arr_clock) + ' and needs the ' + f0(sa.min_layover || 7) + '-min minimum layover, so it leaves at <b>' + esc(L.earliest_clock) + '</b> (+' + f0(L.late) + '). ' : '')
-    + '</p><p><b>No halfway: ' + esc(sa.seq || "") + '</b> &ndash; the 5 duties in front of the late trip and the 5 behind it are all held: 5 min next to it, then 4, 3, 2 and 1 going outwards.<br>' + esc(rows.join(" \u00b7 ")) + '</p>'
-    + (hl ? '<p><b>Halfway: ' + esc(hl.seq) + '</b> &ndash; the 2 duties in front of the halfway trip are held (2 min, then 1) and the 2 behind it leave earlier (2 min, then 1) to close up the gap.<br>'
+    + '</p><p>The ladder follows the lateness: up to 10 min late &rarr; 1-min steps, more than 10 min &rarr; 2-min steps; the number of duties is the lateness &divide; the step, half in front and half behind (up to 5 each side), the biggest move next to the late trip.</p>'
+    + '<p><b>Continue service: ' + esc(sa.seq || "") + '</b> &ndash; the duties in front and behind are held.<br>' + esc(rows.join(" \u00b7 ")) + '</p>'
+    + (hl ? '<p><b>Halfway: ' + esc(hl.seq) + '</b> &ndash; the duties in front of the halfway trip are held and the duties behind it leave earlier, to close up the gap.<br>'
          + esc(hl.rows.slice().sort((a, b) => a.trip - b.trip).map(ladderRow).join(" \u00b7 ")) + '</p>' : '')
     + '<p>A bus never leaves before its arrival + minimum layover or before the bus in front. Gaps without halfway ' + esc(evenSegs(sa)) + '. Trip ' + sa.after + ' and the trips after it run as normal.</p></details>';
 }
