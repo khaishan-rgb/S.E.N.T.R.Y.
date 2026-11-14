@@ -18,7 +18,7 @@ def ctx(late, params=None, now=None):
             "stop_names": [f"Stop {i}" for i in range(N_ST)], "stop_codes": CODES, "t0": 420.0, "late": late,
             "candidates": [{"j": j} for j in (10, 15, 20, 25)], "aitp_up": CODES, "now": now, "down_stops": DOWN,
             "aitp_dn": [DOWN[int(round(k * (N_ST - 1) / 9))][1] for k in range(10)],
-            "params": dict({"balance_trips": 4, "sims": 150}, **(params or {})), "mode": "balanced"}
+            "params": dict({"balance_trips": 4, "sims": 150, "adjust_style": "least_wait"}, **(params or {})), "mode": "balanced"}   # the old AI plan (V13.22 default = controller method)
 
 
 LATE6 = [0, 0, 0, 0, 0, 16, 0, 0, 0, 0]                                # trip 6's bus arrives 16 min late (ready 13 min after its slot)
@@ -185,6 +185,13 @@ class RunOrder(unittest.TestCase):
         self.assertEqual(rows[7]["shift"], 0)                                  # nobody steps in: trip 7 leaves when it is ready
         self.assertLess(rows[7]["dep"], rows[6]["dep"])
 
+    def test_controller_method_is_the_default(self):
+        """V13.22: least waiting removed - with no style asked, Trip adjustment and Halfway use the controller method."""
+        c = ctx(LATE6); c["params"].pop("adjust_style")
+        r = R.optimise(c)
+        self.assertEqual(r["adjust_style"], "steady")
+        self.assertEqual(r["plans"]["adjust"]["steady"]["mode"], "ladder")
+
     def test_even_headway_ladder_rule(self):
         """V13.21 controller's method: step 1 (late <= 10) / 2 (late > 10); duties = late / step, half each side, at most 5 each side."""
         LH, SQ = R.Optimiser.ladder_holds, R.Optimiser._seq
@@ -227,7 +234,7 @@ class RunOrder(unittest.TestCase):
                 self.assertEqual(st["step"], 3)                                        # 17 min late: 2-min steps need more than 10 trips ...
             else:
                 self.assertEqual(st["step"], 2)                                        # ... and fit in 12
-        self.assertEqual(R.optimise(ctx([0, 0, 0, 0, 10, 0, 0, 0, 0, 0]))["adjust_style"], "least_wait")
+        self.assertEqual(R.optimise(ctx([0, 0, 0, 0, 10, 0, 0, 0, 0, 0]))["adjust_style"], "none")           # least waiting asked: no even headway used
 
 
 if __name__ == "__main__":

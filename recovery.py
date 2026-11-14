@@ -120,7 +120,7 @@ Pure computation (numpy), no I/O. Decision support only.
 import math
 import numpy as np
 
-MODEL_VERSION = "recovery-3.2-ladder-by-lateness"
+MODEL_VERSION = "recovery-3.3-controller-only"
 EPS = 1e-6
 
 PARAMS = {
@@ -150,7 +150,7 @@ PARAMS = {
     "halfway_adj_max": -1.0,      # max hold / release of those trips; -1 = auto = scheduled layover - minimum layover (what the BC wins back before trip 2)
     "adjust_even": 1,             # 1 = Trip adjustment evens out the gaps (every interchange headway as close to scheduled as the limits allow) when that is at least as good for passengers; 0 = the cost search only
     "even_side": 6,               # ... moving up to this many trips either side of the late trip(s)
-    "adjust_style": "least_wait", # V13.14 Trip adjustment: "least_wait" = the least-waiting plan within +/-adj_max (V13.13); "steady" = every trip from trip 2
+    "adjust_style": "steady",     # V13.22: the controller method only (least waiting removed). V13.14 Trip adjustment: "least_wait" = the least-waiting plan within +/-adj_max (V13.13); "steady" = every trip from trip 2
                                   # leaves ONE whole-minute headway apart and keeps it on every later trip (holds may pass adj_max: the price of one number)
     "no_overtake": 1,             # V13.15 HARD: the AI's plans keep the run order - no trip leaves before the trip in front of it (T6, T7, T8 - never T7, T8, then T6).
                                   # A bus that has to wait behind a late bus leaves min_dep_gap after it; that wait may pass adj_max. No action is not changed.
@@ -1056,7 +1056,7 @@ class Optimiser:
                 combos.append((sev[x], sev[y]))
         hreg = bool(P.get("halfway_regulate"))
         hl = self._hw_lim()
-        lad = str(P.get("even_rule", "ladder")) == "ladder" and str(P.get("adjust_style", "least_wait")) == "steady"
+        lad = str(P.get("even_rule", "ladder")) == "ladder" and str(P.get("adjust_style", "steady")) == "steady"
         for combo in combos:
             regs = [{}]
             if lad:                                                       # V13.20 controller's method: +1 -1 +2 -2 around the halfway trip
@@ -1512,7 +1512,7 @@ class Optimiser:
         C, P = self.C, self.P
         hwb = {h[0] for h in plan["hw"]}
         vars_ = [b for b in self.focus if not C.locked[b] and b not in hwb]
-        if plan["hw"] and (not P.get("halfway_regulate") or plan.get("ladder") or (str(P.get("even_rule", "ladder")) == "ladder" and str(P.get("adjust_style", "least_wait")) == "steady")):
+        if plan["hw"] and (not P.get("halfway_regulate") or plan.get("ladder") or (str(P.get("even_rule", "ladder")) == "ladder" and str(P.get("adjust_style", "steady")) == "steady")):
             vars_ = []                                                  # halfway only / controller ladder: just the halfway start time is tuned
         blim = plan.get("lim") if plan["hw"] else None
         cur = {"dep": dict(plan["dep"]), "hw": list(plan["hw"]), "fam": plan.get("fam"), "reg": plan.get("reg", True), "lim": plan.get("lim"), "ladder": plan.get("ladder")}
@@ -1779,9 +1779,11 @@ class Optimiser:
             self.lw_ewt = float(ml_["ewt_avg"][0])
             self.steady_alt = dict(st_["steady"], ewt=_r(float(ms["ewt_avg"][0]), 3), max=_r(float(ms["max"][0]), 0), least_wait_ewt=_r(self.lw_ewt, 3),
                                    least_wait_max=_r(float(ml_["max"][0]), 0), options=[] if str(P.get("even_rule", "ladder")) == "ladder" else self.steady_options())
-            if str(P.get("adjust_style", "least_wait")) == "steady":
+            if str(P.get("adjust_style", "steady")) == "steady":
                 self.lw_qos = self.qos_report(self._eval_keep(best_a))     # what the limits allow without one steady headway (decision reference)
                 best_a, ca, self.steady_used = st_, float(ms["cost"][0]), True
+        elif best_a is not None and str(P.get("adjust_style", "steady")) == "steady" and str(P.get("even_rule", "ladder")) == "ladder":
+            best_a = dict(none_plan, fam="Controller method: nothing to move")   # V13.22 no least-waiting fallback: the controller method or nothing
         best_h, ch = None, 1e18
         for s in sorted(hbest, key=lambda p: p["_cost"])[:4]:
             r, c = self.refine(s)
@@ -1965,7 +1967,7 @@ class Optimiser:
                 "benefit": dec["benefit"], "halfway_ok": dec["halfway_ok"], "adjust_unacceptable": dec["adjust_unacceptable"], "delay": dec["delay"],
                 "instructions": instr, "why": why, "plans": res, "sims": sims, "legs": [leg_name(L) for L in range(C.NL)], "balance_trips": C.NL, "horizon": horizon_text(C.NL), "ewt": self.ewt_summary(res, dec), "tests": dec.get("tests") or [], "focus": self.focus, "late_trips": self.lateb,
                 "halfway_trips_tested": self.hk, "stops_tested": [{"j": j, "name": C.names[j], "code": C.codes[j]} for j in self.js],
-                "adjust_style": "steady" if self.steady_used else "least_wait", "adjust_style_asked": str(P.get("adjust_style", "least_wait")),
+                "adjust_style": "steady" if self.steady_used else "none", "adjust_style_asked": str(P.get("adjust_style", "steady")),
                 "steady_alt": self.steady_alt, "steady_why": self.steady_why,
                 "generated": self._gen_info(), "live": C.live, "veh": self.veh, "needs_standby": self.needs_standby, "not_recovered_min": _r(C.chain_len, 0), "now": _r(C.now, 1), "now_clock": hm(C.now) if C.now is not None else None,
                 "locked": [b for b in range(1, C.n + 1) if C.locked[b]], "first_stop": C.names[0], "pts_up": C.pts_up, "pts_km": [_r(C.stop_s[j], 3) for j in C.pts_up], "prep_min": P["prep_min"], "disp_j": disp_j, "disp_name": C.names[disp_j] if disp_j is not None else None,
@@ -2081,8 +2083,12 @@ class Optimiser:
             else:
                 stp = f"gaps change by at most {sa['step']} min from one bus to the next" + (f" ({sa['step_asked']} is not possible with {sa['n_trips']} trips)" if sa["step"] > (sa.get("step_asked") or 0) else "")
             if self.steady_used:
-                out.append(f"Trip adjustment uses an EVEN HEADWAY: {stp}. Trips {sa['first']}-{sa['last']} move; gaps from Trip {sa['before']} to Trip {sa['after']}: {gl} min. "
-                           f"Largest hold +{sa['hold_max']:.0f} min{lim_txt}. Average EWT {sa['ewt']:.2f} min, against {sa['least_wait_ewt']:.2f} min with the least-waiting spacing.")
+                if sa.get("mode") == "ladder":
+                    out.append(f"Trip adjustment uses the {stp}. Trips {sa['first']}-{sa['last']} move; gaps from Trip {sa['before']} to Trip {sa['after']}: {gl} min. "
+                               f"Largest hold +{sa['hold_max']:.0f} min. Average EWT {sa['ewt']:.2f} min.")
+                else:
+                    out.append(f"Trip adjustment uses an EVEN HEADWAY: {stp}. Trips {sa['first']}-{sa['last']} move; gaps from Trip {sa['before']} to Trip {sa['after']}: {gl} min. "
+                               f"Largest hold +{sa['hold_max']:.0f} min{lim_txt}. Average EWT {sa['ewt']:.2f} min, against {sa['least_wait_ewt']:.2f} min with the least-waiting spacing.")
             else:
                 out.append(f"An even headway ({stp}) would move Trips {sa['first']}-{sa['last']} with gaps {gl} min; largest hold +{sa['hold_max']:.0f} min{lim_txt}; "
                            f"Average EWT {sa['ewt']:.2f} min against {sa['least_wait_ewt']:.2f} min with the least-waiting spacing used here.")

@@ -418,7 +418,7 @@ input.bad-time{border-color:#ff4d55!important;box-shadow:0 0 0 1px #ff4d55}
         <h3>Recovery priority</h3>
         <div class="hopref" id="hoPref"><label><input type="radio" name="hopref" value="balanced" checked> Balanced</label><label><input type="radio" name="hopref" value="recovery"> Headway focus — Halfway &gt; Adjustment</label><label><input type="radio" name="hopref" value="mileage"> Mileage focus — Adjustment &gt; Halfway</label></div>
         <label class="hx-chk"><input type="checkbox" id="hoTreg" checked> AI also regulates the later trips at the terminals <small>(even spacing, hold &le; 8 &middot; early &le; 3 min, same rule for both scenarios)</small></label>
-        <label class="hx-chk"><input type="checkbox" id="hoSteady"> <b>Controller method</b> <small>(by lateness: up to 10 min late &rarr; 1-min steps, over 10 min &rarr; 2-min steps; duties = lateness &divide; step, half in front, half behind, up to 5 each side. Late 8: +1 &minus;1 +2 &minus;2 +3 &minus;3 +4 &minus;4; late 12: +2 &minus;2 +4 &minus;4 +6 &minus;6. Halfway: in front held (+), behind leave earlier (&minus;); continue service: both held (+). Off = AI least-waiting plan)</small></label>
+        <input type="checkbox" id="hoSteady" checked hidden>
         <label class="hx-chk"><input type="checkbox" id="hoAdj2"> Allow two back-to-back halfway trips <small>(e.g. T3 + T4 both disrupted; off = never two consecutive trips)</small></label>
         <label class="hx-chk"><input type="checkbox" id="hoReg" checked> AI regulates headway <small>(hold / release trips, re-time the replacement)</small></label>
         <h3>Halfway deployment</h3>
@@ -980,9 +980,8 @@ $("aitpClrAll").onclick = () => { LS.set(aitpKey(), {}); aitpRender(); aitpChang
 $("hoTreg").checked = LS.get("ho.treg", true);
 $("hoTreg").onchange = () => { LS.set("ho.treg", $("hoTreg").checked); hoTouch(); };
 /* ---- Trip adjustment style: least waiting (default) or even headway (one headway, +/-1 min), chosen per browser */
-function hoSteady(){ return !!($("hoSteady") && $("hoSteady").checked); }
-$("hoSteady").checked = !!LS.get("ho.method", true);                       // V13.20: the controller method is the default
-$("hoSteady").onchange = () => { LS.set("ho.method", $("hoSteady").checked); hoTouch(); };
+function hoSteady(){ return true; }                                       // V13.22: the controller method only (least waiting removed)
+$("hoSteady").checked = true;
 /* ---- two back-to-back halfway trips: off by default (Settings), chosen per run */
 function hoAdj2(){ return !!($("hoAdj2") && $("hoAdj2").checked); }
 $("hoAdj2").checked = !!LS.get("ho.adj2", false);
@@ -2472,24 +2471,10 @@ document.addEventListener("click", function(e){
   /* ---------- Trip adjustment style: least waiting (default) or even headway (no big jumps between neighbouring gaps); the other one's cost in one line */
   function styleLine(r){
     var sa = r.steady_alt; if(!r.plans || !r.plans.adjust) return "";
-    var seg = function(on){ return '<div class="ds-segm" role="group" aria-label="Trip adjustment style"><button type="button" data-st="0" aria-pressed="' + (!on) + '">Least waiting</button><button type="button" data-st="1" aria-pressed="' + on + '">Even headway</button></div>'; };
-    if(!sa){ if(r.adjust_style_asked !== "steady") return "";
-      return '<div class="ln-style">' + seg(true) + '<span>An even headway is not possible here' + (r.steady_why ? ' (' + esc(r.steady_why) + ')' : '') + ', so Trip adjustment uses <b>least waiting</b>.</span></div>'; }
-    var on = r.adjust_style === "steady", gaps = '<b>' + esc(evenSegs(sa)) + '</b>', am = f0(sa.adj_max || 8);
-    var hold = 'largest hold +' + f0(sa.hold_max) + ' min' + (sa.n_over_cap ? ' (' + sa.n_over_cap + ' over the ' + am + '-min limit)' : '');
-    var txt = on
-      ? 'Trip adjustment uses an <b>even headway</b>: ' + esc(evenStep(sa)) + '. ' + gaps + '; Trip ' + sa.after + ' on the timetable. EWT ' + f2(sa.ewt) + ' min, ' + hold + '. <b>Least waiting</b> (within &plusmn;' + am + ' min) would give EWT ' + f2(sa.least_wait_ewt) + ' min.'
-      : '<b>Even headway instead?</b> ' + esc(evenStep(sa)) + ': ' + gaps + ' &ndash; EWT ' + f2(sa.ewt) + ' min instead of ' + f2(sa.least_wait_ewt) + ', ' + hold + '.';
-    var L = (sa.late || [])[0], up = [], dn = [], sh = sa.show || [], li = L ? L.trip - sa.before : -1;
-    sh.forEach(function(g, i){ (i < li ? up : dn).push(f0(g)); });
-    var why = sa.mode === "ladder" ? ladderWhy(sa, r) : '<details class="ln-why"><summary>How these gaps are worked out &middot; smoother or not?</summary><p>'
-      + (L ? 'Trip ' + L.trip + '&rsquo;s bus arrives at ' + esc(L.arr_clock) + ' and needs the ' + f0(sa.min_layover || 7) + '-min minimum layover, so it leaves at <b>' + esc(L.earliest_clock) + '</b> (+' + f0(L.late) + '). ' : '')
-      + 'Instead of one long gap and buses bunched behind it, each gap may differ from the gap before it by at most <b>' + sa.step + ' min</b>: the buses ahead are held a little more each'
-      + (up.length ? ' (' + up.join(' &rarr; ') + ')' : '') + ', the buses behind catch up a little at a time' + (dn.length ? ' (' + dn.join(' &rarr; ') + ')' : '') + ', and Trip ' + sa.after + ' is back on the timetable (' + esc(sa.after_clock) + '). '
-      + 'Of all the plans like that, this one gives passengers the least waiting (the smallest &Sigma; (gap &minus; ' + f0(sa.H) + ')&sup2;).'
-      + (sa.step > sa.step_asked ? ' ' + sa.step_asked + '-min steps do not fit in the ' + sa.n_trips + ' trips simulated: there are not enough trips to share ' + f0(L ? L.late : 0) + ' min that gently. More trips simulated (Settings) would allow it.' : '') + '</p>'
-      + (sa.options && sa.options.length ? optTable(sa, r) : '') + '</details>';
-    return '<div class="ln-style">' + seg(on) + '<span>' + txt + '</span>' + why + '</div>';
+    if(!sa) return '<div class="ln-style"><span>The controller method does not move any trip here' + (r.steady_why ? ' (' + esc(r.steady_why) + ')' : '') + ', so Trip adjustment changes nothing.</span></div>';
+    var gaps = '<b>' + esc(evenSegs(sa)) + '</b>';
+    var txt = 'Trip adjustment uses the <b>controller method ' + esc(sa.seq || "") + '</b>. ' + gaps + '; Trip ' + sa.after + ' runs as normal. EWT ' + f2(sa.ewt) + ' min, largest hold +' + f0(sa.hold_max) + ' min.';
+    return '<div class="ln-style"><span>' + txt + '</span>' + ladderWhy(sa, r) + '</div>';
   }
   /* the even headway with each largest change between neighbouring gaps (1..6 min): smoother = longer holds; "Use" re-runs with that step */
   function optTable(sa, r){
