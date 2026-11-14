@@ -5241,7 +5241,7 @@ async def api_ho_recovery(service: str = "", direction: int = 1, ref: str = "", 
         return {"ok": False, "error": "Balance Trips must be between 1 and 16."}
     adj_ok = int(adj2.strip() in ("1", "true", "yes", "on")) if adj2.strip() else int(P.get("allow_adjacent_halfway", 0))     # two back-to-back halfway trips allowed?
     t_reg = int(treg.strip() in ("1", "true", "yes", "on")) if treg.strip() else int(P.get("term_reg", 1))                   # AI regulates the later trips at the terminals?
-    a_style = "steady" if steady.strip() in ("1", "true", "yes", "on") else "least_wait"                                    # Trip adjustment: even headway, or least waiting (default)
+    a_style = "least_wait" if steady.strip() in ("0", "false", "no", "off") else "steady"                                   # V13.20: the controller method (default), or the AI least-waiting plan
     try:
         e_side = max(1, min(6, int(float(side)))) if side.strip() else 2                                                    # even headway: duties above and below the late trip
     except ValueError:

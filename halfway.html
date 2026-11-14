@@ -418,7 +418,7 @@ input.bad-time{border-color:#ff4d55!important;box-shadow:0 0 0 1px #ff4d55}
         <h3>Recovery priority</h3>
         <div class="hopref" id="hoPref"><label><input type="radio" name="hopref" value="balanced" checked> Balanced</label><label><input type="radio" name="hopref" value="recovery"> Headway focus — Halfway &gt; Adjustment</label><label><input type="radio" name="hopref" value="mileage"> Mileage focus — Adjustment &gt; Halfway</label></div>
         <label class="hx-chk"><input type="checkbox" id="hoTreg" checked> AI also regulates the later trips at the terminals <small>(even spacing, hold &le; 8 &middot; early &le; 3 min, same rule for both scenarios)</small></label>
-        <label class="hx-chk"><input type="checkbox" id="hoSteady"> Trip adjustment: <b>even headway</b> <small>(no big jumps: each gap within 2 min of the one before &ndash; 16, 14, 12 &ndash; with the lowest EWT; a bus may be held up to 20 min for it; off = least waiting)</small></label>
+        <label class="hx-chk"><input type="checkbox" id="hoSteady"> <b>Controller method</b> <small>(no halfway: +1 +1 +2 +2 +3 +3 +4 +4 +5 +5 &ndash; the 5 duties in front of and behind the late trip are held, 5 min next to it down to 1 min; halfway: +1 &minus;1 +2 &minus;2 &ndash; the 2 in front are held, the 2 behind leave earlier; off = AI least-waiting plan)</small></label>
         <label class="hx-chk"><input type="checkbox" id="hoAdj2"> Allow two back-to-back halfway trips <small>(e.g. T3 + T4 both disrupted; off = never two consecutive trips)</small></label>
         <label class="hx-chk"><input type="checkbox" id="hoReg" checked> AI regulates headway <small>(hold / release trips, re-time the replacement)</small></label>
         <h3>Halfway deployment</h3>
@@ -684,19 +684,22 @@ const TBL_NAME = {none:"No action", adjust:"Trip adjustment", halfway:"Halfway d
 function evenBand(st){ return st.gap_min != null && st.gap_min !== st.gap_max ? st.gap_min + "\u2013" + st.gap_max : String(st.gap_min != null ? st.gap_min : st.h); }
 function evenWin(st){ return st.first === st.last ? "Trip " + st.first : "Trips " + st.first + "\u2013" + st.last; }                                       // "Trips 3–7"
 function evenSegs(st){ return st.show ? "Trip " + st.before + " \u2192 " + st.after + ": " + st.show.map(x => Math.round(x)).join(", ") + " min" : (st.segments || []).map(g => "Trip " + g.from + " \u2192 " + g.to + ": " + g.gaps.map(x => Math.round(x)).join(", ")).join(" \u00b7 ") + " min"; }
+function ladderRow(x){ return "Trip " + x.trip + " " + (x.hold >= 0 ? "held " + x.hold : "leaves " + (-x.hold) + " min earlier") + (x.hold >= 0 ? " min" : "")
+  + (x.waits ? " \u2192 +" + Math.round(x.applied) + " (it cannot leave before the bus in front)" : ""); }
 function ladderWhy(sa, r){
-  const L = (sa.late || [])[0], sp = Math.round(sa.split || 10);
-  const rows = (sa.rows || []).slice().sort((a, b) => a.trip - b.trip).map(x => "Trip " + x.trip + " (" + (x.side === "above" ? "above" : "below") + ") held " + x.hold + " min" + (x.waits ? " \u2192 " + Math.round(x.applied) + " (it cannot leave before the bus in front)" : ""));
-  return '<details class="ln-why"><summary>How the even headway is worked out</summary><p>'
+  const f0 = x => x == null || isNaN(x) ? "\u2013" : String(Math.round(+x));
+  const L = (sa.late || [])[0], hl = r && r.plans && r.plans.halfway && r.plans.halfway.ladder;
+  const rows = (sa.rows || []).slice().sort((a, b) => a.trip - b.trip).map(ladderRow);
+  return '<details class="ln-why"><summary>How the controller method is worked out</summary><p>'
     + (L ? 'Trip ' + L.trip + '&rsquo;s bus arrives at ' + esc(L.arr_clock) + ' and needs the ' + f0(sa.min_layover || 7) + '-min minimum layover, so it leaves at <b>' + esc(L.earliest_clock) + '</b> (+' + f0(L.late) + '). ' : '')
-    + 'The duties around it are held in steps, alternately above (+, the buses in front) and below (&minus;, the buses behind): late under ' + sp + ' min &rarr; ' + f0(sa.step_small || 1) + '-min steps (+1 &minus;1 +2 &minus;2 +3 &hellip;), late ' + sp + ' min or more &rarr; ' + f0(sa.step_big || 2) + '-min steps (+2 &minus;2 +4 &minus;4 &hellip;). '
-    + 'The ladder stops at the first step that reaches half the delay, and the biggest hold is next to the late trip.</p>'
-    + '<p><b>' + esc(ladderText(sa)) + '</b><br>' + esc(rows.join(" \u00b7 ")) + '</p>'
-    + '<p>Gaps ' + esc(evenSegs(sa)) + '. Trip ' + sa.after + ' and the trips after it run as normal.</p></details>';
+    + '</p><p><b>No halfway: ' + esc(sa.seq || "") + '</b> &ndash; the 5 duties in front of the late trip and the 5 behind it are all held: 5 min next to it, then 4, 3, 2 and 1 going outwards.<br>' + esc(rows.join(" \u00b7 ")) + '</p>'
+    + (hl ? '<p><b>Halfway: ' + esc(hl.seq) + '</b> &ndash; the 2 duties in front of the halfway trip are held (2 min, then 1) and the 2 behind it leave earlier (2 min, then 1) to close up the gap.<br>'
+         + esc(hl.rows.slice().sort((a, b) => a.trip - b.trip).map(ladderRow).join(" \u00b7 ")) + '</p>' : '')
+    + '<p>A bus never leaves before its arrival + minimum layover or before the bus in front. Gaps without halfway ' + esc(evenSegs(sa)) + '. Trip ' + sa.after + ' and the trips after it run as normal.</p></details>';
 }
-function ladderSeq(l){ const a = l.above.slice().reverse(), b = l.below.slice().reverse(), o = []; for(let i = 0; i < a.length; i++){ o.push("+" + a[i]); if(i < b.length) o.push("\u2212" + b[i]); } return o.join(" "); }   // "+1 −1 +2 −2 +3"
-function ladderText(st){ return (st.ladder || []).map(l => "Trip " + l.trip + " " + Math.round(l.late) + " min late \u2192 " + l.step + "-min steps: " + ladderSeq(l)).join("; "); }
-function evenStep(st){ if(st.mode === "ladder") return "duties above (+) and below (\u2212) the late trip held in steps (" + ladderText(st) + ")";
+function ladderSeq(l){ return l.seq || ""; }
+function ladderText(st){ return (st.ladder || []).map(l => "Trip " + l.trip + " " + Math.round(l.late) + " min late \u2192 " + (st.seq || "")).join("; "); }
+function evenStep(st){ if(st.mode === "ladder") return "controller method " + (st.seq || "");
   return st.step != null ? "gaps change by at most " + st.step + " min from one bus to the next" + (st.step > st.step_asked ? " (" + st.step_asked + " does not fit in the " + st.n_trips + " trips simulated)" : "") : ""; }
 function rvTableKey(){ const r = HO.rec; if(!r || !r.ok || !r.plans || !r.plans[r.decision]) return null; return HO.tblK && r.plans[HO.tblK] ? HO.tblK : r.decision; }   // the option shown in the table's green columns
 function rvShowInTable(k, scroll){ HO.tblK = k; hoRenderTrips(); if(scroll){ const t = $("hoTrips"); if(t) t.scrollIntoView({behavior:"smooth", block:"start"}); } }
@@ -976,8 +979,8 @@ $("hoTreg").checked = LS.get("ho.treg", true);
 $("hoTreg").onchange = () => { LS.set("ho.treg", $("hoTreg").checked); hoTouch(); };
 /* ---- Trip adjustment style: least waiting (default) or even headway (one headway, +/-1 min), chosen per browser */
 function hoSteady(){ return !!($("hoSteady") && $("hoSteady").checked); }
-$("hoSteady").checked = !!LS.get("ho.steady", false);
-$("hoSteady").onchange = () => { LS.set("ho.steady", $("hoSteady").checked); hoTouch(); };
+$("hoSteady").checked = !!LS.get("ho.method", true);                       // V13.20: the controller method is the default
+$("hoSteady").onchange = () => { LS.set("ho.method", $("hoSteady").checked); hoTouch(); };
 /* ---- two back-to-back halfway trips: off by default (Settings), chosen per run */
 function hoAdj2(){ return !!($("hoAdj2") && $("hoAdj2").checked); }
 $("hoAdj2").checked = !!LS.get("ho.adj2", false);
