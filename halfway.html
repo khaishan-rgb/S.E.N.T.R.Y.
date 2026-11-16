@@ -693,7 +693,8 @@ function ladderWhy(sa, r){
   const rows = (sa.rows || []).slice().sort((a, b) => a.trip - b.trip).map(ladderRow);
   return '<details class="ln-why"><summary>How the controller method is worked out</summary><p>'
     + (L ? 'Trip ' + L.trip + '&rsquo;s bus arrives at ' + esc(L.arr_clock) + ' and needs the ' + f0(sa.min_layover || 7) + '-min minimum layover, so it leaves at <b>' + esc(L.earliest_clock) + '</b> (+' + f0(L.late) + '). ' : '')
-    + '</p><p>The ladder follows the lateness: up to 10 min late &rarr; 1-min steps, more than 10 min &rarr; 2-min steps; the number of duties is the lateness &divide; the step, half in front and half behind (up to 5 each side), the biggest move next to the late trip.</p>'
+    + '</p><p>The ladder uses <b>lateness &minus; scheduled headway</b>' + ((sa.ladder || [])[0] ? ' (' + f0(sa.ladder[0].arr_late) + ' &minus; ' + f0(sa.ladder[0].headway) + ' = <b>' + f0(sa.ladder[0].late) + ' min</b>)' : '')
+    + ': up to 10 min &rarr; 1-min steps, more than 10 min &rarr; 2-min steps; the number of duties is that figure &divide; the step, half in front and half behind (up to 5 each side), the biggest move next to the late trip.</p>'
     + '<p><b>Continue service: ' + esc(sa.seq || "") + '</b> &ndash; the duties in front and behind are held.<br>' + esc(rows.join(" \u00b7 ")) + '</p>'
     + (hl ? '<p><b>Halfway: ' + esc(hl.seq) + '</b> &ndash; the duties in front of the halfway trip are held and the duties behind it leave earlier, to close up the gap.<br>'
          + esc(hl.rows.slice().sort((a, b) => a.trip - b.trip).map(ladderRow).join(" \u00b7 ")) + '</p>' : '')

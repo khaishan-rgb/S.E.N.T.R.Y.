@@ -191,6 +191,12 @@ class RunOrder(unittest.TestCase):
         r = R.optimise(c)
         self.assertEqual(r["adjust_style"], "steady")
         self.assertEqual(r["plans"]["adjust"]["steady"]["mode"], "ladder")
+        lad = r["plans"]["adjust"]["steady"]["ladder"][0]                         # V13.23: lateness 16 - headway 12 = 4 -> +1 +1 +2 +2
+        self.assertEqual((lad["arr_late"], lad["headway"], lad["late"]), (16, 12, 4))
+        self.assertEqual(lad["seq"], "+1 +1 +2 +2")
+        c = ctx([0, 0, 0, 0, 0, 10, 0, 0, 0, 0]); c["params"].pop("adjust_style")  # 10 - 12 < 0: no ladder, nothing moves
+        r2 = R.optimise(c)
+        self.assertFalse(any(abs(x.get("shift") or 0) > 0.4 for x in r2["plans"]["adjust"]["rows"] if x.get("type") == "full"))
 
     def test_even_headway_ladder_rule(self):
         """V13.21 controller's method: step 1 (late <= 10) / 2 (late > 10); duties = late / step, half each side, at most 5 each side."""

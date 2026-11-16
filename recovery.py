@@ -83,6 +83,11 @@ V13.18 (10 Nov 2026) - EVEN HEADWAY with no big jumps (even_step)
     run order. When the trips simulated are too few for even_step, the smallest step that works is used and the page says so.
   * The page shows steps 1..6 with their EWT and largest hold.
 
+V13.23 (16 Nov 2026) - the ladder uses LATENESS MINUS THE SCHEDULED HEADWAY
+  * x = how late the bus arrives (the Lateness column) - the scheduled headway. x <= 0: no ladder (nothing moves).
+    Lateness 16, headway 12 -> x = 4 -> 1-min steps, 2 duties each side: +1 -1 +2 -2. Lateness 24, headway 12 -> x = 12 -> +2 -2 +4 -4 +6 -6.
+  * Everything below (steps, number of duties) now reads "lateness" as x.
+
 V13.21 (15 Nov 2026) - the controller's method follows the lateness
   * Step: late up to ladder_split (10) min -> 1 min (1, 2, 3, 4, 5); more than 10 min -> 2 min (2, 4, 6, 8, 10).
   * Duties: lateness / step, half in front and half behind (at most ladder_max_side = 5 each side), biggest next to the late trip.
@@ -120,7 +125,7 @@ Pure computation (numpy), no I/O. Decision support only.
 import math
 import numpy as np
 
-MODEL_VERSION = "recovery-3.3-controller-only"
+MODEL_VERSION = "recovery-3.4-ladder-late-minus-headway"
 EPS = 1e-6
 
 PARAMS = {
@@ -1165,7 +1170,7 @@ class Optimiser:
         late = float(late or 0.0)
         if late < 0.5:
             return [], []
-        step = 2 if late > float(P.get("ladder_split", 10.0)) + 1e-9 else 1
+        step = 2 if late > float(P.get("ladder_split", 10.0)) + 1e-9 else 1     # late = lateness - scheduled headway (V13.23)
         k = int(math.ceil(late / step / 2.0 - 1e-9))
         k = max(1, min(int(P.get("ladder_max_side", 5)), k))
         near = [step * i for i in range(k, 0, -1)]
@@ -1178,9 +1183,11 @@ class Optimiser:
         n, gmin = C.n, float(P["min_dep_gap"])
         want, rows, seqs = {}, [], []
         for b in centres:
-            late = float(C.nat[b] - C.S[b])
+            arr_late = float(C.late[b - 1]) if 1 <= b <= len(C.late) else float(C.nat[b] - C.S[b])
+            late = arr_late - float(C.H)                                   # V13.23: lateness minus the scheduled headway
             above, below = self.ladder_holds(kind, P, late)
-            seqs.append({"trip": int(b), "late": _r(late, 0), "above": above, "below": below, "seq": self._seq(above, below)})
+            seqs.append({"trip": int(b), "late": _r(late, 0), "arr_late": _r(arr_late, 0), "headway": _r(float(C.H), 0),
+                         "above": above, "below": below, "seq": self._seq(above, below)})
             for side, lst, d in (("above", above, -1), ("below", below, 1)):
                 for i, v in enumerate(lst):
                     t = b + d * (i + 1)
@@ -1225,7 +1232,9 @@ class Optimiser:
             return None
         dep, rows, xs = self._ladder_dep(lateb, "full")
         if not dep:
-            self.steady_why = "no departure needs to move"
+            q = self._lad_seqs[0] if getattr(self, "_lad_seqs", None) else None
+            self.steady_why = (f"lateness {q['arr_late']:.0f} - headway {q['headway']:.0f} = {q['late']:.0f} min, so no duty moves"
+                               if q and q["late"] < 0.5 else "no departure needs to move")
             return None
         why = self._check(dep, [], cap=False)
         if why:
